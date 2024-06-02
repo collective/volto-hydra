@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const Iframe = () => {
-  const [url, setUrl] = useState(
-    `http://localhost:3002${window.location.pathname.replace('/edit', '')}`,
-  );
+  const [url, setUrl] = useState('');
   const [src, setSrc] = useState(url);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const initialUrl = `http://localhost:3002${window.location.pathname.replace('/edit', '')}`;
+      setUrl(initialUrl);
+      setSrc(initialUrl);
+    }
+  }, []);
+
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
   };
