@@ -9,6 +9,19 @@ const Iframe = () => {
       const initialUrl = `http://localhost:3002${window.location.pathname.replace('/edit', '')}`;
       setUrl(initialUrl);
       setSrc(initialUrl);
+
+      // Listen for messages from the iframe
+      window.addEventListener('message', (event) => {
+        const { type, url } = event.data;
+        if (event.origin !== 'http://localhost:3002') {
+          return;
+        }
+        if (type === 'URL_CHANGE') {
+          // console.log('URL_CHANGE', url);
+          setUrl(url);
+          handleNavigateToUrl(url);
+        }
+      });
     }
   }, []);
 
@@ -16,9 +29,9 @@ const Iframe = () => {
     setUrl(event.target.value);
   };
 
-  const handleButtonClick = () => {
-    // Update the iframe src with the input URL
-    const formattedUrl = new URL(url);
+  const handleNavigateToUrl = (givenUrl = '') => {
+    // Update adminUI URL with the new URL
+    const formattedUrl = url ? new URL(url) : new URL(givenUrl);
     formattedUrl.host = 'localhost:3000';
     window.location.href = window.location.pathname.endsWith('/edit')
       ? `${formattedUrl.href}/edit`
@@ -62,7 +75,7 @@ const Iframe = () => {
           }}
         />
         <button
-          onClick={handleButtonClick}
+          onClick={handleNavigateToUrl}
           style={{
             padding: '10px',
             fontSize: '16px',
