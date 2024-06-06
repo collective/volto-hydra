@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
+import './styles.css';
 
 const Iframe = () => {
   const [url, setUrl] = useState('');
@@ -43,66 +44,20 @@ const Iframe = () => {
   };
 
   return (
-    <div
-      className="iframe-container"
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: 'calc(100vh - 95px)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        className="input-container"
-        style={{
-          display: 'flex',
-          width: '50%',
-          margin: '10px auto',
-        }}
-      >
+    <div className="iframe-container">
+      <div className="input-container">
         <input
           type="text"
           value={url}
           onChange={handleUrlChange}
           placeholder="Enter URL"
-          style={{
-            flex: 1,
-            padding: '10px',
-            fontSize: '16px',
-            border: '1px solid #ccc',
-            borderRadius: '4px 0 0 4px',
-            outline: 'none',
-          }}
+          className="iframe-input-field"
         />
-        <button
-          onClick={handleNavigateToUrl}
-          style={{
-            padding: '10px',
-            fontSize: '16px',
-            border: '1px solid #ccc',
-            borderLeft: 'none',
-            backgroundColor: '#007bff',
-            color: '#fff',
-            borderRadius: '0 4px 4px 0',
-            cursor: 'pointer',
-          }}
-        >
+        <button onClick={handleNavigateToUrl} className="iframe-input-button">
           ➔
         </button>
       </div>
-      <iframe
-        id="previewIframe"
-        title="Preview"
-        src={src}
-        style={{
-          width: 'calc(100% - 32px)',
-          height: 'calc(100vh)',
-          border: 'none',
-        }}
-      />
+      <iframe id="previewIframe" title="Preview" src={src} />
     </div>
   );
 };
