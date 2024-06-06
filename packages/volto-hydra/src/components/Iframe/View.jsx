@@ -36,11 +36,15 @@ const Iframe = () => {
     // Update adminUI URL with the new URL
     const formattedUrl = url ? new URL(url) : new URL(givenUrl);
     setSrc(formattedUrl.href);
-    history.push(
-      window.location.pathname.endsWith('/edit')
-        ? `${formattedUrl.pathname}/edit`
-        : `${formattedUrl.pathname}`,
-    );
+    if (formattedUrl.pathname !== '/') {
+      history.push(
+        window.location.pathname.endsWith('/edit')
+          ? `${formattedUrl.pathname}/edit`
+          : `${formattedUrl.pathname}`,
+      );
+    } else {
+      history.push(window.location.pathname.endsWith('/edit') ? `/edit` : `/`);
+    }
   };
 
   return (
