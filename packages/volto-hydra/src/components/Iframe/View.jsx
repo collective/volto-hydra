@@ -44,10 +44,9 @@ const Iframe = () => {
       style={{
         position: 'relative',
         width: '100%',
-        height: '65vh',
+        height: 'calc(100vh - 95px)',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
       }}
@@ -56,8 +55,8 @@ const Iframe = () => {
         className="input-container"
         style={{
           display: 'flex',
-          width: 'calc(65vh * 1.6)',
-          marginBottom: '10px',
+          width: '50%',
+          margin: '10px auto',
         }}
       >
         <input
@@ -95,11 +94,9 @@ const Iframe = () => {
         title="Preview"
         src={src}
         style={{
-          width: 'calc(65vh * 1.6)', // Maintain a 16:10 aspect ratio (or adjust as needed)
-          height: '100%',
+          width: 'calc(100% - 32px)',
+          height: 'calc(100vh)',
           border: 'none',
-          transform: 'scale(0.9)', // Adjust scale as necessary
-          transformOrigin: '0 0',
         }}
       />
     </div>
