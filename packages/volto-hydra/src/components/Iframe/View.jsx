@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useHistory } from 'react-router-dom';
 
 const Iframe = () => {
   const [url, setUrl] = useState('');
   const [src, setSrc] = useState(url);
+  const history = useHistory();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -32,10 +34,11 @@ const Iframe = () => {
   const handleNavigateToUrl = (givenUrl = '') => {
     // Update adminUI URL with the new URL
     const formattedUrl = url ? new URL(url) : new URL(givenUrl);
-    formattedUrl.host = 'localhost:3000';
-    window.location.href = window.location.pathname.endsWith('/edit')
-      ? `${formattedUrl.href}/edit`
-      : formattedUrl.href;
+    history.push(
+      window.location.pathname.endsWith('/edit')
+        ? `${formattedUrl.pathname}/edit`
+        : `${formattedUrl.pathname}`,
+    );
   };
 
   return (
