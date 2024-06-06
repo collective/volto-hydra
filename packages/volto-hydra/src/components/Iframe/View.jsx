@@ -15,11 +15,11 @@ const Iframe = () => {
       // Listen for messages from the iframe
       window.addEventListener('message', (event) => {
         const { type, url } = event.data;
-        if (event.origin !== 'http://localhost:3002') {
+        const initialUrlOrigin = new URL(initialUrl).origin;
+        if (event.origin !== initialUrlOrigin) {
           return;
         }
         if (type === 'URL_CHANGE') {
-          // console.log('URL_CHANGE', url);
           setUrl(url);
           handleNavigateToUrl(url);
         }
@@ -34,6 +34,7 @@ const Iframe = () => {
   const handleNavigateToUrl = (givenUrl = '') => {
     // Update adminUI URL with the new URL
     const formattedUrl = url ? new URL(url) : new URL(givenUrl);
+    setSrc(formattedUrl.href);
     history.push(
       window.location.pathname.endsWith('/edit')
         ? `${formattedUrl.pathname}/edit`
