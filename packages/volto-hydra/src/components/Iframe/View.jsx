@@ -44,7 +44,7 @@ const Iframe = () => {
   };
 
   return (
-    <div className="iframe-container">
+    <div id="iframeContainer">
       <div className="input-container">
         <input
           type="text"
