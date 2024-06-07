@@ -77,18 +77,47 @@ To test against a local hydra instance
 - Initialising hydra iframe bridge creates a two way link between the hydra editor and your frontend. You will be able to optionally register call backs 
   for events allowing you to add more advanced editor functionality depending on your needs.
 
-# TODO: how to initialise the bridge.
+### How to initialise the bridge.
 
-- Log into https://hydra.pretagov.com/ and paste in your local running frontend to test
+- Import `initBridge` from [hydra.js](https://github.com/collective/volto-hydra/tree/hydra.js).
+- Call the `initBridge` and pass the origin of your adminUI as the argument to the initBridge method.
+- For example, if you are trying out demo editor, it will be: `https://hydra.pretagov.com`
+  ```js
+  // In Layout.js or App.js
+  import { initBridge } from './hydra.js';
+  initBridge("https://hydra.pretagov.com");
+  ```
+- This will enable the 2 way link between hydra and your frontend.
+- Log into https://hydra.pretagov.com/ and paste in your local running frontend to test.
 
 TODO: more integrations will be added below as the [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
 
+#### Authenticate frontend to access private content
+
+After initializing the Bridge, you can import `get_token` method from [hydra.js](https://github.com/collective/volto-hydra/tree/hydra.js). This will return the token which you can use to access private content from Plone backend.
+If you are using `@plone/client`, you can pass the token when initializing the client.
+
+**Note**: If you are not logged in at adminUI, then `get_token()` will return empty string and client will fetch only public content.
+  ```js
+  // After Bridge is initialized
+  import ploneClient from '@plone/client';
+  import { get_token } from './hydra.js';
+
+  const hydra_token = get_token(); // either be 'auth_token' or '', based on weather you are logged in or not at adminUI.
+  const client = ploneClient.initialize({
+    apiPath: 'http://localhost:8080/Plone',
+    token: hydra_token,
+  });
+  ```
+TODO: will be implemented before the end of this iteration
+
 #### Show changes after save
+
 This is the most basic form of integration. For this no additional integraion is needed. 
 
 If you wish to make the editing experience faster you can register for ```onSave``` and ```onRoute``` callbacks to prevent reloads of the frontend (TODO)
 
-#### Enable Show changes will editing
+#### Enable Show changes while editing
 
 You will need to subscribe to an ```onEditChange``` event that will send blocks or metadata changes
 
