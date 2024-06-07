@@ -324,6 +324,9 @@ class Form extends Component {
     ) {
       this.setState(() => ({ sidebarMetadataIsAvailable: true }));
     }
+    if (this.props.location.pathname !== prevProps.location.pathname) {
+      this.setState({ formData: this.props.formData });
+    }
   }
 
   /**
