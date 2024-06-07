@@ -6,11 +6,9 @@ npm-debug.log*
 .DS_Store
 *.swp
 yarn-error.log
-
 node_modules
 dockerfiles
 acceptance
 build
-dist
 yarn.lock
 .storybook
