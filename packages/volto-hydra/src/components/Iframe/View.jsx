@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import './styles.css';
 
 const Iframe = () => {
   const [url, setUrl] = useState('');
   const [src, setSrc] = useState(url);
   const history = useHistory();
+  const token = useSelector((state) => state.userSession.token);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -14,19 +16,31 @@ const Iframe = () => {
       setSrc(initialUrl);
 
       // Listen for messages from the iframe
+      const initialUrlOrigin = new URL(initialUrl).origin;
       window.addEventListener('message', (event) => {
-        const { type, url } = event.data;
-        const initialUrlOrigin = new URL(initialUrl).origin;
         if (event.origin !== initialUrlOrigin) {
           return;
         }
-        if (type === 'URL_CHANGE') {
-          setUrl(url);
-          handleNavigateToUrl(url);
+        const { type } = event.data;
+        switch (type) {
+          case 'URL_CHANGE': // URL change from the iframe
+            setUrl(event.data.url);
+            handleNavigateToUrl(event.data.url);
+            break;
+
+          case 'GET_TOKEN': // Request for the token from the iframe
+            event.source.postMessage(
+              { type: 'GET_TOKEN_RESPONSE', token: token },
+              event.origin,
+            );
+            break;
+
+          default:
+            break;
         }
       });
     }
-  }, []);
+  }, [token]);
 
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
