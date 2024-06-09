@@ -50,6 +50,7 @@ import config from '@plone/volto/registry';
 
 import saveSVG from '@plone/volto/icons/save.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
+import Iframe from '../../../../components/Iframe/View';
 
 const messages = defineMessages({
   add: {
@@ -166,8 +167,7 @@ class Add extends Component {
     ) {
       this.props.setFormData({});
       this.props.history.push(
-        this.props.returnUrl ||
-          `${flattenToAppURL(nextProps.content['@id'])}/edit`,
+        this.props.returnUrl || flattenToAppURL(nextProps.content['@id']),
       );
     }
 
