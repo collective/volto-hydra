@@ -166,7 +166,8 @@ class Add extends Component {
     ) {
       this.props.setFormData({});
       this.props.history.push(
-        this.props.returnUrl || `${flattenToAppURL(nextProps.content['@id'])}/edit`,
+        this.props.returnUrl ||
+          `${flattenToAppURL(nextProps.content['@id'])}/edit`,
       );
     }
 
