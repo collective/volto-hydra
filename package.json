@@ -36,11 +36,14 @@
     "@plone/client": "1.0.0-alpha.13",
     "@plone/registry": "workspace:*",
     "@plone/volto": "workspace:*",
+    "js-cookie": "^3.0.5",
     "volto-hydra": "workspace:*"
   },
   "devDependencies": {
     "mrs-developer": "^2.2.0"
   },
   "packageManager": "pnpm@9.1.1",
-  "files": ["./dist"]
+  "files": [
+    "./dist"
+  ]
 }
