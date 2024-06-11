@@ -30,7 +30,6 @@ import {
 import config from '@plone/volto/registry';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
 import Iframe from '../../../../components/Iframe/View';
-import HomePage from '../../../../components/HomePage/HomePage';
 
 /**
  * View container class.
@@ -264,7 +263,7 @@ class View extends Component {
         /> */}
 
         {/* We can add Iframe Preview Component Here to Render View of the Frontend */}
-        {this.props.token ? <Iframe /> : <HomePage />}
+        {this.props.token && <Iframe />}
 
         <SlotRenderer name="belowContent" content={this.props.content} />
         {config.settings.showTags &&
