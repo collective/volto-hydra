@@ -234,6 +234,11 @@ class View extends Component {
     if (!this.props.content) {
       return <span />;
     }
+    if (!this.props.token) {
+      return (
+        <Redirect to={`/login?return_url=${this.props.location.pathname}`} />
+      );
+    }
     const RenderedView =
       this.getViewByLayout() || this.getViewByType() || this.getViewDefault();
 
@@ -258,7 +263,7 @@ class View extends Component {
         /> */}
 
         {/* We can add Iframe Preview Component Here to Render View of the Frontend */}
-        <Iframe />
+        {this.props.token && <Iframe />}
 
         <SlotRenderer name="belowContent" content={this.props.content} />
         {config.settings.showTags &&
