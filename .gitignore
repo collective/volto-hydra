@@ -12,4 +12,3 @@ results
 yarn.lock
 .github
 dist
-.env

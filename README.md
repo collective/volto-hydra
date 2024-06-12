@@ -94,22 +94,44 @@ TODO: more integrations will be added below as the [Hydra GSoC project progresse
 
 #### Authenticate frontend to access private content
 
-After initializing the Bridge, you can import `get_token` method from [hydra.js](https://github.com/collective/volto-hydra/tree/hydra.js). This will return the token which you can use to access private content from Plone backend.
-If you are using `@plone/client`, you can pass the token when initializing the client.
+In hydra.js, it initiates the Bridge, and starts listening to the token response from the Hydra. It also have the method `(_getTokenFromCookies)` to fetch the token from the cookies and pass it to the integrator to use it in the `ploneClient.initialize()`.
 
-**Note**: If you are not logged in at adminUI, then `get_token()` will return empty string and client will fetch only public content.
-  ```js
-  // After Bridge is initialized
-  import ploneClient from '@plone/client';
-  import { get_token } from './hydra.js';
+Integrate your frontend:
 
-  const hydra_token = get_token(); // either be 'auth_token' or '', based on weather you are logged in or not at adminUI.
+- Add 'hydra.js` in your frontend.
+- Initialize the Bridge using `initBridge` method provided by './hydra.js', use 'https://hydra.pretagov.com' for option `adminOrigin` to tryout demo.
+- Use the `getToken()` method provided by './hydra.js' to access the token. Use this in your ploneClient inctance.
+- At [Volto-Hydra demo](https://hydra.pretagov.com/) type in your hosted frontend url to preview public content and login to see the private pages.
+
+Example Usage:
+```js
+// nextjs 14
+import ploneClient from "@plone/client";
+import { useQuery } from "@tanstack/react-query";
+import { initBridge } from "@/utils/hydra";
+
+export default function Blog({ params }) {
+  const bridge = initBridge("http://localhost:3000"); // Origin of your local Volto-Hydra
+  const token = bridge._getTokenFromCookie();
   const client = ploneClient.initialize({
-    apiPath: 'http://localhost:8080/Plone',
-    token: hydra_token,
+    apiPath: "http://localhost:8080/Plone/", // Plone backend
+    token: token,
   });
-  ```
-TODO: will be implemented before the end of this iteration
+  const { getContentQuery } = client;
+  const { data, isLoading } = useQuery(getContentQuery({ path: '/blogs' }));
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  return (
+    <div> {data.title}</div>
+  )
+}
+```
+
+Reference Issue: [#6](https://github.com/collective/volto-hydra/issues/6)
+
+Now your editors login to hydra and navigate the site within the editor or via the frontend displayed in the middle of the screen. They can add, remove objects and do normal plone toolbar functions as well as edit a page metadata via the sidebar.
 
 #### Show changes after save
 
