@@ -1,0 +1,14 @@
+.vscode/
+.history
+logs
+*.log
+npm-debug.log*
+.DS_Store
+*.swp
+yarn-error.log
+node_modules
+dockerfiles
+acceptance
+build
+yarn.lock
+.storybook

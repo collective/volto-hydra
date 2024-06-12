@@ -1,0 +1,49 @@
+{
+  "name": "volto-hydra-dev",
+  "version": "1.0.0-alpha.0",
+  "description": "A volto addon to let you edit content in realtime when you have many frontends written in any framework.",
+  "author": "Plone Community",
+  "homepage": "https://github.com/collective/volto-hydra",
+  "license": "MIT",
+  "keywords": [
+    "volto-addon",
+    "volto",
+    "plone",
+    "react"
+  ],
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "start": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start",
+    "start:prod": "pnpm --filter @plone/volto start:prod",
+    "build": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build",
+    "build:deps": "pnpm --filter @plone/registry --filter @plone/components build",
+    "i18n": "pnpm --filter volto-hydra i18n",
+    "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js pnpm --filter @plone/volto test",
+    "lint": "eslint --max-warnings=0 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
+    "lint:fix": "eslint --fix 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
+    "prettier": "prettier --check 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
+    "prettier:fix": "prettier --write 'packages/**/src/**/*.{js,jsx,ts,tsx}' ",
+    "stylelint": "stylelint 'packages/**/src/**/*.{css,scss,less}' --allow-empty-input",
+    "stylelint:fix": "stylelint 'packages/**/src/**/*.{css,scss,less}' --fix --allow-empty-input",
+    "dry-release": "pnpm --filter volto-hydra dry-release",
+    "release": "pnpm --filter volto-hydra release",
+    "release-major-alpha": "pnpm --filter volto-hydra release-major-alpha",
+    "release-alpha": "pnpm --filter volto-hydra release-alpha",
+    "storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto storybook dev -p 6006 -c $(pwd)/.storybook",
+    "build-storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build-storybook -c $(pwd)/.storybook"
+  },
+  "dependencies": {
+    "@plone/client": "1.0.0-alpha.13",
+    "@plone/registry": "workspace:*",
+    "@plone/volto": "workspace:*",
+    "js-cookie": "^3.0.5",
+    "volto-hydra": "workspace:*"
+  },
+  "devDependencies": {
+    "mrs-developer": "^2.2.0"
+  },
+  "packageManager": "pnpm@9.1.1",
+  "files": [
+    "./dist"
+  ]
+}
