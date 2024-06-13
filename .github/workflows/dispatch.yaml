@@ -10,6 +10,13 @@ jobs:
     runs-on: "ubuntu-latest"  
     
     steps:
+    - name: Install dependencies
+      run: |
+        apt-get -y update && apt-get -y install git make
+        pnpm dlx mrs-developer missdev --no-config --fetch-https \&& pnpm install --frozen-lockfile
+    - name: Test build
+      run: |
+        pnpm run build    
     - name: Repository Dispatch
       uses: peter-evans/repository-dispatch@v3
       with:
