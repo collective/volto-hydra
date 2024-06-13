@@ -12,8 +12,8 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 8
-          run_install: |
-            - args: [dlx, mrs-developer, missdev, --no-config, --fetch-https]
+          # run_install: |
+          #   - args: [dlx, mrs-developer, missdev, --no-config, --fetch-https]
       - name: Get pnpm store directory
         shell: bash
         run: |
@@ -33,7 +33,8 @@ jobs:
     #     pnpm dlx mrs-developer missdev --no-config --fetch-https \&& pnpm install --frozen-lockfile
       - name: Install dependencies
         run: |
-          pnpm install        
+          pnpm dlx mrs-developer missdev --no-config --fetch-https
+          pnpm install --frozen-lockfile         
       - name: Test build
         run: |
-          pnpm run build    
+          pnpm run build  
