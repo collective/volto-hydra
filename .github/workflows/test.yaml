@@ -1,12 +1,10 @@
-name: Kickoff deploy
+name: Build and test
 
 on:
-  workflow_run:
-    workflows: ["Build and test"]
-    branches: [ main ]
+  push:
 
 jobs:
-  dispatch-deploy:
+  build-test:
 
     runs-on: "ubuntu-latest"  
     
@@ -18,9 +16,3 @@ jobs:
     - name: Test build
       run: |
         pnpm run build    
-    - name: Repository Dispatch
-      uses: peter-evans/repository-dispatch@v3
-      with:
-        token: ${{ secrets.DEPLOY_PAT }}
-        repository: pretagov/deploy-helm
-        event-type: deploy
