@@ -9,10 +9,31 @@ jobs:
     runs-on: "ubuntu-latest"  
     
     steps:
-    - name: Install dependencies
-      run: |
-        apt-get -y update && apt-get -y install git make
-        pnpm dlx mrs-developer missdev --no-config --fetch-https \&& pnpm install --frozen-lockfile
-    - name: Test build
-      run: |
-        pnpm run build    
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+          run_install: |
+            - args: [dlx, mrs-developer, missdev, --no-config, --fetch-https]
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+    # - name: Install dependencies
+    #   run: |
+    #     apt-get -y update && apt-get -y install git make
+    #     pnpm dlx mrs-developer missdev --no-config --fetch-https \&& pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: |
+          pnpm install        
+      - name: Test build
+        run: |
+          pnpm run build    
