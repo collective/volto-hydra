@@ -5,26 +5,22 @@ import Cookies from 'js-cookie';
 import './styles.css';
 
 const Iframe = () => {
-  const [url, setUrl] = useState('');
-
-  const [src, setSrc] = useState('');
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
-
+  const form = useSelector((state) => state.form.global);
   const getDefualtUrlFromEnv = () =>
     process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
     (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']);
 
+  const defaultUrl = getDefualtUrlFromEnv() || 'http://localhost:3002'; // fallback if env is not set
+  const savedUrl = Cookies.get('iframe_url');
+  const initialUrl = savedUrl
+    ? `${savedUrl}${history.location.pathname.replace('/edit', '')}`
+    : `${defaultUrl}${history.location.pathname.replace('/edit', '')}`;
+  const [url, setUrl] = useState(initialUrl);
+  const [src, setSrc] = useState(initialUrl);
+
   useEffect(() => {
-    const defaultUrl = getDefualtUrlFromEnv() || 'http://localhost:3002'; // fallback if env is not set
-    const savedUrl = Cookies.get('iframe_url');
-    const initialUrl = savedUrl
-      ? `${savedUrl}${window.location.pathname.replace('/edit', '')}`
-      : `${defaultUrl}${window.location.pathname.replace('/edit', '')}`;
-
-    setUrl(initialUrl);
-    setSrc(initialUrl);
-
     // Listen for messages from the iframe
     const initialUrlOrigin = new URL(initialUrl).origin;
     window.addEventListener('message', (event) => {
@@ -51,6 +47,16 @@ const Iframe = () => {
     });
   }, [token]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Send the form data to the iframe
+      const origin = new URL(initialUrl).origin;
+      document
+        .getElementById('previewIframe')
+        .contentWindow.postMessage({ type: 'FORM', data: form }, origin);
+    }
+  }, [form]);
+
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
   };
@@ -58,8 +64,8 @@ const Iframe = () => {
   const handleNavigateToUrl = (givenUrl = '') => {
     // Update adminUI URL with the new URL
     const formattedUrl = givenUrl ? new URL(givenUrl) : new URL(url);
-    const newUrl = formattedUrl.href;
-    setSrc(newUrl);
+    // const newUrl = formattedUrl.href;
+    // setSrc(newUrl);
     const newOrigin = formattedUrl.origin;
     Cookies.set('iframe_url', newOrigin, { expires: 7 });
 
