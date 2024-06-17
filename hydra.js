@@ -114,6 +114,18 @@ class Bridge {
     }
     return null;
   }
+  enableBlockClickListener() {
+    document.addEventListener('click', (event) => {
+      const blockElement = event.target.closest('[data-block-uid]');
+      if (blockElement) {
+        const blockUid = blockElement.getAttribute('data-block-uid');
+        window.parent.postMessage(
+          { type: 'OPEN_SETTINGS', uid: blockUid },
+          this.adminOrigin,
+        );
+      }
+    });
+  }
 }
 
 // Export an instance of the Bridge class
@@ -150,5 +162,11 @@ export async function getToken() {
 export function onEditChange(initialData, callback) {
   if (bridgeInstance) {
     bridgeInstance.onEditChange(initialData, callback);
+  }
+}
+
+export function enableBlockClickListener() {
+  if (bridgeInstance) {
+    bridgeInstance.enableBlockClickListener();
   }
 }
