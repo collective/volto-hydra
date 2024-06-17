@@ -143,7 +143,10 @@ If you wish to make the editing experience faster you can register for ```onSave
 
 You will need to subscribe to an ```onEditChange``` event that will send blocks or metadata changes. 
 
-The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data or the initial data if no update is available. It takes following args:
+The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data or the initial data if no update is available.
+The 'data' object follows the same format as you get from the [ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
+
+`onEditChange` takes following args:
 | Args         | Description |
 | :-----------:| :-------|
 | *initialData*| The initial data to fall back on if no updated data is received. |
