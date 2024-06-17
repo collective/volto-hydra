@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Cookies from 'js-cookie';
 import './styles.css';
+import { setSelectedBlock } from '../../actions';
 
 const Iframe = () => {
+  const dispatch = useDispatch();
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
   const form = useSelector((state) => state.form.global);
@@ -39,6 +41,10 @@ const Iframe = () => {
             { type: 'GET_TOKEN_RESPONSE', token: token },
             event.origin,
           );
+          break;
+
+        case 'OPEN_SETTINGS':
+          dispatch(setSelectedBlock(event.data.uid));
           break;
 
         default:

@@ -168,6 +168,9 @@ onEditChange(initialData, handleEditChange);
 You will add data attributes to your rendered block html so hydra knows where they are on the page and it
 will automatically handle click events and show a quanta toolbar when selecting a block.
 
+Add the `data-block-uid={}` attribute to your rendered block html and call the `enableBlockClickListener()` provided by 'hydra.js' whenever your component is mounted.
+Now, Click on your blocks in iframe and the sidebar will show its settings.
+
 TODO: not implemented yet
 
 #### Enable Editing blocks inplace
