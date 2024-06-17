@@ -218,8 +218,9 @@ export default compose(
   injectIntl,
   withObjectBrowser,
   connect(
-    (state) => ({
+    (state, props) => ({
       selectedBlock: state.selectedBlock,
+      selected: state.selectedBlock.uid === props.id,
     }),
     { setSidebarTab },
   ),
