@@ -29,7 +29,6 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm dlx mrs-developer missdev --no-config --fetch-https
-          # pnpm install --frozen-lockfile         
       - name: Check pnpm lockfile consistency
         run: |
-          pnpm install --lockfile-only
+          pnpm install --frozen-lockfile
