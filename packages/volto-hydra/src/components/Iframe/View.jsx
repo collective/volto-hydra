@@ -44,7 +44,9 @@ const Iframe = () => {
           break;
 
         case 'OPEN_SETTINGS':
-          dispatch(setSelectedBlock(event.data.uid));
+          if (history.location.pathname.endsWith('/edit')) {
+            dispatch(setSelectedBlock(event.data.uid));
+          }
           break;
 
         default:
