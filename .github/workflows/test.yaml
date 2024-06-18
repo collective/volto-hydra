@@ -22,7 +22,6 @@ jobs:
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
       - uses: actions/cache@v4
         name: Setup pnpm cache
         with:
@@ -30,11 +29,6 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
-
-    # - name: Install dependencies
-    #   run: |
-    #     apt-get -y update && apt-get -y install git make
-    #     pnpm dlx mrs-developer missdev --no-config --fetch-https \&& pnpm install --frozen-lockfile
       - name: Install dependencies
         run: |
           pnpm dlx mrs-developer missdev --no-config --fetch-https
@@ -42,6 +36,3 @@ jobs:
       - name: Check pnpm lockfile consistency
         run: |
           pnpm install --lockfile-only
-        # - name: Test build
-        # run: |
-        #   pnpm run build  
