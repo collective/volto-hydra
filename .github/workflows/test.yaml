@@ -14,8 +14,8 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
-        with:
-          version: 8
+        #with:
+        #  version: 8
           # run_install: |
           #   - args: [dlx, mrs-developer, missdev, --no-config, --fetch-https]
       - name: Get pnpm store directory
