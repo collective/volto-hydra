@@ -4,11 +4,12 @@ on:
   workflow_run:
     workflows: ["Build and test"]
     branches: [ main ]
-
+    types: [completed]
 jobs:
   dispatch-deploy:
 
-    runs-on: "ubuntu-latest"  
+    runs-on: "ubuntu-latest"
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}  
     
     steps:
     # - name: Repository Dispatch
