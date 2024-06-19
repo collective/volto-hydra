@@ -180,7 +180,7 @@ const Login = (props) => {
           </Grid.Column>
         </Grid>
         <Grid centered>
-          <Grid.Column width={4}>
+          <Grid.Column largeScreen={4} computer={4} tablet={6} mobile={16}>
             <Form method="post" onSubmit={onLogin}>
               <Segment.Group raised>
                 <Segment className="primary">
