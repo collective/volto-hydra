@@ -48,7 +48,7 @@ const Iframe = () => {
   }, [token]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && Object.keys(form).length > 0) {
       // Send the form data to the iframe
       const origin = new URL(initialUrl).origin;
       document

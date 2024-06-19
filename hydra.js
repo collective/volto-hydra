@@ -29,14 +29,14 @@ class Bridge {
       }
     });
   }
-  onEditChange(initialData, callback) {
+  onEditChange(callback) {
     window.addEventListener('message', (event) => {
       if (event.origin === this.adminOrigin) {
         if (event.data.type === 'FORM') {
           if (event.data.data) {
             callback(event.data.data);
           } else {
-            callback(initialData);
+            throw new Error('No form data has been sent from the adminUI');
           }
         }
       }
