@@ -1,7 +1,7 @@
 #iframeContainer {
   position: relative;
   width: 100%;
-  height: calc(100vh - 95px);
+  height: calc(100vh - 87px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -12,6 +12,7 @@
   display: flex;
   width: 50%;
   margin: 10px auto;
+  justify-content: center;
 }
 .iframe-input-field {
   flex: 1;
@@ -33,7 +34,7 @@
 }
 
 #previewIframe {
-  width: calc(100% - 32px);
+  width: 100%;
   height: 100vh;
   border: none;
 }
