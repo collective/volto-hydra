@@ -169,10 +169,27 @@ You will add data attributes to your rendered block html so hydra knows where th
 will automatically handle click events and show a quanta toolbar when selecting a block.
 
 Add the `data-block-uid={}` attribute to your rendered block html and call the `enableBlockClickListener()` provided by 'hydra.js' whenever your component is mounted.
+The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
+
+For example, if you are using ploneClient to fetch `data`, it will be `data.blocks_layout.items[x]`.
 Now, Click on your blocks in iframe and the sidebar will show its settings.
 
-TODO: not implemented yet
-
+Usage:
+```js
+// This will create a list of all the slate Blocks with 'data-block-uid' attribute
+{data.blocks_layout.items.map((id, index) => {
+            if (data.blocks[id]["@type"] === "slate") {
+              const slateValue = data.blocks[id].value;
+              return (
+                <li key={id} className="blog-list-item" data-block-uid={`${id}`} >
+                  <pre className="pre-block">
+                    {JSON.stringify(slateValue, null, 2)}
+                  </pre>
+                </li>
+              );
+            }
+          })}
+```
 #### Enable Editing blocks inplace
 
 You will add data attributes to where a blocks text is editable and subscribe to ```onBlockFieldChanged``` events to handle fine grained 
