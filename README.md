@@ -176,19 +176,34 @@ Now, Click on your blocks in iframe and the sidebar will show its settings.
 
 Usage:
 ```js
-// This will create a list of all the slate Blocks with 'data-block-uid' attribute
-{data.blocks_layout.items.map((id, index) => {
-            if (data.blocks[id]["@type"] === "slate") {
-              const slateValue = data.blocks[id].value;
-              return (
-                <li key={id} className="blog-list-item" data-block-uid={`${id}`} >
-                  <pre className="pre-block">
-                    {JSON.stringify(slateValue, null, 2)}
-                  </pre>
-                </li>
-              );
-            }
-          })}
+// Vanilla JS example to render Blocks 
+
+// Function to create the block list
+function createBlockList(data) {
+  const blockList = document.createElement('ul');
+
+  data.blocks_layout.items.forEach(id => {
+    if (data.blocks[id]["@type"] === "slate") {
+      const slateValue = data.blocks[id].value;
+      const listItem = document.createElement('li');
+      listItem.className = 'blog-list-item';
+      listItem.setAttribute('data-block-uid', id); // Set Attribute to enable Clicking on Blocks
+
+      const pre = document.createElement('pre');
+      pre.className = 'pre-block';
+      pre.textContent = JSON.stringify(slateValue, null, 2);
+
+      listItem.appendChild(pre);
+      blockList.appendChild(listItem);
+    }
+  });
+
+  document.body.appendChild(blockList);
+  enableBlockClickListener(); // Call the hydra.js function
+}
+
+// Call the function to render the blocks
+createBlockList(data);
 ```
 #### Enable Editing blocks inplace
 
