@@ -4,6 +4,24 @@ import { useSelector } from 'react-redux';
 import Cookies from 'js-cookie';
 import './styles.css';
 
+/**
+ * Get the default URL from the environment
+ * @returns {string} URL from the environment
+ */
+const getDefualtUrlFromEnv = () =>
+  process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
+  (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']);
+
+/**
+ * Format the URL for the Iframe with location, token and enabling edit mode
+ * @param {*} url
+ * @param {*} token
+ * @returns {string} URL with the admin params
+ */
+const getUrlWithAdminParams = (url, token) => {
+  return `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`;
+};
+
 const Iframe = () => {
   const [url, setUrl] = useState('');
 
@@ -11,18 +29,14 @@ const Iframe = () => {
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
 
-  const getDefualtUrlFromEnv = () =>
-    process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
-    (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']);
-
   useEffect(() => {
     const defaultUrl = getDefualtUrlFromEnv() || 'http://localhost:3002'; // fallback if env is not set
     const savedUrl = Cookies.get('iframe_url');
     const initialUrl = savedUrl
-      ? `${savedUrl}${window.location.pathname.replace('/edit', '')}`
-      : `${defaultUrl}${window.location.pathname.replace('/edit', '')}`;
+      ? getUrlWithAdminParams(savedUrl, token)
+      : getUrlWithAdminParams(defaultUrl, token);
 
-    setUrl(initialUrl);
+    setUrl(savedUrl || defaultUrl);
     setSrc(initialUrl);
 
     // Listen for messages from the iframe
@@ -36,13 +50,6 @@ const Iframe = () => {
         case 'URL_CHANGE': // URL change from the iframe
           setUrl(event.data.url);
           handleNavigateToUrl(event.data.url);
-          break;
-
-        case 'GET_TOKEN': // Request for the token from the iframe
-          event.source.postMessage(
-            { type: 'GET_TOKEN_RESPONSE', token: token },
-            event.origin,
-          );
           break;
 
         default:
