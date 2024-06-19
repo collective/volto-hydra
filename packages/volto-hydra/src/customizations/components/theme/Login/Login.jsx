@@ -151,7 +151,7 @@ const Login = (props) => {
                 <a href="https://github.com/collective/volto-hydra">progress</a>
               </p>
               <p>
-                Login below with "hydraeditor" "hydraeditor" to see the progress
+                Login below with username "hydraedit" and password "hydraedit" to see the progress
                 of the editor experience. You can try any of the following
                 frontends:
               </p>
@@ -174,13 +174,13 @@ const Login = (props) => {
                 doesn't are in the{' '}
                 <a href="https://github.com/collective/volto-hydra">
                   Hydra README
-                </a>
+                </a>. Report bugs to <a href="https://github.com/collective/volto-hydra/issues">Hydra Issues</a>.
               </p>
             </Segment>
           </Grid.Column>
         </Grid>
         <Grid centered>
-          <Grid.Column width={4}>
+          <Grid.Column largeScreen={4} computer={4} tablet={6} mobile={16}>
             <Form method="post" onSubmit={onLogin}>
               <Segment.Group raised>
                 <Segment className="primary">
