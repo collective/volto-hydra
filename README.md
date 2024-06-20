@@ -77,7 +77,7 @@ To test against a local hydra instance
 - Initialising hydra iframe bridge creates a two way link between the hydra editor and your frontend. You will be able to optionally register call backs 
   for events allowing you to add more advanced editor functionality depending on your needs.
 
-### Authenticate frontend to access private content
+#### Authenticate frontend to access private content
 
 - When you input your frontend URL at the Volto Hydra (adminUI) it will set 2 params in your frontend URL.
 - You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
@@ -127,8 +127,6 @@ Now your editors login to hydra and navigate the site within the editor or via t
   ```
 - This will enable the 2 way link between hydra and your frontend.
 - Log into https://hydra.pretagov.com/ and paste in your local running frontend to test.
-
-TODO: more integrations will be added below as the [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
 
 ### Asynchronously Load the Bridge
 
@@ -195,4 +193,4 @@ on https://hydra.pretagov.com for others to test.
 But be sure to subscribe to the project so you can keep your frontend updated with changes to the hydra api as more 
 capabilities are added. If there are bugs lets us know.
 
-
+TODO: more integrations will be added below as the [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
