@@ -149,7 +149,6 @@ The 'data' object follows the same format as you get from the [ploneClient](http
 `onEditChange` takes following args:
 | Args         | Description |
 | :-----------:| :-------|
-| *initialData*| The initial data to fall back on if no updated data is received. |
 | *callback*   | A function to call with the updated data when a change is detected. |
 
 Usage:
