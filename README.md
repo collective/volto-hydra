@@ -166,9 +166,29 @@ If you wish to make the editing experience faster you can register for ```onSave
 
 #### Enable Show changes while editing
 
-You will need to subscribe to an ```onEditChange``` event that will send blocks or metadata changes
+You will need to subscribe to an ```onEditChange``` event that will call the callback with the updated data. 
 
-TODO: not implemented yet. 
+The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data.
+The 'data' object follows the same format as you get from the [ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
+
+`onEditChange` takes following args:
+| Args         | Description |
+| :-----------:| :-------|
+| *callback*   | A function to call with the updated data when a change is detected. |
+
+Usage:
+```js
+// the initial data (from ploneClient)
+const initialData = data;
+
+// Define the callback function
+function handleEditChange(updatedData) {
+  console.log('Updated data:', updatedData);
+}
+
+// Set up the onEditChange listener
+onEditChange(initialData, handleEditChange);
+```
 
 #### Enable Managing Blocks directly on your frontend
 

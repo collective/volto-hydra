@@ -1,0 +1,16 @@
+{
+  "name": "@volto-hydra/hydra-js",
+  "version": "1.0.0",
+  "description": "Provides a method to initialize a bridge which enables communication between Volt Hydra and your frontend",
+  "private": true,
+  "exports": {
+    ".": "./hydra.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED"
+}

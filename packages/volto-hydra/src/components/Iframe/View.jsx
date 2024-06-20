@@ -23,25 +23,36 @@ const getUrlWithAdminParams = (url, token) => {
   return `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`;
 };
 
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
 const Iframe = () => {
   const [url, setUrl] = useState('');
 
   const [src, setSrc] = useState('');
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
+  const form = useSelector((state) => state.form.global);
+
+  const defaultUrl = getDefualtUrl();
+  const savedUrl = Cookies.get('iframe_url');
+  const initialUrl = savedUrl
+    ? getUrlWithAdminParams(savedUrl, token)
+    : getUrlWithAdminParams(defaultUrl, token);
+
+  setUrl(
+    `${savedUrl || defaultUrl}${window.location.pathname.replace('/edit', '')}`,
+  );
+  setSrc(initialUrl);
 
   useEffect(() => {
-    const defaultUrl = getDefualtUrl();
-    const savedUrl = Cookies.get('iframe_url');
-    const initialUrl = savedUrl
-      ? getUrlWithAdminParams(savedUrl, token)
-      : getUrlWithAdminParams(defaultUrl, token);
-
-    setUrl(
-      `${savedUrl || defaultUrl}${window.location.pathname.replace('/edit', '')}`,
-    );
-    setSrc(initialUrl);
-
     const initialUrlOrigin = new URL(initialUrl).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
@@ -68,12 +79,25 @@ const Iframe = () => {
     };
   }, [token]);
 
+  useEffect(() => {
+    if (Object.keys(form).length > 0 && isValidUrl(initialUrl)) {
+      // Send the form data to the iframe
+      const origin = new URL(initialUrl).origin;
+      document
+        .getElementById('previewIframe')
+        .contentWindow.postMessage({ type: 'FORM', data: form }, origin);
+    }
+  }, [form, initialUrl]);
+
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
   };
 
   const handleNavigateToUrl = useCallback(
     (givenUrl = null) => {
+      if (!isValidUrl(givenUrl) && !isValidUrl(url)) {
+        return;
+      }
       // Update adminUI URL with the new URL
       const formattedUrl = givenUrl ? new URL(givenUrl) : new URL(url);
       // setSrc(getUrlWithAdminParams(formattedUrl.origin, token));
