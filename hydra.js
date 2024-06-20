@@ -29,7 +29,19 @@ class Bridge {
       }
     });
   }
-
+  onEditChange(callback) {
+    window.addEventListener('message', (event) => {
+      if (event.origin === this.adminOrigin) {
+        if (event.data.type === 'FORM') {
+          if (event.data.data) {
+            callback(event.data.data);
+          } else {
+            throw new Error('No form data has been sent from the adminUI');
+          }
+        }
+      }
+    });
+  }
   async get_token() {
     if (this.token !== null) {
       return this.token;
@@ -129,4 +141,14 @@ export async function getToken() {
     return await bridgeInstance.get_token();
   }
   return '';
+}
+/**
+ * Enable the frontend to listen for changes in the admin and call the callback with updated data
+ * @param {*} initialData
+ * @param {*} callback
+ */
+export function onEditChange(callback) {
+  if (bridgeInstance) {
+    bridgeInstance.onEditChange(callback);
+  }
 }
