@@ -12,9 +12,16 @@
   "dependencies": {
     "@astrojs/check": "^0.7.0",
     "astro": "^4.11.0",
+    "cirrus-ui": "0.7.2-patch.1",
     "typescript": "^5.5.2"
   },
   "devDependencies": {
+    "@plone/types": "1.0.0-alpha.16",
     "sass": "1.77.6"
+  },
+  "overrides": {
+    "react-intl": {
+      "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
+    }
   }
 }
