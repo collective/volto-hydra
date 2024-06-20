@@ -1,8 +1,9 @@
 ---
+import type { NavigationResponse } from '@plone/types';
+
 const response = await fetch('http://localhost:8080/Plone/++api++/@navigation');
-const result = await response.json();
-const items: [] = result.items;
-console.log(items);
+const result: NavigationResponse = await response.json();
+const items = result.items;
 
 function flattenToAppUrl(url: string) {
   // TODO: Replace URL with config
@@ -10,12 +11,23 @@ function flattenToAppUrl(url: string) {
 }
 ---
 
-<nav>
-  <ul>
-    {
-      items.map((item) => {
-        return <a href={flattenToAppUrl(item['@id'])}>{item.title}</a>;
-      })
-    }
-  </ul>
-</nav>
+<header class="header u-unselectable header-animated">
+  <div class="header-brand">
+    <div class="nav-item no-hover">
+      <a><h6 class="title">Hydra Astro</h6></a>
+    </div>
+  </div>
+  <nav class="header-nav" id="header-menu" role="button">
+    <ul class="nav-left">
+      {
+        items.map((item) => {
+          return (
+            <div class="nav-item text-center">
+              <a href={flattenToAppUrl(item['@id'])}>{item.title}</a>
+            </div>
+          );
+        })
+      }
+    </ul>
+  </nav>
+</header>
