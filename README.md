@@ -72,7 +72,7 @@ To test against a local hydra instance
 
 ### Make your frontend editable
 
-- Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/hydra.js) and include it in your frontend
+- Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
 - Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will recieve a ```?_edit=true```, [checkout below](#asynchronously-load-the-bridge) to load `hydra.js` asynchronously.
 - Initialising hydra iframe bridge creates a two way link between the hydra editor and your frontend. You will be able to optionally register call backs 
   for events allowing you to add more advanced editor functionality depending on your needs.
@@ -117,7 +117,7 @@ Now your editors login to hydra and navigate the site within the editor or via t
 
 ### How to initialise the bridge.
 
-- Import `initBridge` from [hydra.js](https://github.com/collective/volto-hydra/tree/hydra.js).
+- Import `initBridge` from [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js).
 - Call the `initBridge` and pass the origin of your adminUI as the argument to the initBridge method.
 - For example, if you are trying out demo editor, it will be: `https://hydra.pretagov.com`
   ```js
