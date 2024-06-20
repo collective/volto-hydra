@@ -1,0 +1,21 @@
+---
+const response = await fetch('http://localhost:8080/Plone/++api++/@navigation');
+const result = await response.json();
+const items: [] = result.items;
+console.log(items);
+
+function flattenToAppUrl(url: string) {
+  // TODO: Replace URL with config
+  return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
+}
+---
+
+<nav>
+  <ul>
+    {
+      items.map((item) => {
+        return <a href={flattenToAppUrl(item['@id'])}>{item.title}</a>;
+      })
+    }
+  </ul>
+</nav>
