@@ -28,7 +28,7 @@ class Bridge {
         }
       }
     });
-    enableBlockClickListener();
+    this.enableBlockClickListener();
   }
   onEditChange(initialData, callback) {
     window.addEventListener('message', (event) => {
