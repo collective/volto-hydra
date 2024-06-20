@@ -30,14 +30,14 @@ class Bridge {
     });
     this.enableBlockClickListener();
   }
-  onEditChange(initialData, callback) {
+  onEditChange(callback) {
     window.addEventListener('message', (event) => {
       if (event.origin === this.adminOrigin) {
         if (event.data.type === 'FORM') {
           if (event.data.data) {
             callback(event.data.data);
           } else {
-            callback(initialData);
+            throw new Error('No form data has been sent from the adminUI');
           }
         }
       }
@@ -160,9 +160,9 @@ export async function getToken() {
  * @param {*} initialData
  * @param {*} callback
  */
-export function onEditChange(initialData, callback) {
+export function onEditChange(callback) {
   if (bridgeInstance) {
-    bridgeInstance.onEditChange(initialData, callback);
+    bridgeInstance.onEditChange(callback);
   }
 }
 
