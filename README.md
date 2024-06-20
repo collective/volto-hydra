@@ -168,7 +168,7 @@ onEditChange(initialData, handleEditChange);
 You will add data attributes to your rendered block html so hydra knows where they are on the page and it
 will automatically handle click events and show a quanta toolbar when selecting a block.
 
-Add the `data-block-uid={}` attribute to your rendered block html and call the `enableBlockClickListener()` provided by 'hydra.js' whenever your component is mounted.
+Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html and call the `enableBlockClickListener()` provided by 'hydra.js' whenever your component is mounted.
 The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
 
 For example, if you are using ploneClient to fetch `data`, it will be `data.blocks_layout.items[x]`.
