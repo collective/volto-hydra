@@ -4,6 +4,16 @@ import { useSelector } from 'react-redux';
 import Cookies from 'js-cookie';
 import './styles.css';
 
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
 const Iframe = () => {
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
@@ -48,14 +58,14 @@ const Iframe = () => {
   }, [token]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && Object.keys(form).length > 0) {
+    if (Object.keys(form).length > 0 && isValidUrl(initialUrl)) {
       // Send the form data to the iframe
       const origin = new URL(initialUrl).origin;
       document
         .getElementById('previewIframe')
         .contentWindow.postMessage({ type: 'FORM', data: form }, origin);
     }
-  }, [form]);
+  }, [form, initialUrl]);
 
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
@@ -63,6 +73,9 @@ const Iframe = () => {
 
   const handleNavigateToUrl = (givenUrl = '') => {
     // Update adminUI URL with the new URL
+    if (!isValidUrl(givenUrl) && !isValidUrl(url)) {
+      return;
+    }
     const formattedUrl = givenUrl ? new URL(givenUrl) : new URL(url);
     // const newUrl = formattedUrl.href;
     // setSrc(newUrl);

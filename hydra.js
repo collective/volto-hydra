@@ -147,8 +147,8 @@ export async function getToken() {
  * @param {*} initialData
  * @param {*} callback
  */
-export function onEditChange(initialData, callback) {
+export function onEditChange(callback) {
   if (bridgeInstance) {
-    bridgeInstance.onEditChange(initialData, callback);
+    bridgeInstance.onEditChange(callback);
   }
 }
