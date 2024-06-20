@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Cookies from 'js-cookie';
@@ -8,9 +8,10 @@ import './styles.css';
  * Get the default URL from the environment
  * @returns {string} URL from the environment
  */
-const getDefualtUrlFromEnv = () =>
+const getDefualtUrl = () =>
   process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
-  (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']);
+  (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']) ||
+  'http://localhost:3002'; // fallback if env is not set
 
 /**
  * Format the URL for the Iframe with location, token and enabling edit mode
@@ -30,18 +31,19 @@ const Iframe = () => {
   const token = useSelector((state) => state.userSession.token);
 
   useEffect(() => {
-    const defaultUrl = getDefualtUrlFromEnv() || 'http://localhost:3002'; // fallback if env is not set
+    const defaultUrl = getDefualtUrl();
     const savedUrl = Cookies.get('iframe_url');
     const initialUrl = savedUrl
       ? getUrlWithAdminParams(savedUrl, token)
       : getUrlWithAdminParams(defaultUrl, token);
 
-    setUrl(savedUrl || defaultUrl);
+    setUrl(
+      `${savedUrl || defaultUrl}${window.location.pathname.replace('/edit', '')}`,
+    );
     setSrc(initialUrl);
 
-    // Listen for messages from the iframe
     const initialUrlOrigin = new URL(initialUrl).origin;
-    window.addEventListener('message', (event) => {
+    const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
         return;
       }
@@ -55,31 +57,43 @@ const Iframe = () => {
         default:
           break;
       }
-    });
+    };
+
+    // Listen for messages from the iframe
+    window.addEventListener('message', messageHandler);
+
+    // Clean up the event listener on unmount
+    return () => {
+      window.removeEventListener('message', messageHandler);
+    };
   }, [token]);
 
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
   };
 
-  const handleNavigateToUrl = (givenUrl = '') => {
-    // Update adminUI URL with the new URL
-    const formattedUrl = givenUrl ? new URL(givenUrl) : new URL(url);
-    const newUrl = formattedUrl.href;
-    setSrc(newUrl);
-    const newOrigin = formattedUrl.origin;
-    Cookies.set('iframe_url', newOrigin, { expires: 7 });
+  const handleNavigateToUrl = useCallback(
+    (givenUrl = null) => {
+      // Update adminUI URL with the new URL
+      const formattedUrl = givenUrl ? new URL(givenUrl) : new URL(url);
+      // setSrc(getUrlWithAdminParams(formattedUrl.origin, token));
+      const newOrigin = formattedUrl.origin;
+      Cookies.set('iframe_url', newOrigin, { expires: 7 });
 
-    if (formattedUrl.pathname !== '/') {
-      history.push(
-        window.location.pathname.endsWith('/edit')
-          ? `${formattedUrl.pathname}/edit`
-          : `${formattedUrl.pathname}`,
-      );
-    } else {
-      history.push(window.location.pathname.endsWith('/edit') ? `/edit` : `/`);
-    }
-  };
+      if (formattedUrl.pathname !== '/') {
+        history.push(
+          window.location.pathname.endsWith('/edit')
+            ? `${formattedUrl.pathname}/edit`
+            : `${formattedUrl.pathname}`,
+        );
+      } else {
+        history.push(
+          window.location.pathname.endsWith('/edit') ? `/edit` : `/`,
+        );
+      }
+    },
+    [history, url],
+  );
 
   return (
     <div id="iframeContainer">

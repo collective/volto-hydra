@@ -3,6 +3,9 @@ class Bridge {
   constructor(adminOrigin) {
     this.adminOrigin = adminOrigin;
     this.token = null;
+    this.navigationHandler = null; // Handler for navigation events
+    this.realTimeDataHandler = null; // Handler for message events
+    this.blockClickHandler = null; // Handler for block click events
     this.init();
   }
 
@@ -12,95 +15,80 @@ class Bridge {
     }
 
     if (window.self !== window.top) {
-      window.navigation.addEventListener('navigate', (event) => {
+      this.navigationHandler = (event) => {
         window.parent.postMessage(
           { type: 'URL_CHANGE', url: event.destination.url },
           this.adminOrigin,
         );
-      });
-    }
-
-    window.addEventListener('message', (event) => {
-      if (event.origin === this.adminOrigin) {
-        if (event.data.type === 'GET_TOKEN_RESPONSE') {
-          this.token = event.data.token;
-          this._setTokenCookie(event.data.token);
-        }
-      }
-    });
-  }
-
-  async get_token() {
-    if (this.token !== null) {
-      return this.token;
-    }
-    const cookieToken = this._getTokenFromCookie();
-    if (cookieToken) {
-      this.token = cookieToken;
-      return cookieToken;
-    }
-
-    if (window.self !== window.top) {
-      try {
-        window.parent.postMessage({ type: 'GET_TOKEN' }, this.adminOrigin);
-        const token = await this._waitForToken(this.adminOrigin);
-        return token;
-      } catch (error) {
-        console.error('Failed to retrieve auth_token:', error);
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-
-  _waitForToken(adminOrigin) {
-    return new Promise((resolve, reject) => {
-      const tokenListener = (event) => {
-        if (adminOrigin === this.adminOrigin) {
-          if (event.data.type === 'GET_TOKEN_RESPONSE') {
-            window.removeEventListener('message', tokenListener);
-            this._setTokenCookie(event.data.token);
-            resolve(event.data.token);
-          } else {
-            reject(
-              new Error(
-                `Invalid message type: Expected GET_TOKEN_RESPONSE, received ${event.data.type}`,
-              ),
-            );
-          }
-        } else {
-          reject(
-            new Error(
-              `Origin mismatch: Expected ${this.adminOrigin}, received ${adminOrigin}`,
-            ),
-          );
-        }
       };
-      window.addEventListener('message', tokenListener);
-    });
+
+      // Ensure we don't add multiple listeners
+      window.navigation.removeEventListener('navigate', this.navigationHandler);
+      window.navigation.addEventListener('navigate', this.navigationHandler);
+
+      // Get the access token from the URL
+      const url = new URL(window.location.href);
+      const access_token = url.searchParams.get('access_token');
+      this.token = access_token;
+      this._setTokenCookie(access_token);
+    }
+  }
+
+  onEditChange(callback) {
+    this.realTimeDataHandler = (event) => {
+      if (event.origin === this.adminOrigin) {
+        if (event.data.type === 'FORM') {
+          if (event.data.data) {
+            callback(event.data.data);
+          } else {
+            throw new Error('No form data has been sent from the adminUI');
+          }
+        }
+      }
+    };
+
+    // Ensure we don't add multiple listeners
+    window.removeEventListener('message', this.realTimeDataHandler);
+    window.addEventListener('message', this.realTimeDataHandler);
   }
 
   _setTokenCookie(token) {
     const expiryDate = new Date();
     expiryDate.setTime(expiryDate.getTime() + 12 * 60 * 60 * 1000); // 12 hours
-    document.cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/`;
+
+    const url = new URL(window.location.href);
+    const domain = url.hostname;
+    document.cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain};`;
   }
 
-  _getTokenFromCookie() {
-    if (typeof document === 'undefined') {
-      return null;
-    }
-    const name = 'auth_token=';
-    const decodedCookie = decodeURIComponent(document.cookie);
-    const cookieArray = decodedCookie.split(';');
-    for (let i = 0; i < cookieArray.length; i++) {
-      let cookie = cookieArray[i].trim();
-      if (cookie.indexOf(name) === 0) {
-        return cookie.substring(name.length, cookie.length);
+  enableBlockClickListener() {
+    this.blockClickHandler = (event) => {
+      const blockElement = event.target.closest('[data-block-uid]');
+      if (blockElement) {
+        const blockUid = blockElement.getAttribute('data-block-uid');
+        window.parent.postMessage(
+          { type: 'OPEN_SETTINGS', uid: blockUid },
+          this.adminOrigin,
+        );
       }
+    };
+
+    // Ensure we don't add multiple listeners
+    document.removeEventListener('click', this.blockClickHandler);
+    document.addEventListener('click', this.blockClickHandler);
+  }
+
+  // Method to clean up all event listeners
+  cleanup() {
+    if (this.navigationHandler) {
+      window.navigation.removeEventListener('navigate', this.navigationHandler);
     }
-    return null;
+    if (this.realTimeDataHandler) {
+      window.removeEventListener('message', this.realTimeDataHandler);
+    }
+    if (this.blockClickHandler) {
+      document.removeEventListener('click', this.blockClickHandler);
+    }
   }
 }
 
@@ -124,9 +112,42 @@ export function initBridge(adminOrigin) {
  * Get the token from the admin
  * @returns string
  */
-export async function getToken() {
-  if (bridgeInstance) {
-    return await bridgeInstance.get_token();
+export function getTokenFromCookie() {
+  if (typeof document === 'undefined') {
+    return null;
   }
-  return '';
+  const name = 'auth_token=';
+  const decodedCookie = decodeURIComponent(document.cookie);
+  const cookieArray = decodedCookie.split(';');
+  for (let i = 0; i < cookieArray.length; i++) {
+    let cookie = cookieArray[i].trim();
+    if (cookie.indexOf(name) === 0) {
+      return cookie.substring(name.length, cookie.length);
+    }
+  }
+  return null;
+}
+
+/**
+ * Enable the frontend to listen for changes in the admin and call the callback with updated data
+ * @param {*} callback
+ */
+export function onEditChange(callback) {
+  if (bridgeInstance) {
+    bridgeInstance.onEditChange(callback);
+  }
+}
+
+/**
+ * Enable the frontend to listen for clicks on blocks to open the settings
+ */
+export function enableBlockClickListener() {
+  if (bridgeInstance) {
+    bridgeInstance.enableBlockClickListener();
+  }
+}
+
+// Make initBridge available globally
+if (typeof window !== 'undefined') {
+  window.initBridge = initBridge;
 }

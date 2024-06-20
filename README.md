@@ -73,9 +73,47 @@ To test against a local hydra instance
 ### Make your frontend editable
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/hydra.js) and include it in your frontend
-- Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will recieve a ```?hydra_auth=xxxxx```
+- Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will recieve a ```?_edit=true```, [checkout below](#asynchronously-load-the-bridge) to load `hydra.js` asynchronously.
 - Initialising hydra iframe bridge creates a two way link between the hydra editor and your frontend. You will be able to optionally register call backs 
   for events allowing you to add more advanced editor functionality depending on your needs.
+
+### Authenticate frontend to access private content
+
+- When you input your frontend URL at the Volto Hydra (adminUI) it will set 2 params in your frontend URL.
+- You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
+- Or you can use it in Authorization header if you are using other methods to fetch content from plone Backend.
+
+Example Usage:
+```js
+// nextjs 14 using ploneClient
+import ploneClient from "@plone/client";
+import { useQuery } from "@tanstack/react-query";
+
+export default function Blog({ params }) {
+  // Extract token directly from the URL
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("access_token");
+  
+  const client = ploneClient.initialize({
+    apiPath: "http://localhost:8080/Plone/", // Plone backend
+    token: token,
+  });
+
+  const { getContentQuery } = client;
+  const { data, isLoading } = useQuery(getContentQuery({ path: '/blogs' }));
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  return (
+    <div> {data.title}</div>
+  )
+}
+```
+
+Reference Issue: [#6](https://github.com/collective/volto-hydra/issues/6)
+
+Now your editors login to hydra and navigate the site within the editor or via the frontend displayed in the middle of the screen. They can add, remove objects and do normal plone toolbar functions as well as edit a page metadata via the sidebar.
 
 ### How to initialise the bridge.
 
@@ -92,46 +130,35 @@ To test against a local hydra instance
 
 TODO: more integrations will be added below as the [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
 
-#### Authenticate frontend to access private content
+### Asynchronously Load the Bridge
 
-In hydra.js, it initiates the Bridge, and starts listening to the token response from the Hydra. It also have the method `(_getTokenFromCookies)` to fetch the token from the cookies and pass it to the integrator to use it in the `ploneClient.initialize()`.
+Since the script has a considerable size, it’s recommended to load the bridge only when necessary, such as in edit mode.
+To load the bridge asynchronously, add a function that checks if the bridge is already present. If it isn't, the function will load it and then call a callback function. This ensures the bridge is loaded only when needed.
 
-Integrate your frontend:
-
-- Add 'hydra.js` in your frontend.
-- Initialize the Bridge using `initBridge` method provided by './hydra.js', use 'https://hydra.pretagov.com' for option `adminOrigin` to tryout demo.
-- Use the `getToken()` method provided by './hydra.js' to access the token. Use this in your ploneClient inctance.
-- At [Volto-Hydra demo](https://hydra.pretagov.com/) type in your hosted frontend url to preview public content and login to see the private pages.
-
-Example Usage:
 ```js
-// nextjs 14
-import ploneClient from "@plone/client";
-import { useQuery } from "@tanstack/react-query";
-import { initBridge } from "@/utils/hydra";
-
-export default function Blog({ params }) {
-  const bridge = initBridge("http://localhost:3000"); // Origin of your local Volto-Hydra
-  const token = bridge._getTokenFromCookie();
-  const client = ploneClient.initialize({
-    apiPath: "http://localhost:8080/Plone/", // Plone backend
-    token: token,
-  });
-  const { getContentQuery } = client;
-  const { data, isLoading } = useQuery(getContentQuery({ path: '/blogs' }));
-
-  if (isLoading) {
-    return <div>Loading...</div>;
+function loadBridge(callback) {
+  const existingScript = document.getElementById("hydraBridge");
+  if (!existingScript) {
+    const script = document.createElement("script");
+    script.src = "./hydra.js";
+    script.id = "hydraBridge";
+    document.body.appendChild(script);
+    script.onload = () => {
+      callback();
+    };
+  } else {
+    callback();
   }
-  return (
-    <div> {data.title}</div>
-  )
+}
+
+// Initialize the bridge only inside the admin UI
+if (window.location.search.includes('_edit=true')) {
+  loadBridge(() => {
+    const { initBridge } = window;
+    initBridge('https://hydra.pretagov.com');
+  });
 }
 ```
-
-Reference Issue: [#6](https://github.com/collective/volto-hydra/issues/6)
-
-Now your editors login to hydra and navigate the site within the editor or via the frontend displayed in the middle of the screen. They can add, remove objects and do normal plone toolbar functions as well as edit a page metadata via the sidebar.
 
 #### Show changes after save
 
