@@ -151,13 +151,17 @@ const Login = (props) => {
                 <a href="https://github.com/collective/volto-hydra">progress</a>
               </p>
               <p>
-                Login below with username "hydraedit" and password "hydraedit" to see the progress
-                of the editor experience. You can try any of the following
-                frontends:
+                Login below with username "hydraedit" and password "hydraedit"
+                to see the progress of the editor experience. You can try any of
+                the following frontends:
               </p>
               <List bulleted>
                 <List.Item>
-                  <a href="https://hydra-nextjs-frontend-git-production-max786s-projects.vercel.app/">
+                  <a
+                    href="https://hydra-blogsite-nextjs.vercel.app/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Next.js Frontend
                   </a>
                 </List.Item>
@@ -174,7 +178,12 @@ const Login = (props) => {
                 doesn't are in the{' '}
                 <a href="https://github.com/collective/volto-hydra">
                   Hydra README
-                </a>. Report bugs to <a href="https://github.com/collective/volto-hydra/issues">Hydra Issues</a>.
+                </a>
+                . Report bugs to{' '}
+                <a href="https://github.com/collective/volto-hydra/issues">
+                  Hydra Issues
+                </a>
+                .
               </p>
             </Segment>
           </Grid.Column>
