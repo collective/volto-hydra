@@ -118,7 +118,13 @@ const Iframe = () => {
     return () => {
       window.removeEventListener('message', messageHandler);
     };
-  }, [handleNavigateToUrl, initialUrl, token]);
+  }, [
+    dispatch,
+    handleNavigateToUrl,
+    history.location.pathname,
+    initialUrl,
+    token,
+  ]);
 
   useEffect(() => {
     if (Object.keys(form).length > 0 && isValidUrl(initialUrl)) {
