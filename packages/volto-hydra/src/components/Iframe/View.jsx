@@ -100,13 +100,6 @@ const Iframe = () => {
           handleNavigateToUrl(event.data.url);
           break;
 
-        case 'GET_TOKEN': // Request for the token from the iframe
-          event.source.postMessage(
-            { type: 'GET_TOKEN_RESPONSE', token: token },
-            event.origin,
-          );
-          break;
-
         case 'OPEN_SETTINGS':
           if (history.location.pathname.endsWith('/edit')) {
             dispatch(setSelectedBlock(event.data.uid));
