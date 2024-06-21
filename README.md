@@ -183,9 +183,7 @@ If you wish to make the editing experience faster you can register for ```onSave
 TODO: not implemented yet
 
 
-### Level 2: Click to select blocks on your frontend
-
-TODO: not implemented yet
+### Level 2: Click to select blocks on your frontend ([TODO](https://github.com/collective/volto-hydra/issues/4))
 
 You will add data attributes to your rendered block html so hydra knows where they are on the page and it
 will automatically handle click events and show a quanta toolbar when selecting a block.
@@ -218,9 +216,7 @@ function handleEditChange(updatedData) {
 onEditChange(initialData, handleEditChange);
 ```
 
-### Level 4: Enable Managing Blocks directly on your frontend
-
-TODO: not implemented yet
+### Level 4: Enable Managing Blocks directly on your frontend ([TODO](https://github.com/collective/volto-hydra/issues/4))
 
 If you completed level 2 & 3 and made blocks clickable and enabled live updates then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar
 - Add blocks (TODO)
@@ -230,9 +226,7 @@ If you completed level 2 & 3 and made blocks clickable and enabled live updates 
  
 You will still need to edit the blocks themselves via the sidebar
 
-### Level 5: Enable Editing blocks text and images inplace
-
-TODO: not implemented yet
+### Level 5: Enable Editing blocks text and images inplace ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 You will add data attributes to where a blocks text is editable and subscribe to ```onBlockFieldChanged``` events to handle fine grained 
 changes to text being edited such as turning text bold or creating a link. Hydra will notice where you have indicated a block field can 
