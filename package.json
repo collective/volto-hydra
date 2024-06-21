@@ -30,7 +30,8 @@
     "release-major-alpha": "pnpm --filter volto-hydra release-major-alpha",
     "release-alpha": "pnpm --filter volto-hydra release-alpha",
     "storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto storybook dev -p 6006 -c $(pwd)/.storybook",
-    "build-storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build-storybook -c $(pwd)/.storybook"
+    "build-storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build-storybook -c $(pwd)/.storybook",
+    "example:astro": "pnpm --filter hydra-astro run dev"
   },
   "dependencies": {
     "@plone/client": "1.0.0-alpha.13",

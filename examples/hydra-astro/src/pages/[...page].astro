@@ -59,8 +59,7 @@ const { title } = Astro.props;
 </MainLayout>
 
 <script>
-  import { initBridge } from '../hydra.js';
-  import { onEditChange } from '../hydra.js';
+  import { initBridge, onEditChange } from '@volto-hydra/hydra-js';
   import type { Content } from '@plone/types';
 
   const bridge = initBridge('http://localhost:3000');
