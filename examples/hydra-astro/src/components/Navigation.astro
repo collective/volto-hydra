@@ -1,20 +1,34 @@
 ---
-import type { NavigationResponse } from '@plone/types';
+import type { NavigationResponse, NavigationItem } from '@plone/types';
 
-const response = await fetch('http://localhost:8080/Plone/++api++/@navigation');
+const response = await fetch(
+  'http://localhost:8080/Plone/++api++/@navigation?expand.navigation.depth=2',
+);
 const result: NavigationResponse = await response.json();
-const items = result.items;
+const items = result.items
+  .map((item) => {
+    return item.items.length > 0
+      ? [item, ...(item.items as NavigationItem[])]
+      : item;
+  })
+  .flat();
 
 function flattenToAppUrl(url: string) {
   // TODO: Replace URL with config
   return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
+}
+
+export function getStaticPaths() {
+  return items.map((item) => {
+    return { params: { page: flattenToAppUrl(item['@id']) } };
+  });
 }
 ---
 
 <header class="header u-unselectable header-animated">
   <div class="header-brand">
     <div class="nav-item no-hover">
-      <a><h6 class="title">Hydra Astro</h6></a>
+      <a href="/"><h6 class="title">Hydra Astro</h6></a>
     </div>
   </div>
   <nav class="header-nav" id="header-menu" role="button">

@@ -1,0 +1,52 @@
+---
+import type { NavigationResponse, NavigationItem, Content } from '@plone/types';
+import MainLayout from '../layouts/MainLayout.astro';
+
+export async function getStaticPaths() {
+  function flattenToAppUrl(url: string) {
+    // TODO: Replace URL with config
+    return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
+  }
+
+  const response = await fetch(
+    'http://localhost:8080/Plone/++api++/@navigation?expand.navigation.depth=2',
+  );
+  const result: NavigationResponse = await response.json();
+  const items = result.items
+    .map((item) => {
+      return item.items.length > 0
+        ? [item, ...(item.items as NavigationItem[])]
+        : item;
+    })
+    .flat();
+
+  //   console.log('items', items);
+  const contentPromise = Promise.all(
+    items.map(async (item) => {
+      const pageId = flattenToAppUrl(item['@id']);
+      const response = await fetch(
+        `http://localhost:8080/Plone/++api++${pageId}`,
+      );
+      const result: Content = await response.json();
+      return result;
+    }),
+  );
+  const contents = await contentPromise;
+
+  return contents.map((item) => {
+    const pageId = flattenToAppUrl(item['@id']);
+    return {
+      params: {
+        page: pageId === '/' ? undefined : pageId,
+      },
+      props: { title: item.title },
+    };
+  });
+}
+
+const { title } = Astro.props;
+---
+
+<MainLayout>
+  <h1>{title}</h1>
+</MainLayout>
