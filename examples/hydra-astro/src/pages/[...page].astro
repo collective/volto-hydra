@@ -7,7 +7,6 @@ export async function getStaticPaths() {
     // TODO: Replace URL with config
     return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
   }
-
   const response = await fetch(
     'http://localhost:8080/Plone/++api++/@navigation?expand.navigation.depth=2',
   );
@@ -48,5 +47,31 @@ const { title } = Astro.props;
 ---
 
 <MainLayout>
-  <h1>{title}</h1>
+  <h1 id="title">{title}</h1>
 </MainLayout>
+
+<script>
+  import { initBridge } from '../hydra.js';
+
+  const bridge = initBridge('http://localhost:3000');
+  const token = bridge._getTokenFromCookie();
+  const response = await fetch(
+    'http://localhost:8080/Plone/++api++/private-page',
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  if (response.ok) {
+    const data = await response.json();
+    const titleElement = document.getElementById('title');
+    if (titleElement) {
+      const dataElement = document.createElement('pre');
+      dataElement.style.fontSize = 10;
+      // dataElement.style['font-size'] = 10;
+      dataElement.textContent = JSON.stringify(data, null, 3);
+      titleElement.insertAdjacentElement('afterend', dataElement);
+    }
+  }
+</script>
