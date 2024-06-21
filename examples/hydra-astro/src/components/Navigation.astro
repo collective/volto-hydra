@@ -17,12 +17,6 @@ function flattenToAppUrl(url: string) {
   // TODO: Replace URL with config
   return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
 }
-
-export function getStaticPaths() {
-  return items.map((item) => {
-    return { params: { page: flattenToAppUrl(item['@id']) } };
-  });
-}
 ---
 
 <header class="header u-unselectable header-animated">
