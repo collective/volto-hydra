@@ -194,9 +194,46 @@ will automatically handle click events and show a quanta toolbar when selecting 
 
 It will allow you to naviate to the parent block (TODO)
 
+Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
+The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
+
+For example, if you are using ploneClient to fetch `data`, it will be `data.blocks_layout.items[x]`.
+Now, Click on your blocks in iframe and the sidebar will show its settings.
+
+Usage:
+```js
+// Vanilla JS example to render Blocks 
+
+// Function to create the block list
+function createBlockList(data) {
+  const blockList = document.createElement('ul');
+
+  data.blocks_layout.items.forEach(id => {
+    if (data.blocks[id]["@type"] === "slate") {
+      const slateValue = data.blocks[id].value;
+      const listItem = document.createElement('li');
+      listItem.className = 'blog-list-item';
+      listItem.setAttribute('data-block-uid', id); // Set Attribute to enable Clicking on Blocks
+
+      const pre = document.createElement('pre');
+      pre.className = 'pre-block';
+      pre.textContent = JSON.stringify(slateValue, null, 2);
+
+      listItem.appendChild(pre);
+      blockList.appendChild(listItem);
+    }
+  });
+
+  document.body.appendChild(blockList);
+}
+
+// Call the function to render the blocks
+createBlockList(data);
+```
+
 ### Level 3: Enable Realtime changes while editing
 
-You will need to subscribe to an ```onEditChange``` event that will call the callback with the updated data. 
+You will need to subscribe to an ```onEditChange``` event that will call the callback with the updated data.
 
 The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data.
 The 'data' object follows the same format as you get from the [ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).

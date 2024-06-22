@@ -3,9 +3,10 @@ class Bridge {
   constructor(adminOrigin) {
     this.adminOrigin = adminOrigin;
     this.token = null;
-    this.navigationHandler = null; // Handler for navigation events
-    this.realTimeDataHandler = null; // Handler for message events
-    this.blockClickHandler = null; // Handler for block click events
+    this.navigationHandler = null;
+    this.realTimeDataHandler = null;
+    this.blockClickHandler = null;
+    this.currentlySelectedBlock = null;
     this.init();
   }
 
@@ -29,8 +30,16 @@ class Bridge {
       // Get the access token from the URL
       const url = new URL(window.location.href);
       const access_token = url.searchParams.get('access_token');
-      this.token = access_token;
-      this._setTokenCookie(access_token);
+      const isEditMode = url.searchParams.get('_edit') === 'true'; // Only when in edit mode
+
+      if (access_token) {
+        this.token = access_token;
+        this._setTokenCookie(access_token);
+      }
+
+      if (isEditMode) {
+        this.enableBlockClickListener();
+      }
     }
   }
 
@@ -61,11 +70,24 @@ class Bridge {
     document.cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain};`;
   }
 
+  /**
+   * Enable the frontend to listen for clicks on blocks to open the settings
+   */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
+        // Remove border and button from the previously selected block
+        if (this.currentlySelectedBlock) {
+          this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
+        }
+
+        // Set the currently selected block
+        this.currentlySelectedBlock = blockElement;
+        // Add border to the currently selected block
+        this.currentlySelectedBlock.classList.add('volto-hydra--outline');
         const blockUid = blockElement.getAttribute('data-block-uid');
+
         window.parent.postMessage(
           { type: 'OPEN_SETTINGS', uid: blockUid },
           this.adminOrigin,
@@ -135,15 +157,6 @@ export function getTokenFromCookie() {
 export function onEditChange(callback) {
   if (bridgeInstance) {
     bridgeInstance.onEditChange(callback);
-  }
-}
-
-/**
- * Enable the frontend to listen for clicks on blocks to open the settings
- */
-export function enableBlockClickListener() {
-  if (bridgeInstance) {
-    bridgeInstance.enableBlockClickListener();
   }
 }
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Cookies from 'js-cookie';
 import isValidUrl from '../../utils/isValidUrl';
 import './styles.css';
+import { setSelectedBlock } from '../../actions';
 import usePresetUrls from '../../utils/usePresetsUrls';
 import UrlInput from '../UrlInput';
 
@@ -29,6 +30,7 @@ const getUrlWithAdminParams = (url, token) => {
 };
 
 const Iframe = () => {
+  const dispatch = useDispatch();
   const [url, setUrl] = useState('');
 
   const [src, setSrc] = useState('');
@@ -87,6 +89,12 @@ const Iframe = () => {
           handleNavigateToUrl(event.data.url);
           break;
 
+        case 'OPEN_SETTINGS':
+          if (history.location.pathname.endsWith('/edit')) {
+            dispatch(setSelectedBlock(event.data.uid));
+          }
+          break;
+
         default:
           break;
       }
@@ -99,7 +107,13 @@ const Iframe = () => {
     return () => {
       window.removeEventListener('message', messageHandler);
     };
-  }, [handleNavigateToUrl, initialUrl, token]);
+  }, [
+    dispatch,
+    handleNavigateToUrl,
+    history.location.pathname,
+    initialUrl,
+    token,
+  ]);
 
   useEffect(() => {
     if (Object.keys(form).length > 0 && isValidUrl(initialUrl)) {

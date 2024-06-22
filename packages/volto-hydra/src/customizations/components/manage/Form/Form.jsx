@@ -57,7 +57,7 @@ import { compose } from 'redux';
 import config from '@plone/volto/registry';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
 import Iframe from '../../../../components/Iframe/View';
-
+import './styles.css';
 /**
  * Form container class.
  * @class Form
@@ -700,7 +700,8 @@ class Form extends Component {
               }}
             />
             <Iframe />
-            {/* <BlocksForm
+            <BlocksForm
+              className="blocks-form"
               onChangeFormData={(newData) => {
                 const newFormData = {
                   ...formData,
@@ -730,7 +731,7 @@ class Form extends Component {
               history={this.props.history}
               location={this.props.location}
               token={this.props.token}
-            /> */}
+            />
             {this.state.isClient &&
               this.state.sidebarMetadataIsAvailable &&
               this.props.editable &&
