@@ -106,6 +106,14 @@ const Iframe = () => {
           }
           break;
 
+        case 'ADD_BLOCK':
+          console.log('ADD_BLOCK', event.data.uid);
+          break;
+
+        case 'DELETE_BLOCK':
+          console.log('DELETE_BLOCK', event.data.uid);
+          break;
+
         default:
           break;
       }
