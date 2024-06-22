@@ -60,16 +60,20 @@ To test against a local hydra instance
     ```bash
     make start
     ```
+- You can also set your preset frontend URLs with environment variables, making them available in the admin UI. This allows you to switch between them seamlessly:
+    ```bash
+    RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3002,https://hydra-blogsite-nextjs.vercel.app pnpm start
+    ```
+    You can find `.env.example` at root directory of the project.
 - Ensure Volto is running on port 3000.
 
 **3. Start the Plone Backend**
 
-- You can start the Plone backend using Docker images, or you can navigate to the core/api directory in Volto-Hydra and run:
+- You can start the Plone backend using Docker images:
     ```bash
-    cd core/api
-    make start
+    make backend-docker-start
     ```
-
+  ***Note :***  This will also set `CORS_ALLOW_ORIGIN` to `'*'`, so there are no cors error.
 ### Deploy your frontend
 
 Use netlify or similar and make your frontend public and then let us know by creating a ticket and we will advertise your frontend
