@@ -13,10 +13,10 @@ It's Volto without having to learn any Volto.
 
 ## Want to try the editor?
 
-You can try out the editing experience now by logging into https://hydra.pretagov.com and pasting in the url of one of the available 
-frontends already deployed for this demo site.
+You can try out the editing experience now by logging into https://hydra.pretagov.com and selecting one of the available preset frontend urls from dropdown or you can paste the url of frontend deployed for the demo site.
 
-The first frontend you can test with is ... TODO
+Available example frontends:
+- https://hydra-blogsite-nextjs.vercel.app
 
 Note: not everything works yet. Follow the progress on the [Hydra Roadmap](https://github.com/orgs/collective/projects/3/views/4)
 or the [Hydra README](https://github.com/collective/volto-hydra)

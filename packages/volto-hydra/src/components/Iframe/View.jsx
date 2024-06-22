@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Cookies from 'js-cookie';
+import isValidUrl from '../../utils/isValidUrl';
 import './styles.css';
-
+import usePresetUrls from '../../utils/usePresetsUrls';
+import UrlDropdown from '../UrlDropdown';
 /**
  * Get the default URL from the environment
  * @returns {string} URL from the environment
@@ -25,16 +27,6 @@ const getUrlWithAdminParams = (url, token) => {
     : null;
 };
 
-function isValidUrl(string) {
-  try {
-    new URL(string);
-    return true;
-  } catch (error) {
-    console.error(error);
-    return false;
-  }
-}
-
 const Iframe = () => {
   const [url, setUrl] = useState('');
 
@@ -42,6 +34,7 @@ const Iframe = () => {
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
   const form = useSelector((state) => state.form.global);
+  const presetUrls = usePresetUrls();
 
   const defaultUrl = getDefualtUrl();
   const savedUrl = Cookies.get('iframe_url');
@@ -124,6 +117,7 @@ const Iframe = () => {
   return (
     <div id="iframeContainer">
       <div className="input-container">
+        <UrlDropdown urls={presetUrls} onChange={handleNavigateToUrl} />
         <input
           type="text"
           value={url}
