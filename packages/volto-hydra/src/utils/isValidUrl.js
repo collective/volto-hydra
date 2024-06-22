@@ -3,7 +3,6 @@ export default function isValidUrl(string) {
     new URL(string);
     return true;
   } catch (error) {
-    console.error(error);
     return false;
   }
 }
