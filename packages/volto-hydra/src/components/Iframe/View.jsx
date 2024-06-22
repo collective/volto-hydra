@@ -5,7 +5,8 @@ import Cookies from 'js-cookie';
 import isValidUrl from '../../utils/isValidUrl';
 import './styles.css';
 import usePresetUrls from '../../utils/usePresetsUrls';
-import UrlDropdown from '../UrlDropdown';
+import UrlInput from '../UrlInput';
+
 /**
  * Get the default URL from the environment
  * @returns {string} URL from the environment
@@ -110,27 +111,10 @@ const Iframe = () => {
     }
   }, [form, initialUrl]);
 
-  const handleUrlChange = (event) => {
-    setUrl(event.target.value);
-  };
-
   return (
     <div id="iframeContainer">
       <div className="input-container">
-        <UrlDropdown urls={presetUrls} onChange={handleNavigateToUrl} />
-        <input
-          type="text"
-          value={url}
-          onChange={handleUrlChange}
-          placeholder="Enter URL"
-          className="iframe-input-field"
-        />
-        <button
-          onClick={() => handleNavigateToUrl(url)}
-          className="iframe-input-button"
-        >
-          ➔
-        </button>
+        <UrlInput urls={presetUrls} onSelect={handleNavigateToUrl} />
       </div>
       <iframe id="previewIframe" title="Preview" src={src} />
     </div>
