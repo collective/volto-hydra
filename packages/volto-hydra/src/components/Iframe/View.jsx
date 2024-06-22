@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Cookies from 'js-cookie';
 import './styles.css';
+import { setSelectedBlock } from '../../actions';
 
 /**
  * Get the default URL from the environment
@@ -20,9 +21,14 @@ const getDefualtUrl = () =>
  * @returns {string} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
-  return typeof window !== 'undefined'
-    ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-    : null;
+  if (typeof window !== 'undefined') {
+    if (window.location.pathname.endsWith('/edit')) {
+      return `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`;
+    } else {
+      return `${url}${window.location.pathname}?access_token=${token}&_edit=false`;
+    }
+  }
+  return null;
 };
 
 function isValidUrl(string) {
@@ -36,6 +42,7 @@ function isValidUrl(string) {
 }
 
 const Iframe = () => {
+  const dispatch = useDispatch();
   const [url, setUrl] = useState('');
 
   const [src, setSrc] = useState('');
@@ -93,6 +100,12 @@ const Iframe = () => {
           handleNavigateToUrl(event.data.url);
           break;
 
+        case 'OPEN_SETTINGS':
+          if (history.location.pathname.endsWith('/edit')) {
+            dispatch(setSelectedBlock(event.data.uid));
+          }
+          break;
+
         default:
           break;
       }
@@ -105,7 +118,13 @@ const Iframe = () => {
     return () => {
       window.removeEventListener('message', messageHandler);
     };
-  }, [handleNavigateToUrl, initialUrl, token]);
+  }, [
+    dispatch,
+    handleNavigateToUrl,
+    history.location.pathname,
+    initialUrl,
+    token,
+  ]);
 
   useEffect(() => {
     if (Object.keys(form).length > 0 && isValidUrl(initialUrl)) {
