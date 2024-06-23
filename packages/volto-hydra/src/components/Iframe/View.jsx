@@ -9,15 +9,6 @@ import usePresetUrls from '../../utils/usePresetsUrls';
 import UrlInput from '../UrlInput';
 
 /**
- * Get the default URL from the environment
- * @returns {string} URL from the environment
- */
-const getDefualtUrl = () =>
-  process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
-  (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']) ||
-  'http://localhost:3002'; // fallback if env is not set
-
-/**
  * Format the URL for the Iframe with location, token and enabling edit mode
  * @param {*} url
  * @param {*} token
@@ -39,7 +30,7 @@ const Iframe = () => {
   const form = useSelector((state) => state.form.global);
   const presetUrls = usePresetUrls();
 
-  const defaultUrl = getDefualtUrl();
+  const defaultUrl = presetUrls[0] || 'http://localhost:3002';
   const savedUrl = Cookies.get('iframe_url');
   const initialUrl = savedUrl
     ? getUrlWithAdminParams(savedUrl, token)
