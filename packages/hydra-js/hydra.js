@@ -3,12 +3,13 @@ class Bridge {
   constructor(adminOrigin) {
     this.adminOrigin = adminOrigin;
     this.token = null;
-    this.navigationHandler = null; // Handler for navigation event
-    this.realTimeDataHandler = null; // Handler for real-time data event
-    this.blockClickHandler = null; // Handler for block click event
+    this.navigationHandler = null; // Handler for navigation events
+    this.realTimeDataHandler = null; // Handler for message events
+    this.blockClickHandler = null; // Handler for block click events
     this.currentlySelectedBlock = null;
     this.addButton = null;
     this.deleteButton = null;
+    this.clickOnBtn = false;
     this.init();
   }
 
@@ -41,6 +42,7 @@ class Bridge {
       if (isEditMode) {
         this.enableBlockClickListener();
         this.injectCSS();
+        this.setupMessageListener();
       }
     }
   }
@@ -76,59 +78,107 @@ class Bridge {
    * Enable the frontend to listen for clicks on blocks to open the settings
    */
   enableBlockClickListener() {
-    document.addEventListener('click', (event) => {
+    this.blockClickHandler = (event) => {
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
-        // Remove border and button from the previously selected block
-        if (this.currentlySelectedBlock) {
-          this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
-          if (this.addButton) {
-            this.addButton.remove();
-            this.addButton = null;
-          }
-          if (this.deleteButton) {
-            this.deleteButton.remove();
-            this.deleteButton = null;
+        this.selectBlock(blockElement);
+      }
+    };
+
+    document.removeEventListener('click', this.blockClickHandler);
+    document.addEventListener('click', this.blockClickHandler);
+  }
+
+  selectBlock(blockElement) {
+    // Remove border and button from the previously selected block
+    if (this.currentlySelectedBlock) {
+      this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
+      if (this.addButton) {
+        this.addButton.remove();
+        this.addButton = null;
+      }
+      if (this.deleteButton) {
+        this.deleteButton.remove();
+        this.deleteButton = null;
+      }
+    }
+
+    // Set the currently selected block
+    this.currentlySelectedBlock = blockElement;
+    // Add border to the currently selected block
+    this.currentlySelectedBlock.classList.add('volto-hydra--outline');
+    const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // Create and append the Add button
+    this.addButton = document.createElement('button');
+    this.addButton.className = 'volto-hydra-add-button';
+    this.addButton.innerHTML = addSVG;
+    this.addButton.onclick = () => {
+      this.clickOnBtn = true;
+      window.parent.postMessage(
+        { type: 'ADD_BLOCK', uid: blockUid },
+        this.adminOrigin,
+      );
+    };
+    this.currentlySelectedBlock.appendChild(this.addButton);
+
+    // Create and append the Delete button
+    this.deleteButton = document.createElement('button');
+    this.deleteButton.className = 'volto-hydra-delete-button';
+    this.deleteButton.innerHTML = deleteSVG;
+    this.deleteButton.onclick = () => {
+      this.clickOnBtn = true;
+      window.parent.postMessage(
+        { type: 'DELETE_BLOCK', uid: blockUid },
+        this.adminOrigin,
+      );
+    };
+    this.currentlySelectedBlock.appendChild(this.deleteButton);
+
+    if (!this.clickOnBtn) {
+      window.parent.postMessage(
+        { type: 'OPEN_SETTINGS', uid: blockUid },
+        this.adminOrigin,
+      );
+    } else {
+      this.clickOnBtn = false;
+    }
+  }
+
+  setupMessageListener() {
+    this.messageHandler = (event) => {
+      if (
+        event.origin === this.adminOrigin &&
+        event.data.type === 'SELECT_BLOCK'
+      ) {
+        const { uid } = event.data;
+        this.observeForBlock(uid);
+      }
+    };
+
+    window.removeEventListener('message', this.messageHandler);
+    window.addEventListener('message', this.messageHandler);
+  }
+
+  observeForBlock(uid) {
+    const observer = new MutationObserver((mutationsList, observer) => {
+      for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+          const blockElement = document.querySelector(
+            `[data-block-uid="${uid}"]`,
+          );
+          if (blockElement) {
+            this.selectBlock(blockElement);
+            observer.disconnect();
+            break;
           }
         }
-
-        // Set the currently selected block
-        this.currentlySelectedBlock = blockElement;
-        // Add border to the currently selected block
-        this.currentlySelectedBlock.classList.add('volto-hydra--outline');
-        const blockUid = blockElement.getAttribute('data-block-uid');
-
-        // Create and append the Add button
-        this.addButton = document.createElement('button');
-        this.addButton.className = 'volto-hydra-add-button';
-        this.addButton.innerHTML = addSVG;
-        this.addButton.onclick = () => {
-          window.parent.postMessage(
-            { type: 'ADD_BLOCK', uid: blockUid },
-            this.adminOrigin,
-          );
-        };
-        this.currentlySelectedBlock.appendChild(this.addButton);
-
-        // Create and append the Delete button
-        this.deleteButton = document.createElement('button');
-        this.deleteButton.className = 'volto-hydra-delete-button';
-        this.deleteButton.innerHTML = deleteSVG;
-        this.deleteButton.onclick = () => {
-          window.parent.postMessage(
-            { type: 'DELETE_BLOCK', uid: blockUid },
-            this.adminOrigin,
-          );
-        };
-        this.currentlySelectedBlock.appendChild(this.deleteButton);
-
-        window.parent.postMessage(
-          { type: 'OPEN_SETTINGS', uid: blockUid },
-          this.adminOrigin,
-        );
       }
     });
+
+    observer.observe(document.body, { childList: true, subtree: true });
   }
+
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';
@@ -186,6 +236,9 @@ class Bridge {
     if (this.blockClickHandler) {
       document.removeEventListener('click', this.blockClickHandler);
     }
+    if (this.messageHandler) {
+      window.removeEventListener('message', this.messageHandler);
+    }
   }
 }
 
@@ -227,7 +280,7 @@ export function getTokenFromCookie() {
 
 /**
  * Enable the frontend to listen for changes in the admin and call the callback with updated data
- * @param {*} callback
+ * @param {*} callback - this will be called with the updated data
  */
 export function onEditChange(callback) {
   if (bridgeInstance) {

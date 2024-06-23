@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
 import Cookies from 'js-cookie';
+import {
+  addBlock,
+  applyBlockDefaults,
+  getBlocksFieldname,
+} from '@plone/volto/helpers';
 import './styles.css';
-import { setSelectedBlock } from '../../actions';
-
-/**
- * Get the default URL from the environment
- * @returns {string} URL from the environment
- */
-const getDefualtUrl = () =>
-  process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
-  (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']) ||
-  'http://localhost:3002'; // fallback if env is not set
+import { useIntl } from 'react-intl';
+import config from '@plone/volto/registry';
+import usePresetUrls from '../../utils/usePreseturls';
+import isValidUrl from '../../utils/isValidUrl';
 
 /**
  * Format the URL for the Iframe with location, token and enabling edit mode
@@ -31,30 +29,50 @@ const getUrlWithAdminParams = (url, token) => {
   return null;
 };
 
-function isValidUrl(string) {
-  try {
-    new URL(string);
-    return true;
-  } catch (error) {
-    console.error(error);
-    return false;
-  }
-}
+const Iframe = (props) => {
+  // ----Experimental----
+  const {
+    onSelectBlock,
+    properties,
+    editable,
+    onChangeFormData,
+    metadata,
+    formData: form,
+    token,
+  } = props;
 
-const Iframe = () => {
-  const dispatch = useDispatch();
   const [url, setUrl] = useState('');
-
   const [src, setSrc] = useState('');
   const history = useHistory();
-  const token = useSelector((state) => state.userSession.token);
-  const form = useSelector((state) => state.form.global);
 
-  const defaultUrl = getDefualtUrl();
+  const presetUrls = usePresetUrls();
+  const defaultUrl = presetUrls[0] || 'http://localhost:3002';
   const savedUrl = Cookies.get('iframe_url');
   const initialUrl = savedUrl
     ? getUrlWithAdminParams(savedUrl, token)
     : getUrlWithAdminParams(defaultUrl, token);
+
+  //-----Experimental-----
+  const intl = useIntl();
+  const onAddBlock = (type, index) => {
+    if (editable) {
+      const [id, newFormData] = addBlock(properties, type, index);
+      const blocksFieldname = getBlocksFieldname(newFormData);
+      const blockData = newFormData[blocksFieldname][id];
+      newFormData[blocksFieldname][id] = applyBlockDefaults({
+        data: blockData,
+        intl,
+        metadata,
+        properties,
+      });
+      onChangeFormData(newFormData);
+      const origin = new URL(src).origin;
+      document
+        .getElementById('previewIframe')
+        .contentWindow.postMessage({ type: 'SELECT_BLOCK', uid: id }, origin);
+      return id;
+    }
+  };
 
   const handleNavigateToUrl = useCallback(
     (givenUrl = null) => {
@@ -89,7 +107,7 @@ const Iframe = () => {
   }, [savedUrl, defaultUrl, initialUrl]);
 
   useEffect(() => {
-    const initialUrlOrigin = new URL(initialUrl).origin;
+    const initialUrlOrigin = initialUrl ? new URL(initialUrl).origin : '';
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
         return;
@@ -102,12 +120,20 @@ const Iframe = () => {
 
         case 'OPEN_SETTINGS':
           if (history.location.pathname.endsWith('/edit')) {
-            dispatch(setSelectedBlock(event.data.uid));
+            onSelectBlock(event.data.uid);
           }
           break;
 
         case 'ADD_BLOCK':
-          console.log('ADD_BLOCK', event.data.uid);
+          //----Experimental----
+          onSelectBlock(
+            onAddBlock(
+              config.settings.defaultBlockType,
+              form?.blocks_layout?.items.indexOf(event.data.uid)
+                ? form?.blocks_layout?.items.indexOf(event.data.uid) + 1
+                : -1,
+            ),
+          );
           break;
 
         case 'DELETE_BLOCK':
@@ -126,18 +152,12 @@ const Iframe = () => {
     return () => {
       window.removeEventListener('message', messageHandler);
     };
-  }, [
-    dispatch,
-    handleNavigateToUrl,
-    history.location.pathname,
-    initialUrl,
-    token,
-  ]);
+  }, [handleNavigateToUrl, history.location.pathname, initialUrl, token]);
 
   useEffect(() => {
-    if (Object.keys(form).length > 0 && isValidUrl(initialUrl)) {
+    if (form && Object.keys(form).length > 0 && isValidUrl(src)) {
       // Send the form data to the iframe
-      const origin = new URL(initialUrl).origin;
+      const origin = new URL(src).origin;
       document
         .getElementById('previewIframe')
         .contentWindow.postMessage({ type: 'FORM', data: form }, origin);
