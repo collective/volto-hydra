@@ -4,7 +4,9 @@ import Cookies from 'js-cookie';
 import {
   addBlock,
   applyBlockDefaults,
+  deleteBlock,
   getBlocksFieldname,
+  previousBlockId,
 } from '@plone/volto/helpers';
 import './styles.css';
 import { useIntl } from 'react-intl';
@@ -40,6 +42,7 @@ const Iframe = (props) => {
     formData: form,
     token,
   } = props;
+  //-------------------------
 
   const [url, setUrl] = useState('');
   const [src, setSrc] = useState('');
@@ -73,6 +76,22 @@ const Iframe = (props) => {
       return id;
     }
   };
+
+  const onDeleteBlock = (id, selectPrev) => {
+    const previous = previousBlockId(properties, id);
+    const newFormData = deleteBlock(properties, id);
+    onChangeFormData(newFormData);
+
+    onSelectBlock(selectPrev ? previous : null);
+    const origin = new URL(src).origin;
+    document
+      .getElementById('previewIframe')
+      .contentWindow.postMessage(
+        { type: 'SELECT_BLOCK', uid: previous },
+        origin,
+      );
+  };
+  //---------------------------
 
   const handleNavigateToUrl = useCallback(
     (givenUrl = null) => {
@@ -137,7 +156,7 @@ const Iframe = (props) => {
           break;
 
         case 'DELETE_BLOCK':
-          console.log('DELETE_BLOCK', event.data.uid);
+          onDeleteBlock(event.data.uid, true);
           break;
 
         default:
