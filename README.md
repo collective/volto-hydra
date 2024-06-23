@@ -256,8 +256,8 @@ onEditChange(initialData, handleEditChange);
 ### Level 4: Enable Managing Blocks directly on your frontend ([TODO](https://github.com/collective/volto-hydra/issues/4))
 
 If you completed level 2 & 3 and made blocks clickable and enabled live updates then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar
-- Add blocks (TODO)
-- remove blocks (TODO)
+- You can click on '+' Icon to add a slate (default) block below the selected block.
+- You can click on delete icon to delete any block.
 - drag and drop blocks (TODO)
 - cut, copy and paste blocks (TODO)
  
