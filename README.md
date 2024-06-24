@@ -177,18 +177,19 @@ if (window.location.search.includes('_edit=true')) {
 }
 ```
 
-#### Preventing reloads
-If you wish to make the editing experience faster you can register for ```onSave``` and ```onRoute``` callbacks to prevent reloads of the frontend
-
-TODO: not implemented yet
+#### Preventing reloads ([TODO](https://github.com/collective/volto-hydra/issues/55))
+If you wish to make the editing experience smoother you can register for ```onSave``` and ```onRoute``` callbacks to prevent reloads of the frontend
 
 
-### Level 2: Click to select blocks on your frontend ([TODO](https://github.com/collective/volto-hydra/issues/4))
+### Level 2: Click to select blocks on your frontend
 
 You will add data attributes to your rendered block html so hydra knows where they are on the page and it
-will automatically handle click events and show a quanta toolbar when selecting a block.
+will automatically handle click events and show a quanta toolbar ([TODO](https://github.com/collective/volto-hydra/issues/25)) 
+and border ([TODO](https://github.com/collective/volto-hydra/issues/24)) when selecting a block.
+Without this, you can still manage blocks via the blocks navigation in the sidebar.
 
-It will allow you to naviate to the parent block (TODO)
+It will allow you to naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) but not add, remove or move blocks
+unless live updates (level 3) is enabled. 
 
 Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
 The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
@@ -255,18 +256,35 @@ onEditChange(initialData, handleEditChange);
 
 ### Level 4: Enable Managing Blocks directly on your frontend ([TODO](https://github.com/collective/volto-hydra/issues/4))
 
-If you completed level 2 & 3 and made blocks clickable and enabled live updates then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar
-- Add blocks (TODO)
-- remove blocks (TODO)
-- drag and drop blocks (TODO)
-- cut, copy and paste blocks (TODO)
+If you completed level 2 & 3 (made blocks clickable and enabled live updates) then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar
+- Add blocks ([TODO](https://github.com/collective/volto-hydra/issues/27))
+- remove blocks ([TODO](https://github.com/collective/volto-hydra/issues/26))
+- drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
+- cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
+- and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
  
-You will still need to edit the blocks themselves via the sidebar
+You will still need to edit the blocks themselves via the sidebar. 
 
 ### Level 5: Enable Editing blocks text and images inplace ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
-You will add data attributes to where a blocks text is editable and subscribe to ```onBlockFieldChanged``` events to handle fine grained 
+If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
+can change check, links or media by typing or clicking directly on your frontend instead of via fields on the sidebar.
+
+#### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
+You will add data attributes to where a blocks text is editable and where text formatting and features are locationed (like links)
+and also subscribe to ```onBlockFieldChanged``` events. This will enable handling fine grained 
 changes to text being edited such as turning text bold or creating a link. Hydra will notice where you have indicated a block field can 
-be clicked on and will automatically make it inplace editable handling shortcuts, typing and selections for you.
+be clicked on and will automatically make it inplace editable handling typing, shortcuts 
+(slash ([TODO](https://github.com/collective/volto-hydra/issues/34)), 
+enter ([TODO](https://github.com/collective/volto-hydra/issues/33)) and bullets etc) and 
+selection (TODO](https://github.com/collective/volto-hydra/issues/31))for you.
+
+#### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
+
+TODO
+
+#### Inline link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
+
+TODO
 
 
