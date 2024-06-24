@@ -2,17 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import Cookies from 'js-cookie';
+import isValidUrl from '../../utils/isValidUrl';
 import './styles.css';
 import { setSelectedBlock } from '../../actions';
-
-/**
- * Get the default URL from the environment
- * @returns {string} URL from the environment
- */
-const getDefualtUrl = () =>
-  process.env['RAZZLE_DEFAULT_IFRAME_URL'] ||
-  (typeof window !== 'undefined' && window.env['RAZZLE_DEFAULT_IFRAME_URL']) ||
-  'http://localhost:3002'; // fallback if env is not set
+import usePresetUrls from '../../utils/usePresetsUrls';
+import UrlInput from '../UrlInput';
 
 /**
  * Format the URL for the Iframe with location, token and enabling edit mode
@@ -21,25 +15,10 @@ const getDefualtUrl = () =>
  * @returns {string} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
-  if (typeof window !== 'undefined') {
-    if (window.location.pathname.endsWith('/edit')) {
-      return `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`;
-    } else {
-      return `${url}${window.location.pathname}?access_token=${token}&_edit=false`;
-    }
-  }
-  return null;
+  return typeof window !== 'undefined'
+    ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
+    : null;
 };
-
-function isValidUrl(string) {
-  try {
-    new URL(string);
-    return true;
-  } catch (error) {
-    console.error(error);
-    return false;
-  }
-}
 
 const Iframe = () => {
   const dispatch = useDispatch();
@@ -49,8 +28,9 @@ const Iframe = () => {
   const history = useHistory();
   const token = useSelector((state) => state.userSession.token);
   const form = useSelector((state) => state.form.global);
+  const presetUrls = usePresetUrls();
 
-  const defaultUrl = getDefualtUrl();
+  const defaultUrl = presetUrls[0] || 'http://localhost:3002';
   const savedUrl = Cookies.get('iframe_url');
   const initialUrl = savedUrl
     ? getUrlWithAdminParams(savedUrl, token)
@@ -136,26 +116,10 @@ const Iframe = () => {
     }
   }, [form, initialUrl]);
 
-  const handleUrlChange = (event) => {
-    setUrl(event.target.value);
-  };
-
   return (
     <div id="iframeContainer">
       <div className="input-container">
-        <input
-          type="text"
-          value={url}
-          onChange={handleUrlChange}
-          placeholder="Enter URL"
-          className="iframe-input-field"
-        />
-        <button
-          onClick={() => handleNavigateToUrl(url)}
-          className="iframe-input-button"
-        >
-          ➔
-        </button>
+        <UrlInput urls={presetUrls} onSelect={handleNavigateToUrl} />
       </div>
       <iframe id="previewIframe" title="Preview" src={src} />
     </div>
