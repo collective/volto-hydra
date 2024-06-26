@@ -39,6 +39,9 @@
     "js-cookie": "^3.0.5",
     "volto-hydra": "workspace:*"
   },
+  "peerDependencies": {
+    "@plone/volto": "volto-18.0.0-alpha.36"
+  },
   "devDependencies": {
     "mrs-developer": "^2.2.0"
   },
