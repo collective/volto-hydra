@@ -74,6 +74,20 @@ To test against a local hydra instance
     make backend-docker-start
     ```
   ***Note :***  This will also set `CORS_ALLOW_ORIGIN` to `'*'`, so there are no cors error.
+
+### Using the example frontend
+
+You can use one of the example frontends available at `./examples` directory.
+
+- Running Volto Hydra:
+  ```bash
+  make example-nextjs-admin
+  ```
+- Running example frontend:
+  ```bash
+  make example-nextjs-frontend
+  ```
+
 ### Deploy your frontend
 
 Use netlify or similar and make your frontend public and then let us know by creating a ticket and we will advertise your frontend

@@ -125,5 +125,5 @@ example-nextjs-admin: ## Starts Volto, allowing reloading of the add-on during d
 
 ## Examples
 .PHONY: example-nextjs-frontend
-example-nextjs-frontend: ## Starts Volto, allowing reloading of the add-on during development
+example-nextjs-frontend: ## Starts nextjs example frontend
 	pnpm example:nextjs
