@@ -21,14 +21,9 @@ import isValidUrl from '../../utils/isValidUrl';
  * @returns {string} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
-  if (typeof window !== 'undefined') {
-    if (window.location.pathname.endsWith('/edit')) {
-      return `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`;
-    } else {
-      return `${url}${window.location.pathname}?access_token=${token}&_edit=false`;
-    }
-  }
-  return null;
+  return typeof window !== 'undefined'
+    ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
+    : null;
 };
 
 const Iframe = (props) => {
@@ -183,26 +178,10 @@ const Iframe = (props) => {
     }
   }, [form, initialUrl]);
 
-  const handleUrlChange = (event) => {
-    setUrl(event.target.value);
-  };
-
   return (
     <div id="iframeContainer">
       <div className="input-container">
-        <input
-          type="text"
-          value={url}
-          onChange={handleUrlChange}
-          placeholder="Enter URL"
-          className="iframe-input-field"
-        />
-        <button
-          onClick={() => handleNavigateToUrl(url)}
-          className="iframe-input-button"
-        >
-          ➔
-        </button>
+        <UrlInput urls={presetUrls} onSelect={handleNavigateToUrl} />
       </div>
       <iframe id="previewIframe" title="Preview" src={src} />
     </div>

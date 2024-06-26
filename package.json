@@ -33,11 +33,14 @@
     "build-storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build-storybook -c $(pwd)/.storybook"
   },
   "dependencies": {
-    "@plone/client": "1.0.0-alpha.13",
+    "@plone/client": "1.0.0-alpha.16",
     "@plone/registry": "workspace:*",
     "@plone/volto": "workspace:*",
     "js-cookie": "^3.0.5",
     "volto-hydra": "workspace:*"
+  },
+  "peerDependencies": {
+    "@plone/volto": "volto-18.0.0-alpha.36"
   },
   "devDependencies": {
     "mrs-developer": "^2.2.0"
