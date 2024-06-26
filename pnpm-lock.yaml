@@ -1414,7 +1414,7 @@ importers:
         specifier: ^17.1.1
         version: 17.1.1(typescript@5.4.5)
 
-  examples/hydra-nextjs-frontend-main:
+  examples/hydra-nextjs:
     dependencies:
       '@plone/client':
         specifier: ^1.0.0-alpha.15
