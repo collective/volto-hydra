@@ -2,7 +2,7 @@
 import "../styles.css";
 import "semantic-ui-css/semantic.min.css";
 import { useEffect } from "react";
-import { initBridge } from "@/utils/hydra";
+import { initBridge } from "@volto-hydra/hydra-js";
 import TranstackProviders from "@/providers/TranstackProviders";
 import { Container } from "semantic-ui-react";
 import Menu from "@/components/Menu";

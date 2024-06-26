@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Menu as SemanticMenu, Dropdown } from "semantic-ui-react";
 import { fetchContent } from "@/utils/api";
-import { getTokenFromCookie } from "@/utils/hydra";
+import { getTokenFromCookie } from "@volto-hydra/hydra-js";
 import Link from "next/link";
 import RecursiveMenuItem from "@/components/RecursiveMenuItem";
 
