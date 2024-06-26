@@ -1,42 +1,137 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Next.js Example frontend for Volto Hydra
 
-## Getting Started
+This provides instructions on integrating your frontend built with Next.js into the Volto Hydra decoupled editor for headless Plone.
+Follow these steps to set up and run your frontend with Volto Hydra.
 
-First, run the development server:
+***Note:*** This example frontend uses already deployed [Volto Hydra Demo](https://hydra.pretagov.com/).
+You can also set up your own local instance of Volto Hydra by following [this guide](https://github.com/collective/volto-hydra/?tab=readme-ov-file#test-your-frontend).
 
+### Running the application
+
+Start the development server:
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Deploying the frontend
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+We are using vercel to deploy our frontend which will automatically set up CI/CD as you go.
+For more information on deployment, Follow [vercel guide](https://vercel.com/docs/getting-started-with-vercel).
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+### Editing your content using Volto Hydra
 
-## Setup Plone Backend
+Once your frontend is deployed you can visit [the Demo site](https://hydra.pretagov.com/) or the local instance of Volto Hydra, login with demo username & password (mentioned in login page) and paste your frontend url in the adminUI (Volto Hydra).
 
-Simply run a plone backend using docker container: [Checkout the Plone 6 doc](https://6.docs.plone.org/install/containers/images/backend.html)
+Now, you can access private content and start editing!
 
-Add a new Blogs page at home and add some blogs in it.
+**Follow and star the [Volto Hydra Repo](https://github.com/collective/volto-hydra) to know about latest features you can use.**
 
-## Learn More
+### Available Features:
 
-To learn more about Next.js, take a look at the following resources:
+List of currently working features of Volto Hydra and short explanation on how they are integrated:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### Authenticating frontend to access private content
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+When you input your frontend URL at the Volto Hydra (adminUI) it will set 2 params in your frontend URL. You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option.
 
-## Deploy on Vercel
+Usage:
+```js
+import ploneClient from "@plone/client";
+import { useQuery } from "@tanstack/react-query";
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+export default function Blog({ params }) {
+  // Extract token directly from the URL
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("access_token");
+  
+  const client = ploneClient.initialize({
+    apiPath: "http://localhost:8080/Plone/", // Plone backend
+    token: token,
+  });
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+  const { getContentQuery } = client;
+  const { data, isLoading } = useQuery(getContentQuery({ path: '/blogs' }));
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  return (
+    <div> {data.title}</div>
+  )
+}
+```
+
+#### Initiating Hydra Bridge for 2-way communication with Hydra
+
+```js
+  // In Layout.js
+  import { initBridge } from './hydra.js';
+  initBridge("https://hydra.pretagov.com");
+```
+
+#### Enabling Click on Blocks
+
+You will add data attributes to your rendered block html so hydra knows where they are on the page and it
+will automatically handle click events and show a quanta toolbar ([TODO](https://github.com/collective/volto-hydra/issues/25)) 
+and border ([TODO](https://github.com/collective/volto-hydra/issues/24)) when selecting a block.
+Without this, you can still manage blocks via the blocks navigation in the sidebar.
+
+Usage:
+
+```js
+// components/BlockList
+import React from "react";
+import SlateBlock from "@/components/SlateBlock";
+
+const BlocksList = ({ data }) => {
+  return (
+    <ul className="blog-list">
+      {data.blocks_layout.items.map((id) => {
+        if (data.blocks[id]["@type"] === "slate") {
+          const slateValue = data.blocks[id].value;
+          return (
+            <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
+              <SlateBlock value={slateValue} />
+            </li>
+          );
+        } else if (data.blocks[id]["@type"] === "image") {
+          const image_url = data.blocks[id].url;
+          return (
+            <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
+              <img src={image_url} alt="" width={100} height={100} />
+            </li>
+          );
+        }
+        return null;
+      })}
+    </ul>
+  );
+};
+
+export default BlocksList;
+```
+
+#### Enable Realtime changes while editing
+
+You will need to subscribe to an ```onEditChange``` event that will call the callback with the updated data.
+
+The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data.
+The 'data' object follows the same format as you get from the [ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
+
+`onEditChange` takes following args:
+| Args         | Description |
+| :-----------:| :-------|
+| *callback*   | A function to call with the updated data when a change is detected. |
+
+Usage:
+
+```js
+  useEffect(() => {
+    onEditChange((updatedData) => {
+      if (updatedData) {
+        setValue(updatedData);
+      }
+    });
+  },[]);
+```
+
