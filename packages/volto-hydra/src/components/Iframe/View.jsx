@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
-  addBlock,
   applyBlockDefaults,
   deleteBlock,
   getBlocksFieldname,
+  insertBlock,
+  mutateBlock,
   previousBlockId,
 } from '@plone/volto/helpers';
 import './styles.css';
@@ -13,6 +14,10 @@ import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import usePresetUrls from '../../utils/usePreseturls';
 import isValidUrl from '../../utils/isValidUrl';
+import { BlockChooser } from '@plone/volto/components';
+import { createPortal } from 'react-dom';
+import { usePopper } from 'react-popper';
+import UrlInput from '../UrlInput';
 
 /**
  * Format the URL for the Iframe with location, token and enabling edit mode
@@ -22,7 +27,9 @@ import isValidUrl from '../../utils/isValidUrl';
  */
 const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
-    ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
+    ? window.location.pathname.endsWith('/edit')
+      ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
+      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
     : null;
 };
 
@@ -31,12 +38,43 @@ const Iframe = (props) => {
   const {
     onSelectBlock,
     properties,
-    editable,
     onChangeFormData,
     metadata,
     formData: form,
     token,
+    allowedBlocks,
+    showRestricted,
+    blocksConfig = config.blocks.blocksConfig,
+    navRoot,
+    type: contentType,
+    selectedBlock,
   } = props;
+  // const [ready, setReady] = useState(false);
+  // useEffect(() => {
+  //   setReady(true);
+  // }, []);
+  const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
+  const [popperElement, setPopperElement] = useState(null);
+  const [referenceElement, setReferenceElement] = useState(null);
+  const blockChooserRef = useRef();
+  const { styles, attributes } = usePopper(referenceElement, popperElement, {
+    strategy: 'fixed',
+    placement: 'bottom',
+    modifiers: [
+      {
+        name: 'offset',
+        options: {
+          offset: [0, -150],
+        },
+      },
+      {
+        name: 'flip',
+        options: {
+          fallbackPlacements: ['right-end', 'top-start'],
+        },
+      },
+    ],
+  });
   //-------------------------
 
   const [url, setUrl] = useState('');
@@ -44,7 +82,7 @@ const Iframe = (props) => {
   const history = useHistory();
 
   const presetUrls = usePresetUrls();
-  const defaultUrl = presetUrls[0] || 'http://localhost:3002';
+  const defaultUrl = presetUrls[0];
   const savedUrl = Cookies.get('iframe_url');
   const initialUrl = savedUrl
     ? getUrlWithAdminParams(savedUrl, token)
@@ -52,39 +90,32 @@ const Iframe = (props) => {
 
   //-----Experimental-----
   const intl = useIntl();
-  const onAddBlock = (type, index) => {
-    if (editable) {
-      const [id, newFormData] = addBlock(properties, type, index);
-      const blocksFieldname = getBlocksFieldname(newFormData);
-      const blockData = newFormData[blocksFieldname][id];
-      newFormData[blocksFieldname][id] = applyBlockDefaults({
-        data: blockData,
-        intl,
-        metadata,
-        properties,
-      });
-      onChangeFormData(newFormData);
-      const origin = new URL(src).origin;
-      document
-        .getElementById('previewIframe')
-        .contentWindow.postMessage({ type: 'SELECT_BLOCK', uid: id }, origin);
-      return id;
-    }
+
+  const onInsertBlock = (id, value, current) => {
+    const [newId, newFormData] = insertBlock(
+      properties,
+      id,
+      value,
+      current,
+      config.experimental.addBlockButton.enabled ? 1 : 0,
+    );
+
+    const blocksFieldname = getBlocksFieldname(newFormData);
+    const blockData = newFormData[blocksFieldname][newId];
+    newFormData[blocksFieldname][newId] = applyBlockDefaults({
+      data: blockData,
+      intl,
+      metadata,
+      properties,
+    });
+
+    onChangeFormData(newFormData);
+    return newId;
   };
 
-  const onDeleteBlock = (id, selectPrev) => {
-    const previous = previousBlockId(properties, id);
-    const newFormData = deleteBlock(properties, id);
+  const onMutateBlock = (id, value) => {
+    const newFormData = mutateBlock(properties, id, value);
     onChangeFormData(newFormData);
-
-    onSelectBlock(selectPrev ? previous : null);
-    const origin = new URL(src).origin;
-    document
-      .getElementById('previewIframe')
-      .contentWindow.postMessage(
-        { type: 'SELECT_BLOCK', uid: previous },
-        origin,
-      );
   };
   //---------------------------
 
@@ -121,6 +152,22 @@ const Iframe = (props) => {
   }, [savedUrl, defaultUrl, initialUrl]);
 
   useEffect(() => {
+    //----------------Experimental----------------
+    const onDeleteBlock = (id, selectPrev) => {
+      const previous = previousBlockId(properties, id);
+      const newFormData = deleteBlock(properties, id);
+      onChangeFormData(newFormData);
+
+      onSelectBlock(selectPrev ? previous : null);
+      const origin = new URL(src).origin;
+      document
+        .getElementById('previewIframe')
+        .contentWindow.postMessage(
+          { type: 'SELECT_BLOCK', uid: previous },
+          origin,
+        );
+    };
+    //----------------------------------------------
     const initialUrlOrigin = initialUrl ? new URL(initialUrl).origin : '';
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
@@ -135,19 +182,13 @@ const Iframe = (props) => {
         case 'OPEN_SETTINGS':
           if (history.location.pathname.endsWith('/edit')) {
             onSelectBlock(event.data.uid);
+            setAddNewBlockOpened(false);
           }
           break;
 
         case 'ADD_BLOCK':
           //----Experimental----
-          onSelectBlock(
-            onAddBlock(
-              config.settings.defaultBlockType,
-              form?.blocks_layout?.items.indexOf(event.data.uid)
-                ? form?.blocks_layout?.items.indexOf(event.data.uid) + 1
-                : -1,
-            ),
-          );
+          setAddNewBlockOpened(true);
           break;
 
         case 'DELETE_BLOCK':
@@ -166,7 +207,16 @@ const Iframe = (props) => {
     return () => {
       window.removeEventListener('message', messageHandler);
     };
-  }, [handleNavigateToUrl, history.location.pathname, initialUrl, token]);
+  }, [
+    handleNavigateToUrl,
+    history.location.pathname,
+    initialUrl,
+    onChangeFormData,
+    onSelectBlock,
+    properties,
+    src,
+    token,
+  ]);
 
   useEffect(() => {
     if (form && Object.keys(form).length > 0 && isValidUrl(src)) {
@@ -176,14 +226,65 @@ const Iframe = (props) => {
         .getElementById('previewIframe')
         .contentWindow.postMessage({ type: 'FORM', data: form }, origin);
     }
-  }, [form, initialUrl]);
+  }, [form, initialUrl, src]);
 
   return (
     <div id="iframeContainer">
       <div className="input-container">
         <UrlInput urls={presetUrls} onSelect={handleNavigateToUrl} />
       </div>
-      <iframe id="previewIframe" title="Preview" src={src} />
+      {addNewBlockOpened &&
+        createPortal(
+          <div
+            ref={setPopperElement}
+            style={styles.popper}
+            {...attributes.popper}
+          >
+            <BlockChooser
+              onMutateBlock={
+                onMutateBlock
+                  ? (id, value) => {
+                      setAddNewBlockOpened(false);
+                      onMutateBlock(id, value);
+                    }
+                  : null
+              }
+              onInsertBlock={
+                onInsertBlock
+                  ? (id, value) => {
+                      setAddNewBlockOpened(false);
+                      const newId = onInsertBlock(id, value);
+                      const origin = new URL(src).origin;
+                      document
+                        .getElementById('previewIframe')
+                        .contentWindow.postMessage(
+                          {
+                            type: 'SELECT_BLOCK',
+                            uid: newId,
+                          },
+                          origin,
+                        );
+                    }
+                  : null
+              }
+              currentBlock={selectedBlock}
+              allowedBlocks={allowedBlocks}
+              blocksConfig={blocksConfig}
+              properties={properties}
+              showRestricted={showRestricted}
+              ref={blockChooserRef}
+              navRoot={navRoot}
+              contentType={contentType}
+            />
+          </div>,
+          document.body,
+        )}
+      <iframe
+        id="previewIframe"
+        title="Preview"
+        src={src}
+        ref={setReferenceElement}
+      />
     </div>
   );
 };
