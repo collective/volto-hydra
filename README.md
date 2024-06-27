@@ -260,10 +260,13 @@ onEditChange(initialData, handleEditChange);
 
 ### Level 4: Enable Managing Blocks directly on your frontend ([TODO](https://github.com/collective/volto-hydra/issues/4))
 
-If you completed level 2 & 3 (made blocks clickable and enabled live updates) then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar
+If you completed level 2 & 3 (made blocks clickable and enabled live updates) then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar.
 
-- You can click on '+' Icon to add a slate (default) block below the selected block ([TODO](https://github.com/collective/volto-hydra/issues/27))
-- You can click on delete icon to delete any block. ([TODO](https://github.com/collective/volto-hydra/issues/26))
+With Quanta toobar, you can use following features:
+
+- You can click on '+' Icon (appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute) to add a block below the current block by choosing a type from BlockChooser popup.
+- You can click on three dots icon on Quanta toolbar (appears at the top-left) and it will open up a dropdown menu, you can click on 'Remove' to delete the current block.
+- Settings option is yet to be implemented (TODO)
 - drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
 - cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
