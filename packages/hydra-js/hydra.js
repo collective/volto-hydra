@@ -306,27 +306,29 @@ class Bridge {
         display: none;
         position: absolute;
         top: 100%;
-        right: -100%;
+        right: -200%;
         background: white;
         border: 1px solid #ccc;
         border-radius: 4px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         z-index: 100;
         margin-top: -8px;
+        width: 180px;
+        box-sizing: border-box;
       }
       .volto-hydra-dropdown-menu.visible {
         display: block;
       }
       .volto-hydra-dropdown-item {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-start;
         align-items: center;
-        padding: 0.5em 1em;
+        padding: 10px;
         cursor: pointer;
         transition: background 0.2s;
       }
       .volto-hydra-dropdown-item svg {
-        margin-right: 0.5em;
+        margin-right: 1em;
       }
       .volto-hydra-dropdown-item:hover {
         background: #f0f0f0;
@@ -334,7 +336,7 @@ class Bridge {
       .volto-hydra-divider {
         height: 1px;
         background: rgba(0, 0, 0, 0.1);
-        margin: 0.5em 1em;
+        margin: 0 1em;
       }
     `;
     document.head.appendChild(style);
