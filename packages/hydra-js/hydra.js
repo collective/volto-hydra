@@ -285,6 +285,8 @@ class Bridge {
         z-index: 10;
         top: -45px;
         left: 0;
+        box-sizing: border-box;
+        width: 70px;
       }
       .volto-hydra-drag-button,
       .volto-hydra-menu-button {
@@ -296,6 +298,9 @@ class Bridge {
       }
       .volto-hydra-drag-button {
         cursor: default;
+        background: #E4E8EC;
+        border-radius: 6px;
+        padding: 9px 6px;
       }
       .volto-hydra-dropdown-menu {
         display: none;
