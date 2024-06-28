@@ -138,6 +138,7 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG; // Use your drag SVG here
+    dragButton.disabled = true; // Disable drag button for now
 
     // Create the three-dot menu button
     const menuButton = document.createElement('button');
@@ -279,7 +280,7 @@ class Bridge {
         align-items: center;
         position: absolute;
         background: white;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+        box-shadow: 3px 3px 10px rgb(0 0 0 / 53%);
         border-radius: 6px;
         z-index: 10;
         top: -45px;
@@ -294,7 +295,7 @@ class Bridge {
         margin: 0;
       }
       .volto-hydra-drag-button {
-        cursor: grab;
+        cursor: default;
       }
       .volto-hydra-dropdown-menu {
         display: none;
