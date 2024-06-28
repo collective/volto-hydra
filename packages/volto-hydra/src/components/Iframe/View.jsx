@@ -129,17 +129,7 @@ const Iframe = (props) => {
       const newOrigin = formattedUrl.origin;
       Cookies.set('iframe_url', newOrigin, { expires: 7 });
 
-      if (formattedUrl.pathname !== '/') {
-        history.push(
-          window.location.pathname.endsWith('/edit')
-            ? `${formattedUrl.pathname}/edit`
-            : `${formattedUrl.pathname}`,
-        );
-      } else {
-        history.push(
-          window.location.pathname.endsWith('/edit') ? `/edit` : `/`,
-        );
-      }
+      history.push(`${formattedUrl.pathname}`);
     },
     [history, url],
   );
