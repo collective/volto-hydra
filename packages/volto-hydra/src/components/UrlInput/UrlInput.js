@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dropdown, Icon } from 'semantic-ui-react';
+import { Dropdown } from 'semantic-ui-react';
 import Cookies from 'js-cookie';
 import './styles.css';
 
