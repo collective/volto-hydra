@@ -19,7 +19,7 @@ const getPresetUrls = () => {
 };
 
 const usePresetUrls = () => {
-  const [urls, setUrls] = useState([]);
+  const [urls, setUrls] = useState(['http://localhost:3002']);
 
   useEffect(() => {
     setUrls(getPresetUrls());
