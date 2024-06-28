@@ -3,6 +3,15 @@ import { Dropdown, Icon } from 'semantic-ui-react';
 import Cookies from 'js-cookie';
 import './styles.css';
 
+const getSavedUrls = () => {
+  const savedUrls = Cookies.get('saved_urls');
+  return savedUrls ? savedUrls.split(',') : [];
+};
+
+const setSavedUrls = (urls) => {
+  Cookies.set('saved_urls', urls.join(','), { expires: 7 });
+};
+
 const UrlInput = ({ urls, onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [value, setValue] = useState(Cookies.get('iframe_url') || '');
@@ -14,7 +23,10 @@ const UrlInput = ({ urls, onSelect }) => {
   };
 
   useEffect(() => {
-    setUrlList((prev) => (prev ? [...prev, ...urls] : urls));
+    const savedUrls = getSavedUrls();
+    setUrlList((prev) =>
+      prev ? [...new Set([...savedUrls, ...prev, ...urls])] : urls,
+    );
   }, [urls]);
 
   const handleSearchChange = (e, { searchQuery }) => {
@@ -22,7 +34,10 @@ const UrlInput = ({ urls, onSelect }) => {
   };
 
   const handleOnAddItem = (e, { value }) => {
-    setUrlList((prev) => (prev ? [...prev, value] : [value]));
+    const updatedUrlList = [...urlList, value];
+    setUrlList(updatedUrlList);
+    setSavedUrls(updatedUrlList);
+    onSelect(value);
   };
   const renderDropdown = () => {
     const dropdownOptions = urlList.map((url) => ({
