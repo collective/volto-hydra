@@ -247,7 +247,7 @@ class Bridge {
         left: -1px;
         right: -1px;
         bottom: -1px;
-        border: 2px solid #2597F4;
+        border: 2px solid rgba(120,192,215,.75);
         border-radius: 6px;
         pointer-events: none;
         z-index: 5;
