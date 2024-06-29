@@ -64,7 +64,7 @@ const Iframe = (props) => {
       {
         name: 'offset',
         options: {
-          offset: [0, -150],
+          offset: [0, -250],
         },
       },
       {
