@@ -15,7 +15,7 @@ It's Volto without having to learn any Volto.
 
 You can try out the editing experience now by logging into https://hydra.pretagov.com and selecting one of the available preset frontend urls from dropdown or you can paste the url of frontend deployed for the demo site.
 
-Available example frontends:
+Available example frontends (go to `examples` directory for source code):
 - https://hydra-blogsite-nextjs.vercel.app
 
 Note: not everything works yet. Follow the progress on the [Hydra Roadmap](https://github.com/orgs/collective/projects/3/views/4)
@@ -74,6 +74,20 @@ To test against a local hydra instance
     make backend-docker-start
     ```
   ***Note :***  This will also set `CORS_ALLOW_ORIGIN` to `'*'`, so there are no cors error.
+
+### Using the example frontend
+
+You can use one of the example frontends available at `./examples` directory.
+
+- Running Volto Hydra:
+  ```bash
+  make example-nextjs-admin
+  ```
+- Running example frontend:
+  ```bash
+  make example-nextjs-frontend
+  ```
+
 ### Deploy your frontend
 
 Use netlify or similar and make your frontend public and then let us know by creating a ticket and we will advertise your frontend
@@ -255,7 +269,7 @@ function handleEditChange(updatedData) {
 }
 
 // Set up the onEditChange listener
-onEditChange(initialData, handleEditChange);
+onEditChange(handleEditChange);
 ```
 
 ### Level 4: Enable Managing Blocks directly on your frontend
