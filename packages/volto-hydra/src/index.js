@@ -17,7 +17,6 @@ const applyConfig = (config) => {
     schema.fieldsets[0].fields.push('value');
     return schema;
   };
-
   // Set the sidebarTab to 1
   config.blocks.blocksConfig.slate.sidebarTab = 1;
 

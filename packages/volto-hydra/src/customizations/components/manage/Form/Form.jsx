@@ -699,7 +699,38 @@ class Form extends Component {
                 return this.setState(state);
               }}
             />
-            <Iframe />
+            <Iframe
+              formData={formData}
+              onChangeFormData={(newData) => {
+                const newFormData = {
+                  ...formData,
+                  ...newData,
+                };
+                this.setState({
+                  formData: newFormData,
+                });
+                if (this.props.global) {
+                  this.props.setFormData(newFormData);
+                }
+              }}
+              onChangeField={this.onChangeField}
+              onSelectBlock={this.onSelectBlock}
+              properties={formData}
+              navRoot={navRoot}
+              type={type}
+              pathname={this.props.pathname}
+              selectedBlock={this.state.selected}
+              multiSelected={this.state.multiSelected}
+              manage={this.props.isAdminForm}
+              allowedBlocks={this.props.allowedBlocks}
+              showRestricted={this.props.showRestricted}
+              editable={this.props.editable}
+              isMainForm={this.props.editable}
+              // Properties to pass to the BlocksForm to match the View ones
+              history={this.props.history}
+              location={this.props.location}
+              token={this.props.token}
+            />
             <BlocksForm
               className="blocks-form"
               onChangeFormData={(newData) => {
