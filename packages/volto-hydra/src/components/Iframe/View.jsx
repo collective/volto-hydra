@@ -219,9 +219,10 @@ const Iframe = (props) => {
   useEffect(() => {
     if (form && Object.keys(form).length > 0 && isValidUrl(src)) {
       // Send the form data to the iframe
+      const origin = new URL(src).origin;
       document
         .getElementById('previewIframe')
-        .contentWindow.postMessage({ type: 'FORM', data: form }, '*');
+        .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, origin);
     }
   }, [form, initialUrl, src]);
 
