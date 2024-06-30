@@ -214,7 +214,7 @@ const Iframe = (props) => {
       const origin = new URL(src).origin;
       document
         .getElementById('previewIframe')
-        .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, '*');
+        .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, origin);
     }
   }, [form, initialUrl, src]);
 
