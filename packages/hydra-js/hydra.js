@@ -50,8 +50,8 @@ class Bridge {
 
   onEditChange(callback) {
     this.realTimeDataHandler = (event) => {
-      if (event.data.type === 'FORM_DATA') {
-        if (event.origin === this.adminOrigin) {
+      if (event.origin === this.adminOrigin) {
+        if (event.data.type === 'FORM_DATA') {
           if (event.data.data) {
             callback(event.data.data);
           } else {
