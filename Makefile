@@ -119,11 +119,18 @@ ci-acceptance-test: ## Run cypress tests in headless mode for CI
 	pnpm --filter @plone/volto exec cypress run --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern=$(CURRENT_DIR)'/cypress/tests/**/*.{js,jsx,ts,tsx}'
 
 ## Examples
+.PHONY: example-nextjs-admin
+example-nextjs-admin: ## Starts Volto, allowing reloading of the add-on during development
+	RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3002 pnpm start
+
+.PHONY: example-nextjs-frontend
+example-nextjs-frontend: ## Starts nextjs example frontend
+	pnpm example:nextjs
+
 .PHONY: example-astro-admin
 example-astro-admin: ## Starts Volto, allowing reloading of the add-on during development
 	RAZZLE_DEFAULT_IFRAME_URL=http://localhost:4321 pnpm start
 
-## Examples
 .PHONY: example-astro-frontend
 example-astro-frontend: ## Starts Volto, allowing reloading of the add-on during development
 	pnpm example:astro
