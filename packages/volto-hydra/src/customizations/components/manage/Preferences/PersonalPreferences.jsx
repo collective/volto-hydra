@@ -18,12 +18,8 @@ import languages from '@plone/volto/constants/Languages';
 import { changeLanguage } from '@plone/volto/actions';
 import { toGettextLang } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
-
-const urls = {
-  URL1: 'http://localhost:3000',
-  URL2: 'http://localhost:3001',
-  URL3: 'http://localhost:3002',
-};
+import getSavedURLs from '../../../../utils/getSavedURLs';
+import isValidUrl from '../../../../utils/isValidUrl';
 
 const messages = defineMessages({
   personalPreferences: {
@@ -98,6 +94,7 @@ class PersonalPreferences extends Component {
     super(props);
     this.onCancel = this.onCancel.bind(this);
     this.onSubmit = this.onSubmit.bind(this);
+    this.urls = getSavedURLs();
     this.state = {
       hidden: true,
     };
@@ -118,8 +115,31 @@ class PersonalPreferences extends Component {
       });
     }
     toast.success(
-      <Toast success title={this.props.intl.formatMessage(messages.saved)} />,
+      <Toast
+        success
+        content={''}
+        title={this.props.intl.formatMessage(messages.saved)}
+      />,
     );
+    if (data.urlCheck) {
+      if (!isValidUrl(data.url)) {
+        toast.error(
+          <Toast
+            error
+            content={'Please enter a valid URL or select URL from the options.'}
+            title={'Invalid Entered URL!'}
+          />,
+        );
+        return;
+      }
+      const urlList = [...new Set([this.urls, data.url])];
+      this.props.cookies.set('saved_urls', urlList.join(','), {
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 Days
+      });
+      console.log('data.url', data.url);
+    } else {
+      console.log('data.urls', data.urls);
+    }
     this.props.closeMenu();
   }
 
@@ -130,7 +150,6 @@ class PersonalPreferences extends Component {
    */
   onCancel() {
     this.props.closeMenu();
-    toast.error(<Toast error title={'Invalid Entered URL!.'} />);
   }
 
   /**
@@ -140,6 +159,7 @@ class PersonalPreferences extends Component {
    */
   render() {
     const { cookies } = this.props;
+    const urls = this.urls;
     return (
       <Form
         formData={{
@@ -156,7 +176,7 @@ class PersonalPreferences extends Component {
             {
               id: 'frontend',
               title: 'Frontend',
-              fields: ['urls', 'urlCheck', 'url'],
+              fields: ['urls', 'url', 'urlCheck'],
             },
           ],
           properties: {
@@ -174,7 +194,7 @@ class PersonalPreferences extends Component {
               ),
               title: this.props.intl.formatMessage(messages.frontendUrls),
               type: 'string',
-              choices: map(keys(urls), (url) => [url, urls[url]]),
+              choices: map(urls, (url) => [url, url]),
               mode: !this.state.hidden ? 'hidden' : '',
             },
             urlCheck: {
