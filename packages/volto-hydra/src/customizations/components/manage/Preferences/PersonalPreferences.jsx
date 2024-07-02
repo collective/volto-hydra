@@ -98,6 +98,9 @@ class PersonalPreferences extends Component {
     super(props);
     this.onCancel = this.onCancel.bind(this);
     this.onSubmit = this.onSubmit.bind(this);
+    this.state = {
+      hidden: true,
+    };
   }
 
   /**
@@ -127,6 +130,7 @@ class PersonalPreferences extends Component {
    */
   onCancel() {
     this.props.closeMenu();
+    toast.error(<Toast error title={'Invalid Entered URL!.'} />);
   }
 
   /**
@@ -147,7 +151,12 @@ class PersonalPreferences extends Component {
             {
               id: 'default',
               title: this.props.intl.formatMessage(messages.default),
-              fields: ['language', 'urls', 'url'],
+              fields: ['language'],
+            },
+            {
+              id: 'frontend',
+              title: 'Frontend',
+              fields: ['urls', 'urlCheck', 'url'],
             },
           ],
           properties: {
@@ -166,13 +175,19 @@ class PersonalPreferences extends Component {
               title: this.props.intl.formatMessage(messages.frontendUrls),
               type: 'string',
               choices: map(keys(urls), (url) => [url, urls[url]]),
+              mode: !this.state.hidden ? 'hidden' : '',
             },
-            url: {
+            urlCheck: {
               description: this.props.intl.formatMessage(
                 messages.urlDescription,
               ),
               title: this.props.intl.formatMessage(messages.frontendUrl),
+              type: 'boolean',
+            },
+            url: {
+              title: this.props.intl.formatMessage(messages.frontendUrl),
               type: 'string',
+              mode: this.state.hidden ? 'hidden' : '',
             },
           },
           required: [],
@@ -180,7 +195,11 @@ class PersonalPreferences extends Component {
         onSubmit={this.onSubmit}
         onCancel={this.onCancel}
         onChangeFormData={(newFormData) => {
-          console.log(newFormData);
+          if (newFormData.urlCheck) {
+            this.setState({ hidden: false });
+          } else {
+            this.setState({ hidden: true });
+          }
           return;
         }}
       />
