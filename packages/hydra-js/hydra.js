@@ -214,6 +214,16 @@ class Bridge {
     window.addEventListener('message', this.messageHandler);
   }
 
+  elementIsVisibleInViewport(el, partiallyVisible = false) {
+    const { top, left, bottom, right } = el.getBoundingClientRect();
+    const { innerHeight, innerWidth } = window;
+    return partiallyVisible
+      ? ((top > 0 && top < innerHeight) ||
+          (bottom > 0 && bottom < innerHeight)) &&
+          ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
+      : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+  }
+
   observeForBlock(uid) {
     const observer = new MutationObserver((mutationsList, observer) => {
       for (const mutation of mutationsList) {
@@ -223,6 +233,8 @@ class Bridge {
           );
           if (blockElement) {
             this.selectBlock(blockElement);
+            !this.elementIsVisibleInViewport(blockElement, true) &&
+              blockElement.scrollIntoView({ behavior: 'smooth' });
             observer.disconnect();
             break;
           }
