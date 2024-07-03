@@ -10,7 +10,7 @@ import Menu from "@/components/Menu";
 export default function RootLayout({ children }) {
   useEffect(() => {
     initBridge("https://hydra.pretagov.com");
-  });
+  }, []);
 
   return (
     <>
