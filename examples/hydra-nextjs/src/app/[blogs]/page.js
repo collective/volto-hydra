@@ -2,8 +2,8 @@
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onEditChange, getTokenFromCookie } from "@volto-hydra/hydra-js";
-import { fetchContent } from "@/utils/api";
 import BlocksList from "@/components/BlocksList";
+import { fetchContent } from '#utils/api';
 
 export default function Home({ params }) {
   const [data, setData] = useState(null);

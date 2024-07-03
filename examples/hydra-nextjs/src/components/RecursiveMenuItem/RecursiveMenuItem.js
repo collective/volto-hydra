@@ -3,10 +3,10 @@
 import React, { useEffect, useState } from "react";
 import { Menu as SemanticMenu } from "semantic-ui-react";
 import Link from "next/link";
-import { fetchContent } from "@/utils/api";
 import HoverableDropdown from "@/components/HoverableDropdown";
 import { getTokenFromCookie } from "@volto-hydra/hydra-js";
-import extractEndpoints from "@/utils/extractEndpoints";
+import { fetchContent } from '#utils/api';
+import extractEndpoints from '#utils/extractEndpoints';
 
 const RecursiveMenuItem = ({ item }) => {
   const [subItems, setSubItems] = useState([]);

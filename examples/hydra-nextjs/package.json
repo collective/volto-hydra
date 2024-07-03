@@ -2,11 +2,15 @@
   "name": "hydra-nextjs",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3002",
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint"
+  },
+  "imports": {
+    "#utils/*": "./src/utils/*.js"
   },
   "dependencies": {
     "@plone/client": "^1.0.0-alpha.15",

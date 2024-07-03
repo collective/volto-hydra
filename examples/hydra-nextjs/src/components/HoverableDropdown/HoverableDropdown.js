@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Dropdown } from "semantic-ui-react";
 import Link from "next/link";
 import RecursiveMenuItem from "@/components/RecursiveMenuItem";
-import extractEndpoints from "@/utils/extractEndpoints";
+import extractEndpoints from '#utils/extractEndpoints';
 
 const HoverableDropdown = ({ item, subItems }) => {
   const [open, setOpen] = useState(false);
