@@ -11,6 +11,8 @@ class Bridge {
     this.deleteButton = null;
     this.clickOnBtn = false;
     this.quantaToolbar = null;
+    this.currentPathname =
+      typeof window !== 'undefined' ? window.location.pathname : null;
     this.init();
   }
 
@@ -20,11 +22,19 @@ class Bridge {
     }
 
     if (window.self !== window.top) {
-      this.navigationHandler = (event) => {
-        window.parent.postMessage(
-          { type: 'URL_CHANGE', url: event.destination.url },
-          this.adminOrigin,
-        );
+      // Handle URL changes generically (no chromium-specific code here)
+      this.navigationHandler = (e) => {
+        const newPathname = new URL(e.destination.url).pathname;
+        if (
+          newPathname !== this.currentPathname ||
+          this.currentPathname === null
+        ) {
+          this.currentUrl = newPathname;
+          window.parent.postMessage(
+            { type: 'URL_CHANGE', url: e.destination.url },
+            this.adminOrigin,
+          );
+        }
       };
 
       // Ensure we don't add multiple listeners
@@ -214,6 +224,12 @@ class Bridge {
     window.addEventListener('message', this.messageHandler);
   }
 
+  /**
+   * Checks if an element is visible in the viewport
+   * @param {} el
+   * @param {} partiallyVisible
+   * @returns boolean - true if the element is visible in the viewport
+   */
   elementIsVisibleInViewport(el, partiallyVisible = false) {
     const { top, left, bottom, right } = el.getBoundingClientRect();
     const { innerHeight, innerWidth } = window;
