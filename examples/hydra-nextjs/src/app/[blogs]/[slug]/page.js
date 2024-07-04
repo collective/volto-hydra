@@ -1,19 +1,20 @@
-"use client";
-import { notFound } from "next/navigation";
-import { usePathname } from "next/navigation";
-import { onEditChange, getTokenFromCookie } from "@volto-hydra/hydra-js";
-import { useEffect, useState } from "react";
-import BlocksList from "@/components/BlocksList";
+'use client';
+import { notFound } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { initBridge, getTokenFromCookie } from '#utils/hydra';
+import { useEffect, useState } from 'react';
+import BlocksList from '@/components/BlocksList';
 import { fetchContent } from '#utils/api';
 
 export default function Blog({ params }) {
+  const bridge = initBridge('https://hydra.pretagov.com');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   useEffect(() => {
     async function getData(token = null) {
       try {
-        const apiPath = "https://hydra.pretagov.com";
+        const apiPath = 'https://hydra.pretagov.com';
         const path = pathname;
         const content = await fetchContent(apiPath, { token, path });
         setData(content);
@@ -26,19 +27,19 @@ export default function Blog({ params }) {
 
     const url = new URL(window.location.href);
     const tokenFromUrl =
-      url.searchParams.get("access_token") || getTokenFromCookie();
+      url.searchParams.get('access_token') || getTokenFromCookie();
     getData(tokenFromUrl);
   }, [pathname]);
 
   const [value, setValue] = useState(data);
 
   useEffect(() => {
-    onEditChange((updatedData) => {
+    bridge.onEditChange((updatedData) => {
       if (updatedData) {
         setValue(updatedData);
       }
     });
-  },[]);
+  }, [bridge]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -59,5 +60,5 @@ export default function Blog({ params }) {
     return notFound();
   }
 
-  return "";
+  return '';
 }

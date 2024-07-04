@@ -269,7 +269,9 @@ function handleEditChange(updatedData) {
 }
 
 // Set up the onEditChange listener
-onEditChange(handleEditChange);
+//After initiating the bridge you can use its onEditChange method
+const bridge = initBridge('https://hydra.pretagov.com');
+bridge.onEditChange(handleEditChange);
 ```
 
 ### Level 4: Enable Managing Blocks directly on your frontend
