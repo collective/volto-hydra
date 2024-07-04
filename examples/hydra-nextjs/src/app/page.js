@@ -1,19 +1,20 @@
-"use client";
-import { notFound } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { getTokenFromCookie, onEditChange } from "@volto-hydra/hydra-js";
-import { fetchContent } from "@/utils/api";
-import BlocksList from "@/components/BlocksList";
+'use client';
+import { notFound } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { getTokenFromCookie, initBridge } from '#utils/hydra';
+import { fetchContent } from '#utils/api';
+import BlocksList from '@/components/BlocksList';
 
 export default function Home() {
+  const brige = initBridge('https://hydra.pretagov.com');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function getData(token = null) {
       try {
-        const apiPath = "https://hydra.pretagov.com";
-        const path = "";
+        const apiPath = 'https://hydra.pretagov.com';
+        const path = '';
         const content = await fetchContent(apiPath, { token, path });
         setData(content);
       } catch (error) {
@@ -25,19 +26,19 @@ export default function Home() {
 
     const url = new URL(window.location.href);
     const tokenFromUrl =
-      url.searchParams.get("access_token") || getTokenFromCookie();
+      url.searchParams.get('access_token') || getTokenFromCookie();
     getData(tokenFromUrl);
   }, []);
 
   const [value, setValue] = useState(data);
 
   useEffect(() => {
-    onEditChange((updatedData) => {
+    brige.onEditChange((updatedData) => {
       if (updatedData) {
         setValue(updatedData);
       }
     });
-  }, []);
+  }, [brige]);
 
   if (loading) {
     return <div>Loading...</div>;
