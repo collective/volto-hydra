@@ -74,6 +74,14 @@ const Iframe = (props) => {
       },
     ],
   });
+  useEffect(() => {
+    document
+      .getElementById('previewIframe')
+      .contentWindow.postMessage(
+        { type: 'SELECT_BLOCK', uid: selectedBlock },
+        '*',
+      );
+  }, [selectedBlock]);
   //-------------------------
 
   const [iframeSrc, setIframeSrc] = useState(null);
