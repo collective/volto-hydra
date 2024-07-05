@@ -167,6 +167,7 @@ export class App extends Component {
           <Segment
             basic
             className="content-area"
+            style={{ padding: '0' }}
             onClick={this.dispatchContentClick}
           >
             <main ref={this.mainRef}>
