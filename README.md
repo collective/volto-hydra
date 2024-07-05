@@ -104,6 +104,26 @@ Each level requires more work to integrate but makes editing easier.
 As the GSoC projects progresses more of these levels will be enabled so you can try them out.
 see [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
 
+## Managing multiple frontends
+
+To switch to a different frontend in the Volto Hydra AdminUI, follow these steps:
+
+1. **Navigate to Personal Tools**: 
+   - In the bottom of the toolbar on the left, click on "Personal Tools".
+
+2. **Go to Preferences**: 
+   - From the Personal Tools menu, select "Preferences".
+
+3. **Change Frontend URL**: 
+   - In the Preferences section, you will find an option to select the Frontend URL.
+   - You can either select a frontend URL from the available options or type in a custom URL:
+     - To select a URL from the options, simply choose from the dropdown menu.
+     - To enter a custom URL, click on the toggle to make the input field appear and type in your desired URL.
+
+This allows you to switch seamlessly between different frontend URLs for testing or editing purposes.
+
+**Note**: Make sure the frontend URL is correct and accessible to avoid any CORS issues.
+
 ### Level 1: Show changes after save
 
 This is the most basic form of integration.
