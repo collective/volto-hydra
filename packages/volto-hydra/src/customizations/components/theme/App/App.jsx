@@ -159,7 +159,7 @@ export class App extends Component {
         />
         <SkipLinks />
         {/* <Header pathname={path} /> */}
-        <Breadcrumbs pathname={path} />
+        {/* <Breadcrumbs pathname={path} /> */}
         <MultilingualRedirector
           pathname={this.props.pathname}
           contentLanguage={this.props.content?.language?.token}

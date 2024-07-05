@@ -1,15 +1,15 @@
-import { SET_SELECTED_BLOCK } from './constants';
+import { SET_FRONTEND_PREVIEW_URL } from './constants';
 
 const initialState = {
-  uid: null,
+  url: null,
 };
 
-export default function selectedBlock(state = initialState, action = {}) {
+export default function frontendPreviewUrl(state = initialState, action = {}) {
   switch (action.type) {
-    case `${SET_SELECTED_BLOCK}`:
+    case `${SET_FRONTEND_PREVIEW_URL}`:
       return {
         ...state,
-        uid: action.uid,
+        url: action.url,
       };
 
     default:

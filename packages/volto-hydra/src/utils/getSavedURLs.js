@@ -3,7 +3,7 @@ import isValidUrl from './isValidUrl';
 
 /**
  * Get the default URL(s) from the environment
- * @returns {Array} URL(s) from the environment
+ * @returns {Array} URL(s) from the environment or 'http://localhost:3002' as fallback
  */
 export const getURlsFromEnv = () => {
   const presetUrlsString =

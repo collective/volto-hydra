@@ -20,6 +20,7 @@ import { toGettextLang } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
 import getSavedURLs from '../../../../utils/getSavedURLs';
 import isValidUrl from '../../../../utils/isValidUrl';
+import { setFrontendPreviewUrl } from '../../../../actions';
 
 const messages = defineMessages({
   personalPreferences: {
@@ -51,16 +52,16 @@ const messages = defineMessages({
     defaultMessage: 'Success',
   },
   frontendUrls: {
-    id: 'Select Frontend URL',
-    defaultMessage: 'Select Frontend URL',
+    id: 'Frontend URL',
+    defaultMessage: 'Frontend URL',
   },
   frontendUrl: {
-    id: 'Enter Frontend URL',
-    defaultMessage: 'Enter Frontend URL',
+    id: 'Custom URL',
+    defaultMessage: 'Custom URL',
   },
   urlsDescription: {
-    id: `Select your Frontend's base URL`,
-    defaultMessage: `Select your Frontend's base URL`,
+    id: `Changes the site to visit when in edit mode.`,
+    defaultMessage: `Changes the site to visit when in edit mode.`,
   },
   urlDescription: {
     id: `OR Enter your Frontend's base URL`,
@@ -132,13 +133,15 @@ class PersonalPreferences extends Component {
         );
         return;
       }
-      const urlList = [...new Set([this.urls, data.url])];
+      const url = new URL(data.url);
+      this.props.setFrontendPreviewUrl(url.origin);
+      const urlList = [...new Set([this.urls, url])];
       this.props.cookies.set('saved_urls', urlList.join(','), {
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 Days
       });
-      console.log('data.url', data.url);
     } else {
-      console.log('data.urls', data.urls);
+      const url = new URL(data.urls);
+      this.props.setFrontendPreviewUrl(url.origin);
     }
     this.props.closeMenu();
   }
@@ -171,12 +174,7 @@ class PersonalPreferences extends Component {
             {
               id: 'default',
               title: this.props.intl.formatMessage(messages.default),
-              fields: ['language'],
-            },
-            {
-              id: 'frontend',
-              title: 'Frontend',
-              fields: ['urls', 'url', 'urlCheck'],
+              fields: ['language', 'urls', 'url', 'urlCheck'],
             },
           ],
           properties: {
@@ -230,5 +228,5 @@ class PersonalPreferences extends Component {
 export default compose(
   injectIntl,
   withCookies,
-  connect(null, { changeLanguage }),
+  connect(null, { changeLanguage, setFrontendPreviewUrl }),
 )(PersonalPreferences);
