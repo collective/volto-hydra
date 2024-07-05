@@ -1,8 +1,8 @@
-import { SET_SELECTED_BLOCK } from './constants';
+import { SET_FRONTEND_PREVIEW_URL } from './constants';
 
-export function setSelectedBlock(uid) {
+export function setFrontendPreviewUrl(url) {
   return {
-    type: SET_SELECTED_BLOCK,
-    uid: uid,
+    type: SET_FRONTEND_PREVIEW_URL,
+    url: url,
   };
 }

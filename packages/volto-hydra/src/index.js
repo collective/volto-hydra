@@ -1,8 +1,8 @@
-import selectedBlock from './reducers';
+import frontendPreviewUrl from './reducers';
 
 const applyConfig = (config) => {
-  // Add the selectedBlock reducer
-  config.addonReducers.selectedBlock = selectedBlock;
+  // Add the frontendPreviwUrl reducer
+  config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
 
   // Add the slate block in the sidebar
   config.blocks.blocksConfig.slate.schemaEnhancer = ({

@@ -159,7 +159,7 @@ export class App extends Component {
         />
         <SkipLinks />
         {/* <Header pathname={path} /> */}
-        <Breadcrumbs pathname={path} />
+        {/* <Breadcrumbs pathname={path} /> */}
         <MultilingualRedirector
           pathname={this.props.pathname}
           contentLanguage={this.props.content?.language?.token}
@@ -167,6 +167,7 @@ export class App extends Component {
           <Segment
             basic
             className="content-area"
+            style={{ padding: '0' }}
             onClick={this.dispatchContentClick}
           >
             <main ref={this.mainRef}>
