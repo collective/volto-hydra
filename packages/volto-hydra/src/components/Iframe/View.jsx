@@ -18,6 +18,8 @@ import { BlockChooser } from '@plone/volto/components';
 import { createPortal } from 'react-dom';
 import { usePopper } from 'react-popper';
 import UrlInput from '../UrlInput';
+import { useDispatch } from 'react-redux';
+import { setSidebarTab } from '@plone/volto/actions';
 
 /**
  * Format the URL for the Iframe with location, token and enabling edit mode
@@ -53,6 +55,7 @@ const Iframe = (props) => {
   // useEffect(() => {
   //   setReady(true);
   // }, []);
+  const dispatch = useDispatch();
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
@@ -181,6 +184,7 @@ const Iframe = (props) => {
           if (history.location.pathname.endsWith('/edit')) {
             onSelectBlock(event.data.uid);
             setAddNewBlockOpened(false);
+            dispatch(setSidebarTab(1));
           }
           break;
 
