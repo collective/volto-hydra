@@ -33,13 +33,10 @@ import { setSidebarTab } from '@plone/volto/actions';
  * @returns {URL} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
-  // return typeof window !== 'undefined'
-  //   ? window.location.pathname.endsWith('/edit')
-  //     ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-  //     : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
-  //   : null;
   return typeof window !== 'undefined'
-    ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=${window.location.pathname.endsWith('/edit') ? 'true' : 'false'}`
+    ? window.location.pathname.endsWith('/edit')
+      ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
+      : `${url}?access_token=${token}&_edit=false`
     : null;
 };
 
@@ -101,9 +98,15 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
-    setIframeSrc(getUrlWithAdminParams(u, token));
+    if (iframeSrc) {
+      if (new URL(iframeSrc).origin !== new URL(u).origin) {
+        setIframeSrc(getUrlWithAdminParams(u, token));
+      }
+    } else {
+      setIframeSrc(getUrlWithAdminParams(u, token));
+    }
     u && Cookies.set('iframe_url', u, { expires: 7 });
-  }, [token, u]);
+  }, [iframeSrc, token, u]);
   const history = useHistory();
 
   //-----Experimental-----
@@ -144,7 +147,6 @@ const Iframe = (props) => {
       }
       // Update adminUI URL with the new URL
       const formattedUrl = new URL(givenUrl);
-
       history.push(`${formattedUrl.pathname}`);
     },
     [history],
