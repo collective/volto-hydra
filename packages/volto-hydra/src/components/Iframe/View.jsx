@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
@@ -27,10 +33,13 @@ import { setSidebarTab } from '@plone/volto/actions';
  * @returns {URL} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
+  // return typeof window !== 'undefined'
+  //   ? window.location.pathname.endsWith('/edit')
+  //     ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
+  //     : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
+  //   : null;
   return typeof window !== 'undefined'
-    ? window.location.pathname.endsWith('/edit')
-      ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
+    ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=${window.location.pathname.endsWith('/edit') ? 'true' : 'false'}`
     : null;
 };
 
@@ -135,8 +144,6 @@ const Iframe = (props) => {
       }
       // Update adminUI URL with the new URL
       const formattedUrl = new URL(givenUrl);
-      const newOrigin = formattedUrl.origin;
-      Cookies.set('iframe_url', newOrigin, { expires: 7 });
 
       history.push(`${formattedUrl.pathname}`);
     },
@@ -168,6 +175,10 @@ const Iframe = (props) => {
       const { type } = event.data;
       switch (type) {
         case 'URL_CHANGE': // URL change from the iframe
+          handleNavigateToUrl(event.data.url);
+          break;
+
+        case 'EXIT_EDIT_MODE': // URL change from the iframe
           handleNavigateToUrl(event.data.url);
           break;
 
@@ -221,6 +232,17 @@ const Iframe = (props) => {
     }
   }, [form, iframeSrc]);
 
+  const memoizedIframe = useMemo(
+    () => (
+      <iframe
+        id="previewIframe"
+        title="Preview"
+        src={iframeSrc}
+        ref={setReferenceElement}
+      />
+    ),
+    [iframeSrc],
+  );
   return (
     <div id="iframeContainer">
       {addNewBlockOpened &&
@@ -269,12 +291,7 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
-      <iframe
-        id="previewIframe"
-        title="Preview"
-        src={iframeSrc}
-        ref={setReferenceElement}
-      />
+      {memoizedIframe}
     </div>
   );
 };
