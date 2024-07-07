@@ -135,9 +135,14 @@ class Bridge {
       this.formData.blocks[blockUid] = this.addNodeIds(
         this.formData.blocks[blockUid],
       );
-      this.setDataCallback(this.formData);
-      console.log('selected', this.formData.blocks[blockUid]);
+      // this.setDataCallback(this.formData);
     }
+
+    // Add focus out event listener
+    blockElement.addEventListener(
+      'focusout',
+      this.handleBlockFocusOut.bind(this),
+    );
 
     // Set the currently selected block
     this.currentlySelectedBlock = blockElement;
@@ -359,6 +364,12 @@ class Bridge {
 
       // Clean up JSON structure
       this.resetJsonNodeIds(this.blocksJson);
+
+      // Remove focus out event listener
+      blockElement.removeEventListener(
+        'focusout',
+        this.handleBlockFocusOut.bind(this),
+      );
     }
     // Disconnect the mutation observer
     if (this.blockTextMutationObserver) {
@@ -431,10 +442,9 @@ class Bridge {
       const updatedJson = this.updateJsonNode(
         this.formData?.blocks[this.selectedBlockUid],
         nodeId,
-        closestNode.innerText,
+        closestNode.innerText?.replace(/\n$/, ''),
       );
       // this.resetJsonNodeIds(updatedJson);
-      console.log('updatedJson', updatedJson);
       this.formData.blocks[this.selectedBlockUid] = updatedJson;
       window.parent.postMessage(
         { type: 'INLINE_EDIT_DATA', data: this.formData },
@@ -467,6 +477,9 @@ class Bridge {
     return json;
   }
 
+  handleBlockFocusOut(e) {
+    window.parent.postMessage({ type: 'INLINE_EDIT_EXIT' }, this.adminOrigin);
+  }
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';

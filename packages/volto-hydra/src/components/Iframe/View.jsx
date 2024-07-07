@@ -84,6 +84,7 @@ const Iframe = (props) => {
   }, [selectedBlock]);
   //-------------------------
 
+  const isInlineEditingRef = useRef(false);
   const [iframeSrc, setIframeSrc] = useState(null);
   const urlFromEnv = getURlsFromEnv();
   const u =
@@ -101,6 +102,9 @@ const Iframe = (props) => {
   const intl = useIntl();
 
   const onInsertBlock = (id, value, current) => {
+    if (value?.['@type'] === 'slate') {
+      value = { ...value, value: [{ type: 'p', children: [{ text: '' }] }] };
+    }
     const [newId, newFormData] = insertBlock(
       properties,
       id,
@@ -189,7 +193,12 @@ const Iframe = (props) => {
           break;
 
         case 'INLINE_EDIT_DATA':
+          isInlineEditingRef.current = true;
           onChangeFormData(event.data.data);
+          break;
+
+        case 'INLINE_EDIT_EXIT':
+          isInlineEditingRef.current = false;
           break;
 
         default:
@@ -216,7 +225,12 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    if (form && Object.keys(form).length > 0 && isValidUrl(iframeSrc)) {
+    if (
+      !isInlineEditingRef.current &&
+      form &&
+      Object.keys(form).length > 0 &&
+      isValidUrl(iframeSrc)
+    ) {
       // Send the form data to the iframe
       const origin = new URL(iframeSrc).origin;
       document
