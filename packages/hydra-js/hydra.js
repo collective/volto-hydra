@@ -262,6 +262,18 @@ class Bridge {
   }
 
   /**
+   * Set the contenteditable of the block with the given UID and its children to true
+   * @param {Element} blockElement
+   */
+  makeBlockContentEditable(blockElement) {
+    blockElement.setAttribute('contenteditable', 'true');
+    const childNodes = blockElement.querySelectorAll('[data-hydra-node]');
+    childNodes.forEach((node) => {
+      node.setAttribute('contenteditable', 'true');
+    });
+  }
+
+  /**
    * Add nodeIds in the json object to each of the Selected Block's children
    * @param {JSON} json Selected Block's data
    * @param {BigInteger} nodeIdCounter (Optional) Counter to keep track of the nodeIds
