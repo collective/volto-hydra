@@ -42,10 +42,6 @@ class Bridge {
         ) {
           e.preventDefault();
           window.open(newUrl.href, '_blank').focus();
-          window.parent.postMessage(
-            { type: 'EXIT_EDIT_MODE', url: this.currentUrl.href },
-            this.adminOrigin,
-          );
         }
       };
 

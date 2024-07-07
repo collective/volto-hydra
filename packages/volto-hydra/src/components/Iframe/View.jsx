@@ -180,10 +180,6 @@ const Iframe = (props) => {
           handleNavigateToUrl(event.data.url);
           break;
 
-        case 'EXIT_EDIT_MODE': // URL change from the iframe
-          handleNavigateToUrl(event.data.url);
-          break;
-
         case 'OPEN_SETTINGS':
           if (history.location.pathname.endsWith('/edit')) {
             onSelectBlock(event.data.uid);
