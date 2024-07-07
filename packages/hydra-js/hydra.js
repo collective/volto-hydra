@@ -46,10 +46,6 @@ class Bridge {
         ) {
           e.preventDefault();
           window.open(newUrl.href, '_blank').focus();
-          window.parent.postMessage(
-            { type: 'EXIT_EDIT_MODE', url: this.currentUrl.href },
-            this.adminOrigin,
-          );
         }
       };
 
@@ -412,7 +408,7 @@ class Bridge {
 
           if (mutation.type === 'characterData') {
             targetElement =
-              mutation.target.parentElement.closest('[data-hydra-node]');
+              mutation.target?.parentElement.closest('[data-hydra-node]');
           } else {
             targetElement = mutation.target.closest('[data-hydra-node]');
           }
