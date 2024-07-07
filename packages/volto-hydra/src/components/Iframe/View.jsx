@@ -188,6 +188,10 @@ const Iframe = (props) => {
           onDeleteBlock(event.data.uid, true);
           break;
 
+        case 'INLINE_EDIT_DATA':
+          onChangeFormData(event.data.data);
+          break;
+
         default:
           break;
       }
