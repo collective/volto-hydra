@@ -17,8 +17,12 @@ const applyConfig = (config) => {
     schema.fieldsets[0].fields.push('value');
     return schema;
   };
-  // Set the sidebarTab to 1
-  config.blocks.blocksConfig.slate.sidebarTab = 1;
+  // Set the sidebarTab to 1 & set most used to true
+  config.blocks.blocksConfig.slate = {
+    ...config.blocks.blocksConfig.slate,
+    sidebarTab: 1,
+    mostUsed: true,
+  };
 
   // Add image from sidebar
   config.blocks.blocksConfig.image.schemaEnhancer = ({
@@ -33,6 +37,13 @@ const applyConfig = (config) => {
     schema.fieldsets[0].fields.push('url');
     return schema;
   };
+
+  // Remove Blocks except for slate and image
+  for (const key in config.blocks.blocksConfig) {
+    if (key !== 'slate' && key !== 'image') {
+      config.blocks.blocksConfig[key].restricted = true;
+    }
+  }
 
   return config;
 };
