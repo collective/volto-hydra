@@ -1,6 +1,11 @@
 /** Bridge class creating two-way link between the Hydra and the frontend **/
 class Bridge {
-  constructor(adminOrigin) {
+  /**
+   *
+   * @param {URL} adminOrigin - The origin of the adminUI
+   * @param {Object} options - Options for the bridge initialization -- allowedBlocks: Array of allowed block types e.g. ['title', 'text', 'image', ...]
+   */
+  constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
@@ -14,10 +19,10 @@ class Bridge {
     this.quantaToolbar = null;
     this.currentUrl =
       typeof window !== 'undefined' ? new URL(window.location.href) : null;
-    this.init();
+    this.init(options);
   }
 
-  init() {
+  init(options = {}) {
     if (typeof window === 'undefined') {
       return;
     }
@@ -56,6 +61,15 @@ class Bridge {
       if (access_token) {
         this.token = access_token;
         this._setTokenCookie(access_token);
+      }
+
+      if (options) {
+        if (options.allowedBlocks) {
+          window.parent.postMessage(
+            { type: 'ALLOWED_BLOCKS', allowedBlocks: options.allowedBlocks },
+            this.adminOrigin,
+          );
+        }
       }
 
       if (isEditMode) {
@@ -412,11 +426,12 @@ let bridgeInstance = null;
  * Initialize the bridge
  *
  * @param {URL} adminOrigin
- * @returns {Bridge} new Bridge()
+ * @param {Object} options
+ * @returns new Bridge()
  */
-export function initBridge(adminOrigin) {
+export function initBridge(adminOrigin, options = {}) {
   if (!bridgeInstance) {
-    bridgeInstance = new Bridge(adminOrigin);
+    bridgeInstance = new Bridge(adminOrigin, options);
   }
   return bridgeInstance;
 }

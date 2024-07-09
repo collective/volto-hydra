@@ -17,6 +17,9 @@ importers:
       '@plone/volto':
         specifier: workspace:*
         version: link:core/packages/volto
+      events:
+        specifier: ^3.3.0
+        version: 3.3.0
       js-cookie:
         specifier: ^3.0.5
         version: 3.0.5

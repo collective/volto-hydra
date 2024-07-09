@@ -179,11 +179,19 @@ export default function Blog({ params }) {
   ```js
   // In Layout.js or App.js
   import { initBridge } from './hydra.js';
-  initBridge("https://hydra.pretagov.com");
+  const bridge = initBridge("https://hydra.pretagov.com");
   ```
 - This will enable the 2 way link between hydra and your frontend.
 - Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend to test.
    - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on your hydra instance to have this frontend selectable by the user. 
+
+**Note:** You can also pass an options object while initializing the bridge. Currently you can pass a List of allowed blocks (by default image & text blocks are allowed if not specified).
+E.g. :
+  ```js
+  // In Layout.js or App.js
+  import { initBridge } from './hydra.js';
+  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
+  ```
 
 #### Asynchronously Load the Bridge
 
