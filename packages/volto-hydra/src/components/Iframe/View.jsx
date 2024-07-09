@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
@@ -34,7 +40,7 @@ const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
       ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
+      : `${url}?access_token=${token}&_edit=false`
     : null;
 };
 
@@ -96,9 +102,15 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
-    setIframeSrc(getUrlWithAdminParams(u, token));
+    if (iframeSrc) {
+      if (new URL(iframeSrc).origin !== new URL(u).origin) {
+        setIframeSrc(getUrlWithAdminParams(u, token));
+      }
+    } else {
+      setIframeSrc(getUrlWithAdminParams(u, token));
+    }
     u && Cookies.set('iframe_url', u, { expires: 7 });
-  }, [token, u]);
+  }, [iframeSrc, token, u]);
   const history = useHistory();
 
   //-----Experimental-----
@@ -139,9 +151,6 @@ const Iframe = (props) => {
       }
       // Update adminUI URL with the new URL
       const formattedUrl = new URL(givenUrl);
-      const newOrigin = formattedUrl.origin;
-      Cookies.set('iframe_url', newOrigin, { expires: 7 });
-
       history.push(`${formattedUrl.pathname}`);
     },
     [history],
@@ -234,6 +243,17 @@ const Iframe = (props) => {
     }
   }, [form, iframeSrc]);
 
+  const memoizedIframe = useMemo(
+    () => (
+      <iframe
+        id="previewIframe"
+        title="Preview"
+        src={iframeSrc}
+        ref={setReferenceElement}
+      />
+    ),
+    [iframeSrc],
+  );
   return (
     <div id="iframeContainer">
       {addNewBlockOpened &&
@@ -282,12 +302,7 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
-      <iframe
-        id="previewIframe"
-        title="Preview"
-        src={iframeSrc}
-        ref={setReferenceElement}
-      />
+      {memoizedIframe}
     </div>
   );
 };
