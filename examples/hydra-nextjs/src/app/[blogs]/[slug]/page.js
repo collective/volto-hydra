@@ -1,7 +1,7 @@
 'use client';
 import { notFound } from 'next/navigation';
 import { usePathname } from 'next/navigation';
-import { initBridge, getTokenFromCookie } from '#utils/hydra';
+import { initBridge, getTokenFromCookie } from '@volto-hydra/hydra-js';
 import { useEffect, useState } from 'react';
 import BlocksList from '@/components/BlocksList';
 import { fetchContent } from '#utils/api';
