@@ -1,4 +1,8 @@
 import frontendPreviewUrl from './reducers';
+import {
+  getAllowedBlocksList,
+  subscribeToAllowedBlocksListChanges,
+} from './utils/allowedBlockList';
 
 const applyConfig = (config) => {
   // Add the frontendPreviwUrl reducer
@@ -38,12 +42,22 @@ const applyConfig = (config) => {
     return schema;
   };
 
-  // Remove Blocks except for slate and image
-  for (const key in config.blocks.blocksConfig) {
-    if (key !== 'slate' && key !== 'image') {
-      config.blocks.blocksConfig[key].restricted = true;
+  const updateAllowedBlocks = () => {
+    const allowedBlocksList = getAllowedBlocksList();
+    const defaultAllowedBlocks = ['slate', 'image'];
+
+    for (const key in config.blocks.blocksConfig) {
+      config.blocks.blocksConfig[key].restricted =
+        allowedBlocksList && allowedBlocksList.length > 0
+          ? !allowedBlocksList.includes(key)
+          : !defaultAllowedBlocks.includes(key);
     }
-  }
+  };
+  // Subscribe to changes in the allowed blocks list
+  subscribeToAllowedBlocksListChanges(updateAllowedBlocks);
+
+  // Initial call to set the blocks based on the initial state
+  updateAllowedBlocks();
 
   return config;
 };
