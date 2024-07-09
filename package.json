@@ -41,7 +41,7 @@
     "volto-hydra": "workspace:*"
   },
   "peerDependencies": {
-    "@plone/volto": "volto-18.0.0-alpha.36"
+    "@plone/volto": "volto-18.0.0-alpha.41"
   },
   "devDependencies": {
     "mrs-developer": "^2.2.0"
