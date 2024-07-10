@@ -7,14 +7,16 @@ import BlocksList from '@/components/BlocksList';
 import { fetchContent } from '#utils/api';
 
 export default function Blog({ params }) {
-  const bridge = initBridge('https://hydra.pretagov.com');
+  const bridge = initBridge(process.env.NEXT_PUBLIC_ADMINUI_ORIGIN, {
+    allowedBlocks: ['slate', 'image', 'video'],
+  });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   useEffect(() => {
     async function getData(token = null) {
       try {
-        const apiPath = 'https://hydra.pretagov.com';
+        const apiPath = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
         const path = pathname;
         const content = await fetchContent(apiPath, { token, path });
         setData(content);
