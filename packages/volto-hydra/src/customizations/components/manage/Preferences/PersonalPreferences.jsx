@@ -14,7 +14,7 @@ import { toast } from 'react-toastify';
 
 import { Toast } from '@plone/volto/components';
 import { Form } from '@plone/volto/components/manage/Form';
-import languages from '@plone/volto/constants/Languages.cjs';
+import languages from '@plone/volto/constants/Languages';
 import { changeLanguage } from '@plone/volto/actions';
 import { toGettextLang } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
@@ -124,7 +124,8 @@ class PersonalPreferences extends Component {
     );
     // Check if the URL is typed in or Selected from dropdown
     if (data.urlCheck) {
-      if (!isValidUrl(data.url)) { // Check if the URL is valid
+      if (!isValidUrl(data.url)) {
+        // Check if the URL is valid
         toast.error(
           <Toast
             error
@@ -214,7 +215,8 @@ class PersonalPreferences extends Component {
         }}
         onSubmit={this.onSubmit}
         onCancel={this.onCancel}
-        onChangeFormData={(newFormData) => { // Show/Hide the URL input field based on the checkbox
+        onChangeFormData={(newFormData) => {
+          // Show/Hide the URL input field based on the checkbox
           if (newFormData.urlCheck) {
             this.setState({ hidden: false });
           } else {

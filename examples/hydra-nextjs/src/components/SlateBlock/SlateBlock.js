@@ -10,7 +10,6 @@ const SlateBlock = ({ value }) => {
     [],
   );
   const renderElement = ({ attributes, children, element }) => {
-    console.log('element', element);
     if (element.type === 'link') {
       return (
         <a
@@ -32,8 +31,6 @@ const SlateBlock = ({ value }) => {
   };
 
   const renderLeaf = ({ attributes, children }) => {
-    console.log('attr', attributes);
-    console.log('children', children);
     return (
       <span {...attributes} data-hydra-node={`${children.props.leaf?.nodeId}`}>
         {children}
