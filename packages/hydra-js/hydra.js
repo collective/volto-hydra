@@ -1,6 +1,11 @@
 /** Bridge class creating two-way link between the Hydra and the frontend **/
 class Bridge {
-  constructor(adminOrigin) {
+  /**
+   *
+   * @param {URL} adminOrigin - The origin of the adminUI
+   * @param {Object} options - Options for the bridge initialization -- allowedBlocks: Array of allowed block types e.g. ['title', 'text', 'image', ...]
+   */
+  constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
@@ -18,16 +23,15 @@ class Bridge {
     this.formData = null;
     this.blockTextMutationObserver = null;
     this.selectedBlockUid = null;
-    this.init();
+    this.init(options);
   }
 
-  init() {
+  init(options = {}) {
     if (typeof window === 'undefined') {
       return;
     }
 
     if (window.self !== window.top) {
-      // Handle URL changes generically (no chromium-specific code here)
       this.navigationHandler = (e) => {
         const newUrl = new URL(e.destination.url);
         if (
@@ -60,6 +64,15 @@ class Bridge {
       if (access_token) {
         this.token = access_token;
         this._setTokenCookie(access_token);
+      }
+
+      if (options) {
+        if (options.allowedBlocks) {
+          window.parent.postMessage(
+            { type: 'ALLOWED_BLOCKS', allowedBlocks: options.allowedBlocks },
+            this.adminOrigin,
+          );
+        }
       }
 
       if (isEditMode) {
@@ -131,7 +144,7 @@ class Bridge {
       this.formData.blocks[blockUid] = this.addNodeIds(
         this.formData.blocks[blockUid],
       );
-      // this.setDataCallback(this.formData);
+      this.setDataCallback(this.formData);
     }
 
     // Add focus out event listener

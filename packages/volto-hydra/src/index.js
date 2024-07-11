@@ -34,6 +34,17 @@ const applyConfig = (config) => {
     return schema;
   };
 
+  // Initial block for Document content type
+  config.blocks.initialBlocks = {
+    Document: [
+      { '@type': 'title' },
+      {
+        '@type': 'slate',
+        value: [{ type: 'p', children: [{ text: '' }] }],
+      },
+    ],
+  };
+
   return config;
 };
 
