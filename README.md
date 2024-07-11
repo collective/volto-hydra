@@ -300,7 +300,7 @@ If you completed level 2 & 3 (made blocks clickable and enabled live updates) th
 
 With Quanta toobar, you can use following features:
 
-- You can click on '+' Icon (appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute) to add a block below the current block by choosing a type from BlockChooser popup.
+- You can click on '+' Icon (appears at the bottom-right of the container in which you added `data-block-uid="<<BLOCK_UID>>>"` attribute) to add a block below the current block by choosing a type from BlockChooser popup.
 - You can click on three dots icon on Quanta toolbar (appears at the top-left) and it will open up a dropdown menu, you can click on 'Remove' to delete the current block.
 - Settings option is yet to be implemented [TODO](https://github.com/collective/volto-hydra/issues/81)
 - drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
@@ -314,14 +314,45 @@ You will still need to edit the blocks themselves via the sidebar.
 If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
 can change check, links or media by typing or clicking directly on your frontend instead of via fields on the sidebar.
 
-#### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
-You will add data attributes to where a blocks text is editable and where text formatting and features are locationed (like links)
-and also subscribe to ```onBlockFieldChanged``` events. This will enable handling fine grained 
-changes to text being edited such as turning text bold or creating a link. Hydra will notice where you have indicated a block field can 
-be clicked on and will automatically make it inplace editable handling typing, shortcuts 
+#### Inline text editing
+
+Now Hydra supports inline editing of text! You can enable this by adding an attribute `data-hydra-node="<<nodeId>>"` to your html nodes.
+The `nodeId` is accessible from `data` object itself once you subscribe to `onEditChange` for realtime data updates (since nodeId is not always available its recommended to use optional chaining). 
+For example if you are using slate to render the text block, then:
+```jsx
+
+const SlateBlock = ({ value }) => {
+  const editor = React.useMemo(() => withReact(withHistory(createEditor())), []);
+  const renderElement = ({ attributes, children, element }) => {
+    if (element.type === "link") {
+      return (// nodeId is given by hydra.js itself
+        <a href={element.data.url} {...attributes} data-hydra-node={`${element?.nodeId}`}> 
+          {children}
+        </a>
+      );
+    }
+    
+    const Tag = element.type;
+    return <Tag {...attributes} data-hydra-node={`${element?.nodeId}`}>{children}</Tag>;
+  };
+  
+  const renderLeaf = ({ attributes, children }) => {
+    return <span {...attributes} data-hydra-node={`${children.props.leaf?.nodeId}`}>{children}</span>; // similarly for the leaf node
+  };
+
+  const initialValue = value || [{ type: "p", children: [{ text: "" }] }];
+  editor.children = initialValue;
+  return (
+    <Slate editor={editor} initialValue={initialValue}>
+      <Editable renderElement={renderElement} renderLeaf={renderLeaf} readOnly />
+    </Slate>
+  );
+};
+```
+Hydra will notice where you have indicated a block field can be clicked on and will automatically make it inplace editable handling typing, shortcuts 
 (slash ([TODO](https://github.com/collective/volto-hydra/issues/34)), 
 enter ([TODO](https://github.com/collective/volto-hydra/issues/33)) and bullets etc) and 
-selection (TODO](https://github.com/collective/volto-hydra/issues/31))for you.
+selection ([TODO](https://github.com/collective/volto-hydra/issues/31))for you.
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
