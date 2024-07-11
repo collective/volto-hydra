@@ -19,6 +19,10 @@ import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
 import { setSidebarTab } from '@plone/volto/actions';
+import {
+  getAllowedBlocksList,
+  setAllowedBlocksList,
+} from '../../utils/allowedBlockList';
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -63,7 +67,7 @@ const Iframe = (props) => {
       {
         name: 'offset',
         options: {
-          offset: [0, -350],
+          offset: [550, -300],
         },
       },
       {
@@ -190,6 +194,15 @@ const Iframe = (props) => {
 
         case 'DELETE_BLOCK':
           onDeleteBlock(event.data.uid, true);
+          break;
+
+        case 'ALLOWED_BLOCKS':
+          if (
+            JSON.stringify(getAllowedBlocksList()) !==
+            JSON.stringify(event.data.allowedBlocks)
+          ) {
+            setAllowedBlocksList(event.data.allowedBlocks);
+          }
           break;
 
         case 'INLINE_EDIT_DATA':

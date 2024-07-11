@@ -635,11 +635,12 @@ let bridgeInstance = null;
  * Initialize the bridge
  *
  * @param {URL} adminOrigin
- * @returns {Bridge} new Bridge()
+ * @param {Object} options
+ * @returns new Bridge()
  */
-export function initBridge(adminOrigin) {
+export function initBridge(adminOrigin, options = {}) {
   if (!bridgeInstance) {
-    bridgeInstance = new Bridge(adminOrigin);
+    bridgeInstance = new Bridge(adminOrigin, options);
   }
   return bridgeInstance;
 }
