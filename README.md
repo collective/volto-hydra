@@ -192,11 +192,11 @@ you would change this to
 </div>
 ```
 
-and now you can click directly on your block to edit the block contents in the sidebar and selecting a block in the sidebar will highlight that block.
-Without this, you can still manage blocks via the blocks navigation in the sidebar.
-
-It will allow you to naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) but not add, remove or move blocks
-unless live updates (level 3) is enabled. 
+Now an editor can :-
+- click directly on your block to edit the block contents in the sidebar. 
+   - The block will appear highlighted and a quantatool bar will appear above it.
+- selecting a block in the sidebar will highlight that block on the frontend
+- naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) 
 
 ### Level 3: Enable Realtime changes while editing
 
@@ -220,22 +220,23 @@ bridge.onEditChange(handleEditChange);
 
 Your ```handleEditChange``` callback can be hooked up to the code you wrote to render the page from Plone restapi contents.
 
-Now any change made in the sidebar automatically appears on the frontend as you type.
+Now an editor can:-
+- change a block in the sidebar and have it change on the frontend even as you type in WYSIWYG style
+- Add and remove blocks in the side bar and have them appear on the frontend preview
+- Change page metadata and have blocks that depend on this like the "Title" block change.
 
 ### Level 4: Enable Managing Blocks directly on your frontend
 
-If you completed level 2 & 3 (made blocks clickable and enabled live updates) then there is nothing more you need to do.
+If you completed levels 1 to 3 (made blocks clickable and enabled live updates) then there is nothing more you need to do.
 
-Now your editors can
-- You can click on '+' Icon to add a block below the current block by choosing a type from BlockChooser popup.
+Now an editor can :-
+- You can click on '+' Icon directly on the frontend to add a block below the current block by choosing a type from BlockChooser popup.
    - It appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute.
 - Quanta toolbar menu let's you remove a block and open or close the block settings [TODO](https://github.com/collective/volto-hydra/issues/81)
 - drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
 - cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
  
-You will still need to edit the blocks themselves via the sidebar. 
-
 ### Level 5: Enable Editing blocks text and images inplace ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
@@ -255,15 +256,17 @@ e.g. our example teaser block above will become
 </div>
 ```
 
-You will need to add a call back to the bridge ```onBlockFieldChanged``` so that any formatting changes
+You may choose to add a call back to the bridge ```onBlockFieldChanged``` so that any formatting changes
 such as applying bold, can be rerendered efficiently.
 
-Thats it. Hydra will handle inplace editing, formatting and keyboard shortcuts for you. Just like you did in volto.
-
-Shortcuts  will include
-(slash ([TODO](https://github.com/collective/volto-hydra/issues/34)), 
-enter ([TODO](https://github.com/collective/volto-hydra/issues/33)) and bullets etc) and 
-selection (TODO](https://github.com/collective/volto-hydra/issues/31)) for you.
+Now an editor can:-
+- click into rich text and type, adding, removing and cut and pasting, all directly on the frontend. [TODO](https://github.com/collective/volto-hydra/issues/29)
+- select text and apply formating ([TODO](https://github.com/collective/volto-hydra/issues/31))
+- apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
+- create or edit a link [TODO](https://github.com/collective/volto-hydra/issues/35)
+- type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
+- type "enter" at the end of a text block to create a new block ([TODO](https://github.com/collective/volto-hydra/issues/33))
+- use markdown shortcuts like bullet and heading codes (TODO)
 
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
