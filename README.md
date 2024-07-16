@@ -1,15 +1,24 @@
 # Volto Hydra (volto-hydra)
 
-A volto addon to turn Plone Volto into a decoupled editor for headless Plone.
+A Google summer of code project to create a proof of concept of 
+volto addon to turn Plone Volto into a decoupled editor for headless Plone.
 
-Why Hydra? because it lets you have many frontends (heads) written in many framework all connected to the same body (plone) while still letting 
-you edit the content directly into your frontend. 
+Why does it matter?
 
-It is a GSoC project to prove with the following goals
-- Provide an editing UI as similar to Volto as possible (with some Quanta design ideas)
-- Do so with the simplest integrator instructions possible
+If you already use volto
+- you can develop frontends with faster load times and less risky future volto upgrades
 
-It's Volto without having to learn any Volto.
+If you don't use volto 
+- it will lower the learning curve by allowing you to use your preferred frontend stack.
+
+If you are already using plone headless
+- this will improve the editor experience with just a few lines of code
+
+
+Why Hydra? 
+- it lets you have many frontends (heads) written in many framework all connected to the same body (plone) while still letting 
+you edit the content using a volto like editing UI
+
 
 ## Want to try the editor?
 
@@ -27,6 +36,7 @@ or the [Hydra README](https://github.com/collective/volto-hydra)
 You can build your own frontend in your favourite frontend framework, deploy it and then [submit a ticket to have it listed as
 one of the test frontends](https://github.com/collective/volto-hydra/issues).
 
+## Building a Frontend for Headless Plone
 
 ### Choose Your Framework
 
@@ -96,15 +106,7 @@ on https://hydra.pretagov.com for others to test.
 But be sure to subscribe to the project so you can keep your frontend updated with changes to the hydra api as more 
 capabilities are added. If there are bugs lets us know.
 
-## Make your frontend editable
-
-As an integrator you have a choice on how nice you want the editor user experience to be.
-Each level requires more work to integrate but makes editing easier.
-
-As the GSoC projects progresses more of these levels will be enabled so you can try them out.
-see [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
-
-## Managing multiple frontends
+### Managing multiple frontends
 
 To switch to a different frontend in the Volto Hydra AdminUI, follow these steps:
 
@@ -124,6 +126,14 @@ This allows you to switch seamlessly between different frontend URLs for testing
 
 **Note**: Make sure the frontend URL is correct and accessible to avoid any CORS issues.
 
+## Make your Frontend editable
+
+As an integrator you have a choice on how nice you want the editor user experience to be.
+Each level requires more work to integrate but makes editing easier.
+
+As the GSoC projects progresses more of these levels will be enabled so you can try them out.
+see [Hydra GSoC project progresses](https://github.com/orgs/collective/projects/3/views/4)
+
 ### Level 1: Show changes after save
 
 To do this you will include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
@@ -131,7 +141,6 @@ To do this you will include the hydra iframe bridge which creates a two way link
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
 - Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will recieve a ```?_edit=true```, [checkout below](#asynchronously-load-the-bridge) to load `hydra.js` asynchronously.
 - You may need to [change your authentication token you are using with the rest api so you can access the same content as the logged in editor](#authenticate-frontend-to-access-private-content).
-
 
 #### How to initialise the bridge.
 
@@ -254,7 +263,7 @@ Thats it. Hydra will handle inplace editing, formatting and keyboard shortcuts f
 Shortcuts  will include
 (slash ([TODO](https://github.com/collective/volto-hydra/issues/34)), 
 enter ([TODO](https://github.com/collective/volto-hydra/issues/33)) and bullets etc) and 
-selection (TODO](https://github.com/collective/volto-hydra/issues/31))for you.
+selection (TODO](https://github.com/collective/volto-hydra/issues/31)) for you.
 
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
