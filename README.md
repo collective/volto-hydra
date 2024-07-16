@@ -159,33 +159,35 @@ Now an editor can :-
 
 ### Level 2: Click to select blocks on your frontend (Quanta Toolbar)
 
-You will add data attributes to your rendered block html so hydra knows where they are on the page and it
-will automatically handle click events and show a quanta toolbar 
-and border when selecting a block.
-Without this, you can still manage blocks via the blocks navigation in the sidebar.
-
-It will allow you to naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) but not add, remove or move blocks
-unless live updates (level 3) is enabled. 
-
 Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
-The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
 
-For example, if you are using ploneClient to fetch `data`, it will be `data.blocks_layout.items[x]`.
-Now, Click on your blocks in iframe and the sidebar will show its settings.
-
-If you are rendering a Title block as
+If you are rendering a Teaser block as
 
 ``` html
-<h1>My Title</h1>
+<div class="teaser">
+<img src="/big_news.jpg"/>
+<h2>Big News</h2>
+<div>Check out <b>hydra</b>, it will change everything</div>
+<a href="/big_news">Read more</a>
+</div>
 ```
 
 you would change this to
 
 ``` html
-<h1 data-block-uid="....">My title</h1>
+<div class="teaser" data-block-uid="....">
+<img src="/big_news.jpg"/>
+<h2>Big News</h2>
+<div>Check out <b>hydra</b>, it will change everything</div>
+<a href="/big_news">Read more</a>
+</div>
 ```
 
-and now your block can be selected.
+and now you can click directly on your block to edit the block contents in the sidebar and selecting a block in the sidebar will highlight that block.
+Without this, you can still manage blocks via the blocks navigation in the sidebar.
+
+It will allow you to naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) but not add, remove or move blocks
+unless live updates (level 3) is enabled. 
 
 ### Level 3: Enable Realtime changes while editing
 
@@ -233,14 +235,15 @@ can change check, links or media by typing or clicking directly on your frontend
 #### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
 You will add data attributes to where a blocks text is editable and where text formatting and features are locationed (like links).
 
-e.g. 
-``` html
-<h1 data-block-uid="....">My title</h1>
-```
+e.g. our example teaser block above will become
 
-will become
 ``` html
-<h1 data-block-uid="...." data-editable-field="title">My <b data-node-id="2">title</b></h1>
+<div class="teaser" data-block-uid="....">
+<img src="/big_news.jpg"/>
+<h2 data-editable-field="title">Big News</h2>
+<div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
+<a href="/big_news">Read more</a>
+</div>
 ```
 
 You will need to add a call back to the bridge ```onBlockFieldChanged``` so that any formatting changes
@@ -258,9 +261,12 @@ selection (TODO](https://github.com/collective/volto-hydra/issues/31))for you.
 
 You can let the user upload images or pick an existing image by clicking on the image on your frontend.
 
-```html
-<div data-block-uid="....">
-<img src="..." data-editible-field="image"/>
+``` html
+<div class="teaser" data-block-uid="....">
+<img data-editible-field="image" src="/big_news.jpg"/>
+<h2 data-editable-field="title">Big News</h2>
+<div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
+<a href="/big_news">Read more</a>
 </div>
 ```
 
@@ -269,11 +275,12 @@ You can let the user upload images or pick an existing image by clicking on the 
 You might have a block with a link field like the Teaser block. You can also make this
 editable. In edit mode the user clicks and can pick content to link to or enter an external url.
 
-```html
-<div data-block-uid="....">
-<img src="..." data-editible-field="teaser_image"/>
-<h2 data-editible-field="teaser_title">Big News</h2>
-<a href="..." data-editable-field="teaser_link">Read more</a>
+``` html
+<div class="teaser" data-block-uid="....">
+<img data-editible-field="image" src="/big_news.jpg"/>
+<h2 data-editable-field="title">Big News</h2>
+<div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
+<a data-editable-field="link" href="/big_news">Read more</a>
 </div>
 ```
 
