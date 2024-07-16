@@ -141,7 +141,7 @@ To do this you will include the hydra iframe bridge which creates a two way link
   ```js
   // In Layout.js or App.js
   import { initBridge } from './hydra.js';
-  const bridge = initBridge("https://hydra.pretagov.com");
+  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
 - This will enable the 2 way link between hydra and your frontend.
 - Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend to test.
@@ -156,15 +156,6 @@ Now an editor can :-
    - they will be able to add blocks the frontend specifies that it can support. 
 - remove a page.
 - all other volto features outside editing work the same.
-
-
-**Note:** You can also pass an options object while initializing the bridge. Currently you can pass a List of allowed blocks (by default image & text blocks are allowed if not specified).
-E.g. :
-  ```js
-  // In Layout.js or App.js
-  import { initBridge } from './hydra.js';
-  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
-  ```
 
 ### Level 2: Click to select blocks on your frontend (Quanta Toolbar)
 
