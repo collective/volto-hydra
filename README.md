@@ -143,7 +143,7 @@ To do this you will include the hydra iframe bridge which creates a two way link
 - You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
 - Or you can use it in Authorization header if you are using other methods to fetch content from plone Backend.
 
-Example Usage:
+Example using nextjs 14 and ploneClient:
 ```js
 // nextjs 14 using ploneClient
 import ploneClient from "@plone/client";
@@ -193,9 +193,137 @@ E.g. :
   const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
 
+
+### Level 2: Click to select blocks on your frontend (Quanta Toolbar)
+
+You will add data attributes to your rendered block html so hydra knows where they are on the page and it
+will automatically handle click events and show a quanta toolbar 
+and border when selecting a block.
+Without this, you can still manage blocks via the blocks navigation in the sidebar.
+
+It will allow you to naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) but not add, remove or move blocks
+unless live updates (level 3) is enabled. 
+
+Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
+The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
+
+For example, if you are using ploneClient to fetch `data`, it will be `data.blocks_layout.items[x]`.
+Now, Click on your blocks in iframe and the sidebar will show its settings.
+
+If you are rendering a Title block as
+
+``` html
+<h1>My Title</h1>
+```
+
+you would change this to
+
+``` html
+<h1 data-block-uid="....">My title</h1>
+```
+
+and now your block can be selected.
+
+### Level 3: Enable Realtime changes while editing
+
+You will need to subscribe to an ```onEditChange``` event that will call the callback with the updated data.
+
+The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data.
+The 'data' object follows the same format as you get from the [ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
+
+`onEditChange` takes following args:
+| Args         | Description |
+| :-----------:| :-------|
+| *callback*   | A function to call with the updated data when a change is detected. |
+
+Usage:
+```js
+// Set up the onEditChange listener
+//After initiating the bridge you can use its onEditChange method
+const bridge = initBridge('https://hydra.pretagov.com');
+bridge.onEditChange(handleEditChange);
+```
+
+Your ```handleEditChange``` callback can be hooked up to the code you wrote to render the page from Plone restapi contents.
+
+Now any change made in the sidebar automatically appears on the frontend as you type.
+
+### Level 4: Enable Managing Blocks directly on your frontend
+
+If you completed level 2 & 3 (made blocks clickable and enabled live updates) then there is nothing more you need to do.
+
+Now your editors can
+- You can click on '+' Icon to add a block below the current block by choosing a type from BlockChooser popup.
+   - It appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute.
+- Quanta toolbar menu let's you remove a block and open or close the block settings [TODO](https://github.com/collective/volto-hydra/issues/81)
+- drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
+- cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
+- and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
+ 
+You will still need to edit the blocks themselves via the sidebar. 
+
+### Level 5: Enable Editing blocks text and images inplace ([TODO](https://github.com/collective/volto-hydra/issues/5))
+
+If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
+can change check, links or media by typing or clicking directly on your frontend instead of via fields on the sidebar.
+
+#### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
+You will add data attributes to where a blocks text is editable and where text formatting and features are locationed (like links).
+
+e.g. 
+``` html
+<h1 data-block-uid="....">My title</h1>
+```
+
+will become
+``` html
+<h1 data-block-uid="...." data-editable-field="title">My <b data-node-id="2">title</b></h1>
+```
+
+You will need to add a call back to the bridge ```onBlockFieldChanged``` so that any formatting changes
+such as applying bold, can be rerendered efficiently.
+
+Thats it. Hydra will handle inplace editing, formatting and keyboard shortcuts for you. Just like you did in volto.
+
+Shortcuts  will include
+(slash ([TODO](https://github.com/collective/volto-hydra/issues/34)), 
+enter ([TODO](https://github.com/collective/volto-hydra/issues/33)) and bullets etc) and 
+selection (TODO](https://github.com/collective/volto-hydra/issues/31))for you.
+
+
+#### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
+
+You can let the user upload images or pick an existing image by clicking on the image on your frontend.
+
+```html
+<div data-block-uid="....">
+<img src="..." data-editible-field="image"/>
+</div>
+```
+
+#### Inline link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
+
+You might have a block with a link field like the Teaser block. You can also make this
+editable. In edit mode the user clicks and can pick content to link to or enter an external url.
+
+```html
+<div data-block-uid="....">
+<img src="..." data-editible-field="teaser_image"/>
+<h2 data-editible-field="teaser_title">Big News</h2>
+<a href="..." data-editable-field="teaser_link">Read more</a>
+</div>
+```
+
+
+### Congratulations
+
+You have now made your frontend fully editable.
+
+## Code Examples
+
 #### Asynchronously Load the Bridge
 
-Since the script has a considerable size, it’s recommended to load the bridge only when necessary, such as in edit mode.
+Since the script has a considerable size, it’s recommended to load the bridge only when necessary, such as in edit mode (```window.location.search.includes('_edit=true')```)
 To load the bridge asynchronously, add a function that checks if the bridge is already present. If it isn't, the function will load it and then call a callback function. This ensures the bridge is loaded only when needed.
 
 ```js
@@ -226,26 +354,10 @@ if (window.location.search.includes('_edit=true')) {
 #### Preventing reloads ([TODO](https://github.com/collective/volto-hydra/issues/55))
 If you wish to make the editing experience smoother you can register for ```onSave``` and ```onRoute``` callbacks to prevent reloads of the frontend
 
+#### Simple rendering clickable blocks
 
-### Level 2: Click to select blocks on your frontend
-
-You will add data attributes to your rendered block html so hydra knows where they are on the page and it
-will automatically handle click events and show a quanta toolbar ([TODO](https://github.com/collective/volto-hydra/issues/25)) 
-and border ([TODO](https://github.com/collective/volto-hydra/issues/24)) when selecting a block.
-Without this, you can still manage blocks via the blocks navigation in the sidebar.
-
-It will allow you to naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) but not add, remove or move blocks
-unless live updates (level 3) is enabled. 
-
-Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
-The `data-block-uid` requires the block's UID, which you need to provide in the outermost container of the block.
-
-For example, if you are using ploneClient to fetch `data`, it will be `data.blocks_layout.items[x]`.
-Now, Click on your blocks in iframe and the sidebar will show its settings.
-
-Usage:
+Vanilla JS example:
 ```js
-// Vanilla JS example to render Blocks 
 
 // Function to create the block list
 function createBlockList(data) {
@@ -273,70 +385,4 @@ function createBlockList(data) {
 // Call the function to render the blocks
 createBlockList(data);
 ```
-
-### Level 3: Enable Realtime changes while editing
-
-You will need to subscribe to an ```onEditChange``` event that will call the callback with the updated data.
-
-The `onEditChange` method listens for changes in the Hydra and triggers a callback with updated data.
-The 'data' object follows the same format as you get from the [ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
-
-`onEditChange` takes following args:
-| Args         | Description |
-| :-----------:| :-------|
-| *callback*   | A function to call with the updated data when a change is detected. |
-
-Usage:
-```js
-// the initial data (from ploneClient)
-const initialData = data;
-
-// Define the callback function
-function handleEditChange(updatedData) {
-  console.log('Updated data:', updatedData);
-}
-
-// Set up the onEditChange listener
-//After initiating the bridge you can use its onEditChange method
-const bridge = initBridge('https://hydra.pretagov.com');
-bridge.onEditChange(handleEditChange);
-```
-
-### Level 4: Enable Managing Blocks directly on your frontend
-
-If you completed level 2 & 3 (made blocks clickable and enabled live updates) then the editor will automatically gain the management of blocks on the frontend using the quanta toolbar.
-
-With Quanta toobar, you can use following features:
-
-- You can click on '+' Icon (appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute) to add a block below the current block by choosing a type from BlockChooser popup.
-- You can click on three dots icon on Quanta toolbar (appears at the top-left) and it will open up a dropdown menu, you can click on 'Remove' to delete the current block.
-- Settings option is yet to be implemented [TODO](https://github.com/collective/volto-hydra/issues/81)
-- drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
-- cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
-- and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
- 
-You will still need to edit the blocks themselves via the sidebar. 
-
-### Level 5: Enable Editing blocks text and images inplace ([TODO](https://github.com/collective/volto-hydra/issues/5))
-
-If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
-can change check, links or media by typing or clicking directly on your frontend instead of via fields on the sidebar.
-
-#### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
-You will add data attributes to where a blocks text is editable and where text formatting and features are locationed (like links)
-and also subscribe to ```onBlockFieldChanged``` events. This will enable handling fine grained 
-changes to text being edited such as turning text bold or creating a link. Hydra will notice where you have indicated a block field can 
-be clicked on and will automatically make it inplace editable handling typing, shortcuts 
-(slash ([TODO](https://github.com/collective/volto-hydra/issues/34)), 
-enter ([TODO](https://github.com/collective/volto-hydra/issues/33)) and bullets etc) and 
-selection (TODO](https://github.com/collective/volto-hydra/issues/31))for you.
-
-#### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
-
-TODO
-
-#### Inline link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
-
-TODO
-
 
