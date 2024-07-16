@@ -126,50 +126,12 @@ This allows you to switch seamlessly between different frontend URLs for testing
 
 ### Level 1: Show changes after save
 
-This is the most basic form of integration.
-You can 
-- add and remove pages
-- navigate either using your frontend or the AdminUI
-- edit a page, but only via the sidebar and you will only see changes after you click save
-
 To do this you will include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
 - Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will recieve a ```?_edit=true```, [checkout below](#asynchronously-load-the-bridge) to load `hydra.js` asynchronously.
+- You may need to [change your authentication token you are using with the rest api so you can access the same content as the logged in editor](#authenticate-frontend-to-access-private-content).
 
-#### Authenticate frontend to access private content
-
-- When you input your frontend URL at the Volto Hydra (adminUI) it will set 2 params in your frontend URL.
-- You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
-- Or you can use it in Authorization header if you are using other methods to fetch content from plone Backend.
-
-Example using nextjs 14 and ploneClient:
-```js
-// nextjs 14 using ploneClient
-import ploneClient from "@plone/client";
-import { useQuery } from "@tanstack/react-query";
-
-export default function Blog({ params }) {
-  // Extract token directly from the URL
-  const url = new URL(window.location.href);
-  const token = url.searchParams.get("access_token");
-  
-  const client = ploneClient.initialize({
-    apiPath: "http://localhost:8080/Plone/", // Plone backend
-    token: token,
-  });
-
-  const { getContentQuery } = client;
-  const { data, isLoading } = useQuery(getContentQuery({ path: '/blogs' }));
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-  return (
-    <div> {data.title}</div>
-  )
-}
-```
 
 #### How to initialise the bridge.
 
@@ -185,6 +147,17 @@ export default function Blog({ params }) {
 - Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend to test.
    - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on your hydra instance to have this frontend selectable by the user. 
 
+Now an editor can :-
+- login to hydra and see the frontend in an iframe as if it was volto
+- browse in hydra your frontend page will change. 
+- browse in your frontend, hydra will change context.
+- add a page in hydra and it will appear.
+- edit a page and after you save it will reload the iframe and the changes will appear on your frontend.
+   - they will be able to add blocks the frontend specifies that it can support. 
+- remove a page.
+- all other volto features outside editing work the same.
+
+
 **Note:** You can also pass an options object while initializing the bridge. Currently you can pass a List of allowed blocks (by default image & text blocks are allowed if not specified).
 E.g. :
   ```js
@@ -192,7 +165,6 @@ E.g. :
   import { initBridge } from './hydra.js';
   const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
-
 
 ### Level 2: Click to select blocks on your frontend (Quanta Toolbar)
 
@@ -348,6 +320,44 @@ if (window.location.search.includes('_edit=true')) {
     const { initBridge } = window;
     initBridge('https://hydra.pretagov.com');
   });
+}
+```
+
+
+#### Authenticate frontend to access private content
+
+As soon as the editor logs into the hydra editor it will load up the frontend into an iframe.
+Your frontend should now use the same auth token so the you access the restapi with the same priviliges and
+can render the same content.
+
+- You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
+- Or you can use it in Authorization header if you are using other methods to fetch content from plone Backend.
+
+Example using nextjs 14 and ploneClient:
+```js
+// nextjs 14 using ploneClient
+import ploneClient from "@plone/client";
+import { useQuery } from "@tanstack/react-query";
+
+export default function Blog({ params }) {
+  // Extract token directly from the URL
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("access_token");
+  
+  const client = ploneClient.initialize({
+    apiPath: "http://localhost:8080/Plone/", // Plone backend
+    token: token,
+  });
+
+  const { getContentQuery } = client;
+  const { data, isLoading } = useQuery(getContentQuery({ path: '/blogs' }));
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  return (
+    <div> {data.title}</div>
+  )
 }
 ```
 
