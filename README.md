@@ -243,7 +243,7 @@ If you want to make the editing experience the most intuitive, you can enable re
 can change check, links or media by typing or clicking directly on your frontend instead of via fields on the sidebar.
 
 #### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
-You will add data attributes to where a blocks text is editable and where text formatting and features are locationed (like links).
+You will add data attributes to where a blocks text is editable.
 
 e.g. our example teaser block above will become
 
@@ -251,13 +251,20 @@ e.g. our example teaser block above will become
 <div class="teaser" data-block-uid="....">
 <img src="/big_news.jpg"/>
 <h2 data-editable-field="title">Big News</h2>
-<div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
+<div data-editable-field="description">Check out <b data-node-id="1">hydra</b>, it will change everything</div>
 <a href="/big_news">Read more</a>
 </div>
 ```
 
-You may choose to add a call back to the bridge ```onBlockFieldChanged``` so that any formatting changes
-such as applying bold, can be rerendered efficiently.
+You can mark both simple text fields and rich text fields as editable. 
+Rich text comes via the contents restiapi as a semantic structure in json using nodes rather than as html.
+Your frontend could choose to represent that formatting using whatever html you want, however for hydra.js 
+to keep track of what you are changing you will need to add ```data-node-id``` attributes to the outermost
+html that contains a rich text node. e.g. ```<span class="custom" data-node-id="5"><a href="...">my link</a></span>```.
+These node ids aren't available from the plone restapi but only via the hydra.js bridge, so you will need hook
+into ```handleEditChange``` to rerender your content with the node ids to make editing work. Or you can choose
+to add a call back to the bridge ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
+
 
 Now an editor can:-
 - click into rich text and type, adding, removing and cut and pasting, all directly on the frontend. [TODO](https://github.com/collective/volto-hydra/issues/29)
