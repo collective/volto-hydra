@@ -15,8 +15,12 @@ Why does it matter?
    - this will improve the editor experience with just a few lines of code
 
 Why Hydra? 
-- it turns the Volto CMS into one with many detached heads (frontends) that you can switch between while editing. 
-  It is cutting Volto's head off so many more can grow in it's place.
+- It gives Headless Plone a Quanta CMS UI but with one or more decoupled heads (frontends) that you can switch between while editing.
+  Decoupled means they are seperated from Hyrda and Plone in both where they can be hosted and what framework they can use.
+
+What is Quanta?
+- [Quanta](https://github.com/plone/volto/issues/4332) is an iteration on the design system and editing UI that Volto impliments
+- Hydra is using Volto as it's base and where parts are reimplimented it is being done closer to the Quanta design.
 
 
 ## Want to try the editor?
