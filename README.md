@@ -301,6 +301,22 @@ Now as editor can :-
 - Click on a link or button to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
 - Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
 
+### Comment syntax (TODO)
+
+If you can't easily modify the markup you can use the altetrnative comment synatx to specify which elements are editable.
+Use css selectors to specify which elements are editible. The selectors are applied just to the following element.
+
+e.g.
+``` html
+<!-- hydra_block_uid:...; img:image; h2:title; .description:text; div a:link  -->
+<div class="teaser">
+<img src="/big_news.jpg"/>
+<h2>Big News</h2>
+<div class="desciption">Check out <b>hydra</b>, it will change everything</div>
+<div><a href="/big_news">Read more</a></div>
+</div>
+```
+
 
 ### Congratulations
 
