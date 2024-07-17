@@ -139,14 +139,14 @@ Now an editor can :-
 
 Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
 
-If you are rendering a Teaser block as
+For example, let's say you are rendering a Teaser block as
 
 ``` html
 <div class="teaser">
 <img src="/big_news.jpg"/>
 <h2>Big News</h2>
 <div>Check out <b>hydra</b>, it will change everything</div>
-<a href="/big_news">Read more</a>
+<div><a href="/big_news">Read more</a><div>
 </div>
 ```
 
@@ -157,7 +157,7 @@ you would change this to
 <img src="/big_news.jpg"/>
 <h2>Big News</h2>
 <div>Check out <b>hydra</b>, it will change everything</div>
-<a href="/big_news">Read more</a>
+<div><a href="/big_news">Read more</a><div>
 </div>
 ```
 
@@ -166,6 +166,23 @@ Now an editor can :-
    - The block will appear highlighted and a quantatool bar will appear above it.
 - selecting a block in the sidebar will highlight that block on the frontend
 - naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) 
+
+If are using a 3rd party library to render a block, then you might not be able to easily modify the markup 
+to put in the ```data-block-uid```. Instead you can use an alternative 
+comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113)) where a comment goes
+directly before the block markup.
+
+e.g.
+``` html
+<!-- hydra_block_uid:... -->
+<div class="teaser">
+<img src="/big_news.jpg"/>
+<h2>Big News</h2>
+<div>Check out <b>hydra</b>, it will change everything</div>
+<div><a href="/big_news">Read more</a><div>
+</div>
+```
+
 
 ### Level 3: Enable Realtime changes while editing
 
@@ -221,7 +238,7 @@ e.g. our example teaser block above will become
 <img src="/big_news.jpg"/>
 <h2 data-editable-field="title">Big News</h2>
 <div data-editable-field="description">Check out <b data-node-id="1">hydra</b>, it will change everything</div>
-<a href="/big_news">Read more</a>
+<div><a href="/big_news">Read more</a><div>
 </div>
 ```
 
@@ -257,7 +274,7 @@ You can let the user upload images/videos or pick an existing file by clicking o
 <img data-editible-field="image" src="/big_news.jpg"/>
 <h2>Big News</h2>
 <div>Check out <b>hydra</b>, it will change everything</div>
-<a href="/big_news">Read more</a>
+<div><a href="/big_news">Read more</a><div>
 </div>
 ```
 
@@ -276,7 +293,7 @@ editable. In edit mode the user clicks and can pick content to link to or enter 
 <img src="/big_news.jpg"/>
 <h2>Big News</h2>
 <div>Check out <b>hydra</b>, it will change everything</div>
-<a data-editable-field="link" href="/big_news">Read more</a>
+<div><a data-editable-field="link" href="/big_news">Read more</a></div>
 </div>
 ```
 
