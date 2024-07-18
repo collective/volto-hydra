@@ -7,12 +7,12 @@ Note: It is a [Work in Progress: Hydra Project]((https://github.com/orgs/collect
 It should not be used in production.
 
 Why does it matter?
-- If you **already use volto**:
-   - you can develop frontends with faster load times and less risky future volto upgrades
-- If you **don't currently use volto**: 
-   - it will lower the learning curve if you already have knowledge of a frontend framework. You no longer need to learn Volto.
+- If you **don't currently know Volto or Plone**: 
+   - You get the best editor UX for a headless CMS with a lower dev learning curve by letting you use a frontend framework you already know
+- If you **already use Volto**:
+   - you can develop frontends with faster load times and less risky Volto upgrades with no downgrade in editor UX
 - If you are **already using plone headless**:
-   - this will improve the editor experience with just a few lines of code
+   - this will improve the editor UX with just a few lines of code
 
 Why Hydra? 
 - It gives Headless Plone a Quanta CMS UI but with one or more decoupled heads (frontends) that you can switch between while editing.
