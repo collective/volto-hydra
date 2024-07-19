@@ -35,10 +35,14 @@ Available example frontends (go to `examples` directory for source code):
 
 ### Choose Your Framework
 
-- You can use any frontend framework (e.g., React, Next.js, Vue.js).
+- You can use any frontend framework (e.g., Next.js, Nuxt.js, Astro etc or plain js).
+  - Static site generators like Gatsby and server side rendering like Flask could work but without realtime updates
+    and inline editing. Your frontend would lack browser based code to render content dynamically but in the future
+    it could be possible for these edits to go via the backend making near realtime editing possible.
 - Fetch content from the Plone backend using the [@plone/client](https://github.com/plone/volto/tree/main/packages/client) 
-  library or the simple Fetch API.
-- You can start small without dynamic menus or complex blocks and work up to supporting more kinds of blocks as you go.
+  library or the simple Fetch API. You should be able to use [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) also.
+- You can start small with just simple navigation and just a few basic blocks and work up to supporting more kinds of blocks as you need them.
+
 
 TODO: link to more documentation on creating a frontend using @plone/client
 
@@ -78,7 +82,7 @@ To test against a local hydra instance
     ```bash
     make backend-docker-start
     ```
-  ***Note :***  This will also set `CORS_ALLOW_ORIGIN` to `'*'`, so there are no cors error.
+  ***Note :***  This will also set [`CORS_ALLOW_ORIGIN` to `'*'`](https://6.docs.plone.org/install/containers/images/backend.html?highlight=cors#cors-variables), so there are no cors error.
 
 ### Using the example frontend
 
@@ -96,7 +100,8 @@ You can use one of the example frontends available at `./examples` directory.
 ### Deploy your frontend
 
 Use netlify or similar and make your frontend public.
-Ensure you have correctly set the CORS headers to allow access by the hydra editor.
+Ensure you have correctly set the CORS headers to allow access by the hydra editor. How to do this will depend
+on how your host your frontend.
 
 You can then log into https://hydra.pretagov.com and set the frontend to edit in the user settings.
 
