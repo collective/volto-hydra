@@ -101,7 +101,7 @@ You can use one of the example frontends available at `./examples` directory.
 
 Use netlify or similar and make your frontend public.
 Ensure you have correctly set the CORS headers to allow access by the hydra editor. How to do this will depend
-on how your host your frontend.
+on how you host your frontend.
 
 You can then log into https://hydra.pretagov.com and set the frontend to edit in the user settings.
 
@@ -112,9 +112,8 @@ then let us know by [creating a ticket](https://github.com/collective/volto-hydr
 ## Make your Frontend editable
 
 As an integrator you have a choice on how nice you want the editor user experience to be.
-The hydrajs bridge is designed with a staged approach so minimal effort will get allow for basic editing
-and adding further integration levels will get you back to the full inline editing experience you
-would have got with Volto.
+The hydrajs bridge is designed with a staged approach so minimal effort will allow for basic editing
+and further integration work will get you back to the full inline editing experience similar to Volto.
 
 ### Level 1: Enable Switching pages and showing changes *after* save
 
@@ -148,8 +147,9 @@ Now an editor can :-
 
 Add the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most container of the rendered block html.
 
-For example, let's say you are rendering a Teaser block as
+For example, let's say your frontend is rendering a simple Teaser block
 
+Your frontend might choose to render a Teaser like
 ``` html
 <div class="teaser">
 <img src="/big_news.jpg"/>
@@ -159,7 +159,7 @@ For example, let's say you are rendering a Teaser block as
 </div>
 ```
 
-you would change this to
+you would addin the ```data-block-uid``` so it becomes
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -170,9 +170,11 @@ you would change this to
 </div>
 ```
 
+Hydrajs will find these block markers and register click handlers and insert css to for you.
+
 Now an editor can :-
-- click directly on your block to edit the block contents in the sidebar. 
-   - The block will appear highlighted and a quantatool bar will appear above it.
+- click directly on your block on the frontend preview to edit the block contents in the sidebar. 
+   - The block will be highlighted and a toolbar (called the quanta toolbar) will appear above it.
 - selecting a block in the sidebar will highlight that block on the frontend
 - naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) 
 
@@ -235,10 +237,10 @@ Now an editor can :-
 ### Level 5: Enable Inplace frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
-can change text, links or media by typing or clicking directly on your frontend instead of via fields on the sidebar.
+can change text, links or media directly on your frontend instead of via fields on the sidebar.
 
 #### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
-You will add data attributes to where a blocks text is editable.
+You will add data attributes to where a block text is editable.
 
 e.g. our example teaser block above will become
 
