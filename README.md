@@ -242,18 +242,32 @@ can change text, links or media directly on your frontend instead of via fields 
 #### Inline text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
 You will add data attributes to where a block text is editable.
 
-e.g. our example teaser block above will become
+e.g. our example teaser block above we will make the heading inline editable
+by just adding ```data-editable-field="title"``` to the element you want to make editable adn hydrajs will be the rest.
 
 ``` html
 <div class="teaser" data-block-uid="....">
 <img src="/big_news.jpg"/>
 <h2 data-editable-field="title">Big News</h2>
-<div data-editable-field="description">Check out <b data-node-id="1">hydra</b>, it will change everything</div>
+<div >Check out <b>hydra</b>, it will change everything</div>
 <div><a href="/big_news">Read more</a><div>
 </div>
 ```
 
-You can mark both simple text fields and rich text fields as editable. 
+Now an editor can :-
+- click into rich text and type, adding, removing and cut and pasting, all directly on the frontend. [TODO](https://github.com/collective/volto-hydra/issues/29)
+- apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
+- create or edit a rich text link [TODO](https://github.com/collective/volto-hydra/issues/35)
+- type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
+- type "enter" at the end of a text block to create a new block ([TODO](https://github.com/collective/volto-hydra/issues/33))
+
+Additionally your frontend can
+- specify parts of the text that aren't editable by the user (TODO)
+
+#### Inline Rich Text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
+
+For rich text (slate) you will have to do a little more work.
+
 Rich text comes via the contents restiapi as a semantic structure in json using nodes rather than as html.
 Your frontend could choose to represent that formatting using whatever html you want, however for hydra.js 
 to keep track of what text the editor is changing you will need to add ```data-node-id``` attributes to the outermost
@@ -262,19 +276,26 @@ These node ids aren't available from the plone restapi but only via the hydra.js
 into ```handleEditChange``` to rerender your content with the node ids to make inplace editing work. Or you can choose
 to add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
 
+For example, if the schema for the Teaser block had the description as slate then we would render it like this
+
+``` html
+<div class="teaser" data-block-uid="....">
+<img src="/big_news.jpg"/>
+<h2>Big News</h2>
+<div data-editable-field="description">Check out <b data-node-id="1">hydra</b>, it will change everything</div>
+<div><a href="/big_news">Read more</a><div>
+</div>
+```
 
 Now an editor can :-
-- click into rich text and type, adding, removing and cut and pasting, all directly on the frontend. [TODO](https://github.com/collective/volto-hydra/issues/29)
 - select text and apply formating ([TODO](https://github.com/collective/volto-hydra/issues/31))
 - apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
-- create or edit a link [TODO](https://github.com/collective/volto-hydra/issues/35)
-- type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
-- type "enter" at the end of a text block to create a new block ([TODO](https://github.com/collective/volto-hydra/issues/33))
+- create or edit a rich text link [TODO](https://github.com/collective/volto-hydra/issues/35)
 - use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
 
 Additionally your frontend can
-- specify parts of the text that aren't editable by the user (TODO)
 - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
+
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
