@@ -271,12 +271,18 @@ For rich text (slate) you will have to do a little more work.
 Rich text comes via the contents restiapi as a semantic structure in json using nodes rather than as html.
 Your frontend could choose to represent that formatting using whatever html you want, however for hydra.js 
 to keep track of what text the editor is changing you will need to add ```data-node-id``` attributes to the outermost
-html that contains a rich text node. e.g. ```<span class="custom" data-node-id="5"><a href="...">my link</a></span>```.
-These node ids aren't available from the plone restapi but only via the hydra.js bridge, so you will need hook
-into ```handleEditChange``` to rerender your content with the node ids to make inplace editing work. Or you can choose
-to add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
+html that contains a rich text node. 
 
-For example, if the schema for the Teaser block had the description as slate then we would render it like this
+e.g. a link node could be rendered as
+
+```html
+<span class="custom" data-node-id="5"><a href="...">my link</a></span>
+```
+
+These node ids aren't available from the plone restapi but only via the hydra.js bridge, so you will need hook
+into ```handleEditChange``` to rerender your content with the node ids it provides to make inplace editing work.
+
+For example, if the schema for the Teaser block had the description as rich text then we would render it like this
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -287,6 +293,8 @@ For example, if the schema for the Teaser block had the description as slate the
 </div>
 ```
 
+Hydra.js will now adjust the quanta toolbar with formatting buttons.
+
 Now an editor can :-
 - select text and apply formating ([TODO](https://github.com/collective/volto-hydra/issues/31))
 - apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
@@ -295,7 +303,7 @@ Now an editor can :-
 
 Additionally your frontend can
 - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
-
+- add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
