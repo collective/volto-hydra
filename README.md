@@ -312,6 +312,16 @@ and the frontend could render the editible teaser block like below, being sure t
 </div>
 ```
 
+A slate block is just a special case with a single rich tech editable field
+
+``` html
+<p data-block-uid="...." data-editable-field="body">
+My Paragraph with <span class="custom" data-node-id="5"><a href="...">a link</a></span>
+</p>
+```
+
+
+
 Hydra.js will now adjust the quanta toolbar with formatting buttons.
 
 Now an editor can :-
@@ -323,6 +333,8 @@ Now an editor can :-
 Additionally your frontend can
 - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
+
+Note Hydra.js knows about the schema of your blocks and based on the field name will determine what what to make your html editable.
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
