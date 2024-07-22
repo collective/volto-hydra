@@ -273,16 +273,35 @@ Your frontend could choose to represent that formatting using whatever html you 
 to keep track of what text the editor is changing you will need to add ```data-node-id``` attributes to the outermost
 html that contains a rich text node. 
 
-e.g. a link node could be rendered as
-
-```html
-<span class="custom" data-node-id="5"><a href="...">my link</a></span>
-```
-
 These node ids aren't available from the plone restapi but only via the hydra.js bridge, so you will need hook
 into ```handleEditChange``` to rerender your content with the node ids it provides to make inplace editing work.
 
-For example, if the schema for the Teaser block had the description as rich text then we would render it like this
+
+
+For example, if the schema for the Teaser block had the description field type as rich text then 
+the json value might be
+
+``` json
+[
+  {
+    "text": "Check out "
+  }
+  {
+    "children": [
+      {
+        "text": "hydra"
+      }
+    ],
+    "type": "bold",
+    "id": 1
+  },
+  {
+    "text": ", it will change everything"
+  }
+]
+```
+
+and the frontend could render the editible teaser block like below, being sure to include the ```data-node-id```.
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -319,9 +338,9 @@ You can let the user upload images/videos or pick an existing file by clicking o
 ```
 
 Now an editor can :-
-- Be presented with a empty media slot and and a prompt to upload or pick ([TODO](https://github.com/collective/volto-hydra/issues/112))
-- Remove the currently selected media and pick a different one ([TODO](https://github.com/collective/volto-hydra/issues/36))
-- DND an image directly only a media slot on the frontend ([TODO](https://github.com/collective/volto-hydra/issues/108))
+- Be presented with a empty media element on the frontend and and a prompt to upload or pick media ([TODO](https://github.com/collective/volto-hydra/issues/112))
+- Remove the currently selected media to pick a different one ([TODO](https://github.com/collective/volto-hydra/issues/36))
+- DND an image diretly only a media element on the frontend ([TODO](https://github.com/collective/volto-hydra/issues/108))
 
 #### Inline link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
 
@@ -338,7 +357,7 @@ editable. In edit mode the user clicks and can pick content to link to or enter 
 ```
 
 Now as editor can :-
-- Click on a link or button to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
+- Click on a link or button on the frontend to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
 - Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
 
 ### Comment syntax (TODO)
