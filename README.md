@@ -315,7 +315,7 @@ and the frontend could render the editible teaser block like below, being sure t
 A slate block is just a special case with a single rich tech editable field
 
 ``` html
-<p data-block-uid="...." data-editable-field="body">
+<p data-block-uid="...." data-editable-field="value">
 My Paragraph with <span class="custom" data-node-id="5"><a href="...">a link</a></span>
 </p>
 ```
@@ -364,7 +364,7 @@ editable. In edit mode the user clicks and can pick content to link to or enter 
 <img src="/big_news.jpg"/>
 <h2>Big News</h2>
 <div>Check out <b>hydra</b>, it will change everything</div>
-<div><a data-editable-field="link" href="/big_news">Read more</a></div>
+<div><a data-editable-field="href" href="/big_news">Read more</a></div>
 </div>
 ```
 
