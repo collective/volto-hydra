@@ -131,6 +131,24 @@ class Bridge {
    * @param {Element} blockElement - Block element with the data-block-uid attribute
    */
   selectBlock(blockElement) {
+    // Helper function to handle each element
+    const handleElement = (element) => {
+      const editableField = element.getAttribute('data-editable-field');
+      if (editableField === 'value') {
+        this.makeBlockContentEditable(element);
+      } else if (editableField !== null) {
+        element.setAttribute('contenteditable', 'true');
+      }
+    };
+
+    // Function to recursively handle all children
+    const handleElementAndChildren = (element) => {
+      handleElement(element);
+      Array.from(element.children).forEach((child) =>
+        handleElementAndChildren(child),
+      );
+    };
+
     // Remove border and button from the previously selected block
     if (this.currentlySelectedBlock) {
       this.deselectBlock(this.currentlySelectedBlock);
@@ -138,9 +156,12 @@ class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
     this.selectedBlockUid = blockUid;
 
-    this.makeBlockContentEditable(blockElement);
+    // Handle the selected block and its children
+    handleElementAndChildren(blockElement);
+
     this.observeBlockTextChanges(blockElement);
-    if (this.formData) {
+    // if the block is a slate block, add nodeIds to the block's data
+    if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
       this.formData.blocks[blockUid] = this.addNodeIds(
         this.formData.blocks[blockUid],
       );
@@ -441,7 +462,7 @@ class Bridge {
   }
 
   /**
-   * Handle the text change in the block element
+   * Handle the text change in the slate block element
    * @param {Element} target
    */
   handleTextChange(target) {
