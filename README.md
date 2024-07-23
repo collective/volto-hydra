@@ -7,11 +7,13 @@ Note: It is a [Work in Progress: Hydra Project]((https://github.com/orgs/collect
 It should not be used in production.
 
 Why does it matter?
-- If you **don't currently know Volto or Plone**: 
-   - You get the best editor UX for a headless CMS with a lower dev learning curve by letting you use a frontend framework you already know
+- If you **want a Headless CMS**: 
+   - You get the best editor UX for a headless CMS with inplace editing like Volto with the bonus of being open source
+- If you **are new to Volto**:
+   - You get a lower learning curve if you already know a frontend framework 
 - If you **already use Volto**:
    - you can develop frontends with faster load times and less risky Volto upgrades with no downgrade in editor UX
-- If you are **already using plone headless**:
+- If you are **already using Plone Headless**:
    - this will improve the editor UX with just a few lines of code
 
 Why Hydra? 
@@ -274,9 +276,7 @@ to keep track of what text the editor is changing you will need to add ```data-n
 html that contains a rich text node. 
 
 These node ids aren't available from the plone restapi but only via the hydra.js bridge, so you will need hook
-into ```handleEditChange``` to rerender your content with the node ids it provides to make inplace editing work.
-
-
+into ```onEditChange``` to rerender your content with the node ids it provides to make inplace editing work.
 
 For example, if the schema for the Teaser block had the description field type as rich text then 
 the json value might be
