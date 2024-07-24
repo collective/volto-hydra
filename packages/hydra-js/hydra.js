@@ -156,9 +156,10 @@ class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
     this.selectedBlockUid = blockUid;
 
-    // Handle the selected block and its children
+    // Handle the selected block and its children for contenteditable
     handleElementAndChildren(blockElement);
 
+    // Only when the block is a slate block, add nodeIds to the block's data
     this.observeBlockTextChanges(blockElement);
     // if the block is a slate block, add nodeIds to the block's data
     if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
