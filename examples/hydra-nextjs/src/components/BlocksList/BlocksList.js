@@ -30,6 +30,60 @@ const BlocksList = ({ data }) => {
               />
             </li>
           );
+        } else if (data.blocks[id]['@type'] === 'teaser') {
+          const teaser = data.blocks[id];
+          const teaserHeadTitle = teaser.head_title;
+          const teaserTitle = teaser.title;
+          const teaserDescription = teaser.description;
+          const teaserLink =
+            teaser.href && teaser.href.length > 0
+              ? teaser.href[0]['@id']
+              : null;
+          const teaserLinkTitle =
+            teaser.href && teaser.href.length > 0 ? teaser.href[0].title : null;
+
+          return (
+            <li
+              key={id}
+              className="blog-list-item teaser-block"
+              data-block-uid={`${id}`}
+            >
+              <div className="teaser-content">
+                {teaserHeadTitle && (
+                  <h3 className="teaser-head-title">{teaserHeadTitle}</h3>
+                )}
+                {teaserTitle && <h2 className="teaser-title">{teaserTitle}</h2>}
+                {teaserDescription && (
+                  <p
+                    data-editable-field="teaser"
+                    className="teaser-description"
+                  >
+                    {teaserDescription}
+                  </p>
+                )}
+                {teaserLink && (
+                  <a href={teaserLink} className="teaser-link">
+                    {teaserLinkTitle}
+                  </a>
+                )}
+              </div>
+            </li>
+          );
+        } else if (data.blocks[id]['@type'] === 'video') {
+          const video_url = data.blocks[id].url;
+          const size = data.blocks[id].size;
+          const align = data.blocks[id].align;
+          return (
+            <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
+              <video
+                src={video_url}
+                className={`blog-list-item-video video-size-${size} video-align-${align}`}
+                controls
+                width={100}
+                height={100}
+              />
+            </li>
+          );
         }
         return null;
       })}

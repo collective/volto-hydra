@@ -41,13 +41,15 @@ const SlateBlock = ({ value }) => {
   const initialValue = value || [{ type: 'p', children: [{ text: '' }] }];
   editor.children = initialValue;
   return (
-    <Slate editor={editor} initialValue={initialValue}>
-      <Editable
-        renderElement={renderElement}
-        renderLeaf={renderLeaf}
-        readOnly
-      />
-    </Slate>
+    <div data-editable-field="value">
+      <Slate editor={editor} initialValue={initialValue}>
+        <Editable
+          renderElement={renderElement}
+          renderLeaf={renderLeaf}
+          readOnly
+        />
+      </Slate>
+    </div>
   );
 };
 
