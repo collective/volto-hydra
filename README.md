@@ -245,7 +245,7 @@ can change text, links or media directly on your frontend instead of via fields 
 You will add data attributes to where a block text is editable.
 
 e.g. our example teaser block above we will make the heading inline editable
-by just adding ```data-editable-field="title"``` to the element you want to make editable adn hydrajs will be the rest.
+by just adding ```data-editable-field="title"``` to the element you want to make editable and hydrajs will do the rest.
 
 ``` html
 <div class="teaser" data-block-uid="....">

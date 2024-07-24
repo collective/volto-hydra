@@ -19,6 +19,10 @@ class Bridge {
     this.quantaToolbar = null;
     this.currentUrl =
       typeof window !== 'undefined' ? new URL(window.location.href) : null;
+    this.setDataCallback = null;
+    this.formData = null;
+    this.blockTextMutationObserver = null;
+    this.selectedBlockUid = null;
     this.init(options);
   }
 
@@ -28,7 +32,6 @@ class Bridge {
     }
 
     if (window.self !== window.top) {
-      // Handle URL changes generically (no chromium-specific code here)
       this.navigationHandler = (e) => {
         const newUrl = new URL(e.destination.url);
         if (
@@ -75,16 +78,18 @@ class Bridge {
       if (isEditMode) {
         this.enableBlockClickListener();
         this.injectCSS();
-        this.listenForSelectBlock();
+        this.listenForSelectBlockMessage();
       }
     }
   }
 
   onEditChange(callback) {
+    this.setDataCallback = callback;
     this.realTimeDataHandler = (event) => {
       if (event.origin === this.adminOrigin) {
         if (event.data.type === 'FORM_DATA') {
           if (event.data.data) {
+            this.formData = JSON.parse(JSON.stringify(event.data.data));
             callback(event.data.data);
           } else {
             throw new Error('No form data has been sent from the adminUI');
@@ -121,30 +126,59 @@ class Bridge {
     document.removeEventListener('click', this.blockClickHandler);
     document.addEventListener('click', this.blockClickHandler);
   }
-
+  /**
+   * Method to add border, ADD button and Quanta toolbar to the selected block
+   * @param {Element} blockElement - Block element with the data-block-uid attribute
+   */
   selectBlock(blockElement) {
+    // Helper function to handle each element
+    const handleElement = (element) => {
+      const editableField = element.getAttribute('data-editable-field');
+      if (editableField === 'value') {
+        this.makeBlockContentEditable(element);
+      } else if (editableField !== null) {
+        element.setAttribute('contenteditable', 'true');
+      }
+    };
+
+    // Function to recursively handle all children
+    const handleElementAndChildren = (element) => {
+      handleElement(element);
+      Array.from(element.children).forEach((child) =>
+        handleElementAndChildren(child),
+      );
+    };
+
     // Remove border and button from the previously selected block
     if (this.currentlySelectedBlock) {
-      this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
-      if (this.addButton) {
-        this.addButton.remove();
-        this.addButton = null;
-      }
-      if (this.deleteButton) {
-        this.deleteButton.remove();
-        this.deleteButton = null;
-      }
-      if (this.quantaToolbar) {
-        this.quantaToolbar.remove();
-        this.quantaToolbar = null;
-      }
+      this.deselectBlock(this.currentlySelectedBlock);
     }
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    this.selectedBlockUid = blockUid;
+
+    // Handle the selected block and its children for contenteditable
+    handleElementAndChildren(blockElement);
+
+    // Only when the block is a slate block, add nodeIds to the block's data
+    this.observeBlockTextChanges(blockElement);
+    // if the block is a slate block, add nodeIds to the block's data
+    if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
+      this.formData.blocks[blockUid] = this.addNodeIds(
+        this.formData.blocks[blockUid],
+      );
+      this.setDataCallback(this.formData);
+    }
+
+    // Add focus out event listener
+    blockElement.addEventListener(
+      'focusout',
+      this.handleBlockFocusOut.bind(this),
+    );
 
     // Set the currently selected block
     this.currentlySelectedBlock = blockElement;
     // Add border to the currently selected block
     this.currentlySelectedBlock.classList.add('volto-hydra--outline');
-    const blockUid = blockElement.getAttribute('data-block-uid');
 
     // Create and append the Add button
     this.addButton = document.createElement('button');
@@ -230,8 +264,10 @@ class Bridge {
       this.clickOnBtn = false;
     }
   }
-
-  listenForSelectBlock() {
+  /**
+   * Method to listen for the SELECT_BLOCK message from the adminUI
+   */
+  listenForSelectBlockMessage() {
     this.selectBlockHandler = (event) => {
       if (
         event.origin === this.adminOrigin &&
@@ -261,7 +297,10 @@ class Bridge {
           ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
       : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
   }
-
+  /**
+   * Observe the DOM for the changes to select and scroll the block with the given UID into view
+   * @param {String} uid - UID of the block
+   */
   observeForBlock(uid) {
     const observer = new MutationObserver((mutationsList, observer) => {
       for (const mutation of mutationsList) {
@@ -283,10 +322,202 @@ class Bridge {
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  /**
+   * Set the contenteditable of the block with the given UID and its children to true
+   * @param {Element} blockElement
+   */
+  makeBlockContentEditable(blockElement) {
+    blockElement.setAttribute('contenteditable', 'true');
+    const childNodes = blockElement.querySelectorAll('[data-hydra-node]');
+    childNodes.forEach((node) => {
+      node.setAttribute('contenteditable', 'true');
+    });
+  }
+
+  /**
+   * Add nodeIds in the json object to each of the Selected Block's children
+   * @param {JSON} json Selected Block's data
+   * @param {BigInteger} nodeIdCounter (Optional) Counter to keep track of the nodeIds
+   * @returns {JSON} block's data with nodeIds added
+   */
+  addNodeIds(json, nodeIdCounter = { current: 0 }) {
+    if (Array.isArray(json)) {
+      return json.map((item) => this.addNodeIds(item, nodeIdCounter));
+    } else if (typeof json === 'object' && json !== null) {
+      // Clone the object to ensure it's extensible
+      json = JSON.parse(JSON.stringify(json));
+
+      if (json.hasOwnProperty('data')) {
+        json.nodeId = nodeIdCounter.current++;
+        for (const key in json) {
+          if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
+            json[key] = this.addNodeIds(json[key], nodeIdCounter);
+          }
+        }
+      } else {
+        json.nodeId = nodeIdCounter.current++;
+        for (const key in json) {
+          if (json.hasOwnProperty(key) && key !== 'nodeId') {
+            json[key] = this.addNodeIds(json[key], nodeIdCounter);
+          }
+        }
+      }
+    }
+    return json;
+  }
+
+  /**
+   * Reset the block's listeners, mutation observer and remove the nodeIds from the block's data
+   * @param {Element} blockElement Selected block element
+   */
+  deselectBlock(blockElement) {
+    this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
+    if (this.addButton) {
+      this.addButton.remove();
+      this.addButton = null;
+    }
+    if (this.deleteButton) {
+      this.deleteButton.remove();
+      this.deleteButton = null;
+    }
+    if (this.quantaToolbar) {
+      this.quantaToolbar.remove();
+      this.quantaToolbar = null;
+    }
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    if (this.selectedBlockUid !== null && this.selectedBlockUid !== blockUid) {
+      // Remove contenteditable attribute
+      blockElement.removeAttribute('contenteditable');
+      const childNodes = blockElement.querySelectorAll('[data-hydra-node]');
+      childNodes.forEach((node) => {
+        node.removeAttribute('contenteditable');
+      });
+
+      // Clean up JSON structure
+      this.resetJsonNodeIds(this.blocksJson);
+
+      // Remove focus out event listener
+      blockElement.removeEventListener(
+        'focusout',
+        this.handleBlockFocusOut.bind(this),
+      );
+    }
+    // Disconnect the mutation observer
+    if (this.blockTextMutationObserver) {
+      this.blockTextMutationObserver.disconnect();
+      this.blockTextMutationObserver = null;
+    }
+  }
+
+  /**
+   * Remove the nodeIds from the JSON object
+   * @param {JSON} json Selected Block's data
+   */
+  resetJsonNodeIds(json) {
+    if (Array.isArray(json)) {
+      json.forEach((item) => this.resetJsonNodeIds(item));
+    } else if (typeof json === 'object' && json !== null) {
+      if (json.hasOwnProperty('nodeId')) {
+        delete json.nodeId;
+      }
+      for (const key in json) {
+        if (json.hasOwnProperty(key) && key !== 'data') {
+          this.resetJsonNodeIds(json[key]);
+        }
+      }
+    }
+  }
+
+  /**
+   * Observes the block element for any text changes
+   * @param {Element} blockElement Selected block element
+   */
+  observeBlockTextChanges(blockElement) {
+    this.blockTextMutationObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (
+          mutation.type === 'characterData' ||
+          mutation.type === 'childList'
+        ) {
+          let targetElement = null;
+
+          if (mutation.type === 'characterData') {
+            targetElement =
+              mutation.target?.parentElement.closest('[data-hydra-node]');
+          } else {
+            targetElement = mutation.target.closest('[data-hydra-node]');
+          }
+
+          if (targetElement) {
+            this.handleTextChange(targetElement);
+          }
+        }
+      });
+    });
+
+    this.blockTextMutationObserver.observe(blockElement, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  }
+
+  /**
+   * Handle the text change in the slate block element
+   * @param {Element} target
+   */
+  handleTextChange(target) {
+    const closestNode = target.closest('[data-hydra-node]');
+    if (closestNode) {
+      const nodeId = closestNode.getAttribute('data-hydra-node');
+      const updatedJson = this.updateJsonNode(
+        this.formData?.blocks[this.selectedBlockUid],
+        nodeId,
+        closestNode.innerText?.replace(/\n$/, ''),
+      );
+      // this.resetJsonNodeIds(updatedJson);
+      this.formData.blocks[this.selectedBlockUid] = updatedJson;
+      window.parent.postMessage(
+        { type: 'INLINE_EDIT_DATA', data: this.formData },
+        this.adminOrigin,
+      );
+
+      // this.sendUpdatedJsonToAdminUI(updatedJson);
+    }
+  }
+  /**
+   * Update the JSON object with the new text
+   * @param {JSON} json Block's data
+   * @param {BigInteger} nodeId Node ID of the element
+   * @param {String} newText Updated text
+   * @returns {JSON} Updated JSON object
+   */
+  updateJsonNode(json, nodeId, newText) {
+    if (Array.isArray(json)) {
+      return json.map((item) => this.updateJsonNode(item, nodeId, newText));
+    } else if (typeof json === 'object' && json !== null) {
+      if (json.nodeId === parseInt(nodeId, 10)) {
+        json.text = newText;
+      }
+      for (const key in json) {
+        if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
+          json[key] = this.updateJsonNode(json[key], nodeId, newText);
+        }
+      }
+    }
+    return json;
+  }
+
+  handleBlockFocusOut(e) {
+    window.parent.postMessage({ type: 'INLINE_EDIT_EXIT' }, this.adminOrigin);
+  }
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';
     style.innerHTML = `
+        [contenteditable] {
+          outline: 0px solid transparent;
+        }
         .volto-hydra--outline {
           position: relative !important;
         }

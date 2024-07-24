@@ -59,6 +59,17 @@ const applyConfig = (config) => {
   // Initial call to set the blocks based on the initial state
   updateAllowedBlocks();
 
+  // Initial block for Document content type
+  config.blocks.initialBlocks = {
+    Document: [
+      { '@type': 'title' },
+      {
+        '@type': 'slate',
+        value: [{ type: 'p', children: [{ text: '' }] }],
+      },
+    ],
+  };
+
   return config;
 };
 

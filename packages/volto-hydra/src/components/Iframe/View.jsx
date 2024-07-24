@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
@@ -40,7 +34,7 @@ const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
       ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-      : `${url}?access_token=${token}&_edit=false`
+      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
     : null;
 };
 
@@ -94,6 +88,7 @@ const Iframe = (props) => {
   }, [selectedBlock]);
   //-------------------------
 
+  const isInlineEditingRef = useRef(false);
   const [iframeSrc, setIframeSrc] = useState(null);
   const urlFromEnv = getURlsFromEnv();
   const u =
@@ -102,21 +97,18 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
-    if (iframeSrc) {
-      if (new URL(iframeSrc).origin !== new URL(u).origin) {
-        setIframeSrc(getUrlWithAdminParams(u, token));
-      }
-    } else {
-      setIframeSrc(getUrlWithAdminParams(u, token));
-    }
+    setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
-  }, [iframeSrc, token, u]);
+  }, [token, u]);
   const history = useHistory();
 
   //-----Experimental-----
   const intl = useIntl();
 
   const onInsertBlock = (id, value, current) => {
+    if (value?.['@type'] === 'slate') {
+      value = { ...value, value: [{ type: 'p', children: [{ text: '' }] }] };
+    }
     const [newId, newFormData] = insertBlock(
       properties,
       id,
@@ -151,6 +143,9 @@ const Iframe = (props) => {
       }
       // Update adminUI URL with the new URL
       const formattedUrl = new URL(givenUrl);
+      const newOrigin = formattedUrl.origin;
+      Cookies.set('iframe_url', newOrigin, { expires: 7 });
+
       history.push(`${formattedUrl.pathname}`);
     },
     [history],
@@ -210,6 +205,15 @@ const Iframe = (props) => {
           }
           break;
 
+        case 'INLINE_EDIT_DATA':
+          isInlineEditingRef.current = true;
+          onChangeFormData(event.data.data);
+          break;
+
+        case 'INLINE_EDIT_EXIT':
+          isInlineEditingRef.current = false;
+          break;
+
         default:
           break;
       }
@@ -234,7 +238,12 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    if (form && Object.keys(form).length > 0 && isValidUrl(iframeSrc)) {
+    if (
+      !isInlineEditingRef.current &&
+      form &&
+      Object.keys(form).length > 0 &&
+      isValidUrl(iframeSrc)
+    ) {
       // Send the form data to the iframe
       const origin = new URL(iframeSrc).origin;
       document
@@ -243,17 +252,6 @@ const Iframe = (props) => {
     }
   }, [form, iframeSrc]);
 
-  const memoizedIframe = useMemo(
-    () => (
-      <iframe
-        id="previewIframe"
-        title="Preview"
-        src={iframeSrc}
-        ref={setReferenceElement}
-      />
-    ),
-    [iframeSrc],
-  );
   return (
     <div id="iframeContainer">
       {addNewBlockOpened &&
@@ -302,7 +300,12 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
-      {memoizedIframe}
+      <iframe
+        id="previewIframe"
+        title="Preview"
+        src={iframeSrc}
+        ref={setReferenceElement}
+      />
     </div>
   );
 };
