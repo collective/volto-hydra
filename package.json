@@ -38,11 +38,12 @@
     "@plone/client": "1.0.0-alpha.16",
     "@plone/registry": "workspace:*",
     "@plone/volto": "workspace:*",
+    "events": "^3.3.0",
     "js-cookie": "^3.0.5",
     "volto-hydra": "workspace:*"
   },
   "peerDependencies": {
-    "@plone/volto": "volto-18.0.0-alpha.36"
+    "@plone/volto": "volto-18.0.0-alpha.41"
   },
   "devDependencies": {
     "mrs-developer": "^2.2.0"

@@ -324,7 +324,7 @@ class Form extends Component {
     ) {
       this.setState(() => ({ sidebarMetadataIsAvailable: true }));
     }
-    if (this.props.location.pathname !== prevProps.location.pathname) {
+    if (this.props?.location?.pathname !== prevProps?.location?.pathname) {
       this.setState({ formData: this.props.formData });
     }
   }
@@ -663,176 +663,172 @@ class Form extends Component {
             navRoot={navRoot}
           />
 
-          <Container>
-            <BlocksToolbar
-              formData={formData}
-              selectedBlock={this.state.selected}
-              selectedBlocks={this.state.multiSelected}
-              onChangeBlocks={(newBlockData) => {
-                const newFormData = {
-                  ...formData,
-                  ...newBlockData,
-                };
-                this.setState({
-                  formData: newFormData,
-                });
-                if (this.props.global) {
-                  this.props.setFormData(newFormData);
-                }
-              }}
-              onSetSelectedBlocks={(blockIds) =>
-                this.setState({ multiSelected: blockIds })
+          <BlocksToolbar
+            formData={formData}
+            selectedBlock={this.state.selected}
+            selectedBlocks={this.state.multiSelected}
+            onChangeBlocks={(newBlockData) => {
+              const newFormData = {
+                ...formData,
+                ...newBlockData,
+              };
+              this.setState({
+                formData: newFormData,
+              });
+              if (this.props.global) {
+                this.props.setFormData(newFormData);
               }
-              onSelectBlock={this.onSelectBlock}
-            />
-            <UndoToolbar
-              state={{
-                formData,
-                selected: this.state.selected,
-                multiSelected: this.state.multiSelected,
-              }}
-              enableHotKeys
-              onUndoRedo={({ state }) => {
-                if (this.props.global) {
-                  this.props.setFormData(state.formData);
-                }
-                return this.setState(state);
-              }}
-            />
-            <Iframe
-              formData={formData}
-              onChangeFormData={(newData) => {
-                const newFormData = {
-                  ...formData,
-                  ...newData,
-                };
-                this.setState({
-                  formData: newFormData,
-                });
-                if (this.props.global) {
-                  this.props.setFormData(newFormData);
-                }
-              }}
-              onChangeField={this.onChangeField}
-              onSelectBlock={this.onSelectBlock}
-              properties={formData}
-              navRoot={navRoot}
-              type={type}
-              pathname={this.props.pathname}
-              selectedBlock={this.state.selected}
-              multiSelected={this.state.multiSelected}
-              manage={this.props.isAdminForm}
-              allowedBlocks={this.props.allowedBlocks}
-              showRestricted={this.props.showRestricted}
-              editable={this.props.editable}
-              isMainForm={this.props.editable}
-              // Properties to pass to the BlocksForm to match the View ones
-              history={this.props.history}
-              location={this.props.location}
-              token={this.props.token}
-            />
-            <BlocksForm
-              className="blocks-form"
-              onChangeFormData={(newData) => {
-                const newFormData = {
-                  ...formData,
-                  ...newData,
-                };
-                this.setState({
-                  formData: newFormData,
-                });
-                if (this.props.global) {
-                  this.props.setFormData(newFormData);
-                }
-              }}
-              onChangeField={this.onChangeField}
-              onSelectBlock={this.onSelectBlock}
-              properties={formData}
-              navRoot={navRoot}
-              type={type}
-              pathname={this.props.pathname}
-              selectedBlock={this.state.selected}
-              multiSelected={this.state.multiSelected}
-              manage={this.props.isAdminForm}
-              allowedBlocks={this.props.allowedBlocks}
-              showRestricted={this.props.showRestricted}
-              editable={this.props.editable}
-              isMainForm={this.props.editable}
-              // Properties to pass to the BlocksForm to match the View ones
-              history={this.props.history}
-              location={this.props.location}
-              token={this.props.token}
-            />
-            {this.state.isClient &&
-              this.state.sidebarMetadataIsAvailable &&
-              this.props.editable &&
-              createPortal(
-                <UiForm
-                  method="post"
-                  onSubmit={this.onSubmit}
-                  error={keys(this.state.errors).length > 0}
-                >
-                  {schema &&
-                    map(schema.fieldsets, (fieldset) => (
-                      <Accordion
-                        fluid
-                        styled
-                        className="form"
-                        key={fieldset.title}
+            }}
+            onSetSelectedBlocks={(blockIds) =>
+              this.setState({ multiSelected: blockIds })
+            }
+            onSelectBlock={this.onSelectBlock}
+          />
+          <UndoToolbar
+            state={{
+              formData,
+              selected: this.state.selected,
+              multiSelected: this.state.multiSelected,
+            }}
+            enableHotKeys
+            onUndoRedo={({ state }) => {
+              if (this.props.global) {
+                this.props.setFormData(state.formData);
+              }
+              return this.setState(state);
+            }}
+          />
+          <Iframe
+            formData={formData}
+            onChangeFormData={(newData) => {
+              const newFormData = {
+                ...formData,
+                ...newData,
+              };
+              this.setState({
+                formData: newFormData,
+              });
+              if (this.props.global) {
+                this.props.setFormData(newFormData);
+              }
+            }}
+            onChangeField={this.onChangeField}
+            onSelectBlock={this.onSelectBlock}
+            properties={formData}
+            navRoot={navRoot}
+            type={type}
+            pathname={this.props.pathname}
+            selectedBlock={this.state.selected}
+            multiSelected={this.state.multiSelected}
+            manage={this.props.isAdminForm}
+            allowedBlocks={this.props.allowedBlocks}
+            showRestricted={this.props.showRestricted}
+            editable={this.props.editable}
+            isMainForm={this.props.editable}
+            // Properties to pass to the BlocksForm to match the View ones
+            history={this.props.history}
+            location={this.props.location}
+            token={this.props.token}
+          />
+          <BlocksForm
+            className="blocks-form"
+            onChangeFormData={(newData) => {
+              const newFormData = {
+                ...formData,
+                ...newData,
+              };
+              this.setState({
+                formData: newFormData,
+              });
+              if (this.props.global) {
+                this.props.setFormData(newFormData);
+              }
+            }}
+            onChangeField={this.onChangeField}
+            onSelectBlock={this.onSelectBlock}
+            properties={formData}
+            navRoot={navRoot}
+            type={type}
+            pathname={this.props.pathname}
+            selectedBlock={this.state.selected}
+            multiSelected={this.state.multiSelected}
+            manage={this.props.isAdminForm}
+            allowedBlocks={this.props.allowedBlocks}
+            showRestricted={this.props.showRestricted}
+            editable={this.props.editable}
+            isMainForm={this.props.editable}
+            // Properties to pass to the BlocksForm to match the View ones
+            history={this.props.history}
+            location={this.props.location}
+            token={this.props.token}
+          />
+          {this.state.isClient &&
+            this.state.sidebarMetadataIsAvailable &&
+            this.props.editable &&
+            createPortal(
+              <UiForm
+                method="post"
+                onSubmit={this.onSubmit}
+                error={keys(this.state.errors).length > 0}
+              >
+                {schema &&
+                  map(schema.fieldsets, (fieldset) => (
+                    <Accordion
+                      fluid
+                      styled
+                      className="form"
+                      key={fieldset.title}
+                    >
+                      <div
+                        key={fieldset.id}
+                        id={`metadataform-fieldset-${fieldset.id}`}
                       >
-                        <div
-                          key={fieldset.id}
-                          id={`metadataform-fieldset-${fieldset.id}`}
+                        <Accordion.Title
+                          active={metadataFieldsets.includes(fieldset.id)}
+                          index={fieldset.id}
+                          onClick={this.onToggleMetadataFieldset}
                         >
-                          <Accordion.Title
-                            active={metadataFieldsets.includes(fieldset.id)}
-                            index={fieldset.id}
-                            onClick={this.onToggleMetadataFieldset}
-                          >
-                            {fieldset.title}
-                            {metadataFieldsets.includes(fieldset.id) ? (
-                              <Icon name={upSVG} size="20px" />
-                            ) : (
-                              <Icon name={downSVG} size="20px" />
-                            )}
-                          </Accordion.Title>
-                          <Accordion.Content
-                            active={metadataFieldsets.includes(fieldset.id)}
-                          >
-                            <Segment className="attached">
-                              {map(fieldset.fields, (field, index) => (
-                                <Field
-                                  {...schema.properties[field]}
-                                  id={field}
-                                  fieldSet={fieldset.title.toLowerCase()}
-                                  formData={formData}
-                                  focus={this.state.inFocus[field]}
-                                  value={formData?.[field]}
-                                  required={
-                                    schema.required.indexOf(field) !== -1
-                                  }
-                                  onChange={this.onChangeField}
-                                  onBlur={this.onBlurField}
-                                  onClick={this.onClickInput}
-                                  key={field}
-                                  error={this.state.errors[field]}
-                                />
-                              ))}
-                            </Segment>
-                          </Accordion.Content>
-                        </div>
-                      </Accordion>
-                    ))}
-                </UiForm>,
-                document.getElementById('sidebar-metadata'),
-              )}
+                          {fieldset.title}
+                          {metadataFieldsets.includes(fieldset.id) ? (
+                            <Icon name={upSVG} size="20px" />
+                          ) : (
+                            <Icon name={downSVG} size="20px" />
+                          )}
+                        </Accordion.Title>
+                        <Accordion.Content
+                          active={metadataFieldsets.includes(fieldset.id)}
+                        >
+                          <Segment className="attached">
+                            {map(fieldset.fields, (field, index) => (
+                              <Field
+                                {...schema.properties[field]}
+                                id={field}
+                                fieldSet={fieldset.title.toLowerCase()}
+                                formData={formData}
+                                focus={this.state.inFocus[field]}
+                                value={formData?.[field]}
+                                required={schema.required.indexOf(field) !== -1}
+                                onChange={this.onChangeField}
+                                onBlur={this.onBlurField}
+                                onClick={this.onClickInput}
+                                key={field}
+                                error={this.state.errors[field]}
+                              />
+                            ))}
+                          </Segment>
+                        </Accordion.Content>
+                      </div>
+                    </Accordion>
+                  ))}
+              </UiForm>,
+              document.getElementById('sidebar-metadata'),
+            )}
 
-            <SlotRenderer
-              name="belowContent"
-              content={this.props.content}
-              navRoot={navRoot}
-            />
-          </Container>
+          <SlotRenderer
+            name="belowContent"
+            content={this.props.content}
+            navRoot={navRoot}
+          />
         </>
       )
     ) : (

@@ -12,18 +12,23 @@ import {
 import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
-import usePresetUrls from '../../utils/usePreseturls';
 import isValidUrl from '../../utils/isValidUrl';
 import { BlockChooser } from '@plone/volto/components';
 import { createPortal } from 'react-dom';
 import { usePopper } from 'react-popper';
-import UrlInput from '../UrlInput';
+import { useSelector, useDispatch } from 'react-redux';
+import { getURlsFromEnv } from '../../utils/getSavedURLs';
+import { setSidebarTab } from '@plone/volto/actions';
+import {
+  getAllowedBlocksList,
+  setAllowedBlocksList,
+} from '../../utils/allowedBlockList';
 
 /**
- * Format the URL for the Iframe with location, token and enabling edit mode
- * @param {*} url
- * @param {*} token
- * @returns {string} URL with the admin params
+ * Format the URL for the Iframe with location, token and edit mode
+ * @param {URL} url
+ * @param {String} token
+ * @returns {URL} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
@@ -49,10 +54,8 @@ const Iframe = (props) => {
     type: contentType,
     selectedBlock,
   } = props;
-  // const [ready, setReady] = useState(false);
-  // useEffect(() => {
-  //   setReady(true);
-  // }, []);
+
+  const dispatch = useDispatch();
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
@@ -64,7 +67,7 @@ const Iframe = (props) => {
       {
         name: 'offset',
         options: {
-          offset: [0, -250],
+          offset: [550, -300],
         },
       },
       {
@@ -75,23 +78,37 @@ const Iframe = (props) => {
       },
     ],
   });
+  useEffect(() => {
+    document
+      .getElementById('previewIframe')
+      .contentWindow.postMessage(
+        { type: 'SELECT_BLOCK', uid: selectedBlock },
+        '*',
+      );
+  }, [selectedBlock]);
   //-------------------------
 
-  const [url, setUrl] = useState('');
-  const [src, setSrc] = useState('');
-  const history = useHistory();
+  const isInlineEditingRef = useRef(false);
+  const [iframeSrc, setIframeSrc] = useState(null);
+  const urlFromEnv = getURlsFromEnv();
+  const u =
+    useSelector((state) => state.frontendPreviewUrl.url) ||
+    Cookies.get('iframe_url') ||
+    urlFromEnv[0];
 
-  const presetUrls = usePresetUrls();
-  const defaultUrl = presetUrls[0];
-  const savedUrl = Cookies.get('iframe_url');
-  const initialUrl = savedUrl
-    ? getUrlWithAdminParams(savedUrl, token)
-    : getUrlWithAdminParams(defaultUrl, token);
+  useEffect(() => {
+    setIframeSrc(getUrlWithAdminParams(u, token));
+    u && Cookies.set('iframe_url', u, { expires: 7 });
+  }, [token, u]);
+  const history = useHistory();
 
   //-----Experimental-----
   const intl = useIntl();
 
   const onInsertBlock = (id, value, current) => {
+    if (value?.['@type'] === 'slate') {
+      value = { ...value, value: [{ type: 'p', children: [{ text: '' }] }] };
+    }
     const [newId, newFormData] = insertBlock(
       properties,
       id,
@@ -121,25 +138,18 @@ const Iframe = (props) => {
 
   const handleNavigateToUrl = useCallback(
     (givenUrl = null) => {
-      if (!isValidUrl(givenUrl) && !isValidUrl(url)) {
+      if (!isValidUrl(givenUrl)) {
         return;
       }
       // Update adminUI URL with the new URL
-      const formattedUrl = givenUrl ? new URL(givenUrl) : new URL(url);
+      const formattedUrl = new URL(givenUrl);
       const newOrigin = formattedUrl.origin;
       Cookies.set('iframe_url', newOrigin, { expires: 7 });
 
       history.push(`${formattedUrl.pathname}`);
     },
-    [history, url],
+    [history],
   );
-
-  useEffect(() => {
-    setUrl(
-      `${savedUrl || defaultUrl}${window.location.pathname.replace('/edit', '')}`,
-    );
-    setSrc(initialUrl);
-  }, [savedUrl, defaultUrl, initialUrl]);
 
   useEffect(() => {
     //----------------Experimental----------------
@@ -149,7 +159,7 @@ const Iframe = (props) => {
       onChangeFormData(newFormData);
 
       onSelectBlock(selectPrev ? previous : null);
-      const origin = new URL(src).origin;
+      const origin = new URL(iframeSrc).origin;
       document
         .getElementById('previewIframe')
         .contentWindow.postMessage(
@@ -158,7 +168,7 @@ const Iframe = (props) => {
         );
     };
     //----------------------------------------------
-    const initialUrlOrigin = initialUrl ? new URL(initialUrl).origin : '';
+    const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
         return;
@@ -173,6 +183,7 @@ const Iframe = (props) => {
           if (history.location.pathname.endsWith('/edit')) {
             onSelectBlock(event.data.uid);
             setAddNewBlockOpened(false);
+            dispatch(setSidebarTab(1));
           }
           break;
 
@@ -183,6 +194,24 @@ const Iframe = (props) => {
 
         case 'DELETE_BLOCK':
           onDeleteBlock(event.data.uid, true);
+          break;
+
+        case 'ALLOWED_BLOCKS':
+          if (
+            JSON.stringify(getAllowedBlocksList()) !==
+            JSON.stringify(event.data.allowedBlocks)
+          ) {
+            setAllowedBlocksList(event.data.allowedBlocks);
+          }
+          break;
+
+        case 'INLINE_EDIT_DATA':
+          isInlineEditingRef.current = true;
+          onChangeFormData(event.data.data);
+          break;
+
+        case 'INLINE_EDIT_EXIT':
+          isInlineEditingRef.current = false;
           break;
 
         default:
@@ -198,31 +227,33 @@ const Iframe = (props) => {
       window.removeEventListener('message', messageHandler);
     };
   }, [
+    dispatch,
     handleNavigateToUrl,
     history.location.pathname,
-    initialUrl,
+    iframeSrc,
     onChangeFormData,
     onSelectBlock,
     properties,
-    src,
     token,
   ]);
 
   useEffect(() => {
-    if (form && Object.keys(form).length > 0 && isValidUrl(src)) {
+    if (
+      !isInlineEditingRef.current &&
+      form &&
+      Object.keys(form).length > 0 &&
+      isValidUrl(iframeSrc)
+    ) {
       // Send the form data to the iframe
-      const origin = new URL(src).origin;
+      const origin = new URL(iframeSrc).origin;
       document
         .getElementById('previewIframe')
         .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, origin);
     }
-  }, [form, initialUrl, src]);
+  }, [form, iframeSrc]);
 
   return (
     <div id="iframeContainer">
-      <div className="input-container">
-        <UrlInput urls={presetUrls} onSelect={handleNavigateToUrl} />
-      </div>
       {addNewBlockOpened &&
         createPortal(
           <div
@@ -244,7 +275,7 @@ const Iframe = (props) => {
                   ? (id, value) => {
                       setAddNewBlockOpened(false);
                       const newId = onInsertBlock(id, value);
-                      const origin = new URL(src).origin;
+                      const origin = new URL(iframeSrc).origin;
                       document
                         .getElementById('previewIframe')
                         .contentWindow.postMessage(
@@ -272,7 +303,7 @@ const Iframe = (props) => {
       <iframe
         id="previewIframe"
         title="Preview"
-        src={src}
+        src={iframeSrc}
         ref={setReferenceElement}
       />
     </div>

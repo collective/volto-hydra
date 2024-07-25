@@ -138,7 +138,7 @@ const Login = (props) => {
     <div id="page-login">
       <Helmet title={intl.formatMessage(messages.Login)} />
       <Container>
-        <Grid centered>
+        <Grid centered style={{ marginTop: '10px' }}>
           <Grid.Column>
             <Segment raised>
               <Header as="h1" textAlign="center">
