@@ -3,10 +3,6 @@ import Page from '../pages/page.vue';
 import NotFoundPage from '../pages/404.vue';
 import axios from 'axios';
 
-// In Layout.js or App.js
-import { initBridge } from './hydra.js';
-const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
-
 
 var routes = [
   {
@@ -32,7 +28,7 @@ var routes = [
       };
       const api = "https://hydra.pretagov.com/++api++"+path+"?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=1"
       axios.get(api, {headers}).then((response) => {
-        var data = response.data;
+        app.store.state.content = response.data;
         // Hide Preloader
         app.preloader.hide();
 
@@ -45,7 +41,6 @@ var routes = [
           },
           {
             props: {
-              data: data,
             }
           }
         );

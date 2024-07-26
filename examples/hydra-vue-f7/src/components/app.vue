@@ -75,6 +75,8 @@
   import routes from '../js/routes.js';
   import store from '../js/store';
   import SideMenu from '../pages/sidenav.vue'
+  import { initBridge } from '../js/hydra.js';
+
 
   export default {
     data() {
@@ -114,9 +116,27 @@
           f7.loginScreen.close();
         });
       }
-      onMounted(() => {
-        f7ready(() => {
 
+      // In Layout.js or App.js
+      const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
+
+
+      onMounted(() => {
+        f7ready((f7) => {
+
+          bridge.onEditChange((data) => {
+            // f7.views.main.router.navigate(f7.views.main.router.currentRoute.url, {
+            //   reloadCurrent: true,
+            //   ignoreCache: true,
+            //   options: {
+            //     props: {
+            //       data: data
+            //     }
+            //   }
+            // });
+            f7.store.state.content = data;
+        
+           });
 
           // Call F7 APIs here
         });

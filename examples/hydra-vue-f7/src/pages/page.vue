@@ -29,6 +29,7 @@
 <script>
   import SideNav from './sidenav.vue';
   import RichText from '../components/richtext.vue';
+  import { useStore } from 'framework7-vue';
   export default {
     components: {
       RichText
@@ -45,7 +46,13 @@
       },
     },
     props: {
-      data: Object,
+    },
+    data() {
+      
+      return {
+        data: useStore('content'),
+      }
     }
+
   }
 </script>
