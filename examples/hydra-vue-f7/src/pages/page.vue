@@ -12,14 +12,14 @@
       <f7-nav-title-large>{{data.title}}</f7-nav-title-large>
     </f7-navbar>
 
-    <template v-for="block_uid in data.blocks_layout.items">
+    <template v-for="block_uid in data.blocks_layout.items" v-bind="data.blocks[block_uid]">
       <f7-block-title v-if="data.blocks[block_uid]['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title>
-      <f7-block v-if="data.blocks[block_uid]['@type']=='slate'" :data-block-uid="block_uid">
+      <f7-block v-if="data.blocks[block_uid]['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
         <RichText v-for="node in data.blocks[block_uid]['value']" :key="node" :node="node" />
       </f7-block>
-      <f7-block-title v-if="data.blocks[block_uid]['@type']=='image'" :data-block-uid="block_uid">
-        <img :src="data.blocks[block_uid].src"/>
-      </f7-block-title>
+      <f7-block v-if="data.blocks[block_uid]['@type']=='image'" :data-block-uid="block_uid">
+        <img :src="data.blocks[block_uid].url+'/@@images/image'"/>
+      </f7-block>
     </template>
   </f7-page>
 
@@ -44,6 +44,18 @@
       changePanelFoo() {
         //this.$root.panelProps.data = data;
       },
+      imageProps(block) {
+        const image_url = data.blocks[id]?.image_scales
+            ? `${data.blocks[id].url}/++api++/${data.blocks[id]?.image_scales.image[0].download}`
+            : data.blocks[id].url;
+        const size = data.blocks[id].size;
+        const align = data.blocks[id].align;
+        return {
+          url: image_url,
+          size: size,
+          align: align
+        }
+      }
     },
     props: {
     },
