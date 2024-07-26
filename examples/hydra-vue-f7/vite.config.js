@@ -34,6 +34,9 @@ export default {
   server: {
     host: true,
     https: true,
+    cors: {
+      origin: "https://hydra.pretagov.com"
+    }
   },
 
 };

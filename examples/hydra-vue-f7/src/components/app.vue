@@ -95,8 +95,10 @@
       const f7params = {
         name: 'My App', // App name
         theme: 'auto', // Automatic theme detection
+        view: {
+            browserHistory: true,
 
-
+        },
 
         // App store
         store: store,
