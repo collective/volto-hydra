@@ -13,10 +13,13 @@
     </f7-navbar>
 
     <template v-for="block_uid in data.blocks_layout.items">
-      <f7-block-title v-if="data.blocks[block_uid]['@type']=='title'">{{ data.blocks[block_uid]['title']}}</f7-block-title>
-      <f7-block v-if="data.blocks[block_uid]['@type']=='slate'">
+      <f7-block-title v-if="data.blocks[block_uid]['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title>
+      <f7-block v-if="data.blocks[block_uid]['@type']=='slate'" :data-block-uid="block_uid">
         <RichText v-for="node in data.blocks[block_uid]['value']" :key="node" :node="node" />
       </f7-block>
+      <f7-block-title v-if="data.blocks[block_uid]['@type']=='image'" :data-block-uid="block_uid">
+        <img :src="data.blocks[block_uid].src"/>
+      </f7-block-title>
     </template>
   </f7-page>
 
