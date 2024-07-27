@@ -27,7 +27,7 @@
     "skeleton-elements": "^4.0.1",
     "swiper": "^11.1.7",
     "vue": "^3.4.34",
-    "axios": ""
+    "axios": "^1.7.2"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.0",
@@ -36,6 +36,6 @@
     "cross-env": "^7.0.3",
     "postcss-preset-env": "^9.6.0",
     "vite": "^5.3.5",
-    "vite-plugin-mkcert": ""
+    "vite-plugin-mkcert": "^1.17.5"
   }
 }
