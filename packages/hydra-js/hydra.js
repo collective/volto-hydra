@@ -36,14 +36,21 @@ class Bridge {
         const newUrl = new URL(e.destination.url);
         if (
           this.currentUrl === null ||
+          newUrl.hash !== this.currentUrl.hash ||
           (this.currentUrl.pathname !== newUrl.pathname &&
             this.currentUrl.origin === newUrl.origin)
         ) {
-          this.currentUrl = newUrl;
           window.parent.postMessage(
-            { type: 'URL_CHANGE', url: e.destination.url },
+            {
+              type: 'URL_CHANGE',
+              url: newUrl.href,
+              isRoutingWithHash:
+                newUrl.hash !== this.currentUrl?.hash &&
+                newUrl.hash.startsWith('#!'),
+            },
             this.adminOrigin,
           );
+          this.currentUrl = newUrl;
         } else if (
           this.currentUrl !== null &&
           this.currentUrl.origin !== newUrl.origin

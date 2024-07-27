@@ -135,18 +135,26 @@ const Iframe = (props) => {
     onChangeFormData(newFormData);
   };
   //---------------------------
-
+  /**
+   * Handle the navigation to a new URL
+   * @param {URL} givenUrlObject
+   * @param {Boolean} isRoutingWithHash
+   */
   const handleNavigateToUrl = useCallback(
-    (givenUrl = null) => {
-      if (!isValidUrl(givenUrl)) {
+    (givenUrlObject, isRoutingWithHash) => {
+      if (!isValidUrl(givenUrlObject.href)) {
         return;
       }
       // Update adminUI URL with the new URL
-      const formattedUrl = new URL(givenUrl);
-      const newOrigin = formattedUrl.origin;
+      const newOrigin = givenUrlObject.origin;
       Cookies.set('iframe_url', newOrigin, { expires: 7 });
-
-      history.push(`${formattedUrl.pathname}`);
+      const hash = givenUrlObject.hash;
+      if (isRoutingWithHash) {
+        const pathname = hash.replace('#!', '');
+        history.push(`${pathname}`);
+      } else {
+        history.push(`${givenUrlObject.pathname}`);
+      }
     },
     [history],
   );
@@ -176,7 +184,10 @@ const Iframe = (props) => {
       const { type } = event.data;
       switch (type) {
         case 'URL_CHANGE': // URL change from the iframe
-          handleNavigateToUrl(event.data.url);
+          handleNavigateToUrl(
+            new URL(event.data.url),
+            event.data.isRoutingWithHash,
+          );
           break;
 
         case 'OPEN_SETTINGS':
