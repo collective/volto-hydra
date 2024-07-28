@@ -12,4 +12,4 @@ acceptance
 build
 yarn.lock
 .storybook
-examples/
+examples/**
