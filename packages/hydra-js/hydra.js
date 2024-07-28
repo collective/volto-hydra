@@ -204,7 +204,7 @@ class Bridge {
     this.quantaToolbar = document.createElement('div');
     this.quantaToolbar.className = 'volto-hydra-quantaToolbar';
 
-    // Prevent event propagation for the quantaToolbar
+    // Prevent click event propagation for the quantaToolbar
     this.quantaToolbar.addEventListener('click', (e) => e.stopPropagation());
 
     // Create the drag button
@@ -212,6 +212,20 @@ class Bridge {
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG; // Use your drag SVG here
     dragButton.disabled = true; // Disable drag button for now
+
+    // Create the bold button
+    const boldButton = document.createElement('button');
+    boldButton.className = 'volto-hydra-bold-button';
+    boldButton.innerHTML = boldSVG;
+    boldButton.addEventListener('click', () => {
+      // Send postMessage to toggle bold formatting
+      const isActive = boldButton.classList.toggle('active');
+      const message = {
+        type: 'TOGGLE_BOLD',
+        active: isActive,
+      };
+      window.parent.postMessage(message, this.adminOrigin);
+    });
 
     // Create the three-dot menu button
     const menuButton = document.createElement('button');
@@ -256,6 +270,7 @@ class Bridge {
 
     // Append elements to the quantaToolbar
     this.quantaToolbar.appendChild(dragButton);
+    this.quantaToolbar.appendChild(boldButton);
     this.quantaToolbar.appendChild(menuButton);
     this.quantaToolbar.appendChild(dropdownMenu);
 
@@ -575,16 +590,25 @@ class Bridge {
           top: -45px;
           left: 0;
           box-sizing: border-box;
-          width: 70px;
+          width: 107px;
           height: 40px;
         }
         .volto-hydra-drag-button,
-        .volto-hydra-menu-button {
+        .volto-hydra-menu-button,
+        .volto-hydra-bold-button {
           background: none;
           border: none;
           cursor: pointer;
           padding: 0.5em;
           margin: 0;
+        }
+        .volto-hydra-bold-button {
+          border-radius: 5px;
+          margin: 1px;
+        }
+        .volto-hydra-bold-button.active,
+        .volto-hydra-bold-button:hover {
+          background-color: #ddd;
         }
         .volto-hydra-drag-button {
           cursor: default;
@@ -717,6 +741,7 @@ const dragSVG = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none"
   <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/>
   <g id="SVGRepo_iconCarrier"> <path d="M8 6.5C9.38071 6.5 10.5 5.38071 10.5 4C10.5 2.61929 9.38071 1.5 8 1.5C6.61929 1.5 5.5 2.61929 5.5 4C5.5 5.38071 6.61929 6.5 8 6.5Z" fill="#4A5B68"/> <path d="M15.5 6.5C16.8807 6.5 18 5.38071 18 4C18 2.61929 16.8807 1.5 15.5 1.5C14.1193 1.5 13 2.61929 13 4C13 5.38071 14.1193 6.5 15.5 6.5Z" fill="#4A5B68"/> <path d="M10.5 12C10.5 13.3807 9.38071 14.5 8 14.5C6.61929 14.5 5.5 13.3807 5.5 12C5.5 10.6193 6.61929 9.5 8 9.5C9.38071 9.5 10.5 10.6193 10.5 12Z" fill="#4A5B68"/> <path d="M15.5 14.5C16.8807 14.5 18 13.3807 18 12C18 10.6193 16.8807 9.5 15.5 9.5C14.1193 9.5 13 10.6193 13 12C13 13.3807 14.1193 14.5 15.5 14.5Z" fill="#4A5B68"/> <path d="M10.5 20C10.5 21.3807 9.38071 22.5 8 22.5C6.61929 22.5 5.5 21.3807 5.5 20C5.5 18.6193 6.61929 17.5 8 17.5C9.38071 17.5 10.5 18.6193 10.5 20Z" fill="#4A5B68"/> <path d="M15.5 22.5C16.8807 22.5 18 21.3807 18 20C18 18.6193 16.8807 17.5 15.5 17.5C14.1193 17.5 13 18.6193 13 20C13 21.3807 14.1193 22.5 15.5 22.5Z" fill="#4A5B68"/> </g>
   </svg>`;
+const boldSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAACLUlEQVR4nO3az4tOURzH8RejZiNFKUWywD+g/AEo2VioCWWnlBVCLERCiZ2dGFmQJgtFfmxkYsvCyiyI8iMpRndGfjXz6NZ5aprM85wxZu7t3POuz/ae+313O9/z45LJZDKZTCaTyfwLBVr/IT/wJeQ9XmAQ13AaG9ArYQGtiIzgHJZoqIBWyDC2abCAFsZwQIMFtEJ2Nl3AMFY1WUALA3UWMIK+KbIDeybkII7gGG7g6zTmgxV1FfB5Bs9ehP5ICXslKKDN7QgBlyQsYH2EgDsSFjAf37uMc1fCAoTndBrnqoQFLAwzfadx9ktYwK4uY4xjrUQFLMe7LmM8VCHFLAnoCYulbsWPhS5RWwHfwupuco7ibMh5XAy5Emb0TxGtr8zJKouvei/QH1pk4wT8xCHMUwOKOS7+I9apEUUFX0B5gHoda9SAosI54BeOVz0PFBUKaOcWFtRVwG887ZAhvMKHcCcwOoOOkMxCqBersR0PpiFhq0T3Apsjv4yhKlpjMQcCSrZEfgWbJCqg5HGEgHJZnayAwxECygvVZAX0RQgob5UbLeCNhAWciBDwXKICekKb6ybgpkQFnIlsg+U2OSkBy3A5svhWFYejRZcXGp10ATpV9k04LjsV1vaD4fAjtvhHc118XXaD7WzUYAEDVRRfFwEvsVhDBbxu8i8y97G0yuKrEvCkqsOP2RAwPuEX2XbehmOyZ2ELfA8XsBsr//oWmUwmk8lkMpmM6fIH83xLt33EM5cAAAAASUVORK5CYII=">`;
 const addSVG = `<img widht="20px" height="20px" src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjgzMjggMi41MDAwMkg5LjE2NjE4VjkuMTY2NjhIMi40OTk1MVYxMC44MzMzSDkuMTY2MThWMTcuNUgxMC44MzI4VjEwLjgzMzNIMTcuNDk5NVY5LjE2NjY4SDEwLjgzMjhWMi41MDAwMloiIGZpbGw9IiM0QTVCNjgiLz4KPC9zdmc+Cg=='/>`;
 const threeDotsSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12C3 10.8954 3.89543 10 5 10Z" fill="#000000"/>

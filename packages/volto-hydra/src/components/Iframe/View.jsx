@@ -225,6 +225,10 @@ const Iframe = (props) => {
           isInlineEditingRef.current = false;
           break;
 
+        case 'TOGGLE_BOLD':
+          console.log('TOGGLE_BOLD', event.data);
+          // document.execCommand('bold');
+          break;
         default:
           break;
       }
