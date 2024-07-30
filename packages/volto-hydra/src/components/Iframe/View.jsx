@@ -235,7 +235,7 @@ const Iframe = (props) => {
 
             // Find the nodes and update the JSON data
             const updatedJsonData = toggleMark(
-              form.blocks[selectedBlock]?.value,
+              form.blocks[selectedBlock],
               selection,
               active,
             );
@@ -261,7 +261,7 @@ const Iframe = (props) => {
     };
   }, [
     dispatch,
-    form.blocks,
+    form?.blocks,
     handleNavigateToUrl,
     history.location.pathname,
     iframeSrc,

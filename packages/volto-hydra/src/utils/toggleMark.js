@@ -1,21 +1,21 @@
 // Function to toggle mark in the JSON data
-function toggleMark(jsonData, selection, active) {
-  // Find the start and end nodes using selection.startNodeId and selection.endNodeId
-  // Update the JSON data structure to apply or remove bold formatting
+function toggleMark(blockData, selection, active) {
+  const { startNodeId, endNodeId, startOffset, endOffset } = selection;
+  let json = JSON.parse(JSON.stringify(blockData));
+  const jsonData = json.value;
+  let startNodeParent = null;
 
-  const { startNodeId, endNodeId, startOffset, endOffset, text } = selection;
-
-  const findNode = (nodeId, nodes) => {
-    console.log('findNode', nodeId, nodes);
+  const findNode = (nodeId, nodes, parent = null) => {
     for (let node of nodes) {
       if (node.nodeId === parseInt(nodeId)) {
-        console.log('found the node');
+        if (!startNodeParent) {
+          startNodeParent = parent;
+        }
         return node;
       }
       if (node.children) {
-        const found = findNode(nodeId, node.children);
+        const found = findNode(nodeId, node.children, node);
         if (found) {
-          console.log('return found');
           return found;
         }
       }
@@ -23,13 +23,12 @@ function toggleMark(jsonData, selection, active) {
     return null;
   };
 
-  const startNode = findNode(startNodeId, jsonData);
-  const endNode = findNode(endNodeId, jsonData);
-  console.log('startNode', startNode);
-  console.log('endNode', endNode);
+  let startNode = findNode(startNodeId, jsonData);
+  let endNode = findNode(endNodeId, jsonData);
+
   if (!startNode || !endNode) {
-    console.log('No matching nodes found');
-    return jsonData; // No matching nodes found, return original data
+    console.warn('No matching nodes found');
+    return json; // No matching nodes found, return original data
   }
 
   const startText = startNode.text.substring(0, startOffset);
@@ -43,16 +42,39 @@ function toggleMark(jsonData, selection, active) {
     { nodeId: startNode.nodeId, text: startText },
     active
       ? {
+          nodeId: startNode.nodeId + 1,
           type: 'strong',
-          children: [{ nodeId: startNode.nodeId, text: middleText }],
+          children: [{ nodeId: startNode.nodeId + 2, text: middleText }],
         }
-      : { nodeId: startNode.nodeId, text: middleText },
-    { nodeId: endNode.nodeId, text: endText },
+      : { nodeId: startNode.nodeId + 1, text: middleText },
+    { nodeId: startNode.nodeId + 3, text: endText },
   ];
 
-  startNode.children = updatedNodes;
+  // Remove nodes within the range of [startNodeId, endNodeId] and insert updated nodes
+  if (startNodeParent && startNodeParent.children) {
+    let insertIndex = -1;
+    startNodeParent.children = startNodeParent.children.filter(
+      (node, index) => {
+        if (
+          node.nodeId >= Math.min(startNode.nodeId, endNode.nodeId) &&
+          node.nodeId <= Math.max(startNode.nodeId, endNode.nodeId)
+        ) {
+          if (insertIndex === -1) {
+            insertIndex = index;
+          }
+          return false;
+        }
+        return true;
+      },
+    );
 
-  return jsonData;
+    if (insertIndex !== -1) {
+      startNodeParent.children.splice(insertIndex, 0, ...updatedNodes);
+    }
+  }
+
+  json.value = jsonData;
+  return json;
 }
 
 export default toggleMark;
