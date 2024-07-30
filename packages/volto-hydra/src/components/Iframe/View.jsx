@@ -23,6 +23,7 @@ import {
   getAllowedBlocksList,
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
+import toggleMark from '../../utils/toggleMark';
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -226,8 +227,25 @@ const Iframe = (props) => {
           break;
 
         case 'TOGGLE_BOLD':
-          console.log('TOGGLE_BOLD', event.data);
-          // document.execCommand('bold');
+          console.log('TOGGLE_BOLD', event.data, selectedBlock);
+          const data = event.data;
+
+          if (data.type === 'TOGGLE_BOLD') {
+            const { active, selection } = data;
+
+            // Find the nodes and update the JSON data
+            const updatedJsonData = toggleMark(
+              form.blocks[selectedBlock]?.value,
+              selection,
+              active,
+            );
+            console.log('updatedJsonData', updatedJsonData);
+            // Send the updated JSON data back to the iframe
+            event.source.postMessage(
+              { type: 'UPDATE_JSON_DATA', data: updatedJsonData },
+              event.origin,
+            );
+          }
           break;
         default:
           break;
@@ -243,12 +261,14 @@ const Iframe = (props) => {
     };
   }, [
     dispatch,
+    form.blocks,
     handleNavigateToUrl,
     history.location.pathname,
     iframeSrc,
     onChangeFormData,
     onSelectBlock,
     properties,
+    selectedBlock,
     token,
   ]);
 
