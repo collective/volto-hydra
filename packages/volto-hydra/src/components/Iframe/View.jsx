@@ -240,6 +240,8 @@ const Iframe = (props) => {
               active,
             );
             console.log('updatedJsonData', updatedJsonData);
+            form.blocks[selectedBlock] = updatedJsonData;
+            onChangeFormData(form);
             // Send the updated JSON data back to the iframe
             event.source.postMessage(
               { type: 'UPDATE_JSON_DATA', data: updatedJsonData },
@@ -261,6 +263,7 @@ const Iframe = (props) => {
     };
   }, [
     dispatch,
+    form,
     form?.blocks,
     handleNavigateToUrl,
     history.location.pathname,

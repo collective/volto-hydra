@@ -39,7 +39,7 @@ function toggleMark(blockData, selection, active) {
   const endText = endNode.text.substring(endOffset);
 
   const updatedNodes = [
-    { nodeId: startNode.nodeId, text: startText },
+    startText !== '' && { nodeId: startNode.nodeId, text: startText },
     active
       ? {
           nodeId: startNode.nodeId + 1,
@@ -47,7 +47,7 @@ function toggleMark(blockData, selection, active) {
           children: [{ nodeId: startNode.nodeId + 2, text: middleText }],
         }
       : { nodeId: startNode.nodeId + 1, text: middleText },
-    { nodeId: startNode.nodeId + 3, text: endText },
+    endText !== '' && { nodeId: startNode.nodeId + 3, text: endText },
   ];
 
   // Remove nodes within the range of [startNodeId, endNodeId] and insert updated nodes
