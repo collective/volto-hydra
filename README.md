@@ -24,6 +24,52 @@ What is Quanta?
 - [Quanta](https://github.com/plone/volto/issues/4332) is an iteration on the design system and editing UI that Volto impliments
 - Hydra is using Volto as it's base and where parts are reimplimented it is being done closer to the Quanta design.
 
+## How Hydra works
+
+Instead of combining editing and rendering into one framework and codebase, these are seperated and during editing
+a two way communication channel is opened across an iframe so that the editing UI is no longer
+part of the frontend code. Instead a small js file called ```hydra.js``` is included in your frontend during editing
+that handles the iframe bridge communication to hydra which is running in the same browser window. Hydra.js also 
+handles small parts of UI that need to be displayed on the frontend during editing.
+You could think of it as spliting Volto into two parts, Rendering and CMSUI/AdminUI and then making the Rendering part
+easily replacable with other implementations.
+
+```
+                          Browser            RestAPI             Server              
+                                                                                     
+                                                                                     
+                      ┌──────────────┐                       ┌─────────────┐         
+                      │              │                       │             │         
+   Anon/Editing       │    Volto     │◄─────────────────────►│    Plone    │         
+                      │              │                       │             │         
+                      └──────────────┘                       └─────────────┘         
+                                                                                     
+                                                                                     
+─────────────────────────────────────────────────────────────────────────────────────
+                                                                                     
+                                                                                     
+                  │   ┌──────────────┐                       ┌─────────────┐         
+                  │   │              │                       │             │         
+                  │   │   Frontend   │◄──────────────────────┤    Plone    │         
+                  │   │              │                       │             │         
+                  │   └──hydra.js────┘                       └─────────────┘         
+                  │          ▲                                  ▲                    
+   Editing       UI          │ iFrame Bridge                    │                    
+                  │          ▼                                  │                    
+                  │   ┌──────────────┐                          │                    
+                  │   │              │                          │                    
+                  │   │    Hydra     │◄─────────────────────────┘                    
+                  │   │              │                                               
+                  │   └──────────────┘                                               
+                                                                                     
+                                                                                     
+                      ┌──────────────┐                       ┌─────────────┐         
+                      │              │                       │             │         
+   Anon               │   Frontend   │◄──────────────────────┤    Plone    │         
+                      │              │                       │             │         
+                      └──────────────┘                       └─────────────┘         
+             
+```
 
 ## Want to try the editor?
 
@@ -32,6 +78,8 @@ Go to user preferences in the bottom left to select one of the available preset 
 
 Available example frontends (go to `examples` directory for source code):
 - https://hydra-blogsite-nextjs.vercel.app
+
+Note: These are simple test frontends made with minimal effort and don't include support for all the navigation and block of volto yet.
 
 ## Building a Frontend for Headless Plone
 
@@ -42,9 +90,8 @@ Available example frontends (go to `examples` directory for source code):
     and inline editing. Your frontend would lack browser based code to render content dynamically but in the future
     it could be possible for these edits to go via the backend making near realtime editing possible.
 - Fetch content from the Plone backend using the [@plone/client](https://github.com/plone/volto/tree/main/packages/client) 
-  library or the simple Fetch API. You should be able to use [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) also.
+  library or directly use [Plone restAPI](https://plonerestapi.readthedocs.io/en/latest/). You should be able to use [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) also.
 - You can start small with just simple navigation and just a few basic blocks and work up to supporting more kinds of blocks as you need them.
-
 
 TODO: link to more documentation on creating a frontend using @plone/client
 
