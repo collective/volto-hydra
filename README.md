@@ -31,8 +31,9 @@ a two way communication channel is opened across an iframe so that the editing U
 part of the frontend code. Instead a small js file called ```hydra.js``` is included in your frontend during editing
 that handles the iframe bridge communication to hydra which is running in the same browser window. Hydra.js also 
 handles small parts of UI that need to be displayed on the frontend during editing.
-You could think of it as spliting Volto into two parts, Rendering and CMSUI/AdminUI and then making the Rendering part
-easily replacable with other implementations.
+
+You could think of it as spliting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
+making the Rendering part easily replacable with other implementations.
 
 ```
                           Browser            RestAPI             Server              
@@ -71,6 +72,8 @@ easily replacable with other implementations.
              
 ```
 
+
+
 ## Want to try the editor?
 
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
@@ -85,13 +88,14 @@ Note: These are simple test frontends made with minimal effort and don't include
 
 ### Choose Your Framework
 
-- You can use any frontend framework (e.g., Next.js, Nuxt.js, Astro etc or plain js).
+- You can use any frontend framework (e.g., Next.js/React, Nuxt.js/Vue, Astro etc or plain js).
   - Static site generators like Gatsby and server side rendering like Flask could work but without realtime updates
     and inline editing. Your frontend would lack browser based code to render content dynamically but in the future
     it could be possible for these edits to go via the backend making near realtime editing possible.
 - Fetch content from the Plone backend using the [@plone/client](https://github.com/plone/volto/tree/main/packages/client) 
   library or directly use [Plone restAPI](https://plonerestapi.readthedocs.io/en/latest/). You should be able to use [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) also.
 - You can start small with just simple navigation and just a few basic blocks and work up to supporting more kinds of blocks as you need them.
+- There is a [set of example frontends](https://github.com/collective/volto-hydra/tree/main/examples) in different frameworks.
 
 TODO: link to more documentation on creating a frontend using @plone/client
 
@@ -102,60 +106,13 @@ You can either run a local hydra instance (see below) or connect it directly to 
 If you are testing against https://hydra.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
 are no CORS errors
 
-To test against a local hydra instance
-
-**1. Clone the Volto-Hydra Repository**
-
-- Clone the Volto-Hydra repository from GitHub:
-
-    ```bash
-    git clone https://github.com/collective/volto-hydra.git
-    cd volto-hydra
-    ```
-**2. Start Volto-Hydra**
-
-- Run the following command to start the Volto-Hydra site:
-    ```bash
-    make start
-    ```
-- You can also set your preset frontend URLs with environment variables, making them available in the admin UI. This allows you to switch between them seamlessly:
-    ```bash
-    RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3002,https://hydra-blogsite-nextjs.vercel.app pnpm start
-    ```
-    You can find `.env.example` at root directory of the project.
-- Ensure Volto is running on port 3000.
-
-**3. Start the Plone Backend**
-
-- You can start the Plone backend using Docker images:
-    ```bash
-    make backend-docker-start
-    ```
-  ***Note :***  This will also set [`CORS_ALLOW_ORIGIN` to `'*'`](https://6.docs.plone.org/install/containers/images/backend.html?highlight=cors#cors-variables), so there are no cors error.
-
-### Using the example frontend
-
-You can use one of the example frontends available at `./examples` directory.
-
-- Running Volto Hydra:
-  ```bash
-  make example-nextjs-admin
-  ```
-- Running example frontend:
-  ```bash
-  make example-nextjs-frontend
-  ```
-
 ### Deploy your frontend
 
-Use netlify or similar and make your frontend public.
+Use netlify or similar and make your frontend publicly accessible.
 Ensure you have correctly set the CORS headers to allow access by the hydra editor. How to do this will depend
 on how you host your frontend.
 
 You can then log into https://hydra.pretagov.com and set the frontend to edit in the user settings.
-
-If want others to try editing using your demo frontend
-then let us know by [creating a ticket](https://github.com/collective/volto-hydra/issues)
 
 
 ## Make your Frontend editable
@@ -439,6 +396,57 @@ e.g.
 ### Congratulations
 
 You have now made your frontend fully editable.
+
+If deployed your frontend and want others to try editing it
+then let us know by [creating a ticket](https://github.com/collective/volto-hydra/issues)
+
+
+## Local Development
+
+To test against a local hydra instance
+
+**1. Clone the Volto-Hydra Repository**
+
+- Clone the Volto-Hydra repository from GitHub:
+
+    ```bash
+    git clone https://github.com/collective/volto-hydra.git
+    cd volto-hydra
+    ```
+**2. Start Volto-Hydra**
+
+- Run the following command to start the Volto-Hydra site:
+    ```bash
+    make start
+    ```
+- You can also set your preset frontend URLs with environment variables, making them available in the admin UI. This allows you to switch between them seamlessly:
+    ```bash
+    RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3002,https://hydra-blogsite-nextjs.vercel.app pnpm start
+    ```
+    You can find `.env.example` at root directory of the project.
+- Ensure Volto is running on port 3000.
+
+**3. Start the Plone Backend**
+
+- You can start the Plone backend using Docker images:
+    ```bash
+    make backend-docker-start
+    ```
+  ***Note :***  This will also set [`CORS_ALLOW_ORIGIN` to `'*'`](https://6.docs.plone.org/install/containers/images/backend.html?highlight=cors#cors-variables), so there are no cors error.
+
+### Using the example frontend
+
+You can use one of the example frontends available at `./examples` directory.
+
+- Running Volto Hydra:
+  ```bash
+  make example-nextjs-admin
+  ```
+- Running example frontend:
+  ```bash
+  make example-nextjs-frontend
+  ```
+
 
 ## Code Examples
 
