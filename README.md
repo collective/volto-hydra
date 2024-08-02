@@ -8,11 +8,11 @@ It should not be used in production.
 
 Why does it matter?
 - If you **want a Headless CMS**: 
-   - You get the best editor UX for a headless CMS with inplace editing like Volto with the bonus of being open source
-- If you **are new to Volto**:
-   - You get a lower learning curve if you already know a frontend framework 
+   - You get the best editor UX for a headless CMS with inplace visual editing with the bonus of being open source
+- If you **don't know Volto**:
+   - You get a lower learning curve if you already know a frontend framework, or just use one of the included starter frontends.  
 - If you **already use Volto**:
-   - you can develop frontends with faster load times and less risky Volto upgrades with no downgrade in editor UX
+   - you can develop frontends with faster load times, higher security and less risky Volto upgrades, with no downgrade in editor UX
 - If you are **already using Plone Headless**:
    - this will improve the editor UX with just a few lines of code
 
