@@ -1,0 +1,27 @@
+@use 'cirrus-ui/src/cirrus-ext' as * with (
+  $config: (
+    extend: (
+      colors: (
+        semantic: (
+          'primary': #a020f0,
+        ),
+        extended: (
+          'blue': (
+            '500': #ff6600,
+          ),
+          'magenta': (
+            '100': #fef7f4,
+            '200': #fbe0dd,
+            '300': #f2afb3,
+            '400': #ec798b,
+            '500': #dc5472,
+            '600': #bc3263,
+            '700': #98184d,
+            '800': #73123f,
+            '900': #560e39,
+          ),
+        ),
+      ),
+    ),
+  )
+);

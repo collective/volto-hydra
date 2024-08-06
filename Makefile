@@ -123,7 +123,14 @@ ci-acceptance-test: ## Run cypress tests in headless mode for CI
 example-nextjs-admin: ## Starts Volto, allowing reloading of the add-on during development
 	RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3002 pnpm start
 
-## Examples
 .PHONY: example-nextjs-frontend
 example-nextjs-frontend: ## Starts nextjs example frontend
 	pnpm example:nextjs
+
+.PHONY: example-astro-admin
+example-astro-admin: ## Starts Volto, allowing reloading of the add-on during development
+	RAZZLE_DEFAULT_IFRAME_URL=http://localhost:4321 pnpm start
+
+.PHONY: example-astro-frontend
+example-astro-frontend: ## Starts Volto, allowing reloading of the add-on during development
+	pnpm example:astro
