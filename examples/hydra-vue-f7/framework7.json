@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/dylanjay/Projects/deploy-helm/volto-hydra/examples/volto-vue-f7",
+  "type": [
+    "web"
+  ],
+  "name": "Hydra Frontend Vue f7",
+  "framework": "vue",
+  "template": "single-view",
+  "cssPreProcessor": false,
+  "bundler": "vite",
+  "theming": {
+    "customColor": false,
+    "color": "#007aff",
+    "darkTheme": false,
+    "iconFonts": true,
+    "fillBars": false
+  },
+  "customBuild": false
+}
