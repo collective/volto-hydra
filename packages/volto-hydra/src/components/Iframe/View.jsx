@@ -226,28 +226,10 @@ const Iframe = (props) => {
           isInlineEditingRef.current = false;
           break;
 
-        case 'TOGGLE_BOLD':
+        case 'TOGGLE_MARK':
           console.log('TOGGLE_BOLD', event.data, selectedBlock);
-          const data = event.data;
+          onChangeFormData(event.data.data);
 
-          if (data.type === 'TOGGLE_BOLD') {
-            const { active, selection } = data;
-
-            // Find the nodes and update the JSON data
-            const updatedJsonData = toggleMark(
-              form.blocks[selectedBlock],
-              selection,
-              active,
-            );
-            console.log('updatedJsonData', updatedJsonData);
-            form.blocks[selectedBlock] = updatedJsonData;
-            onChangeFormData(form);
-            // Send the updated JSON data back to the iframe
-            event.source.postMessage(
-              { type: 'UPDATE_JSON_DATA', data: updatedJsonData },
-              event.origin,
-            );
-          }
           break;
         default:
           break;

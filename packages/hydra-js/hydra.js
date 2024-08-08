@@ -1,4 +1,4 @@
-/** Bridge class creating two-way link between the Hydra and the frontend **/
+/** Bridge class creating two-way link between the Hydra and the frontend */
 class Bridge {
   /**
    *
@@ -23,6 +23,8 @@ class Bridge {
     this.formData = null;
     this.blockTextMutationObserver = null;
     this.selectedBlockUid = null;
+    this.handleBlockFocusIn = null;
+    this.handleBlockFocusOut = null;
     this.init(options);
   }
 
@@ -171,12 +173,45 @@ class Bridge {
     boldButton.className = `volto-hydra-bold-button`;
     boldButton.innerHTML = boldSVG;
     boldButton.addEventListener('click', () => {
+      const selection = window.getSelection();
       const isActive = boldButton.classList.toggle('active');
-      const message = {
-        type: 'TOGGLE_BOLD',
-        active: isActive,
+      const startNode = this.findParentWithAttribute(
+        selection.anchorNode.parentElement,
+        'data-hydra-node',
+      );
+      const endNode = this.findParentWithAttribute(
+        selection.focusNode.parentElement,
+        'data-hydra-node',
+      );
+      const startOffset = selection.anchorOffset;
+      const endOffset = selection.focusOffset;
+
+      // Prepare data to send to admin UI
+
+      const selectionData = {
+        startNodeId: Math.min(
+          startNode.getAttribute('data-hydra-node'),
+          endNode.getAttribute('data-hydra-node'),
+        ),
+        endNodeId: Math.max(
+          startNode.getAttribute('data-hydra-node'),
+          endNode.getAttribute('data-hydra-node'),
+        ),
+        startOffset: Math.min(startOffset, endOffset),
+        endOffset: Math.max(startOffset, endOffset),
+        text: selection.toString(),
       };
-      window.parent.postMessage(message, this.adminOrigin);
+
+      this.formData.blocks[this.selectedBlockUid] = this.toggleMark(
+        this.formData.blocks[this.selectedBlockUid],
+        selectionData,
+        isActive,
+      );
+      // this.setDataCallback(this.formData);
+      window.parent.postMessage(
+        { type: 'TOGGLE_MARK', data: this.formData },
+        this.adminOrigin,
+      );
     });
 
     // Check if the selected text is bold
@@ -287,7 +322,34 @@ class Bridge {
     if (this.currentlySelectedBlock) {
       this.deselectBlock(this.currentlySelectedBlock, blockElement);
     }
+    if (
+      this.currentlySelectedBlock === null ||
+      this.currentlySelectedBlock !== blockElement
+    ) {
+      this.handleBlockFocusOut = (e) => {
+        // console.log("focus out");
+        window.parent.postMessage(
+          { type: 'INLINE_EDIT_EXIT' },
+          this.adminOrigin,
+        );
+      };
+      this.handleBlockFocusIn = (e) => {
+        // console.log("focus in");
+        window.parent.postMessage(
+          {
+            type: 'INLINE_EDIT_ENTER',
+          },
+          this.adminOrigin,
+        );
+      };
+      // Add focus in event listener
+      blockElement.addEventListener('focusout', this.handleBlockFocusOut);
 
+      blockElement.addEventListener(
+        'focusin',
+        this.handleBlockFocusIn.bind(this),
+      );
+    }
     // Helper function to handle each element
     const handleElement = (element) => {
       const editableField = element.getAttribute('data-editable-field');
@@ -314,19 +376,17 @@ class Bridge {
 
     // Only when the block is a slate block, add nodeIds to the block's data
     this.observeBlockTextChanges(blockElement);
-    // if the block is a slate block, add nodeIds to the block's data
+    // // if the block is a slate block, add nodeIds to the block's data
     if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
       this.formData.blocks[blockUid] = this.addNodeIds(
         this.formData.blocks[blockUid],
       );
       this.setDataCallback(this.formData);
+      // window.parent.postMessage(
+      //   { type: "ADD_NODEIDS", data: this.formData },
+      //   this.adminOrigin
+      // );
     }
-
-    // Add focus out event listener
-    blockElement.addEventListener(
-      'focusout',
-      this.handleBlockFocusOut.bind(this),
-    );
 
     // Set the currently selected block
     this.currentlySelectedBlock = blockElement;
@@ -477,13 +537,15 @@ class Bridge {
       });
 
       // Clean up JSON structure
-      this.resetJsonNodeIds(this.blocksJson);
+      // if (this.formData.blocks[this.selectedBlockUid]["@type"] === "slate") this.resetJsonNodeIds(this.formData.blocks[this.selectedBlockUid]);
 
       // Remove focus out event listener
       prevBlockElement.removeEventListener(
         'focusout',
-        this.handleBlockFocusOut.bind(this),
+        this.handleBlockFocusOut,
       );
+      // Remove focus in event listener
+      prevBlockElement.removeEventListener('focusin', this.handleBlockFocusIn);
     }
     document.removeEventListener('mouseup', this.handleMouseUp);
     // Disconnect the mutation observer
@@ -592,8 +654,97 @@ class Bridge {
     return json;
   }
 
-  handleBlockFocusOut(e) {
-    window.parent.postMessage({ type: 'INLINE_EDIT_EXIT' }, this.adminOrigin);
+  findParentWithAttribute(node, attribute) {
+    while (node && node.nodeType === Node.ELEMENT_NODE) {
+      if (node.hasAttribute(attribute)) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  toggleMark(blockData, selection, active) {
+    const { startNodeId, endNodeId, startOffset, endOffset } = selection;
+    let json = JSON.parse(JSON.stringify(blockData));
+    const jsonData = json.value;
+    let startNodeParent = null;
+
+    const findNode = (nodeId, nodes, parent = null) => {
+      for (let node of nodes) {
+        if (node.nodeId === parseInt(nodeId)) {
+          if (!startNodeParent) {
+            startNodeParent = parent;
+          }
+          return node;
+        }
+        if (node.children) {
+          const found = findNode(nodeId, node.children, node);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
+    };
+
+    let startNode = findNode(startNodeId, jsonData);
+    let endNode = findNode(endNodeId, jsonData);
+
+    if (!startNode || !endNode) {
+      console.warn('No matching nodes found');
+      return json; // No matching nodes found, return original data
+    }
+    console.log('selection', selection);
+    const startText = startNode.text.substring(0, startOffset);
+    const middleText = startNode.text.substring(
+      startOffset,
+      endNode.text.length - (endNode.text.length - endOffset),
+    );
+    const endText = endNode.text.substring(endOffset);
+
+    const updatedNodes = [
+      { nodeId: startNode.nodeId, text: startText },
+      active
+        ? {
+            nodeId: startNode.nodeId + 1,
+            type: 'strong',
+            children: [{ nodeId: startNode.nodeId + 2, text: middleText }],
+          }
+        : {
+            nodeId: startNode.nodeId + 1,
+            text: startText + middleText + endText,
+          },
+      { nodeId: startNode.nodeId + 3, text: endText },
+    ];
+    console.log('updatednode', updatedNodes);
+    // Remove nodes within the range of [startNodeId, endNodeId] and insert updated nodes
+    if (startNodeParent && startNodeParent.children) {
+      let insertIndex = -1;
+      startNodeParent.children = startNodeParent.children.filter(
+        (node, index) => {
+          if (
+            node.nodeId >= Math.min(startNode.nodeId, endNode.nodeId) &&
+            node.nodeId <= Math.max(startNode.nodeId, endNode.nodeId)
+          ) {
+            if (insertIndex === -1) {
+              insertIndex = index;
+            }
+            return false;
+          }
+          return true;
+        },
+      );
+
+      if (insertIndex !== -1) {
+        if (active)
+          startNodeParent.children.splice(insertIndex, 0, ...updatedNodes);
+        else startNodeParent.children.splice(insertIndex, 0, updatedNodes[1]);
+      }
+    }
+    console.log('value', json.value);
+    json.value = this.addNodeIds(jsonData);
+    return json;
   }
   injectCSS() {
     const style = document.createElement('style');
