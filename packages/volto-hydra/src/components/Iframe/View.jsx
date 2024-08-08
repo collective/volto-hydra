@@ -23,6 +23,7 @@ import {
   getAllowedBlocksList,
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
+import toggleMark from '../../utils/toggleMark';
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -225,6 +226,11 @@ const Iframe = (props) => {
           isInlineEditingRef.current = false;
           break;
 
+        case 'TOGGLE_MARK':
+          console.log('TOGGLE_BOLD', event.data, selectedBlock);
+          onChangeFormData(event.data.data);
+
+          break;
         default:
           break;
       }
@@ -239,12 +245,15 @@ const Iframe = (props) => {
     };
   }, [
     dispatch,
+    form,
+    form?.blocks,
     handleNavigateToUrl,
     history.location.pathname,
     iframeSrc,
     onChangeFormData,
     onSelectBlock,
     properties,
+    selectedBlock,
     token,
   ]);
 
