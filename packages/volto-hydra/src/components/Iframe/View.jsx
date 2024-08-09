@@ -219,6 +219,10 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
+          console.log(
+            'Inline data recieved',
+            event.data.data?.blocks[selectedBlock],
+          );
           onChangeFormData(event.data.data);
           break;
 
@@ -227,8 +231,20 @@ const Iframe = (props) => {
           break;
 
         case 'TOGGLE_MARK':
-          console.log('TOGGLE_BOLD', event.data, selectedBlock);
-          onChangeFormData(event.data.data);
+          console.log('TOGGLE_BOLD', event.data.html);
+          isInlineEditingRef.current = true;
+          const deserializedHTMLData = toggleMark(event.data.html);
+          console.log('deserializedHTMLData', deserializedHTMLData);
+          onChangeFormData({
+            ...form,
+            blocks: {
+              ...form.blocks,
+              [selectedBlock]: {
+                ...form.blocks[selectedBlock],
+                value: deserializedHTMLData,
+              },
+            },
+          });
 
           break;
         default:
@@ -258,6 +274,7 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
+    console.log('form data changed', form?.blocks[selectedBlock]);
     if (
       !isInlineEditingRef.current &&
       form &&

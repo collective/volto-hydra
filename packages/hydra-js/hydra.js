@@ -25,6 +25,7 @@ class Bridge {
     this.selectedBlockUid = null;
     this.handleBlockFocusIn = null;
     this.handleBlockFocusOut = null;
+    this.isInlineEditing = false;
     this.init(options);
   }
 
@@ -173,45 +174,43 @@ class Bridge {
     boldButton.className = `volto-hydra-bold-button`;
     boldButton.innerHTML = boldSVG;
     boldButton.addEventListener('click', () => {
-      const selection = window.getSelection();
-      const isActive = boldButton.classList.toggle('active');
-      const startNode = this.findParentWithAttribute(
-        selection.anchorNode.parentElement,
-        'data-hydra-node',
-      );
-      const endNode = this.findParentWithAttribute(
-        selection.focusNode.parentElement,
-        'data-hydra-node',
-      );
-      const startOffset = selection.anchorOffset;
-      const endOffset = selection.focusOffset;
+      this.formatSelectedText('bold');
+      // const selection = window.getSelection();
+      // const isActive = boldButton.classList.toggle("active");
+      // const startNode = this.findParentWithAttribute(
+      //   selection.anchorNode.parentElement,
+      //   "data-hydra-node"
+      // );
+      // const endNode = this.findParentWithAttribute(
+      //   selection.focusNode.parentElement,
+      //   "data-hydra-node"
+      // );
+      // const startOffset = selection.anchorOffset;
+      // const endOffset = selection.focusOffset;
 
-      // Prepare data to send to admin UI
+      // // Prepare data to send to admin UI
 
-      const selectionData = {
-        startNodeId: Math.min(
-          startNode.getAttribute('data-hydra-node'),
-          endNode.getAttribute('data-hydra-node'),
-        ),
-        endNodeId: Math.max(
-          startNode.getAttribute('data-hydra-node'),
-          endNode.getAttribute('data-hydra-node'),
-        ),
-        startOffset: Math.min(startOffset, endOffset),
-        endOffset: Math.max(startOffset, endOffset),
-        text: selection.toString(),
-      };
-
-      this.formData.blocks[this.selectedBlockUid] = this.toggleMark(
-        this.formData.blocks[this.selectedBlockUid],
-        selectionData,
-        isActive,
-      );
-      // this.setDataCallback(this.formData);
-      window.parent.postMessage(
-        { type: 'TOGGLE_MARK', data: this.formData },
-        this.adminOrigin,
-      );
+      // const selectionData = {
+      //   startNodeId: Math.min(
+      //     startNode.getAttribute("data-hydra-node"),
+      //     endNode.getAttribute("data-hydra-node")
+      //   ),
+      //   endNodeId: Math.max(
+      //     startNode.getAttribute("data-hydra-node"),
+      //     endNode.getAttribute("data-hydra-node")
+      //   ),
+      //   startOffset: Math.min(startOffset, endOffset),
+      //   endOffset: Math.max(startOffset, endOffset),
+      //   text: selection.toString(),
+      // };
+      // console.log(selectionData);
+      // this.formData.blocks[this.selectedBlockUid] = this.toggleMark(
+      //   this.formData.blocks[this.selectedBlockUid],
+      //   selectionData,
+      //   isActive
+      // );
+      // // this.setDataCallback(this.formData);
+      // window.parent.postMessage({type: "TOGGLE_MARK", data: this.formData}, this.adminOrigin);
     });
 
     // Check if the selected text is bold
@@ -341,6 +340,7 @@ class Bridge {
           },
           this.adminOrigin,
         );
+        this.isInlineEditing = true;
       };
       // Add focus in event listener
       blockElement.addEventListener('focusout', this.handleBlockFocusOut);
@@ -581,20 +581,12 @@ class Bridge {
   observeBlockTextChanges(blockElement) {
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        if (
-          mutation.type === 'characterData' ||
-          mutation.type === 'childList'
-        ) {
+        if (mutation.type === 'characterData') {
           let targetElement = null;
+          targetElement =
+            mutation.target?.parentElement.closest('[data-hydra-node]');
 
-          if (mutation.type === 'characterData') {
-            targetElement =
-              mutation.target?.parentElement.closest('[data-hydra-node]');
-          } else {
-            targetElement = mutation.target.closest('[data-hydra-node]');
-          }
-
-          if (targetElement) {
+          if (targetElement && this.isInlineEditing) {
             this.handleTextChange(targetElement);
           }
         }
@@ -602,7 +594,6 @@ class Bridge {
     });
 
     this.blockTextMutationObserver.observe(blockElement, {
-      childList: true,
       subtree: true,
       characterData: true,
     });
@@ -664,87 +655,248 @@ class Bridge {
     return null;
   }
 
-  toggleMark(blockData, selection, active) {
-    const { startNodeId, endNodeId, startOffset, endOffset } = selection;
-    let json = JSON.parse(JSON.stringify(blockData));
-    const jsonData = json.value;
-    let startNodeParent = null;
+  // toggleMark(blockData, selection, active) {
+  //   const { startNodeId, endNodeId, startOffset, endOffset } = selection;
+  //   let json = JSON.parse(JSON.stringify(blockData));
+  //   const jsonData = json.value;
+  //   let startNodeParent = null;
 
-    const findNode = (nodeId, nodes, parent = null) => {
-      for (let node of nodes) {
-        if (node.nodeId === parseInt(nodeId)) {
-          if (!startNodeParent) {
-            startNodeParent = parent;
-          }
-          return node;
-        }
-        if (node.children) {
-          const found = findNode(nodeId, node.children, node);
-          if (found) {
-            return found;
-          }
-        }
+  //   const findNode = (nodeId, nodes, parent = null) => {
+  //     for (let node of nodes) {
+  //       if (node.nodeId === parseInt(nodeId)) {
+  //         if (!startNodeParent) {
+  //           startNodeParent = parent;
+  //         }
+  //         return node;
+  //       }
+  //       if (node.children) {
+  //         const found = findNode(nodeId, node.children, node);
+  //         if (found) {
+  //           return found;
+  //         }
+  //       }
+  //     }
+  //     return null;
+  //   };
+
+  //   let startNode = findNode(startNodeId, jsonData);
+  //   let endNode = findNode(endNodeId, jsonData);
+
+  //   if (!startNode || !endNode) {
+  //     console.warn("No matching nodes found");
+  //     return json; // No matching nodes found, return original data
+  //   }
+  //   console.log('selection', selection);
+  //   const startText = startNode.text.substring(0, startOffset);
+  //   const middleText = startNode.text.substring(
+  //     startOffset,
+  //     endNode.text.length - (endNode.text.length - endOffset)
+  //   );
+  //   const endText = endNode.text.substring(endOffset);
+
+  //   const updatedNodes = [
+  //     { nodeId: startNode.nodeId, text: startText },
+  //     active
+  //       ? {
+  //           nodeId: startNode.nodeId + 1,
+  //           type: "strong",
+  //           children: [{ nodeId: startNode.nodeId + 2, text: middleText }],
+  //         }
+  //       : { nodeId: startNode.nodeId + 1, text: startText + middleText + endText},
+  //     { nodeId: startNode.nodeId + 3, text: endText },
+  //   ];
+  //   console.log('updatednode', updatedNodes);
+  //   // Remove nodes within the range of [startNodeId, endNodeId] and insert updated nodes
+  //   console.log('value before',json.value);
+  //   if (startNodeParent && startNodeParent.children) {
+  //     let insertIndex = -1;
+  //     startNodeParent.children = startNodeParent.children.filter(
+  //       (node, index) => {
+  //         if (
+  //           node.nodeId >= Math.min(startNode.nodeId, endNode.nodeId) &&
+  //           node.nodeId <= Math.max(startNode.nodeId, endNode.nodeId)
+  //         ) {
+  //           if (insertIndex === -1) {
+  //             insertIndex = index;
+  //           }
+  //           return false;
+  //         }
+  //         return true;
+  //       }
+  //     );
+
+  //     if (insertIndex !== -1) {
+  //       if (active) startNodeParent.children.splice(insertIndex, 0, ...updatedNodes);
+  //       else startNodeParent.children.splice(insertIndex, 0, updatedNodes[1]);
+  //     }
+  //   }
+  //   console.log('value after',json.value);
+  //   json.value = this.addNodeIds(jsonData);
+  //   return json;
+  // }
+  getSelectionHTML(range) {
+    const div = document.createElement('div');
+    div.appendChild(range.cloneContents());
+    return div.innerHTML;
+  }
+  isFormatted(range) {
+    if (range.collapsed) return { bold: false, italic: false, del: false };
+    const formats = { bold: false, italic: false, del: false };
+
+    const selectionHTML = this.getSelectionHTML(range);
+
+    // Check if any formatting elements exist within the selection HTML
+    if (selectionHTML.includes('<strong>') || selectionHTML.includes('<b>')) {
+      formats.bold = true;
+    }
+    if (selectionHTML.includes('<em>') || selectionHTML.includes('<i>')) {
+      formats.italic = true;
+    }
+    if (selectionHTML.includes('<del>')) {
+      formats.del = true;
+    }
+    // Get the common ancestor container of the selection
+    let container = range.commonAncestorContainer;
+
+    // Traverse upwards until we find the editable parent or the root
+    while (
+      container &&
+      container !== document &&
+      !(container.dataset && container.dataset['editable-field'] === 'value')
+    ) {
+      // Check if the container itself has any of the formatting
+      if (container.nodeName === 'STRONG' || container.nodeName === 'B') {
+        formats.bold = true;
       }
-      return null;
+      if (container.nodeName === 'EM' || container.nodeName === 'I') {
+        formats.italic = true;
+      }
+      if (container.nodeName === 'DEL') {
+        formats.del = true;
+      }
+
+      container = container.parentNode;
+    }
+    return formats;
+  }
+
+  // Helper function to get the next node in the selection
+  nextNode(node) {
+    if (!node) return null; // Handle the case where node is null
+
+    if (node.firstChild) return node.firstChild;
+
+    while (node) {
+      if (node.nextSibling) return node.nextSibling;
+      node = node.parentNode;
+    }
+
+    return null; // Reached the end, return null
+  }
+
+  formatSelectedText(format) {
+    this.isInlineEditing = false;
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const currentFormats = this.isFormatted(range);
+    if (currentFormats[format]) {
+      this.unwrapFormatting(range, format);
+    } else {
+      // Handle selections that include non-Text nodes
+      const fragment = range.extractContents(); // Extract the selected content
+      const newNode = document.createElement(
+        format === 'bold'
+          ? 'strong'
+          : format === 'italic'
+            ? 'em'
+            : format === 'del'
+              ? 'del'
+              : 'span',
+      );
+      newNode.appendChild(fragment); // Append the extracted content to the new node
+      range.insertNode(newNode); // Insert the new node back into the document
+    }
+    this.sendFormattedHTMLToAdminUI(selection);
+  }
+
+  // Helper function to unwrap formatting while preserving other formatting
+  unwrapFormatting(range, format) {
+    const formattingElements = {
+      bold: ['STRONG', 'B'],
+      italic: ['EM', 'I'],
+      del: ['DEL'],
     };
 
-    let startNode = findNode(startNodeId, jsonData);
-    let endNode = findNode(endNodeId, jsonData);
-
-    if (!startNode || !endNode) {
-      console.warn('No matching nodes found');
-      return json; // No matching nodes found, return original data
-    }
-    console.log('selection', selection);
-    const startText = startNode.text.substring(0, startOffset);
-    const middleText = startNode.text.substring(
-      startOffset,
-      endNode.text.length - (endNode.text.length - endOffset),
-    );
-    const endText = endNode.text.substring(endOffset);
-
-    const updatedNodes = [
-      { nodeId: startNode.nodeId, text: startText },
-      active
-        ? {
-            nodeId: startNode.nodeId + 1,
-            type: 'strong',
-            children: [{ nodeId: startNode.nodeId + 2, text: middleText }],
-          }
-        : {
-            nodeId: startNode.nodeId + 1,
-            text: startText + middleText + endText,
-          },
-      { nodeId: startNode.nodeId + 3, text: endText },
-    ];
-    console.log('updatednode', updatedNodes);
-    // Remove nodes within the range of [startNodeId, endNodeId] and insert updated nodes
-    if (startNodeParent && startNodeParent.children) {
-      let insertIndex = -1;
-      startNodeParent.children = startNodeParent.children.filter(
-        (node, index) => {
-          if (
-            node.nodeId >= Math.min(startNode.nodeId, endNode.nodeId) &&
-            node.nodeId <= Math.max(startNode.nodeId, endNode.nodeId)
-          ) {
-            if (insertIndex === -1) {
-              insertIndex = index;
-            }
-            return false;
-          }
-          return true;
-        },
-      );
-
-      if (insertIndex !== -1) {
-        if (active)
-          startNodeParent.children.splice(insertIndex, 0, ...updatedNodes);
-        else startNodeParent.children.splice(insertIndex, 0, updatedNodes[1]);
+    // Check if the selection is entirely within a formatting element of the specified type
+    let container = range.commonAncestorContainer;
+    while (
+      container &&
+      container !== document &&
+      !(container.dataset && container.dataset.editableField === 'value')
+    ) {
+      if (formattingElements[format].includes(container.nodeName)) {
+        // Selection is within the formatting element, so unwrap it
+        this.unwrapElement(container);
+        return; // No need to check further
       }
+      container = container.parentNode;
     }
-    console.log('value', json.value);
-    json.value = this.addNodeIds(jsonData);
-    return json;
+
+    // If the selection is not entirely within a formatting element, proceed as before
+    const nodesToRemove = [];
+    let node = range.startContainer;
+    while (node && node !== range.endContainer) {
+      if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        formattingElements[format].includes(node.nodeName)
+      ) {
+        nodesToRemove.push(node);
+      }
+      node = this.nextNode(node);
+    }
+
+    nodesToRemove.forEach((nodeToRemove) => {
+      this.unwrapElement(nodeToRemove);
+    });
+  }
+
+  // Helper function to unwrap a single formatting element
+  unwrapElement(element) {
+    const parent = element.parentNode;
+    while (element.firstChild) {
+      parent.insertBefore(element.firstChild, element);
+    }
+    parent.removeChild(element);
+  }
+  sendFormattedHTMLToAdminUI(selection) {
+    if (!selection.rangeCount) return; // No selection
+
+    const range = selection.getRangeAt(0);
+    const commonAncestor = range.commonAncestorContainer;
+
+    const editableParent = this.findEditableParent(commonAncestor);
+    if (!editableParent) return; // Couldn't find the editable parent
+
+    const htmlString = editableParent.outerHTML;
+
+    window.parent.postMessage(
+      {
+        type: 'TOGGLE_MARK',
+        html: htmlString,
+      },
+      this.adminOrigin,
+    );
+  }
+  findEditableParent(node) {
+    if (!node || node === document) return null; // Reached the top without finding
+
+    if (node.dataset && node.dataset.editableField === 'value') {
+      return node;
+    }
+
+    return this.findEditableParent(node.parentNode);
   }
   injectCSS() {
     const style = document.createElement('style');
