@@ -57,6 +57,12 @@ const deserialize = (el, markAttributes = {}) => {
       );
     case 'STRONG': // Handle <strong> elements explicitly
       return jsx('element', { type: 'strong' }, children);
+
+    case 'EM': // Handle <strong> elements explicitly
+      return jsx('element', { type: 'em' }, children);
+
+    case 'DEL': // Handle <strong> elements explicitly
+      return jsx('element', { type: 'del' }, children);
     default:
       return children;
   }

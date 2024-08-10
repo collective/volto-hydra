@@ -299,7 +299,7 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    console.log('form data changed', form?.blocks[selectedBlock]);
+    // console.log('form data changed', form?.blocks[selectedBlock]);
     if (
       !isInlineEditingRef.current &&
       form &&

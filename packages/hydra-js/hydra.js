@@ -175,95 +175,75 @@ class Bridge {
 
     // Create the bold button
     const boldButton = document.createElement('button');
-    boldButton.className = `volto-hydra-bold-button`;
+    boldButton.className = `volto-hydra-format-button`;
     boldButton.innerHTML = boldSVG;
     boldButton.addEventListener('click', () => {
       this.formatSelectedText('bold');
-      // const selection = window.getSelection();
-      // const isActive = boldButton.classList.toggle("active");
-      // const startNode = this.findParentWithAttribute(
-      //   selection.anchorNode.parentElement,
-      //   "data-hydra-node"
-      // );
-      // const endNode = this.findParentWithAttribute(
-      //   selection.focusNode.parentElement,
-      //   "data-hydra-node"
-      // );
-      // const startOffset = selection.anchorOffset;
-      // const endOffset = selection.focusOffset;
-
-      // // Prepare data to send to admin UI
-
-      // const selectionData = {
-      //   startNodeId: Math.min(
-      //     startNode.getAttribute("data-hydra-node"),
-      //     endNode.getAttribute("data-hydra-node")
-      //   ),
-      //   endNodeId: Math.max(
-      //     startNode.getAttribute("data-hydra-node"),
-      //     endNode.getAttribute("data-hydra-node")
-      //   ),
-      //   startOffset: Math.min(startOffset, endOffset),
-      //   endOffset: Math.max(startOffset, endOffset),
-      //   text: selection.toString(),
-      // };
-      // console.log(selectionData);
-      // this.formData.blocks[this.selectedBlockUid] = this.toggleMark(
-      //   this.formData.blocks[this.selectedBlockUid],
-      //   selectionData,
-      //   isActive
-      // );
-      // // this.setDataCallback(this.formData);
-      // window.parent.postMessage({type: "TOGGLE_MARK", data: this.formData}, this.adminOrigin);
     });
 
-    // Check if the selected text is bold
-    const isBold = (selection) => {
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const parentNode = range.commonAncestorContainer.parentNode;
-        return (
-          parentNode.nodeName === 'B' ||
-          parentNode.nodeName === 'STRONG' ||
-          window.getComputedStyle(parentNode).fontWeight === 'bold' ||
-          window.getComputedStyle(parentNode).fontWeight === '700'
-        );
-      }
-      return false;
-    };
+    // Create the italic button
+    const italicButton = document.createElement('button');
+    italicButton.className = `volto-hydra-format-button`;
+    italicButton.innerHTML = italicSVG;
+    italicButton.addEventListener('click', () => {
+      this.formatSelectedText('italic');
+    });
 
-    // Function to handle the text selection and show/hide the bold button
-    const handleSelectionChange = () => {
-      const selection = window.getSelection();
-      const selectedText = selection.toString();
-      const anchorNode = selection.anchorNode;
+    // Create the del button
+    const delButton = document.createElement('button');
+    delButton.className = `volto-hydra-format-button`;
+    delButton.innerHTML = delSVG;
+    delButton.addEventListener('click', () => {
+      this.formatSelectedText('del');
+    });
 
-      // Check if anchorNode is an element, if not get its parent element
-      const parentElement =
-        anchorNode.nodeType === Node.ELEMENT_NODE
-          ? anchorNode
-          : anchorNode.parentElement;
+    // // Check if the selected text is bold
+    // const isBold = (selection) => {
+    //   if (selection.rangeCount > 0) {
+    //     const range = selection.getRangeAt(0);
+    //     const parentNode = range.commonAncestorContainer.parentNode;
+    //     return (
+    //       parentNode.nodeName === "B" ||
+    //       parentNode.nodeName === "STRONG" ||
+    //       window.getComputedStyle(parentNode).fontWeight === "bold" ||
+    //       window.getComputedStyle(parentNode).fontWeight === "700"
+    //     );
+    //   }
+    //   return false;
+    // };
 
-      const parentBlock = parentElement.closest(
-        '[data-editable-field="value"]',
-      );
+    // // Function to handle the text selection and show/hide the bold button
+    // const handleSelectionChange = () => {
+    //   const selection = window.getSelection();
+    //   const selectedText = selection.toString();
+    //   const anchorNode = selection.anchorNode;
 
-      // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
-      if (selectedText.length > 0 && parentBlock) {
-        boldButton.classList.toggle('show', true);
-        boldButton.classList.toggle('active', isBold(selection));
-      } else {
-        boldButton.classList.toggle('show', false);
-      }
-    };
+    //   // Check if anchorNode is an element, if not get its parent element
+    //   const parentElement =
+    //     anchorNode.nodeType === Node.ELEMENT_NODE
+    //       ? anchorNode
+    //       : anchorNode.parentElement;
 
-    // Add event listener to handle text selection within the block
-    this.handleMouseUp = (e) => {
-      if (e.target.closest('[data-editable-field="value"]')) {
-        handleSelectionChange();
-      }
-    };
-    this.currentlySelectedBlock.addEventListener('mouseup', this.handleMouseUp);
+    //   const parentBlock = parentElement.closest(
+    //     '[data-editable-field="value"]'
+    //   );
+
+    //   // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
+    //   if (selectedText.length > 0 && parentBlock) {
+    //     boldButton.classList.toggle("show", true);
+    //     boldButton.classList.toggle("active", isBold(selection));
+    //   } else {
+    //     boldButton.classList.toggle("show", false);
+    //   }
+    // };
+
+    // // Add event listener to handle text selection within the block
+    // this.handleMouseUp = (e) => {
+    //   if (e.target.closest('[data-editable-field="value"]')) {
+    //     handleSelectionChange();
+    //   }
+    // };
+    // this.currentlySelectedBlock.addEventListener("mouseup", this.handleMouseUp);
 
     // Create the three-dot menu button
     const menuButton = document.createElement('button');
@@ -309,6 +289,8 @@ class Bridge {
     // Append elements to the quantaToolbar
     this.quantaToolbar.appendChild(dragButton);
     this.quantaToolbar.appendChild(boldButton);
+    this.quantaToolbar.appendChild(italicButton);
+    this.quantaToolbar.appendChild(delButton);
     this.quantaToolbar.appendChild(menuButton);
     this.quantaToolbar.appendChild(dropdownMenu);
 
@@ -659,85 +641,6 @@ class Bridge {
     return null;
   }
 
-  // toggleMark(blockData, selection, active) {
-  //   const { startNodeId, endNodeId, startOffset, endOffset } = selection;
-  //   let json = JSON.parse(JSON.stringify(blockData));
-  //   const jsonData = json.value;
-  //   let startNodeParent = null;
-
-  //   const findNode = (nodeId, nodes, parent = null) => {
-  //     for (let node of nodes) {
-  //       if (node.nodeId === parseInt(nodeId)) {
-  //         if (!startNodeParent) {
-  //           startNodeParent = parent;
-  //         }
-  //         return node;
-  //       }
-  //       if (node.children) {
-  //         const found = findNode(nodeId, node.children, node);
-  //         if (found) {
-  //           return found;
-  //         }
-  //       }
-  //     }
-  //     return null;
-  //   };
-
-  //   let startNode = findNode(startNodeId, jsonData);
-  //   let endNode = findNode(endNodeId, jsonData);
-
-  //   if (!startNode || !endNode) {
-  //     console.warn("No matching nodes found");
-  //     return json; // No matching nodes found, return original data
-  //   }
-  //   console.log('selection', selection);
-  //   const startText = startNode.text.substring(0, startOffset);
-  //   const middleText = startNode.text.substring(
-  //     startOffset,
-  //     endNode.text.length - (endNode.text.length - endOffset)
-  //   );
-  //   const endText = endNode.text.substring(endOffset);
-
-  //   const updatedNodes = [
-  //     { nodeId: startNode.nodeId, text: startText },
-  //     active
-  //       ? {
-  //           nodeId: startNode.nodeId + 1,
-  //           type: "strong",
-  //           children: [{ nodeId: startNode.nodeId + 2, text: middleText }],
-  //         }
-  //       : { nodeId: startNode.nodeId + 1, text: startText + middleText + endText},
-  //     { nodeId: startNode.nodeId + 3, text: endText },
-  //   ];
-  //   console.log('updatednode', updatedNodes);
-  //   // Remove nodes within the range of [startNodeId, endNodeId] and insert updated nodes
-  //   console.log('value before',json.value);
-  //   if (startNodeParent && startNodeParent.children) {
-  //     let insertIndex = -1;
-  //     startNodeParent.children = startNodeParent.children.filter(
-  //       (node, index) => {
-  //         if (
-  //           node.nodeId >= Math.min(startNode.nodeId, endNode.nodeId) &&
-  //           node.nodeId <= Math.max(startNode.nodeId, endNode.nodeId)
-  //         ) {
-  //           if (insertIndex === -1) {
-  //             insertIndex = index;
-  //           }
-  //           return false;
-  //         }
-  //         return true;
-  //       }
-  //     );
-
-  //     if (insertIndex !== -1) {
-  //       if (active) startNodeParent.children.splice(insertIndex, 0, ...updatedNodes);
-  //       else startNodeParent.children.splice(insertIndex, 0, updatedNodes[1]);
-  //     }
-  //   }
-  //   console.log('value after',json.value);
-  //   json.value = this.addNodeIds(jsonData);
-  //   return json;
-  // }
   getSelectionHTML(range) {
     const div = document.createElement('div');
     div.appendChild(range.cloneContents());
@@ -992,23 +895,20 @@ class Bridge {
         }
         .volto-hydra-drag-button,
         .volto-hydra-menu-button,
-        .volto-hydra-bold-button {
+        .volto-hydra-format-button {
           background: none;
           border: none;
           cursor: pointer;
           padding: 0.5em;
           margin: 0;
         }
-        .volto-hydra-bold-button {
+        .volto-hydra-format-button {
           border-radius: 5px;
           margin: 1px;
-          display: none;
+          display: block;
         }
-        .volto-hydra-bold-button.show {
-          display: block !important;
-        }
-        .volto-hydra-bold-button.active,
-        .volto-hydra-bold-button:hover {
+        .volto-hydra-format-button.active,
+        .volto-hydra-format-button:hover {
           background-color: #ddd;
         }
         .volto-hydra-drag-button {
@@ -1023,7 +923,7 @@ class Bridge {
           display: none;
           position: absolute;
           top: 100%;
-          right: -200%;
+          right: -80%;
           background: white;
           border: 1px solid #ccc;
           border-radius: 4px;
@@ -1143,6 +1043,8 @@ const dragSVG = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none"
   <g id="SVGRepo_iconCarrier"> <path d="M8 6.5C9.38071 6.5 10.5 5.38071 10.5 4C10.5 2.61929 9.38071 1.5 8 1.5C6.61929 1.5 5.5 2.61929 5.5 4C5.5 5.38071 6.61929 6.5 8 6.5Z" fill="#4A5B68"/> <path d="M15.5 6.5C16.8807 6.5 18 5.38071 18 4C18 2.61929 16.8807 1.5 15.5 1.5C14.1193 1.5 13 2.61929 13 4C13 5.38071 14.1193 6.5 15.5 6.5Z" fill="#4A5B68"/> <path d="M10.5 12C10.5 13.3807 9.38071 14.5 8 14.5C6.61929 14.5 5.5 13.3807 5.5 12C5.5 10.6193 6.61929 9.5 8 9.5C9.38071 9.5 10.5 10.6193 10.5 12Z" fill="#4A5B68"/> <path d="M15.5 14.5C16.8807 14.5 18 13.3807 18 12C18 10.6193 16.8807 9.5 15.5 9.5C14.1193 9.5 13 10.6193 13 12C13 13.3807 14.1193 14.5 15.5 14.5Z" fill="#4A5B68"/> <path d="M10.5 20C10.5 21.3807 9.38071 22.5 8 22.5C6.61929 22.5 5.5 21.3807 5.5 20C5.5 18.6193 6.61929 17.5 8 17.5C9.38071 17.5 10.5 18.6193 10.5 20Z" fill="#4A5B68"/> <path d="M15.5 22.5C16.8807 22.5 18 21.3807 18 20C18 18.6193 16.8807 17.5 15.5 17.5C14.1193 17.5 13 18.6193 13 20C13 21.3807 14.1193 22.5 15.5 22.5Z" fill="#4A5B68"/> </g>
   </svg>`;
 const boldSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAACLUlEQVR4nO3az4tOURzH8RejZiNFKUWywD+g/AEo2VioCWWnlBVCLERCiZ2dGFmQJgtFfmxkYsvCyiyI8iMpRndGfjXz6NZ5aprM85wxZu7t3POuz/ae+313O9/z45LJZDKZTCaTyfwLBVr/IT/wJeQ9XmAQ13AaG9ArYQGtiIzgHJZoqIBWyDC2abCAFsZwQIMFtEJ2Nl3AMFY1WUALA3UWMIK+KbIDeybkII7gGG7g6zTmgxV1FfB5Bs9ehP5ICXslKKDN7QgBlyQsYH2EgDsSFjAf37uMc1fCAoTndBrnqoQFLAwzfadx9ktYwK4uY4xjrUQFLMe7LmM8VCHFLAnoCYulbsWPhS5RWwHfwupuco7ibMh5XAy5Emb0TxGtr8zJKouvei/QH1pk4wT8xCHMUwOKOS7+I9apEUUFX0B5gHoda9SAosI54BeOVz0PFBUKaOcWFtRVwG887ZAhvMKHcCcwOoOOkMxCqBersR0PpiFhq0T3Apsjv4yhKlpjMQcCSrZEfgWbJCqg5HGEgHJZnayAwxECygvVZAX0RQgob5UbLeCNhAWciBDwXKICekKb6ybgpkQFnIlsg+U2OSkBy3A5svhWFYejRZcXGp10ATpV9k04LjsV1vaD4fAjtvhHc118XXaD7WzUYAEDVRRfFwEvsVhDBbxu8i8y97G0yuKrEvCkqsOP2RAwPuEX2XbehmOyZ2ELfA8XsBsr//oWmUwmk8lkMpmM6fIH83xLt33EM5cAAAAASUVORK5CYII=">`;
+const italicSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAq0lEQVR4nO3WsQnCYBRF4ZvSXjKA2EsGkPTiAGIvDiBZIziA2AcHEFsjDhDSSwYQayslEOGC2B4R/wOvesXXPZ4UCr1XSnp8mHb3FfgooK2BC4EdDJ6QcG3wiIRvBvcptGfoXVJEwUODLwJLDT6R8NzggoQzg3MSXhu8IuGdwTMSPhs8JuHG4AGFRt3ReMHtMUGKDb0KLDG4IuGpwXsSXhq8IcDyb3+t0G/1BLG4VBFDInqeAAAAAElFTkSuQmCC">`;
+const delSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAB70lEQVR4nO3ZTatOURjG8d/xiEjolAiZUYoopYgiH8EpiSi+gIGBEhMdE2WgdAYGjokyRJgYMCGKAYZeyrtS5O1RJ45WrVOrncHzvp9V61+rPdr3uq6991r3ve5NoVAoFIaAEWzGKdzAS3zBdLy+wC2MYzsahoQGDuJ5FNvqeIfjWFCn+JW436bw6niLvXWIX4UPFTFfcSEK2oBlmIXFWIMxnI9Pv2rkzCDFz8bDZPImTmJ+G/fvx+skxjcDZKwifleHcYLhiSg+LP6BcTMxEHaV7HiVGFgrQ34nBubJkPeJgXUy5Epi4PowZdVW2Yq/iYnbWC0zTlcSUVgXk9hSt7BCoU/fe7PLqrOT0exFpg8Hle81iJ+OI8zdNeM5v4F+EM4IB/AxERvyym6ZEQ48jxMTn7FQZiyKDYAZE0dlyKHEwB0ZsiIxENZFdsyt1FTZsTExEE57fSXsyz9xNia5XjCRGLikz/xIJgs9oDldxtuBP0nMnfrMuUq2vBc7dJ2wLTbDZmJdMwAa8TVX65UTGG0xxmgsEKeSGG/ibjQQRmJjNhUQxi9cxmGsx9JoeElsv4Ru3MX/FIef6moOhOPjoy4LtrtYrubCbB8etCn8CfbE+4eG8NkcwVU8jVl1Kl6fxR8cx7Cph1twoVAoFHTFPycjIDOxcKkjAAAAAElFTkSuQmCC">`;
 const addSVG = `<img widht="20px" height="20px" src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjgzMjggMi41MDAwMkg5LjE2NjE4VjkuMTY2NjhIMi40OTk1MVYxMC44MzMzSDkuMTY2MThWMTcuNUgxMC44MzI4VjEwLjgzMzNIMTcuNDk5NVY5LjE2NjY4SDEwLjgzMjhWMi41MDAwMloiIGZpbGw9IiM0QTVCNjgiLz4KPC9zdmc+Cg=='/>`;
 const threeDotsSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12C3 10.8954 3.89543 10 5 10Z" fill="#000000"/>
