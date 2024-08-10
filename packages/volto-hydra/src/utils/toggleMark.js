@@ -1,4 +1,5 @@
 import { jsx } from 'slate-hyperscript';
+import addNodeIds from './addNodeIds';
 
 const deserialize = (el, markAttributes = {}) => {
   if (el.nodeType === Node.TEXT_NODE) {
@@ -19,7 +20,13 @@ const deserialize = (el, markAttributes = {}) => {
   // }
 
   const children = Array.from(el.childNodes)
-    .map((node) => deserialize(node, nodeAttributes))
+    .map((node) => {
+      // Add data-slate-node attribute if missing
+      if (node.nodeType === Node.ELEMENT_NODE && !node.dataset.slateNode) {
+        node.dataset.slateNode = 'element'; // Or 'text' if it's a text node
+      }
+      return deserialize(node, nodeAttributes);
+    })
     .flat();
 
   // Ensure 'strong' elements have a 'children' array even if empty
@@ -31,7 +38,13 @@ const deserialize = (el, markAttributes = {}) => {
     case 'BODY':
       return jsx('fragment', {}, children);
     case 'BR':
-      return '\n';
+      // Add newline only if it's not the last child of a block-level element
+      const parent = el.parentNode;
+      if (parent && parent.lastChild !== el && isBlockElement(parent)) {
+        return '\n';
+      } else {
+        return null; // Ignore <br> if it's at the end or within an inline element
+      }
     case 'BLOCKQUOTE':
       return jsx('element', { type: 'quote' }, children);
     case 'P':
@@ -51,5 +64,25 @@ const deserialize = (el, markAttributes = {}) => {
 
 export default function toggleMark(html) {
   const document = new DOMParser().parseFromString(html, 'text/html');
-  return deserialize(document.body);
+  const d = deserialize(document.body);
+  return addNodeIds(d, { current: 1 });
+}
+
+// Helper function to check if an element is block-level
+function isBlockElement(element) {
+  const blockElements = [
+    'P',
+    'DIV',
+    'BLOCKQUOTE',
+    'H1',
+    'H2',
+    'H3',
+    'H4',
+    'H5',
+    'H6',
+    'UL',
+    'OL',
+    'LI',
+  ]; // Add more as needed
+  return blockElements.includes(element.nodeName);
 }

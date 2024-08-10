@@ -104,6 +104,10 @@ class Bridge {
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
+        } else if (event.data.type === 'TOGGLE_MARK_DONE') {
+          console.log('toggle mark data rec');
+          this.formData = JSON.parse(JSON.stringify(event.data.data));
+          callback(event.data.data);
         }
       }
     };
@@ -740,21 +744,15 @@ class Bridge {
     return div.innerHTML;
   }
   isFormatted(range) {
-    if (range.collapsed) return { bold: false, italic: false, del: false };
-    const formats = { bold: false, italic: false, del: false };
+    const formats = {
+      bold: { present: false, enclosing: false },
+      italic: { present: false, enclosing: false },
+      del: { present: false, enclosing: false },
+    };
 
-    const selectionHTML = this.getSelectionHTML(range);
+    // Check if the selection is collapsed (empty)
+    if (range.collapsed) return formats;
 
-    // Check if any formatting elements exist within the selection HTML
-    if (selectionHTML.includes('<strong>') || selectionHTML.includes('<b>')) {
-      formats.bold = true;
-    }
-    if (selectionHTML.includes('<em>') || selectionHTML.includes('<i>')) {
-      formats.italic = true;
-    }
-    if (selectionHTML.includes('<del>')) {
-      formats.del = true;
-    }
     // Get the common ancestor container of the selection
     let container = range.commonAncestorContainer;
 
@@ -762,21 +760,52 @@ class Bridge {
     while (
       container &&
       container !== document &&
-      !(container.dataset && container.dataset['editable-field'] === 'value')
+      !(container.dataset && container.dataset.editableField === 'value')
     ) {
       // Check if the container itself has any of the formatting
       if (container.nodeName === 'STRONG' || container.nodeName === 'B') {
-        formats.bold = true;
+        if (
+          container.contains(range.startContainer) &&
+          container.contains(range.endContainer)
+        ) {
+          formats.bold.enclosing = true;
+          formats.bold.present = true;
+        }
       }
       if (container.nodeName === 'EM' || container.nodeName === 'I') {
-        formats.italic = true;
+        if (
+          container.contains(range.startContainer) &&
+          container.contains(range.endContainer)
+        ) {
+          formats.italic.enclosing = true;
+          formats.italic.present = true;
+        }
       }
       if (container.nodeName === 'DEL') {
-        formats.del = true;
+        if (
+          container.contains(range.startContainer) &&
+          container.contains(range.endContainer)
+        ) {
+          formats.del.enclosing = true;
+          formats.del.present = true;
+        }
       }
 
       container = container.parentNode;
     }
+
+    // Check for formatting within the selection (similar to your previous implementation)
+    const selectionHTML = this.getSelectionHTML(range).toString();
+    if (selectionHTML.includes('</strong>') || selectionHTML.includes('</b>')) {
+      formats.bold.present = true;
+    }
+    if (selectionHTML.includes('</em>') || selectionHTML.includes('</i>')) {
+      formats.italic.present = true;
+    }
+    if (selectionHTML.includes('</del>')) {
+      formats.del.present = true;
+    }
+
     return formats;
   }
 
@@ -801,7 +830,8 @@ class Bridge {
 
     const range = selection.getRangeAt(0);
     const currentFormats = this.isFormatted(range);
-    if (currentFormats[format]) {
+    console.log(currentFormats);
+    if (currentFormats[format].present) {
       this.unwrapFormatting(range, format);
     } else {
       // Handle selections that include non-Text nodes
@@ -844,22 +874,24 @@ class Bridge {
       container = container.parentNode;
     }
 
-    // If the selection is not entirely within a formatting element, proceed as before
-    const nodesToRemove = [];
+    // If the selection is not entirely within a formatting element, remove all occurrences of the format within the selection
     let node = range.startContainer;
     while (node && node !== range.endContainer) {
       if (
         node.nodeType === Node.ELEMENT_NODE &&
         formattingElements[format].includes(node.nodeName)
       ) {
-        nodesToRemove.push(node);
+        this.unwrapElement(node);
+      } else if (
+        node.nodeType === Node.TEXT_NODE &&
+        node.parentNode &&
+        formattingElements[format].includes(node.parentNode.nodeName)
+      ) {
+        // Handle the case where the text node itself is within the formatting element
+        this.unwrapElement(node.parentNode);
       }
       node = this.nextNode(node);
     }
-
-    nodesToRemove.forEach((nodeToRemove) => {
-      this.unwrapElement(nodeToRemove);
-    });
   }
 
   // Helper function to unwrap a single formatting element
