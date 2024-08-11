@@ -11,6 +11,7 @@ const deserialize = (el, markAttributes = {}) => {
   const nodeAttributes = { ...markAttributes };
 
   // define attributes for text nodes
+  // (Lets try handling this after the recursive call because slate is throwing an error when we pass this json)
   // switch (el.nodeName) {
   //   case 'STRONG':
   //     nodeAttributes.type = 'strong';
@@ -29,9 +30,9 @@ const deserialize = (el, markAttributes = {}) => {
     })
     .flat();
 
-  // Ensure 'strong' elements have a 'children' array even if empty
-  if (children.length === 0 && el.nodeName === 'STRONG') {
-    children.push(jsx('text', {}, ''));
+  // Ensure formatting elements have at least one child (empty text if necessary)
+  if (children.length === 0 && ['STRONG', 'EM', 'DEL'].includes(el.nodeName)) {
+    children.push(jsx('text', {}, ' '));
   }
 
   switch (el.nodeName) {
@@ -67,7 +68,11 @@ const deserialize = (el, markAttributes = {}) => {
       return children;
   }
 };
-
+/**
+ * Converts html string (recieved from hydrajs) to slate compatible json data by first deserializing the html string to slate json data and adding node ids to the json data
+ * @param {String} html html string
+ * @returns {JSON} slate compatible json data
+ */
 export default function toggleMark(html) {
   const document = new DOMParser().parseFromString(html, 'text/html');
   const d = deserialize(document.body);

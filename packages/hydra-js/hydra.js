@@ -141,7 +141,7 @@ class Bridge {
     document.addEventListener('click', this.blockClickHandler);
   }
 
-  createQuantaToolbar(blockUid) {
+  createQuantaToolbar(blockUid, show = { formatBtns: true }) {
     // Check if the toolbar already exists
     if (this.quantaToolbar) {
       return;
@@ -173,77 +173,75 @@ class Bridge {
     dragButton.innerHTML = dragSVG;
     dragButton.disabled = true;
 
-    // Create the bold button
-    const boldButton = document.createElement('button');
-    boldButton.className = `volto-hydra-format-button`;
-    boldButton.innerHTML = boldSVG;
-    boldButton.addEventListener('click', () => {
-      this.formatSelectedText('bold');
-    });
+    let boldButton = null;
+    let italicButton = null;
+    let delButton = null;
 
-    // Create the italic button
-    const italicButton = document.createElement('button');
-    italicButton.className = `volto-hydra-format-button`;
-    italicButton.innerHTML = italicSVG;
-    italicButton.addEventListener('click', () => {
-      this.formatSelectedText('italic');
-    });
+    if (show.formatBtns) {
+      // Create the bold button
+      boldButton = document.createElement('button');
+      boldButton.className = `volto-hydra-format-button ${
+        show.formatBtns ? 'show' : ''
+      }`;
+      boldButton.innerHTML = boldSVG;
+      boldButton.addEventListener('click', () => {
+        this.formatSelectedText('bold');
+      });
 
-    // Create the del button
-    const delButton = document.createElement('button');
-    delButton.className = `volto-hydra-format-button`;
-    delButton.innerHTML = delSVG;
-    delButton.addEventListener('click', () => {
-      this.formatSelectedText('del');
-    });
+      // Create the italic button
+      italicButton = document.createElement('button');
+      italicButton.className = `volto-hydra-format-button ${
+        show.formatBtns ? 'show' : ''
+      }`;
+      italicButton.innerHTML = italicSVG;
+      italicButton.addEventListener('click', () => {
+        this.formatSelectedText('italic');
+      });
 
-    // // Check if the selected text is bold
-    // const isBold = (selection) => {
-    //   if (selection.rangeCount > 0) {
-    //     const range = selection.getRangeAt(0);
-    //     const parentNode = range.commonAncestorContainer.parentNode;
-    //     return (
-    //       parentNode.nodeName === "B" ||
-    //       parentNode.nodeName === "STRONG" ||
-    //       window.getComputedStyle(parentNode).fontWeight === "bold" ||
-    //       window.getComputedStyle(parentNode).fontWeight === "700"
-    //     );
-    //   }
-    //   return false;
-    // };
+      // Create the del button
+      delButton = document.createElement('button');
+      delButton.className = `volto-hydra-format-button ${
+        show.formatBtns ? 'show' : ''
+      }`;
+      delButton.innerHTML = delSVG;
+      delButton.addEventListener('click', () => {
+        this.formatSelectedText('del');
+      });
 
-    // // Function to handle the text selection and show/hide the bold button
-    // const handleSelectionChange = () => {
-    //   const selection = window.getSelection();
-    //   const selectedText = selection.toString();
-    //   const anchorNode = selection.anchorNode;
+      // Function to handle the text selection and show/hide the bold button
+      const handleSelectionChange = () => {
+        const selection = window.getSelection();
+        const range = selection.getRangeAt(0);
+        const selectedText = selection.toString();
+        console.log(selectedText);
+        // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
 
-    //   // Check if anchorNode is an element, if not get its parent element
-    //   const parentElement =
-    //     anchorNode.nodeType === Node.ELEMENT_NODE
-    //       ? anchorNode
-    //       : anchorNode.parentElement;
+        const formats = this.isFormatted(range);
+        boldButton.classList.toggle(
+          'active',
+          formats.bold.enclosing || formats.bold.present,
+        );
+        italicButton.classList.toggle(
+          'active',
+          formats.italic.enclosing || formats.italic.present,
+        );
+        delButton.classList.toggle(
+          'active',
+          formats.del.enclosing || formats.del.present,
+        );
+      };
 
-    //   const parentBlock = parentElement.closest(
-    //     '[data-editable-field="value"]'
-    //   );
-
-    //   // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
-    //   if (selectedText.length > 0 && parentBlock) {
-    //     boldButton.classList.toggle("show", true);
-    //     boldButton.classList.toggle("active", isBold(selection));
-    //   } else {
-    //     boldButton.classList.toggle("show", false);
-    //   }
-    // };
-
-    // // Add event listener to handle text selection within the block
-    // this.handleMouseUp = (e) => {
-    //   if (e.target.closest('[data-editable-field="value"]')) {
-    //     handleSelectionChange();
-    //   }
-    // };
-    // this.currentlySelectedBlock.addEventListener("mouseup", this.handleMouseUp);
+      // Add event listener to handle text selection within the block
+      this.handleMouseUp = (e) => {
+        if (e.target.closest('[data-editable-field="value"]')) {
+          handleSelectionChange();
+        }
+      };
+      this.currentlySelectedBlock.addEventListener(
+        'mouseup',
+        this.handleMouseUp,
+      );
+    }
 
     // Create the three-dot menu button
     const menuButton = document.createElement('button');
@@ -288,9 +286,11 @@ class Bridge {
 
     // Append elements to the quantaToolbar
     this.quantaToolbar.appendChild(dragButton);
-    this.quantaToolbar.appendChild(boldButton);
-    this.quantaToolbar.appendChild(italicButton);
-    this.quantaToolbar.appendChild(delButton);
+    if (show.formatBtns) {
+      this.quantaToolbar.appendChild(boldButton);
+      this.quantaToolbar.appendChild(italicButton);
+      this.quantaToolbar.appendChild(delButton);
+    }
     this.quantaToolbar.appendChild(menuButton);
     this.quantaToolbar.appendChild(dropdownMenu);
 
@@ -329,7 +329,10 @@ class Bridge {
         this.isInlineEditing = true;
       };
       // Add focus in event listener
-      blockElement.addEventListener('focusout', this.handleBlockFocusOut);
+      blockElement.addEventListener(
+        'focusout',
+        this.handleBlockFocusOut.bind(this),
+      );
 
       blockElement.addEventListener(
         'focusin',
@@ -359,11 +362,11 @@ class Bridge {
 
     // Handle the selected block and its children for contenteditable
     handleElementAndChildren(blockElement);
-
-    // Only when the block is a slate block, add nodeIds to the block's data
+    let show = { formatBtns: false };
     this.observeBlockTextChanges(blockElement);
     // // if the block is a slate block, add nodeIds to the block's data
     if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
+      show.formatBtns = true;
       this.formData.blocks[blockUid] = this.addNodeIds(
         this.formData.blocks[blockUid],
       );
@@ -379,7 +382,7 @@ class Bridge {
     // Add border to the currently selected block
     this.currentlySelectedBlock.classList.add('volto-hydra--outline');
 
-    this.createQuantaToolbar(blockUid);
+    if (this.formData) this.createQuantaToolbar(blockUid, show);
 
     if (!this.clickOnBtn) {
       window.parent.postMessage(
@@ -654,7 +657,7 @@ class Bridge {
     };
 
     // Check if the selection is collapsed (empty)
-    if (range.collapsed) return formats;
+    // if (range.collapsed) return formats;
 
     // Get the common ancestor container of the selection
     let container = range.commonAncestorContainer;
@@ -905,7 +908,10 @@ class Bridge {
         .volto-hydra-format-button {
           border-radius: 5px;
           margin: 1px;
-          display: block;
+          display: none;
+        }
+        .volto-hydra-format-button.show {
+          display: block !important;
         }
         .volto-hydra-format-button.active,
         .volto-hydra-format-button:hover {
