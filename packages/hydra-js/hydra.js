@@ -700,7 +700,7 @@ class Bridge {
       container = container.parentNode;
     }
 
-    // Check for formatting within the selection (similar to your previous implementation)
+    // Check for formatting within the selection
     const selectionHTML = this.getSelectionHTML(range).toString();
     if (selectionHTML.includes('</strong>') || selectionHTML.includes('</b>')) {
       formats.bold.present = true;
@@ -773,8 +773,23 @@ class Bridge {
       !(container.dataset && container.dataset.editableField === 'value')
     ) {
       if (formattingElements[format].includes(container.nodeName)) {
-        // Selection is within the formatting element, so unwrap it
-        this.unwrapElement(container);
+        // Check if the entire content of the formatting element is selected
+        const isEntireContentSelected =
+          range.startOffset === 0 &&
+          range.endOffset === container.textContent.length;
+
+        if (isEntireContentSelected) {
+          // Unwrap the entire element
+          this.unwrapElement(container);
+        } else {
+          // Unwrap only the selected portion
+          this.unwrapSelectedPortion(
+            container,
+            range,
+            format,
+            formattingElements,
+          );
+        }
         return; // No need to check further
       }
       container = container.parentNode;
@@ -798,6 +813,63 @@ class Bridge {
       }
       node = this.nextNode(node);
     }
+  }
+
+  // Helper function to unwrap the selected portion within a formatting element
+  unwrapSelectedPortion(element, range, format, formattingElements) {
+    const formattingTag = formattingElements[format][0];
+
+    // Check if selection starts at the beginning of the formatting element
+    const selectionStartsAtBeginning = range.startOffset === 0;
+
+    // Check if selection ends at the end of the formatting element
+    const selectionEndsAtEnd = range.endOffset === element.textContent.length;
+
+    // Extract the contents before the selection (only if not at the beginning)
+    let beforeFragment = null;
+    if (!selectionStartsAtBeginning) {
+      const beforeRange = document.createRange();
+      beforeRange.setStart(element, 0);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+      beforeFragment = beforeRange.extractContents();
+    }
+
+    // Extract the selected contents
+    const selectionFragment = range.extractContents();
+
+    // Extract the contents after the selection (only if not at the end)
+    let afterFragment = null;
+    if (!selectionEndsAtEnd) {
+      const afterRange = document.createRange();
+      afterRange.setStart(range.endContainer, range.endOffset);
+      afterRange.setEnd(element, element.childNodes.length);
+      afterFragment = afterRange.extractContents();
+    }
+
+    // Create new elements to wrap the before and after fragments, keeping the original formatting (only if fragments exist)
+    const beforeWrapper = beforeFragment
+      ? document.createElement(formattingTag)
+      : null;
+    if (beforeWrapper) {
+      beforeWrapper.appendChild(beforeFragment);
+    }
+    const afterWrapper = afterFragment
+      ? document.createElement(formattingTag)
+      : null;
+    if (afterWrapper) {
+      afterWrapper.appendChild(afterFragment);
+    }
+
+    // Replace the original element with the unwrapped selection and the formatted before/after parts
+    const parent = element.parentNode;
+    if (beforeWrapper) {
+      parent.insertBefore(beforeWrapper, element);
+    }
+    parent.insertBefore(selectionFragment, element);
+    if (afterWrapper) {
+      parent.insertBefore(afterWrapper, element);
+    }
+    parent.removeChild(element);
   }
 
   // Helper function to unwrap a single formatting element
