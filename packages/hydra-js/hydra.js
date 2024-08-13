@@ -606,10 +606,12 @@ class Bridge {
     if (editableField)
       this.formData.blocks[blockUid][editableField] = target.innerText;
     console.log('editableField', this.formData.blocks[blockUid][editableField]);
-    window.parent.postMessage(
-      { type: 'INLINE_EDIT_DATA', data: this.formData },
-      this.adminOrigin,
-    );
+    if (this.formData.blocks[blockUid]['@type'] !== 'slate') {
+      window.parent.postMessage(
+        { type: 'INLINE_EDIT_DATA', data: this.formData },
+        this.adminOrigin,
+      );
+    }
   }
 
   /**
