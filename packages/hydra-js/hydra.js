@@ -382,7 +382,10 @@ class Bridge {
     // Add border to the currently selected block
     this.currentlySelectedBlock.classList.add('volto-hydra--outline');
 
-    if (this.formData) this.createQuantaToolbar(blockUid, show);
+    if (this.formData) {
+      this.createQuantaToolbar(blockUid, show);
+      this.makeDraggable(blockElement);
+    }
 
     if (!this.clickOnBtn) {
       window.parent.postMessage(
@@ -934,6 +937,37 @@ class Bridge {
 
     return this.findEditableParent(node.parentNode);
   }
+
+  makeDraggable(blockElement) {
+    const dragButton = blockElement.querySelector('.volto-hydra-drag-button');
+
+    dragButton.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+
+      const draggedBlock = blockElement.cloneNode(true);
+      draggedBlock.classList.add('dragging');
+      document.body.appendChild(draggedBlock);
+
+      const rect = blockElement.getBoundingClientRect();
+      draggedBlock.style.left = `${e.clientX - rect.width / 2}px`; // have to go through this? why its not working with just rect.left
+      draggedBlock.style.top = `${e.clientY - rect.height / 2}px`;
+
+      const onMouseMove = (e) => {
+        draggedBlock.style.left = `${e.clientX - rect.width / 2}px`;
+        draggedBlock.style.top = `${e.clientY - rect.height / 2}px`;
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        draggedBlock.remove();
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  }
+
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';
@@ -1016,12 +1050,18 @@ class Bridge {
           background-color: #ddd;
         }
         .volto-hydra-drag-button {
-          cursor: default;
+          cursor: grab;
           background: #E4E8EC;
           border-radius: 6px;
           padding: 9px 6px;
           height: 40px;
           display: flex;
+        }
+        .dragging {
+          position: fixed; /* Essential for positioning while dragging */
+          opacity: 0.5; /* Dimmed visual */
+          pointer-events: none; /* Prevent interaction with the dragged copy */
+          z-index: 1000; /* Ensure the dragged copy is on top */
         }
         .volto-hydra-dropdown-menu {
           display: none;
