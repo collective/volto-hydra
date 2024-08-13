@@ -272,6 +272,11 @@ const Iframe = (props) => {
             event.origin,
           );
           break;
+
+        case 'UPDATE_BLOCKS_LAYOUT':
+          isInlineEditingRef.current = false;
+          onChangeFormData(event.data.data);
+          break;
         default:
           break;
       }
