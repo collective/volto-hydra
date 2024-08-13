@@ -193,7 +193,7 @@ class Bridge {
       );
       let closestBlockUid = null;
       let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
-
+      let insertAt = null; // 0 for top & 1 for bottom
       // Handle mouse movement
       const onMouseMove = (e) => {
         draggedBlock.style.left = `${e.clientX}px`;
@@ -216,11 +216,31 @@ class Bridge {
             if (closestBlock) {
               // Remove border from any previously highlighted block
               const prevHighlighted =
-                document.querySelector('.highlighted-block');
+                insertAt === 0
+                  ? document.querySelector('.highlighted-block')
+                  : document.querySelector('.highlighted-block-bottom');
+
               if (prevHighlighted) {
-                prevHighlighted.classList.remove('highlighted-block');
+                prevHighlighted.classList.remove(
+                  'highlighted-block',
+                  'highlighted-block-bottom',
+                );
               }
-              closestBlock.classList.add('highlighted-block');
+
+              // Determine if hovering over top or bottom half (not effiecient but lets try!)
+              const closestBlockRect = closestBlock.getBoundingClientRect();
+              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
+              const isHoveringOverTopHalf =
+                mouseYRelativeToBlock < closestBlockRect.height / 2;
+
+              if (isHoveringOverTopHalf) {
+                insertAt = 0;
+              } else {
+                insertAt = 1;
+              }
+              closestBlock.classList.add(
+                `${insertAt === 0 ? 'highlighted-block' : 'highlighted-block-bottom'}`,
+              );
               closestBlockUid = closestBlock.getAttribute('data-block-uid');
             } else {
               console.log('Not hovering over any block');
@@ -234,9 +254,7 @@ class Bridge {
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
-        document
-          .querySelector('.highlighted-block')
-          ?.classList.remove('highlighted-block');
+
         draggedBlock.remove();
         if (closestBlockUid) {
           const draggedBlockId =
@@ -246,11 +264,22 @@ class Bridge {
           const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
           const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
           if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
-            // Remove the dragged block from its current position
             blocks_layout.splice(draggedBlockIndex, 1);
 
-            // Insert it just before the target block
-            blocks_layout.splice(targetBlockIndex, 0, draggedBlockId);
+            // Determine insertion point based on hover position
+            const insertIndex =
+              insertAt === 1 ? targetBlockIndex + 1 : targetBlockIndex;
+
+            blocks_layout.splice(insertIndex, 0, draggedBlockId);
+            if (insertAt === 0) {
+              document
+                .querySelector('.highlighted-block')
+                .classList.remove('highlighted-block');
+            } else {
+              document
+                .querySelector('.highlighted-block-bottom')
+                .classList.remove('highlighted-block-bottom');
+            }
             window.parent.postMessage(
               { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
               this.adminOrigin,
@@ -1122,6 +1151,9 @@ class Bridge {
         }
         .highlighted-block {
           border-top: 5px solid blue; 
+        }
+        .highlighted-block-bottom {
+          border-bottom: 5px solid blue;
         }
         .volto-hydra-dropdown-menu {
           display: none;
