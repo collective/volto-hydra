@@ -571,12 +571,18 @@ class Bridge {
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === 'characterData') {
-          let targetElement = null;
-          targetElement =
+          const targetElement =
             mutation.target?.parentElement.closest('[data-hydra-node]');
 
           if (targetElement && this.isInlineEditing) {
-            this.handleTextChange(targetElement);
+            this.handleTextChangeOnSlate(targetElement);
+          } else {
+            const targetElement = mutation.target?.parentElement.closest(
+              '[data-editable-field]',
+            );
+            if (targetElement) {
+              this.handleTextChange(targetElement);
+            }
           }
         }
       });
@@ -589,10 +595,28 @@ class Bridge {
   }
 
   /**
-   * Handle the text change in the slate block element
+   * Handle the text change in the block element with attr data-editable-field
    * @param {Element} target
    */
   handleTextChange(target) {
+    const blockUid = target
+      .closest('[data-block-uid]')
+      .getAttribute('data-block-uid');
+    const editableField = target.getAttribute('data-editable-field');
+    if (editableField)
+      this.formData.blocks[blockUid][editableField] = target.innerText;
+    console.log('editableField', this.formData.blocks[blockUid][editableField]);
+    window.parent.postMessage(
+      { type: 'INLINE_EDIT_DATA', data: this.formData },
+      this.adminOrigin,
+    );
+  }
+
+  /**
+   * Handle the text change in the slate block element
+   * @param {Element} target
+   */
+  handleTextChangeOnSlate(target) {
     const closestNode = target.closest('[data-hydra-node]');
     if (closestNode) {
       const nodeId = closestNode.getAttribute('data-hydra-node');
