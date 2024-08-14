@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Menu as SemanticMenu } from 'semantic-ui-react';
 import Link from 'next/link';
 import HoverableDropdown from '@/components/HoverableDropdown';
-import { getTokenFromCookie } from '#utils/hydra';
+import { getTokenFromCookie } from '@volto-hydra/hydra-js';
 import { fetchContent } from '#utils/api';
 import extractEndpoints from '#utils/extractEndpoints';
 
