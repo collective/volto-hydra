@@ -38,8 +38,6 @@
     "@plone/registry": "workspace:*",
     "@plone/volto": "workspace:*",
     "events": "^3.3.0",
-    "framework7": "^8.3.3",
-    "framework7-vue": "^8.3.3",
     "js-cookie": "^3.0.5",
     "volto-hydra": "workspace:*"
   },
