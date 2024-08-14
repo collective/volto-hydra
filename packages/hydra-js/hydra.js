@@ -212,8 +212,7 @@ class Bridge {
       const handleSelectionChange = () => {
         const selection = window.getSelection();
         const range = selection.getRangeAt(0);
-        const selectedText = selection.toString();
-        console.log(selectedText);
+
         // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
 
         const formats = this.isFormatted(range);
@@ -576,7 +575,7 @@ class Bridge {
 
           if (targetElement && this.isInlineEditing) {
             this.handleTextChangeOnSlate(targetElement);
-          } else {
+          } else if (this.isInlineEditing) {
             const targetElement = mutation.target?.parentElement.closest(
               '[data-editable-field]',
             );
@@ -762,7 +761,7 @@ class Bridge {
 
     const range = selection.getRangeAt(0);
     const currentFormats = this.isFormatted(range);
-    console.log(currentFormats);
+
     if (currentFormats[format].present) {
       this.unwrapFormatting(range, format);
     } else {
@@ -790,7 +789,7 @@ class Bridge {
       italic: ['EM', 'I'],
       del: ['DEL'],
     };
-
+    const selection = window.getSelection();
     // Check if the selection is entirely within a formatting element of the specified type
     let container = range.commonAncestorContainer;
     while (
@@ -804,7 +803,7 @@ class Bridge {
           range.startOffset === 0 &&
           range.endOffset === container.textContent.length;
 
-        if (isEntireContentSelected) {
+        if (isEntireContentSelected || selection.isCollapsed) {
           // Unwrap the entire element
           this.unwrapElement(container);
         } else {

@@ -336,10 +336,11 @@ Additionally your frontend can
 
 Note Hydra.js knows about the schema of your blocks and based on the field name will determine what to make your html editable.
 
-Currently, Hydra.js supports BOLD, ITALIC & STRIKETHROUGH formats on slate blocks and following are the conditions when it breaks slate:
-- if you select the whole text and change its formats your frontend might throw slate error saying `Cannot get the leaf node at path [0,0] because it refers to a non-leaf node: ` but it is due to proper syncing of json b/w hydrajs & adminUI.
-- if you select text at the end of the line samething will happen.
+IMPORTANT: Currently, Hydra.js supports BOLD, ITALIC & STRIKETHROUGH formats on slate blocks and following are the conditions when it breaks slate:
+- if you select the whole text and change its formats your frontend might throw slate error saying `Cannot get the leaf node at path [0,0] because it refers to a non-leaf node:` but it is due to proper syncing of json b/w hydrajs & adminUI.
+- At the endline if you press format button then it will change the state (active/inactive) but frontend might throw slate error/warning that `Error: Cannot find a descendant at path [0,4,0] in node:` 
 - pressing ENTER is not implemented so, pressing it will have abnormal changes & error ([TODO](https://github.com/collective/volto-hydra/issues/33))
+These will not break the codebase completely as deserializer at the adminUI cleans up the html and make a proper
 
 #### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
