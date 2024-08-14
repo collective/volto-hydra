@@ -1,0 +1,41 @@
+{
+  "name": "hydra-vue-f7",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Hydra Vue Framework7",
+  "repository": "",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "npm run dev",
+    "dev": "cross-env NODE_ENV=development vite",
+    "build": "cross-env NODE_ENV=production vite build",
+    "postinstall": "cpy --flat ./node_modules/framework7-icons/fonts/*.* ./src/fonts/ && cpy --flat ./node_modules/material-icons/iconfont/*.* ./src/fonts/"
+  },
+  "browserslist": [
+    "IOS >= 13",
+    "Safari >= 13",
+    "last 5 Chrome versions",
+    "last 5 Firefox versions",
+    "Samsung >= 12"
+  ],
+  "dependencies": {
+    "dom7": "^4.0.6",
+    "framework7": "^8.3.3",
+    "framework7-icons": "^5.0.5",
+    "framework7-vue": "^8.3.3",
+    "material-icons": "^1.13.12",
+    "skeleton-elements": "^4.0.1",
+    "swiper": "^11.1.7",
+    "vue": "^3.4.34",
+    "axios": "^1.7.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.0",
+    "@vue/compiler-sfc": "^3.4.34",
+    "cpy-cli": "^5.0.0",
+    "cross-env": "^7.0.3",
+    "postcss-preset-env": "^9.6.0",
+    "vite": "^5.3.5",
+    "vite-plugin-mkcert": "^1.17.5"
+  }
+}
