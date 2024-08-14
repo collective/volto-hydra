@@ -23,6 +23,8 @@ import {
   getAllowedBlocksList,
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
+import toggleMark from '../../utils/toggleMark';
+import addNodeIds from '../../utils/addNodeIds';
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -216,8 +218,21 @@ const Iframe = (props) => {
           }
           break;
 
+        // case 'INLINE_EDIT_ENTER':
+        //   isInlineEditingRef.current = true; // Set to true to prevent sending form data to iframe
+        //   const updatedJson = addNodeIds(form.blocks[selectedBlock]);
+        //   onChangeFormData({
+        //     ...form,
+        //     blocks: { ...form.blocks, [selectedBlock]: updatedJson },
+        //   });
+        //   break;
+
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
+          console.log(
+            'Inline data recieved',
+            event.data.data?.blocks[selectedBlock],
+          );
           onChangeFormData(event.data.data);
           break;
 
@@ -225,6 +240,38 @@ const Iframe = (props) => {
           isInlineEditingRef.current = false;
           break;
 
+        case 'TOGGLE_MARK':
+          console.log('TOGGLE_BOLD', event.data.html);
+          isInlineEditingRef.current = true;
+          const deserializedHTMLData = toggleMark(event.data.html);
+          console.log('deserializedHTMLData', deserializedHTMLData);
+          onChangeFormData({
+            ...form,
+            blocks: {
+              ...form.blocks,
+              [selectedBlock]: {
+                ...form.blocks[selectedBlock],
+                value: deserializedHTMLData,
+              },
+            },
+          });
+          event.source.postMessage(
+            {
+              type: 'TOGGLE_MARK_DONE',
+              data: {
+                ...form,
+                blocks: {
+                  ...form.blocks,
+                  [selectedBlock]: {
+                    ...form.blocks[selectedBlock],
+                    value: deserializedHTMLData,
+                  },
+                },
+              },
+            },
+            event.origin,
+          );
+          break;
         default:
           break;
       }
@@ -239,16 +286,20 @@ const Iframe = (props) => {
     };
   }, [
     dispatch,
+    form,
+    form?.blocks,
     handleNavigateToUrl,
     history.location.pathname,
     iframeSrc,
     onChangeFormData,
     onSelectBlock,
     properties,
+    selectedBlock,
     token,
   ]);
 
   useEffect(() => {
+    // console.log('form data changed', form?.blocks[selectedBlock]);
     if (
       !isInlineEditingRef.current &&
       form &&
