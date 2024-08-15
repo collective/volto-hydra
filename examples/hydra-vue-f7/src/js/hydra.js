@@ -51,7 +51,7 @@ class Bridge {
               isRoutingWithHash:
                 newUrl.hash !== this.currentUrl?.hash &&
                 newUrl.hash !== '' &&
-                newUrl.hash.startsWith('#!'),
+                newUrl.hash.startsWith('#/!'),
             },
             this.adminOrigin,
           );

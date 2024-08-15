@@ -163,7 +163,7 @@ const Iframe = (props) => {
       // Update adminUI URL with the new URL
       const hash = givenUrlObject.hash;
       if (isRoutingWithHash) {
-        const pathname = hash.replace('#!', '');
+        const pathname = hash.replace('#/!', '');
         history.push(`${pathname === '' ? '/' : pathname}`);
       } else {
         history.push(
