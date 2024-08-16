@@ -171,11 +171,135 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG;
-    dragButton.disabled = true;
+    // dragButton.disabled = true;
+    dragButton.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      document.querySelector('body').classList.add('grabbing');
+      // Create a copy of the block
+      const draggedBlock = this.currentlySelectedBlock.cloneNode(true);
+      draggedBlock.classList.add('dragging');
+      document.body.appendChild(draggedBlock);
+
+      // Position the copy under the cursor
+      const rect = this.currentlySelectedBlock.getBoundingClientRect();
+      draggedBlock.style.width = `${rect.width}px`;
+      draggedBlock.style.height = `${rect.height}px`;
+      draggedBlock.style.left = `${e.clientX}px`;
+      draggedBlock.style.top = `${e.clientY}px`;
+      console.log(
+        'DRAGGED BLOCK POSITION',
+        draggedBlock.style.left,
+        draggedBlock.style.top,
+      );
+      let closestBlockUid = null;
+      let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
+      let insertAt = null; // 0 for top & 1 for bottom
+      // Handle mouse movement
+      const onMouseMove = (e) => {
+        draggedBlock.style.left = `${e.clientX}px`;
+        draggedBlock.style.top = `${e.clientY}px`;
+        if (!throttleTimeout) {
+          throttleTimeout = setTimeout(() => {
+            const elementBelow = document.elementFromPoint(
+              e.clientX,
+              e.clientY,
+            );
+            let closestBlock = elementBelow;
+            // Find the closest ancestor with 'data-block-id'
+            while (
+              closestBlock &&
+              !closestBlock.hasAttribute('data-block-uid')
+            ) {
+              closestBlock = closestBlock.parentElement;
+            }
+
+            if (closestBlock) {
+              // Remove border from any previously highlighted block
+              const prevHighlighted =
+                insertAt === 0
+                  ? document.querySelector('.highlighted-block')
+                  : document.querySelector('.highlighted-block-bottom');
+
+              if (prevHighlighted) {
+                prevHighlighted.classList.remove(
+                  'highlighted-block',
+                  'highlighted-block-bottom',
+                );
+              }
+
+              // Determine if hovering over top or bottom half (not effiecient but lets try!)
+              const closestBlockRect = closestBlock.getBoundingClientRect();
+              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
+              const isHoveringOverTopHalf =
+                mouseYRelativeToBlock < closestBlockRect.height / 2;
+
+              if (isHoveringOverTopHalf) {
+                insertAt = 0;
+              } else {
+                insertAt = 1;
+              }
+              closestBlock.classList.add(
+                `${
+                  insertAt === 0
+                    ? 'highlighted-block'
+                    : 'highlighted-block-bottom'
+                }`,
+              );
+              closestBlockUid = closestBlock.getAttribute('data-block-uid');
+            } else {
+              console.log('Not hovering over any block');
+            }
+            throttleTimeout = null;
+          }, 100);
+        }
+      };
+      // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
+      const onMouseUp = () => {
+        document.querySelector('body').classList.remove('grabbing');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        draggedBlock.remove();
+        if (closestBlockUid) {
+          const draggedBlockId =
+            this.currentlySelectedBlock.getAttribute('data-block-uid');
+
+          const blocks_layout = this.formData.blocks_layout.items;
+          const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
+          const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
+          if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
+            blocks_layout.splice(draggedBlockIndex, 1);
+
+            // Determine insertion point based on hover position
+            const insertIndex =
+              insertAt === 1 ? targetBlockIndex + 1 : targetBlockIndex;
+
+            blocks_layout.splice(insertIndex, 0, draggedBlockId);
+            if (insertAt === 0) {
+              document
+                .querySelector('.highlighted-block')
+                .classList.remove('highlighted-block');
+            } else {
+              document
+                .querySelector('.highlighted-block-bottom')
+                .classList.remove('highlighted-block-bottom');
+            }
+            window.parent.postMessage(
+              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
+              this.adminOrigin,
+            );
+          }
+        }
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
 
     let boldButton = null;
     let italicButton = null;
     let delButton = null;
+    let linkButton = null;
 
     if (show.formatBtns) {
       // Create the bold button
@@ -208,12 +332,69 @@ class Bridge {
         this.formatSelectedText('del');
       });
 
+      // Create the del button
+      linkButton = document.createElement('button');
+      linkButton.className = `volto-hydra-format-button ${
+        show.formatBtns ? 'show' : ''
+      }`;
+      linkButton.innerHTML = linkSVG;
+      linkButton.addEventListener('click', () => {
+        const selection = window.getSelection();
+        const commonAncestor = selection.getRangeAt(0).commonAncestorContainer;
+
+        if (!selection.rangeCount || selection.isCollapsed) return;
+
+        const range = selection.getRangeAt(0);
+        const container = document.createElement('div');
+        container.classList.add('link-input-container');
+
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.placeholder = 'Enter URL';
+
+        const beforeButton = document.createElement('button');
+        beforeButton.textContent = 'Before';
+
+        const afterButton = document.createElement('button');
+        afterButton.textContent = 'After';
+        afterButton.addEventListener('click', () => {
+          const url = inputField.value;
+          const link = document.createElement('a');
+          link.href = url;
+          range.surroundContents(link);
+          this.isInlineEditing = false;
+          const editableParent = this.findEditableParent(commonAncestor);
+          const htmlString = editableParent.outerHTML;
+
+          window.parent.postMessage(
+            {
+              type: 'TOGGLE_MARK',
+              html: htmlString,
+            },
+            this.adminOrigin,
+          );
+          container.remove(); // Close the input field (why errrrror? whyyy..)(sometimes)
+        });
+
+        container.appendChild(beforeButton);
+        container.appendChild(inputField);
+        container.appendChild(afterButton);
+
+        const buttonRect = linkButton.getBoundingClientRect();
+        container.style.position = 'absolute';
+        container.style.top = `${
+          buttonRect.top - container.offsetHeight - 5
+        }px`; // 5px gap above the button (UI later)
+        container.style.left = `${buttonRect.left}px`;
+
+        // Append the container to the link button's parent
+        linkButton.parentNode.appendChild(container);
+      });
+
       // Function to handle the text selection and show/hide the bold button
       const handleSelectionChange = () => {
         const selection = window.getSelection();
         const range = selection.getRangeAt(0);
-
-        // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
 
         const formats = this.isFormatted(range);
         boldButton.classList.toggle(
@@ -289,6 +470,7 @@ class Bridge {
       this.quantaToolbar.appendChild(boldButton);
       this.quantaToolbar.appendChild(italicButton);
       this.quantaToolbar.appendChild(delButton);
+      this.quantaToolbar.appendChild(linkButton);
     }
     this.quantaToolbar.appendChild(menuButton);
     this.quantaToolbar.appendChild(dropdownMenu);
@@ -381,7 +563,9 @@ class Bridge {
     // Add border to the currently selected block
     this.currentlySelectedBlock.classList.add('volto-hydra--outline');
 
-    if (this.formData) this.createQuantaToolbar(blockUid, show);
+    if (this.formData) {
+      this.createQuantaToolbar(blockUid, show);
+    }
 
     if (!this.clickOnBtn) {
       window.parent.postMessage(
@@ -575,7 +759,7 @@ class Bridge {
 
           if (targetElement && this.isInlineEditing) {
             this.handleTextChangeOnSlate(targetElement);
-          } else if (this.isInlineEditing) {
+          } else {
             const targetElement = mutation.target?.parentElement.closest(
               '[data-editable-field]',
             );
@@ -604,7 +788,6 @@ class Bridge {
     const editableField = target.getAttribute('data-editable-field');
     if (editableField)
       this.formData.blocks[blockUid][editableField] = target.innerText;
-    console.log('editableField', this.formData.blocks[blockUid][editableField]);
     if (this.formData.blocks[blockUid]['@type'] !== 'slate') {
       window.parent.postMessage(
         { type: 'INLINE_EDIT_DATA', data: this.formData },
@@ -628,6 +811,7 @@ class Bridge {
       );
       // this.resetJsonNodeIds(updatedJson);
       this.formData.blocks[this.selectedBlockUid] = updatedJson;
+
       window.parent.postMessage(
         { type: 'INLINE_EDIT_DATA', data: this.formData },
         this.adminOrigin,
@@ -761,7 +945,6 @@ class Bridge {
 
     const range = selection.getRangeAt(0);
     const currentFormats = this.isFormatted(range);
-
     if (currentFormats[format].present) {
       this.unwrapFormatting(range, format);
     } else {
@@ -789,7 +972,7 @@ class Bridge {
       italic: ['EM', 'I'],
       del: ['DEL'],
     };
-    const selection = window.getSelection();
+
     // Check if the selection is entirely within a formatting element of the specified type
     let container = range.commonAncestorContainer;
     while (
@@ -803,7 +986,7 @@ class Bridge {
           range.startOffset === 0 &&
           range.endOffset === container.textContent.length;
 
-        if (isEntireContentSelected || selection.isCollapsed) {
+        if (isEntireContentSelected) {
           // Unwrap the entire element
           this.unwrapElement(container);
         } else {
@@ -933,6 +1116,7 @@ class Bridge {
 
     return this.findEditableParent(node.parentNode);
   }
+
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';
@@ -1015,12 +1199,27 @@ class Bridge {
           background-color: #ddd;
         }
         .volto-hydra-drag-button {
-          cursor: default;
+          cursor: grab;
           background: #E4E8EC;
           border-radius: 6px;
           padding: 9px 6px;
           height: 40px;
           display: flex;
+        }
+        .grabbing {
+          cursor: grabbing !important;
+        }
+        .dragging {
+          position: fixed !important; 
+          opacity: 0.5; 
+          pointer-events: none; 
+          z-index: 1000; 
+        }
+        .highlighted-block {
+          border-top: 5px solid blue; 
+        }
+        .highlighted-block-bottom {
+          border-bottom: 5px solid blue;
         }
         .volto-hydra-dropdown-menu {
           display: none;
@@ -1149,6 +1348,7 @@ const boldSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBO
 const italicSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAq0lEQVR4nO3WsQnCYBRF4ZvSXjKA2EsGkPTiAGIvDiBZIziA2AcHEFsjDhDSSwYQayslEOGC2B4R/wOvesXXPZ4UCr1XSnp8mHb3FfgooK2BC4EdDJ6QcG3wiIRvBvcptGfoXVJEwUODLwJLDT6R8NzggoQzg3MSXhu8IuGdwTMSPhs8JuHG4AGFRt3ReMHtMUGKDb0KLDG4IuGpwXsSXhq8IcDyb3+t0G/1BLG4VBFDInqeAAAAAElFTkSuQmCC">`;
 const delSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAB70lEQVR4nO3ZTatOURjG8d/xiEjolAiZUYoopYgiH8EpiSi+gIGBEhMdE2WgdAYGjokyRJgYMCGKAYZeyrtS5O1RJ45WrVOrncHzvp9V61+rPdr3uq6991r3ve5NoVAoFIaAEWzGKdzAS3zBdLy+wC2MYzsahoQGDuJ5FNvqeIfjWFCn+JW436bw6niLvXWIX4UPFTFfcSEK2oBlmIXFWIMxnI9Pv2rkzCDFz8bDZPImTmJ+G/fvx+skxjcDZKwifleHcYLhiSg+LP6BcTMxEHaV7HiVGFgrQ34nBubJkPeJgXUy5Epi4PowZdVW2Yq/iYnbWC0zTlcSUVgXk9hSt7BCoU/fe7PLqrOT0exFpg8Hle81iJ+OI8zdNeM5v4F+EM4IB/AxERvyym6ZEQ48jxMTn7FQZiyKDYAZE0dlyKHEwB0ZsiIxENZFdsyt1FTZsTExEE57fSXsyz9xNia5XjCRGLikz/xIJgs9oDldxtuBP0nMnfrMuUq2vBc7dJ2wLTbDZmJdMwAa8TVX65UTGG0xxmgsEKeSGG/ibjQQRmJjNhUQxi9cxmGsx9JoeElsv4Ru3MX/FIef6moOhOPjoy4LtrtYrubCbB8etCn8CfbE+4eG8NkcwVU8jVl1Kl6fxR8cx7Cph1twoVAoFHTFPycjIDOxcKkjAAAAAElFTkSuQmCC">`;
 const addSVG = `<img widht="20px" height="20px" src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjgzMjggMi41MDAwMkg5LjE2NjE4VjkuMTY2NjhIMi40OTk1MVYxMC44MzMzSDkuMTY2MThWMTcuNUgxMC44MzI4VjEwLjgzMzNIMTcuNDk5NVY5LjE2NjY4SDEwLjgzMjhWMi41MDAwMloiIGZpbGw9IiM0QTVCNjgiLz4KPC9zdmc+Cg=='/>`;
+const linkSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAArUlEQVR4nO2VXQrCMBCEv2P4cyQt3sb4LgUvpe2VtL74FFkYQZa2ohtE1IF5SAfmC2nIwodoBbTAWW6AqlT5DsgDrkvsPAMXYA3M5KRvli0jgFYlVuiVlB0igE4l055souwUAWT51fxpQH6w/kGAV/FCrz/gC29RfjfAKwzoVGBPtNdc2TECaEae642yfQRQ3Q2cNDBwFgRVj4zMbbT8JhuLNrnsn5jtWMI7L6IrN6JmJYjJ8jsAAAAASUVORK5CYII=">`;
 const threeDotsSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12C3 10.8954 3.89543 10 5 10Z" fill="#000000"/>
   <path d="M12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12C10 10.8954 10.8954 10 12 10Z" fill="#000000"/>

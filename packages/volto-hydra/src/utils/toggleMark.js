@@ -53,7 +53,7 @@ const deserialize = (el, markAttributes = {}) => {
     case 'A':
       return jsx(
         'element',
-        { type: 'link', url: el.getAttribute('href') },
+        { type: 'link', data: { url: el.getAttribute('href') } },
         children,
       );
     case 'STRONG': // Handle <strong> elements explicitly
