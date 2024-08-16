@@ -230,17 +230,57 @@ performance reasons (TODO)
 If you completed levels 1 to 3 (made blocks clickable and enabled live updates) then there is nothing more you need to do.
 
 Now an editor can :-
-- click on '+' Icon directly on the frontend to add a block below the current block by choosing a type from BlockChooser popup.
-   - It appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute.
+- click on '+' Icon directly on the frontend to add a block after the current block. This will make the BlockChooser popup appear.
+   - The '+' Icon appears outside the corner of the element with ```data-bloc-uid="<<BLOCK_UID>>>``` in the direction the block will be added.
 - remove a block via the Quanta toolbar dropdown
 - open or close the block settings [TODO](https://github.com/collective/volto-hydra/issues/81)
 - drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
 - cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
 - multiple block selection to move, delete, or copy in bulk ([TODO](https://github.com/collective/volto-hydra/issues/104))
-- add and manage blocks inside containers like a columns block ([TODO](https://github.com/collective/volto-hydra/issues/99))
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
- 
-### Level 5: Enable Inplace frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
+
+#### Container Blocks ([TODO](https://github.com/collective/volto-hydra/issues/99))
+
+If your block can contain other blocks you can let hydra know where the sub-blocks can be added by marking the html element that will contain them.
+
+For example if you had a grid implimented as a table that can only allow a single block per column then you might have
+
+```html
+<table data-block-uid="..." data-block-container-horizontal="blocks">
+  <tr data-block-uid="...">
+    <td data-editable-field="value"><p>my text</p></td>
+  </tr>
+  <tr data-block-uid="...">
+    <td data-editable-field="value"><p>other slate</p></td>
+  </tr>
+</table>
+```
+
+but if you wanted to allow many columns each with many blocks inside you can use specify a column block
+
+```html
+<table data-block-uid="..." data-block-container-vertical="blocks,4">
+  <tr data-block-uid="..." data-block-container-vertical="blocks">
+    <td data-block-uid="..." data-editable-field="value"><p>my text</p></td>
+  </tr>
+  <tr data-block-uid="..." data-block-container-vertical="blocks">
+    <td data-block-uid="..." data-editable-field="value"><p>other slate</p></td>
+  </tr>
+</table>
+```
+
+- The allowed block types for a given container can be overridden in the hydra settings at initilisation.
+- The first of the allowed blocks is the default block. In the case where the only remaining block is deleted, a new empty default
+  block will be created in it's place so that a container is never empty.
+- The orientation tells hydra where to place the add button and DND drop markers.
+- if there is a maximum number of blocks a container can hold then specify it in the data attribute ```data-block-container-horizontal="blocks,4"```
+- it might be that a container has more than area to add blocks. In which case you use a different field prefix, e.g. ```data-block-container-horizontal="left"```. 
+  This will put the blocks into a dict in the field ```left``` and the order in a list in ```left_layout```.
+- if it is hard to select a container using the mouse then the quanta toolbar provides a "up" button to select the container of the current block. On mobile a single press
+  selects the container and a double press selects the sub-block.  
+
+
+### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 If you want to make the editing experience the most intuitive, you can enable real-time inplace editing, where an editor
 can change text, links or media directly on your frontend instead of via fields on the sidebar.
@@ -270,7 +310,7 @@ Now an editor can :-
 Additionally your frontend can
 - specify parts of the text that aren't editable by the user (TODO)
 
-#### Inline Rich Text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
+#### Visual Rich Text editing ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 For rich text (slate) you will have to do a little more work.
 
@@ -324,8 +364,6 @@ My Paragraph with <span class="custom" data-node-id="5"><a href="...">a link</a>
 </p>
 ```
 
-
-
 Hydra.js will now adjust the quanta toolbar with formatting buttons.
 
 Now an editor can :-
@@ -346,7 +384,7 @@ IMPORTANT: Currently, Hydra.js supports BOLD, ITALIC & STRIKETHROUGH formats on 
 - pressing ENTER is not implemented so, pressing it will have abnormal changes & error ([TODO](https://github.com/collective/volto-hydra/issues/33))
 These will not break the codebase completely as deserializer at the adminUI cleans up the html and make a proper
 
-#### Inline media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
+#### Visual media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
 You can let the user upload images/videos or pick an existing file by clicking on the image on your frontend.
 
@@ -364,10 +402,10 @@ Now an editor can :-
 - Remove the currently selected media to pick a different one ([TODO](https://github.com/collective/volto-hydra/issues/36))
 - DND an image diretly only a media element on the frontend ([TODO](https://github.com/collective/volto-hydra/issues/108))
 
-#### Inline link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
+#### Visual link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
 
 You might have a block with a link field like the Teaser block. You can also make this
-editable. In edit mode the user clicks and can pick content to link to or enter an external url.
+editable. In edit mode the user clicks on the element and can pick content to link to or enter an external url.
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -389,7 +427,7 @@ Use css selectors to specify which elements are editible. The selectors are appl
 
 e.g.
 ``` html
-<!-- hydra_block_uid:...; img:image; h2:title; .description:text; div a:link  -->
+<!-- hydra_block_uid:...; img:image; h2:title; .description:desc_field; div a:url  -->
 <div class="teaser">
 <img src="/big_news.jpg"/>
 <h2>Big News</h2>
