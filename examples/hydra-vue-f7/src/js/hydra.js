@@ -35,39 +35,58 @@ class Bridge {
     }
 
     if (window.self !== window.top) {
-      this.navigationHandler = (e) => {
-        const newUrl = new URL(e.destination.url);
-        console.log('newhash:', newUrl.hash, 'prevHash', this.currentUrl.hash);
-        if (
-          this.currentUrl === null ||
-          newUrl.hash !== this.currentUrl.hash ||
-          (this.currentUrl.pathname !== newUrl.pathname &&
-            this.currentUrl.origin === newUrl.origin)
-        ) {
+      // This will set the listners for hashchange & pushstate
+      function detectNavigation(callback) {
+        let currentUrl = window.location.href;
+
+        function checkNavigation() {
+          const newUrl = window.location.href;
+          if (newUrl !== currentUrl) {
+            callback(currentUrl);
+            currentUrl = newUrl;
+          }
+        }
+
+        // Handle hash changes & popstate events (only happens when browser back/forward buttons is clicked)
+        window.addEventListener('hashchange', checkNavigation);
+        window.addEventListener('popstate', checkNavigation);
+
+        // Intercept pushState and replaceState to detect navigation changes
+        const originalPushState = window.history.pushState;
+        window.history.pushState = function (...args) {
+          originalPushState.apply(this, args);
+          checkNavigation();
+        };
+
+        const originalReplaceState = window.history.replaceState;
+        window.history.replaceState = function (...args) {
+          originalReplaceState.apply(this, args);
+          checkNavigation();
+        };
+      }
+
+      detectNavigation((currentUrl) => {
+        const currentUrlObj = new URL(currentUrl);
+        if (window.location.pathname !== currentUrlObj.pathname) {
           window.parent.postMessage(
             {
-              type: 'URL_CHANGE',
-              url: newUrl.href,
-              isRoutingWithHash:
-                newUrl.hash !== this.currentUrl?.hash &&
-                newUrl.hash !== '' &&
-                newUrl.hash.startsWith('#/!'),
+              type: 'PATH_CHANGE',
+              path: window.location.pathname,
             },
             this.adminOrigin,
           );
-          this.currentUrl = newUrl;
-        } else if (
-          this.currentUrl !== null &&
-          this.currentUrl.origin !== newUrl.origin
-        ) {
-          e.preventDefault();
-          window.open(newUrl.href, '_blank').focus();
+        } else if (window.location.hash !== currentUrlObj.hash) {
+          const hash = window.location.hash;
+          const i = hash.indexOf('/');
+          window.parent.postMessage(
+            {
+              type: 'PATH_CHANGE',
+              path: i !== -1 ? hash.slice(i) || '/' : '/',
+            },
+            this.adminOrigin,
+          );
         }
-      };
-
-      // Ensure we don't add multiple listeners
-      window.navigation.removeEventListener('navigate', this.navigationHandler);
-      window.navigation.addEventListener('navigate', this.navigationHandler);
+      });
 
       // Get the access token from the URL
       const url = new URL(window.location.href);
