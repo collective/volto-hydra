@@ -1,1 +1,10 @@
 /* Your app custom styles here */
+
+.image-align-right {
+    float: right;
+}
+
+.image-size-s {
+    width: 100px;
+    height: 100px;
+}
