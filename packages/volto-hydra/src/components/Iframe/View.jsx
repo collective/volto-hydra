@@ -24,7 +24,14 @@ import {
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
-import addNodeIds from '../../utils/addNodeIds';
+
+const addQueryParam = (url, params) => {
+  const newUrl = new URL(url);
+  for (const [key, value] of Object.entries(params)) {
+    newUrl.searchParams.set(key, value);
+  }
+  return newUrl.toString();
+};
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -35,8 +42,14 @@ import addNodeIds from '../../utils/addNodeIds';
 const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
-      ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
+      ? addQueryParam(
+          `${url}${window.location.pathname.replace('/edit', '')}`,
+          { access_token: token, _edit: true },
+        )
+      : addQueryParam(`${url}${window.location.pathname}`, {
+          access_token: token,
+          _edit: false,
+        })
     : null;
 };
 
@@ -148,14 +161,14 @@ const Iframe = (props) => {
         return;
       }
       // Update adminUI URL with the new URL
-      const newOrigin = givenUrlObject.origin;
-      Cookies.set('iframe_url', newOrigin, { expires: 7 });
       const hash = givenUrlObject.hash;
       if (isRoutingWithHash) {
-        const pathname = hash.replace('#!', '');
-        history.push(`${pathname}`);
+        const pathname = hash.replace('#/!', '');
+        history.push(`${pathname === '' ? '/' : pathname}`);
       } else {
-        history.push(`${givenUrlObject.pathname}`);
+        history.push(
+          `${givenUrlObject.pathname === '' ? '/' : givenUrlObject.pathname}`,
+        );
       }
     },
     [history],
