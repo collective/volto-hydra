@@ -244,6 +244,7 @@ class Bridge {
                     ? 'highlighted-block'
                     : 'highlighted-block-bottom'
                 }`,
+                `${insertAt === 0 ? 'highlighted-block' : 'highlighted-block-bottom'}`,
               );
               closestBlockUid = closestBlock.getAttribute('data-block-uid');
             } else {
