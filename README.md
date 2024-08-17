@@ -234,7 +234,7 @@ Now an editor can :-
    - It appears at the bottom-right of the container in which you added `data-bloc-uid="<<BLOCK_UID>>>"` attribute.
 - remove a block via the Quanta toolbar dropdown
 - open or close the block settings [TODO](https://github.com/collective/volto-hydra/issues/81)
-- drag and drop blocks ([TODO](https://github.com/collective/volto-hydra/issues/65))
+- drag and drop blocks
 - cut, copy and paste blocks ([TODO](https://github.com/collective/volto-hydra/issues/67))
 - multiple block selection to move, delete, or copy in bulk ([TODO](https://github.com/collective/volto-hydra/issues/104))
 - add and manage blocks inside containers like a columns block ([TODO](https://github.com/collective/volto-hydra/issues/99))

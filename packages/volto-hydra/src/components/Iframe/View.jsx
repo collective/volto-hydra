@@ -25,11 +25,12 @@ import {
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
 
-const addQueryParam = (url, params) => {
+const addUrlParams = (url, qParams, pathname) => {
   const newUrl = new URL(url);
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(qParams)) {
     newUrl.searchParams.set(key, value);
   }
+  newUrl.pathname = pathname;
   return newUrl.toString();
 };
 
@@ -42,14 +43,19 @@ const addQueryParam = (url, params) => {
 const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
-      ? addQueryParam(
-          `${url}${window.location.pathname.replace('/edit', '')}`,
+      ? addUrlParams(
+          `${url}`,
           { access_token: token, _edit: true },
+          `${window.location.pathname.replace('/edit', '')}`,
         )
-      : addQueryParam(`${url}${window.location.pathname}`, {
-          access_token: token,
-          _edit: false,
-        })
+      : addUrlParams(
+          `${url}`,
+          {
+            access_token: token,
+            _edit: false,
+          },
+          `${window.location.pathname}`,
+        )
     : null;
 };
 
@@ -112,6 +118,8 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
+    console.log('settinf iframe url with token');
+
     setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
   }, [token, u]);
@@ -150,29 +158,6 @@ const Iframe = (props) => {
     onChangeFormData(newFormData);
   };
   //---------------------------
-  /**
-   * Handle the navigation to a new URL
-   * @param {URL} givenUrlObject
-   * @param {Boolean} isRoutingWithHash
-   */
-  const handleNavigateToUrl = useCallback(
-    (givenUrlObject, isRoutingWithHash) => {
-      if (!isValidUrl(givenUrlObject.href)) {
-        return;
-      }
-      // Update adminUI URL with the new URL
-      const hash = givenUrlObject.hash;
-      if (isRoutingWithHash) {
-        const pathname = hash.replace('#/!', '');
-        history.push(`${pathname === '' ? '/' : pathname}`);
-      } else {
-        history.push(
-          `${givenUrlObject.pathname === '' ? '/' : givenUrlObject.pathname}`,
-        );
-      }
-    },
-    [history],
-  );
 
   useEffect(() => {
     //----------------Experimental----------------
@@ -198,11 +183,9 @@ const Iframe = (props) => {
       }
       const { type } = event.data;
       switch (type) {
-        case 'URL_CHANGE': // URL change from the iframe
-          handleNavigateToUrl(
-            new URL(event.data.url),
-            event.data.isRoutingWithHash,
-          );
+        case 'PATH_CHANGE': // PATH change from the iframe
+          history.push(event.data.path);
+
           break;
 
         case 'OPEN_SETTINGS':
@@ -285,6 +268,11 @@ const Iframe = (props) => {
             event.origin,
           );
           break;
+
+        case 'UPDATE_BLOCKS_LAYOUT':
+          isInlineEditingRef.current = false;
+          onChangeFormData(event.data.data);
+          break;
         default:
           break;
       }
@@ -301,7 +289,7 @@ const Iframe = (props) => {
     dispatch,
     form,
     form?.blocks,
-    handleNavigateToUrl,
+    history,
     history.location.pathname,
     iframeSrc,
     onChangeFormData,

@@ -35,37 +35,58 @@ class Bridge {
     }
 
     if (window.self !== window.top) {
-      this.navigationHandler = (e) => {
-        const newUrl = new URL(e.destination.url);
-        if (
-          this.currentUrl === null ||
-          newUrl.hash !== this.currentUrl.hash ||
-          (this.currentUrl.pathname !== newUrl.pathname &&
-            this.currentUrl.origin === newUrl.origin)
-        ) {
+      // This will set the listners for hashchange & pushstate
+      function detectNavigation(callback) {
+        let currentUrl = window.location.href;
+
+        function checkNavigation() {
+          const newUrl = window.location.href;
+          if (newUrl !== currentUrl) {
+            callback(currentUrl);
+            currentUrl = newUrl;
+          }
+        }
+
+        // Handle hash changes & popstate events (only happens when browser back/forward buttons is clicked)
+        window.addEventListener('hashchange', checkNavigation);
+        window.addEventListener('popstate', checkNavigation);
+
+        // Intercept pushState and replaceState to detect navigation changes
+        const originalPushState = window.history.pushState;
+        window.history.pushState = function (...args) {
+          originalPushState.apply(this, args);
+          checkNavigation();
+        };
+
+        const originalReplaceState = window.history.replaceState;
+        window.history.replaceState = function (...args) {
+          originalReplaceState.apply(this, args);
+          checkNavigation();
+        };
+      }
+
+      detectNavigation((currentUrl) => {
+        const currentUrlObj = new URL(currentUrl);
+        if (window.location.pathname !== currentUrlObj.pathname) {
           window.parent.postMessage(
             {
-              type: 'URL_CHANGE',
-              url: newUrl.href,
-              isRoutingWithHash:
-                newUrl.hash !== this.currentUrl?.hash &&
-                newUrl.hash.startsWith('#!'),
+              type: 'PATH_CHANGE',
+              path: window.location.pathname,
             },
             this.adminOrigin,
           );
-          this.currentUrl = newUrl;
-        } else if (
-          this.currentUrl !== null &&
-          this.currentUrl.origin !== newUrl.origin
-        ) {
-          e.preventDefault();
-          window.open(newUrl.href, '_blank').focus();
+        } else if (window.location.hash !== currentUrlObj.hash) {
+          const hash = window.location.hash;
+          const i = hash.indexOf('/');
+          window.parent.postMessage(
+            {
+              type: 'PATH_CHANGE',
+              path: i !== -1 ? hash.slice(i) || '/' : '/',
+            },
+            this.adminOrigin,
+          );
         }
-      };
-
-      // Ensure we don't add multiple listeners
-      window.navigation.removeEventListener('navigate', this.navigationHandler);
-      window.navigation.addEventListener('navigate', this.navigationHandler);
+      });
 
       // Get the access token from the URL
       const url = new URL(window.location.href);
@@ -171,7 +192,126 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG;
-    dragButton.disabled = true;
+    // dragButton.disabled = true;
+    dragButton.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      document.querySelector('body').classList.add('grabbing');
+      // Create a copy of the block
+      const draggedBlock = this.currentlySelectedBlock.cloneNode(true);
+      draggedBlock.classList.add('dragging');
+      document.body.appendChild(draggedBlock);
+
+      // Position the copy under the cursor
+      const rect = this.currentlySelectedBlock.getBoundingClientRect();
+      draggedBlock.style.width = `${rect.width}px`;
+      draggedBlock.style.height = `${rect.height}px`;
+      draggedBlock.style.left = `${e.clientX}px`;
+      draggedBlock.style.top = `${e.clientY}px`;
+      console.log(
+        'DRAGGED BLOCK POSITION',
+        draggedBlock.style.left,
+        draggedBlock.style.top,
+      );
+      let closestBlockUid = null;
+      let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
+      let insertAt = null; // 0 for top & 1 for bottom
+      // Handle mouse movement
+      const onMouseMove = (e) => {
+        draggedBlock.style.left = `${e.clientX}px`;
+        draggedBlock.style.top = `${e.clientY}px`;
+        if (!throttleTimeout) {
+          throttleTimeout = setTimeout(() => {
+            const elementBelow = document.elementFromPoint(
+              e.clientX,
+              e.clientY,
+            );
+            let closestBlock = elementBelow;
+            // Find the closest ancestor with 'data-block-id'
+            while (
+              closestBlock &&
+              !closestBlock.hasAttribute('data-block-uid')
+            ) {
+              closestBlock = closestBlock.parentElement;
+            }
+
+            if (closestBlock) {
+              // Remove border from any previously highlighted block
+              const prevHighlighted =
+                insertAt === 0
+                  ? document.querySelector('.highlighted-block')
+                  : document.querySelector('.highlighted-block-bottom');
+
+              if (prevHighlighted) {
+                prevHighlighted.classList.remove(
+                  'highlighted-block',
+                  'highlighted-block-bottom',
+                );
+              }
+
+              // Determine if hovering over top or bottom half (not effiecient but lets try!)
+              const closestBlockRect = closestBlock.getBoundingClientRect();
+              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
+              const isHoveringOverTopHalf =
+                mouseYRelativeToBlock < closestBlockRect.height / 2;
+
+              if (isHoveringOverTopHalf) {
+                insertAt = 0;
+              } else {
+                insertAt = 1;
+              }
+              closestBlock.classList.add(
+                `${insertAt === 0 ? 'highlighted-block' : 'highlighted-block-bottom'}`,
+              );
+              closestBlockUid = closestBlock.getAttribute('data-block-uid');
+            } else {
+              console.log('Not hovering over any block');
+            }
+            throttleTimeout = null;
+          }, 100);
+        }
+      };
+      // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
+      const onMouseUp = () => {
+        document.querySelector('body').classList.remove('grabbing');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        draggedBlock.remove();
+        if (closestBlockUid) {
+          const draggedBlockId =
+            this.currentlySelectedBlock.getAttribute('data-block-uid');
+
+          const blocks_layout = this.formData.blocks_layout.items;
+          const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
+          const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
+          if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
+            blocks_layout.splice(draggedBlockIndex, 1);
+
+            // Determine insertion point based on hover position
+            const insertIndex =
+              insertAt === 1 ? targetBlockIndex + 1 : targetBlockIndex;
+
+            blocks_layout.splice(insertIndex, 0, draggedBlockId);
+            if (insertAt === 0) {
+              document
+                .querySelector('.highlighted-block')
+                .classList.remove('highlighted-block');
+            } else {
+              document
+                .querySelector('.highlighted-block-bottom')
+                .classList.remove('highlighted-block-bottom');
+            }
+            window.parent.postMessage(
+              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
+              this.adminOrigin,
+            );
+          }
+        }
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
 
     let boldButton = null;
     let italicButton = null;
@@ -1015,12 +1155,27 @@ class Bridge {
           background-color: #ddd;
         }
         .volto-hydra-drag-button {
-          cursor: default;
+          cursor: grab;
           background: #E4E8EC;
           border-radius: 6px;
           padding: 9px 6px;
           height: 40px;
           display: flex;
+        }
+        .grabbing {
+          cursor: grabbing !important;
+        }
+        .dragging {
+          position: fixed !important; 
+          opacity: 0.5; 
+          pointer-events: none; 
+          z-index: 1000; 
+        }
+        .highlighted-block {
+          border-top: 5px solid blue; 
+        }
+        .highlighted-block-bottom {
+          border-bottom: 5px solid blue;
         }
         .volto-hydra-dropdown-menu {
           display: none;
