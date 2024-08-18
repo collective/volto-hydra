@@ -36,11 +36,15 @@
     components: {
       RichText
     },
+    props: {
+      f7route: Object,
+      f7router: Object,
+    },
     mounted() {
-      this.$root.panelComponent = SideNav;
-      this.$root.panelProps = {
-        navigation: this.data['@components'].navigation.items,
-      }
+      // this.$root.panelComponent = SideNav;
+      // this.$root.panelProps = {
+      //   navigation: this.data['@components'].navigation.items,
+      // }
     },
     methods: {
       changePanelFoo() {
@@ -60,10 +64,7 @@
         }
       }
     },
-    props: {
-    },
     data() {
-      
       return {
         data: useStore('content'),
       }
