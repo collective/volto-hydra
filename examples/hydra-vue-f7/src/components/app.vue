@@ -125,7 +125,7 @@
       }
 
       // In Layout.js or App.js
-      const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
+      const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
 
       onMounted(() => {
         f7ready((f7) => {

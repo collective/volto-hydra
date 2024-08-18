@@ -13,15 +13,7 @@
     </f7-navbar>
 
     <f7-block>
-      <template v-for="block_uid in data.blocks_layout.items" >
-      <f7-block-title v-if="data.blocks[block_uid]['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title>
-      <div v-if="data.blocks[block_uid]['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
-        <RichText v-for="node in data.blocks[block_uid]['value']" :key="node" :node="node" />
-      </div>
-      <f7-block v-if="data.blocks[block_uid]['@type']=='image'" :data-block-uid="block_uid">
-        <img v-for="props in [imageProps(data.blocks[block_uid])]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" />
-      </f7-block>
-    </template>
+      <Block v-for="block_uid in data.blocks_layout.items" :key="data.blocks[block_uid]" :block_uid="block_uid" :block="data.blocks[block_uid]" :data="data"></Block>
   </f7-block>
 </f7-page>
 
@@ -30,11 +22,11 @@
 
 <script>
   import SideNav from './sidenav.vue';
-  import RichText from '../components/richtext.vue';
+  import Block from '../components/block.vue';
   import { useStore } from 'framework7-vue';
   export default {
     components: {
-      RichText
+      Block
     },
     props: {
       f7route: Object,
@@ -49,19 +41,6 @@
     methods: {
       changePanelFoo() {
         //this.$root.panelProps.data = data;
-      },
-      imageProps(block) {
-        var image_url = block?.image_scales
-            ? `${block.url}/++api++/${block?.image_scales.image[0].download}`
-            : block.url;
-        image_url = image_url.startsWith("https://hydra.pretagov.com") ? image_url + "/@@images/image" : image_url;
-        const size = block.size;
-        const align = block.align;
-        return {
-          url: image_url,
-          size: size,
-          align: align
-        }
       }
     },
     data() {
