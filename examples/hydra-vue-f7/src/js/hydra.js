@@ -192,126 +192,7 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG;
-    // dragButton.disabled = true;
-    dragButton.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      document.querySelector('body').classList.add('grabbing');
-      // Create a copy of the block
-      const draggedBlock = this.currentlySelectedBlock.cloneNode(true);
-      draggedBlock.classList.add('dragging');
-      document.body.appendChild(draggedBlock);
-
-      // Position the copy under the cursor
-      const rect = this.currentlySelectedBlock.getBoundingClientRect();
-      draggedBlock.style.width = `${rect.width}px`;
-      draggedBlock.style.height = `${rect.height}px`;
-      draggedBlock.style.left = `${e.clientX}px`;
-      draggedBlock.style.top = `${e.clientY}px`;
-      console.log(
-        'DRAGGED BLOCK POSITION',
-        draggedBlock.style.left,
-        draggedBlock.style.top,
-      );
-      let closestBlockUid = null;
-      let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
-      let insertAt = null; // 0 for top & 1 for bottom
-      // Handle mouse movement
-      const onMouseMove = (e) => {
-        draggedBlock.style.left = `${e.clientX}px`;
-        draggedBlock.style.top = `${e.clientY}px`;
-        if (!throttleTimeout) {
-          throttleTimeout = setTimeout(() => {
-            const elementBelow = document.elementFromPoint(
-              e.clientX,
-              e.clientY,
-            );
-            let closestBlock = elementBelow;
-            // Find the closest ancestor with 'data-block-id'
-            while (
-              closestBlock &&
-              !closestBlock.hasAttribute('data-block-uid')
-            ) {
-              closestBlock = closestBlock.parentElement;
-            }
-
-            if (closestBlock) {
-              // Remove border from any previously highlighted block
-              const prevHighlighted =
-                insertAt === 0
-                  ? document.querySelector('.highlighted-block')
-                  : document.querySelector('.highlighted-block-bottom');
-
-              if (prevHighlighted) {
-                prevHighlighted.classList.remove(
-                  'highlighted-block',
-                  'highlighted-block-bottom',
-                );
-              }
-
-              // Determine if hovering over top or bottom half (not effiecient but lets try!)
-              const closestBlockRect = closestBlock.getBoundingClientRect();
-              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
-              const isHoveringOverTopHalf =
-                mouseYRelativeToBlock < closestBlockRect.height / 2;
-
-              if (isHoveringOverTopHalf) {
-                insertAt = 0;
-              } else {
-                insertAt = 1;
-              }
-              closestBlock.classList.add(
-                `${insertAt === 0 ? 'highlighted-block' : 'highlighted-block-bottom'}`,
-              );
-              closestBlockUid = closestBlock.getAttribute('data-block-uid');
-            } else {
-              console.log('Not hovering over any block');
-            }
-            throttleTimeout = null;
-          }, 100);
-        }
-      };
-      // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
-      const onMouseUp = () => {
-        document.querySelector('body').classList.remove('grabbing');
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-
-        draggedBlock.remove();
-        if (closestBlockUid) {
-          const draggedBlockId =
-            this.currentlySelectedBlock.getAttribute('data-block-uid');
-
-          const blocks_layout = this.formData.blocks_layout.items;
-          const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
-          const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
-          if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
-            blocks_layout.splice(draggedBlockIndex, 1);
-
-            // Determine insertion point based on hover position
-            const insertIndex =
-              insertAt === 1 ? targetBlockIndex + 1 : targetBlockIndex;
-
-            blocks_layout.splice(insertIndex, 0, draggedBlockId);
-            if (insertAt === 0) {
-              document
-                .querySelector('.highlighted-block')
-                .classList.remove('highlighted-block');
-            } else {
-              document
-                .querySelector('.highlighted-block-bottom')
-                .classList.remove('highlighted-block-bottom');
-            }
-            window.parent.postMessage(
-              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
-              this.adminOrigin,
-            );
-          }
-        }
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    });
+    dragButton.disabled = true;
 
     let boldButton = null;
     let italicButton = null;
@@ -1155,27 +1036,12 @@ class Bridge {
           background-color: #ddd;
         }
         .volto-hydra-drag-button {
-          cursor: grab;
+          cursor: default;
           background: #E4E8EC;
           border-radius: 6px;
           padding: 9px 6px;
           height: 40px;
           display: flex;
-        }
-        .grabbing {
-          cursor: grabbing !important;
-        }
-        .dragging {
-          position: fixed !important; 
-          opacity: 0.5; 
-          pointer-events: none; 
-          z-index: 1000; 
-        }
-        .highlighted-block {
-          border-top: 5px solid blue; 
-        }
-        .highlighted-block-bottom {
-          border-bottom: 5px solid blue;
         }
         .volto-hydra-dropdown-menu {
           display: none;

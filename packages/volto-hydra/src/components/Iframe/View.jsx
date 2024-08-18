@@ -24,7 +24,15 @@ import {
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
-import addNodeIds from '../../utils/addNodeIds';
+
+const addUrlParams = (url, qParams, pathname) => {
+  const newUrl = new URL(url);
+  for (const [key, value] of Object.entries(qParams)) {
+    newUrl.searchParams.set(key, value);
+  }
+  newUrl.pathname = pathname;
+  return newUrl.toString();
+};
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -35,8 +43,19 @@ import addNodeIds from '../../utils/addNodeIds';
 const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
-      ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
+      ? addUrlParams(
+          `${url}`,
+          { access_token: token, _edit: true },
+          `${window.location.pathname.replace('/edit', '')}`,
+        )
+      : addUrlParams(
+          `${url}`,
+          {
+            access_token: token,
+            _edit: false,
+          },
+          `${window.location.pathname}`,
+        )
     : null;
 };
 
@@ -99,6 +118,8 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
+    console.log('settinf iframe url with token');
+
     setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
   }, [token, u]);
@@ -137,29 +158,6 @@ const Iframe = (props) => {
     onChangeFormData(newFormData);
   };
   //---------------------------
-  /**
-   * Handle the navigation to a new URL
-   * @param {URL} givenUrlObject
-   * @param {Boolean} isRoutingWithHash
-   */
-  const handleNavigateToUrl = useCallback(
-    (givenUrlObject, isRoutingWithHash) => {
-      if (!isValidUrl(givenUrlObject.href)) {
-        return;
-      }
-      // Update adminUI URL with the new URL
-      const newOrigin = givenUrlObject.origin;
-      Cookies.set('iframe_url', newOrigin, { expires: 7 });
-      const hash = givenUrlObject.hash;
-      if (isRoutingWithHash) {
-        const pathname = hash.replace('#!', '');
-        history.push(`${pathname}`);
-      } else {
-        history.push(`${givenUrlObject.pathname}`);
-      }
-    },
-    [history],
-  );
 
   useEffect(() => {
     //----------------Experimental----------------
@@ -185,11 +183,9 @@ const Iframe = (props) => {
       }
       const { type } = event.data;
       switch (type) {
-        case 'URL_CHANGE': // URL change from the iframe
-          handleNavigateToUrl(
-            new URL(event.data.url),
-            event.data.isRoutingWithHash,
-          );
+        case 'PATH_CHANGE': // PATH change from the iframe
+          history.push(event.data.path);
+
           break;
 
         case 'OPEN_SETTINGS':
@@ -227,8 +223,21 @@ const Iframe = (props) => {
         //   });
         //   break;
 
+        // case 'INLINE_EDIT_ENTER':
+        //   isInlineEditingRef.current = true; // Set to true to prevent sending form data to iframe
+        //   const updatedJson = addNodeIds(form.blocks[selectedBlock]);
+        //   onChangeFormData({
+        //     ...form,
+        //     blocks: { ...form.blocks, [selectedBlock]: updatedJson },
+        //   });
+        //   break;
+
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
+          console.log(
+            'Inline data recieved',
+            event.data.data?.blocks[selectedBlock],
+          );
           console.log(
             'Inline data recieved',
             event.data.data?.blocks[selectedBlock],
@@ -272,6 +281,11 @@ const Iframe = (props) => {
             event.origin,
           );
           break;
+
+        case 'UPDATE_BLOCKS_LAYOUT':
+          isInlineEditingRef.current = false;
+          onChangeFormData(event.data.data);
+          break;
         default:
           break;
       }
@@ -288,7 +302,7 @@ const Iframe = (props) => {
     dispatch,
     form,
     form?.blocks,
-    handleNavigateToUrl,
+    history,
     history.location.pathname,
     iframeSrc,
     onChangeFormData,

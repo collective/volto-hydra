@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Menu as SemanticMenu } from 'semantic-ui-react';
-import { getTokenFromCookie } from '#utils/hydra';
+import { getTokenFromCookie } from '@volto-hydra/hydra-js';
 import Link from 'next/link';
 import RecursiveMenuItem from '@/components/RecursiveMenuItem';
 import { fetchContent } from '#utils/api';
