@@ -144,7 +144,7 @@ class Bridge {
 
     const url = new URL(window.location.href);
     const domain = url.hostname;
-    document.cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain};`;
+    document.cookie = `access_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain}; SameSite=None; Secure`;
   }
 
   /**
@@ -1265,7 +1265,7 @@ export function getTokenFromCookie() {
   if (typeof document === 'undefined') {
     return null;
   }
-  const name = 'auth_token=';
+  const name = 'access_token=';
   const decodedCookie = decodeURIComponent(document.cookie);
   const cookieArray = decodedCookie.split(';');
   for (let i = 0; i < cookieArray.length; i++) {
