@@ -124,6 +124,7 @@ class PersonalPreferences extends Component {
     );
     // Check if the URL is typed in or Selected from dropdown
     if (data.urlCheck) {
+      // Custom URL is given
       if (!isValidUrl(data.url)) {
         // Check if the URL is valid
         toast.error(
@@ -136,14 +137,15 @@ class PersonalPreferences extends Component {
         return;
       }
       const url = new URL(data.url);
-      this.props.setFrontendPreviewUrl(url.href);
-      const urlList = [...new Set([this.urls, url])];
+      this.props.setFrontendPreviewUrl(url.origin);
+      const urlList = [...new Set([this.urls, url.origin])];
       this.props.cookies.set('saved_urls', urlList.join(','), {
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 Days
       });
     } else {
+      // URL is selected from the dropdown
       const url = new URL(data.urls);
-      this.props.setFrontendPreviewUrl(url.href);
+      this.props.setFrontendPreviewUrl(url.origin);
     }
     this.props.closeMenu();
   }
