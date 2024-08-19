@@ -9,7 +9,7 @@
       <f7-nav-right>
         <f7-link icon-ios="f7:menu" icon-aurora="f7:menu" icon-md="material:menu" @click="changePanelFoo" panel-open="right"></f7-link>
       </f7-nav-right>
-      <f7-nav-title-large>{{data.title}}</f7-nav-title-large>
+      <f7-nav-title-large data-editable-metadata="title">{{data.title}}</f7-nav-title-large>
     </f7-navbar>
 
     <f7-block>
