@@ -3,11 +3,11 @@
         <f7-navbar title="Navigation"></f7-navbar>
         <f7-list dividers-ios strong-ios outline-ios>
           <template  v-for="(item) in navigation" >
-            <f7-list-item :title="item.title" :link="item['@id'].replace('https://hydra.pretagov.com/', '/').replace('https://hydra.pretagov.com', '/')"   
+            <f7-list-item :title="item.title" :link="getUrl(item)"   
              panel-close/>
             <ul v-if="item.items.length">
             <li>
-                <f7-list-item :title="item.title" :link="item['@id'].replace('https://hydra.pretagov.com/', '/').replace('https://hydra.pretagov.com', '/')"   
+                <f7-list-item :title="item.title" :link="getUrl(item)"   
                   v-for="(item) in item.items" panel-close/>
             </li>
             </ul>
@@ -21,6 +21,11 @@
     export default {
       props: {
         data: Object,
+      },
+      methods: {
+        getUrl(item) {
+          return item['@id'].replace('https://hydra.pretagov.com/', '/').replace('https://hydra.pretagov.com', '/')
+        }
       },
       data() {      
         return {

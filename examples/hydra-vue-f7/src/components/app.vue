@@ -99,7 +99,14 @@
         theme: 'auto', // Automatic theme detection
         view: {
             browserHistory: true,
-
+            browserHistoryOnLoad: true,
+            browserHistoryStoreHistory: false,
+            browserHistoryInitialMatch: false,
+            preloadPreviousPage: false
+            //browserHistorySeperator: "#!",
+            //cache: false,
+            //reloadPages: true,
+            //reloadDetail: true
         },
 
         // App store
@@ -118,11 +125,15 @@
       }
 
       // In Layout.js or App.js
-      const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
-
+      const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
 
       onMounted(() => {
         f7ready((f7) => {
+          window.addEventListener("hashchange", () => {
+              const url = new URL(window.location);
+              const path = url.href.split("#!")[1];
+              f7.views.main.router.navigate(path);
+            });
 
           bridge.onEditChange((data) => {
             // f7.views.main.router.navigate(f7.views.main.router.currentRoute.url, {
