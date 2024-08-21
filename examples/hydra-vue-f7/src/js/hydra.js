@@ -19,13 +19,15 @@ class Bridge {
     this.quantaToolbar = null;
     this.currentUrl =
       typeof window !== 'undefined' ? new URL(window.location.href) : null;
-    this.setDataCallback = null;
     this.formData = null;
     this.blockTextMutationObserver = null;
+    this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
     this.handleBlockFocusIn = null;
     this.handleBlockFocusOut = null;
     this.isInlineEditing = false;
+    this.handleMouseUp = null;
+    this.blockObserver = null;
     this.init(options);
   }
 
@@ -110,14 +112,33 @@ class Bridge {
         this.enableBlockClickListener();
         this.injectCSS();
         this.listenForSelectBlockMessage();
+        window.parent.postMessage(
+          { type: 'GET_INITIAL_DATA' },
+          this.adminOrigin,
+        );
+        const reciveInitialData = (e) => {
+          if (e.origin === this.adminOrigin) {
+            if (e.data.type === 'INITIAL_DATA') {
+              this.formData = JSON.parse(JSON.stringify(e.data.data));
+              window.postMessage(
+                { type: 'FORM_DATA', data: this.formData },
+                window.location.origin,
+              );
+            }
+          }
+        };
+        window.removeEventListener('message', reciveInitialData);
+        window.addEventListener('message', reciveInitialData);
       }
     }
   }
 
   onEditChange(callback) {
-    this.setDataCallback = callback;
     this.realTimeDataHandler = (event) => {
-      if (event.origin === this.adminOrigin) {
+      if (
+        event.origin === this.adminOrigin ||
+        event.origin === window.location.origin
+      ) {
         if (event.data.type === 'FORM_DATA') {
           if (event.data.data) {
             this.formData = JSON.parse(JSON.stringify(event.data.data));
@@ -126,7 +147,6 @@ class Bridge {
             throw new Error('No form data has been sent from the adminUI');
           }
         } else if (event.data.type === 'TOGGLE_MARK_DONE') {
-          console.log('toggle mark data rec');
           this.formData = JSON.parse(JSON.stringify(event.data.data));
           callback(event.data.data);
         }
@@ -144,7 +164,7 @@ class Bridge {
 
     const url = new URL(window.location.href);
     const domain = url.hostname;
-    document.cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain};`;
+    document.cookie = `access_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain}; SameSite=None; Secure`;
   }
 
   /**
@@ -152,6 +172,7 @@ class Bridge {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
+      event.stopPropagation();
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
         this.selectBlock(blockElement);
@@ -179,7 +200,8 @@ class Bridge {
     this.addButton = document.createElement('button');
     this.addButton.className = 'volto-hydra-add-button';
     this.addButton.innerHTML = addSVG;
-    this.addButton.onclick = () => {
+    this.addButton.onclick = (e) => {
+      e.stopPropagation();
       this.clickOnBtn = true;
       window.parent.postMessage(
         { type: 'ADD_BLOCK', uid: blockUid },
@@ -192,6 +214,8 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG;
+    let isDragging = false;
+    let startY;
     // dragButton.disabled = true;
     dragButton.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -207,14 +231,12 @@ class Bridge {
       draggedBlock.style.height = `${rect.height}px`;
       draggedBlock.style.left = `${e.clientX}px`;
       draggedBlock.style.top = `${e.clientY}px`;
-      console.log(
-        'DRAGGED BLOCK POSITION',
-        draggedBlock.style.left,
-        draggedBlock.style.top,
-      );
       let closestBlockUid = null;
       let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
       let insertAt = null; // 0 for top & 1 for bottom
+      isDragging = true;
+      startY = e.clientY;
+      let startYTimeout;
       // Handle mouse movement
       const onMouseMove = (e) => {
         draggedBlock.style.left = `${e.clientX}px`;
@@ -260,14 +282,43 @@ class Bridge {
                 insertAt = 1;
               }
               closestBlock.classList.add(
-                `${insertAt === 0 ? 'highlighted-block' : 'highlighted-block-bottom'}`,
+                `${
+                  insertAt === 0
+                    ? 'highlighted-block'
+                    : 'highlighted-block-bottom'
+                }`,
+                `${
+                  insertAt === 0
+                    ? 'highlighted-block'
+                    : 'highlighted-block-bottom'
+                }`,
               );
               closestBlockUid = closestBlock.getAttribute('data-block-uid');
             } else {
-              console.log('Not hovering over any block');
+              // console.log("Not hovering over any block");
             }
             throttleTimeout = null;
           }, 100);
+        }
+        if (isDragging) {
+          const currentY = e.clientY;
+          const deltaY = currentY - startY;
+          clearTimeout(startYTimeout);
+          startYTimeout = setTimeout(() => {
+            startY = currentY;
+          }, 153);
+
+          // Check if the mouse is near the top or bottom of the viewport
+          const scrollThreshold = 50; // distance from the top/bottom of the viewport
+          const scrollSpeedFactor = 0.1; // for speeed scrolling (try/error)
+
+          if (currentY < scrollThreshold) {
+            // Scroll up, speed based on deltaY
+            window.scrollBy(0, -Math.abs(deltaY) * scrollSpeedFactor);
+          } else if (currentY > window.innerHeight - scrollThreshold) {
+            // Scroll down, speed based on deltaY
+            window.scrollBy(0, Math.abs(deltaY) * scrollSpeedFactor);
+          }
         }
       };
       // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
@@ -275,7 +326,8 @@ class Bridge {
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
-
+        isDragging = false;
+        clearTimeout(startYTimeout);
         draggedBlock.remove();
         if (closestBlockUid) {
           const draggedBlockId =
@@ -316,6 +368,7 @@ class Bridge {
     let boldButton = null;
     let italicButton = null;
     let delButton = null;
+    let linkButton = null;
 
     if (show.formatBtns) {
       // Create the bold button
@@ -348,12 +401,69 @@ class Bridge {
         this.formatSelectedText('del');
       });
 
+      // Create the del button
+      linkButton = document.createElement('button');
+      linkButton.className = `volto-hydra-format-button ${
+        show.formatBtns ? 'show' : ''
+      }`;
+      linkButton.innerHTML = linkSVG;
+      linkButton.addEventListener('click', () => {
+        const selection = window.getSelection();
+        const commonAncestor = selection.getRangeAt(0).commonAncestorContainer;
+
+        if (!selection.rangeCount || selection.isCollapsed) return;
+
+        const range = selection.getRangeAt(0);
+        const container = document.createElement('div');
+        container.classList.add('link-input-container');
+
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.placeholder = 'Enter URL';
+
+        const beforeButton = document.createElement('button');
+        beforeButton.textContent = 'Before';
+
+        const afterButton = document.createElement('button');
+        afterButton.textContent = 'After';
+        afterButton.addEventListener('click', () => {
+          const url = inputField.value;
+          const link = document.createElement('a');
+          link.href = url;
+          range.surroundContents(link);
+          this.isInlineEditing = false;
+          const editableParent = this.findEditableParent(commonAncestor);
+          const htmlString = editableParent.outerHTML;
+
+          window.parent.postMessage(
+            {
+              type: 'TOGGLE_MARK',
+              html: htmlString,
+            },
+            this.adminOrigin,
+          );
+          container.remove(); // Close the input field (why errrrror? whyyy..)(sometimes)
+        });
+
+        container.appendChild(beforeButton);
+        container.appendChild(inputField);
+        container.appendChild(afterButton);
+
+        const buttonRect = linkButton.getBoundingClientRect();
+        container.style.position = 'absolute';
+        container.style.top = `${
+          buttonRect.top - container.offsetHeight - 5
+        }px`; // 5px gap above the button (UI later)
+        container.style.left = `${buttonRect.left}px`;
+
+        // Append the container to the link button's parent
+        linkButton.parentNode.appendChild(container);
+      });
+
       // Function to handle the text selection and show/hide the bold button
       const handleSelectionChange = () => {
         const selection = window.getSelection();
         const range = selection.getRangeAt(0);
-
-        // Append the bold button only if text is selected and the block has the data-editable-field="value" attribute
 
         const formats = this.isFormatted(range);
         boldButton.classList.toggle(
@@ -372,7 +482,12 @@ class Bridge {
 
       // Add event listener to handle text selection within the block
       this.handleMouseUp = (e) => {
-        if (e.target.closest('[data-editable-field="value"]')) {
+        if (
+          e.target.closest('[data-editable-field="value"]') &&
+          e.target
+            .closest('[data-block-uid]')
+            .getAttribute('data-block-uid') === blockUid
+        ) {
           handleSelectionChange();
         }
       };
@@ -429,6 +544,7 @@ class Bridge {
       this.quantaToolbar.appendChild(boldButton);
       this.quantaToolbar.appendChild(italicButton);
       this.quantaToolbar.appendChild(delButton);
+      this.quantaToolbar.appendChild(linkButton);
     }
     this.quantaToolbar.appendChild(menuButton);
     this.quantaToolbar.appendChild(dropdownMenu);
@@ -442,6 +558,7 @@ class Bridge {
    * @param {Element} blockElement - Block element with the data-block-uid attribute
    */
   selectBlock(blockElement) {
+    if (!blockElement) return;
     // Remove border and button from the previously selected block
     if (this.currentlySelectedBlock) {
       this.deselectBlock(this.currentlySelectedBlock, blockElement);
@@ -450,87 +567,93 @@ class Bridge {
       this.currentlySelectedBlock === null ||
       this.currentlySelectedBlock !== blockElement
     ) {
+      this.isInlineEditing = true;
       this.handleBlockFocusOut = (e) => {
         // console.log("focus out");
         window.parent.postMessage(
           { type: 'INLINE_EDIT_EXIT' },
           this.adminOrigin,
         );
+        this.isInlineEditing = false;
       };
       this.handleBlockFocusIn = (e) => {
-        // console.log("focus in");
-        window.parent.postMessage(
-          {
-            type: 'INLINE_EDIT_ENTER',
-          },
-          this.adminOrigin,
-        );
         this.isInlineEditing = true;
       };
       // Add focus in event listener
-      blockElement.addEventListener(
-        'focusout',
-        this.handleBlockFocusOut.bind(this),
-      );
+      blockElement.addEventListener('focusout', this.handleBlockFocusOut);
 
-      blockElement.addEventListener(
-        'focusin',
-        this.handleBlockFocusIn.bind(this),
-      );
-    }
-    // Helper function to handle each element
-    const handleElement = (element) => {
-      const editableField = element.getAttribute('data-editable-field');
-      if (editableField === 'value') {
-        this.makeBlockContentEditable(element);
-      } else if (editableField !== null) {
-        element.setAttribute('contenteditable', 'true');
+      blockElement.addEventListener('focusin', this.handleBlockFocusIn);
+
+      // Helper function to handle each element
+      const handleElement = (element) => {
+        const editableField = element.getAttribute('data-editable-field');
+        if (editableField === 'value') {
+          this.makeBlockContentEditable(element);
+        } else if (editableField !== null) {
+          element.setAttribute('contenteditable', 'true');
+        }
+      };
+
+      // Function to recursively handle all children
+      const handleElementAndChildren = (element) => {
+        handleElement(element);
+        Array.from(element.children).forEach((child) =>
+          handleElementAndChildren(child),
+        );
+      };
+
+      const blockUid = blockElement.getAttribute('data-block-uid');
+      this.selectedBlockUid = blockUid;
+
+      let show = { formatBtns: false };
+      // if the block is a slate block, add nodeIds to the block's data
+      if (
+        this.formData &&
+        this.formData.blocks[blockUid]['@type'] === 'slate'
+      ) {
+        show.formatBtns = true;
+        this.formData.blocks[blockUid] = this.addNodeIds(
+          this.formData.blocks[blockUid],
+        );
+        window.postMessage(
+          { type: 'FORM_DATA', data: this.formData },
+          window.location.origin,
+        );
+        window.parent.postMessage(
+          { type: 'INLINE_EDIT_DATA', data: this.formData },
+          this.adminOrigin,
+        );
+        window.parent.postMessage(
+          { type: 'INLINE_EDIT_EXIT' },
+          this.adminOrigin,
+        );
       }
-    };
+      handleElementAndChildren(blockElement);
+      // Set the currently selected block
+      this.currentlySelectedBlock = blockElement;
+      // Add border to the currently selected block
+      this.currentlySelectedBlock.classList.add('volto-hydra--outline');
 
-    // Function to recursively handle all children
-    const handleElementAndChildren = (element) => {
-      handleElement(element);
-      Array.from(element.children).forEach((child) =>
-        handleElementAndChildren(child),
-      );
-    };
+      if (this.formData) {
+        this.createQuantaToolbar(blockUid, show);
+      }
 
-    const blockUid = blockElement.getAttribute('data-block-uid');
-    this.selectedBlockUid = blockUid;
-
-    // Handle the selected block and its children for contenteditable
-    handleElementAndChildren(blockElement);
-    let show = { formatBtns: false };
+      if (!this.clickOnBtn) {
+        window.parent.postMessage(
+          { type: 'OPEN_SETTINGS', uid: blockUid },
+          this.adminOrigin,
+        );
+      } else {
+        this.clickOnBtn = false;
+      }
+    }
     this.observeBlockTextChanges(blockElement);
-    // // if the block is a slate block, add nodeIds to the block's data
-    if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
-      show.formatBtns = true;
-      this.formData.blocks[blockUid] = this.addNodeIds(
-        this.formData.blocks[blockUid],
-      );
-      this.setDataCallback(this.formData);
-      // window.parent.postMessage(
-      //   { type: "ADD_NODEIDS", data: this.formData },
-      //   this.adminOrigin
-      // );
-    }
-
-    // Set the currently selected block
-    this.currentlySelectedBlock = blockElement;
-    // Add border to the currently selected block
-    this.currentlySelectedBlock.classList.add('volto-hydra--outline');
-
-    if (this.formData) this.createQuantaToolbar(blockUid, show);
-
-    if (!this.clickOnBtn) {
-      window.parent.postMessage(
-        { type: 'OPEN_SETTINGS', uid: blockUid },
-        this.adminOrigin,
-      );
-    } else {
-      this.clickOnBtn = false;
-    }
+    const editableChildren = blockElement.querySelectorAll(
+      '[data-editable-field]',
+    );
+    editableChildren.forEach((child) => {
+      child.setAttribute('contenteditable', 'true');
+    });
   }
   /**
    * Method to listen for the SELECT_BLOCK message from the adminUI
@@ -570,24 +693,29 @@ class Bridge {
    * @param {String} uid - UID of the block
    */
   observeForBlock(uid) {
-    const observer = new MutationObserver((mutationsList, observer) => {
+    if (this.blockObserver) this.blockObserver.disconnect();
+    this.blockObserver = new MutationObserver((mutationsList, observer) => {
       for (const mutation of mutationsList) {
         if (mutation.type === 'childList') {
           const blockElement = document.querySelector(
             `[data-block-uid="${uid}"]`,
           );
+
           if (blockElement) {
             this.selectBlock(blockElement);
             !this.elementIsVisibleInViewport(blockElement, true) &&
               blockElement.scrollIntoView({ behavior: 'smooth' });
             observer.disconnect();
-            break;
+            return;
           }
         }
       }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    this.blockObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   /**
@@ -639,12 +767,16 @@ class Bridge {
    * @param {Element} blockElement Selected block element
    */
   deselectBlock(prevBlockElement, currBlockElement) {
-    const currBlockUid = currBlockElement.getAttribute('data-block-uid');
+    const currBlockUid = currBlockElement?.getAttribute('data-block-uid');
     if (
       this.selectedBlockUid !== null &&
+      currBlockUid &&
       this.selectedBlockUid !== currBlockUid
     ) {
       this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
+      if (this.blockObserver) {
+        this.blockObserver.disconnect();
+      }
       if (this.addButton) {
         this.addButton.remove();
         this.addButton = null;
@@ -680,6 +812,10 @@ class Bridge {
     if (this.blockTextMutationObserver) {
       this.blockTextMutationObserver.disconnect();
       this.blockTextMutationObserver = null;
+    }
+    if (this.attributeMutationObserver) {
+      this.attributeMutationObserver.disconnect();
+      this.attributeMutationObserver = null;
     }
   }
 
@@ -726,7 +862,9 @@ class Bridge {
         }
       });
     });
-
+    if (this.blockTextMutationObserver) {
+      this.blockTextMutationObserver.disconnect();
+    }
     this.blockTextMutationObserver.observe(blockElement, {
       subtree: true,
       characterData: true,
@@ -744,10 +882,12 @@ class Bridge {
     const editableField = target.getAttribute('data-editable-field');
     if (editableField)
       this.formData.blocks[blockUid][editableField] = target.innerText;
-    console.log('editableField', this.formData.blocks[blockUid][editableField]);
     if (this.formData.blocks[blockUid]['@type'] !== 'slate') {
       window.parent.postMessage(
-        { type: 'INLINE_EDIT_DATA', data: this.formData },
+        {
+          type: 'INLINE_EDIT_DATA',
+          data: this.formData,
+        },
         this.adminOrigin,
       );
     }
@@ -767,7 +907,11 @@ class Bridge {
         closestNode.innerText?.replace(/\n$/, ''),
       );
       // this.resetJsonNodeIds(updatedJson);
-      this.formData.blocks[this.selectedBlockUid] = updatedJson;
+      this.formData.blocks[this.selectedBlockUid] = {
+        ...updatedJson,
+        plaintext: this.currentlySelectedBlock.innerText,
+      };
+
       window.parent.postMessage(
         { type: 'INLINE_EDIT_DATA', data: this.formData },
         this.adminOrigin,
@@ -788,7 +932,12 @@ class Bridge {
       return json.map((item) => this.updateJsonNode(item, nodeId, newText));
     } else if (typeof json === 'object' && json !== null) {
       if (json.nodeId === parseInt(nodeId, 10)) {
-        json.text = newText;
+        if (json.hasOwnProperty('text')) {
+          json.text = newText;
+        } else {
+          json.children[0].text = newText;
+        }
+        return json;
       }
       for (const key in json) {
         if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
@@ -901,7 +1050,6 @@ class Bridge {
 
     const range = selection.getRangeAt(0);
     const currentFormats = this.isFormatted(range);
-
     if (currentFormats[format].present) {
       this.unwrapFormatting(range, format);
     } else {
@@ -929,7 +1077,7 @@ class Bridge {
       italic: ['EM', 'I'],
       del: ['DEL'],
     };
-    const selection = window.getSelection();
+
     // Check if the selection is entirely within a formatting element of the specified type
     let container = range.commonAncestorContainer;
     while (
@@ -943,7 +1091,7 @@ class Bridge {
           range.startOffset === 0 &&
           range.endOffset === container.textContent.length;
 
-        if (isEntireContentSelected || selection.isCollapsed) {
+        if (isEntireContentSelected) {
           // Unwrap the entire element
           this.unwrapElement(container);
         } else {
@@ -1040,10 +1188,27 @@ class Bridge {
   // Helper function to unwrap a single formatting element
   unwrapElement(element) {
     const parent = element.parentNode;
+    if (!parent) return; // Handle the case where the element has no parent
+
+    // Store the next sibling of the element before modifying the DOM
+    const nextSibling = element.nextSibling;
+
     while (element.firstChild) {
       parent.insertBefore(element.firstChild, element);
     }
+
+    // Remove the element itself
     parent.removeChild(element);
+
+    // If there was a next sibling, set the selection to the beginning of it
+    if (nextSibling) {
+      const range = document.createRange();
+      range.setStart(nextSibling, 0);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
   }
   sendFormattedHTMLToAdminUI(selection) {
     if (!selection.rangeCount) return; // No selection
@@ -1265,7 +1430,7 @@ export function getTokenFromCookie() {
   if (typeof document === 'undefined') {
     return null;
   }
-  const name = 'auth_token=';
+  const name = 'access_token=';
   const decodedCookie = decodeURIComponent(document.cookie);
   const cookieArray = decodedCookie.split(';');
   for (let i = 0; i < cookieArray.length; i++) {
@@ -1304,6 +1469,7 @@ const boldSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBO
 const italicSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAq0lEQVR4nO3WsQnCYBRF4ZvSXjKA2EsGkPTiAGIvDiBZIziA2AcHEFsjDhDSSwYQayslEOGC2B4R/wOvesXXPZ4UCr1XSnp8mHb3FfgooK2BC4EdDJ6QcG3wiIRvBvcptGfoXVJEwUODLwJLDT6R8NzggoQzg3MSXhu8IuGdwTMSPhs8JuHG4AGFRt3ReMHtMUGKDb0KLDG4IuGpwXsSXhq8IcDyb3+t0G/1BLG4VBFDInqeAAAAAElFTkSuQmCC">`;
 const delSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAB70lEQVR4nO3ZTatOURjG8d/xiEjolAiZUYoopYgiH8EpiSi+gIGBEhMdE2WgdAYGjokyRJgYMCGKAYZeyrtS5O1RJ45WrVOrncHzvp9V61+rPdr3uq6991r3ve5NoVAoFIaAEWzGKdzAS3zBdLy+wC2MYzsahoQGDuJ5FNvqeIfjWFCn+JW436bw6niLvXWIX4UPFTFfcSEK2oBlmIXFWIMxnI9Pv2rkzCDFz8bDZPImTmJ+G/fvx+skxjcDZKwifleHcYLhiSg+LP6BcTMxEHaV7HiVGFgrQ34nBubJkPeJgXUy5Epi4PowZdVW2Yq/iYnbWC0zTlcSUVgXk9hSt7BCoU/fe7PLqrOT0exFpg8Hle81iJ+OI8zdNeM5v4F+EM4IB/AxERvyym6ZEQ48jxMTn7FQZiyKDYAZE0dlyKHEwB0ZsiIxENZFdsyt1FTZsTExEE57fSXsyz9xNia5XjCRGLikz/xIJgs9oDldxtuBP0nMnfrMuUq2vBc7dJ2wLTbDZmJdMwAa8TVX65UTGG0xxmgsEKeSGG/ibjQQRmJjNhUQxi9cxmGsx9JoeElsv4Ru3MX/FIef6moOhOPjoy4LtrtYrubCbB8etCn8CfbE+4eG8NkcwVU8jVl1Kl6fxR8cx7Cph1twoVAoFHTFPycjIDOxcKkjAAAAAElFTkSuQmCC">`;
 const addSVG = `<img widht="20px" height="20px" src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjgzMjggMi41MDAwMkg5LjE2NjE4VjkuMTY2NjhIMi40OTk1MVYxMC44MzMzSDkuMTY2MThWMTcuNUgxMC44MzI4VjEwLjgzMzNIMTcuNDk5NVY5LjE2NjY4SDEwLjgzMjhWMi41MDAwMloiIGZpbGw9IiM0QTVCNjgiLz4KPC9zdmc+Cg=='/>`;
+const linkSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAArUlEQVR4nO2VXQrCMBCEv2P4cyQt3sb4LgUvpe2VtL74FFkYQZa2ohtE1IF5SAfmC2nIwodoBbTAWW6AqlT5DsgDrkvsPAMXYA3M5KRvli0jgFYlVuiVlB0igE4l055souwUAWT51fxpQH6w/kGAV/FCrz/gC29RfjfAKwzoVGBPtNdc2TECaEae642yfQRQ3Q2cNDBwFgRVj4zMbbT8JhuLNrnsn5jtWMI7L6IrN6JmJYjJ8jsAAAAASUVORK5CYII=">`;
 const threeDotsSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12C3 10.8954 3.89543 10 5 10Z" fill="#000000"/>
   <path d="M12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12C10 10.8954 10.8954 10 12 10Z" fill="#000000"/>
