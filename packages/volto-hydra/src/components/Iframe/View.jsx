@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
@@ -100,11 +100,12 @@ const Iframe = (props) => {
     ],
   });
   useEffect(() => {
+    const origin = iframeSrc && new URL(iframeSrc).origin;
     document
       .getElementById('previewIframe')
       .contentWindow.postMessage(
-        { type: 'SELECT_BLOCK', uid: selectedBlock },
-        '*',
+        { type: 'SELECT_BLOCK', uid: selectedBlock, method: 'select' },
+        origin,
       );
   }, [selectedBlock]);
   //-------------------------
@@ -118,8 +119,6 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
-    console.log('settinf iframe url with token');
-
     setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
   }, [token, u]);
@@ -130,7 +129,10 @@ const Iframe = (props) => {
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
-      value = { ...value, value: [{ type: 'p', children: [{ text: '' }] }] };
+      value = {
+        ...value,
+        value: [{ type: 'p', children: [{ text: '' }] }],
+      };
     }
     const [newId, newFormData] = insertBlock(
       properties,
@@ -167,13 +169,9 @@ const Iframe = (props) => {
       onChangeFormData(newFormData);
 
       onSelectBlock(selectPrev ? previous : null);
-      const origin = new URL(iframeSrc).origin;
-      document
-        .getElementById('previewIframe')
-        .contentWindow.postMessage(
-          { type: 'SELECT_BLOCK', uid: previous },
-          origin,
-        );
+      onSelectBlock(previous);
+      setAddNewBlockOpened(false);
+      dispatch(setSidebarTab(1));
     };
     //----------------------------------------------
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
@@ -225,10 +223,6 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
-          console.log(
-            'Inline data recieved',
-            event.data.data?.blocks[selectedBlock],
-          );
           onChangeFormData(event.data.data);
           break;
 
@@ -273,6 +267,17 @@ const Iframe = (props) => {
           isInlineEditingRef.current = false;
           onChangeFormData(event.data.data);
           break;
+
+        case 'GET_INITIAL_DATA':
+          event.source.postMessage(
+            {
+              type: 'INITIAL_DATA',
+              data: form,
+            },
+            event.origin,
+          );
+          break;
+
         default:
           break;
       }
@@ -300,7 +305,6 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    // console.log('form data changed', form?.blocks[selectedBlock]);
     if (
       !isInlineEditingRef.current &&
       form &&
@@ -338,16 +342,9 @@ const Iframe = (props) => {
                   ? (id, value) => {
                       setAddNewBlockOpened(false);
                       const newId = onInsertBlock(id, value);
-                      const origin = new URL(iframeSrc).origin;
-                      document
-                        .getElementById('previewIframe')
-                        .contentWindow.postMessage(
-                          {
-                            type: 'SELECT_BLOCK',
-                            uid: newId,
-                          },
-                          origin,
-                        );
+                      onSelectBlock(newId);
+                      setAddNewBlockOpened(false);
+                      dispatch(setSidebarTab(1));
                     }
                   : null
               }

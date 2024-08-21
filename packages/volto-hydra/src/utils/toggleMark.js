@@ -10,22 +10,8 @@ const deserialize = (el, markAttributes = {}) => {
 
   const nodeAttributes = { ...markAttributes };
 
-  // define attributes for text nodes
-  // (Lets try handling this after the recursive call because slate is throwing an error when we pass this json)
-  // switch (el.nodeName) {
-  //   case 'STRONG':
-  //     nodeAttributes.type = 'strong';
-  //     break;
-  //   default:
-  //     break;
-  // }
-
   const children = Array.from(el.childNodes)
     .map((node) => {
-      // Add data-slate-node attribute if missing
-      if (node.nodeType === Node.ELEMENT_NODE && !node.dataset.slateNode) {
-        node.dataset.slateNode = 'element'; // Or 'text' if it's a text node
-      }
       return deserialize(node, nodeAttributes);
     })
     .flat();
