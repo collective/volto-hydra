@@ -79,10 +79,12 @@ making the Rendering part easily replacable with other implementations.
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
 Go to user preferences in the bottom left to select one of the available preset frontends or paste in your own frontend url to test.
 
-Available example frontends (go to `examples` directory for source code):
-- https://hydra-blogsite-nextjs.vercel.app
+Note: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
 
-Note: These are simple test frontends made with minimal effort and don't include support for all the navigation and block of volto yet.
+Available example frontends:
+- https://hydra-blogsite-nextjs.vercel.app (Blog style website using Next.js)
+- https://hydra-vue-f7.netlify.app (mobile hybrid framework using Vue.js)
+- [more examples (including source code)](https://github.com/collective/volto-hydra/tree/main/examples)
 
 ## Building a Frontend for Headless Plone
 
@@ -134,7 +136,8 @@ To do this you will include the hydra iframe bridge which creates a two way link
   const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
 - Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend or deployed frontend to test.
-   - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on a local hydra instance to have this frontend selectable by the user. 
+   - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on a local hydra instance to have this frontend selectable by the user.
+   - The url should be the prefix to which the current path is appended so both /#!/path and /path style routing is supported.
 - Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will have an added url parameter ```_edit=true```
    - you might choose to [load `hydra.js` asynchronously](#asynchronously-load-the-bridge) so no additional js is loaded unless editing.
 - You will need to [change your authentication token]((#authenticate-frontend-to-access-private-content)) you are using with the rest api so you can access the same content as the logged in editor.
