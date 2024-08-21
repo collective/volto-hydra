@@ -19,13 +19,15 @@ class Bridge {
     this.quantaToolbar = null;
     this.currentUrl =
       typeof window !== 'undefined' ? new URL(window.location.href) : null;
-    this.setDataCallback = null;
     this.formData = null;
     this.blockTextMutationObserver = null;
+    this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
     this.handleBlockFocusIn = null;
     this.handleBlockFocusOut = null;
     this.isInlineEditing = false;
+    this.handleMouseUp = null;
+    this.blockObserver = null;
     this.init(options);
   }
 
@@ -110,14 +112,33 @@ class Bridge {
         this.enableBlockClickListener();
         this.injectCSS();
         this.listenForSelectBlockMessage();
+        window.parent.postMessage(
+          { type: 'GET_INITIAL_DATA' },
+          this.adminOrigin,
+        );
+        const reciveInitialData = (e) => {
+          if (e.origin === this.adminOrigin) {
+            if (e.data.type === 'INITIAL_DATA') {
+              this.formData = JSON.parse(JSON.stringify(e.data.data));
+              window.postMessage(
+                { type: 'FORM_DATA', data: this.formData },
+                window.location.origin,
+              );
+            }
+          }
+        };
+        window.removeEventListener('message', reciveInitialData);
+        window.addEventListener('message', reciveInitialData);
       }
     }
   }
 
   onEditChange(callback) {
-    this.setDataCallback = callback;
     this.realTimeDataHandler = (event) => {
-      if (event.origin === this.adminOrigin) {
+      if (
+        event.origin === this.adminOrigin ||
+        event.origin === window.location.origin
+      ) {
         if (event.data.type === 'FORM_DATA') {
           if (event.data.data) {
             this.formData = JSON.parse(JSON.stringify(event.data.data));
@@ -126,7 +147,6 @@ class Bridge {
             throw new Error('No form data has been sent from the adminUI');
           }
         } else if (event.data.type === 'TOGGLE_MARK_DONE') {
-          console.log('toggle mark data rec');
           this.formData = JSON.parse(JSON.stringify(event.data.data));
           callback(event.data.data);
         }
@@ -144,7 +164,7 @@ class Bridge {
 
     const url = new URL(window.location.href);
     const domain = url.hostname;
-    document.cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain};`;
+    document.cookie = `access_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain}; SameSite=None; Secure`;
   }
 
   /**
@@ -179,7 +199,8 @@ class Bridge {
     this.addButton = document.createElement('button');
     this.addButton.className = 'volto-hydra-add-button';
     this.addButton.innerHTML = addSVG;
-    this.addButton.onclick = () => {
+    this.addButton.onclick = (e) => {
+      e.stopPropagation();
       this.clickOnBtn = true;
       window.parent.postMessage(
         { type: 'ADD_BLOCK', uid: blockUid },
@@ -192,6 +213,8 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG;
+    let isDragging = false;
+    let startY;
     // dragButton.disabled = true;
     dragButton.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -207,14 +230,12 @@ class Bridge {
       draggedBlock.style.height = `${rect.height}px`;
       draggedBlock.style.left = `${e.clientX}px`;
       draggedBlock.style.top = `${e.clientY}px`;
-      console.log(
-        'DRAGGED BLOCK POSITION',
-        draggedBlock.style.left,
-        draggedBlock.style.top,
-      );
       let closestBlockUid = null;
       let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
       let insertAt = null; // 0 for top & 1 for bottom
+      isDragging = true;
+      startY = e.clientY;
+      let startYTimeout;
       // Handle mouse movement
       const onMouseMove = (e) => {
         draggedBlock.style.left = `${e.clientX}px`;
@@ -265,14 +286,38 @@ class Bridge {
                     ? 'highlighted-block'
                     : 'highlighted-block-bottom'
                 }`,
-                `${insertAt === 0 ? 'highlighted-block' : 'highlighted-block-bottom'}`,
+                `${
+                  insertAt === 0
+                    ? 'highlighted-block'
+                    : 'highlighted-block-bottom'
+                }`,
               );
               closestBlockUid = closestBlock.getAttribute('data-block-uid');
             } else {
-              console.log('Not hovering over any block');
+              // console.log("Not hovering over any block");
             }
             throttleTimeout = null;
           }, 100);
+        }
+        if (isDragging) {
+          const currentY = e.clientY;
+          const deltaY = currentY - startY;
+          clearTimeout(startYTimeout);
+          startYTimeout = setTimeout(() => {
+            startY = currentY;
+          }, 153);
+
+          // Check if the mouse is near the top or bottom of the viewport
+          const scrollThreshold = 50; // distance from the top/bottom of the viewport
+          const scrollSpeedFactor = 0.1; // for speeed scrolling (try/error)
+
+          if (currentY < scrollThreshold) {
+            // Scroll up, speed based on deltaY
+            window.scrollBy(0, -Math.abs(deltaY) * scrollSpeedFactor);
+          } else if (currentY > window.innerHeight - scrollThreshold) {
+            // Scroll down, speed based on deltaY
+            window.scrollBy(0, Math.abs(deltaY) * scrollSpeedFactor);
+          }
         }
       };
       // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
@@ -280,7 +325,8 @@ class Bridge {
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
-
+        isDragging = false;
+        clearTimeout(startYTimeout);
         draggedBlock.remove();
         if (closestBlockUid) {
           const draggedBlockId =
@@ -435,7 +481,12 @@ class Bridge {
 
       // Add event listener to handle text selection within the block
       this.handleMouseUp = (e) => {
-        if (e.target.closest('[data-editable-field="value"]')) {
+        if (
+          e.target.closest('[data-editable-field="value"]') &&
+          e.target
+            .closest('[data-block-uid]')
+            .getAttribute('data-block-uid') === blockUid
+        ) {
           handleSelectionChange();
         }
       };
@@ -506,6 +557,7 @@ class Bridge {
    * @param {Element} blockElement - Block element with the data-block-uid attribute
    */
   selectBlock(blockElement) {
+    if (!blockElement) return;
     // Remove border and button from the previously selected block
     if (this.currentlySelectedBlock) {
       this.deselectBlock(this.currentlySelectedBlock, blockElement);
@@ -514,89 +566,93 @@ class Bridge {
       this.currentlySelectedBlock === null ||
       this.currentlySelectedBlock !== blockElement
     ) {
+      this.isInlineEditing = true;
       this.handleBlockFocusOut = (e) => {
         // console.log("focus out");
         window.parent.postMessage(
           { type: 'INLINE_EDIT_EXIT' },
           this.adminOrigin,
         );
+        this.isInlineEditing = false;
       };
       this.handleBlockFocusIn = (e) => {
-        // console.log("focus in");
-        window.parent.postMessage(
-          {
-            type: 'INLINE_EDIT_ENTER',
-          },
-          this.adminOrigin,
-        );
         this.isInlineEditing = true;
       };
       // Add focus in event listener
-      blockElement.addEventListener(
-        'focusout',
-        this.handleBlockFocusOut.bind(this),
-      );
+      blockElement.addEventListener('focusout', this.handleBlockFocusOut);
 
-      blockElement.addEventListener(
-        'focusin',
-        this.handleBlockFocusIn.bind(this),
-      );
-    }
-    // Helper function to handle each element
-    const handleElement = (element) => {
-      const editableField = element.getAttribute('data-editable-field');
-      if (editableField === 'value') {
-        this.makeBlockContentEditable(element);
-      } else if (editableField !== null) {
-        element.setAttribute('contenteditable', 'true');
+      blockElement.addEventListener('focusin', this.handleBlockFocusIn);
+
+      // Helper function to handle each element
+      const handleElement = (element) => {
+        const editableField = element.getAttribute('data-editable-field');
+        if (editableField === 'value') {
+          this.makeBlockContentEditable(element);
+        } else if (editableField !== null) {
+          element.setAttribute('contenteditable', 'true');
+        }
+      };
+
+      // Function to recursively handle all children
+      const handleElementAndChildren = (element) => {
+        handleElement(element);
+        Array.from(element.children).forEach((child) =>
+          handleElementAndChildren(child),
+        );
+      };
+
+      const blockUid = blockElement.getAttribute('data-block-uid');
+      this.selectedBlockUid = blockUid;
+
+      let show = { formatBtns: false };
+      // if the block is a slate block, add nodeIds to the block's data
+      if (
+        this.formData &&
+        this.formData.blocks[blockUid]['@type'] === 'slate'
+      ) {
+        show.formatBtns = true;
+        this.formData.blocks[blockUid] = this.addNodeIds(
+          this.formData.blocks[blockUid],
+        );
+        window.postMessage(
+          { type: 'FORM_DATA', data: this.formData },
+          window.location.origin,
+        );
+        window.parent.postMessage(
+          { type: 'INLINE_EDIT_DATA', data: this.formData },
+          this.adminOrigin,
+        );
+        window.parent.postMessage(
+          { type: 'INLINE_EDIT_EXIT' },
+          this.adminOrigin,
+        );
       }
-    };
+      handleElementAndChildren(blockElement);
+      // Set the currently selected block
+      this.currentlySelectedBlock = blockElement;
+      // Add border to the currently selected block
+      this.currentlySelectedBlock.classList.add('volto-hydra--outline');
 
-    // Function to recursively handle all children
-    const handleElementAndChildren = (element) => {
-      handleElement(element);
-      Array.from(element.children).forEach((child) =>
-        handleElementAndChildren(child),
-      );
-    };
+      if (this.formData) {
+        this.createQuantaToolbar(blockUid, show);
+      }
 
-    const blockUid = blockElement.getAttribute('data-block-uid');
-    this.selectedBlockUid = blockUid;
-
-    // Handle the selected block and its children for contenteditable
-    handleElementAndChildren(blockElement);
-    let show = { formatBtns: false };
+      if (!this.clickOnBtn) {
+        window.parent.postMessage(
+          { type: 'OPEN_SETTINGS', uid: blockUid },
+          this.adminOrigin,
+        );
+      } else {
+        this.clickOnBtn = false;
+      }
+    }
     this.observeBlockTextChanges(blockElement);
-    // // if the block is a slate block, add nodeIds to the block's data
-    if (this.formData && this.formData.blocks[blockUid]['@type'] === 'slate') {
-      show.formatBtns = true;
-      this.formData.blocks[blockUid] = this.addNodeIds(
-        this.formData.blocks[blockUid],
-      );
-      this.setDataCallback(this.formData);
-      // window.parent.postMessage(
-      //   { type: "ADD_NODEIDS", data: this.formData },
-      //   this.adminOrigin
-      // );
-    }
-
-    // Set the currently selected block
-    this.currentlySelectedBlock = blockElement;
-    // Add border to the currently selected block
-    this.currentlySelectedBlock.classList.add('volto-hydra--outline');
-
-    if (this.formData) {
-      this.createQuantaToolbar(blockUid, show);
-    }
-
-    if (!this.clickOnBtn) {
-      window.parent.postMessage(
-        { type: 'OPEN_SETTINGS', uid: blockUid },
-        this.adminOrigin,
-      );
-    } else {
-      this.clickOnBtn = false;
-    }
+    const editableChildren = blockElement.querySelectorAll(
+      '[data-editable-field]',
+    );
+    editableChildren.forEach((child) => {
+      child.setAttribute('contenteditable', 'true');
+    });
   }
   /**
    * Method to listen for the SELECT_BLOCK message from the adminUI
@@ -636,24 +692,29 @@ class Bridge {
    * @param {String} uid - UID of the block
    */
   observeForBlock(uid) {
-    const observer = new MutationObserver((mutationsList, observer) => {
+    if (this.blockObserver) this.blockObserver.disconnect();
+    this.blockObserver = new MutationObserver((mutationsList, observer) => {
       for (const mutation of mutationsList) {
         if (mutation.type === 'childList') {
           const blockElement = document.querySelector(
             `[data-block-uid="${uid}"]`,
           );
+
           if (blockElement) {
             this.selectBlock(blockElement);
             !this.elementIsVisibleInViewport(blockElement, true) &&
               blockElement.scrollIntoView({ behavior: 'smooth' });
             observer.disconnect();
-            break;
+            return;
           }
         }
       }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    this.blockObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   /**
@@ -705,12 +766,16 @@ class Bridge {
    * @param {Element} blockElement Selected block element
    */
   deselectBlock(prevBlockElement, currBlockElement) {
-    const currBlockUid = currBlockElement.getAttribute('data-block-uid');
+    const currBlockUid = currBlockElement?.getAttribute('data-block-uid');
     if (
       this.selectedBlockUid !== null &&
+      currBlockUid &&
       this.selectedBlockUid !== currBlockUid
     ) {
       this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
+      if (this.blockObserver) {
+        this.blockObserver.disconnect();
+      }
       if (this.addButton) {
         this.addButton.remove();
         this.addButton = null;
@@ -747,6 +812,10 @@ class Bridge {
       this.blockTextMutationObserver.disconnect();
       this.blockTextMutationObserver = null;
     }
+    if (this.attributeMutationObserver) {
+      this.attributeMutationObserver.disconnect();
+      this.attributeMutationObserver = null;
+    }
   }
 
   /**
@@ -781,7 +850,7 @@ class Bridge {
 
           if (targetElement && this.isInlineEditing) {
             this.handleTextChangeOnSlate(targetElement);
-          } else {
+          } else if (this.isInlineEditing) {
             const targetElement = mutation.target?.parentElement.closest(
               '[data-editable-field]',
             );
@@ -792,7 +861,9 @@ class Bridge {
         }
       });
     });
-
+    if (this.blockTextMutationObserver) {
+      this.blockTextMutationObserver.disconnect();
+    }
     this.blockTextMutationObserver.observe(blockElement, {
       subtree: true,
       characterData: true,
@@ -812,7 +883,10 @@ class Bridge {
       this.formData.blocks[blockUid][editableField] = target.innerText;
     if (this.formData.blocks[blockUid]['@type'] !== 'slate') {
       window.parent.postMessage(
-        { type: 'INLINE_EDIT_DATA', data: this.formData },
+        {
+          type: 'INLINE_EDIT_DATA',
+          data: this.formData,
+        },
         this.adminOrigin,
       );
     }
@@ -832,7 +906,10 @@ class Bridge {
         closestNode.innerText?.replace(/\n$/, ''),
       );
       // this.resetJsonNodeIds(updatedJson);
-      this.formData.blocks[this.selectedBlockUid] = updatedJson;
+      this.formData.blocks[this.selectedBlockUid] = {
+        ...updatedJson,
+        plaintext: this.currentlySelectedBlock.innerText,
+      };
 
       window.parent.postMessage(
         { type: 'INLINE_EDIT_DATA', data: this.formData },
@@ -854,7 +931,12 @@ class Bridge {
       return json.map((item) => this.updateJsonNode(item, nodeId, newText));
     } else if (typeof json === 'object' && json !== null) {
       if (json.nodeId === parseInt(nodeId, 10)) {
-        json.text = newText;
+        if (json.hasOwnProperty('text')) {
+          json.text = newText;
+        } else {
+          json.children[0].text = newText;
+        }
+        return json;
       }
       for (const key in json) {
         if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
@@ -1105,10 +1187,27 @@ class Bridge {
   // Helper function to unwrap a single formatting element
   unwrapElement(element) {
     const parent = element.parentNode;
+    if (!parent) return; // Handle the case where the element has no parent
+
+    // Store the next sibling of the element before modifying the DOM
+    const nextSibling = element.nextSibling;
+
     while (element.firstChild) {
       parent.insertBefore(element.firstChild, element);
     }
+
+    // Remove the element itself
     parent.removeChild(element);
+
+    // If there was a next sibling, set the selection to the beginning of it
+    if (nextSibling) {
+      const range = document.createRange();
+      range.setStart(nextSibling, 0);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
   }
   sendFormattedHTMLToAdminUI(selection) {
     if (!selection.rangeCount) return; // No selection
@@ -1138,7 +1237,6 @@ class Bridge {
 
     return this.findEditableParent(node.parentNode);
   }
-
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';
@@ -1331,7 +1429,7 @@ export function getTokenFromCookie() {
   if (typeof document === 'undefined') {
     return null;
   }
-  const name = 'auth_token=';
+  const name = 'access_token=';
   const decodedCookie = decodeURIComponent(document.cookie);
   const cookieArray = decodedCookie.split(';');
   for (let i = 0; i < cookieArray.length; i++) {

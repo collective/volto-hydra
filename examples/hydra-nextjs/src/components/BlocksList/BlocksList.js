@@ -8,9 +8,16 @@ const BlocksList = ({ data }) => {
       {data.blocks_layout.items.map((id) => {
         if (data.blocks[id]['@type'] === 'slate') {
           const slateValue = data.blocks[id].value;
+
           return (
             <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
-              <SlateBlock value={slateValue} />
+              <SlateBlock
+                value={
+                  slateValue || [
+                    { nodeId: 1, type: 'p', children: [{ text: '&nbsp;' }] },
+                  ]
+                }
+              />
             </li>
           );
         } else if (data.blocks[id]['@type'] === 'image') {
@@ -52,10 +59,14 @@ const BlocksList = ({ data }) => {
                 {teaserHeadTitle && (
                   <h3 className="teaser-head-title">{teaserHeadTitle}</h3>
                 )}
-                {teaserTitle && <h2 className="teaser-title">{teaserTitle}</h2>}
+                {teaserTitle && (
+                  <h2 className="teaser-title" data-editable-field="title">
+                    {teaserTitle}
+                  </h2>
+                )}
                 {teaserDescription && (
                   <p
-                    data-editable-field="teaser"
+                    data-editable-field="description"
                     className="teaser-description"
                   >
                     {teaserDescription}
