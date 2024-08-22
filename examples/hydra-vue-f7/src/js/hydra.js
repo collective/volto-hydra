@@ -23,8 +23,6 @@ class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.handleBlockFocusIn = null;
-    this.handleBlockFocusOut = null;
     this.isInlineEditing = false;
     this.handleMouseUp = null;
     this.blockObserver = null;
@@ -141,12 +139,72 @@ class Bridge {
       ) {
         if (event.data.type === 'FORM_DATA') {
           if (event.data.data) {
+            this.isInlineEditing = false;
             this.formData = JSON.parse(JSON.stringify(event.data.data));
+            console.log(
+              'data recieved from adminUI',
+              this.formData.blocks[this.selectedBlockUid],
+            );
+
+            // Call the callback first to trigger the re-render
             callback(event.data.data);
+
+            // After the re-render, add the toolbar (if needed)
+            setTimeout(() => {
+              if (this.selectedBlockUid) {
+                // Check if a block is selected
+                const blockElement = document.querySelector(
+                  `[data-block-uid="${this.selectedBlockUid}"]`,
+                );
+                if (
+                  blockElement &&
+                  !blockElement.contains(this.quantaToolbar)
+                ) {
+                  console.log(
+                    'is toolbar inside block already',
+                    blockElement.contains(this.quantaToolbar),
+                  );
+                  // Add border to the currently selected block
+                  blockElement.classList.add('volto-hydra--outline');
+                  let show = { formatBtns: false };
+                  if (
+                    this.formData &&
+                    this.formData.blocks[this.selectedBlockUid] &&
+                    this.formData.blocks[this.selectedBlockUid]['@type'] ===
+                      'slate'
+                  ) {
+                    show.formatBtns = true;
+                  }
+                  if (this.currentlySelectedBlock) {
+                    this.deselectBlock(
+                      this.currentlySelectedBlock,
+                      blockElement,
+                    );
+                  }
+                  this.createQuantaToolbar(this.selectedBlockUid, show);
+                  this.observeBlockTextChanges(blockElement);
+                  const editableField = blockElement.getAttribute(
+                    'data-editable-field',
+                  );
+                  if (editableField === 'value') {
+                    this.makeBlockContentEditable(blockElement);
+                  } else if (editableField !== null) {
+                    blockElement.setAttribute('contenteditable', 'true');
+                  }
+                  const editableChildren = blockElement.querySelectorAll(
+                    '[data-editable-field]',
+                  );
+                  editableChildren.forEach((child) => {
+                    child.setAttribute('contenteditable', 'true');
+                  });
+                }
+              }
+            }, 0); // Use setTimeout to ensure execution after the current call stack
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
         } else if (event.data.type === 'TOGGLE_MARK_DONE') {
+          console.log('toggle mark data rec');
           this.formData = JSON.parse(JSON.stringify(event.data.data));
           callback(event.data.data);
         }
@@ -188,7 +246,9 @@ class Bridge {
     if (this.quantaToolbar) {
       return;
     }
-
+    const blockElement = document.querySelector(
+      `[data-block-uid="${blockUid}"]`,
+    );
     // Create the quantaToolbar
     this.quantaToolbar = document.createElement('div');
     this.quantaToolbar.className = 'volto-hydra-quantaToolbar';
@@ -208,7 +268,7 @@ class Bridge {
         this.adminOrigin,
       );
     };
-    this.currentlySelectedBlock.appendChild(this.addButton);
+    blockElement.appendChild(this.addButton);
 
     // Create the drag button
     const dragButton = document.createElement('button');
@@ -221,12 +281,12 @@ class Bridge {
       e.preventDefault();
       document.querySelector('body').classList.add('grabbing');
       // Create a copy of the block
-      const draggedBlock = this.currentlySelectedBlock.cloneNode(true);
+      const draggedBlock = blockElement.cloneNode(true);
       draggedBlock.classList.add('dragging');
       document.body.appendChild(draggedBlock);
 
       // Position the copy under the cursor
-      const rect = this.currentlySelectedBlock.getBoundingClientRect();
+      const rect = blockElement.getBoundingClientRect();
       draggedBlock.style.width = `${rect.width}px`;
       draggedBlock.style.height = `${rect.height}px`;
       draggedBlock.style.left = `${e.clientX}px`;
@@ -330,8 +390,7 @@ class Bridge {
         clearTimeout(startYTimeout);
         draggedBlock.remove();
         if (closestBlockUid) {
-          const draggedBlockId =
-            this.currentlySelectedBlock.getAttribute('data-block-uid');
+          const draggedBlockId = blockElement.getAttribute('data-block-uid');
 
           const blocks_layout = this.formData.blocks_layout.items;
           const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
@@ -491,10 +550,7 @@ class Bridge {
           handleSelectionChange();
         }
       };
-      this.currentlySelectedBlock.addEventListener(
-        'mouseup',
-        this.handleMouseUp,
-      );
+      blockElement.addEventListener('mouseup', this.handleMouseUp);
     }
 
     // Create the three-dot menu button
@@ -550,7 +606,7 @@ class Bridge {
     this.quantaToolbar.appendChild(dropdownMenu);
 
     // Append the quantaToolbar to the currently selected block
-    this.currentlySelectedBlock.appendChild(this.quantaToolbar);
+    blockElement.appendChild(this.quantaToolbar);
   }
 
   /**
@@ -559,6 +615,7 @@ class Bridge {
    */
   selectBlock(blockElement) {
     if (!blockElement) return;
+    this.isInlineEditing = true;
     // Remove border and button from the previously selected block
     if (this.currentlySelectedBlock) {
       this.deselectBlock(this.currentlySelectedBlock, blockElement);
@@ -567,23 +624,6 @@ class Bridge {
       this.currentlySelectedBlock === null ||
       this.currentlySelectedBlock !== blockElement
     ) {
-      this.isInlineEditing = true;
-      this.handleBlockFocusOut = (e) => {
-        // console.log("focus out");
-        window.parent.postMessage(
-          { type: 'INLINE_EDIT_EXIT' },
-          this.adminOrigin,
-        );
-        this.isInlineEditing = false;
-      };
-      this.handleBlockFocusIn = (e) => {
-        this.isInlineEditing = true;
-      };
-      // Add focus in event listener
-      blockElement.addEventListener('focusout', this.handleBlockFocusOut);
-
-      blockElement.addEventListener('focusin', this.handleBlockFocusIn);
-
       // Helper function to handle each element
       const handleElement = (element) => {
         const editableField = element.getAttribute('data-editable-field');
@@ -604,6 +644,8 @@ class Bridge {
 
       const blockUid = blockElement.getAttribute('data-block-uid');
       this.selectedBlockUid = blockUid;
+      // Set the currently selected block
+      this.currentlySelectedBlock = blockElement;
 
       let show = { formatBtns: false };
       // if the block is a slate block, add nodeIds to the block's data
@@ -620,23 +662,24 @@ class Bridge {
           window.location.origin,
         );
         window.parent.postMessage(
-          { type: 'INLINE_EDIT_DATA', data: this.formData },
+          {
+            type: 'INLINE_EDIT_DATA',
+            data: this.formData,
+            from: 'selectBlock',
+          },
           this.adminOrigin,
         );
-        window.parent.postMessage(
-          { type: 'INLINE_EDIT_EXIT' },
-          this.adminOrigin,
-        );
+      } else {
+        // Add border to the currently selected block
+        this.currentlySelectedBlock.classList.add('volto-hydra--outline');
+        this.createQuantaToolbar(this.selectedBlockUid, show);
+        console.log('added toolbar on non slate');
       }
       handleElementAndChildren(blockElement);
-      // Set the currently selected block
-      this.currentlySelectedBlock = blockElement;
-      // Add border to the currently selected block
-      this.currentlySelectedBlock.classList.add('volto-hydra--outline');
 
-      if (this.formData) {
-        this.createQuantaToolbar(blockUid, show);
-      }
+      // if (this.formData) {
+      //   this.createQuantaToolbar(blockUid, show);
+      // }
 
       if (!this.clickOnBtn) {
         window.parent.postMessage(
@@ -665,6 +708,23 @@ class Bridge {
         event.data.type === 'SELECT_BLOCK'
       ) {
         const { uid } = event.data;
+        this.selectedBlockUid = uid;
+        this.formData = JSON.parse(JSON.stringify(event.data.data));
+        if (
+          this.selectedBlockUid &&
+          this.formData.blocks[this.selectedBlockUid]['@type'] === 'slate' &&
+          typeof this.formData.blocks[this.selectedBlockUid].nodeId ===
+            'undefined'
+        ) {
+          this.formData.blocks[this.selectedBlockUid] = this.addNodeIds(
+            this.formData.blocks[this.selectedBlockUid],
+          );
+          window.postMessage(
+            { type: 'FORM_DATA', data: this.formData },
+            window.location.origin,
+          );
+        }
+        this.isInlineEditing = true;
         this.observeForBlock(uid);
       }
     };
@@ -701,8 +761,10 @@ class Bridge {
             `[data-block-uid="${uid}"]`,
           );
 
-          if (blockElement) {
+          if (blockElement && this.isInlineEditing) {
             this.selectBlock(blockElement);
+            console.log('oberveeeeeeeee');
+
             !this.elementIsVisibleInViewport(blockElement, true) &&
               blockElement.scrollIntoView({ behavior: 'smooth' });
             observer.disconnect();
@@ -768,10 +830,13 @@ class Bridge {
    */
   deselectBlock(prevBlockElement, currBlockElement) {
     const currBlockUid = currBlockElement?.getAttribute('data-block-uid');
+    const prevBlockUid = prevBlockElement?.getAttribute('data-block-uid');
+    console.log('delesecet', prevBlockElement);
+
     if (
-      this.selectedBlockUid !== null &&
+      prevBlockUid !== null &&
       currBlockUid &&
-      this.selectedBlockUid !== currBlockUid
+      prevBlockUid !== currBlockUid
     ) {
       this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
       if (this.blockObserver) {
@@ -798,14 +863,6 @@ class Bridge {
 
       // Clean up JSON structure
       // if (this.formData.blocks[this.selectedBlockUid]["@type"] === "slate") this.resetJsonNodeIds(this.formData.blocks[this.selectedBlockUid]);
-
-      // Remove focus out event listener
-      prevBlockElement.removeEventListener(
-        'focusout',
-        this.handleBlockFocusOut,
-      );
-      // Remove focus in event listener
-      prevBlockElement.removeEventListener('focusin', this.handleBlockFocusIn);
     }
     document.removeEventListener('mouseup', this.handleMouseUp);
     // Disconnect the mutation observer

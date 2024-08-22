@@ -101,12 +101,17 @@ const Iframe = (props) => {
   });
   useEffect(() => {
     const origin = iframeSrc && new URL(iframeSrc).origin;
-    document
-      .getElementById('previewIframe')
-      .contentWindow.postMessage(
-        { type: 'SELECT_BLOCK', uid: selectedBlock, method: 'select' },
-        origin,
-      );
+    console.log('selectedBlock', selectedBlock);
+
+    document.getElementById('previewIframe').contentWindow.postMessage(
+      {
+        type: 'SELECT_BLOCK',
+        uid: selectedBlock,
+        method: 'select',
+        data: form,
+      },
+      origin,
+    );
   }, [selectedBlock]);
   //-------------------------
 
@@ -223,6 +228,9 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
+          console.log('INLINE_EDIT_DATA is triggered, true', event.data?.from);
+
+          // console.log('INLINE_EDIT_DATA is triggered, true');
           onChangeFormData(event.data.data);
           break;
 
@@ -305,6 +313,7 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
+    console.log('isInlineEditingRef.current', isInlineEditingRef.current);
     if (
       !isInlineEditingRef.current &&
       form &&
@@ -318,6 +327,33 @@ const Iframe = (props) => {
         .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, origin);
     }
   }, [form, iframeSrc]);
+
+  const sidebarFocusEventListenerRef = useRef(null);
+
+  useEffect(() => {
+    const handleFocus = (event) => {
+      isInlineEditingRef.current = false;
+      // console.log(
+      //   'Sidebar or its child element focused!',
+      //   isInlineEditingRef.current,
+      // );
+    };
+    sidebarFocusEventListenerRef.current = handleFocus;
+    const sidebarElement = document.getElementById('sidebar');
+    sidebarElement.addEventListener('focus', handleFocus, true);
+
+    // Cleanup on component unmount
+    return () => {
+      // ... (your other cleanup code)
+      if (sidebarElement && sidebarFocusEventListenerRef.current) {
+        sidebarElement.removeEventListener(
+          'focus',
+          sidebarFocusEventListenerRef.current,
+          true,
+        );
+      }
+    };
+  }, []);
 
   return (
     <div id="iframeContainer">
@@ -341,6 +377,7 @@ const Iframe = (props) => {
                 onInsertBlock
                   ? (id, value) => {
                       setAddNewBlockOpened(false);
+                      isInlineEditingRef.current = false;
                       const newId = onInsertBlock(id, value);
                       onSelectBlock(newId);
                       setAddNewBlockOpened(false);
