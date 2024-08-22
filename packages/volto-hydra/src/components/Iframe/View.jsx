@@ -103,15 +103,16 @@ const Iframe = (props) => {
     const origin = iframeSrc && new URL(iframeSrc).origin;
     console.log('selectedBlock', selectedBlock);
 
-    document.getElementById('previewIframe').contentWindow.postMessage(
-      {
-        type: 'SELECT_BLOCK',
-        uid: selectedBlock,
-        method: 'select',
-        data: form,
-      },
-      origin,
-    );
+    !isInlineEditingRef.current &&
+      document.getElementById('previewIframe').contentWindow.postMessage(
+        {
+          type: 'SELECT_BLOCK',
+          uid: selectedBlock,
+          method: 'select',
+          data: form,
+        },
+        origin,
+      );
   }, [selectedBlock]);
   //-------------------------
 
@@ -136,7 +137,7 @@ const Iframe = (props) => {
     if (value?.['@type'] === 'slate') {
       value = {
         ...value,
-        value: [{ type: 'p', children: [{ text: '' }] }],
+        value: [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }],
       };
     }
     const [newId, newFormData] = insertBlock(
@@ -171,10 +172,9 @@ const Iframe = (props) => {
     const onDeleteBlock = (id, selectPrev) => {
       const previous = previousBlockId(properties, id);
       const newFormData = deleteBlock(properties, id);
+      isInlineEditingRef.current = false;
       onChangeFormData(newFormData);
-
       onSelectBlock(selectPrev ? previous : null);
-      onSelectBlock(previous);
       setAddNewBlockOpened(false);
       dispatch(setSidebarTab(1));
     };
@@ -331,23 +331,24 @@ const Iframe = (props) => {
   const sidebarFocusEventListenerRef = useRef(null);
 
   useEffect(() => {
-    const handleFocus = (event) => {
+    const handleMouseHover = (e) => {
+      e.stopPropagation();
       isInlineEditingRef.current = false;
       // console.log(
       //   'Sidebar or its child element focused!',
       //   isInlineEditingRef.current,
       // );
     };
-    sidebarFocusEventListenerRef.current = handleFocus;
+    sidebarFocusEventListenerRef.current = handleMouseHover;
     const sidebarElement = document.getElementById('sidebar');
-    sidebarElement.addEventListener('focus', handleFocus, true);
+    sidebarElement.addEventListener('mouseover', handleMouseHover, true);
 
     // Cleanup on component unmount
     return () => {
       // ... (your other cleanup code)
       if (sidebarElement && sidebarFocusEventListenerRef.current) {
         sidebarElement.removeEventListener(
-          'focus',
+          'mouseover',
           sidebarFocusEventListenerRef.current,
           true,
         );

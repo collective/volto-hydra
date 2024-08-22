@@ -13,6 +13,7 @@ class Bridge {
     this.blockClickHandler = null; // Handler for block click events
     this.selectBlockHandler = null; // Handler for select block events
     this.currentlySelectedBlock = null;
+    this.prevSelectedBlock = null;
     this.addButton = null;
     this.deleteButton = null;
     this.clickOnBtn = false;
@@ -119,7 +120,11 @@ class Bridge {
             if (e.data.type === 'INITIAL_DATA') {
               this.formData = JSON.parse(JSON.stringify(e.data.data));
               window.postMessage(
-                { type: 'FORM_DATA', data: this.formData },
+                {
+                  type: 'FORM_DATA',
+                  data: this.formData,
+                  sender: 'hydrajs-initial',
+                },
                 window.location.origin,
               );
             }
@@ -137,12 +142,16 @@ class Bridge {
         event.origin === this.adminOrigin ||
         event.origin === window.location.origin
       ) {
-        if (event.data.type === 'FORM_DATA') {
+        if (
+          event.data.type === 'FORM_DATA' ||
+          event.data.type === 'TOGGLE_MARK_DONE'
+        ) {
           if (event.data.data) {
             this.isInlineEditing = false;
             this.formData = JSON.parse(JSON.stringify(event.data.data));
             console.log(
               'data recieved from adminUI',
+              event.data?.sender,
               this.formData.blocks[this.selectedBlockUid],
             );
 
@@ -156,14 +165,14 @@ class Bridge {
                 const blockElement = document.querySelector(
                   `[data-block-uid="${this.selectedBlockUid}"]`,
                 );
-                if (
-                  blockElement &&
-                  !blockElement.contains(this.quantaToolbar)
-                ) {
-                  console.log(
-                    'is toolbar inside block already',
-                    blockElement.contains(this.quantaToolbar),
-                  );
+                const isToolbarPresent = blockElement?.contains(
+                  this.quantaToolbar,
+                );
+                console.log(
+                  'is toolbar inside block already',
+                  isToolbarPresent,
+                );
+                if (blockElement && !isToolbarPresent) {
                   // Add border to the currently selected block
                   blockElement.classList.add('volto-hydra--outline');
                   let show = { formatBtns: false };
@@ -175,14 +184,13 @@ class Bridge {
                   ) {
                     show.formatBtns = true;
                   }
-                  if (this.currentlySelectedBlock) {
+                  this.prevSelectedBlock &&
                     this.deselectBlock(
-                      this.currentlySelectedBlock,
-                      blockElement,
+                      this.prevSelectedBlock.getAttribute('data-block-uid'),
+                      this.selectedBlockUid,
                     );
-                  }
+                  this.quantaToolbar = null;
                   this.createQuantaToolbar(this.selectedBlockUid, show);
-                  this.observeBlockTextChanges(blockElement);
                   const editableField = blockElement.getAttribute(
                     'data-editable-field',
                   );
@@ -197,16 +205,14 @@ class Bridge {
                   editableChildren.forEach((child) => {
                     child.setAttribute('contenteditable', 'true');
                   });
+                  this.prevSelectedBlock = blockElement;
+                  this.observeBlockTextChanges(blockElement);
                 }
               }
             }, 0); // Use setTimeout to ensure execution after the current call stack
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
-        } else if (event.data.type === 'TOGGLE_MARK_DONE') {
-          console.log('toggle mark data rec');
-          this.formData = JSON.parse(JSON.stringify(event.data.data));
-          callback(event.data.data);
         }
       }
     };
@@ -242,6 +248,8 @@ class Bridge {
   }
 
   createQuantaToolbar(blockUid, show = { formatBtns: true }) {
+    console.log('toolbar creation, already exists?:', this.quantaToolbar);
+
     // Check if the toolbar already exists
     if (this.quantaToolbar) {
       return;
@@ -617,13 +625,17 @@ class Bridge {
     if (!blockElement) return;
     this.isInlineEditing = true;
     // Remove border and button from the previously selected block
-    if (this.currentlySelectedBlock) {
-      this.deselectBlock(this.currentlySelectedBlock, blockElement);
-    }
     if (
-      this.currentlySelectedBlock === null ||
-      this.currentlySelectedBlock !== blockElement
+      this.prevSelectedBlock === null ||
+      this.prevSelectedBlock?.getAttribute('data-block-uid') !==
+        blockElement?.getAttribute('data-block-uid')
     ) {
+      if (this.currentlySelectedBlock) {
+        this.deselectBlock(
+          this.currentlySelectedBlock?.getAttribute('data-block-uid'),
+          blockElement?.getAttribute('data-block-uid'),
+        );
+      }
       // Helper function to handle each element
       const handleElement = (element) => {
         const editableField = element.getAttribute('data-editable-field');
@@ -645,7 +657,6 @@ class Bridge {
       const blockUid = blockElement.getAttribute('data-block-uid');
       this.selectedBlockUid = blockUid;
       // Set the currently selected block
-      this.currentlySelectedBlock = blockElement;
 
       let show = { formatBtns: false };
       // if the block is a slate block, add nodeIds to the block's data
@@ -658,7 +669,7 @@ class Bridge {
           this.formData.blocks[blockUid],
         );
         window.postMessage(
-          { type: 'FORM_DATA', data: this.formData },
+          { type: 'FORM_DATA', data: this.formData, sender: 'hydrajs-nodeids' },
           window.location.origin,
         );
         window.parent.postMessage(
@@ -671,7 +682,7 @@ class Bridge {
         );
       } else {
         // Add border to the currently selected block
-        this.currentlySelectedBlock.classList.add('volto-hydra--outline');
+        blockElement.classList.add('volto-hydra--outline');
         this.createQuantaToolbar(this.selectedBlockUid, show);
         console.log('added toolbar on non slate');
       }
@@ -680,7 +691,8 @@ class Bridge {
       // if (this.formData) {
       //   this.createQuantaToolbar(blockUid, show);
       // }
-
+      this.currentlySelectedBlock = blockElement;
+      this.prevSelectedBlock = blockElement;
       if (!this.clickOnBtn) {
         window.parent.postMessage(
           { type: 'OPEN_SETTINGS', uid: blockUid },
@@ -719,13 +731,19 @@ class Bridge {
           this.formData.blocks[this.selectedBlockUid] = this.addNodeIds(
             this.formData.blocks[this.selectedBlockUid],
           );
-          window.postMessage(
-            { type: 'FORM_DATA', data: this.formData },
-            window.location.origin,
-          );
         }
-        this.isInlineEditing = true;
-        this.observeForBlock(uid);
+        window.postMessage(
+          {
+            type: 'FORM_DATA',
+            data: this.formData,
+            sender: 'hydrajs-select',
+          },
+          window.location.origin,
+        );
+        // console.log("select block", event.data?.method);
+
+        // this.isInlineEditing = true;
+        // this.observeForBlock(uid);
       }
     };
 
@@ -786,7 +804,7 @@ class Bridge {
    */
   makeBlockContentEditable(blockElement) {
     blockElement.setAttribute('contenteditable', 'true');
-    const childNodes = blockElement.querySelectorAll('[data-hydra-node]');
+    const childNodes = blockElement.querySelectorAll('[data-node-id]');
     childNodes.forEach((node) => {
       node.setAttribute('contenteditable', 'true');
     });
@@ -828,17 +846,19 @@ class Bridge {
    * Reset the block's listeners, mutation observer and remove the nodeIds from the block's data
    * @param {Element} blockElement Selected block element
    */
-  deselectBlock(prevBlockElement, currBlockElement) {
-    const currBlockUid = currBlockElement?.getAttribute('data-block-uid');
-    const prevBlockUid = prevBlockElement?.getAttribute('data-block-uid');
+  deselectBlock(prevBlockUid, currBlockUid) {
+    const prevBlockElement = document.querySelector(
+      `[data-block-uid="${prevBlockUid}"]`,
+    );
     console.log('delesecet', prevBlockElement);
 
     if (
       prevBlockUid !== null &&
       currBlockUid &&
-      prevBlockUid !== currBlockUid
+      prevBlockUid !== currBlockUid &&
+      prevBlockElement
     ) {
-      this.currentlySelectedBlock.classList.remove('volto-hydra--outline');
+      prevBlockElement.classList.remove('volto-hydra--outline');
       if (this.blockObserver) {
         this.blockObserver.disconnect();
       }
@@ -856,7 +876,7 @@ class Bridge {
       }
       // Remove contenteditable attribute
       prevBlockElement.removeAttribute('contenteditable');
-      const childNodes = prevBlockElement.querySelectorAll('[data-hydra-node]');
+      const childNodes = prevBlockElement.querySelectorAll('[data-node-id]');
       childNodes.forEach((node) => {
         node.removeAttribute('contenteditable');
       });
@@ -900,14 +920,21 @@ class Bridge {
    * @param {Element} blockElement Selected block element
    */
   observeBlockTextChanges(blockElement) {
+    if (this.blockTextMutationObserver) {
+      this.blockTextMutationObserver.disconnect();
+    }
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === 'characterData') {
           const targetElement =
-            mutation.target?.parentElement.closest('[data-hydra-node]');
+            mutation.target?.parentElement.closest('[data-node-id]');
 
           if (targetElement && this.isInlineEditing) {
             this.handleTextChangeOnSlate(targetElement);
+            console.log(
+              'observing text changes if inline edit is true',
+              this.isInlineEditing,
+            );
           } else if (this.isInlineEditing) {
             const targetElement = mutation.target?.parentElement.closest(
               '[data-editable-field]',
@@ -919,9 +946,6 @@ class Bridge {
         }
       });
     });
-    if (this.blockTextMutationObserver) {
-      this.blockTextMutationObserver.disconnect();
-    }
     this.blockTextMutationObserver.observe(blockElement, {
       subtree: true,
       characterData: true,
@@ -944,6 +968,7 @@ class Bridge {
         {
           type: 'INLINE_EDIT_DATA',
           data: this.formData,
+          from: 'textChange',
         },
         this.adminOrigin,
       );
@@ -955,22 +980,29 @@ class Bridge {
    * @param {Element} target
    */
   handleTextChangeOnSlate(target) {
-    const closestNode = target.closest('[data-hydra-node]');
+    const closestNode = target.closest('[data-node-id]');
     if (closestNode) {
-      const nodeId = closestNode.getAttribute('data-hydra-node');
+      const nodeId = closestNode.getAttribute('data-node-id');
       const updatedJson = this.updateJsonNode(
         this.formData?.blocks[this.selectedBlockUid],
         nodeId,
         closestNode.innerText?.replace(/\n$/, ''),
       );
       // this.resetJsonNodeIds(updatedJson);
+      const currBlock = document.querySelector(
+        `[data-block-uid="${this.selectedBlockUid}"]`,
+      );
       this.formData.blocks[this.selectedBlockUid] = {
         ...updatedJson,
-        plaintext: this.currentlySelectedBlock.innerText,
+        plaintext: currBlock.innerText,
       };
 
       window.parent.postMessage(
-        { type: 'INLINE_EDIT_DATA', data: this.formData },
+        {
+          type: 'INLINE_EDIT_DATA',
+          data: this.formData,
+          from: 'textChangeSlate',
+        },
         this.adminOrigin,
       );
 
@@ -1289,7 +1321,7 @@ class Bridge {
   findEditableParent(node) {
     if (!node || node === document) return null; // Reached the top without finding
 
-    if (node.dataset && node.dataset.editableField === 'value') {
+    if (node.dataset && node.dataset.nodeId === '1') {
       return node;
     }
 
@@ -1368,6 +1400,8 @@ class Bridge {
           border-radius: 5px;
           margin: 1px;
           display: none;
+          height: 32px;
+          width: 32px;
         }
         .volto-hydra-format-button.show {
           display: block !important;
@@ -1425,6 +1459,7 @@ class Bridge {
           cursor: pointer;
           transition: background 0.2s;
           height: 40px;
+          box-sizing: border-box;
         }
         .volto-hydra-dropdown-text {
           font-size: 15px;
