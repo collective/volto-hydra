@@ -538,9 +538,23 @@ class Bridge {
         submitBtn.innerHTML = linkSubmitSVG;
         submitBtn.addEventListener('click', () => {
           const url = inputField.value;
-          const link = document.createElement('a');
-          link.href = url;
-          range.surroundContents(link);
+          if (!currentFormats['link'].present) {
+            const link = document.createElement('a');
+            link.href = url;
+            range.surroundContents(link);
+          } else {
+            if (currentFormats['link'].enclosing)
+              range.commonAncestorContainer.parentNode.closest('a').href = url;
+            else {
+              const children = commonAncestor.children;
+              for (let i = 0; i < children.length; i++) {
+                if (children[i].tagName === 'A') {
+                  children[i].href = url;
+                  break;
+                }
+              }
+            }
+          }
           this.isInlineEditing = false;
           const editableParent = this.findEditableParent(commonAncestor);
           const htmlString = editableParent?.outerHTML;
@@ -1602,6 +1616,8 @@ class Bridge {
           cursor: pointer;
           border-radius: 8px;
           margin-right: 2px
+          display: flex;
+          align-items: center;
         }
         .link-folder-btn:hover,
         .link-submit-btn:hover,
