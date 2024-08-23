@@ -499,9 +499,18 @@ class Bridge {
         const container = document.createElement('div');
         container.classList.add('link-input-container');
 
+        const isValidURL = (url) => {
+          try {
+            new URL(url);
+            return true;
+          } catch (e) {
+            return false;
+          }
+        };
+
         const inputField = document.createElement('input');
         inputField.classList.add('link-input');
-        inputField.type = 'text';
+        inputField.type = 'url';
         inputField.placeholder = 'Type a URL...';
         inputField.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
@@ -521,6 +530,13 @@ class Bridge {
         });
         inputField.addEventListener('input', (e) => {
           const currentValue = e.target.value;
+          if (isValidURL(currentValue)) {
+            container.classList.remove('link-invalid-url');
+            submitBtn.disabled = false;
+          } else {
+            container.classList.add('link-invalid-url');
+            submitBtn.disabled = true;
+          }
           if (currentValue === '') {
             submitBtn.classList.add('hide');
             cancelBtn.classList.remove('hide');
@@ -604,15 +620,9 @@ class Bridge {
               }
             }
           }
+        } else {
+          container.classList.add('link-invalid-url');
         }
-
-        // const buttonRect = linkButton.getBoundingClientRect();
-        // container.style.position = "absolute";
-        // container.style.top = `${
-        //   buttonRect.top - container.top - 5
-        // }px`; // 5px gap above the button (UI later)
-        // container.style.left = `${buttonRect.left}px`;
-
         // Append the container to the link button's parent
         linkButton.parentNode.appendChild(container);
         inputField.focus();
@@ -1584,6 +1594,7 @@ class Bridge {
           display: flex;
           background: white;
           box-shadow: 3px 3px 10px rgb(0 0 0 / 53%);
+          border: 1px solid #00ff00;
           border-radius: 6px;
           z-index: 10;
           align-items: center;
@@ -1605,6 +1616,9 @@ class Bridge {
         }
         .link-input::placeholder {
           color: #0B78D0;
+        }
+        .link-invalid-url {
+          border: 1px solid red;
         }
         .link-folder-btn,
         .link-submit-btn,
