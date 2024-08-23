@@ -2,7 +2,7 @@ import { jsx } from 'slate-hyperscript';
 import addNodeIds from './addNodeIds';
 
 const deserialize = (el, markAttributes = {}) => {
-  if (el.nodeType === Node.TEXT_NODE) {
+  if (el.nodeType === Node.TEXT_NODE && !!el.textContent.trim()) {
     return jsx('text', markAttributes, el.textContent);
   } else if (el.nodeType !== Node.ELEMENT_NODE) {
     return null;
