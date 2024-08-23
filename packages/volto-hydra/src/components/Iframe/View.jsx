@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
@@ -100,11 +100,18 @@ const Iframe = (props) => {
     ],
   });
   useEffect(() => {
-    document
-      .getElementById('previewIframe')
-      .contentWindow.postMessage(
-        { type: 'SELECT_BLOCK', uid: selectedBlock },
-        '*',
+    const origin = iframeSrc && new URL(iframeSrc).origin;
+    console.log('selectedBlock', selectedBlock);
+
+    !isInlineEditingRef.current &&
+      document.getElementById('previewIframe').contentWindow.postMessage(
+        {
+          type: 'SELECT_BLOCK',
+          uid: selectedBlock,
+          method: 'select',
+          data: form,
+        },
+        origin,
       );
   }, [selectedBlock]);
   //-------------------------
@@ -118,8 +125,6 @@ const Iframe = (props) => {
     urlFromEnv[0];
 
   useEffect(() => {
-    console.log('settinf iframe url with token');
-
     setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
   }, [token, u]);
@@ -130,7 +135,10 @@ const Iframe = (props) => {
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
-      value = { ...value, value: [{ type: 'p', children: [{ text: '' }] }] };
+      value = {
+        ...value,
+        value: [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }],
+      };
     }
     const [newId, newFormData] = insertBlock(
       properties,
@@ -164,16 +172,11 @@ const Iframe = (props) => {
     const onDeleteBlock = (id, selectPrev) => {
       const previous = previousBlockId(properties, id);
       const newFormData = deleteBlock(properties, id);
+      isInlineEditingRef.current = false;
       onChangeFormData(newFormData);
-
       onSelectBlock(selectPrev ? previous : null);
-      const origin = new URL(iframeSrc).origin;
-      document
-        .getElementById('previewIframe')
-        .contentWindow.postMessage(
-          { type: 'SELECT_BLOCK', uid: previous },
-          origin,
-        );
+      setAddNewBlockOpened(false);
+      dispatch(setSidebarTab(1));
     };
     //----------------------------------------------
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
@@ -225,10 +228,9 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
-          console.log(
-            'Inline data recieved',
-            event.data.data?.blocks[selectedBlock],
-          );
+          console.log('INLINE_EDIT_DATA is triggered, true', event.data?.from);
+
+          // console.log('INLINE_EDIT_DATA is triggered, true');
           onChangeFormData(event.data.data);
           break;
 
@@ -273,6 +275,17 @@ const Iframe = (props) => {
           isInlineEditingRef.current = false;
           onChangeFormData(event.data.data);
           break;
+
+        case 'GET_INITIAL_DATA':
+          event.source.postMessage(
+            {
+              type: 'INITIAL_DATA',
+              data: form,
+            },
+            event.origin,
+          );
+          break;
+
         default:
           break;
       }
@@ -300,7 +313,7 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    // console.log('form data changed', form?.blocks[selectedBlock]);
+    console.log('isInlineEditingRef.current', isInlineEditingRef.current);
     if (
       !isInlineEditingRef.current &&
       form &&
@@ -314,6 +327,34 @@ const Iframe = (props) => {
         .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, origin);
     }
   }, [form, iframeSrc]);
+
+  const sidebarFocusEventListenerRef = useRef(null);
+
+  useEffect(() => {
+    const handleMouseHover = (e) => {
+      e.stopPropagation();
+      isInlineEditingRef.current = false;
+      // console.log(
+      //   'Sidebar or its child element focused!',
+      //   isInlineEditingRef.current,
+      // );
+    };
+    sidebarFocusEventListenerRef.current = handleMouseHover;
+    const sidebarElement = document.getElementById('sidebar');
+    sidebarElement.addEventListener('mouseover', handleMouseHover, true);
+
+    // Cleanup on component unmount
+    return () => {
+      // ... (your other cleanup code)
+      if (sidebarElement && sidebarFocusEventListenerRef.current) {
+        sidebarElement.removeEventListener(
+          'mouseover',
+          sidebarFocusEventListenerRef.current,
+          true,
+        );
+      }
+    };
+  }, []);
 
   return (
     <div id="iframeContainer">
@@ -337,17 +378,11 @@ const Iframe = (props) => {
                 onInsertBlock
                   ? (id, value) => {
                       setAddNewBlockOpened(false);
+                      isInlineEditingRef.current = false;
                       const newId = onInsertBlock(id, value);
-                      const origin = new URL(iframeSrc).origin;
-                      document
-                        .getElementById('previewIframe')
-                        .contentWindow.postMessage(
-                          {
-                            type: 'SELECT_BLOCK',
-                            uid: newId,
-                          },
-                          origin,
-                        );
+                      onSelectBlock(newId);
+                      setAddNewBlockOpened(false);
+                      dispatch(setSidebarTab(1));
                     }
                   : null
               }

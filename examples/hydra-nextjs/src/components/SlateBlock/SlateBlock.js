@@ -1,56 +1,69 @@
 'use client';
-import React from 'react';
-import { createEditor } from 'slate';
-import { Slate, Editable, withReact } from 'slate-react';
-import { withHistory } from 'slate-history';
 
-const SlateBlock = ({ value }) => {
-  const editor = React.useMemo(
-    () => withReact(withHistory(createEditor())),
-    [],
-  );
-  const renderElement = ({ attributes, children, element }) => {
-    if (element.type === 'link') {
+import { useEffect, useState } from 'react';
+
+/**
+ * Serializes Slate JSON into JSX elements
+ * @param {Array} value - The Slate JSON value (array of nodes)
+ * @returns {Array} - An array of JSX elements
+ */
+function serializeSlateJSON(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value?.map(serializeNode);
+}
+
+/**
+ * Recursively serializes a single Slate node into a JSX element
+ * @param {Object} node - The Slate node object
+ * @returns {JSX.Element} - The JSX representation of the node
+ */
+function serializeNode(node) {
+  if (!node) {
+    return null;
+  }
+  if (node.text !== undefined) {
+    return node.text !== '' ? (
+      <span data-hydra-node={`${node?.nodeId}`}>{node.text}</span>
+    ) : (
+      <span data-hydra-node={`${node?.nodeId}`}>&#xFEFF;</span>
+    );
+  }
+
+  const children = node.children ? node.children.map(serializeNode) : null;
+
+  const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
+  switch (node.type) {
+    case 'link':
       return (
-        <a
-          href={element.data.url}
-          {...attributes}
-          data-hydra-node={`${element?.nodeId}`}
-        >
+        <a key={uid} href={node.data.url} data-hydra-node={`${node?.nodeId}`}>
           {children}
         </a>
       );
-    }
 
-    const Tag = element.type;
-    return (
-      <Tag {...attributes} data-hydra-node={`${element?.nodeId}`}>
-        {children}
-      </Tag>
-    );
-  };
+    default:
+      const Tag = node.type;
+      if (Tag)
+        return (
+          <Tag key={uid} data-hydra-node={`${node?.nodeId}`}>
+            {children}
+          </Tag>
+        );
+      else return null;
+  }
+}
 
-  const renderLeaf = ({ attributes, children }) => {
-    return (
-      <span {...attributes} data-hydra-node={`${children.props.leaf?.nodeId}`}>
-        {children}
-      </span>
-    );
-  };
-
-  const initialValue = value || [{ type: 'p', children: [{ text: '' }] }];
-  editor.children = initialValue;
+export default function SlateBlock({ value }) {
+  const [slateValue, setSlateValue] = useState(value);
+  const elements = serializeSlateJSON(slateValue);
+  useEffect(() => {
+    setSlateValue(value);
+  }, [value]);
+  const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
   return (
-    <div data-editable-field="value">
-      <Slate editor={editor} initialValue={initialValue}>
-        <Editable
-          renderElement={renderElement}
-          renderLeaf={renderLeaf}
-          readOnly
-        />
-      </Slate>
+    <div key={uid} data-editable-field="value">
+      {elements}
     </div>
   );
-};
-
-export default SlateBlock;
+}
