@@ -187,7 +187,6 @@ Now an editor can :-
 - click directly on your block on the frontend preview to select it and edit the block settings in the sidebar. 
    - The block will be highlighted and a toolbar (called the quanta toolbar) will appear above it.
 - selecting a block in the sidebar will highlight that block on the frontend
-- naviate to the parent block ([TODO](https://github.com/collective/volto-hydra/issues/66)) 
 
 If are using a 3rd party library to render a block, then you might not be able to easily modify the markup 
 to put in the ```data-block-uid```. Instead you can use an alternative 
@@ -277,12 +276,20 @@ but if you wanted to allow many columns each with many blocks inside you can use
 - The allowed block types for a given container can be overridden in the hydra settings at initilisation.
 - The first of the allowed blocks is the default block. In the case where the only remaining block is deleted, a new empty default
   block will be created in it's place so that a container is never empty.
+  - if you want to allow choice of the first block then a chooser block can be the default (TODO)
 - The orientation tells hydra where to place the add button and DND drop markers.
 - if there is a maximum number of blocks a container can hold then specify it in the data attribute ```data-block-container-horizontal="blocks,4"```
 - it might be that a container has more than area to add blocks. In which case you use a different field prefix, e.g. ```data-block-container-horizontal="left"```. 
   This will put the blocks into a dict in the field ```left``` and the order in a list in ```left_layout```.
-- if it is hard to select a container using the mouse then the quanta toolbar provides a "up" button to select the container of the current block. On mobile a single press
-  selects the container and a double press selects the sub-block.  
+
+Now an editor can do the following on a container such as the Grid Block:
+- Add a new sub-block visually on the frontend
+- Use enter on a rich text block to add a sub-block
+- remove blocks from a container
+- DND blocks in and out of containers or to reorder them
+- if it is hard to select a container using the mouse then the quanta toolbar provides a "up" action ([TODO](https://github.com/collective/volto-hydra/issues/66))  
+  to select the container of the current block. On mobile a single press
+  selects the container and a double press selects the sub-block. 
 
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
@@ -306,10 +313,11 @@ by adding ```data-editable-field="title"``` to the html element that contains th
 </div>
 ```
 
-If the text comes from the metadata and not a block then use ```data-editable-metdata``` ([TODO](https://github.com/collective/volto-hydra/issues/118))
+If the text comes from the metadata and not a block then use ```data-editable-metdata``` ([TODO](https://github.com/collective/volto-hydra/issues/118)).
+- Note: ```data-editable-metadata``` isn't required to be inside a block so can make fixed parts of the page editable.
 
 ``` html
-<h2 data-editable-metdata="title">My </h2>
+<h2 data-editable-metdata="title">My Title</h2>
 ```
 
 
@@ -370,9 +378,11 @@ A slate block is just a special case with a single rich tech editable field
 
 ``` html
 <p data-block-uid="...." data-editable-field="value">
-My Paragraph with <span class="custom" data-node-id="5"><a href="...">a link</a></span>
+My Paragraph with <span class="custom_link" data-node-id="5"><a href="...">a link</a></span>
 </p>
 ```
+
+Note: there is currently a bug where any text also needs to be wrapped in a ```<span data-node-id="...">``` but this will be fixed in the future.
 
 Hydra.js will now adjust the quanta toolbar with formatting buttons.
 
@@ -386,12 +396,13 @@ Now an editor can :-
 - create or edit a rich text link [TODO](https://github.com/collective/volto-hydra/issues/35)
 - apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
 - use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
+- paste rich text from the clipboard (TODO)
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 Additionally your frontend can
 - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
-- specify parts of the text that aren't editable by the user (TODO)
+- specify parts of the text that aren't editable by the user which could be needed for some usecases where style includes text that needs to appear. (TODO)
 
 
 #### Visual media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
