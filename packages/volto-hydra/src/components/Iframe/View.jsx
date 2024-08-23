@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
+import { compose } from 'redux';
 import Cookies from 'js-cookie';
 import {
   applyBlockDefaults,
@@ -24,6 +25,7 @@ import {
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
+import withObjectBrowser from '@plone/volto/components/manage/Sidebar/ObjectBrowser';
 
 const addUrlParams = (url, qParams, pathname) => {
   const newUrl = new URL(url);
@@ -74,6 +76,8 @@ const Iframe = (props) => {
     navRoot,
     type: contentType,
     selectedBlock,
+    openObjectBrowser,
+    closeObjectBrowser,
   } = props;
 
   const dispatch = useDispatch();
@@ -101,7 +105,6 @@ const Iframe = (props) => {
   });
   useEffect(() => {
     const origin = iframeSrc && new URL(iframeSrc).origin;
-    console.log('selectedBlock', selectedBlock);
 
     !isInlineEditingRef.current &&
       document.getElementById('previewIframe').contentWindow.postMessage(
@@ -286,6 +289,26 @@ const Iframe = (props) => {
           );
           break;
 
+        case 'OPEN_OBJECT_BROWSER':
+          openObjectBrowser({
+            mode: event.data.mode,
+            propDataName: 'data',
+            onSelectItem: (item) => {
+              console.log('item', item);
+
+              event.source.postMessage(
+                {
+                  type: 'OBJECT_SELECTED',
+                  path: item,
+                },
+                event.origin,
+              );
+              closeObjectBrowser();
+              isInlineEditingRef.current = true;
+            },
+          });
+          break;
+
         default:
           break;
       }
@@ -299,6 +322,7 @@ const Iframe = (props) => {
       window.removeEventListener('message', messageHandler);
     };
   }, [
+    closeObjectBrowser,
     dispatch,
     form,
     form?.blocks,
@@ -307,6 +331,7 @@ const Iframe = (props) => {
     iframeSrc,
     onChangeFormData,
     onSelectBlock,
+    openObjectBrowser,
     properties,
     selectedBlock,
     token,
@@ -408,4 +433,4 @@ const Iframe = (props) => {
   );
 };
 
-export default Iframe;
+export default compose(withObjectBrowser)(Iframe);

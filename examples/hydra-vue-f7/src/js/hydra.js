@@ -27,6 +27,7 @@ class Bridge {
     this.isInlineEditing = false;
     this.handleMouseUp = null;
     this.blockObserver = null;
+    this.handleObjectBrowserMessage = null;
     this.init(options);
   }
 
@@ -548,6 +549,32 @@ class Bridge {
         const folderBtn = document.createElement('button');
         folderBtn.classList.add('link-folder-btn');
         folderBtn.innerHTML = linkFolderSVG;
+        folderBtn.addEventListener('click', () => {
+          this.handleObjectBrowserMessage = (e) => {
+            console.log('handle broserse mesage', e.data.type);
+
+            if (
+              e.origin === this.adminOrigin &&
+              e.data.type === 'OBJECT_SELECTED'
+            ) {
+              const path = e.data.path;
+              inputField.value = `${window.location.origin}${path}`;
+              submitBtn.click();
+            }
+          };
+          window.removeEventListener(
+            'message',
+            this.handleObjectBrowserMessage,
+          );
+          window.addEventListener('message', this.handleObjectBrowserMessage);
+          window.parent.postMessage(
+            {
+              type: 'OPEN_OBJECT_BROWSER',
+              mode: 'link',
+            },
+            this.adminOrigin,
+          );
+        });
 
         const submitBtn = document.createElement('button');
         submitBtn.classList.add('link-submit-btn', 'hide');
@@ -1014,6 +1041,10 @@ class Bridge {
     if (this.attributeMutationObserver) {
       this.attributeMutationObserver.disconnect();
       this.attributeMutationObserver = null;
+    }
+    if (this.handleObjectBrowserMessage) {
+      window.removeEventListener('message', this.handleObjectBrowserMessage);
+      this.handleObjectBrowserMessage = null;
     }
   }
 
