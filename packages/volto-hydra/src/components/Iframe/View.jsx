@@ -25,7 +25,7 @@ import {
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
-import withObjectBrowser from '@plone/volto/components/manage/Sidebar/ObjectBrowser';
+import OpenObjectBrowser from './OpenObjectBrowser';
 
 const addUrlParams = (url, qParams, pathname) => {
   const newUrl = new URL(url);
@@ -62,7 +62,6 @@ const getUrlWithAdminParams = (url, token) => {
 };
 
 const Iframe = (props) => {
-  // ----Experimental----
   const {
     onSelectBlock,
     properties,
@@ -117,7 +116,6 @@ const Iframe = (props) => {
         origin,
       );
   }, [selectedBlock]);
-  //-------------------------
 
   const isInlineEditingRef = useRef(false);
   const [iframeSrc, setIframeSrc] = useState(null);
@@ -133,7 +131,6 @@ const Iframe = (props) => {
   }, [token, u]);
   const history = useHistory();
 
-  //-----Experimental-----
   const intl = useIntl();
 
   const onInsertBlock = (id, value, current) => {
@@ -168,10 +165,8 @@ const Iframe = (props) => {
     const newFormData = mutateBlock(properties, id, value);
     onChangeFormData(newFormData);
   };
-  //---------------------------
 
   useEffect(() => {
-    //----------------Experimental----------------
     const onDeleteBlock = (id, selectPrev) => {
       const previous = previousBlockId(properties, id);
       const newFormData = deleteBlock(properties, id);
@@ -181,7 +176,7 @@ const Iframe = (props) => {
       setAddNewBlockOpened(false);
       dispatch(setSidebarTab(1));
     };
-    //----------------------------------------------
+
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
@@ -203,7 +198,6 @@ const Iframe = (props) => {
           break;
 
         case 'ADD_BLOCK':
-          //----Experimental----
           setAddNewBlockOpened(true);
           break;
 
@@ -220,20 +214,10 @@ const Iframe = (props) => {
           }
           break;
 
-        // case 'INLINE_EDIT_ENTER':
-        //   isInlineEditingRef.current = true; // Set to true to prevent sending form data to iframe
-        //   const updatedJson = addNodeIds(form.blocks[selectedBlock]);
-        //   onChangeFormData({
-        //     ...form,
-        //     blocks: { ...form.blocks, [selectedBlock]: updatedJson },
-        //   });
-        //   break;
-
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
-          console.log('INLINE_EDIT_DATA is triggered, true', event.data?.from);
+          // console.log('INLINE_EDIT_DATA is triggered, true', event.data?.from);
 
-          // console.log('INLINE_EDIT_DATA is triggered, true');
           onChangeFormData(event.data.data);
           break;
 
@@ -242,7 +226,7 @@ const Iframe = (props) => {
           break;
 
         case 'TOGGLE_MARK':
-          console.log('TOGGLE_BOLD', event.data.html);
+          // console.log('TOGGLE_BOLD', event.data.html);
           isInlineEditingRef.current = true;
           const deserializedHTMLData = toggleMark(event.data.html);
           console.log('deserializedHTMLData', deserializedHTMLData);
@@ -289,25 +273,23 @@ const Iframe = (props) => {
           );
           break;
 
-        case 'OPEN_OBJECT_BROWSER':
-          openObjectBrowser({
-            mode: event.data.mode,
-            propDataName: 'data',
-            onSelectItem: (item) => {
-              console.log('item', item);
-
-              event.source.postMessage(
-                {
-                  type: 'OBJECT_SELECTED',
-                  path: item,
-                },
-                event.origin,
-              );
-              closeObjectBrowser();
-              isInlineEditingRef.current = true;
-            },
-          });
-          break;
+        // case 'OPEN_OBJECT_BROWSER':
+        //   openObjectBrowser({
+        //     mode: event.data.mode,
+        //     propDataName: 'data',
+        //     onSelectItem: (item) => {
+        //       event.source.postMessage(
+        //         {
+        //           type: 'OBJECT_SELECTED',
+        //           path: item,
+        //         },
+        //         event.origin,
+        //       );
+        //       closeObjectBrowser();
+        //       isInlineEditingRef.current = true;
+        //     },
+        //   });
+        //   break;
 
         default:
           break;
@@ -338,7 +320,7 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    console.log('isInlineEditingRef.current', isInlineEditingRef.current);
+    // console.log('isInlineEditingRef.current', isInlineEditingRef.current);
     if (
       !isInlineEditingRef.current &&
       form &&
@@ -383,6 +365,10 @@ const Iframe = (props) => {
 
   return (
     <div id="iframeContainer">
+      <OpenObjectBrowser
+        isInlineEditingRef={isInlineEditingRef}
+        origin={iframeSrc && new URL(iframeSrc).origin}
+      />
       {addNewBlockOpened &&
         createPortal(
           <div
