@@ -1,9 +1,92 @@
-/** Bridge class creating two-way link between the Hydra and the frontend */
+/**
+ * This IS a large file and it needs to be written in one file so for better understanding and
+ * usage of this file in future, Below is the lineup of methods this class provides and also
+ * making it easier for other to understand how each section works :)
+ */
+////////////////////////////////////////////////////////////////////////////////
+// Bridge Class Initialization and Navigation Event Handling
+////////////////////////////////////////////////////////////////////////////////
+
+// constructor
+// init
+// _setTokenCookie
+
+////////////////////////////////////////////////////////////////////////////////
+// Real-time Data Handling and Quanta Toolbar Creation
+////////////////////////////////////////////////////////////////////////////////
+
+// onEditChange
+// createQuantaToolbar
+
+////////////////////////////////////////////////////////////////////////////////
+// Block Selection and Deselection
+////////////////////////////////////////////////////////////////////////////////
+
+// enableBlockClickListener
+// selectBlock
+// deselectBlock
+// listenForSelectBlockMessage
+
+////////////////////////////////////////////////////////////////////////////////
+// Make Block Text Inline Editable and Text Changes Observation
+////////////////////////////////////////////////////////////////////////////////
+
+// makeBlockContentEditable
+// observeBlockTextChanges
+// elementIsVisibleInViewport
+// observeForBlock
+
+////////////////////////////////////////////////////////////////////////////////
+// Adding NodeIds in Slate Block's Json
+////////////////////////////////////////////////////////////////////////////////
+
+// addNodeIds
+// resetJsonNodeIds
+
+////////////////////////////////////////////////////////////////////////////////
+// Handling Text Changes in Blocks
+////////////////////////////////////////////////////////////////////////////////
+
+// handleTextChange
+// handleTextChangeOnSlate
+// updateJsonNode
+// findParentWithAttribute
+
+////////////////////////////////////////////////////////////////////////////////
+// Text Formatting
+////////////////////////////////////////////////////////////////////////////////
+
+// getSelectionHTML
+// isFormatted
+// nextNode
+// formatSelectedText
+// unwrapFormatting
+// unwrapSelectedPortion
+// unwrapElement
+// removeEmptyFormattingElements
+// sendFormattedHTMLToAdminUI
+// findEditableParent
+
+// injectCSS
+
+////////////////////////////////////////////////////////////////////////////////
+// Methods provided by THIS hydra.js as export
+////////////////////////////////////////////////////////////////////////////////
+
+// initBridge
+// getTokenFromCookie
+// onEditChange
+
+/**
+ * Bridge class creating a two-way link between the Hydra and the frontend.
+ */
 class Bridge {
   /**
+   * Constructor for the Bridge class.
    *
-   * @param {URL} adminOrigin - The origin of the adminUI
-   * @param {Object} options - Options for the bridge initialization -- allowedBlocks: Array of allowed block types e.g. ['title', 'text', 'image', ...]
+   * @param {URL} adminOrigin - The origin of the adminUI.
+   * @param {Object} options - Options for the bridge initialization:
+   *   - allowedBlocks: Array of allowed block types (e.g., ['title', 'text', 'image', ...])
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
@@ -28,15 +111,25 @@ class Bridge {
     this.handleMouseUp = null;
     this.blockObserver = null;
     this.handleObjectBrowserMessage = null;
-    this.init(options);
+    this.init(options); // Initialize the bridge
   }
 
+  ////////////////////////////////////////////////////////////////////////////////
+  // Bridge Class Initialization and Navigation Event Handling
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Initializes the bridge, setting up event listeners and communication channels.
+   *
+   * @param {Object} options - Options for initialization.
+   */
   init(options = {}) {
     if (typeof window === 'undefined') {
-      return;
+      return; // Exit if not in a browser environment
     }
 
     if (window.self !== window.top) {
+      // ... (iframe-specific setup: navigation detection, token retrieval, etc.)
       // This will set the listners for hashchange & pushstate
       function detectNavigation(callback) {
         let currentUrl = window.location.href;
@@ -136,7 +229,30 @@ class Bridge {
       }
     }
   }
+  /**
+   * Sets the access token in a cookie.
+   *
+   * @param {string} token - The access token to store.
+   * @private
+   */
+  _setTokenCookie(token) {
+    const expiryDate = new Date();
+    expiryDate.setTime(expiryDate.getTime() + 12 * 60 * 60 * 1000); // 12 hours
 
+    const url = new URL(window.location.href);
+    const domain = url.hostname;
+    document.cookie = `access_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain}; SameSite=None; Secure`;
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Real-time Data Handling and Quanta Toolbar Creation
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Registers a callback to handle real-time data updates from the adminUI.
+   *
+   * @param {function} callback - The function to call when form data is received.
+   */
   onEditChange(callback) {
     this.realTimeDataHandler = (event) => {
       if (
@@ -150,16 +266,16 @@ class Bridge {
           if (event.data.data) {
             this.isInlineEditing = false;
             this.formData = JSON.parse(JSON.stringify(event.data.data));
-            console.log(
-              'data recieved from adminUI',
-              event.data?.sender,
-              this.formData.blocks[this.selectedBlockUid],
-            );
 
             // Call the callback first to trigger the re-render
             callback(event.data.data);
 
-            // After the re-render, add the toolbar (if needed)
+            // After the re-render, add the toolbar
+            /**
+             * (THIS IS THE PART WHICH MAKES TOOLBAR ADDITON SLOW IN REACTJS
+             * BASED FRAMEWORKS BUT ESSENTIAL FOR FRAMEWORKS LIKE F7 WHICH UPGRADES
+             * WHOLE UI ON DATA UPDATE)
+             */
             setTimeout(() => {
               if (this.selectedBlockUid) {
                 // Check if a block is selected
@@ -168,10 +284,6 @@ class Bridge {
                 );
                 const isToolbarPresent = blockElement?.contains(
                   this.quantaToolbar,
-                );
-                console.log(
-                  'is toolbar inside block already',
-                  isToolbarPresent,
                 );
                 if (blockElement && !isToolbarPresent) {
                   // Add border to the currently selected block
@@ -209,6 +321,8 @@ class Bridge {
                   this.prevSelectedBlock = blockElement;
                   this.observeBlockTextChanges(blockElement);
                 }
+              } else {
+                // console.warn('No block is selected to add Toolbar');
               }
             }, 0); // Use setTimeout to ensure execution after the current call stack
           } else {
@@ -222,35 +336,14 @@ class Bridge {
     window.removeEventListener('message', this.realTimeDataHandler);
     window.addEventListener('message', this.realTimeDataHandler);
   }
-
-  _setTokenCookie(token) {
-    const expiryDate = new Date();
-    expiryDate.setTime(expiryDate.getTime() + 12 * 60 * 60 * 1000); // 12 hours
-
-    const url = new URL(window.location.href);
-    const domain = url.hostname;
-    document.cookie = `access_token=${token}; expires=${expiryDate.toUTCString()}; path=/; domain=${domain}; SameSite=None; Secure`;
-  }
-
   /**
-   * Enable the frontend to listen for clicks on blocks to open the settings
+   * Creates the Quanta toolbar for the selected block.
+   *
+   * @param {string} blockUid - The UID of the selected block.
+   * @param {Object} show - Options for showing/hiding toolbar elements:
+   *   - formatBtns: Whether to show format buttons (true/false).
    */
-  enableBlockClickListener() {
-    this.blockClickHandler = (event) => {
-      event.stopPropagation();
-      const blockElement = event.target.closest('[data-block-uid]');
-      if (blockElement) {
-        this.selectBlock(blockElement);
-      }
-    };
-
-    document.removeEventListener('click', this.blockClickHandler);
-    document.addEventListener('click', this.blockClickHandler);
-  }
-
   createQuantaToolbar(blockUid, show = { formatBtns: true }) {
-    console.log('toolbar creation, already exists?:', this.quantaToolbar);
-
     // Check if the toolbar already exists
     if (this.quantaToolbar) {
       return;
@@ -551,8 +644,6 @@ class Bridge {
         folderBtn.innerHTML = linkFolderSVG;
         folderBtn.addEventListener('click', () => {
           this.handleObjectBrowserMessage = (e) => {
-            console.log('handle broserse mesage', e.data.type);
-
             if (
               e.origin === this.adminOrigin &&
               e.data.type === 'OBJECT_SELECTED'
@@ -740,7 +831,6 @@ class Bridge {
           if (!e.target.closest('.volto-hydra-dropdown-menu')) {
             dropdownMenu.classList.remove('visible');
           }
-          console.log('outside click');
         },
         { once: true },
       );
@@ -761,9 +851,29 @@ class Bridge {
     blockElement.appendChild(this.quantaToolbar);
   }
 
+  ////////////////////////////////////////////////////////////////////////////////
+  // Block Selection and Deselection
+  ////////////////////////////////////////////////////////////////////////////////
+
   /**
-   * Method to add border, ADD button and Quanta toolbar to the selected block
-   * @param {Element} blockElement - Block element with the data-block-uid attribute
+   * Enables listening for block clicks to open block settings.
+   */
+  enableBlockClickListener() {
+    this.blockClickHandler = (event) => {
+      event.stopPropagation();
+      const blockElement = event.target.closest('[data-block-uid]');
+      if (blockElement) {
+        this.selectBlock(blockElement);
+      }
+    };
+
+    document.removeEventListener('click', this.blockClickHandler);
+    document.addEventListener('click', this.blockClickHandler);
+  }
+  /**
+   * Selects a block and communicates the selection to the adminUI.
+   *
+   * @param {HTMLElement} blockElement - The block element to select.
    */
   selectBlock(blockElement) {
     if (!blockElement) return;
@@ -828,7 +938,6 @@ class Bridge {
         // Add border to the currently selected block
         blockElement.classList.add('volto-hydra--outline');
         this.createQuantaToolbar(this.selectedBlockUid, show);
-        console.log('added toolbar on non slate');
       }
       handleElementAndChildren(blockElement);
 
@@ -854,151 +963,17 @@ class Bridge {
       child.setAttribute('contenteditable', 'true');
     });
   }
-  /**
-   * Method to listen for the SELECT_BLOCK message from the adminUI
-   */
-  listenForSelectBlockMessage() {
-    this.selectBlockHandler = (event) => {
-      if (
-        event.origin === this.adminOrigin &&
-        event.data.type === 'SELECT_BLOCK'
-      ) {
-        const { uid } = event.data;
-        this.selectedBlockUid = uid;
-        this.formData = JSON.parse(JSON.stringify(event.data.data));
-        if (
-          this.selectedBlockUid &&
-          this.formData.blocks[this.selectedBlockUid]['@type'] === 'slate' &&
-          typeof this.formData.blocks[this.selectedBlockUid].nodeId ===
-            'undefined'
-        ) {
-          this.formData.blocks[this.selectedBlockUid] = this.addNodeIds(
-            this.formData.blocks[this.selectedBlockUid],
-          );
-        }
-        window.postMessage(
-          {
-            type: 'FORM_DATA',
-            data: this.formData,
-            sender: 'hydrajs-select',
-          },
-          window.location.origin,
-        );
-        // console.log("select block", event.data?.method);
-        const blockElement = document.querySelector(
-          `[data-block-uid="${uid}"]`,
-        );
-        !this.elementIsVisibleInViewport(blockElement) &&
-          blockElement.scrollIntoView();
-        // this.isInlineEditing = true;
-        // this.observeForBlock(uid);
-      }
-    };
-
-    window.removeEventListener('message', this.selectBlockHandler);
-    window.addEventListener('message', this.selectBlockHandler);
-  }
 
   /**
-   * Checks if an element is visible in the viewport
-   * @param {Element} el
-   * @param {Boolean} partiallyVisible
-   * @returns
-   */
-  elementIsVisibleInViewport(el, partiallyVisible = false) {
-    const { top, left, bottom, right } = el.getBoundingClientRect();
-    const { innerHeight, innerWidth } = window;
-    return partiallyVisible
-      ? ((top > 0 && top < innerHeight) ||
-          (bottom > 0 && bottom < innerHeight)) &&
-          ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
-      : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
-  }
-  /**
-   * Observe the DOM for the changes to select and scroll the block with the given UID into view
-   * @param {String} uid - UID of the block
-   */
-  observeForBlock(uid) {
-    if (this.blockObserver) this.blockObserver.disconnect();
-    this.blockObserver = new MutationObserver((mutationsList, observer) => {
-      for (const mutation of mutationsList) {
-        if (mutation.type === 'childList') {
-          const blockElement = document.querySelector(
-            `[data-block-uid="${uid}"]`,
-          );
-
-          if (blockElement && this.isInlineEditing) {
-            this.selectBlock(blockElement);
-            console.log('oberveeeeeeeee');
-
-            !this.elementIsVisibleInViewport(blockElement, true) &&
-              blockElement.scrollIntoView({ behavior: 'smooth' });
-            observer.disconnect();
-            return;
-          }
-        }
-      }
-    });
-
-    this.blockObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  /**
-   * Set the contenteditable of the block with the given UID and its children to true
-   * @param {Element} blockElement
-   */
-  makeBlockContentEditable(blockElement) {
-    blockElement.setAttribute('contenteditable', 'true');
-    const childNodes = blockElement.querySelectorAll('[data-node-id]');
-    childNodes.forEach((node) => {
-      node.setAttribute('contenteditable', 'true');
-    });
-  }
-
-  /**
-   * Add nodeIds in the json object to each of the Selected Block's children
-   * @param {JSON} json Selected Block's data
-   * @param {BigInteger} nodeIdCounter (Optional) Counter to keep track of the nodeIds
-   * @returns {JSON} block's data with nodeIds added
-   */
-  addNodeIds(json, nodeIdCounter = { current: 0 }) {
-    if (Array.isArray(json)) {
-      return json.map((item) => this.addNodeIds(item, nodeIdCounter));
-    } else if (typeof json === 'object' && json !== null) {
-      // Clone the object to ensure it's extensible
-      json = JSON.parse(JSON.stringify(json));
-
-      if (json.hasOwnProperty('data')) {
-        json.nodeId = nodeIdCounter.current++;
-        for (const key in json) {
-          if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-            json[key] = this.addNodeIds(json[key], nodeIdCounter);
-          }
-        }
-      } else {
-        json.nodeId = nodeIdCounter.current++;
-        for (const key in json) {
-          if (json.hasOwnProperty(key) && key !== 'nodeId') {
-            json[key] = this.addNodeIds(json[key], nodeIdCounter);
-          }
-        }
-      }
-    }
-    return json;
-  }
-
-  /**
-   * Reset the block's listeners, mutation observer and remove the nodeIds from the block's data
-   * @param {Element} blockElement Selected block element
+   * Deselects a block and updates the frontend accordingly.
+   *
+   * @param {string} prevSelectedBlockUid - The UID of the previously selected block.
+   * @param {string} currentSelectedBlockUid - The UID of the currently selected block.
    */
   deselectBlock(prevBlockUid, currBlockUid) {
     const prevBlockElement = document.querySelector(
       `[data-block-uid="${prevBlockUid}"]`,
     );
-    console.log('delesecet', prevBlockElement);
 
     if (
       prevBlockUid !== null &&
@@ -1049,27 +1024,73 @@ class Bridge {
   }
 
   /**
-   * Remove the nodeIds from the JSON object
-   * @param {JSON} json Selected Block's data
+   * Listens for 'SELECT_BLOCK' messages from the adminUI to select a block.
    */
-  resetJsonNodeIds(json) {
-    if (Array.isArray(json)) {
-      json.forEach((item) => this.resetJsonNodeIds(item));
-    } else if (typeof json === 'object' && json !== null) {
-      if (json.hasOwnProperty('nodeId')) {
-        delete json.nodeId;
-      }
-      for (const key in json) {
-        if (json.hasOwnProperty(key) && key !== 'data') {
-          this.resetJsonNodeIds(json[key]);
+  listenForSelectBlockMessage() {
+    this.selectBlockHandler = (event) => {
+      if (
+        event.origin === this.adminOrigin &&
+        event.data.type === 'SELECT_BLOCK'
+      ) {
+        const { uid } = event.data;
+        this.selectedBlockUid = uid;
+        this.formData = JSON.parse(JSON.stringify(event.data.data));
+        if (
+          this.selectedBlockUid &&
+          this.formData.blocks[this.selectedBlockUid]['@type'] === 'slate' &&
+          typeof this.formData.blocks[this.selectedBlockUid].nodeId ===
+            'undefined'
+        ) {
+          this.formData.blocks[this.selectedBlockUid] = this.addNodeIds(
+            this.formData.blocks[this.selectedBlockUid],
+          );
         }
+        window.postMessage(
+          {
+            type: 'FORM_DATA',
+            data: this.formData,
+            sender: 'hydrajs-select',
+          },
+          window.location.origin,
+        );
+        // console.log("select block", event.data?.method);
+        const blockElement = document.querySelector(
+          `[data-block-uid="${uid}"]`,
+        );
+        if (blockElement) {
+          !this.elementIsVisibleInViewport(blockElement) &&
+            blockElement.scrollIntoView();
+        }
+        // this.isInlineEditing = true;
+        // this.observeForBlock(uid);
       }
-    }
+    };
+
+    window.removeEventListener('message', this.selectBlockHandler);
+    window.addEventListener('message', this.selectBlockHandler);
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Make Block Text Inline Editable and Text Changes Observation
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Makes the content of a block editable.
+   *
+   * @param {HTMLElement} blockElement - The block element to make editable.
+   */
+  makeBlockContentEditable(blockElement) {
+    blockElement.setAttribute('contenteditable', 'true');
+    const childNodes = blockElement.querySelectorAll('[data-node-id]');
+    childNodes.forEach((node) => {
+      node.setAttribute('contenteditable', 'true');
+    });
   }
 
   /**
-   * Observes the block element for any text changes
-   * @param {Element} blockElement Selected block element
+   * Observes changes in the text content of a block.
+   *
+   * @param {HTMLElement} blockElement - The block element to observe.
    */
   observeBlockTextChanges(blockElement) {
     if (this.blockTextMutationObserver) {
@@ -1083,10 +1104,6 @@ class Bridge {
 
           if (targetElement && this.isInlineEditing) {
             this.handleTextChangeOnSlate(targetElement);
-            console.log(
-              'observing text changes if inline edit is true',
-              this.isInlineEditing,
-            );
           } else if (this.isInlineEditing) {
             const targetElement = mutation.target?.parentElement.closest(
               '[data-editable-field]',
@@ -1105,8 +1122,115 @@ class Bridge {
   }
 
   /**
-   * Handle the text change in the block element with attr data-editable-field
-   * @param {Element} target
+   * Checks if an element is visible in the viewport
+   * @param {HTMLElement} el
+   * @param {Boolean} partiallyVisible
+   * @returns
+   */
+  elementIsVisibleInViewport(el, partiallyVisible = false) {
+    if (!el) return true;
+    const { top, left, bottom, right } = el.getBoundingClientRect();
+    const { innerHeight, innerWidth } = window;
+    return partiallyVisible
+      ? ((top > 0 && top < innerHeight) ||
+          (bottom > 0 && bottom < innerHeight)) &&
+          ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
+      : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+  }
+
+  /**
+   * Observe the DOM for the changes to select and scroll the block with the given UID into view
+   * @param {String} uid - UID of the block
+   */
+  observeForBlock(uid) {
+    if (this.blockObserver) this.blockObserver.disconnect();
+    this.blockObserver = new MutationObserver((mutationsList, observer) => {
+      for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+          const blockElement = document.querySelector(
+            `[data-block-uid="${uid}"]`,
+          );
+
+          if (blockElement && this.isInlineEditing) {
+            this.selectBlock(blockElement);
+            !this.elementIsVisibleInViewport(blockElement, true) &&
+              blockElement.scrollIntoView({ behavior: 'smooth' });
+            observer.disconnect();
+            return;
+          }
+        }
+      }
+    });
+
+    this.blockObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Adding NodeIds in Slate Block's Json
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Add nodeIds in the json object to each of the Selected Block's children
+   * @param {JSON} json Selected Block's data
+   * @param {BigInteger} nodeIdCounter (Optional) Counter to keep track of the nodeIds
+   * @returns {JSON} block's data with nodeIds added
+   */
+  addNodeIds(json, nodeIdCounter = { current: 0 }) {
+    if (Array.isArray(json)) {
+      return json.map((item) => this.addNodeIds(item, nodeIdCounter));
+    } else if (typeof json === 'object' && json !== null) {
+      // Clone the object to ensure it's extensible
+      json = JSON.parse(JSON.stringify(json));
+
+      if (json.hasOwnProperty('data')) {
+        json.nodeId = nodeIdCounter.current++;
+        for (const key in json) {
+          if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
+            json[key] = this.addNodeIds(json[key], nodeIdCounter);
+          }
+        }
+      } else {
+        json.nodeId = nodeIdCounter.current++;
+        for (const key in json) {
+          if (json.hasOwnProperty(key) && key !== 'nodeId') {
+            json[key] = this.addNodeIds(json[key], nodeIdCounter);
+          }
+        }
+      }
+    }
+    return json;
+  }
+
+  /**
+   * Remove the nodeIds from the JSON object
+   * @param {JSON} json Selected Block's data
+   */
+  resetJsonNodeIds(json) {
+    if (Array.isArray(json)) {
+      json.forEach((item) => this.resetJsonNodeIds(item));
+    } else if (typeof json === 'object' && json !== null) {
+      if (json.hasOwnProperty('nodeId')) {
+        delete json.nodeId;
+      }
+      for (const key in json) {
+        if (json.hasOwnProperty(key) && key !== 'data') {
+          this.resetJsonNodeIds(json[key]);
+        }
+      }
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Handling Text Changes in Blocks
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Handle the text changed in the block element with attr data-editable-field,
+   * by getting changed text from DOM and send it to the adminUI
+   * @param {HTMLElement} target
    */
   handleTextChange(target) {
     const blockUid = target
@@ -1128,8 +1252,9 @@ class Bridge {
   }
 
   /**
-   * Handle the text change in the slate block element
-   * @param {Element} target
+   * Handle the text changed in the slate block element, by updating the json data
+   * and sending it to the adminUI
+   * @param {HTMLElement} target
    */
   handleTextChangeOnSlate(target) {
     const closestNode = target.closest('[data-node-id]');
@@ -1161,8 +1286,10 @@ class Bridge {
       // this.sendUpdatedJsonToAdminUI(updatedJson);
     }
   }
+
   /**
-   * Update the JSON object with the new text
+   * Update the JSON object with the new text,
+   * finds the node in json with given nodeId and update the text in it
    * @param {JSON} json Block's data
    * @param {BigInteger} nodeId Node ID of the element
    * @param {String} newText Updated text
@@ -1199,11 +1326,21 @@ class Bridge {
     return null;
   }
 
+  ////////////////////////////////////////////////////////////////////////////////
+  // Text Formatting
+  ////////////////////////////////////////////////////////////////////////////////
+
   getSelectionHTML(range) {
     const div = document.createElement('div');
     div.appendChild(range.cloneContents());
     return div.innerHTML;
   }
+
+  /**
+   * Checks if the selected text has which types of formatting.
+   * @param {Range} range - The selection range
+   * @returns {Object} An object indicating the presence of bold, italic, del, and link formatting
+   */
   isFormatted(range) {
     const formats = {
       bold: { present: false, enclosing: false },
@@ -1283,7 +1420,11 @@ class Bridge {
     return formats;
   }
 
-  // Helper function to get the next node in the selection
+  /**
+   * Helper function to get the next node in the selection
+   * @param {Node} node - The current node
+   * @returns {Node|null} The next node in the selection, or null if at the end
+   */
   nextNode(node) {
     if (!node) return null; // Handle the case where node is null
 
@@ -1297,13 +1438,19 @@ class Bridge {
     return null; // Reached the end, return null
   }
 
-  formatSelectedText(format, isActive) {
+  /**
+   * Formats the selected text within a block.
+   *
+   * @param {string} format - The format to apply (e.g., 'bold', 'italic', 'del').
+   * @param {boolean} remove - Whether to remove the format (true) or apply it (false).
+   */
+  formatSelectedText(format, remove) {
     this.isInlineEditing = false;
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
 
     const range = selection.getRangeAt(0);
-    if (isActive) {
+    if (remove) {
       this.unwrapFormatting(range, format);
     } else {
       // Handle selections that include non-Text nodes
@@ -1511,6 +1658,11 @@ class Bridge {
 
     return this.findEditableParent(node.parentNode);
   }
+
+  /**
+   * Injects custom CSS into the iframe for styling the adminUI components which we are
+   * injecting into frontend's DOM like borders, toolbar etc..
+   */
   injectCSS() {
     const style = document.createElement('style');
     style.type = 'text/css';
@@ -1724,22 +1876,6 @@ class Bridge {
       `;
     document.head.appendChild(style);
   }
-
-  // Method to clean up all event listeners
-  cleanup() {
-    if (this.navigationHandler) {
-      window.navigation.removeEventListener('navigate', this.navigationHandler);
-    }
-    if (this.realTimeDataHandler) {
-      window.removeEventListener('message', this.realTimeDataHandler);
-    }
-    if (this.blockClickHandler) {
-      document.removeEventListener('click', this.blockClickHandler);
-    }
-    if (this.messageHandler) {
-      window.removeEventListener('message', this.messageHandler);
-    }
-  }
 }
 
 // Export an instance of the Bridge class
@@ -1794,6 +1930,9 @@ if (typeof window !== 'undefined') {
   window.initBridge = initBridge;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// SVGs & Images should be exported using CDN to reduce the size of this file
+//////////////////////////////////////////////////////////////////////////////
 const deleteSVG = `<svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M4 6H20M16 6L15.7294 5.18807C15.4671 4.40125 15.3359 4.00784 15.0927 3.71698C14.8779 3.46013 14.6021 3.26132 14.2905 3.13878C13.9376 3 13.523 3 12.6936 3H11.3064C10.477 3 10.0624 3 9.70951 3.13878C9.39792 3.26132 9.12208 3.46013 8.90729 3.71698C8.66405 4.00784 8.53292 4.40125 8.27064 5.18807L8 6M18 6V16.2C18 17.8802 18 18.7202 17.673 19.362C17.3854 19.9265 16.9265 20.3854 16.362 20.673C15.7202 21 14.8802 21 13.2 21H10.8C9.11984 21 8.27976 21 7.63803 20.673C7.07354 20.3854 6.6146 19.9265 6.32698 19.362C6 18.7202 6 17.8802 6 16.2V6M14 10V17M10 10V17" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;

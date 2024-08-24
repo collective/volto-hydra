@@ -229,7 +229,7 @@ const Iframe = (props) => {
           // console.log('TOGGLE_BOLD', event.data.html);
           isInlineEditingRef.current = true;
           const deserializedHTMLData = toggleMark(event.data.html);
-          console.log('deserializedHTMLData', deserializedHTMLData);
+          // console.log('deserializedHTMLData', deserializedHTMLData);
           onChangeFormData({
             ...form,
             blocks: {
