@@ -419,4 +419,4 @@ const Iframe = (props) => {
   );
 };
 
-export default compose(withObjectBrowser)(Iframe);
+export default Iframe;
