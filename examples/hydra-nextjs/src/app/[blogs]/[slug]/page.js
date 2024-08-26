@@ -1,15 +1,13 @@
-'use client';
-import { notFound } from 'next/navigation';
-import { usePathname } from 'next/navigation';
-import { initBridge, getTokenFromCookie } from '@volto-hydra/hydra-js';
-import { useEffect, useState } from 'react';
-import BlocksList from '@/components/BlocksList';
+"use client";
+import { notFound } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { initBridge, getTokenFromCookie } from "#utils/hydra";
+import { useEffect, useState } from "react";
+import BlocksList from "@/components/BlocksList";
 import { fetchContent } from '#utils/api';
 
 export default function Blog({ params }) {
-  const bridge = initBridge(process.env.NEXT_PUBLIC_ADMINUI_ORIGIN, {
-    allowedBlocks: ['slate', 'image', 'video'],
-  });
+  const bridge = initBridge(process.env.NEXT_PUBLIC_ADMINUI_ORIGIN, {allowedBlocks: [ "slate", "image", "video"]});
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
@@ -29,7 +27,7 @@ export default function Blog({ params }) {
 
     const url = new URL(window.location.href);
     const tokenFromUrl =
-      url.searchParams.get('access_token') || getTokenFromCookie();
+      url.searchParams.get("access_token") || getTokenFromCookie();
     getData(tokenFromUrl);
   }, [pathname]);
 
@@ -41,7 +39,7 @@ export default function Blog({ params }) {
         setValue(updatedData);
       }
     });
-  }, [bridge]);
+  },[bridge]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -62,5 +60,5 @@ export default function Blog({ params }) {
     return notFound();
   }
 
-  return '';
+  return "";
 }
