@@ -18,10 +18,9 @@
 
 # Abstract
 
-This report presents Volto Hydra (volto-hydra), a PoC decoupled editor for Plone CMS. 
-While not yet production-ready, Volto Hydra offers a glimpse into the future of headless Plone, which will be enabling developers to seamlessly integrate their preferred frontend technologies with Volto's powerful editing features. 
-By leveraging an iframe bridge, we establish a communication channel between the Volto editor and a custom frontend, empowering developers to create tailored experiences without sacrificing the intuitive Volto editing interface. 
-This report explores the technical approach, achievements, and future possibilities, providing insights into the effort and benefits of integrating this decoupled editor with your various frontend frameworks.
+This report details the development of a proof-of-concept (PoC) Volto addon to turn Plone Volto into a decoupled editor for Headless Plone. The goal of the project was to show that decoupling Volto from the frontend is technically possible without losing any editor experience and while keeping the integrator's experience easy. Additionally, we aimed to demonstrate that many parts of Volto can be reused to completely decouple it, allowing it to be used solely as the AdminUI, with the frontend hosted separately.
+
+The project was successful in showing that the existing UI can be replicated in a way that performs well, proving that this approach is feasible and the editor experience remains the same. This report covers all the significant deliverables during this period, as well as the technical approaches and difficulties faced during the project.
 
 **Table of content:**
 
@@ -267,7 +266,7 @@ We created a well-structured and documented codebase for Volto Hydra, including:
 
 I developed an example frontend using Nextjs frameworks to demonstrate the integration process and showcase the possibilities of Volto Hydra.
 
-You can find at [`examples`](https://github.com/collective/volto-hydra/tree/main/examples) directory which includes more frontends developed by us.
+You can find at [`examples`](https://github.com/collective/volto-hydra/tree/main/examples) directory which includes more frontends developed by the people to try out the current hydra!
 
 # Future Work and Enhancements (what's left and more)
 
@@ -280,10 +279,12 @@ While the Volto Hydra prototype demonstrates the potential of decoupled editing 
 
 # Conclusion
 
-Volto Hydra represents a significant step towards a more flexible and adaptable future for Plone CMS. By decoupling the frontend from the backend, we've opened up new possibilities for developers to leverage their preferred technologies while still enjoying the benefits of Volto's intuitive editing experience.
+This project aimed to showcase that creating a headless editor agnostic to the frontend's framework is technically possible and can be done with keeping the editor's features intact without creating much hassle for the integrator.
+In conclusion, this project successfully demonstrated that Volto's UI can be preserved even when different frameworks are used for the frontend. Furthermore, it highlighted the potential for reusing Volto components to build a headless CMS.
 
-While still in its proof-of-concept stage, Volto Hydra lays a solid foundation for future development. The project highlights the possibilities of headless Plone CMS and sets the stage for further enhancements, ultimately enabling a wider range of developers to build innovative and engaging digital experiences on the Plone platform. We are confident that with continued development and community support, Volto Hydra will play a pivotal role in shaping the future of Plone CMS, making it an even more compelling choice for a diverse range of projects and use cases.
+As this being of PoC nature, this project does not provide production-ready code but rather showcases the *possibility* of a decoupled editor built on top of Volto, which still provides all the basic editing experiences and easy integration steps. While time constraints prevented us from implementing all planned features, we successfully showcased all the major editing features.
 
+*If this PoC can intrigue the community and enough love is shown, Volto-Hydra is not very far off in the future.*
 
 # Acknowledgements
 
