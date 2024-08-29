@@ -116,7 +116,7 @@ Or You can [run a local hydra + plone instance](#Local-Development) (see below).
 
 ### Deploy your frontend
 
-Use netlify or similar and make your frontend publicly accessible.
+Use Netlify or similar and make your frontend publicly accessible.
 Ensure you have correctly set the CORS headers to allow access by the hydra editor. How to do this will depend
 on how you host your frontend.
 
@@ -143,7 +143,7 @@ To do this you will include the hydra iframe bridge which creates a two way link
 - Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend or deployed frontend to test.
    - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on a local hydra instance to have this frontend selectable by the user.
    - The url should be the prefix to which the current path is appended so both /#!/path and /path style routing is supported.
-- Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will have an added url parameter ```_edit=true```
+- Your frontend will know to initialize the hydra iframe bridge when it is being edited using hydra as it will have an added url parameter ```_edit=true```
    - you might choose to [load `hydra.js` asynchronously](#asynchronously-load-the-bridge) so no additional js is loaded unless editing.
 - You will need to [change your authentication token]((#authenticate-frontend-to-access-private-content)) you are using with the rest api so you can access the same content as the logged in editor.
 
@@ -228,7 +228,7 @@ code your frontend used to render the page previously.
 
 Now an editor can:-
 - change a block in the sidebar and have it change on the frontend even as you type in WYSIWYG style
-- Add and remove blocks in the side bar and have them appear on the frontend preview
+- Add and remove blocks in the sidebar and have them appear on the frontend preview
 - Change page metadata and have blocks that depend on this like the "Title" block change.
 
 These updates are sent frequently as the user makes changes in the sidebar but can adjust the frequency of updates for
@@ -278,9 +278,9 @@ but if you wanted to allow many columns each with many blocks inside you can use
 </table>
 ```
 
-- The allowed block types for a given container can be overridden in the hydra settings at initialisation.
+- The allowed block types for a given container can be overridden in the hydra settings at initialization.
 - The first of the allowed blocks is the default block. In the case where the only remaining block is deleted, a new empty default
-  block will be created in it's place so that a container is never empty.
+  block will be created in its place so that a container is never empty (TODO).
   - if you want to allow choice of the first block then a chooser block can be the default (TODO)
 - The orientation tells hydra where to place the add button and DND drop markers.
 - if there is a maximum number of blocks a container can hold then specify it in the data attribute ```data-block-container-horizontal="blocks,4"```
@@ -292,7 +292,7 @@ Now an editor can do the following on a container such as the Grid Block:
 - Use enter on a rich text block to add a sub-block
 - remove blocks from a container
 - DND blocks in and out of containers or to reorder them
-- if it is hard to select a container using the mouse then the quanta toolbar provides a "up" action ([TODO](https://github.com/collective/volto-hydra/issues/66))  
+- if it is hard to select a container using the mouse then the quanta toolbar provides an "up" action ([TODO](https://github.com/collective/volto-hydra/issues/66))  
   to select the container of the current block. On mobile a single press
   selects the container and a double press selects the sub-block. 
 
@@ -360,7 +360,7 @@ the json value might be
       }
     ],
     "type": "bold",
-    "id": 1
+    "nodeId": 1
   },
   {
     "text": ", it will change everything"
@@ -525,6 +525,14 @@ You can use one of the example frontends available at `./examples` directory.
 There is a [set of example frontends](https://github.com/collective/volto-hydra/tree/main/examples) in different frameworks 
 in the github repo that might help you. In addition, here are some examples on how you could handle 
 hooking into the hydra bridge.
+
+#### To run Nextjs example:
+
+You can run ```npm run dev``` in `examples/hydra-nextjs/` to start the nextjs frontend at localhost:3002
+
+#### To run Vue F7 example:
+
+You can run ```npm run dev``` in `examples/hydra-vue-f7/` to start the vue-f7 frontend at localhost:5173
 
 #### Asynchronously Load the Hydra.js Bridge
 

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 /**
  * Serializes Slate JSON into JSX elements
@@ -23,21 +23,25 @@ function serializeNode(node) {
   if (!node) {
     return null;
   }
+  const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
   if (node.text !== undefined) {
-    return node.text !== '' ? (
-      <span data-hydra-node={`${node?.nodeId}`}>{node.text}</span>
+    return node.text !== "" ? (
+      <span key={uid} data-node-id={`${node?.nodeId}`}>
+        {node.text}
+      </span>
     ) : (
-      <span data-hydra-node={`${node?.nodeId}`}>&#xFEFF;</span>
+      <span key={uid} data-node-id={`${node?.nodeId}`}>
+        &#xFEFF;
+      </span>
     );
   }
 
   const children = node.children ? node.children.map(serializeNode) : null;
 
-  const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
   switch (node.type) {
-    case 'link':
+    case "link":
       return (
-        <a key={uid} href={node.data.url} data-hydra-node={`${node?.nodeId}`}>
+        <a key={uid} href={node.data?.url} data-node-id={`${node?.nodeId}`}>
           {children}
         </a>
       );
@@ -46,7 +50,7 @@ function serializeNode(node) {
       const Tag = node.type;
       if (Tag)
         return (
-          <Tag key={uid} data-hydra-node={`${node?.nodeId}`}>
+          <Tag key={uid} data-node-id={`${node?.nodeId}`}>
             {children}
           </Tag>
         );
