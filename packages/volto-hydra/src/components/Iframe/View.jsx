@@ -27,13 +27,28 @@ import {
 import toggleMark from '../../utils/toggleMark';
 import OpenObjectBrowser from './OpenObjectBrowser';
 
+/**
+ * Returns url with query params + proper paths
+ * @param {String} url
+ * @param {Object} qParams
+ * @param {String} pathname
+ * @returns {String}
+ */
 const addUrlParams = (url, qParams, pathname) => {
-  const newUrl = new URL(url);
+  const urlObj = new URL(url);
   for (const [key, value] of Object.entries(qParams)) {
-    newUrl.searchParams.set(key, value);
+    urlObj.searchParams.set(key, value);
   }
-  newUrl.pathname = pathname;
-  return newUrl.toString();
+  // console.log('pathname', appendPathToURL(newUrl, pathname));
+
+  const path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
+  if (urlObj.hash) {
+    urlObj.hash += `/${path}`;
+  } else {
+    urlObj.pathname += `${path}`;
+  }
+  const newURL = urlObj.toString();
+  return newURL;
 };
 
 /**
