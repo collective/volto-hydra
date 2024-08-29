@@ -33,7 +33,7 @@ part of the frontend code. Instead a small js file called ```hydra.js``` is incl
 that handles the iframe bridge communication to hydra which is running in the same browser window. Hydra.js also 
 handles small parts of UI that need to be displayed on the frontend during editing.
 
-You could think of it as spiting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
+You could think of it as splitting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
 making the Rendering part easily replaceable with other implementations.
 
 ```
@@ -80,7 +80,7 @@ making the Rendering part easily replaceable with other implementations.
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
 Go to user preferences in the bottom left to select one of the available preset frontends or paste in your own frontend url to test.
 
-Note: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
+**Note**: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
 
 Available example frontends:
 - https://hydra-blogsite-nextjs.vercel.app (Blog style website using Next.js)
@@ -108,8 +108,8 @@ TODO: link to more documentation on creating a frontend using @plone/client
 
 ### Test your frontend
 
-The easiest way is to connect it directly to https://hydra.pretagov.com/++api++
-NOTE: If you are testing against https://hydra.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
+The easiest way is to connect it directly to https://hydra.pretagov.com/++api++ <br />
+**NOTE:** If you are testing against https://hydra.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
 are no CORS errors
 
 Or You can [run a local hydra + plone instance](#Local-Development) (see below).
@@ -155,7 +155,7 @@ Now an editor can :-
    - Note: You now need to create a page and give it a title before editing.
       - This has the benefit that images added during editing always default to being contained inside the page.  
 - edit a page and after you save it will reload the iframe and the changes will appear on your frontend.
-   - they will be able to add blocks the frontend specifies that it can support. 
+   - they will be able to add blocks the frontend specifies that it can support. (?)
 - remove a page.
 - all other Volto features outside editing work the same.
 
@@ -641,3 +641,32 @@ function createBlockList(data) {
 createBlockList(data);
 ```
 
+### asynchronously-load-the-bridge
+
+One way of loading the bridge asynchronously is by adding this function and calling the function at any point where you want to load the bridge.
+Since your application will be loaded inside an iframe in Volto Hydra, the iframe will be passed a `_edit={true/false}` parameter that we can check for.
+If this parameter is present and set to true, we should be inside the editor & are in edit mode.
+```js
+function loadBridge(callback) {
+    const existingScript = document.getElementById("hydraBridge");
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "your-hydra-js-path";
+      script.id = "hydraBridge";
+      document.body.appendChild(script);
+      script.onload = () => {
+        callback();
+      };
+    } else {
+      callback();
+    }
+}
+
+if (window.location.search.includes('_edit')) {
+  loadBridge(() => {
+    const { initBridge } = window
+    const hydraBridgeInstance = new initBridge()
+  })
+}
+
+```
