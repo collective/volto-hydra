@@ -1,6 +1,12 @@
 import withObjectBrowser from '@plone/volto/components/manage/Sidebar/ObjectBrowser';
 import React, { useEffect } from 'react';
-
+/**
+ * An empty fragment component wrapped around by `withObjectBrowser` hoc, that
+ * listens for messages from the iframe and opens the object browser
+ * using the `openObjectBrowser` method from the props.
+ * @param {*} props
+ * @returns
+ */
 const OpenObjectBrowser = (props) => {
   const { openObjectBrowser, closeObjectBrowser, isInlineEditingRef, origin } =
     props;
