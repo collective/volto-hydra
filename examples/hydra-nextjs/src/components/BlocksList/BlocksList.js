@@ -1,33 +1,33 @@
 /* eslint-disable @next/next/no-img-element */
-import React from 'react';
-import SlateBlock from '@/components/SlateBlock';
+import React from "react";
+import SlateBlock from "@/components/SlateBlock";
 
 const BlocksList = ({ data }) => {
   return (
-    <ul className="blog-list">
+    <div className="blog-list">
       {data.blocks_layout.items.map((id) => {
-        if (data.blocks[id]['@type'] === 'slate') {
+        if (data.blocks[id]["@type"] === "slate") {
           const slateValue = data.blocks[id].value;
 
           return (
-            <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
+            <div key={id} className="blog-list-item" data-block-uid={`${id}`}>
               <SlateBlock
                 value={
                   slateValue || [
-                    { nodeId: 1, type: 'p', children: [{ text: '&nbsp;' }] },
+                    { nodeId: 1, type: "p", children: [{ text: "&nbsp;" }] },
                   ]
                 }
               />
-            </li>
+            </div>
           );
-        } else if (data.blocks[id]['@type'] === 'image') {
+        } else if (data.blocks[id]["@type"] === "image") {
           const image_url = data.blocks[id]?.image_scales
             ? `${data.blocks[id].url}/++api++/${data.blocks[id]?.image_scales.image[0].download}`
             : data.blocks[id].url;
           const size = data.blocks[id].size;
           const align = data.blocks[id].align;
           return (
-            <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
+            <div key={id} className="blog-list-item" data-block-uid={`${id}`}>
               <img
                 src={image_url}
                 className={`blog-list-item-img image-size-${size} image-align-${align}`}
@@ -35,26 +35,25 @@ const BlocksList = ({ data }) => {
                 width={100}
                 height={100}
               />
-            </li>
+            </div>
           );
-        } else if (data.blocks[id]['@type'] === 'teaser') {
+        } else if (data.blocks[id]["@type"] === "teaser") {
           const teaser = data.blocks[id];
           const teaserHeadTitle = teaser.head_title;
           const teaserTitle = teaser.title;
           const teaserDescription = teaser.description;
           const teaserLink =
             teaser.href && teaser.href.length > 0
-              ? teaser.href[0]['@id']
+              ? teaser.href[0]["@id"]
               : null;
           const teaserLinkTitle =
             teaser.href && teaser.href.length > 0 ? teaser.href[0].title : null;
 
           return (
-            <li
+            <div
               key={id}
               className="blog-list-item teaser-block"
-              data-block-uid={`${id}`}
-            >
+              data-block-uid={`${id}`}>
               <div className="teaser-content">
                 {teaserHeadTitle && (
                   <h3 className="teaser-head-title">{teaserHeadTitle}</h3>
@@ -67,8 +66,7 @@ const BlocksList = ({ data }) => {
                 {teaserDescription && (
                   <p
                     data-editable-field="description"
-                    className="teaser-description"
-                  >
+                    className="teaser-description">
                     {teaserDescription}
                   </p>
                 )}
@@ -78,14 +76,14 @@ const BlocksList = ({ data }) => {
                   </a>
                 )}
               </div>
-            </li>
+            </div>
           );
-        } else if (data.blocks[id]['@type'] === 'video') {
+        } else if (data.blocks[id]["@type"] === "video") {
           const video_url = data.blocks[id].url;
           const size = data.blocks[id].size;
           const align = data.blocks[id].align;
           return (
-            <li key={id} className="blog-list-item" data-block-uid={`${id}`}>
+            <div key={id} className="blog-list-item" data-block-uid={`${id}`}>
               <video
                 src={video_url}
                 className={`blog-list-item-video video-size-${size} video-align-${align}`}
@@ -93,12 +91,12 @@ const BlocksList = ({ data }) => {
                 width={100}
                 height={100}
               />
-            </li>
+            </div>
           );
         }
         return null;
       })}
-    </ul>
+    </div>
   );
 };
 

@@ -33,7 +33,7 @@ part of the frontend code. Instead a small js file called ```hydra.js``` is incl
 that handles the iframe bridge communication to hydra which is running in the same browser window. Hydra.js also 
 handles small parts of UI that need to be displayed on the frontend during editing.
 
-You could think of it as spiting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
+You could think of it as splitting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
 making the Rendering part easily replaceable with other implementations.
 
 ```
@@ -80,7 +80,7 @@ making the Rendering part easily replaceable with other implementations.
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
 Go to user preferences in the bottom left to select one of the available preset frontends or paste in your own frontend url to test.
 
-Note: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
+**Note**: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
 
 Available example frontends:
 - https://hydra-blogsite-nextjs.vercel.app (Blog style website using Next.js)
@@ -108,15 +108,15 @@ TODO: link to more documentation on creating a frontend using @plone/client
 
 ### Test your frontend
 
-The easiest way is to connect it directly to https://hydra.pretagov.com/++api++
-NOTE: If you are testing against https://hydra.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
+The easiest way is to connect it directly to https://hydra.pretagov.com/++api++ <br />
+**NOTE:** If you are testing against https://hydra.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
 are no CORS errors
 
 Or You can [run a local hydra + plone instance](#Local-Development) (see below).
 
 ### Deploy your frontend
 
-Use netlify or similar and make your frontend publicly accessible.
+Use Netlify or similar and make your frontend publicly accessible.
 Ensure you have correctly set the CORS headers to allow access by the hydra editor. How to do this will depend
 on how you host your frontend.
 
@@ -143,7 +143,7 @@ To do this you will include the hydra iframe bridge which creates a two way link
 - Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend or deployed frontend to test.
    - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on a local hydra instance to have this frontend selectable by the user.
    - The url should be the prefix to which the current path is appended so both /#!/path and /path style routing is supported.
-- Your frontend will know to initialise the hydra iframe bridge when it is being edited using hydra as it will have an added url parameter ```_edit=true```
+- Your frontend will know to initialize the hydra iframe bridge when it is being edited using hydra as it will have an added url parameter ```_edit=true```
    - you might choose to [load `hydra.js` asynchronously](#asynchronously-load-the-bridge) so no additional js is loaded unless editing.
 - You will need to [change your authentication token]((#authenticate-frontend-to-access-private-content)) you are using with the rest api so you can access the same content as the logged in editor.
 
@@ -155,7 +155,7 @@ Now an editor can :-
    - Note: You now need to create a page and give it a title before editing.
       - This has the benefit that images added during editing always default to being contained inside the page.  
 - edit a page and after you save it will reload the iframe and the changes will appear on your frontend.
-   - they will be able to add blocks the frontend specifies that it can support. 
+   - they will be able to add blocks the frontend specifies that it can support. (?)
 - remove a page.
 - all other Volto features outside editing work the same.
 
@@ -228,7 +228,7 @@ code your frontend used to render the page previously.
 
 Now an editor can:-
 - change a block in the sidebar and have it change on the frontend even as you type in WYSIWYG style
-- Add and remove blocks in the side bar and have them appear on the frontend preview
+- Add and remove blocks in the sidebar and have them appear on the frontend preview
 - Change page metadata and have blocks that depend on this like the "Title" block change.
 
 These updates are sent frequently as the user makes changes in the sidebar but can adjust the frequency of updates for
@@ -278,9 +278,9 @@ but if you wanted to allow many columns each with many blocks inside you can use
 </table>
 ```
 
-- The allowed block types for a given container can be overridden in the hydra settings at initialisation.
+- The allowed block types for a given container can be overridden in the hydra settings at initialization.
 - The first of the allowed blocks is the default block. In the case where the only remaining block is deleted, a new empty default
-  block will be created in it's place so that a container is never empty.
+  block will be created in its place so that a container is never empty (TODO).
   - if you want to allow choice of the first block then a chooser block can be the default (TODO)
 - The orientation tells hydra where to place the add button and DND drop markers.
 - if there is a maximum number of blocks a container can hold then specify it in the data attribute ```data-block-container-horizontal="blocks,4"```
@@ -292,7 +292,7 @@ Now an editor can do the following on a container such as the Grid Block:
 - Use enter on a rich text block to add a sub-block
 - remove blocks from a container
 - DND blocks in and out of containers or to reorder them
-- if it is hard to select a container using the mouse then the quanta toolbar provides a "up" action ([TODO](https://github.com/collective/volto-hydra/issues/66))  
+- if it is hard to select a container using the mouse then the quanta toolbar provides an "up" action ([TODO](https://github.com/collective/volto-hydra/issues/66))  
   to select the container of the current block. On mobile a single press
   selects the container and a double press selects the sub-block. 
 
@@ -360,7 +360,7 @@ the json value might be
       }
     ],
     "type": "bold",
-    "id": 1
+    "nodeId": 1
   },
   {
     "text": ", it will change everything"
@@ -526,6 +526,14 @@ There is a [set of example frontends](https://github.com/collective/volto-hydra/
 in the github repo that might help you. In addition, here are some examples on how you could handle 
 hooking into the hydra bridge.
 
+#### To run Nextjs example:
+
+You can run ```npm run dev``` in `examples/hydra-nextjs/` to start the nextjs frontend at localhost:3002
+
+#### To run Vue F7 example:
+
+You can run ```npm run dev``` in `examples/hydra-vue-f7/` to start the vue-f7 frontend at localhost:5173
+
 #### Asynchronously Load the Hydra.js Bridge
 
 You don't need to load the hydra bridge until the user logs into the editor so it’s recommended to load the bridge only when necessary, such as in edit mode (```window.location.search.includes('_edit=true')```)
@@ -633,3 +641,32 @@ function createBlockList(data) {
 createBlockList(data);
 ```
 
+### asynchronously-load-the-bridge
+
+One way of loading the bridge asynchronously is by adding this function and calling the function at any point where you want to load the bridge.
+Since your application will be loaded inside an iframe in Volto Hydra, the iframe will be passed a `_edit={true/false}` parameter that we can check for.
+If this parameter is present and set to true, we should be inside the editor & are in edit mode.
+```js
+function loadBridge(callback) {
+    const existingScript = document.getElementById("hydraBridge");
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "your-hydra-js-path";
+      script.id = "hydraBridge";
+      document.body.appendChild(script);
+      script.onload = () => {
+        callback();
+      };
+    } else {
+      callback();
+    }
+}
+
+if (window.location.search.includes('_edit')) {
+  loadBridge(() => {
+    const { initBridge } = window
+    const hydraBridgeInstance = new initBridge()
+  })
+}
+
+```

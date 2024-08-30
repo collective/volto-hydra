@@ -65,7 +65,7 @@ const applyConfig = (config) => {
       { '@type': 'title' },
       {
         '@type': 'slate',
-        value: [{ type: 'p', children: [{ text: '' }] }],
+        value: [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }],
       },
     ],
   };

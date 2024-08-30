@@ -70,7 +70,7 @@
 // injectCSS
 
 ////////////////////////////////////////////////////////////////////////////////
-// Methods provided by THIS hydra.js as export
+// Methods provided by THIS hydra.js while importing
 ////////////////////////////////////////////////////////////////////////////////
 
 // initBridge
@@ -102,7 +102,7 @@ class Bridge {
     this.clickOnBtn = false;
     this.quantaToolbar = null;
     this.currentUrl =
-      typeof window !== 'undefined' ? new URL(window.location.href) : null;
+      typeof window !== "undefined" ? new URL(window.location.href) : null;
     this.formData = null;
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
@@ -124,7 +124,7 @@ class Bridge {
    * @param {Object} options - Options for initialization.
    */
   init(options = {}) {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return; // Exit if not in a browser environment
     }
 
@@ -143,8 +143,8 @@ class Bridge {
         }
 
         // Handle hash changes & popstate events (only happens when browser back/forward buttons is clicked)
-        window.addEventListener('hashchange', checkNavigation);
-        window.addEventListener('popstate', checkNavigation);
+        window.addEventListener("hashchange", checkNavigation);
+        window.addEventListener("popstate", checkNavigation);
 
         // Intercept pushState and replaceState to detect navigation changes
         const originalPushState = window.history.pushState;
@@ -165,28 +165,28 @@ class Bridge {
         if (window.location.pathname !== currentUrlObj.pathname) {
           window.parent.postMessage(
             {
-              type: 'PATH_CHANGE',
+              type: "PATH_CHANGE",
               path: window.location.pathname,
             },
-            this.adminOrigin,
+            this.adminOrigin
           );
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
-          const i = hash.indexOf('/');
+          const i = hash.indexOf("/");
           window.parent.postMessage(
             {
-              type: 'PATH_CHANGE',
-              path: i !== -1 ? hash.slice(i) || '/' : '/',
+              type: "PATH_CHANGE",
+              path: i !== -1 ? hash.slice(i) || "/" : "/",
             },
-            this.adminOrigin,
+            this.adminOrigin
           );
         }
       });
 
       // Get the access token from the URL
       const url = new URL(window.location.href);
-      const access_token = url.searchParams.get('access_token');
-      const isEditMode = url.searchParams.get('_edit') === 'true';
+      const access_token = url.searchParams.get("access_token");
+      const isEditMode = url.searchParams.get("_edit") === "true";
       if (access_token) {
         this.token = access_token;
         this._setTokenCookie(access_token);
@@ -195,8 +195,8 @@ class Bridge {
       if (options) {
         if (options.allowedBlocks) {
           window.parent.postMessage(
-            { type: 'ALLOWED_BLOCKS', allowedBlocks: options.allowedBlocks },
-            this.adminOrigin,
+            { type: "ALLOWED_BLOCKS", allowedBlocks: options.allowedBlocks },
+            this.adminOrigin
           );
         }
       }
@@ -206,26 +206,26 @@ class Bridge {
         this.injectCSS();
         this.listenForSelectBlockMessage();
         window.parent.postMessage(
-          { type: 'GET_INITIAL_DATA' },
-          this.adminOrigin,
+          { type: "GET_INITIAL_DATA" },
+          this.adminOrigin
         );
         const reciveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
-            if (e.data.type === 'INITIAL_DATA') {
+            if (e.data.type === "INITIAL_DATA") {
               this.formData = JSON.parse(JSON.stringify(e.data.data));
               window.postMessage(
                 {
-                  type: 'FORM_DATA',
+                  type: "FORM_DATA",
                   data: this.formData,
-                  sender: 'hydrajs-initial',
+                  sender: "hydrajs-initial",
                 },
-                window.location.origin,
+                window.location.origin
               );
             }
           }
         };
-        window.removeEventListener('message', reciveInitialData);
-        window.addEventListener('message', reciveInitialData);
+        window.removeEventListener("message", reciveInitialData);
+        window.addEventListener("message", reciveInitialData);
       }
     }
   }
@@ -260,8 +260,8 @@ class Bridge {
         event.origin === window.location.origin
       ) {
         if (
-          event.data.type === 'FORM_DATA' ||
-          event.data.type === 'TOGGLE_MARK_DONE'
+          event.data.type === "FORM_DATA" ||
+          event.data.type === "TOGGLE_MARK_DONE"
         ) {
           if (event.data.data) {
             this.isInlineEditing = false;
@@ -280,61 +280,61 @@ class Bridge {
               if (this.selectedBlockUid) {
                 // Check if a block is selected
                 const blockElement = document.querySelector(
-                  `[data-block-uid="${this.selectedBlockUid}"]`,
+                  `[data-block-uid="${this.selectedBlockUid}"]`
                 );
                 const isToolbarPresent = blockElement?.contains(
-                  this.quantaToolbar,
+                  this.quantaToolbar
                 );
                 if (blockElement && !isToolbarPresent) {
                   // Add border to the currently selected block
-                  blockElement.classList.add('volto-hydra--outline');
+                  blockElement.classList.add("volto-hydra--outline");
                   let show = { formatBtns: false };
                   if (
                     this.formData &&
                     this.formData.blocks[this.selectedBlockUid] &&
-                    this.formData.blocks[this.selectedBlockUid]['@type'] ===
-                      'slate'
+                    this.formData.blocks[this.selectedBlockUid]["@type"] ===
+                      "slate"
                   ) {
                     show.formatBtns = true;
                   }
                   this.prevSelectedBlock &&
                     this.deselectBlock(
-                      this.prevSelectedBlock.getAttribute('data-block-uid'),
-                      this.selectedBlockUid,
+                      this.prevSelectedBlock.getAttribute("data-block-uid"),
+                      this.selectedBlockUid
                     );
                   this.quantaToolbar = null;
                   this.createQuantaToolbar(this.selectedBlockUid, show);
                   const editableField = blockElement.getAttribute(
-                    'data-editable-field',
+                    "data-editable-field"
                   );
-                  if (editableField === 'value') {
+                  if (editableField === "value") {
                     this.makeBlockContentEditable(blockElement);
                   } else if (editableField !== null) {
-                    blockElement.setAttribute('contenteditable', 'true');
+                    blockElement.setAttribute("contenteditable", "true");
                   }
                   const editableChildren = blockElement.querySelectorAll(
-                    '[data-editable-field]',
+                    "[data-editable-field]"
                   );
                   editableChildren.forEach((child) => {
-                    child.setAttribute('contenteditable', 'true');
+                    child.setAttribute("contenteditable", "true");
                   });
                   this.prevSelectedBlock = blockElement;
                   this.observeBlockTextChanges(blockElement);
                 }
               } else {
-                // console.warn('No block is selected to add Toolbar');
+                console.warn("No block is selected to add Toolbar");
               }
             }, 0); // Use setTimeout to ensure execution after the current call stack
           } else {
-            throw new Error('No form data has been sent from the adminUI');
+            throw new Error("No form data has been sent from the adminUI");
           }
         }
       }
     };
 
     // Ensure we don't add multiple listeners
-    window.removeEventListener('message', this.realTimeDataHandler);
-    window.addEventListener('message', this.realTimeDataHandler);
+    window.removeEventListener("message", this.realTimeDataHandler);
+    window.addEventListener("message", this.realTimeDataHandler);
   }
   /**
    * Creates the Quanta toolbar for the selected block.
@@ -349,42 +349,42 @@ class Bridge {
       return;
     }
     const blockElement = document.querySelector(
-      `[data-block-uid="${blockUid}"]`,
+      `[data-block-uid="${blockUid}"]`
     );
     // Create the quantaToolbar
-    this.quantaToolbar = document.createElement('div');
-    this.quantaToolbar.className = 'volto-hydra-quantaToolbar';
+    this.quantaToolbar = document.createElement("div");
+    this.quantaToolbar.className = "volto-hydra-quantaToolbar";
 
     // Prevent click event propagation for the quantaToolbar
-    this.quantaToolbar.addEventListener('click', (e) => e.stopPropagation());
+    this.quantaToolbar.addEventListener("click", (e) => e.stopPropagation());
 
     // Create the Add button
-    this.addButton = document.createElement('button');
-    this.addButton.className = 'volto-hydra-add-button';
+    this.addButton = document.createElement("button");
+    this.addButton.className = "volto-hydra-add-button";
     this.addButton.innerHTML = addSVG;
     this.addButton.onclick = (e) => {
       e.stopPropagation();
       this.clickOnBtn = true;
       window.parent.postMessage(
-        { type: 'ADD_BLOCK', uid: blockUid },
-        this.adminOrigin,
+        { type: "ADD_BLOCK", uid: blockUid },
+        this.adminOrigin
       );
     };
     blockElement.appendChild(this.addButton);
 
     // Create the drag button
-    const dragButton = document.createElement('button');
-    dragButton.className = 'volto-hydra-drag-button';
+    const dragButton = document.createElement("button");
+    dragButton.className = "volto-hydra-drag-button";
     dragButton.innerHTML = dragSVG;
     let isDragging = false;
     let startY;
     // dragButton.disabled = true;
-    dragButton.addEventListener('mousedown', (e) => {
+    dragButton.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      document.querySelector('body').classList.add('grabbing');
+      document.querySelector("body").classList.add("grabbing");
       // Create a copy of the block
       const draggedBlock = blockElement.cloneNode(true);
-      draggedBlock.classList.add('dragging');
+      draggedBlock.classList.add("dragging");
       document.body.appendChild(draggedBlock);
 
       // Position the copy under the cursor
@@ -407,13 +407,13 @@ class Bridge {
           throttleTimeout = setTimeout(() => {
             const elementBelow = document.elementFromPoint(
               e.clientX,
-              e.clientY,
+              e.clientY
             );
             let closestBlock = elementBelow;
             // Find the closest ancestor with 'data-block-id'
             while (
               closestBlock &&
-              !closestBlock.hasAttribute('data-block-uid')
+              !closestBlock.hasAttribute("data-block-uid")
             ) {
               closestBlock = closestBlock.parentElement;
             }
@@ -422,13 +422,13 @@ class Bridge {
               // Remove border from any previously highlighted block
               const prevHighlighted =
                 insertAt === 0
-                  ? document.querySelector('.highlighted-block')
-                  : document.querySelector('.highlighted-block-bottom');
+                  ? document.querySelector(".highlighted-block")
+                  : document.querySelector(".highlighted-block-bottom");
 
               if (prevHighlighted) {
                 prevHighlighted.classList.remove(
-                  'highlighted-block',
-                  'highlighted-block-bottom',
+                  "highlighted-block",
+                  "highlighted-block-bottom"
                 );
               }
 
@@ -446,16 +446,16 @@ class Bridge {
               closestBlock.classList.add(
                 `${
                   insertAt === 0
-                    ? 'highlighted-block'
-                    : 'highlighted-block-bottom'
+                    ? "highlighted-block"
+                    : "highlighted-block-bottom"
                 }`,
                 `${
                   insertAt === 0
-                    ? 'highlighted-block'
-                    : 'highlighted-block-bottom'
-                }`,
+                    ? "highlighted-block"
+                    : "highlighted-block-bottom"
+                }`
               );
-              closestBlockUid = closestBlock.getAttribute('data-block-uid');
+              closestBlockUid = closestBlock.getAttribute("data-block-uid");
             } else {
               // console.log("Not hovering over any block");
             }
@@ -485,14 +485,14 @@ class Bridge {
       };
       // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
       const onMouseUp = () => {
-        document.querySelector('body').classList.remove('grabbing');
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        document.querySelector("body").classList.remove("grabbing");
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
         isDragging = false;
         clearTimeout(startYTimeout);
         draggedBlock.remove();
         if (closestBlockUid) {
-          const draggedBlockId = blockElement.getAttribute('data-block-uid');
+          const draggedBlockId = blockElement.getAttribute("data-block-uid");
 
           const blocks_layout = this.formData.blocks_layout.items;
           const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
@@ -507,23 +507,23 @@ class Bridge {
             blocks_layout.splice(insertIndex, 0, draggedBlockId);
             if (insertAt === 0) {
               document
-                .querySelector('.highlighted-block')
-                .classList.remove('highlighted-block');
+                .querySelector(".highlighted-block")
+                .classList.remove("highlighted-block");
             } else {
               document
-                .querySelector('.highlighted-block-bottom')
-                .classList.remove('highlighted-block-bottom');
+                .querySelector(".highlighted-block-bottom")
+                .classList.remove("highlighted-block-bottom");
             }
             window.parent.postMessage(
-              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
-              this.adminOrigin,
+              { type: "UPDATE_BLOCKS_LAYOUT", data: this.formData },
+              this.adminOrigin
             );
           }
         }
       };
 
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
     });
 
     let currentFormats = null;
@@ -534,64 +534,64 @@ class Bridge {
 
     if (show.formatBtns) {
       // Create the bold button
-      boldButton = document.createElement('button');
+      boldButton = document.createElement("button");
       boldButton.className = `volto-hydra-format-button ${
-        show.formatBtns ? 'show' : ''
+        show.formatBtns ? "show" : ""
       }`;
       boldButton.innerHTML = boldSVG;
-      boldButton.addEventListener('click', () => {
+      boldButton.addEventListener("click", () => {
         currentFormats &&
-          this.formatSelectedText('bold', currentFormats['bold'].present);
+          this.formatSelectedText("bold", currentFormats["bold"].present);
       });
 
       // Create the italic button
-      italicButton = document.createElement('button');
+      italicButton = document.createElement("button");
       italicButton.className = `volto-hydra-format-button ${
-        show.formatBtns ? 'show' : ''
+        show.formatBtns ? "show" : ""
       }`;
       italicButton.innerHTML = italicSVG;
-      italicButton.addEventListener('click', () => {
+      italicButton.addEventListener("click", () => {
         currentFormats &&
-          this.formatSelectedText('italic', currentFormats['italic'].present);
+          this.formatSelectedText("italic", currentFormats["italic"].present);
       });
 
       // Create the del button
-      delButton = document.createElement('button');
+      delButton = document.createElement("button");
       delButton.className = `volto-hydra-format-button ${
-        show.formatBtns ? 'show' : ''
+        show.formatBtns ? "show" : ""
       }`;
       delButton.innerHTML = delSVG;
-      delButton.addEventListener('click', () => {
+      delButton.addEventListener("click", () => {
         currentFormats &&
-          this.formatSelectedText('del', currentFormats['del'].present);
+          this.formatSelectedText("del", currentFormats["del"].present);
       });
 
       // Create the del button
-      linkButton = document.createElement('button');
+      linkButton = document.createElement("button");
       linkButton.className = `volto-hydra-format-button ${
-        show.formatBtns ? 'show' : ''
+        show.formatBtns ? "show" : ""
       }`;
       linkButton.innerHTML = linkSVG;
-      linkButton.addEventListener('click', () => {
+      linkButton.addEventListener("click", () => {
         const selection = window.getSelection();
         if (!selection.rangeCount || selection.isCollapsed) return;
         const listenClickOutside = (e) => {
-          if (!e.target.closest('.link-input-container')) {
-            linkButton.classList.remove('active');
+          if (!e.target.closest(".link-input-container")) {
+            linkButton.classList.remove("active");
             container?.remove();
             if (this.quantaToolbar)
-              this.quantaToolbar.style.visibility = 'visible';
+              this.quantaToolbar.style.visibility = "visible";
           }
         };
-        document.addEventListener('click', listenClickOutside, { once: true });
+        document.addEventListener("click", listenClickOutside, { once: true });
         const range = selection.getRangeAt(0);
 
-        linkButton.classList.add('active');
-        this.quantaToolbar.style.visibility = 'hidden';
+        linkButton.classList.add("active");
+        this.quantaToolbar.style.visibility = "hidden";
         const commonAncestor = range.commonAncestorContainer;
 
-        const container = document.createElement('div');
-        container.classList.add('link-input-container');
+        const container = document.createElement("div");
+        container.classList.add("link-input-container");
 
         const isValidURL = (url) => {
           try {
@@ -602,87 +602,88 @@ class Bridge {
           }
         };
 
-        const inputField = document.createElement('input');
-        inputField.classList.add('link-input');
-        inputField.type = 'url';
-        inputField.placeholder = 'Type a URL...';
-        inputField.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') {
-            linkButton.classList.remove('active');
+        const inputField = document.createElement("input");
+        inputField.classList.add("link-input");
+        inputField.type = "url";
+        inputField.placeholder = "Type a URL...";
+        inputField.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            linkButton.classList.remove("active");
             container.remove();
-            this.quantaToolbar.style.visibility = 'visible';
-          } else if (e.key === 'Enter') {
+            this.quantaToolbar.style.visibility = "visible";
+          } else if (e.key === "Enter") {
             e.preventDefault();
             submitBtn.click();
-          } else if (e.key === 'Tab') {
+          } else if (e.key === "Tab") {
             e.preventDefault();
             inputField.blur();
-            if (inputField.nextSibling.classList.contains('hide'))
+            if (inputField.nextSibling.classList.contains("hide"))
               cancelBtn.focus();
             else submitBtn.focus();
           }
         });
-        inputField.addEventListener('input', (e) => {
+        inputField.addEventListener("input", (e) => {
           const currentValue = e.target.value;
           if (isValidURL(currentValue)) {
-            container.classList.remove('link-invalid-url');
+            container.classList.remove("link-invalid-url");
             submitBtn.disabled = false;
           } else {
-            container.classList.add('link-invalid-url');
+            container.classList.add("link-invalid-url");
             submitBtn.disabled = true;
           }
-          if (currentValue === '') {
-            submitBtn.classList.add('hide');
-            cancelBtn.classList.remove('hide');
+          if (currentValue === "") {
+            submitBtn.classList.add("hide");
+            cancelBtn.classList.remove("hide");
           } else {
-            submitBtn.classList.remove('hide');
-            cancelBtn.classList.add('hide');
+            submitBtn.classList.remove("hide");
+            cancelBtn.classList.add("hide");
           }
         });
-        const folderBtn = document.createElement('button');
-        folderBtn.classList.add('link-folder-btn');
+        const folderBtn = document.createElement("button");
+        folderBtn.classList.add("link-folder-btn");
         folderBtn.innerHTML = linkFolderSVG;
-        folderBtn.addEventListener('click', () => {
+        folderBtn.addEventListener("click", () => {
           this.handleObjectBrowserMessage = (e) => {
             if (
               e.origin === this.adminOrigin &&
-              e.data.type === 'OBJECT_SELECTED'
+              e.data.type === "OBJECT_SELECTED"
             ) {
               const path = e.data.path;
               inputField.value = `${window.location.origin}${path}`;
+              
               submitBtn.click();
             }
           };
           window.removeEventListener(
-            'message',
-            this.handleObjectBrowserMessage,
+            "message",
+            this.handleObjectBrowserMessage
           );
-          window.addEventListener('message', this.handleObjectBrowserMessage);
+          window.addEventListener("message", this.handleObjectBrowserMessage);
           window.parent.postMessage(
             {
-              type: 'OPEN_OBJECT_BROWSER',
-              mode: 'link',
+              type: "OPEN_OBJECT_BROWSER",
+              mode: "link",
             },
-            this.adminOrigin,
+            this.adminOrigin
           );
         });
 
-        const submitBtn = document.createElement('button');
-        submitBtn.classList.add('link-submit-btn', 'hide');
+        const submitBtn = document.createElement("button");
+        submitBtn.classList.add("link-submit-btn", "hide");
         submitBtn.innerHTML = linkSubmitSVG;
-        submitBtn.addEventListener('click', () => {
+        submitBtn.addEventListener("click", () => {
           const url = inputField.value;
-          if (!currentFormats['link'].present) {
-            const link = document.createElement('a');
+          if (!currentFormats["link"].present) {
+            const link = document.createElement("a");
             link.href = url;
             range.surroundContents(link);
           } else {
-            if (currentFormats['link'].enclosing)
-              range.commonAncestorContainer.parentNode.closest('a').href = url;
+            if (currentFormats["link"].enclosing)
+              range.commonAncestorContainer.parentNode.closest("a").href = url;
             else {
               const children = commonAncestor.children;
               for (let i = 0; i < children.length; i++) {
-                if (children[i].tagName === 'A') {
+                if (children[i].tagName === "A") {
                   children[i].href = url;
                   break;
                 }
@@ -695,27 +696,27 @@ class Bridge {
 
           window.parent.postMessage(
             {
-              type: 'TOGGLE_MARK',
+              type: "TOGGLE_MARK",
               html: htmlString,
             },
-            this.adminOrigin,
+            this.adminOrigin
           );
-          linkButton.classList.remove('active');
+          linkButton.classList.remove("active");
           container.remove(); // Close the input field (why errrrror? whyyy..)(sometimes)
-          this.quantaToolbar.style.visibility = 'visible';
+          this.quantaToolbar.style.visibility = "visible";
         });
 
-        const cancelBtn = document.createElement('button');
-        cancelBtn.classList.add('link-cancel-btn');
+        const cancelBtn = document.createElement("button");
+        cancelBtn.classList.add("link-cancel-btn");
         cancelBtn.innerHTML = linkCancelSVG;
-        cancelBtn.addEventListener('click', () => {
-          if (currentFormats['link'].present) {
-            this.unwrapFormatting(range, 'link');
+        cancelBtn.addEventListener("click", () => {
+          if (currentFormats["link"].present) {
+            this.unwrapFormatting(range, "link");
             this.sendFormattedHTMLToAdminUI(selection);
           }
-          linkButton.classList.remove('active');
+          linkButton.classList.remove("active");
           container.remove();
-          this.quantaToolbar.style.visibility = 'visible';
+          this.quantaToolbar.style.visibility = "visible";
           return;
         });
 
@@ -724,22 +725,22 @@ class Bridge {
         container.appendChild(submitBtn);
         container.appendChild(cancelBtn);
 
-        if (currentFormats['link'].present) {
-          if (currentFormats['link'].enclosing) {
+        if (currentFormats["link"].present) {
+          if (currentFormats["link"].enclosing) {
             inputField.value = commonAncestor.parentNode
-              ?.closest('a')
-              ?.getAttribute('href');
+              ?.closest("a")
+              ?.getAttribute("href");
           } else {
             const children = commonAncestor.children;
             for (let i = 0; i < children.length; i++) {
-              if (children[i].tagName === 'A') {
-                inputField.value = children[i].getAttribute('href');
+              if (children[i].tagName === "A") {
+                inputField.value = children[i].getAttribute("href");
                 break;
               }
             }
           }
         } else {
-          container.classList.add('link-invalid-url');
+          container.classList.add("link-invalid-url");
         }
         // Append the container to the link button's parent
         linkButton.parentNode.appendChild(container);
@@ -753,20 +754,20 @@ class Bridge {
 
         currentFormats = this.isFormatted(range);
         boldButton.classList.toggle(
-          'active',
-          currentFormats.bold.enclosing || currentFormats.bold.present,
+          "active",
+          currentFormats.bold.enclosing || currentFormats.bold.present
         );
         italicButton.classList.toggle(
-          'active',
-          currentFormats.italic.enclosing || currentFormats.italic.present,
+          "active",
+          currentFormats.italic.enclosing || currentFormats.italic.present
         );
         delButton.classList.toggle(
-          'active',
-          currentFormats.del.enclosing || currentFormats.del.present,
+          "active",
+          currentFormats.del.enclosing || currentFormats.del.present
         );
         linkButton.classList.toggle(
-          'active',
-          currentFormats.link.enclosing || currentFormats.link.present,
+          "active",
+          currentFormats.link.enclosing || currentFormats.link.present
         );
       };
 
@@ -774,47 +775,47 @@ class Bridge {
       this.handleMouseUp = (e) => {
         if (
           e.target.closest('[data-editable-field="value"]') &&
-          !e.target.closest('.volto-hydra-quantaToolbar') &&
+          !e.target.closest(".volto-hydra-quantaToolbar") &&
           e.target
-            .closest('[data-block-uid]')
-            .getAttribute('data-block-uid') === blockUid
+            .closest("[data-block-uid]")
+            .getAttribute("data-block-uid") === blockUid
         ) {
           handleSelectionChange();
         }
       };
-      blockElement.addEventListener('mouseup', this.handleMouseUp);
+      blockElement.addEventListener("mouseup", this.handleMouseUp);
     }
 
     // Create the three-dot menu button
-    const menuButton = document.createElement('button');
-    menuButton.className = 'volto-hydra-menu-button';
+    const menuButton = document.createElement("button");
+    menuButton.className = "volto-hydra-menu-button";
     menuButton.innerHTML = threeDotsSVG;
 
     // Create the dropdown menu
-    const dropdownMenu = document.createElement('div');
-    dropdownMenu.className = 'volto-hydra-dropdown-menu';
+    const dropdownMenu = document.createElement("div");
+    dropdownMenu.className = "volto-hydra-dropdown-menu";
 
     // Create the 'Remove' option
-    const removeOption = document.createElement('div');
-    removeOption.className = 'volto-hydra-dropdown-item';
+    const removeOption = document.createElement("div");
+    removeOption.className = "volto-hydra-dropdown-item";
     removeOption.innerHTML = `${deleteSVG} <div class="volto-hydra-dropdown-text">Remove</div>`;
     removeOption.onclick = () => {
       this.clickOnBtn = true;
       window.parent.postMessage(
-        { type: 'DELETE_BLOCK', uid: blockUid },
-        this.adminOrigin,
+        { type: "DELETE_BLOCK", uid: blockUid },
+        this.adminOrigin
       );
     };
 
     // Create the 'Settings' option
-    const settingsOption = document.createElement('div');
-    settingsOption.className = 'volto-hydra-dropdown-item';
+    const settingsOption = document.createElement("div");
+    settingsOption.className = "volto-hydra-dropdown-item";
     settingsOption.innerHTML = `${settingsSVG} <div class="volto-hydra-dropdown-text">Settings</div>`;
     // ---Add settings click handler here (currently does nothing)---
 
     // Create the divider
-    const divider = document.createElement('div');
-    divider.className = 'volto-hydra-divider';
+    const divider = document.createElement("div");
+    divider.className = "volto-hydra-divider";
 
     // Append options to the dropdown menu
     dropdownMenu.appendChild(settingsOption);
@@ -822,17 +823,17 @@ class Bridge {
     dropdownMenu.appendChild(removeOption);
 
     // Add event listener to toggle dropdown visibility
-    menuButton.addEventListener('click', (e) => {
+    menuButton.addEventListener("click", (e) => {
       e.stopPropagation();
-      dropdownMenu.classList.toggle('visible');
+      dropdownMenu.classList.toggle("visible");
       document.addEventListener(
-        'click',
+        "click",
         (e) => {
-          if (!e.target.closest('.volto-hydra-dropdown-menu')) {
-            dropdownMenu.classList.remove('visible');
+          if (!e.target.closest(".volto-hydra-dropdown-menu")) {
+            dropdownMenu.classList.remove("visible");
           }
         },
-        { once: true },
+        { once: true }
       );
     });
 
@@ -861,14 +862,14 @@ class Bridge {
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
       event.stopPropagation();
-      const blockElement = event.target.closest('[data-block-uid]');
+      const blockElement = event.target.closest("[data-block-uid]");
       if (blockElement) {
         this.selectBlock(blockElement);
       }
     };
 
-    document.removeEventListener('click', this.blockClickHandler);
-    document.addEventListener('click', this.blockClickHandler);
+    document.removeEventListener("click", this.blockClickHandler);
+    document.addEventListener("click", this.blockClickHandler);
   }
   /**
    * Selects a block and communicates the selection to the adminUI.
@@ -881,22 +882,22 @@ class Bridge {
     // Remove border and button from the previously selected block
     if (
       this.prevSelectedBlock === null ||
-      this.prevSelectedBlock?.getAttribute('data-block-uid') !==
-        blockElement?.getAttribute('data-block-uid')
+      this.prevSelectedBlock?.getAttribute("data-block-uid") !==
+        blockElement?.getAttribute("data-block-uid")
     ) {
       if (this.currentlySelectedBlock) {
         this.deselectBlock(
-          this.currentlySelectedBlock?.getAttribute('data-block-uid'),
-          blockElement?.getAttribute('data-block-uid'),
+          this.currentlySelectedBlock?.getAttribute("data-block-uid"),
+          blockElement?.getAttribute("data-block-uid")
         );
       }
       // Helper function to handle each element
       const handleElement = (element) => {
-        const editableField = element.getAttribute('data-editable-field');
-        if (editableField === 'value') {
+        const editableField = element.getAttribute("data-editable-field");
+        if (editableField === "value") {
           this.makeBlockContentEditable(element);
         } else if (editableField !== null) {
-          element.setAttribute('contenteditable', 'true');
+          element.setAttribute("contenteditable", "true");
         }
       };
 
@@ -904,11 +905,11 @@ class Bridge {
       const handleElementAndChildren = (element) => {
         handleElement(element);
         Array.from(element.children).forEach((child) =>
-          handleElementAndChildren(child),
+          handleElementAndChildren(child)
         );
       };
 
-      const blockUid = blockElement.getAttribute('data-block-uid');
+      const blockUid = blockElement.getAttribute("data-block-uid");
       this.selectedBlockUid = blockUid;
       // Set the currently selected block
 
@@ -916,27 +917,27 @@ class Bridge {
       // if the block is a slate block, add nodeIds to the block's data
       if (
         this.formData &&
-        this.formData.blocks[blockUid]['@type'] === 'slate'
+        this.formData.blocks[blockUid]["@type"] === "slate"
       ) {
         show.formatBtns = true;
         this.formData.blocks[blockUid] = this.addNodeIds(
-          this.formData.blocks[blockUid],
+          this.formData.blocks[blockUid]
         );
         window.postMessage(
-          { type: 'FORM_DATA', data: this.formData, sender: 'hydrajs-nodeids' },
-          window.location.origin,
+          { type: "FORM_DATA", data: this.formData, sender: "hydrajs-nodeids" },
+          window.location.origin
         );
         window.parent.postMessage(
           {
-            type: 'INLINE_EDIT_DATA',
+            type: "INLINE_EDIT_DATA",
             data: this.formData,
-            from: 'selectBlock',
+            from: "selectBlock",
           },
-          this.adminOrigin,
+          this.adminOrigin
         );
       } else {
         // Add border to the currently selected block
-        blockElement.classList.add('volto-hydra--outline');
+        blockElement.classList.add("volto-hydra--outline");
         this.createQuantaToolbar(this.selectedBlockUid, show);
       }
       handleElementAndChildren(blockElement);
@@ -948,8 +949,8 @@ class Bridge {
       this.prevSelectedBlock = blockElement;
       if (!this.clickOnBtn) {
         window.parent.postMessage(
-          { type: 'OPEN_SETTINGS', uid: blockUid },
-          this.adminOrigin,
+          { type: "OPEN_SETTINGS", uid: blockUid },
+          this.adminOrigin
         );
       } else {
         this.clickOnBtn = false;
@@ -957,10 +958,10 @@ class Bridge {
     }
     this.observeBlockTextChanges(blockElement);
     const editableChildren = blockElement.querySelectorAll(
-      '[data-editable-field]',
+      "[data-editable-field]"
     );
     editableChildren.forEach((child) => {
-      child.setAttribute('contenteditable', 'true');
+      child.setAttribute("contenteditable", "true");
     });
   }
 
@@ -972,7 +973,7 @@ class Bridge {
    */
   deselectBlock(prevBlockUid, currBlockUid) {
     const prevBlockElement = document.querySelector(
-      `[data-block-uid="${prevBlockUid}"]`,
+      `[data-block-uid="${prevBlockUid}"]`
     );
 
     if (
@@ -981,7 +982,7 @@ class Bridge {
       prevBlockUid !== currBlockUid &&
       prevBlockElement
     ) {
-      prevBlockElement.classList.remove('volto-hydra--outline');
+      prevBlockElement.classList.remove("volto-hydra--outline");
       if (this.blockObserver) {
         this.blockObserver.disconnect();
       }
@@ -998,16 +999,16 @@ class Bridge {
         this.quantaToolbar = null;
       }
       // Remove contenteditable attribute
-      prevBlockElement.removeAttribute('contenteditable');
-      const childNodes = prevBlockElement.querySelectorAll('[data-node-id]');
+      prevBlockElement.removeAttribute("contenteditable");
+      const childNodes = prevBlockElement.querySelectorAll("[data-node-id]");
       childNodes.forEach((node) => {
-        node.removeAttribute('contenteditable');
+        node.removeAttribute("contenteditable");
       });
 
       // Clean up JSON structure
       // if (this.formData.blocks[this.selectedBlockUid]["@type"] === "slate") this.resetJsonNodeIds(this.formData.blocks[this.selectedBlockUid]);
     }
-    document.removeEventListener('mouseup', this.handleMouseUp);
+    document.removeEventListener("mouseup", this.handleMouseUp);
     // Disconnect the mutation observer
     if (this.blockTextMutationObserver) {
       this.blockTextMutationObserver.disconnect();
@@ -1018,7 +1019,7 @@ class Bridge {
       this.attributeMutationObserver = null;
     }
     if (this.handleObjectBrowserMessage) {
-      window.removeEventListener('message', this.handleObjectBrowserMessage);
+      window.removeEventListener("message", this.handleObjectBrowserMessage);
       this.handleObjectBrowserMessage = null;
     }
   }
@@ -1030,44 +1031,44 @@ class Bridge {
     this.selectBlockHandler = (event) => {
       if (
         event.origin === this.adminOrigin &&
-        event.data.type === 'SELECT_BLOCK'
+        event.data.type === "SELECT_BLOCK"
       ) {
         const { uid } = event.data;
         this.selectedBlockUid = uid;
         this.formData = JSON.parse(JSON.stringify(event.data.data));
         if (
           this.selectedBlockUid &&
-          this.formData.blocks[this.selectedBlockUid]['@type'] === 'slate' &&
+          this.formData.blocks[this.selectedBlockUid]["@type"] === "slate" &&
           typeof this.formData.blocks[this.selectedBlockUid].nodeId ===
-            'undefined'
+            "undefined"
         ) {
           this.formData.blocks[this.selectedBlockUid] = this.addNodeIds(
-            this.formData.blocks[this.selectedBlockUid],
+            this.formData.blocks[this.selectedBlockUid]
           );
         }
         window.postMessage(
           {
-            type: 'FORM_DATA',
+            type: "FORM_DATA",
             data: this.formData,
-            sender: 'hydrajs-select',
+            sender: "hydrajs-select",
           },
-          window.location.origin,
+          window.location.origin
         );
         // console.log("select block", event.data?.method);
         const blockElement = document.querySelector(
-          `[data-block-uid="${uid}"]`,
+          `[data-block-uid="${uid}"]`
         );
         if (blockElement) {
           !this.elementIsVisibleInViewport(blockElement) &&
-            blockElement.scrollIntoView();
+          blockElement.scrollIntoView();
         }
         // this.isInlineEditing = true;
         // this.observeForBlock(uid);
       }
     };
 
-    window.removeEventListener('message', this.selectBlockHandler);
-    window.addEventListener('message', this.selectBlockHandler);
+    window.removeEventListener("message", this.selectBlockHandler);
+    window.addEventListener("message", this.selectBlockHandler);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -1080,10 +1081,10 @@ class Bridge {
    * @param {HTMLElement} blockElement - The block element to make editable.
    */
   makeBlockContentEditable(blockElement) {
-    blockElement.setAttribute('contenteditable', 'true');
-    const childNodes = blockElement.querySelectorAll('[data-node-id]');
+    blockElement.setAttribute("contenteditable", "true");
+    const childNodes = blockElement.querySelectorAll("[data-node-id]");
     childNodes.forEach((node) => {
-      node.setAttribute('contenteditable', 'true');
+      node.setAttribute("contenteditable", "true");
     });
   }
 
@@ -1098,15 +1099,15 @@ class Bridge {
     }
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        if (mutation.type === 'characterData') {
+        if (mutation.type === "characterData") {
           const targetElement =
-            mutation.target?.parentElement.closest('[data-node-id]');
+            mutation.target?.parentElement.closest("[data-node-id]");
 
           if (targetElement && this.isInlineEditing) {
             this.handleTextChangeOnSlate(targetElement);
           } else if (this.isInlineEditing) {
             const targetElement = mutation.target?.parentElement.closest(
-              '[data-editable-field]',
+              "[data-editable-field]"
             );
             if (targetElement) {
               this.handleTextChange(targetElement);
@@ -1146,15 +1147,15 @@ class Bridge {
     if (this.blockObserver) this.blockObserver.disconnect();
     this.blockObserver = new MutationObserver((mutationsList, observer) => {
       for (const mutation of mutationsList) {
-        if (mutation.type === 'childList') {
+        if (mutation.type === "childList") {
           const blockElement = document.querySelector(
-            `[data-block-uid="${uid}"]`,
+            `[data-block-uid="${uid}"]`
           );
 
           if (blockElement && this.isInlineEditing) {
             this.selectBlock(blockElement);
             !this.elementIsVisibleInViewport(blockElement, true) &&
-              blockElement.scrollIntoView({ behavior: 'smooth' });
+              blockElement.scrollIntoView({ behavior: "smooth" });
             observer.disconnect();
             return;
           }
@@ -1181,21 +1182,21 @@ class Bridge {
   addNodeIds(json, nodeIdCounter = { current: 0 }) {
     if (Array.isArray(json)) {
       return json.map((item) => this.addNodeIds(item, nodeIdCounter));
-    } else if (typeof json === 'object' && json !== null) {
+    } else if (typeof json === "object" && json !== null) {
       // Clone the object to ensure it's extensible
       json = JSON.parse(JSON.stringify(json));
 
-      if (json.hasOwnProperty('data')) {
+      if (json.hasOwnProperty("data")) {
         json.nodeId = nodeIdCounter.current++;
         for (const key in json) {
-          if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
+          if (json.hasOwnProperty(key) && key !== "nodeId" && key !== "data") {
             json[key] = this.addNodeIds(json[key], nodeIdCounter);
           }
         }
       } else {
         json.nodeId = nodeIdCounter.current++;
         for (const key in json) {
-          if (json.hasOwnProperty(key) && key !== 'nodeId') {
+          if (json.hasOwnProperty(key) && key !== "nodeId") {
             json[key] = this.addNodeIds(json[key], nodeIdCounter);
           }
         }
@@ -1211,12 +1212,12 @@ class Bridge {
   resetJsonNodeIds(json) {
     if (Array.isArray(json)) {
       json.forEach((item) => this.resetJsonNodeIds(item));
-    } else if (typeof json === 'object' && json !== null) {
-      if (json.hasOwnProperty('nodeId')) {
+    } else if (typeof json === "object" && json !== null) {
+      if (json.hasOwnProperty("nodeId")) {
         delete json.nodeId;
       }
       for (const key in json) {
-        if (json.hasOwnProperty(key) && key !== 'data') {
+        if (json.hasOwnProperty(key) && key !== "data") {
           this.resetJsonNodeIds(json[key]);
         }
       }
@@ -1234,19 +1235,19 @@ class Bridge {
    */
   handleTextChange(target) {
     const blockUid = target
-      .closest('[data-block-uid]')
-      .getAttribute('data-block-uid');
-    const editableField = target.getAttribute('data-editable-field');
+      .closest("[data-block-uid]")
+      .getAttribute("data-block-uid");
+    const editableField = target.getAttribute("data-editable-field");
     if (editableField)
       this.formData.blocks[blockUid][editableField] = target.innerText;
-    if (this.formData.blocks[blockUid]['@type'] !== 'slate') {
+    if (this.formData.blocks[blockUid]["@type"] !== "slate") {
       window.parent.postMessage(
         {
-          type: 'INLINE_EDIT_DATA',
+          type: "INLINE_EDIT_DATA",
           data: this.formData,
-          from: 'textChange',
+          from: "textChange",
         },
-        this.adminOrigin,
+        this.adminOrigin
       );
     }
   }
@@ -1257,17 +1258,17 @@ class Bridge {
    * @param {HTMLElement} target
    */
   handleTextChangeOnSlate(target) {
-    const closestNode = target.closest('[data-node-id]');
+    const closestNode = target.closest("[data-node-id]");
     if (closestNode) {
-      const nodeId = closestNode.getAttribute('data-node-id');
+      const nodeId = closestNode.getAttribute("data-node-id");
       const updatedJson = this.updateJsonNode(
         this.formData?.blocks[this.selectedBlockUid],
         nodeId,
-        closestNode.innerText?.replace(/\n$/, ''),
+        closestNode.innerText?.replace(/\n$/, "")
       );
       // this.resetJsonNodeIds(updatedJson);
       const currBlock = document.querySelector(
-        `[data-block-uid="${this.selectedBlockUid}"]`,
+        `[data-block-uid="${this.selectedBlockUid}"]`
       );
       this.formData.blocks[this.selectedBlockUid] = {
         ...updatedJson,
@@ -1276,11 +1277,11 @@ class Bridge {
 
       window.parent.postMessage(
         {
-          type: 'INLINE_EDIT_DATA',
+          type: "INLINE_EDIT_DATA",
           data: this.formData,
-          from: 'textChangeSlate',
+          from: "textChangeSlate",
         },
-        this.adminOrigin,
+        this.adminOrigin
       );
 
       // this.sendUpdatedJsonToAdminUI(updatedJson);
@@ -1298,9 +1299,9 @@ class Bridge {
   updateJsonNode(json, nodeId, newText) {
     if (Array.isArray(json)) {
       return json.map((item) => this.updateJsonNode(item, nodeId, newText));
-    } else if (typeof json === 'object' && json !== null) {
+    } else if (typeof json === "object" && json !== null) {
       if (json.nodeId === parseInt(nodeId, 10)) {
-        if (json.hasOwnProperty('text')) {
+        if (json.hasOwnProperty("text")) {
           json.text = newText;
         } else {
           json.children[0].text = newText;
@@ -1308,7 +1309,7 @@ class Bridge {
         return json;
       }
       for (const key in json) {
-        if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
+        if (json.hasOwnProperty(key) && key !== "nodeId" && key !== "data") {
           json[key] = this.updateJsonNode(json[key], nodeId, newText);
         }
       }
@@ -1331,7 +1332,7 @@ class Bridge {
   ////////////////////////////////////////////////////////////////////////////////
 
   getSelectionHTML(range) {
-    const div = document.createElement('div');
+    const div = document.createElement("div");
     div.appendChild(range.cloneContents());
     return div.innerHTML;
   }
@@ -1359,10 +1360,10 @@ class Bridge {
     while (
       container &&
       container !== document &&
-      !(container.dataset && container.dataset.editableField === 'value')
+      !(container.dataset && container.dataset.editableField === "value")
     ) {
       // Check if the container itself has any of the formatting
-      if (container.nodeName === 'STRONG' || container.nodeName === 'B') {
+      if (container.nodeName === "STRONG" || container.nodeName === "B") {
         if (
           container.contains(range.startContainer) &&
           container.contains(range.endContainer)
@@ -1371,7 +1372,7 @@ class Bridge {
           formats.bold.present = true;
         }
       }
-      if (container.nodeName === 'EM' || container.nodeName === 'I') {
+      if (container.nodeName === "EM" || container.nodeName === "I") {
         if (
           container.contains(range.startContainer) &&
           container.contains(range.endContainer)
@@ -1380,7 +1381,7 @@ class Bridge {
           formats.italic.present = true;
         }
       }
-      if (container.nodeName === 'DEL') {
+      if (container.nodeName === "DEL") {
         if (
           container.contains(range.startContainer) &&
           container.contains(range.endContainer)
@@ -1389,7 +1390,7 @@ class Bridge {
           formats.del.present = true;
         }
       }
-      if (container.nodeName === 'A') {
+      if (container.nodeName === "A") {
         if (
           container.contains(range.startContainer) &&
           container.contains(range.endContainer)
@@ -1404,16 +1405,16 @@ class Bridge {
 
     // Check for formatting within the selection
     const selectionHTML = this.getSelectionHTML(range).toString();
-    if (selectionHTML.includes('</strong>') || selectionHTML.includes('</b>')) {
+    if (selectionHTML.includes("</strong>") || selectionHTML.includes("</b>")) {
       formats.bold.present = true;
     }
-    if (selectionHTML.includes('</em>') || selectionHTML.includes('</i>')) {
+    if (selectionHTML.includes("</em>") || selectionHTML.includes("</i>")) {
       formats.italic.present = true;
     }
-    if (selectionHTML.includes('</del>')) {
+    if (selectionHTML.includes("</del>")) {
       formats.del.present = true;
     }
-    if (selectionHTML.includes('</a>')) {
+    if (selectionHTML.includes("</a>")) {
       formats.link.present = true;
     }
 
@@ -1456,13 +1457,13 @@ class Bridge {
       // Handle selections that include non-Text nodes
       const fragment = range.extractContents(); // Extract the selected content
       const newNode = document.createElement(
-        format === 'bold'
-          ? 'strong'
-          : format === 'italic'
-            ? 'em'
-            : format === 'del'
-              ? 'del'
-              : 'span',
+        format === "bold"
+          ? "strong"
+          : format === "italic"
+          ? "em"
+          : format === "del"
+          ? "del"
+          : "span"
       );
       newNode.appendChild(fragment); // Append the extracted content to the new node
       range.insertNode(newNode); // Insert the new node back into the document
@@ -1473,17 +1474,17 @@ class Bridge {
   // Helper function to unwrap formatting while preserving other formatting
   unwrapFormatting(range, format) {
     const formattingElements = {
-      bold: ['STRONG', 'B'],
-      italic: ['EM', 'I'],
-      del: ['DEL'],
-      link: ['A'],
+      bold: ["STRONG", "B"],
+      italic: ["EM", "I"],
+      del: ["DEL"],
+      link: ["A"],
     };
 
     // Check if the selection is entirely within a formatting element of the specified type
     let container = range.commonAncestorContainer;
     let topmostParent = false;
     while (container && container !== document && !topmostParent) {
-      if (container.dataset && container.dataset.editableField === 'value')
+      if (container.dataset && container.dataset.editableField === "value")
         topmostParent = true;
       if (formattingElements[format].includes(container.nodeName)) {
         // Check if the entire content of the formatting element is selected
@@ -1500,7 +1501,7 @@ class Bridge {
             container,
             range,
             format,
-            formattingElements,
+            formattingElements
           );
         }
         return; // No need to check further
@@ -1619,11 +1620,11 @@ class Bridge {
       const child = parent.childNodes[i];
       if (
         child.nodeType === Node.ELEMENT_NODE &&
-        (child.nodeName === 'STRONG' ||
-          child.nodeName === 'EM' ||
-          child.nodeName === 'DEL' ||
-          child.nodeName === 'A') &&
-        child.textContent.trim() === ''
+        (child.nodeName === "STRONG" ||
+          child.nodeName === "EM" ||
+          child.nodeName === "DEL" ||
+          child.nodeName === "A") &&
+        child.textContent.trim() === ""
       ) {
         parent.removeChild(child);
         i--; // Decrement i since we removed a child
@@ -1643,16 +1644,16 @@ class Bridge {
 
     window.parent.postMessage(
       {
-        type: 'TOGGLE_MARK',
+        type: "TOGGLE_MARK",
         html: htmlString,
       },
-      this.adminOrigin,
+      this.adminOrigin
     );
   }
   findEditableParent(node) {
     if (!node || node === document) return null; // Reached the top without finding
 
-    if (node.dataset && node.dataset.nodeId === '1') {
+    if (node.dataset && node.dataset.nodeId === "1") {
       return node;
     }
 
@@ -1664,8 +1665,8 @@ class Bridge {
    * injecting into frontend's DOM like borders, toolbar etc..
    */
   injectCSS() {
-    const style = document.createElement('style');
-    style.type = 'text/css';
+    const style = document.createElement("style");
+    style.type = "text/css";
     style.innerHTML = `
         [contenteditable] {
           outline: 0px solid transparent;
@@ -1882,11 +1883,11 @@ class Bridge {
 let bridgeInstance = null;
 
 /**
- * Initialize the bridge
+ * Initializes the bridge, setting up event listeners and communication channels.
  *
  * @param {URL} adminOrigin
  * @param {Object} options
- * @returns new Bridge()
+ * @returns {Bridge} new Bridge()
  */
 export function initBridge(adminOrigin, options = {}) {
   if (!bridgeInstance) {
@@ -1900,12 +1901,12 @@ export function initBridge(adminOrigin, options = {}) {
  * @returns {String} token
  */
 export function getTokenFromCookie() {
-  if (typeof document === 'undefined') {
+  if (typeof document === "undefined") {
     return null;
   }
-  const name = 'access_token=';
+  const name = "access_token=";
   const decodedCookie = decodeURIComponent(document.cookie);
-  const cookieArray = decodedCookie.split(';');
+  const cookieArray = decodedCookie.split(";");
   for (let i = 0; i < cookieArray.length; i++) {
     let cookie = cookieArray[i].trim();
     if (cookie.indexOf(name) === 0) {
@@ -1926,7 +1927,7 @@ export function onEditChange(callback) {
 }
 
 // Make initBridge available globally
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.initBridge = initBridge;
 }
 

@@ -16,8 +16,8 @@ export async function fetchContent(apiPath, { token = null, path = '' } = {}) {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Failed to fetch content:', error);
-      throw error;
+      // console.error('Failed to fetch content:', error);
+      // throw error;
     }
   }
   
