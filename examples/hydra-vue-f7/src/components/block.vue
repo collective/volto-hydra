@@ -18,7 +18,7 @@
             >{{block.title}}</f7-card-header
         >
         <f7-card-content>
-            <p data-editable-field="Description">{{block.Description}}</p>
+            <p data-editable-field="description">{{block.description}}</p>
         </f7-card-content>
         <f7-card-footer>
             <f7-link :href="getUrl(block.href[0])" data-editable-field="href">Read more</f7-link> 
