@@ -19,7 +19,7 @@ Why does it matter?
 
 Why Hydra? 
 - It gives Headless Plone a Quanta CMS UI but with one or more decoupled heads (frontends) that you can switch between while editing.
-  Decoupled means they are separated from Hyrda and Plone in both where they can be hosted and what framework they can use.
+  Decoupled means they are separated from Hydra and Plone in both where they can be hosted and what framework they can use.
 
 What is Quanta?
 - [Quanta](https://github.com/plone/volto/issues/4332) is an iteration on the design system and editing UI that Volto implements
