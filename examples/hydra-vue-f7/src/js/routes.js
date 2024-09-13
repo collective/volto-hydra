@@ -26,7 +26,7 @@ var routes = [
       if (token) {
         headers = {'Authorization': 'Bearer '+token};
       };
-      const api = "https://hydra.pretagov.com/++api++"+path+"?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2"
+      const api = "https://hydra-api.pretagov.com/++api++"+path+"?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2"
       axios.get(api, {headers}).then((response) => {
         app.store.state.content = response.data;
         app.store.state.navigation = response.data["@components"].navigation.items;

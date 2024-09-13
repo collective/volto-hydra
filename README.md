@@ -108,8 +108,8 @@ TODO: link to more documentation on creating a frontend using @plone/client
 
 ### Test your frontend
 
-The easiest way is to connect it directly to https://hydra.pretagov.com/++api++ <br />
-**NOTE:** If you are testing against https://hydra.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
+The easiest way is to connect it directly to https://hydra-api.pretagov.com/++api++ <br />
+**NOTE:** If you are testing against https://hydra-api.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
 are no CORS errors
 
 Or You can [run a local hydra + plone instance](#Local-Development) (see below).
