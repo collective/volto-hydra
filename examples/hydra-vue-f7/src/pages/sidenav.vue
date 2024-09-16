@@ -24,7 +24,7 @@
       },
       methods: {
         getUrl(item) {
-          return item['@id'].replace('https://hydra.pretagov.com/', '/').replace('https://hydra.pretagov.com', '/')
+          return item['@id'].replace('https://hydra-api.pretagov.com/', '/').replace('https://hydra-api.pretagov.com', '/')
         }
       },
       data() {      
