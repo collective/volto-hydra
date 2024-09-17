@@ -1,8 +1,8 @@
 <template>
-    <f7-block-title v-if="block['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title>
-    <div v-else-if="block['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
+    <div v-if="block['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
         <RichText v-for="node in block['value']" :key="node" :node="node" />
     </div>
+    <!-- <f7-block-title v-else-if="block['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title> -->
     <f7-block v-else-if="block['@type']=='image'" :data-block-uid="block_uid">
         <img v-for="props in [imageProps(block)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" />
     </f7-block>
@@ -24,6 +24,34 @@
             <f7-link :href="getUrl(block.href[0])" data-editable-field="href">Read more</f7-link> 
         </f7-card-footer>
     </f7-card>
+    <swiper-container :pagination="true" class="demo-swiper-multiple" :space-between="50"
+    :speed="block.autoplayDelay ? block.autoplayEnabled : ''" v-else-if="block['@type']=='slider'" :data-block-uid="block_uid">
+      <swiper-slide v-for="block in block.slides">
+        <f7-card>
+        <f7-card-header
+            valign="bottom"
+            :style="{'background-image': ('url()' ? block.href.hasPreviewImage : false)}" data-editable-field="title"
+            >{{block.title}}</f7-card-header
+        >
+        <f7-card-content>
+            <p data-editable-field="description">{{block.description}}</p>
+        </f7-card-content>
+        <f7-card-footer>
+            <f7-link :href="getUrl(block.href[0])" data-editable-field="href">{{block.buttonText}}</f7-link> 
+        </f7-card-footer>
+        </f7-card>
+      </swiper-slide >
+    </swiper-container>
+    <hr v-else-if="block['@type']=='separator'" :data-block-uid="block_uid"></hr>
+    <f7-list strong  inset-md accordion-list  v-else-if="block['@type']=='accordian'" :data-block-uid="block_uid">
+      <f7-list-item v-for="block in blocks" accordion-item :title="block.title" :data-block-uid="block_uid">
+        <f7-accordion-content>
+          <f7-block>
+            <div v-for="uid in block.blocks_layout"><Block :block_uid="uid" :block="block.blocks[uid]" :data="data"></Block></div>
+          </f7-block>
+        </f7-accordion-content>
+      </f7-list-item>
+    </f7-list>
 </template>
 <script>
   import RichText from './richtext.vue';
