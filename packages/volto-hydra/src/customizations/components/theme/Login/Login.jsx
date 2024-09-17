@@ -146,21 +146,25 @@ const Login = (props) => {
               </Header>
               <p>
               A Google summer of code project to create a proof of concept of a CMSUI/editor for
-              Plone headless sites that is 
-              <a href="https://github.com/collective/volto-hydra">easy to integrate</a> into 
-              any frontend and is as easy to use for editors as Volto.
+              Plone Headless sites that is
+              <ul>
+                <li><a href="https://github.com/collective/volto-hydra">quick to integrate</a> into 
+                any frontend</li>
+                <li>as easy to use for editors as Volto</li>
+              </ul> 
               </p>
               <p>
-                The instructions and latest updates on what works and what
-                doesn't are in the{' '}
+                View the{' '}
                 <a href="https://github.com/collective/volto-hydra">
                   Hydra README
                 </a>
-                .
+                to see what currently works and what
+                doesn't.
               </p>
               <p>
-                Use "admin" and password "admin" to login. In user preferences
-                you can change which frontend to edit (Note: not all block types are visible on all frontends)
+                Use "admin" and password "admin" to login. 
+                You can change which frontend to edit in user preferences. 
+                Note: not all block types are visible on all frontends.
               </p>
               <List bulleted>
                 <List.Item>
