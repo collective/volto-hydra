@@ -145,15 +145,22 @@ const Login = (props) => {
                 Welcome to Project Hydra
               </Header>
               <p>
-                A multi-headed decoupled CMS editor for Plone that works with
-                frontends, separated from Volto, yet still keeping the Volto
-                editing experience. It's a work in{' '}
-                <a href="https://github.com/collective/volto-hydra">progress</a>
+              A Google summer of code project to create a proof of concept of a CMSUI/editor for
+              Plone headless sites that is 
+              <a href="https://github.com/collective/volto-hydra">easy to integrate</a> into 
+              any frontend and is as easy to use for editors as Volto.
               </p>
               <p>
-                Login below with username "hydraedit" and password "hydraedit"
-                to see the progress of the editor experience. You can try any of
-                the following frontends:
+                The instructions and latest updates on what works and what
+                doesn't are in the{' '}
+                <a href="https://github.com/collective/volto-hydra">
+                  Hydra README
+                </a>
+                .
+              </p>
+              <p>
+                Use "admin" and password "admin" to login. In user preferences
+                you can change which frontend to edit (Note: not all block types are visible on all frontends)
               </p>
               <List bulleted>
                 <List.Item>
@@ -162,7 +169,16 @@ const Login = (props) => {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Next.js Frontend
+                    Next.js Basic Blog Style
+                  </a>
+                </List.Item>
+                <List.Item>
+                  <a
+                    href="https://hydra-vue-f7.netlify.app/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Vue.js Mobile Hybrid App (f7)
                   </a>
                 </List.Item>
                 <List.Item>
@@ -173,18 +189,6 @@ const Login = (props) => {
                   in your favourite framework and let us know if it was easy.
                 </List.Item>
               </List>
-              <p>
-                The instructions and latest updates on what works and what
-                doesn't are in the{' '}
-                <a href="https://github.com/collective/volto-hydra">
-                  Hydra README
-                </a>
-                . Report bugs to{' '}
-                <a href="https://github.com/collective/volto-hydra/issues">
-                  Hydra Issues
-                </a>
-                .
-              </p>
             </Segment>
           </Grid.Column>
         </Grid>
