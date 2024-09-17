@@ -157,7 +157,7 @@ const Login = (props) => {
                 View the{' '}
                 <a href="https://github.com/collective/volto-hydra">
                   Hydra README
-                </a>
+                </a>{' '}
                 to see what currently works and what
                 doesn't.
               </p>
