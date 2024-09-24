@@ -2,6 +2,7 @@
       <f7-page>
         <f7-navbar title="Navigation"></f7-navbar>
         <f7-list dividers-ios strong-ios outline-ios>
+          <f7-list-item title="Home" link="/" panel-close/>
           <template  v-for="(item) in navigation" >
             <f7-list-item :title="item.title" :link="getUrl(item)"   
              panel-close/>
