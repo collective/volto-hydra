@@ -1,16 +1,22 @@
 <template>
-    <div v-if="block['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
+    <div v-if="block['@type']=='slate' || block['@type']=='introduction'" :data-block-uid="block_uid" data-editable-field="value">
         <RichText v-for="node in block['value']" :key="node" :node="node" />
     </div>
-    <!-- <f7-block-title v-else-if="block['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title> -->
+
+    <template v-else-if="block['@type']=='title'" :data-block-uid="block_uid">
+        <!-- Hide titles for now {{ data.title}} -->
+    </template>
+
     <f7-block v-else-if="block['@type']=='image'" :data-block-uid="block_uid">
         <img v-for="props in [imageProps(block)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" />
     </f7-block>
+
     <f7-block v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5">
-        <div :class="['grid', 'grid-cols-'+block.blocks_layout.items.length, 'grid-gap', 'column', 'style-bg-'+(block.styles.backgroundColor||'none')]">
+        <f7-block :class="['grid', 'grid-cols-'+block.blocks_layout.items.length, 'grid-gap', 'column', 'style-bg-'+(block.styles.backgroundColor||'none')]">
             <Block v-for="uid in block.blocks_layout.items" :block_uid="uid" :block="block.blocks[uid]" :data="data"></Block>
-        </div>
+        </f7-block>
     </f7-block>
+
     <f7-card v-else-if="block['@type']=='teaser'" :data-block-uid="block_uid">
         <f7-card-header
             valign="bottom"
@@ -24,6 +30,7 @@
             <f7-link :href="getUrl(block.href[0])" data-editable-field="href">Read more</f7-link> 
         </f7-card-footer>
     </f7-card>
+
     <swiper-container :pagination="true" class="demo-swiper-multiple" :space-between="50"
     :speed="block.autoplayDelay ? block.autoplayEnabled : ''" v-else-if="block['@type']=='slider'" :data-block-uid="block_uid">
       <swiper-slide v-for="block in block.slides">
@@ -45,16 +52,45 @@
        </div>
       </swiper-slide >
     </swiper-container>
+
     <hr v-else-if="block['@type']=='separator'" :data-block-uid="block_uid"></hr>
-    <f7-list strong  inset-md accordion-list  v-else-if="block['@type']=='accordian'" :data-block-uid="block_uid">
-      <f7-list-item v-for="block in blocks" accordion-item :title="block.title" :data-block-uid="block_uid">
+
+    <f7-list v-else-if="block['@type']=='accordion'" strong outline-ios dividers-ios inset-md accordion-list  :data-block-uid="block_uid">
+      <f7-list-item v-for="panel_uid in block.data.blocks_layout.items" accordion-item :opened="!block['collapsed']" :title="block.data.blocks[panel_uid]?.title" :data-block-uid="panel_uid">
         <f7-accordion-content>
           <f7-block>
-            <div v-for="uid in block.blocks_layout.items"><Block :block_uid="uid" :block="block.blocks[uid]" :data="data"></Block></div>
+            <template v-for="uid in block.data.blocks[panel_uid]?.blocks_layout.items"><Block :block_uid="uid" :block="block.data.blocks[panel_uid].blocks[uid]" :data="data"></Block></template>
           </f7-block>
         </f7-accordion-content>
       </f7-list-item>
     </f7-list>
+
+    <f7-list v-else-if="block['@type']=='listing'" media-list dividers-ios strong-ios outline-ios>
+      <template  v-for="(item) in data['items']" >
+        <f7-list-item :title="item.title" :subtitle="item.description" :link="getUrl(item)"/>
+      </template>
+    </f7-list>
+
+    <template v-else-if="block['@type']=='heading'">
+      <h2>{{ block.heading }}</h2>
+    </template>
+
+    <div v-else-if="block['@type']=='slateTable'" class="data-table">
+      <table >
+        <tr v-for="(row) in block.table.rows" >
+          <component v-for="(cell) in row.cells" :key="cell.key" :is="(cell.type=='header')? 'th':'td'">
+            <RichText v-for="(node) in cell.value"  :node="node" />
+          </component>
+        </tr>
+      </table>
+    </div>
+
+
+    <f7-block v-else :data-block-uid="block_uid">
+      {{ 'Not implemented Block: @type=' + block['@type'] }}
+      <pre>{{ block }}</pre>
+    </f7-block>
+
 </template>
 <script>
   import RichText from './richtext.vue';
