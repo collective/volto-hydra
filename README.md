@@ -253,16 +253,16 @@ Now an editor can :-
 
 Many blocks are best handled as containers of other blocks and hydra will provide a UI for you manage these sub-blocks.
 
-Lets say you have a ColumnsBlock. A ColumnsBlock is container of Columns, which is a container of other blocks.
+Lets say you have a ColumnsBlock. A ColumnsBlock containers one or more ColumnBlock, which is a container of other blocks.
 In the simplest case you don't need any special markup. Just render the blocks from "blocks" and "blocks_layout" fields with the 
 ```data-block-uid``` and hydra will manage the UI for you.
 
 ```html
-<table >
-  <tr data-block-uid="...">
+<table data-block-uid="...">
+  <tr>
     <td data-block-uid="...">
       <p data-block-uid="...">my text</p>
-      <p data-block-uid="...">2nd paragraph</p>
+      <img data-block-uid="..." src="..."/>
     </td>
     <td data-block-uid="...">
       <p data-block-uid="...">other slate</p>
@@ -291,9 +291,9 @@ let's say you have a grid block where cells can only contain a Video or Image.
 You can specify this with a container specification in ```data-block-container```.
 
 ```html
-<table >
-  <tr data-block-uid="..." data-block-container="{'allowed':['VideoBlock','ImageBlock']}">
-    <td data-block-uid="..."><video/></td>
+<table data-block-uid="..." data-block-container="{'allowed':['VideoBlock','ImageBlock']}">
+  <tr>
+    <td data-block-uid="..."><video src="..."></video></td>
     <td data-block-uid="..."><img src="..."></td>
   </tr>
 </table>
@@ -314,6 +314,7 @@ The optional specifications you can give the container are
 - field: You can have more than one area of sub-blocks in a container by using a different field prefix. default=blocks.
 - hide_chooser_add: you might want to put in a custom add button via ```data-block-choose``` or an api call. default=false if it's a ChooserBlock
 
+Note: The content object is itself a container so the same specifications can be used for the Page as a whole. 
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
