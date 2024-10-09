@@ -251,51 +251,62 @@ Now an editor can :-
 
 #### Container Blocks ([TODO](https://github.com/collective/volto-hydra/issues/99))
 
-If your block can contain other blocks you can let hydra know where the sub-blocks can be added by marking the html element that will contain them.
+My blocks are best handled as containers of other blocks and hydra will provide a UI for you manage these subblocks.
 
-For example if you had a grid implemented as a table that can only allow a single block per column then you might have
+Lets say you have a table block. A table is container of rows, which is a container of cells, which is a container or other blocks.
+In the simplest case you don't need any special markup. Just render the blocks from "blocks" and "blocks_layout" fields with the 
+```data-block-uid``` and hydra will manage the UI for you.
 
 ```html
-<table data-block-uid="..." data-block-container-horizontal="blocks">
+<table data-block-uid="...">
   <tr data-block-uid="...">
-    <td data-editable-field="value"><p>my text</p></td>
+    <td data-block-uid="..."><p data-block-uid="...">my text</p></td>
   </tr>
   <tr data-block-uid="...">
-    <td data-editable-field="value"><p>other slate</p></td>
+    <td data-block-uid="..."><p data-block-uid="...">other slate</p></td>
   </tr>
 </table>
 ```
 
-but if you wanted to allow many columns each with many blocks inside you can use specify a column block
+During editing containers are never empty to ensure they take up space and are easy to select and navigate.
+This means all containers have a default block type that will get created if the last block is removed. 
+By default a container allows allow other blocks and it's default block is the SlateBlock. A slate block
+is special in that using the "/" shortcut you can turn it into another block.
+
+Some containers you will need another way to pick the first block in the container. For example,
+let's say you have a table where cells can only contain a Video or Image.
+You can specify this with a container specification in ```data-block-container```.
 
 ```html
-<table data-block-uid="..." data-block-container-vertical="blocks,4">
-  <tr data-block-uid="..." data-block-container-vertical="blocks">
-    <td data-block-uid="..." data-editable-field="value"><p>my text</p></td>
-  </tr>
-  <tr data-block-uid="..." data-block-container-vertical="blocks">
-    <td data-block-uid="..." data-editable-field="value"><p>other slate</p></td>
+<table data-block-uid="..." data-block-container="{'allowed':['TableRow']}">
+  <tr data-block-uid="..." data-block-container="{'allowed':['VideoBlock','ImageBlock']}">
+    <td data-block-uid="..." style="width:100%"></td>
   </tr>
 </table>
 ```
 
-- The allowed block types for a given container can be overridden in the hydra settings at initialization.
-- The first of the allowed blocks is the default block. In the case where the only remaining block is deleted, a new empty default
-  block will be created in its place so that a container is never empty (TODO).
-  - if you want to allow choice of the first block then a chooser block can be the default (TODO)
-- The orientation tells hydra where to place the add button and DND drop markers.
-- if there is a maximum number of blocks a container can hold then specify it in the data attribute ```data-block-container-horizontal="blocks,4"```
-- it might be that a container has more than area to add blocks. In which case you use a different field prefix, e.g. ```data-block-container-horizontal="left"```. 
-  This will put the blocks into a dict in the field ```left``` and the order in a list in ```left_layout```.
+In this case, the initial block will be of a special type called ```ChooserBlock```. Just render it to take up
+the normal amount of space one of the other blocks would be expected to take up and Hydra will add a "+" icon
+in the middle which allows the user to replace this dummy block with one of the actual block types. ChooserBlocks
+won't get saved so won't be rendered when not editing.
+
+The optional specifications you can give the container are
+
+- allowed: which block types to let be added, default=[]=any block
+- default: the block type to create when blocks is less than min. default=ChooserBlock or Slate if allowed.
+- min: default blocks will be created to make up this number. default=1
+- max: you can't add more blocks than this. default=null=unlimited
+- style: ```horizontal```  or ```vertical``` to help put the "add" button in the right place. default=null=opposite of parent.
+- field: You can have more than one area of sub-blocks in a container by using a different field prefix. default=blocks.
+- hide_chooser_add: you might want to put in a custom add button via ```data-block-choose``` or an api call. default=false if it's a ChooserBlock
 
 Now an editor can do the following on a container such as the Grid Block:
-- Add a new sub-block visually on the frontend
+- Add a new sub-block visually on the frontend. The add icon is in the direction the new block will appear.
 - Use enter on a rich text block to add a sub-block
 - remove blocks from a container
 - DND blocks in and out of containers or to reorder them
-- if it is hard to select a container using the mouse then the quanta toolbar provides an "up" action ([TODO](https://github.com/collective/volto-hydra/issues/66))  
-  to select the container of the current block. On mobile a single press
-  selects the container and a double press selects the sub-block. 
+- You can see all container settings on the sidebar when a sub-block is selected, and you can close those settings to select the parent and
+  and manage the containers sub blocks from the side panel 
 
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
