@@ -251,22 +251,35 @@ Now an editor can :-
 
 #### Container Blocks ([TODO](https://github.com/collective/volto-hydra/issues/99))
 
-My blocks are best handled as containers of other blocks and hydra will provide a UI for you manage these subblocks.
+Many blocks are best handled as containers of other blocks and hydra will provide a UI for you manage these sub-blocks.
 
-Lets say you have a table block. A table is container of rows, which is a container of cells, which is a container or other blocks.
+Lets say you have a ColumnsBlock. A ColumnsBlock is container of Columns, which is a container of other blocks.
 In the simplest case you don't need any special markup. Just render the blocks from "blocks" and "blocks_layout" fields with the 
 ```data-block-uid``` and hydra will manage the UI for you.
 
 ```html
-<table data-block-uid="...">
+<table >
   <tr data-block-uid="...">
-    <td data-block-uid="..."><p data-block-uid="...">my text</p></td>
-  </tr>
-  <tr data-block-uid="...">
-    <td data-block-uid="..."><p data-block-uid="...">other slate</p></td>
+    <td data-block-uid="...">
+      <p data-block-uid="...">my text</p>
+      <p data-block-uid="...">2nd paragraph</p>
+    </td>
+    <td data-block-uid="...">
+      <p data-block-uid="...">other slate</p>
+    </td>
   </tr>
 </table>
 ```
+
+Now an editor can do the following:
+- Add a new sub-block visually on the frontend. The add icon is in the direction the new block will appear.
+- You can see all container settings on the sidebar when a sub-block is selected, e.g. Column settings and ColumnBlock settings.
+- To add another column select the parent column and click add and a new column will appear next to it.
+   - Select the column by clicking "up" on the quanta toolbar or close the sub-block settings.
+- remove blocks from a container
+- DND blocks in and out of containers or to reorder them
+- To select the container close sub-block section on the sidebar. This also allows you
+  to manage the containers sub blocks from the side panel 
 
 During editing containers are never empty to ensure they take up space and are easy to select and navigate.
 This means all containers have a default block type that will get created if the last block is removed. 
@@ -274,13 +287,14 @@ By default a container allows allow other blocks and it's default block is the S
 is special in that using the "/" shortcut you can turn it into another block.
 
 Some containers you will need another way to pick the first block in the container. For example,
-let's say you have a table where cells can only contain a Video or Image.
+let's say you have a grid block where cells can only contain a Video or Image.
 You can specify this with a container specification in ```data-block-container```.
 
 ```html
-<table data-block-uid="..." data-block-container="{'allowed':['TableRow']}">
+<table >
   <tr data-block-uid="..." data-block-container="{'allowed':['VideoBlock','ImageBlock']}">
-    <td data-block-uid="..." style="width:100%"></td>
+    <td data-block-uid="..."><video/></td>
+    <td data-block-uid="..."><img src="..."></td>
   </tr>
 </table>
 ```
@@ -299,14 +313,6 @@ The optional specifications you can give the container are
 - style: ```horizontal```  or ```vertical``` to help put the "add" button in the right place. default=null=opposite of parent.
 - field: You can have more than one area of sub-blocks in a container by using a different field prefix. default=blocks.
 - hide_chooser_add: you might want to put in a custom add button via ```data-block-choose``` or an api call. default=false if it's a ChooserBlock
-
-Now an editor can do the following on a container such as the Grid Block:
-- Add a new sub-block visually on the frontend. The add icon is in the direction the new block will appear.
-- Use enter on a rich text block to add a sub-block
-- remove blocks from a container
-- DND blocks in and out of containers or to reorder them
-- You can see all container settings on the sidebar when a sub-block is selected, and you can close those settings to select the parent and
-  and manage the containers sub blocks from the side panel 
 
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
