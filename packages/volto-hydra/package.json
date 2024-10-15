@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "@plone/components": "1.7.0",
-    "js-cookie": "^3.0.5"
+    "js-cookie": "^3.0.5",
+    "events": "^3.3.0"
   },
   "peerDependencies": {
     "react": "18.2.0",
