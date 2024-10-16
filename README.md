@@ -176,7 +176,7 @@ Your frontend might choose to render a Teaser like
 </div>
 ```
 
-you would addin the ```data-block-uid``` so it becomes
+you would add in the ```data-block-uid``` so it becomes
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -318,10 +318,10 @@ Note: The content object is itself a container so the same specifications can be
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
-If you want to make the editing experience the most intuitive, you can enable real-time visual editing, where an editor
-can change text, links or media directly on your frontend instead of via fields on the sidebar.
+If you want to make the editing experience the most intuitive, you can enable real-time visual page editing, where an editor
+can change text, links or media directly on your frontend page instead of via fields on the sidebar.
 
-#### Inplace simple text editing
+#### Visual text editing
 
 Can enable live editing of non-rich text such as the title of the teaser block, or the title of the page.
 
@@ -353,16 +353,10 @@ Now an editor can :-
 
 #### Visual Rich Text editing
 
-For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text and also insert ```data-node-id```
-attributes into the elements that render the rich text html.
-
-Rich text comes via the contents RESTAPI as a semantic structure in json using nodes rather than as html.
-Your frontend could choose to represent that formatting using whatever html you want, however for hydra.js 
-to keep track of what text the editor is changing you will need to add ```data-node-id``` attributes to the outermost
-html that contains a rich text node. 
-
-These node ids aren't available from the plone RESTAPI but only via the hydra.js bridge, so you will need hook
-into ```onEditChange``` to rerender your content with the node ids it provides to make visual editing work.
+For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text.
+For hydra.js to allow you to select and format text no matter how your frontend decides to render that formatting
+just insert ```data-node-id``` attributes to the markup for a slate node when in edit made. The node ids to use are in the json
+returned by ```onEditChange```.
 
 For example, if the schema for the Teaser block had the description field type as rich text then 
 the json value might be
@@ -387,7 +381,7 @@ the json value might be
 ]
 ```
 
-and the frontend could render the editible teaser block like below, being sure to include the ```data-node-id```.
+the frontend could render the editable teaser block like below, being sure to include the ```data-node-id```.
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -406,18 +400,11 @@ My Paragraph with <span class="custom_link" data-node-id="5"><a href="...">a lin
 </p>
 ```
 
-Note: there is currently a bug where any text also needs to be wrapped in a ```<span data-node-id="...">``` but this will be fixed in the future.
-
-Hydra.js will now adjust the quanta toolbar with formatting buttons.
-
 Now an editor can :-
-- select text and apply charachter styles
-  - Note: This currently only partially works
-   -  only BOLD, ITALIC & STRIKETHROUGH formats are supported. Custom slate addons/styles are not yet supported.
-   - if you select the whole text and change its formats your frontend might throw slate error saying `Cannot get the leaf node at path [0,0] because it refers to a non-leaf node:` but it is due to proper syncing of json b/w  hydra.js & adminUI.
-   - At the end of line if you press format button then it will change the state (active/inactive) but frontend might throw slate error/warning that `Error: Cannot find a descendant at path [0,4,0] in node:` 
-   - pressing ENTER is not implemented so, pressing it will have abnormal changes & error ([TODO](https://github.com/collective/volto-hydra/issues/33))
-- create or edit a rich text link [TODO](https://github.com/collective/volto-hydra/issues/35)
+- select text to see what formatting has been applied and can be applied via buttons on the quanta toolbar
+- select text and apply character styles (currently BOLD, ITALIC & STRIKETHROUGH)
+- create or edit linked text.
+- Using the enter key to split the block into two text blocks and backspace to join them ([TODO](https://github.com/collective/volto-hydra/issues/33))
 - apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
 - use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
 - paste rich text from the clipboard (TODO)
@@ -427,6 +414,13 @@ Additionally your frontend can
 - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
 - specify parts of the text that aren't editable by the user which could be needed for some use-cases where style includes text that needs to appear. (TODO)
+
+
+Known bugs
+   - if you select the whole text and change its formats your frontend might throw slate error saying `Cannot get the leaf node at path [0,0] because it refers to a non-leaf node:` but it is due to proper syncing of json b/w  hydra.js & adminUI.
+   - At the end of line if you press format button then it will change the state (active/inactive) but frontend might throw slate error/warning that `Error: Cannot find a descendant at path [0,4,0] in node:` 
+   - pressing ENTER is not implemented so, pressing it will have abnormal changes & error ([TODO](https://github.com/collective/volto-hydra/issues/33))
+   - any text also needs to be wrapped in a ```<span data-node-id="...">``` but this will be fixed in the future.
 
 
 #### Visual media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
@@ -450,9 +444,9 @@ Now an editor can :-
 
 #### Visual link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
 
-You might have a block with a link field like the Teaser block. You can also make this live
+You might have a block with a link field like the Teaser block. You can also make this visually
 editable using ```data-editable-field```. In edit mode the click behaviour of that element will be altered and instead
-the editor can pick content to link to or enter an external url.
+the editor can pick content to link to, enter an external url of open the url in a separate tab.
 
 ``` html
 <div class="teaser" data-block-uid="....">
@@ -469,7 +463,7 @@ Now as editor can :-
 
 ### Comment syntax (TODO)
 
-If you can't easily modify the markup you can use the alternative comment syntax to specify which elements are editable.
+If you can't easily modify the markup (for example using a 3rd party component library) you can use the alternative comment syntax to specify which elements are editable.
 Use css selectors to specify which elements are editable. The selectors are applied just to the following element.
 
 e.g.
