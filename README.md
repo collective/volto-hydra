@@ -348,7 +348,7 @@ If the text comes from the metadata and not a block then use ```data-editable-me
 Now an editor can :-
 - click into the text on the frontend and type, adding, removing and cut and pasting
 - type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
-- type "enter" at the end of a text block to create a new block ([TODO](https://github.com/collective/volto-hydra/issues/33))
+    - Using the enter key to split the block into two text blocks and backspace to join them ([TODO](https://github.com/collective/volto-hydra/issues/33))
 
 
 #### Visual Rich Text editing
@@ -404,7 +404,6 @@ Now an editor can :-
 - select text to see what formatting has been applied and can be applied via buttons on the quanta toolbar
 - select text and apply character styles (currently BOLD, ITALIC & STRIKETHROUGH)
 - create or edit linked text.
-- Using the enter key to split the block into two text blocks and backspace to join them ([TODO](https://github.com/collective/volto-hydra/issues/33))
 - apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
 - use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
 - paste rich text from the clipboard (TODO)
