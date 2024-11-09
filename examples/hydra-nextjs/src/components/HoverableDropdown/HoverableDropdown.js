@@ -2,9 +2,9 @@
 import React, { useState } from "react";
 import { Dropdown } from "semantic-ui-react";
 import Link from "next/link";
+import '../../app/globals.css'
 import RecursiveMenuItem from "@/components/RecursiveMenuItem";
 import extractEndpoints from '#utils/extractEndpoints';
-
 const HoverableDropdown = ({ item, subItems }) => {
   const [open, setOpen] = useState(false);
 
@@ -14,19 +14,20 @@ const HoverableDropdown = ({ item, subItems }) => {
 
   return (
     <Dropdown
-      item
+      item 
+      style={{width:'200px'}}
       text={item.title}
       open={open}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <Dropdown.Menu>
-        <Dropdown.Item as={Link} href={absoluteUrl}>
+      <Dropdown.Menu    style={{width:'200px'}}>
+        <Dropdown.Item  as={Link} href={absoluteUrl} >
           {item.title}
         </Dropdown.Item>
         {subItems.map((subItem, index) => (
-          <Dropdown.Item key={index}>
-            <RecursiveMenuItem item={subItem} />
+          <Dropdown.Item   key={index} >
+            <RecursiveMenuItem item={subItem}  />
           </Dropdown.Item>
         ))}
       </Dropdown.Menu>
