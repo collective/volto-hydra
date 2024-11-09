@@ -1,37 +1,75 @@
-export default async function ploneApi({path, variables = {}}) {
+
+
+export default async function ploneApi({path, query = null, watch=[], _default={}}) {
+
+    var headers = {
+        "Accept": "application/json"
+    };
+    if (window?.location) {
+        const url = new URL(window.location.href);
+        const token = url.searchParams.get("access_token");
+        if (token) {
+            headers['Authorization'] = 'Bearer '+token;
+        };
+    }
+    var api = path?.join?path.join('/'):path;
+    if (!api.startsWith("http")) {
+        api = `https://hydra-api.pretagov.com/++api++/${api}`
+    }
+    if (!query) {
+        api = `${api}?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2`
+    }
+    else {
+        headers["Content-Type"] = "application/json";
+    }
+    // https://demo.plone.org/++api++/block/grid-block/listing/@querystring-search
+    // {
+    //     "metadata_fields": "_all",
+    //     "b_size": 25,
+    //     "limit": "7",
+    //     "query": [
+    //         {
+    //             "i": "path",
+    //             "o": "plone.app.querystring.operation.string.absolutePath",
+    //             "v": "/block/grid-block"
+    //         }
+    //     ],
+    //     "sort_order": "ascending",
+    //     "b_start": 0
+    // }
     // a unique key to ensure that data fetching
     // can be properly de-duplicated across requests,
     const key = JSON.stringify({
         path,
-        variables
+        query,
+        headers
     });
-
-
-
-    var headers = {};
-    // if (window.location) {
-    //     const url = new URL(window.location.href);
-    //     const token = url.searchParams.get("access_token");
-    //     if (token) {
-    //         headers = {'Authorization': 'Bearer '+token};
-    //     };
-    // }
-    const api = `https://hydra-api.pretagov.com/++api++/${path?.join?path.join('/'):path}?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2`
 
     return useFetch(api, {
         key,
-        method: 'GET',
+        method: query? 'POST': 'GET',
         headers: headers,
-        // body: {
-        //     query,
-        //     variables,
-        // },
+        body: query,
+        cache: "no-cache",  // we probably don't need it
+        watch: watch,
+        default: () => { return _default;},
+        onResponseError({ request, response, options }) {
+            const error = response._data;
+            showError({
+                statusCode: response.status,
+                statusMessage: `${error.type}: ${error.message}`
+            });
+            return {title:response.statusText, "@components": {navigation: {items: []}}};
+        },
         transform: (data) => {
-            // if (error) {
-            //     throw new error;
+            // if (error!==undefined  ) {
+            //     showError(error);
+            //        // throw new error;
+            //     return {title:"Error"};
             // }
 
             return data;
         },
     });
 };
+

@@ -1,6 +1,6 @@
 <template>
   <template v-if="node.type === 'link'">
-    <NuxtLink :to="node.data.url" external :data-node-id="node.nodeId">
+    <NuxtLink :to="node.data" external :data-node-id="node.nodeId">
       {{ node.text }}
       <RichText v-for="child in subs" :key="child.nodeId" :node="child" />
     </NuxtLink>

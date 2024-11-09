@@ -3,10 +3,22 @@
         <RichText v-for="node in block['value']" :key="node" :node="node" />
     </div>
 
+    <div v-else-if="block['@type']=='introduction'" :data-block-uid="block_uid" data-editable-field="value">
+      <hr/>
+        <RichText v-for="node in block['value']" :key="node" :node="node" />
+      <hr/>  
+    </div>
+
     <h1 v-else-if="block['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</h1>
 
+    <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid"><i>{{ data.value}}</i></p>
+
     <div v-else-if="block['@type']=='image'" :data-block-uid="block_uid">
-        <img v-for="props in [imageProps(block)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+        <img v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+    </div>
+
+    <div v-else-if="block['@type']=='leadimage'" :data-block-uid="block_uid">
+        <img v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" loading="lazy" decoding="async" />
     </div>
 
     <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5"
@@ -16,13 +28,13 @@
 
     <div v-else-if="block['@type']=='teaser'" class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"  :data-block-uid="block_uid">
        <NuxtLink :to="getUrl(block.href[0])" v-if="block.href.hasPreviewImage">
-        <img class="rounded-t-lg"  :src="block.href.hasPreviewImage" alt="" />
+        <img class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url" :srcset="props.srcset" alt="" v-if="block.href[0].hasPreviewImage"/>
        </NuxtLink>
        <div class="p-5">
-          <NuxtLink :to="getUrl(block.href[0])">
+          <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
             <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
            </NuxtLink>
-          <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">{{block.description}}</p>
+          <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description" v-if="block?.description">{{block.description}}</p>
           <NuxtLink :to="getUrl(block.href[0])" data-editable-field="href" class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
             Read more
              <svg class="rtl:rotate-180 w-3.5 h-3.5 ms-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
@@ -35,8 +47,7 @@
     <div v-else-if="block['@type']=='slider'" id="default-carousel" class="relative w-full" data-carousel="static"  :data-block-uid="block_uid">
     <!-- Carousel wrapper -->
     <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div class="hidden duration-700 ease-linear" data-carousel-item v-for="block in block.slides">
-          <div :class="['bg-center', 'bg-no-repeat', 'bg-[url(\''+imageProps(block.preview_image[0]).url+'\')]', 'bg-gray-700', 'bg-blend-multiply']">
+        <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply',imageProps(block).bg,  'hidden', 'duration-700', 'ease-linear']"  data-carousel-item v-for="block in block.slides">
             <div class="max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700">
               <NuxtLink :to="getUrl(block.href[0])">
                   <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
@@ -45,16 +56,11 @@
               <div>{{ block.head_title }}</div>
               <NuxtLink :to="getUrl(block.href[0])" data-editable-field="href">{{block.buttonText}}</NuxtLink>
             </div>
-          </div>
         </div>
     </div>
     <!-- Slider indicators -->
     <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
-        <button type="button" class="w-3 h-3 rounded-full" aria-current="true" aria-label="Slide 1" data-carousel-slide-to="0"></button>
-        <button type="button" class="w-3 h-3 rounded-full" aria-current="false" aria-label="Slide 2" data-carousel-slide-to="1"></button>
-        <button type="button" class="w-3 h-3 rounded-full" aria-current="false" aria-label="Slide 3" data-carousel-slide-to="2"></button>
-        <button type="button" class="w-3 h-3 rounded-full" aria-current="false" aria-label="Slide 4" data-carousel-slide-to="3"></button>
-        <button type="button" class="w-3 h-3 rounded-full" aria-current="false" aria-label="Slide 5" data-carousel-slide-to="4"></button>
+        <button v-for="(block, index) in block.slides" type="button" class="w-3 h-3 rounded-full" aria-current="true" aria-label="Slide 1" :data-carousel-slide-to="index"></button>
     </div>
     <!-- Slider controls -->
     <button type="button" class="absolute top-0 start-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none" data-carousel-prev>
@@ -81,34 +87,78 @@
 
 
     
-    <div id="accordion-collapse" data-accordion="collapse" v-else-if="block['@type']=='accordian'" :data-block-uid="block_uid">
-      <template v-for="block in blocks">
-        <h2 id="accordion-collapse-heading-1" :data-block-uid="block_uid">
-          <button type="button" class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3" data-accordion-target="#accordion-collapse-body-1" aria-expanded="true" aria-controls="accordion-collapse-body-1">
-            <span>{{block.title}}</span>
+    <div v-else-if="block['@type']=='accordion'"  data-accordion="collapse"  :data-block-uid="block_uid">
+      <template v-for="panelid in block.data.blocks_layout.items">
+        <h2 :id="panelid" :data-block-uid="panelid">
+          <button type="button" class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3" 
+          :data-accordion-target="`#accordion-collapse-body-${ panelid }`" aria-expanded="true" aria-controls="accordion-collapse-body-1">
+            <span>{{block.data.blocks[panelid].title}}</span>
             <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
               <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5 5 1 1 5"/>
             </svg>
           </button>
         </h2>
-        <div id="accordion-collapse-body-1" class="hidden" aria-labelledby="accordion-collapse-heading-1">
+        <div :id="`accordion-collapse-body-${ panelid }`" class="hidden" :aria-labelledby="panelid">
           <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-            <div v-for="uid in block.blocks_layout.items"><Block :block_uid="uid" :block="block.blocks[uid]" :data="data"></Block></div>
+            <div v-for="uid in block.data.blocks[panelid].blocks_layout.items">
+              <Block :block_uid="uid" :block="block.data.blocks[panelid].blocks[uid]" :data="data"></Block>
+            </div>
           </div>
         </div>
       </template>
     </div>
 
+
+
+    <div v-else-if="block['@type']=='listing'" :data-block-uid="block_uid">
+      <template  v-for="item in items" >
+        <NuxtLink :to="getUrl(item)" class="flex flex-col items-center bg-white border border-gray-200 rounded-lg shadow md:flex-row md:max-w-xl hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+          <img class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" alt="" v-if="props?.url" v-for="props in [imageProps(item)]">
+          <div class="flex flex-col justify-between p-4 leading-normal">
+            <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{{item.title}}</h5>
+            <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">{{ item.description }}.</p>
+          </div>
+        </NuxtLink>
+      </template>
+    </div>
+
+    <template v-else-if="block['@type']=='heading'" :data-block-uid="block_uid">
+      <h2>{{ block.heading }}</h2>
+    </template>
+
+    <div v-else-if="block['@type']=='slateTable'" class="data-table" :data-block-uid="block_uid">
+      <table >
+        <tr v-for="(row) in block.table.rows" >
+          <component v-for="(cell) in row.cells" :key="cell.key" :is="(cell.type=='header')? 'th':'td'">
+            <RichText v-for="(node) in cell.value"  :node="node" />
+          </component>
+        </tr>
+      </table>
+    </div>
+
+    <NuxtLink v-else-if="block['@type']=='__button'" :to="getUrl(block.href)" :data-block-uid="block_uid" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+      {{block.title}}
+    </NuxtLink>
+
+    <template v-else-if="block['@type']=='video'"  :data-block-uid="block_uid">
+      <iframe v-if="block.url.startsWith('https://www.youtube')" width="420" height="315" 
+        :src="`https://www.youtube.com/embed/${block.url.split('v=')[1]}?controls=0`"></iframe>
+      <video v-else class="w-full h-auto max-w-full" controls >
+        <source :src="block.url" type="video/mp4">
+            Your browser does not support the video tag.
+      </video>
+    </template>
+
+    <div v-else :data-block-uid="block_uid">
+      {{ 'Not implemented Block: @type=' + block['@type'] }}
+      <pre>{{ block }}</pre>
+    </div>
+
 </template>
-<script>
+<script setup>
   import RichText from './richtext.vue';
 
-export default {
-  name: 'Block',
-  components: {
-      RichText,
-    },
-  props: {
+  const {block_uid, block, data} = defineProps({
     block_uid: {
       type: String,
       required: true
@@ -120,50 +170,41 @@ export default {
     data: {
       type: Object,
       required: true
-    }
-  },
-  methods: {
-    getUrl(href) {
-        if (href['@id']) {
-            const url = new URL(href['@id']);
-            return url.pathname;
-        } else {
-            return href
+    }  
+  });
+  
+  const {status, data: {batching, items, items_total}} = block?.querystring ? await ploneApi({
+            path: `${data['@id']}/++api++/@querystring-search`,
+            query: block.querystring,
+            _default: {batching: {}, items: [], items_total: 0}
+          }) : {status:null, data:{batching:{}, items:data.items, items_total: data.items.Length}};
+
+  function getUrl(href) {
+        if (href === undefined) {
+          return "#"
         }
-
-    },
-    imageProps(block) {
-      // https://demo.plone.org/images/penguin1.jpg/@@images/image-32-cecef57e6c78570023eb042501b45dc2.jpeg
-      // https://hydra-api.pretagov.com/images/penguin1.jpg/++api++/@@images/image-1800-31be5b7f53648238b68cae0a3ec45dec.jpeg
-        var image_url = block.url ? block.url : block['@id']; 
-        image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}/@@images/image`: image_url;
-        var srcset = "";
-
-        if (block?.image_scales) {
-          srcset = Object.keys(block.image_scales.image[0].scales).map((name) => {
-              const scale = block.image_scales.image[0].scales[name];
-              return `${image_url}/${scale.download} w${scale.width}`;
-          }).join(", ");
-          //image_url = image_url +  "/@@images/image";
-          image_url = `${image_url}/${block.image_scales.image[0].download}`;
-
+        href = href?.value ? href?.value : href;
+        href = href?.url ? href?.url : href;
+        if (!href) {
+          return "#"
         }
-
-        const size = block.size;
-        const align = block.align;
-        return {
-          url: image_url,
-          size: size,
-          align: align,
-          srcset: srcset
+        if (href?.Length) {
+          href = href[0]
         }
-    }
-  },
-  computed: {
-    subs() {
-      const { children } = this.node
-      return children && children || []
-    }
-  }
-}
+        if (typeof href === 'string') {
+          return href;
+        }
+        else if ('@id' in href) {
+            if (href['@id'].startsWith("http")) {
+              const url = new URL(href['@id']);
+              return url.pathname;
+            }
+            return href['@id'];
+        }
+        return href
+
+    };
+
+
+
 </script>

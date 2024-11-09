@@ -5,7 +5,11 @@
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
     
-      <Block v-for="block_uid in data.blocks_layout.items" :key="data.blocks[block_uid]" :block_uid="block_uid" :block="data.blocks[block_uid]" :data="data"></Block>
+      <Block v-if="data?.blocks_layout" v-for="block_uid in data.blocks_layout.items" :key="data.blocks[block_uid]" :block_uid="block_uid" :block="data.blocks[block_uid]" :data="data"></Block>
+
+      <div v-else>
+        <h1>{{ data?.title }}</h1>
+      </div>
 
     </section>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
@@ -46,9 +50,11 @@ const route = useRoute()
 // based on its slug
 const { data, error } = await ploneApi({
   path: route.params.slug,
-  variables: {
-  }
 });
+// if (error) {
+//     showError(error)
+//     data = {title:"Error"}
+// }
 
 //const nav = data["@components"].navigation.items;
 
