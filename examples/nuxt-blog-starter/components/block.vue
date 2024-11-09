@@ -13,12 +13,23 @@
 
     <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid"><i>{{ data.value}}</i></p>
 
-    <div v-else-if="block['@type']=='image'" :data-block-uid="block_uid">
-        <img v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+    <div v-else-if="block['@type']=='image' && !block?.title" :data-block-uid="block_uid">
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+    </div>
+    <div v-else-if="block['@type']=='image' && block?.title" :data-block-uid="block_uid">
+      <figure>
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+        <figcaption>
+          <h2>{{ block.title }}</h2>
+          <div v-if="block?.description">
+            <p>{{ block.description }}</p>
+          </div>
+        </figcaption>
+      </figure>
     </div>
 
     <div v-else-if="block['@type']=='leadimage'" :data-block-uid="block_uid">
-        <img v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" loading="lazy" decoding="async" />
+        <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" loading="lazy" decoding="async" />
     </div>
 
     <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5"
@@ -28,7 +39,7 @@
 
     <div v-else-if="block['@type']=='teaser'" class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"  :data-block-uid="block_uid">
        <NuxtLink :to="getUrl(block.href[0])" v-if="block.href.hasPreviewImage">
-        <img class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url" :srcset="props.srcset" alt="" v-if="block.href[0].hasPreviewImage"/>
+        <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url" :srcset="props.srcset" alt="" v-if="block.href[0].hasPreviewImage"/>
        </NuxtLink>
        <div class="p-5">
           <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
@@ -179,31 +190,6 @@
             _default: {batching: {}, items: [], items_total: 0}
           }) : {status:null, data:{batching:{}, items:data.items, items_total: data.items.Length}};
 
-  function getUrl(href) {
-        if (href === undefined) {
-          return "#"
-        }
-        href = href?.value ? href?.value : href;
-        href = href?.url ? href?.url : href;
-        if (!href) {
-          return "#"
-        }
-        if (href?.Length) {
-          href = href[0]
-        }
-        if (typeof href === 'string') {
-          return href;
-        }
-        else if ('@id' in href) {
-            if (href['@id'].startsWith("http")) {
-              const url = new URL(href['@id']);
-              return url.pathname;
-            }
-            return href['@id'];
-        }
-        return href
-
-    };
 
 
 

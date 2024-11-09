@@ -26,7 +26,7 @@ export default function imageProps(block) {
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
     var srcset = "";
-    var width = block.width;
+    var width = block?.width;
     const field = block?.image_field ? block.image_field : 'image';
 
     if (block?.image_scales) {
@@ -50,6 +50,6 @@ export default function imageProps(block) {
       align: align,
       srcset: srcset,
       bg: `bg-[url('${image_url}')]`,
-      width: block
+      width: width
     }
 };

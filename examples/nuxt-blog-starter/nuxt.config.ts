@@ -1,7 +1,7 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
-  modules: ['@nuxtjs/tailwindcss', 'nuxt-security'],
+  modules: ['@nuxtjs/tailwindcss', 'nuxt-security', '@nuxt/image'],
   css: ['/assets/css/main.css'],
   ssr: true,
 
@@ -17,6 +17,9 @@ export default defineNuxtConfig({
       options: {
           strict: false
       }
+  },
+  image: {
+    domains: ['hydra-api.pretagov.com']
   },
   vite: {
     plugins: [
