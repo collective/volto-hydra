@@ -5,11 +5,12 @@
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
     
-      <Block v-if="data?.blocks_layout" v-for="block_uid in data.blocks_layout.items" :key="data.blocks[block_uid]" :block_uid="block_uid" :block="data.blocks[block_uid]" :data="data"></Block>
+      <Block v-if="data?.page.blocks_layout" v-for="block_uid in data.page.blocks_layout.items"  :block_uid="block_uid" :block="data.page.blocks[block_uid]" :data="data.page"></Block>
 
       <div v-else>
-        <h1>{{ data?.title }}</h1>
+        <h1>{{ data?.page.title }}</h1>
       </div>
+      <pre>{{ data.page.blocks_layout }}</pre>
 
     </section>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
@@ -36,21 +37,47 @@
 
 
 <script setup>
+import { initBridge } from './hydra.js';
+
 // initialize components based on data attribute selectors
 onMounted(() => {
     useFlowbite(() => {
         initFlowbite();
     })
+
 });
 
 // to get access to the "slug" dynamic param
 const route = useRoute()
+var path = [];
+var pages = {};
+console.log(route.params.slug);
+for (var part of route.params.slug) {
+    if (part.startsWith("@pg_")) {
+        const [_,bid,page] = part.split("_");
+        pages[bid] = page;
+    } else {
+        path.push(part);
+    }
+}
 
 // retrieve the data associated with an article
 // based on its slug
 const { data, error } = await ploneApi({
-  path: route.params.slug,
+  path: path,
+  pages: pages
 });
+
+const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
+bridge.onEditChange((page) => {
+      if (page) {
+        data.value.page = page;
+      }
+    });
+
+// https://stackoverflow.com/questions/72419491/nested-usefetch-in-nuxt-3
+// Need to get all the listings here.
+
 // if (error) {
 //     showError(error)
 //     data = {title:"Error"}

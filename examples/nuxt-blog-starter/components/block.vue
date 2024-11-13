@@ -124,13 +124,27 @@
     <div v-else-if="block['@type']=='listing'" :data-block-uid="block_uid">
       <template  v-for="item in items" >
         <NuxtLink :to="getUrl(item)" class="flex flex-col items-center bg-white border border-gray-200 rounded-lg shadow md:flex-row md:max-w-xl hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-          <img class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" alt="" v-if="props?.url" v-for="props in [imageProps(item)]">
+          <img class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" alt="" v-for="props in [imageProps(item)]">
           <div class="flex flex-col justify-between p-4 leading-normal">
             <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{{item.title}}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">{{ item.description }}.</p>
           </div>
         </NuxtLink>
       </template>
+      <nav aria-label="Listing Navigation" v-if="batching?.last">
+        <ul class="inline-flex -space-x-px text-sm">
+          <li>
+            <a :href="'./@pg_'+block['id']+'_0'" class="flex items-center justify-center px-3 h-8 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Previous</a>
+          </li>
+          <li v-for="page in batching.pages">
+            <a :href="'./@pg_'+block['id']+'_'+page.start" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">{{ page.page }}</a>
+          </li>
+          <li>
+            <a :href="'./@pg_'+block['id']+'_'+batching.last" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Next</a>
+          </li>
+        </ul>
+      </nav>
+
     </div>
 
     <template v-else-if="block['@type']=='heading'" :data-block-uid="block_uid">
@@ -183,13 +197,39 @@
       required: true
     }  
   });
-  
-  const {status, data: {batching, items, items_total}} = block?.querystring ? await ploneApi({
-            path: `${data['@id']}/++api++/@querystring-search`,
-            query: block.querystring,
-            _default: {batching: {}, items: [], items_total: 0}
-          }) : {status:null, data:{batching:{}, items:data.items, items_total: data.items.Length}};
 
+  const items = ref([]);
+  const batching = ref({});
+  const items_total = ref(0);
+  const pages = data._listing_pages;
+  const cur_page = (block['@id'] in pages) ? pages[block['@id']] : 0;
+  var b_size = 0;
+  
+  if ("querystring" in block) {
+    b_size=("b_size" in block.querystring) ? Number(block.querystring.b_size) : 0;
+    ploneApi({
+            path: `${data['@id']}/++api++/@querystring-search`,
+            query: {...block.querystring, ...{b_start:String(cur_page)}},
+            _default: {batching: {}, items: [], items_total: 0}
+          }).then(({data}) => {
+            //const data = qdata;
+            items.value = data.value.items;
+            items_total.value = Number(data.value.items_total);
+            b_size = b_size ? b_size : items_total.value;
+            //batching.value = data.value.batching;
+            var batches = [...Array(Math.ceil(items_total.value/b_size)).keys()].map(i=> {
+              return {start:i*b_size, page:i}
+            })
+            batching['pages'] = batches.slice(cur_page-2,cur_page+3)
+            batching['last'] = batches.Length ? batches[-1].start : 0; 
+            console.log(batching);
+          });
+        }
+  else {
+    items.value = data.items;
+    items_total.value = data.items.Length;
+  }
+  
 
 
 

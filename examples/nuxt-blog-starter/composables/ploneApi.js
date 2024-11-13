@@ -1,6 +1,6 @@
 
 
-export default async function ploneApi({path, query = null, watch=[], _default={}}) {
+export default async function ploneApi({path, query = null, watch=[], _default={}, pages={}}) {
 
     var headers = {
         "Accept": "application/json"
@@ -67,8 +67,20 @@ export default async function ploneApi({path, query = null, watch=[], _default={
             //        // throw new error;
             //     return {title:"Error"};
             // }
-
-            return data;
+            
+            data["_listing_pages"] = pages;
+            if (query) {
+                return data;
+            } else {
+                const comp =  data['@components'];
+                delete data['@components'];
+                return {
+                    page: data,
+                    _listing_pages: pages, 
+                    navigation: comp.navigation,
+                    breadcrumbs: comp.breadcrumbs
+                }
+            }
         },
     });
 };

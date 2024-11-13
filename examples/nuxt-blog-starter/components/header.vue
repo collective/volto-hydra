@@ -63,7 +63,7 @@ function nav(data) {
         if (!data) {
             return []
         }
-        return data['@components']?.navigation?.items;
+        return data?.navigation?.items;
     };
 function getUrl(item) {
         return item['@id'].replace('https://hydra-api.pretagov.com/', '/').replace('https://hydra-api.pretagov.com', '/')

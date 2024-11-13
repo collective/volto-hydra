@@ -3,7 +3,7 @@ import mkcert from 'vite-plugin-mkcert'
 export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', 'nuxt-security', '@nuxt/image'],
   css: ['/assets/css/main.css'],
-  ssr: true,
+  ssr: false,
 
   experimental: {
       payloadExtraction: false
@@ -45,6 +45,7 @@ export default defineNuxtConfig({
       contentSecurityPolicy: {
         'img-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
         'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+        'frame-ancestors': ['*']
       },
       crossOriginResourcePolicy: "cross-origin",
     }
