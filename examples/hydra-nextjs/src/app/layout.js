@@ -4,7 +4,6 @@ import "semantic-ui-css/semantic.min.css";
 import TranstackProviders from "@/providers/TranstackProviders";
 import { Container } from "semantic-ui-react";
 import Menu from "@/components/Menu";
-
 export default function RootLayout({ children }) {
 
   return (
