@@ -9,9 +9,9 @@
       <hr/>  
     </div>
 
-    <h1 v-else-if="block['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</h1>
+    <h1 v-else-if="block['@type']=='title'" :data-block-uid="block_uid" data-editable-metadata="title">{{ data.title}}</h1>
 
-    <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid"><i>{{ data.value}}</i></p>
+    <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid" data-editable-metadata="description"><i>{{ data.description}}</i></p>
 
     <div v-else-if="block['@type']=='image' && !block?.title" :data-block-uid="block_uid">
         <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
@@ -21,7 +21,7 @@
         <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
         <figcaption>
           <h2>{{ block.title }}</h2>
-          <div v-if="block?.description">
+          <div v-if="block?.description" data-editable-field="description">
             <p>{{ block.description }}</p>
           </div>
         </figcaption>
@@ -58,14 +58,14 @@
     <div v-else-if="block['@type']=='slider'" id="default-carousel" class="relative w-full" data-carousel="static"  :data-block-uid="block_uid">
     <!-- Carousel wrapper -->
     <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply',imageProps(block).bg,  'hidden', 'duration-700', 'ease-linear']"  data-carousel-item v-for="block in block.slides">
+        <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply', 'hidden', 'duration-700', 'ease-linear']" :style="imageProps(block).bgStyles"  data-carousel-item v-for="block in block.slides">
             <div class="max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700">
               <NuxtLink :to="getUrl(block.href[0])">
                   <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
               </NuxtLink>
-              <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">{{block.description}}</p>
+              <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">{{block.description}}</p>
               <div>{{ block.head_title }}</div>
-              <NuxtLink :to="getUrl(block.href[0])" data-editable-field="href">{{block.buttonText}}</NuxtLink>
+              <NuxtLink :to="getUrl(block.href[0])" data-editable-field="buttonText">{{block.buttonText}}</NuxtLink>
             </div>
         </div>
     </div>
@@ -103,7 +103,7 @@
         <h2 :id="panelid" :data-block-uid="panelid">
           <button type="button" class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3" 
           :data-accordion-target="`#accordion-collapse-body-${ panelid }`" aria-expanded="true" aria-controls="accordion-collapse-body-1">
-            <span>{{block.data.blocks[panelid].title}}</span>
+            <span data-editable-field="title">{{block.data.blocks[panelid].title}}</span>
             <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
               <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5 5 1 1 5"/>
             </svg>
@@ -122,25 +122,31 @@
 
 
     <div v-else-if="block['@type']=='listing'" :data-block-uid="block_uid">
+      <h2 :is="block.headlineTag">{{ block.headline }}</h2>
+      <p v-if="!items.length">Empty Listing</p>
       <template  v-for="item in items" >
         <NuxtLink :to="getUrl(item)" class="flex flex-col items-center bg-white border border-gray-200 rounded-lg shadow md:flex-row md:max-w-xl hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-          <img class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" alt="" v-for="props in [imageProps(item)]">
+          <template v-for="props in [imageProps(item)]">
+            <NuxtImg class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" :srcset="props.srcset" alt="" v-if="props.url"/>
+          </template>
+
           <div class="flex flex-col justify-between p-4 leading-normal">
             <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{{item.title}}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">{{ item.description }}.</p>
           </div>
         </NuxtLink>
       </template>
+
       <nav aria-label="Listing Navigation" v-if="batching?.last">
         <ul class="inline-flex -space-x-px text-sm">
           <li>
-            <a :href="'./@pg_'+block['id']+'_0'" class="flex items-center justify-center px-3 h-8 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Previous</a>
+            <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_0`" class="flex items-center justify-center px-3 h-8 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Previous</NuxtLink>
           </li>
           <li v-for="page in batching.pages">
-            <a :href="'./@pg_'+block['id']+'_'+page.start" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">{{ page.page }}</a>
+            <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${page.start}`" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">{{ page.page }}</NuxtLink>
           </li>
           <li>
-            <a :href="'./@pg_'+block['id']+'_'+batching.last" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Next</a>
+            <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${batching.last}`" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Next</NuxtLink>
           </li>
         </ul>
       </nav>
@@ -148,7 +154,7 @@
     </div>
 
     <template v-else-if="block['@type']=='heading'" :data-block-uid="block_uid">
-      <h2>{{ block.heading }}</h2>
+      <h2 data-editable-field="heading">{{ block.heading }}</h2>
     </template>
 
     <div v-else-if="block['@type']=='slateTable'" class="data-table" :data-block-uid="block_uid">
@@ -161,7 +167,8 @@
       </table>
     </div>
 
-    <NuxtLink v-else-if="block['@type']=='__button'" :to="getUrl(block.href)" :data-block-uid="block_uid" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+    <NuxtLink v-else-if="block['@type']=='__button'" :to="getUrl(block.href)" :data-block-uid="block_uid" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+    data-editable-field="title">
       {{block.title}}
     </NuxtLink>
 
@@ -173,6 +180,19 @@
             Your browser does not support the video tag.
       </video>
     </template>
+
+    <section v-else-if="block['@type']=='highlight'" class="bg-white dark:bg-gray-900"> 
+    <div class="py-8 px-4 mx-auto max-w-screen-xl text-center lg:py-16">
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :srcset="props.srcset" /> 
+        <h1 class="mb-4 text-4xl font-extrabold tracking-tight leading-none text-gray-900 md:text-5xl lg:text-6xl dark:text-white">{{ block.title }}</h1>
+        <p class="mb-8 text-lg font-normal text-gray-500 lg:text-xl sm:px-16 lg:px-48 dark:text-gray-400"><RichText v-for="node in block['value']" :key="node" :node="node" /></p>
+        <div class="flex flex-col space-y-4 sm:flex-row sm:justify-center sm:space-y-0">
+            <NuxtLink v-if="block.button" :to="getUrl(block.buttonLink)" class="py-3 px-5 sm:ms-4 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
+                {{ block.buttonText }}
+            </NuxtLink>  
+        </div>
+    </div>
+    </section>
 
     <div v-else :data-block-uid="block_uid">
       {{ 'Not implemented Block: @type=' + block['@type'] }}
@@ -202,14 +222,17 @@
   const batching = ref({});
   const items_total = ref(0);
   const pages = data._listing_pages;
-  const cur_page = (block['@id'] in pages) ? pages[block['@id']] : 0;
+  const cur_page = (block_uid in pages) ? pages[block_uid] : 0;
   var b_size = 0;
   
   if ("querystring" in block) {
-    b_size=("b_size" in block.querystring) ? Number(block.querystring.b_size) : 0;
+    // https://stackoverflow.com/questions/72419491/nested-usefetch-in-nuxt-3
+    if ("b_size" in block.querystring) {
+      b_size= Number(block.querystring.b_size);
+    }
     ploneApi({
             path: `${data['@id']}/++api++/@querystring-search`,
-            query: {...block.querystring, ...{b_start:String(cur_page)}},
+            query: {...block.querystring, ...{b_size:b_size, b_start:cur_page*b_size, metadata_fields: "_all"}},
             _default: {batching: {}, items: [], items_total: 0}
           }).then(({data}) => {
             //const data = qdata;
@@ -217,12 +240,15 @@
             items_total.value = Number(data.value.items_total);
             b_size = b_size ? b_size : items_total.value;
             //batching.value = data.value.batching;
-            var batches = [...Array(Math.ceil(items_total.value/b_size)).keys()].map(i=> {
-              return {start:i*b_size, page:i}
+            const max_page = Math.ceil(items_total.value/b_size);
+            var batches = [...Array(max_page).keys()].map(i=> {
+              return {start:(i), page:i+1}
             })
-            batching['pages'] = batches.slice(cur_page-2,cur_page+3)
-            batching['last'] = batches.Length ? batches[-1].start : 0; 
-            console.log(batching);
+            batching.value.pages = batches.slice(Math.max(cur_page-2,0), Math.min(cur_page+3,max_page-1))
+            batching.value.last = data.value.items_total ? batches[batches.length-1].start : 0;
+            batching.value.next = batches[Math.min(cur_page+1,max_page-1)]?.start;
+            batching.value.prev = batches[Math.max(cur_page-1,0)]?.start;
+            console.log(batching.value);
           });
         }
   else {

@@ -5,12 +5,19 @@
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
     
-      <Block v-if="data?.page.blocks_layout" v-for="block_uid in data.page.blocks_layout.items"  :block_uid="block_uid" :block="data.page.blocks[block_uid]" :data="data.page"></Block>
+      <Block v-if="data.page?.blocks_layout" v-for="block_uid in data.page.blocks_layout.items"  :block_uid="block_uid" :block="data.page.blocks[block_uid]" :data="data.page"></Block>
 
-      <div v-else>
-        <h1>{{ data?.page.title }}</h1>
+      <div v-else-if="data?.page">
+        <h1>{{ data.page?.title }}</h1>
+        <p v-if="data.page?.description"> {{ data.page.description }}</p>
+        <NuxtImg v-if="data.page['@type'] == 'Image'" :src="imageProps(data.page.image).url"/>
+        <NuxtLink v-else-if="data.page['@type'] == 'Link'" :to="data.page.remoteUrl">{{ data.page.remoteUrl }}</NuxtLink>
+        <pre v-else> {{ data.page }} </pre>
       </div>
-      <pre>{{ data.page.blocks_layout }}</pre>
+      <div v-else>
+        Error: No page loaded
+      </div>
+    
 
     </section>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
@@ -37,7 +44,6 @@
 
 
 <script setup>
-import { initBridge } from './hydra.js';
 
 // initialize components based on data attribute selectors
 onMounted(() => {
@@ -55,7 +61,7 @@ console.log(route.params.slug);
 for (var part of route.params.slug) {
     if (part.startsWith("@pg_")) {
         const [_,bid,page] = part.split("_");
-        pages[bid] = page;
+        pages[bid] = Number(page);
     } else {
         path.push(part);
     }
@@ -68,22 +74,28 @@ const { data, error } = await ploneApi({
   pages: pages
 });
 
-const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
-bridge.onEditChange((page) => {
-      if (page) {
-        data.value.page = page;
-      }
-    });
+import { initBridge } from '../packages/hydra.js';
 
-// https://stackoverflow.com/questions/72419491/nested-usefetch-in-nuxt-3
-// Need to get all the listings here.
+if (import.meta.client) {
+    const url = new URL(window.location.href);
+    const isEdit = url.searchParams.get("_edit");
+
+    if (isEdit) {
+
+        const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
+        bridge.onEditChange((page) => {
+            if (page) {
+                data.value.page = page;
+            }
+            });
+    }
+}
 
 // if (error) {
 //     showError(error)
 //     data = {title:"Error"}
 // }
 
-//const nav = data["@components"].navigation.items;
 
 
 // if the slug does not correspond to any articles,

@@ -3,7 +3,7 @@ import mkcert from 'vite-plugin-mkcert'
 export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', 'nuxt-security', '@nuxt/image'],
   css: ['/assets/css/main.css'],
-  ssr: false,
+  ssr: true,
 
   experimental: {
       payloadExtraction: false

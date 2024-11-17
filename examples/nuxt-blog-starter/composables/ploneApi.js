@@ -22,23 +22,6 @@ export default async function ploneApi({path, query = null, watch=[], _default={
     else {
         headers["Content-Type"] = "application/json";
     }
-    // https://demo.plone.org/++api++/block/grid-block/listing/@querystring-search
-    // {
-    //     "metadata_fields": "_all",
-    //     "b_size": 25,
-    //     "limit": "7",
-    //     "query": [
-    //         {
-    //             "i": "path",
-    //             "o": "plone.app.querystring.operation.string.absolutePath",
-    //             "v": "/block/grid-block"
-    //         }
-    //     ],
-    //     "sort_order": "ascending",
-    //     "b_start": 0
-    // }
-    // a unique key to ensure that data fetching
-    // can be properly de-duplicated across requests,
     const key = JSON.stringify({
         path,
         query,
