@@ -3,7 +3,7 @@ import mkcert from 'vite-plugin-mkcert'
 export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', 'nuxt-security', '@nuxt/image'],
   css: ['/assets/css/main.css'],
-  ssr: true,
+  ssr: process.env?.NUXT_SSR ? process.env.NUXT_SSR=='true': true,
 
   experimental: {
       payloadExtraction: false
