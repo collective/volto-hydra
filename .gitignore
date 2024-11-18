@@ -13,5 +13,6 @@ yarn.lock
 dist
 examples/nuxt-blog-starter/certs/mkcert
 
+examples/hydra-vue-f7/src/.vite-ssg-temp/
 # Local Netlify folder
 .netlify
