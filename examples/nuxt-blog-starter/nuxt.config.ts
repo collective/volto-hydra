@@ -1,7 +1,12 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
-  modules: ['@nuxtjs/tailwindcss', 'nuxt-security', '@nuxt/image'],
+  modules: [
+    '@nuxtjs/tailwindcss', 
+    'nuxt-security', 
+    '@nuxt/image', 
+    '@aceforth/nuxt-netlify'
+  ],
   css: ['/assets/css/main.css'],
   ssr: process.env?.NUXT_SSR ? process.env.NUXT_SSR=='true': true,
 
@@ -49,6 +54,9 @@ export default defineNuxtConfig({
       },
       crossOriginResourcePolicy: "cross-origin",
     }
+  },
+  netlify: { 
+    mergeSecurityHeaders: true 
   },
   devServer: {
     https: {
