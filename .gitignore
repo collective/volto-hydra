@@ -12,3 +12,6 @@ results
 yarn.lock
 dist
 examples/nuxt-blog-starter/certs/mkcert
+
+# Local Netlify folder
+.netlify

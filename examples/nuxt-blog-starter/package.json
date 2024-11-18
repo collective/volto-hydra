@@ -10,16 +10,16 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@nuxt/image": "^1.8.1",
     "@vueuse/core": "^11.2.0",
     "flowbite": "^2.5.2",
     "nuxi": "^3.15.0",
     "nuxt": "^3.14.0",
     "nuxt-security": "^2.0.0",
     "sharp": "^0.33.5",
+    "@nuxt/image": "^1.8.1",
     "vite-plugin-mkcert": "^1.17.6",
     "vue": "latest",
-    "vue-router": "latest"
+    "vue-router": "latest",
   },
   "devDependencies": {
     "@nuxtjs/tailwindcss": "^6.12.2"
