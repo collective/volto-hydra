@@ -1,13 +1,22 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
-  modules: [
+  buildModules: [
     '@nuxtjs/tailwindcss', 
     'nuxt-security', 
     '@aceforth/nuxt-netlify',
+  ],
+  modules: [
     '@nuxt/image'
   ],
+  devtools: { enabled: true },
   css: ['/assets/css/main.css'],
+  postcss: {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
+    },
+  },
   ssr: process.env?.NUXT_SSR ? process.env.NUXT_SSR=='true': true,
 
   experimental: {
