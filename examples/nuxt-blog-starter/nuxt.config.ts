@@ -4,8 +4,8 @@ export default defineNuxtConfig({
   modules: [
     '@nuxtjs/tailwindcss', 
     'nuxt-security', 
-    '@nuxt/image', 
-    '@aceforth/nuxt-netlify'
+    '@aceforth/nuxt-netlify',
+    '@nuxt/image'
   ],
   css: ['/assets/css/main.css'],
   ssr: process.env?.NUXT_SSR ? process.env.NUXT_SSR=='true': true,
@@ -56,7 +56,10 @@ export default defineNuxtConfig({
     }
   },
   netlify: { 
-    mergeSecurityHeaders: true 
+    mergeSecurityHeaders: true,
+    rewrites: !process.env?.NUXT_SSR ? {
+      "/*": "/index.html  200"
+    } : {}
   },
   devServer: {
     https: {
@@ -64,6 +67,6 @@ export default defineNuxtConfig({
       key: './certs/dev.pem'
     }
   },
-  sourcemap: false,
-  compatibilityDate: '2024-11-05'
+  sourcemap: true,
+  compatibilityDate: '2024-11-20'
 });
