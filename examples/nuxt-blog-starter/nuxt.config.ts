@@ -17,38 +17,11 @@ export default defineNuxtConfig({
       autoprefixer: {},
     },
   },
-  ssr: process.env?.NUXT_SSR ? process.env.NUXT_SSR=='true': true,
-
-  experimental: {
-      payloadExtraction: false
-  },
-
-  // How to prerender dynamic routes?
-  // generate routes -  https://medium.com/js-dojo/how-i-generated-dynamic-routes-for-different-nuxt-js-pages-ce2ee6972743
-  // crawlpages (allows some dynamic to still work) - https://stackoverflow.com/questions/77292506/how-to-make-nuxt-3-correctly-build-ssg-pages-dynamic-api-routes
-
-  router: {
-      options: {
-          strict: false
-      }
-  },
-  image: {
-    domains: ['hydra-api.pretagov.com']
-  },
-  vite: {
-    plugins: [
-      mkcert({
-        savePath: './certs', // save the generated certificate into certs directory
-        force: true, // force generation of certs even without setting https property in the vite config
-      }),  
-    ],
-  
-        /* options for vite */
-    // ssr: true // enable unstable server-side rendering for development (false by default)
-    // experimentWarning: false // hide experimental warning message (disabled by default for tests)
-    vue: {
-      /* options for vite-plugin-vue2 */
-    },
+  ssr: true,
+  $env: {
+    edit: {
+      ssr: false
+    }
   },
   security: {
     corsHandler: {
@@ -66,9 +39,44 @@ export default defineNuxtConfig({
   },
   netlify: { 
     mergeSecurityHeaders: true,
-    rewrites: !process.env?.NUXT_SSR ? {
-      "/*": "/index.html  200"
-    } : {}
+    $env: {
+      edit: {
+        rewrites: {
+          "/*": "/index.html  200"
+        }
+      }
+    }
+  },
+  image: {
+    domains: ['hydra-api.pretagov.com']
+  },
+  experimental: {
+      payloadExtraction: false
+  },
+
+  // How to prerender dynamic routes?
+  // generate routes -  https://medium.com/js-dojo/how-i-generated-dynamic-routes-for-different-nuxt-js-pages-ce2ee6972743
+  // crawlpages (allows some dynamic to still work) - https://stackoverflow.com/questions/77292506/how-to-make-nuxt-3-correctly-build-ssg-pages-dynamic-api-routes
+
+  router: {
+      options: {
+          strict: false
+      }
+  },
+  vite: {
+    plugins: [
+      mkcert({
+        savePath: './certs', // save the generated certificate into certs directory
+        force: true, // force generation of certs even without setting https property in the vite config
+      }),  
+    ],
+  
+        /* options for vite */
+    // ssr: true // enable unstable server-side rendering for development (false by default)
+    // experimentWarning: false // hide experimental warning message (disabled by default for tests)
+    vue: {
+      /* options for vite-plugin-vue2 */
+    },
   },
   devServer: {
     https: {
