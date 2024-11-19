@@ -73,15 +73,15 @@ export default function imageProps(block) {
       srcset: srcset,
       bg: `bg-[url('${image_url}')]`,
       width: width,
-      ...optimizeImage(
-        image_url,
-        /* options */
-        {
-          placeholder: false, // placeholder image before the actual image is fully loaded.
-          //placeholder: props.placeholder, // placeholder image before the actual image is fully loaded.
-        },
-        true /* return bgStyles */,
-      ),
+    //   ...optimizeImage(
+    //     image_url,
+    //     /* options */
+    //     {
+    //       placeholder: false, // placeholder image before the actual image is fully loaded.
+    //       //placeholder: props.placeholder, // placeholder image before the actual image is fully loaded.
+    //     },
+    //     true /* return bgStyles */,
+    //   ),
   
     }
 };

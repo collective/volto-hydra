@@ -39,11 +39,6 @@ export default defineNuxtConfig({
   },
   netlify: { 
     mergeSecurityHeaders: true,
-    redirects: {
-      from: "/_ipx/:size/https://*",
-      to: "/_ipx/:size/https:/*",
-      status: 200
-    },
     $env: {
       edit: {
         redirects: {
@@ -54,9 +49,11 @@ export default defineNuxtConfig({
       }
     }
   },
+  static: true,
   image: {
     provider: 'ipx',
     domains: ['hydra-api.pretagov.com'],
+    staticFilename: '[publicPath]/images/[name]-[hash][ext]',
     alias: {
       plone: "https://hydra-api.pretagov.com"
     }

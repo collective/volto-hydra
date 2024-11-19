@@ -58,7 +58,7 @@
     <div v-else-if="block['@type']=='slider'" id="default-carousel" class="relative w-full" data-carousel="static"  :data-block-uid="block_uid">
     <!-- Carousel wrapper -->
     <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply', 'hidden', 'duration-700', 'ease-linear']" :style="imageProps(block).bgStyles"  data-carousel-item v-for="block in block.slides">
+        <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply', 'hidden', 'duration-700', 'ease-linear']" style="imageProps(block).bgStyles"  data-carousel-item v-for="block in block.slides">
             <div class="max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700">
               <NuxtLink :to="getUrl(block.href[0])">
                   <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
