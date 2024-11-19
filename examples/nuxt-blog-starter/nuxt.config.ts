@@ -41,13 +41,16 @@ export default defineNuxtConfig({
     mergeSecurityHeaders: true,
     $env: {
       edit: {
-        rewrites: {
-          "/*": "/index.html  200"
+        redirects: {
+          from: "/*",
+          to: "/index.html",
+          status: 200
         }
       }
     }
   },
   image: {
+    provider: 'ipx',
     domains: ['hydra-api.pretagov.com']
   },
   experimental: {
