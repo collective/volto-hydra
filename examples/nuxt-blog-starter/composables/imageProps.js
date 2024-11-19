@@ -35,7 +35,7 @@ export default function imageProps(block) {
       return {url:null}
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
-    image_url = image.url.replace("https://hydra-api.pretagov.com/", "/plone/"); // nuxt image alias
+    //image_url = image.url.replace("https://hydra-api.pretagov.com/", "/plone/"); // nuxt image alias
     var srcset = "";
     var width = block?.width;
     const field = block?.image_field ? block.image_field : null;
