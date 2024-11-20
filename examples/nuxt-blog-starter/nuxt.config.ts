@@ -11,17 +11,24 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false,
+      generate: {
+        fallback: "index.html", // Uses '404.html' instead of the default '200.html'
+      },
       routeRules: {
         "/**": {
           cors: true,
+          redirect: {
+            to: "/index",
+            statusCode: 200
+          },
           security: {
-            corsHandler: {
-              // options
-              origin: "https://hydra.pretagov.com"
-            },
+            // corsHandler: {
+            //   // options
+            //   origin: "https://hydra.pretagov.com"
+            // },
             headers: {
               contentSecurityPolicy: {
-                'img-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'img-src': ['self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
                 'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
                 'frame-ancestors': ['*']
               },
