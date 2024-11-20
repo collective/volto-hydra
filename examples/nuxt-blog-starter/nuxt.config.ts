@@ -14,23 +14,20 @@ export default defineNuxtConfig({
       routeRules: {
         "/**": {
           cors: true,
-          headers: {
-            "origin": "https://hydra.pretagov.com",
-            "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
-            "cross-prigin-resource-policy": "cross-origin"
-          }
-        }
-      }
-    }
-  },
-  $development: {
-    routeRules: {
-      "/**": {
-        cors: true,
-        headers: {
-          "origin": "https://hydra.pretagov.com",
-          "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
-          "cross-prigin-resource-policy": "cross-origin"
+          security: {
+            corsHandler: {
+              // options
+              origin: "https://hydra.pretagov.com"
+            },
+            headers: {
+              contentSecurityPolicy: {
+                'img-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'frame-ancestors': ['*']
+              },
+              crossOriginResourcePolicy: "cross-origin",
+            }
+          },
         }
       }
     }
@@ -46,20 +43,20 @@ export default defineNuxtConfig({
     //   }
     // }
   },
-  security: {
-    corsHandler: {
-      // options
-      origin: "https://hydra.pretagov.com"
-    },
-    headers: {
-      contentSecurityPolicy: {
-        'img-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-        'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-        'frame-ancestors': ['*']
-      },
-      crossOriginResourcePolicy: "cross-origin",
-    }
-  },
+  // security: {
+  //   corsHandler: {
+  //     // options
+  //     origin: "https://hydra.pretagov.com"
+  //   },
+  //   headers: {
+  //     contentSecurityPolicy: {
+  //       'img-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+  //       'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+  //       'frame-ancestors': ['*']
+  //     },
+  //     crossOriginResourcePolicy: "cross-origin",
+  //   }
+  // },
   css: ['/assets/css/main.css'],
   // postcss: {
   //   plugins: {
