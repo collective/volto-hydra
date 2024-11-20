@@ -10,7 +10,7 @@ export default defineNuxtConfig({
   ssr: true,
   $env: {
     edit: {
-      ssr: false,
+      ssr: true,
       routeRules: {
         "/*": {
           prerender: true,
