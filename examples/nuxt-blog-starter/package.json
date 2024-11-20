@@ -10,9 +10,9 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@aceforth/nuxt-netlify": "^1.1.0",
     "@vueuse/core": "^11.2.0",
     "flowbite": "^2.5.2",
+    "nitropack": "^2.10.4",
     "nuxi": "^3.15.0",
     "nuxt": "^3.14.159",
     "nuxt-security": "^2.0.0",
@@ -23,11 +23,8 @@
     "vue-router": "latest"
   },
   "devDependencies": {
-    "@aceforth/nuxt-netlify": "^1.1.0",
     "@nuxt/image": "^1.8.1",
     "@nuxtjs/tailwindcss": "^6.12.2",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15"
   }
 }

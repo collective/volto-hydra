@@ -10,8 +10,8 @@
       <div v-else-if="data?.page">
         <h1>{{ data.page?.title }}</h1>
         <p v-if="data.page?.description"> {{ data.page.description }}</p>
-        <NuxtImg v-if="data.page['@type'] == 'Image'" :src="imageProps(data.page.image).url"/>
-        <NuxtLink v-else-if="data.page['@type'] == 'Link'" :to="data.page.remoteUrl">{{ data.page.remoteUrl }}</NuxtLink>
+        <NuxtLink v-if="data.page['@type'] == 'Link'" :to="data.page.remoteUrl">{{ data.page.remoteUrl }}</NuxtLink>
+        <NuxtImg v-else-if="data.page['@type'] == 'Image'" :src="imageProps(data.page).url"/>
         <pre v-else> {{ data.page }} </pre>
       </div>
       <div v-else>

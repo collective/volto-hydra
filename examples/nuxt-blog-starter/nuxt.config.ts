@@ -1,22 +1,22 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
-  buildModules: [
+  // buildModules: [
+  //   '@aceforth/nuxt-netlify',
+  // ],
+  modules: [
     '@nuxtjs/tailwindcss', 
     'nuxt-security', 
-    '@aceforth/nuxt-netlify',
-  ],
-  modules: [
     '@nuxt/image'
   ],
-  devtools: { enabled: true },
+ devtools: { enabled: true },
   css: ['/assets/css/main.css'],
-  postcss: {
-    plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
-    },
-  },
+  // postcss: {
+  //   plugins: {
+  //     tailwindcss: {},
+  //     autoprefixer: {},
+  //   },
+  // },
   ssr: true,
   $env: {
     edit: {
@@ -37,23 +37,23 @@ export default defineNuxtConfig({
       crossOriginResourcePolicy: "cross-origin",
     }
   },
-  netlify: { 
-    mergeSecurityHeaders: true,
-    redirects: {
-      from: "/_ipx/:size/https%3A//*",
-      to: "/_ipx/:size/https%3A/*",
-      status: 200
-    },
-    $env: {
-      edit: {
-        redirects: {
-          from: "/*",
-          to: "/index.html",
-          status: 200
-        }
-      }
-    }
-  },
+  // netlify: { 
+  //   mergeSecurityHeaders: true,
+  //   redirects: {
+  //     from: "/_ipx/:size/https%3A//*",
+  //     to: "/_ipx/:size/https%3A/*",
+  //     status: 200
+  //   },
+  //   $env: {
+  //     edit: {
+  //       redirects: {
+  //         from: "/*",
+  //         to: "/index.html",
+  //         status: 200
+  //       }
+  //     }
+  //   }
+  // },
   image: {
     provider: 'ipx',
     domains: ['hydra-api.pretagov.com'],
@@ -61,9 +61,9 @@ export default defineNuxtConfig({
     // modifiers: {
     //   quality: 80
     // }, 
-    // alias: {
-    //   plone: "https://hydra-api.pretagov.com"
-    // }
+    alias: {
+      plone: "https://hydra-api.pretagov.com"
+    }
   },
   experimental: {
       payloadExtraction: false
@@ -99,6 +99,9 @@ export default defineNuxtConfig({
       key: './certs/dev.pem'
     }
   },
-  sourcemap: true,
+  sourcemap: {
+    server: true,
+    client: true
+  },
   compatibilityDate: '2024-11-20'
 });
