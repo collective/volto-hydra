@@ -17,11 +17,11 @@ export default defineNuxtConfig({
   ssr: true,
   $env: {
     edit: {
-      ssr: false
+      ssr: true
     },
     routeRules: {
       "/*": {
-        prerender: true,
+        prerender: false,
         redirect: '/index',
         cors: true,
         headers: {
@@ -29,6 +29,14 @@ export default defineNuxtConfig({
           "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
           "cross-prigin-resource-policy": "cross-origin"
         }
+      }
+    }
+  },
+  routeRules: {
+    "/_ipx/_/https%3A//*": {
+      redirect: {
+        to: "/_ipx/_/https%3A/*",
+        statusCode: 200
       }
     }
   },
