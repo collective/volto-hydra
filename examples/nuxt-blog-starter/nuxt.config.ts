@@ -7,13 +7,6 @@ export default defineNuxtConfig({
     '@nuxt/image'
   ],
   devtools: { enabled: true },
-  css: ['/assets/css/main.css'],
-  // postcss: {
-  //   plugins: {
-  //     tailwindcss: {},
-  //     autoprefixer: {},
-  //   },
-  // },
   ssr: true,
   $env: {
     edit: {
@@ -22,7 +15,7 @@ export default defineNuxtConfig({
     routeRules: {
       "/*": {
         prerender: false,
-        redirect: '/index',
+        //redirect: '/index',
         cors: true,
         headers: {
           "origin": "https://hydra.pretagov.com",
@@ -54,22 +47,12 @@ export default defineNuxtConfig({
       crossOriginResourcePolicy: "cross-origin",
     }
   },
-  // netlify: { 
-  //   mergeSecurityHeaders: true,
-  //   redirects: {
-  //     from: "/_ipx/:size/https%3A//*",
-  //     to: "/_ipx/:size/https%3A/*",
-  //     status: 200
+  css: ['/assets/css/main.css'],
+  // postcss: {
+  //   plugins: {
+  //     tailwindcss: {},
+  //     autoprefixer: {},
   //   },
-  //   $env: {
-  //     edit: {
-  //       redirects: {
-  //         from: "/*",
-  //         to: "/index.html",
-  //         status: 200
-  //       }
-  //     }
-  //   }
   // },
   image: {
     provider: 'ipx',
