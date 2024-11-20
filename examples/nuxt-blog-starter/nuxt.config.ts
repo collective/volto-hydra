@@ -1,15 +1,12 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
-  // buildModules: [
-  //   '@aceforth/nuxt-netlify',
-  // ],
   modules: [
     '@nuxtjs/tailwindcss', 
     'nuxt-security', 
     '@nuxt/image'
   ],
- devtools: { enabled: true },
+  devtools: { enabled: true },
   css: ['/assets/css/main.css'],
   // postcss: {
   //   plugins: {
@@ -21,6 +18,18 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false
+    },
+    routeRules: {
+      "/*": {
+        prerender: true,
+        redirect: '/index',
+        cors: true,
+        headers: {
+          "origin": "https://hydra.pretagov.com",
+          "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
+          "cross-prigin-resource-policy": "cross-origin"
+        }
+      }
     }
   },
   security: {
