@@ -14,11 +14,11 @@
     <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid" data-editable-metadata="description"><i>{{ data.description}}</i></p>
 
     <div v-else-if="block['@type']=='image' && !block?.title" :data-block-uid="block_uid">
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :sizes="props.sizes" />
     </div>
     <div v-else-if="block['@type']=='image' && block?.title" :data-block-uid="block_uid">
       <figure>
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" />
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" _sizes="props.sizes" />
         <figcaption>
           <h2>{{ block.title }}</h2>
           <div v-if="block?.description" data-editable-field="description">
@@ -29,7 +29,7 @@
     </div>
 
     <div v-else-if="block['@type']=='leadimage'" :data-block-uid="block_uid">
-        <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :srcset="props.srcset" loading="lazy" decoding="async" />
+        <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :sizes="props.sizes" loading="lazy" decoding="async" />
     </div>
 
     <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5"
@@ -39,7 +39,7 @@
 
     <div v-else-if="block['@type']=='teaser'" class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"  :data-block-uid="block_uid">
        <NuxtLink :to="getUrl(block.href[0])" v-if="block.href.hasPreviewImage">
-        <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url" :srcset="props.srcset" alt="" v-if="block.href[0].hasPreviewImage"/>
+        <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url" :sizes="props.sizes" alt="" v-if="block.href[0].hasPreviewImage"/>
        </NuxtLink>
        <div class="p-5">
           <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
@@ -55,7 +55,8 @@
         </div>
      </div>
 
-    <div v-else-if="block['@type']=='slider'" id="default-carousel" class="relative w-full" data-carousel="static"  :data-block-uid="block_uid">
+    <section v-else-if="block['@type']=='slider'" id="default-carousel" class=" w-screen mx-auto" data-carousel="static"  :data-block-uid="block_uid">
+      <div class="relative w-full">
     <!-- Carousel wrapper -->
     <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
         <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply', 'hidden', 'duration-700', 'ease-linear']" style="imageProps(block).bgStyles"  data-carousel-item v-for="block in block.slides">
@@ -68,7 +69,7 @@
               <NuxtLink :to="getUrl(block.href[0])" data-editable-field="buttonText">{{block.buttonText}}</NuxtLink>
             </div>
         </div>
-    </div>
+      </div>
     <!-- Slider indicators -->
     <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
         <button v-for="(block, index) in block.slides" type="button" class="w-3 h-3 rounded-full" aria-current="true" aria-label="Slide 1" :data-carousel-slide-to="index"></button>
@@ -91,6 +92,7 @@
         </span>
     </button>
    </div>
+  </section>
 
 
 
@@ -127,7 +129,7 @@
       <template  v-for="item in items" >
         <NuxtLink :to="getUrl(item)" class="flex flex-col items-center bg-white border border-gray-200 rounded-lg shadow md:flex-row md:max-w-xl hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
           <template v-for="props in [imageProps(item)]">
-            <NuxtImg class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" :srcset="props.srcset" alt="" v-if="props.url"/>
+            <NuxtImg class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" :sizes="props.sizes" alt="" v-if="props.url"/>
           </template>
 
           <div class="flex flex-col justify-between p-4 leading-normal">
@@ -183,7 +185,7 @@
 
     <section v-else-if="block['@type']=='highlight'" class="bg-white dark:bg-gray-900"> 
     <div class="py-8 px-4 mx-auto max-w-screen-xl text-center lg:py-16">
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :srcset="props.srcset" /> 
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :sizes="props.sizes" /> 
         <h1 class="mb-4 text-4xl font-extrabold tracking-tight leading-none text-gray-900 md:text-5xl lg:text-6xl dark:text-white">{{ block.title }}</h1>
         <p class="mb-8 text-lg font-normal text-gray-500 lg:text-xl sm:px-16 lg:px-48 dark:text-gray-400"><RichText v-for="node in block['value']" :key="node" :node="node" /></p>
         <div class="flex flex-col space-y-4 sm:flex-row sm:justify-center sm:space-y-0">

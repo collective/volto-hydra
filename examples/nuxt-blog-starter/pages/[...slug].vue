@@ -1,6 +1,8 @@
 <template>
     <Header :data="data"></Header>
-    <section>
+    <main class="pt-8 pb-16 lg:pt-16 lg:pb-24 bg-white dark:bg-gray-900 antialiased">
+        <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
+            <article class="mx-auto w-full max-w-2xl format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
         <!-- <h1 class="text-center" data-editable-metadata="title">{{data?.title}}</h1> -->
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
@@ -19,7 +21,9 @@
       </div>
     
 
-    </section>
+    </article>
+    </div>
+    </main>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
         <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
         <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">© 2023 <a href="https://flowbite.com/" class="hover:underline">Flowbite™</a>. All Rights Reserved.

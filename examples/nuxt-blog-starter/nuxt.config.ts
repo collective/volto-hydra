@@ -73,7 +73,7 @@ export default defineNuxtConfig({
   //   },
   // },
   image: {
-    provider: 'ipx',
+    //provider: 'ipx',
     domains: ['hydra-api.pretagov.com'],
     // staticFilename: '[publicPath]/images/[name]-[hash][ext]',
     // modifiers: {

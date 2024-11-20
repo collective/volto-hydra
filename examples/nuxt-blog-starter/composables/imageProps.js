@@ -24,7 +24,7 @@ export default function imageProps(block) {
     } else if (block?.download) {
         image_url = block.download;
     }
-    else if (block?.url && block?.image_field) {
+    else if (block?.url && block['@type'] == "image") {
         // image block with image_field and url
         image_url = block.url;
     } else {
@@ -37,6 +37,7 @@ export default function imageProps(block) {
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
     //image_url = image.url.replace("https://hydra-api.pretagov.com/", "/plone/"); // nuxt image alias
     var srcset = "";
+    var sizes = "";
     var width = block?.width;
     const field = block?.image_field ? block.image_field : null;
 
@@ -46,6 +47,10 @@ export default function imageProps(block) {
             const scale = block.image_scales[field][0].scales[name];
             return `${image_url}/${scale.download} w${scale.width}`;
         }).join(", ");
+        sizes = Object.keys(block.image_scales[field][0].scales).map((name) => {
+            const scale = block.image_scales[field][0].scales[name];
+            return `${name}:${scale.width}px`;
+        }).join(" ");
         //image_url = image_url +  "/@@images/image";
         image_url = `${image_url}/${block.image_scales[field][0].download}`;
         //width = block.images_scales[field][0].scales[block.styles["size:noprefix"]].width;
@@ -60,6 +65,10 @@ export default function imageProps(block) {
         // image block with image_field and url
         image_url = `${image_url}/@@images/${block?.image_field}`;
     }
+    else if (block['@type'] == "image") {
+        // image block with image_field and url
+        image_url = `${image_url}/@@images/image`;
+    }
     else if (!/\.[a-zA-Z]+$/.test(image_url)) {
         image_url = "";
     }
@@ -71,6 +80,7 @@ export default function imageProps(block) {
       size: size,
       align: align,
       srcset: srcset,
+      sizes: sizes,
       bg: `bg-[url('${image_url}')]`,
       width: width,
     //   ...optimizeImage(
