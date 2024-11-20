@@ -13,10 +13,6 @@ export default defineNuxtConfig({
       ssr: false,
       routeRules: {
         "/**": {
-          redirect: {
-            to: '/index',
-            statusCode: 200
-          },
           cors: true,
           headers: {
             "origin": "https://hydra.pretagov.com",
@@ -27,7 +23,22 @@ export default defineNuxtConfig({
       }
     }
   },
+  $development: {
+    routeRules: {
+      "/**": {
+        cors: true,
+        headers: {
+          "origin": "https://hydra.pretagov.com",
+          "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
+          "cross-prigin-resource-policy": "cross-origin"
+        }
+      }
+    }
+  },
   routeRules: {
+    "/**": {
+      cors: true
+    }
     // "/_ipx/_/https%3A//*": {
     //   redirect: {
     //     to: "/_ipx/_/https%3A/*",
