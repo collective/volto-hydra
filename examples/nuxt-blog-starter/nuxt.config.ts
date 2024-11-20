@@ -17,10 +17,10 @@ export default defineNuxtConfig({
       routeRules: {
         "/**": {
           cors: true,
-          redirect: {
-            to: "/index.html",
-            statusCode: 200
-          },
+          // redirect: {
+          //   to: "/index.html",
+          //   statusCode: 200
+          // },
           security: {
             // corsHandler: {
             //   // options
