@@ -33,8 +33,9 @@ export default defineNuxtConfig({
                 'frame-ancestors': ['*']
               },
               crossOriginResourcePolicy: "cross-origin",
+              xFrameOptions: false
             }
-          },
+          }
         }
       }
     }
