@@ -10,20 +10,20 @@ export default defineNuxtConfig({
   ssr: true,
   $env: {
     edit: {
-      ssr: true
-    },
-    routeRules: {
-      "/*": {
-        prerender: false,
-        //redirect: '/index',
-        cors: true,
-        headers: {
-          "origin": "https://hydra.pretagov.com",
-          "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
-          "cross-prigin-resource-policy": "cross-origin"
+      ssr: false,
+      routeRules: {
+        "/*": {
+          prerender: true,
+          //redirect: '/index',
+          cors: true,
+          headers: {
+            "origin": "https://hydra.pretagov.com",
+            "content-security-policy": "img-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; connect-src: 'self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'; 'frame-ancestors': '*';",
+            "cross-prigin-resource-policy": "cross-origin"
+          }
         }
       }
-    }
+    },
   },
   routeRules: {
     // "/_ipx/_/https%3A//*": {
