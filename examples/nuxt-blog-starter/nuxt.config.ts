@@ -10,11 +10,13 @@ export default defineNuxtConfig({
   ssr: true,
   $env: {
     edit: {
-      ssr: true,
+      ssr: false,
       routeRules: {
-        "/*": {
-          prerender: true,
-          //redirect: '/index',
+        "/**": {
+          redirect: {
+            to: '/index',
+            statusCode: 200
+          },
           cors: true,
           headers: {
             "origin": "https://hydra.pretagov.com",
@@ -23,7 +25,7 @@ export default defineNuxtConfig({
           }
         }
       }
-    },
+    }
   },
   routeRules: {
     // "/_ipx/_/https%3A//*": {

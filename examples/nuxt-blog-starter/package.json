@@ -6,6 +6,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
+    "edit": "nuxt generate --envName edit",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
