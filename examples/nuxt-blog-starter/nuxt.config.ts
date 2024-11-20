@@ -26,12 +26,12 @@ export default defineNuxtConfig({
     }
   },
   routeRules: {
-    "/_ipx/_/https%3A//*": {
-      redirect: {
-        to: "/_ipx/_/https%3A/*",
-        statusCode: 200
-      }
-    }
+    // "/_ipx/_/https%3A//*": {
+    //   redirect: {
+    //     to: "/_ipx/_/https%3A/*",
+    //     statusCode: 200
+    //   }
+    // }
   },
   security: {
     corsHandler: {
