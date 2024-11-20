@@ -18,7 +18,7 @@ export default defineNuxtConfig({
         "/**": {
           cors: true,
           redirect: {
-            to: "/index",
+            to: "/index.html",
             statusCode: 200
           },
           security: {
