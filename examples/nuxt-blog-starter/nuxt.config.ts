@@ -19,8 +19,8 @@ export default defineNuxtConfig({
           security: {
             headers: { // Edit site can be put in an iframe
               contentSecurityPolicy: {
-                'img-src': ['self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-                'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
                 'frame-ancestors': ['*']
               },
               crossOriginResourcePolicy: "cross-origin",
