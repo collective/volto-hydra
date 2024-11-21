@@ -35,7 +35,7 @@ export default function imageProps(block) {
       return {url:null}
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
-    //image_url = image.url.replace("https://hydra-api.pretagov.com/", "/plone/"); // nuxt image alias
+    //image_url = image.url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
     var srcset = "";
     var sizes = "";
     var width = block?.width;
@@ -81,7 +81,7 @@ export default function imageProps(block) {
       align: align,
       srcset: srcset,
       sizes: sizes,
-      bg: `bg-[url('${image_url}')]`,
+      //bg: `bg-[url('${image_url}')]`,
       width: width,
     //   ...optimizeImage(
     //     image_url,

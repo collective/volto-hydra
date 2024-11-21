@@ -6,27 +6,18 @@ export default defineNuxtConfig({
     'nuxt-security', 
     '@nuxt/image'
   ],
-  devtools: { enabled: true },
-  ssr: true,
+  ssr: true, // "npm run generate" == SSG
+  routeRules: {
+    "/**": { cors: true } // public site can't be edited
+  },
   $env: {
     edit: {
-      ssr: false,
-      generate: {
-        fallback: "index.html", // Uses '404.html' instead of the default '200.html'
-      },
+      ssr: false, // "npm run generate -- --envName edit" == SPA
       routeRules: {
         "/**": {
           cors: true,
-          // redirect: {
-          //   to: "/index.html",
-          //   statusCode: 200
-          // },
           security: {
-            // corsHandler: {
-            //   // options
-            //   origin: "https://hydra.pretagov.com"
-            // },
-            headers: {
+            headers: { // Edit site can be put in an iframe
               contentSecurityPolicy: {
                 'img-src': ['self', 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
                 'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
@@ -37,35 +28,14 @@ export default defineNuxtConfig({
             }
           }
         }
-      }
+      },
+      // generate: {
+      //   fallback: "index.html", // Uses '404.html' instead of the default '200.html'
+      // },
     }
   },
-  routeRules: {
-    "/**": {
-      cors: true
-    }
-    // "/_ipx/_/https%3A//*": {
-    //   redirect: {
-    //     to: "/_ipx/_/https%3A/*",
-    //     statusCode: 200
-    //   }
-    // }
-  },
-  // security: {
-  //   corsHandler: {
-  //     // options
-  //     origin: "https://hydra.pretagov.com"
-  //   },
-  //   headers: {
-  //     contentSecurityPolicy: {
-  //       'img-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-  //       'connect-src': ["'self'", 'data:', 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-  //       'frame-ancestors': ['*']
-  //     },
-  //     crossOriginResourcePolicy: "cross-origin",
-  //   }
-  // },
   css: ['/assets/css/main.css'],
+  devtools: { enabled: true },
   // postcss: {
   //   plugins: {
   //     tailwindcss: {},
@@ -73,15 +43,11 @@ export default defineNuxtConfig({
   //   },
   // },
   image: {
-    provider: 'ipx',
+    //provider: 'ipx',
     domains: ['hydra-api.pretagov.com'],
-    // staticFilename: '[publicPath]/images/[name]-[hash][ext]',
-    // modifiers: {
-    //   quality: 80
-    // }, 
-    alias: {
-      plone: "https://hydra-api.pretagov.com"
-    }
+    // alias: {
+    //   _plone_: "https://hydra-api.pretagov.com"
+    // }
   },
   experimental: {
       payloadExtraction: false
