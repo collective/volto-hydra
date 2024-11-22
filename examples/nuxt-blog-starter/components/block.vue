@@ -13,10 +13,10 @@
 
     <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid" data-editable-metadata="description"><i>{{ data.description}}</i></p>
 
-    <div v-else-if="block['@type']=='image' && !block?.title" :data-block-uid="block_uid">
+    <div v-else-if="block['@type']=='image' && contained" :data-block-uid="block_uid">
         <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]"  />
     </div>
-    <div v-else-if="block['@type']=='image' && block?.title" :data-block-uid="block_uid">
+    <div v-else-if="block['@type']=='image' && !contained" :data-block-uid="block_uid">
       <figure>
         <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]"  />
         <figcaption>
@@ -32,9 +32,11 @@
         <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]"  loading="lazy" decoding="async" />
     </div>
 
-    <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5"
-      :class="['grid', 'grid-cols-'+block.blocks_layout.items.length, 'gap-4', 'grid-rows-1', 'bg-'+(block.styles.backgroundColor||'none')]">
-          <Block v-for="uid in block.blocks_layout.items" :block_uid="uid" :block="block.blocks[uid]" :data="data"></Block>
+    <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
+      class="grid grid-flow-col gap-4"
+      :class="['grid-cols-'+block.blocks_layout.items.length,'bg-'+(block.styles.backgroundColor||'none')]">
+          <Block v-for="uid in block.blocks_layout.items" :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"></Block>
+
     </div>
 
     <div v-else-if="block['@type']=='teaser'" class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"  :data-block-uid="block_uid">
@@ -43,6 +45,7 @@
        </NuxtLink>
        <div class="p-5">
           <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
+            <div>{{ block.head_title }}</div>
             <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
            </NuxtLink>
           <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description" v-if="block?.description">{{block.description}}</p>
@@ -55,7 +58,7 @@
         </div>
      </div>
 
-    <section v-else-if="block['@type']=='slider'" id="default-carousel" class=" w-screen mx-auto" data-carousel="static"  :data-block-uid="block_uid">
+    <section v-else-if="block['@type']=='slider'" id="default-carousel" class=" w-full mx-auto" data-carousel="static"  :data-block-uid="block_uid">
       <div class="relative w-full">
     <!-- Carousel wrapper -->
     <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
@@ -170,10 +173,12 @@
       </table>
     </div>
 
-    <NuxtLink v-else-if="block['@type']=='__button'" :to="getUrl(block.href)" :data-block-uid="block_uid" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+    <div v-else-if="block['@type']=='__button'">
+    <NuxtLink  :to="getUrl(block.href)" :data-block-uid="block_uid" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
     data-editable-field="title">
-      {{block.title}}
+      {{block.title || 'Read more'}}
     </NuxtLink>
+  </div>
 
     <template v-else-if="block['@type']=='video'"  :data-block-uid="block_uid">
       <iframe v-if="block.url.startsWith('https://www.youtube')" width="420" height="315" 
@@ -218,7 +223,12 @@
     data: {
       type: Object,
       required: true
-    }  
+    },
+    contained: {
+      type: Boolean,
+      required: false,
+      default: false
+    } 
   });
 
   const items = ref([]);
