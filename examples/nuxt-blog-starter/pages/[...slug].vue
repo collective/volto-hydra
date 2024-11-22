@@ -1,11 +1,4 @@
 <template>
-    <html>
-        <head v-if="data?.page">
-            <title>{{ data.page?.title }} : Hydra</title>
-            <meta name="description" :content="data.page?.description">
-        </head>
-
-    <body>
         <Header :data="data"></Header>
         <main class="pt-8 pb-16 lg:pt-16 lg:pb-24 bg-white dark:bg-gray-900 antialiased">
         <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
@@ -44,10 +37,7 @@
             </li>
         </ul>
         </div>
-    </footer>
-</body>
-    </html>
-   
+    </footer>   
 </template>
 
 
@@ -98,6 +88,16 @@ if (import.meta.client) {
             });
     }
 }
+
+
+useSeoMeta({
+  title: data.page?.title,
+  ogTitle: data.page?.title,
+  description: data.page?.description,
+  ogDescription: data.page?.description,
+  ogImage: 'https://example.com/image.png',
+  twitterCard: 'summary_large_image',
+})
 
 // if (error) {
 //     showError(error)

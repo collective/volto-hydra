@@ -1,22 +1,25 @@
 
 
-export default function imageProps(block) {
+export default function imageProps(block, bgStyles=false) {
     const { optimizeImage } = useOptimizeImage()
 
     // https://demo.plone.org/images/penguin1.jpg/@@images/image-32-cecef57e6c78570023eb042501b45dc2.jpeg
     // https://hydra-api.pretagov.com/images/penguin1.jpg/++api++/@@images/image-1800-31be5b7f53648238b68cae0a3ec45dec.jpeg
+    var bg_class = {}
     if (!block) {
         return {
-            url: null
+            url: null,
+            class: bg_class
         }
     }
     if (block?.preview_image) {
-        block = block.preview_image
+        block = block.preview_image;
     }
     var image_url = null;
     if (!block) {
         return {
-            url: null
+            url: null,
+            class: bg_class
         }
     } else if ('@id' in block && block?.image_scales) {
         // It's an image content object
@@ -28,11 +31,17 @@ export default function imageProps(block) {
         // image block with image_field and url
         image_url = block.url;
     } else {
-        return {url:null}
+        return {
+            url:null,
+            class: bg_class
+        }
     }
 
     if (!image_url ) {
-      return {url:null}
+      return {
+        url:null,
+        class: bg_class
+        }
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
     //image_url = image.url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
@@ -72,16 +81,20 @@ export default function imageProps(block) {
     else if (!/\.[a-zA-Z]+$/.test(image_url)) {
         image_url = "";
     }
-
+    // `${['hidden', 'duration-700', 'ease-linear', 'bg-center',  ] + (block?.preview_image? ['bg-cover', imageProps(block.preview_image[0]).bg]:['bg-gray-700', 'bg-blend-multiply', 'bg-no-repeat'])}`
     const size = block.size;
     const align = block.align;
+    bg_class = [`background-image: url('${image_url}')`];
+    if (bgStyles){
+        bg_class = optimizeImage(image_url, {}, true).bgStyles;
+    }
     return {
       url: image_url,
       size: size,
       align: align,
       srcset: srcset,
       sizes: sizes,
-      //bg: `bg-[url('${image_url}')]`,
+      class: bg_class,
       width: width,
     //   ...optimizeImage(
     //     image_url,

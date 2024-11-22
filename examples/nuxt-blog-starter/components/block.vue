@@ -14,11 +14,11 @@
     <p v-else-if="block['@type']=='description'" :data-block-uid="block_uid" data-editable-metadata="description"><i>{{ data.description}}</i></p>
 
     <div v-else-if="block['@type']=='image' && !block?.title" :data-block-uid="block_uid">
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" :sizes="props.sizes" />
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]"  />
     </div>
     <div v-else-if="block['@type']=='image' && block?.title" :data-block-uid="block_uid">
       <figure>
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]" _sizes="props.sizes" />
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width" :class="['image-size-'+props.size, 'image-align-'+props.align]"  />
         <figcaption>
           <h2>{{ block.title }}</h2>
           <div v-if="block?.description" data-editable-field="description">
@@ -29,7 +29,7 @@
     </div>
 
     <div v-else-if="block['@type']=='leadimage'" :data-block-uid="block_uid">
-        <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" :sizes="props.sizes" loading="lazy" decoding="async" />
+        <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]"  loading="lazy" decoding="async" />
     </div>
 
     <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5"
@@ -39,7 +39,7 @@
 
     <div v-else-if="block['@type']=='teaser'" class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"  :data-block-uid="block_uid">
        <NuxtLink :to="getUrl(block.href[0])" v-if="block.href.hasPreviewImage">
-        <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url" :sizes="props.sizes" alt="" v-if="block.href[0].hasPreviewImage"/>
+        <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]"  :src="props.url"  alt="" v-if="block.href[0].hasPreviewImage"/>
        </NuxtLink>
        <div class="p-5">
           <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
@@ -59,14 +59,14 @@
       <div class="relative w-full">
     <!-- Carousel wrapper -->
     <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div :class="['bg-center', 'bg-no-repeat', 'bg-gray-700', 'bg-blend-multiply', 'hidden', 'duration-700', 'ease-linear']" style="imageProps(block).bgStyles"  data-carousel-item v-for="block in block.slides">
-            <div class="max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700">
+        <div :style="imageProps(block.preview_image[0], true).class" class="hidden duration-700 ease-linear bg-center flex items-center" :class="{'bg-gray-700':!block.preview_image, 'bg-blend-multiply':!block.preview_image, 'bg-no-repeat':!block.preview_image, 'bg-cover':block.preview_image}"  data-carousel-item v-for="block in block.slides">
+            <div class="max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute" :class="{'right-0':block.flagAlign == 'right'}">
               <NuxtLink :to="getUrl(block.href[0])">
-                  <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
+                <div>{{ block.head_title }}</div>
+                <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">{{block.title}}</h5>
               </NuxtLink>
               <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">{{block.description}}</p>
-              <div>{{ block.head_title }}</div>
-              <NuxtLink :to="getUrl(block.href[0])" data-editable-field="buttonText">{{block.buttonText}}</NuxtLink>
+              <NuxtLink v-if="block.href" :to="getUrl(block.href[0])" data-editable-field="buttonText" class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">{{block.buttonText||'Read More'}}</NuxtLink>
             </div>
         </div>
       </div>
@@ -129,7 +129,8 @@
       <template  v-for="item in items" >
         <NuxtLink :to="getUrl(item)" class="flex flex-col items-center bg-white border border-gray-200 rounded-lg shadow md:flex-row md:max-w-xl hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
           <template v-for="props in [imageProps(item)]">
-            <NuxtImg class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" :src="props.url" :sizes="props.sizes" alt="" v-if="props.url"/>
+           
+            <NuxtImg :src="props.url"  alt="" v-if="props.url" class="object-cover w-full rounded-t-lg h-96 md:h-auto md:w-48 md:rounded-none md:rounded-s-lg" ></NuxtImg>
           </template>
 
           <div class="flex flex-col justify-between p-4 leading-normal">
@@ -185,7 +186,7 @@
 
     <section v-else-if="block['@type']=='highlight'" class="bg-white dark:bg-gray-900"> 
     <div class="py-8 px-4 mx-auto max-w-screen-xl text-center lg:py-16">
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :sizes="props.sizes" /> 
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" /> 
         <h1 class="mb-4 text-4xl font-extrabold tracking-tight leading-none text-gray-900 md:text-5xl lg:text-6xl dark:text-white">{{ block.title }}</h1>
         <p class="mb-8 text-lg font-normal text-gray-500 lg:text-xl sm:px-16 lg:px-48 dark:text-gray-400"><RichText v-for="node in block['value']" :key="node" :node="node" /></p>
         <div class="flex flex-col space-y-4 sm:flex-row sm:justify-center sm:space-y-0">
@@ -243,9 +244,9 @@
             b_size = b_size ? b_size : items_total.value;
             //batching.value = data.value.batching;
             const max_page = Math.ceil(items_total.value/b_size);
-            var batches = [...Array(max_page).keys()].map(i=> {
+            var batches = max_page ? [...Array(max_page).keys()].map(i=> {
               return {start:(i), page:i+1}
-            })
+            }) : [];
             batching.value.pages = batches.slice(Math.max(cur_page-2,0), Math.min(cur_page+3,max_page-1))
             batching.value.last = data.value.items_total ? batches[batches.length-1].start : 0;
             batching.value.next = batches[Math.min(cur_page+1,max_page-1)]?.start;
