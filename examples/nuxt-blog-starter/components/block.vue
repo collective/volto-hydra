@@ -1,5 +1,5 @@
 <template>
-    <div v-if="block['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
+    <div v-if="block['@type']=='slate'" class="bg-transparent" :data-block-uid="block_uid" data-editable-field="value">
         <RichText v-for="node in block['value']" :key="node" :node="node" />
     </div>
 
@@ -34,8 +34,10 @@
 
     <div v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
       class="grid grid-flow-col gap-4"
-      :class="['grid-cols-'+block.blocks_layout.items.length,'bg-'+(block.styles.backgroundColor||'none')]">
-          <Block v-for="uid in block.blocks_layout.items" :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"></Block>
+      :class="['grid-cols-'+block.blocks_layout.items.length,`bg-${block.styles.backgroundColor||'white'}-700`]">
+        <div v-for="uid in block.blocks_layout.items" :class="[`bg-${!block.styles.backgroundColor?'slate':'white'}-700`]">
+          <Block  :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"></Block>
+        </div>
 
     </div>
 
