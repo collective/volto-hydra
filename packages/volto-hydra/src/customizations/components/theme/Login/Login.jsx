@@ -142,38 +142,25 @@ const Login = (props) => {
           <Grid.Column>
             <Segment raised>
               <Header as="h1" textAlign="center">
-                Welcome to Project Hydra
+                Hydra: Plone Visual Headless PoC
               </Header>
-              <p>
-              A Google summer of code project to create a proof of concept of a CMSUI/editor for
-              Plone Headless sites that is
-              <ul>
-                <li><a href="https://github.com/collective/volto-hydra">quick to integrate</a> into 
-                any frontend</li>
-                <li>as easy to use for editors as Volto</li>
-              </ul> 
-              </p>
-              <p>
-                View the{' '}
-                <a href="https://github.com/collective/volto-hydra">
-                  Hydra README
-                </a>{' '}
-                to see what currently works and what
-                doesn't.
-              </p>
-              <p>
-                Use "admin" and password "admin" to login. 
-                You can change which frontend to edit in user preferences. 
-                Note: not all block types are visible on all frontends.
-              </p>
               <List bulleted>
+                <List.Item>
+                  <a
+                    href="https://hydra-nuxt-flowbrite.netlify.app/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Nuxt.js/Vue Example
+                  </a>
+                </List.Item>
                 <List.Item>
                   <a
                     href="https://hydra-blogsite-nextjs.vercel.app/"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Next.js Basic Blog Style
+                    Next.js/React Example
                   </a>
                 </List.Item>
                 <List.Item>
@@ -182,17 +169,21 @@ const Login = (props) => {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Vue.js Mobile Hybrid App (f7)
+                    framework7/Vue Example (mobile app)
                   </a>
                 </List.Item>
-                <List.Item>
-                  Or{' '}
-                  <a href="https://github.com/collective/volto-hydra">
-                    create your own "editable" frontend
-                  </a>{' '}
-                  in your favourite framework and let us know if it was easy.
-                </List.Item>
               </List>
+              <p>
+                <a href="https://github.com/collective/volto-hydra">
+                  Hydra README
+                </a>{' '}
+                - currently implemented features and tutorial.
+              </p>
+              <ul>
+                <li>Use "admin" and password "admin" to edit sites above</li> 
+                <li>User preferences: to Switch headless frontend</li> 
+              </ul>
+
             </Segment>
           </Grid.Column>
         </Grid>
