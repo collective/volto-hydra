@@ -1,4 +1,7 @@
 <template>
+    <Head>
+        <Title>{{ data.page?.title }}</Title>
+    </Head>
         <Header :data="data"></Header>
         <main class="pt-8 pb-16 lg:pt-16 lg:pb-24 bg-white dark:bg-gray-900 antialiased">
         <!-- <div class="flex justify-between px-4 mx-auto max-w-screen-xl "> -->
@@ -99,7 +102,6 @@ const { data, error } = await ploneApi({
 
 
 useSeoMeta({
-  title: data.page?.title,
   ogTitle: data.page?.title,
   description: data.page?.description,
   ogDescription: data.page?.description,
