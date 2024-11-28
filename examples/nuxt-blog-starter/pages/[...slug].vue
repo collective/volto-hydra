@@ -1,6 +1,7 @@
 <template>
     <Head>
         <Title>{{ data.page?.title }}</Title>
+        <Meta name="description" :content="data.page?.description" />
     </Head>
         <Header :data="data"></Header>
         <main class="pt-8 pb-16 lg:pt-16 lg:pb-24 bg-white dark:bg-gray-900 antialiased">
