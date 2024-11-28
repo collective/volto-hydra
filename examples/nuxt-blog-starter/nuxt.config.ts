@@ -43,11 +43,11 @@ export default defineNuxtConfig({
   //   },
   // },
   image: {
-    //provider: 'ipx',
-    domains: ['hydra-api.pretagov.com'],
-    // alias: {
-    //   _plone_: "https://hydra-api.pretagov.com"
-    // }
+    provider: 'ipx',
+    domains: ['hydra-api.pretagov.com','hydra.pretagov.com'],
+    alias: {
+      '_plone_': "https://hydra-api.pretagov.com"
+    }
   },
   experimental: {
       payloadExtraction: false

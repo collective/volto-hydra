@@ -44,7 +44,7 @@ export default function imageProps(block, bgStyles=false) {
         }
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
-    //image_url = image.url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
+    image_url = image_url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
     var srcset = "";
     var sizes = "";
     var width = block?.width;
