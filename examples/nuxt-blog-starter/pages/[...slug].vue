@@ -10,7 +10,7 @@
         <!-- <h1 class="text-center" data-editable-metadata="title">{{data?.title}}</h1> -->
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
-
+                <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
                 <section v-if="data.page?.blocks_layout" v-for="section in getSections(data.page)" :class="section.style">
                     <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
                         <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
