@@ -31,7 +31,8 @@
     "release-alpha": "pnpm --filter volto-hydra release-alpha",
     "storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto storybook dev -p 6006 -c $(pwd)/.storybook",
     "build-storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build-storybook -c $(pwd)/.storybook",
-    "example:nextjs": "pnpm --filter hydra-nextjs run dev"
+    "example:nextjs": "pnpm --filter hydra-nextjs run dev",
+    "example:nuxt": "pnpm --filter nuxt-blog-starter install && pnpm --filter nuxt-blog-starter run dev"
   },
   "dependencies": {
     "@plone/client": "1.0.0-alpha.16",

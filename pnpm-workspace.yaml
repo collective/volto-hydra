@@ -4,4 +4,4 @@ packages:
   - 'packages/*'
   - 'examples/*'
   - '!examples/hydra-vue-f7'
-  - '!examples/nuxt-blog-starter'
+  # - '!examples/nuxt-blog-starter'
