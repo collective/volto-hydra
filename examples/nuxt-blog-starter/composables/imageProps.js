@@ -45,7 +45,7 @@ export default function imageProps(block, bgStyles=false) {
         }
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
-    if (!runtimeConfig.isedit) {
+    if (!runtimeConfig.public.isedit) {
         // in edit mode we are SPA so this won't work
         image_url = image_url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
     }
