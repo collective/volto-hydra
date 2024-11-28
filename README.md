@@ -4,7 +4,7 @@ A Google summer of code project to create a proof of concept of a CMSUI/editor f
 Plone headless sites that is easy to integrate into any frontend and as easy to use
 for editors as Volto is.
 
-Note: It is a [Work in Progress: Hydra Project]((https://github.com/orgs/collective/projects/3/views/4).
+Note: It is a [Work in Progress: Hydra Project](https://github.com/orgs/collective/projects/3/views/4).
 It should not be used in production.
 
 Why does it matter?
