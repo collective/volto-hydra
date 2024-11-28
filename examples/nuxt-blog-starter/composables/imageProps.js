@@ -2,6 +2,7 @@
 
 export default function imageProps(block, bgStyles=false) {
     const { optimizeImage } = useOptimizeImage()
+    const runtimeConfig = useRuntimeConfig()
 
     // https://demo.plone.org/images/penguin1.jpg/@@images/image-32-cecef57e6c78570023eb042501b45dc2.jpeg
     // https://hydra-api.pretagov.com/images/penguin1.jpg/++api++/@@images/image-1800-31be5b7f53648238b68cae0a3ec45dec.jpeg
@@ -44,7 +45,10 @@ export default function imageProps(block, bgStyles=false) {
         }
     } 
     image_url = image_url.startsWith("/") ? `https://hydra-api.pretagov.com${image_url}`: image_url;
-    image_url = image_url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
+    if (!runtimeConfig.isedit) {
+        // in edit mode we are SPA so this won't work
+        image_url = image_url.replace("https://hydra-api.pretagov.com", "/_plone_"); // nuxt image alias
+    }
     var srcset = "";
     var sizes = "";
     var width = block?.width;

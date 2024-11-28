@@ -29,9 +29,20 @@ export default defineNuxtConfig({
           }
         }
       },
+      runtimeConfig: {
+        public: {
+          isedit: true
+        }
+      },
+    
       // generate: {
       //   fallback: "index.html", // Uses '404.html' instead of the default '200.html'
       // },
+    }
+  },
+  runtimeConfig: {
+    public: {
+      isedit: false // needed so we don't use image alias when no SSR
     }
   },
   css: ['/assets/css/main.css'],
