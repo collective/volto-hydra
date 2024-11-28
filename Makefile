@@ -127,3 +127,7 @@ example-nextjs-admin: ## Starts Volto, allowing reloading of the add-on during d
 .PHONY: example-nextjs-frontend
 example-nextjs-frontend: ## Starts nextjs example frontend
 	pnpm example:nextjs
+
+.PHONY: example-nuxt-frontend
+example-nuxt-frontend: ## Starts nuxt example frontend
+	pnpm example:nuxt

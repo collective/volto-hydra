@@ -1,6 +1,13 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
+  app: {
+    head: {
+      htmlAttrs: {
+        lang: 'en',
+      },
+    },
+  },
   modules: [
     '@nuxtjs/tailwindcss', 
     'nuxt-security', 

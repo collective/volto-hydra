@@ -86,15 +86,16 @@
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
             :class="{ 'right-0': block.flagAlign == 'right' }">
-            <NuxtLink :to="getUrl(block.href[0])">
-              <div>{{ block.head_title }}</div>
-              <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
-                data-editable-field="title">{{ block.title }}</h5>
-            </NuxtLink>
+            <div>{{ block.head_title }}</div>
+            <h5 :id="`heading-${block['@id']}`"
+              class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
+              {{ block.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">
               {{ block.description }}</p>
-            <NuxtLink v-if="block.href" :to="getUrl(block.href[0])" data-editable-field="buttonText"
-              class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+              <NuxtLink v-if="block.href" :to="getUrl(block.href[0])" data-editable-field="buttonText"
+              class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+              :aria-describedby="`heading-${block['@id']}`">
+              
               {{ block.buttonText || 'Read More' }}</NuxtLink>
           </div>
         </div>
