@@ -58,7 +58,7 @@ export const useOptimizeImage = () => {
             .split(', ')
             .filter(
               (imgUrl) => imgUrl.endsWith('768w') || imgUrl.endsWith('2560w'),
-            )
+            ).map( (imgUrl) => imgUrl.split(" ")[0])
         })
 
         const responsiveImageSrc = `url("${responsiveImages.value[0]}")`
