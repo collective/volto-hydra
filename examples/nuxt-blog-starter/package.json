@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev_edit": "nuxt dev --envName edit",
     "generate": "nuxt generate",
     "edit": "nuxt generate --envName edit",
     "preview": "nuxt preview",

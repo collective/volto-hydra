@@ -31,10 +31,12 @@ export default defineNuxtConfig({
       },
       runtimeConfig: {
         public: {
-          isedit: true
+          image_alias: ''
         }
       },
-    
+      image: {
+        provider: 'netlify',
+      }        
       // generate: {
       //   fallback: "index.html", // Uses '404.html' instead of the default '200.html'
       // },
@@ -42,7 +44,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      isedit: false // needed so we don't use image alias when no SSR
+      image_alias: '_plone_' // needed so we don't use image alias when no SSR
     }
   },
   css: ['/assets/css/main.css'],
