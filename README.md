@@ -97,10 +97,17 @@ Available example frontends:
   library or directly use [Plone restAPI](https://plonerestapi.readthedocs.io/en/latest/). You should be able to use [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) also.
 - You can start small with just simple navigation and just a few basic blocks and work up to supporting more kinds of blocks as you need them.
 - There is a [set of example frontends](https://github.com/collective/volto-hydra/tree/main/examples) in different frameworks.
-- If want to use static site generation then you will need the following
-  - A draft mode or preview server that is used only while the editor is logged in. Hydra relies on loading changes in the browser.
+
+### Choose your deployment method
+- A SSR/SPA/hybrid frontend deployment works well with Hydra and will allow Visual Editing.
+  - A pure SPA will either need a catchall route or hash style path routing in order to allow new pages to be added during editing.
+- If want to use static site generation (SSG) then you will need the following:
+  - A draft mode or preview server that is used only while the editor is logged in (such as nuxt.js in SPA mode). Hydra relies on loading changes in the browser.
+    - Normally the same code can be used to generate the SSG version which is published. This build would remove hydra.js.
   - [c.webhook](https://github.com/collective/collective.webhook) or similar to trigger the static page build process on edits or publishing.
-- Pure server side rendering frameworks like Flask won't currently work but could in the future via something like a websocket proxy but would likely be too slow in practice.
+  - This will let you have free hosting if you put plone and hydra admin UI onto a host like fly.io that will only load the CMS when someone logs in to to edit.
+  - The nuxt.js example frontend works this way so can be used as an example
+- Pure server side rendering frameworks like Flask won't currently work but could in the future via something like a websocket proxy? but live updates could come too be too slow in practice.
 - if you currently use Volto as your frontend then you should still be able to do so with a few modifications to disable it's builtin editing UI and use hydra instead (TODO)
    - This provides a backwards compatible step before you are willing to rewrite your frontend and has the benefit that  
 
@@ -314,7 +321,16 @@ The optional specifications you can give the container are
 - field: You can have more than one area of sub-blocks in a container by using a different field prefix. default=blocks.
 - hide_chooser_add: you might want to put in a custom add button via ```data-block-choose``` or an api call. default=false if it's a ChooserBlock
 
-Note: The content object is itself a container so the same specifications can be used for the Page as a whole. 
+Note: The content object is itself a container so the same specifications can be used for the Page as a whole.
+
+Some container blocks don't have all sub-blocks visible all the time such as Tabs or Slider blocks or have buttons outside the sub-block that the user
+   might expect would select the sub-block.
+- Hydra will attempt to detect when the selected block is hidden and switch selection but in some cases this doesn't work.
+- You can use ```data-block-selector="block_uid"``` on buttons or links that result in selecting a block. You can also use -1, +1 etc 
+  to select the previous or next block.
+- In the case a block is selected in the sidebar
+  - if the ```data-block-selector``` exists for that block id, that element it will have a click event sent to it.
+  - You can also set a callback during hydra.js init, ```onHandleBlockSelection```.
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
@@ -459,6 +475,12 @@ the editor can pick content to link to, enter an external url of open the url in
 Now as editor can :-
 - Click on a link or button on the frontend to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
 - Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
+
+#### Custom Visual Editing (TODO)
+In some rare cases you might want to provide editors with more visual editing than hydra currently supports. For example a newly create table block 
+might display a form to set the initial number of columns and rows. In this case you can use
+- ```sendBlockUpdate``` hydra.js api to send an updated version of the block after changes.
+- ```sendBlockAction``` hydra.hs api to do actions like select,add, move, copy or remove blocks or perform custom actions on the Volto block edit component.
 
 ### Comment syntax (TODO)
 
