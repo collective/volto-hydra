@@ -1859,7 +1859,7 @@ class Bridge {
           box-sizing: border-box;
         }
         .volto-hydra-dropdown-text {
-          font-size: 15px;
+          font-size: 1rem;
           font-weight: 500;
         }
         .volto-hydra-dropdown-item svg {
