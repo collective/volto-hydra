@@ -1,7 +1,7 @@
 
 
 export default async function ploneApi({path, query = null, watch=[], _default={}, pages={}}) {
-
+    const runtimeConfig = useRuntimeConfig();
     var headers = {
         "Accept": "application/json"
     };
@@ -14,7 +14,7 @@ export default async function ploneApi({path, query = null, watch=[], _default={
     }
     var api = path?.join?path.join('/'):path;
     if (!api.startsWith("http")) {
-        api = `https://hydra-api.pretagov.com/++api++/${api}`
+        api = `${runtimeConfig.backend_base_url}/++api++/${api}`
     }
     if (!query) {
         api = `${api}?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2`

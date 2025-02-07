@@ -79,7 +79,13 @@ making the Rendering part easily replaceable with other implementations.
 ## Want to try the editor?
 
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
-Go to user preferences in the bottom left to select one of the available preset frontends or paste in your own frontend url to test.
+- Go to user preferences in the bottom left
+- select one of the available preset frontends 
+- or paste in your own frontend url to test.
+
+OR run it locally
+
+
 
 **Note**: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
 
@@ -89,6 +95,11 @@ Available example frontends:
 - [more examples (including source code)](https://github.com/collective/volto-hydra/tree/main/examples)
 
 ## Building a Frontend for Headless Plone
+
+The actual code you will write will depend on the framework you choose. You can look these examples to help you.
+
+
+
 
 ### Choose Your Framework
 
@@ -481,6 +492,7 @@ In some rare cases you might want to provide editors with more visual editing th
 might display a form to set the initial number of columns and rows. In this case you can use
 - ```sendBlockUpdate``` hydra.js api to send an updated version of the block after changes.
 - ```sendBlockAction``` hydra.hs api to do actions like select,add, move, copy or remove blocks or perform custom actions on the Volto block edit component.
+- more direct support for initial setup widgets that appear on empty blocks might be supported by hydra in the future.
 
 ### Comment syntax (TODO)
 

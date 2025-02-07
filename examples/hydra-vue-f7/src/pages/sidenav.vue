@@ -19,13 +19,14 @@
   
   <script>
     import { useStore } from 'framework7-vue';
+    const runtimeConfig = useRuntimeConfig();
     export default {
       props: {
         data: Object,
       },
       methods: {
         getUrl(item) {
-          return item['@id'].replace('https://hydra-api.pretagov.com/', '/').replace('https://hydra-api.pretagov.com', '/')
+          return item['@id'].replace(runtimeConfig.backend_base_url+'/', '/').replace(runtimeConfig.backend_base_url, '/')
         }
       },
       data() {      
