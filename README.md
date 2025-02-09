@@ -1,172 +1,173 @@
 # Volto Hydra (volto-hydra)
 
-A Google summer of code project to create a proof of concept of a CMSUI/editor for
-Plone headless sites that is easy to integrate into any frontend and as easy to use
-for editors as Volto is.
+A Google summer of code project to create a proof of concept of a Visual Headless CMS
+using Plone/Nick as a server, Visual editor (based on Volto) but giving you the freedom to
+build your frontend in any framework.
+
+A unique open source Headless CMS
+- Quick to enable Visual editing of frontend blocks regardless of framework
+- Switch between multiple frontends while visual editing
+- Enterpise features such as versioning, i18n, workflow and automated content rules.
+- Unique hierarchical database letting you mix and match collections and trees for storage
+- Easy to implement design systems to enforce governance of content and design.
+- Customisable Administration Interface
+- Choice of python or javascript for your server
+- Scalable and Secure with a mature battle hardened backend used by both CIA and FBI.
 
 Note: It is a [Work in Progress: Hydra Project](https://github.com/orgs/collective/projects/3/views/4).
-It should not be used in production.
-
-Why does it matter?
-- If you **want a Headless CMS**: 
-   - You get the best editor UX for a headless CMS with visual editing with the bonus of being open source
-- If you **don't know Volto**:
-   - You get a lower learning curve if you already know a frontend framework, or just use one of the included starter frontends.  
-- If you **already use Volto**:
-   - you can develop frontends with faster load times, higher security and less risky Volto upgrades, with no downgrade in editor UX
-   - Or continue to use Volto as your frontend only so that your frontend doesn't have to be upgraded with the CMS.
-- If you are **already using Plone Headless**:
-   - this will improve the editor UX with just a few lines of code
-
-Why Hydra? 
-- It gives Headless Plone a Quanta CMS UI but with one or more decoupled heads (frontends) that you can switch between while editing.
-  Decoupled means they are separated from Hydra and Plone in both where they can be hosted and what framework they can use.
-
-What is Quanta?
-- [Quanta](https://github.com/plone/volto/issues/4332) is an iteration on the design system and editing UI that Volto implements
-- Hydra is using Volto as it's base and where parts are reimplemented it is being done closer to the Quanta design.
-
-## How Hydra works
-
-Instead of combining editing and rendering into one framework and codebase, these are separated and during editing
-a two way communication channel is opened across an iframe so that the editing UI is no longer
-part of the frontend code. Instead a small js file called ```hydra.js``` is included in your frontend during editing
-that handles the iframe bridge communication to hydra which is running in the same browser window. Hydra.js also 
-handles small parts of UI that need to be displayed on the frontend during editing.
-
-You could think of it as splitting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
-making the Rendering part easily replaceable with other implementations.
-
-```
-                          Browser            RestAPI             Server              
-                                                                                     
-                                                                                     
-                      ┌──────────────┐                       ┌─────────────┐         
-                      │              │                       │             │         
-   Anon/Editing       │    Volto     │◄─────────────────────►│    Plone    │         
-                      │              │                       │             │         
-                      └──────────────┘                       └─────────────┘         
-                                                                                     
-                                                                                     
-─────────────────────────────────────────────────────────────────────────────────────
-                                                                                     
-                                                                                     
-                  │   ┌──────────────┐                       ┌─────────────┐         
-                  │   │              │                       │             │         
-                  │   │   Frontend   │◄──────────────────────┤    Plone    │         
-                  │   │              │                       │             │         
-                  │   └──hydra.js────┘                       └─────────────┘         
-                  │          ▲                                  ▲                    
-   Editing       UI          │ iFrame Bridge                    │                    
-                  │          ▼                                  │                    
-                  │   ┌──────────────┐                          │                    
-                  │   │              │                          │                    
-                  │   │    Hydra     │◄─────────────────────────┘                    
-                  │   │              │                                               
-                  │   └──────────────┘                                               
-                                                                                     
-                                                                                     
-                      ┌──────────────┐                       ┌─────────────┐         
-                      │              │                       │             │         
-   Anon               │   Frontend   │◄──────────────────────┤    Plone    │         
-                      │              │                       │             │         
-                      └──────────────┘                       └─────────────┘         
-             
-```
+It shouldn't be used in production.
 
 
-
-## Want to try the editor?
+## Online demo
 
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
 - Go to user preferences in the bottom left
 - select one of the available preset frontends 
 - or paste in your own frontend url to test.
 
-OR run it locally
+Note that the Nuxt.js frontend is deployed as a SSG to demonstrate
+scale-to-zero editing so it is deploy as [SSG](https://hydra-nuxt-flowbrite.netlify.app/) 
+while the edit preview is [SPA](https://hydra-nuxt-flowbrite-edit.netlify.app/).
 
+## Run locally
 
+Clone the Volto-Hydra repository from GitHub:
 
-**Note**: These are simple test frontends made with minimal effort and don't include support for all the navigation and standard blocks yet.
+```bash
+git clone https://github.com/collective/volto-hydra.git
+cd volto-hydra
+```
 
-Available example frontends:
-- https://hydra-blogsite-nextjs.vercel.app (Blog style website using Next.js)
-- https://hydra-vue-f7.netlify.app (mobile hybrid framework using Vue.js)
-- [more examples (including source code)](https://github.com/collective/volto-hydra/tree/main/examples)
+Start the Plone RESTAPI/Database
+```bash
+docker run -it -d --rm --name=api -p 8080:8080 -e SITE=Plone -e CORS_ALLOW_ORIGIN='*' plone/server-dev:6
+```
+
+Start a frontend. In this case we will use the Nuxt.js example
+```bash
+cd examples/nuxt-blog-starter
+pnpm install
+NUXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080/Plone pnpm run dev
+```
+The frontend is at https://localhost:3000
+
+To Edit, start the Hydra Admin interface
+```bash
+cd ../..
+make install
+RAZZLE_DEFAULT_IFRAME_URL=https://localhost:3000 pnpm start
+```
+
+Now you can login to Hydra to edit
+- http://localhost:3001
+
+## Run a local frontend with the demo CMS
+
+```bash
+    cd examples/nuxt-blog-starter
+    pnpm install
+    NUXT_PUBLIC_BACKEND_BASE_URL=https://hydra-api.pretagov.com pnpm run dev
+```
+
+Login to https://hydra.pretagov.com/ and in personal preferences add your front url of https://localhost:3000
+
 
 ## Building a Frontend for Headless Plone
 
 The actual code you will write will depend on the framework you choose. You can look these examples to help you.
 
+- [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter)
+- [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
+- [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
 
+The steps involved in creating a frontend are roughly the same for all these frameworks
 
+1. Create a route for any path which goes to a single page.
+   - e.g. in Nuxt.js you create a file ```pages/[..slug].vue```
+2. The page has a template with the static parts of your theme like header and footer etc.
+   1. You might also check the content type to render each differently.
+3. On page setup it takes the path, does a RESTAPI call to the contents endpoint to get the json for this page
+   - You can either use plone/client for this 
+   - but in some frameworks, such as Nuxt.js, is better to use their inbuilt fetch.
+   - You can also [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) 
+     - however note this is just a wrapper on the RESTAPI rather than a server side implementation so it's not more efficient than using the RESTAPI directly.
+4. In your page template fill title etc from the content metadata
+5. For navigation
+   1. adjust the contents api call to use @expand and return navigation data in the same call
+   2. Create a component for your top level nav that uses this nav json to create a menu
+6. For Blocks
+   1. create Block component that takes the id and block json as arguments
+   2. You can use a bunch of if statements to check the Block type to determine how to render than block
+   3. If the block is a container you can call the Block component recursively
+   4. In your page iterate down the ```blocks_layout``` list and render a Block component for each
+   5. Rendering Slate you will want to split into a separate component as it's used in many blocks and is also recursive
+7. There are several helper functions get reused in many blocks
+   1. Generating a url for links. All RESTAPI urls are relative to the api url, so you need to convert these to the right frontend url. 
+   2. Generating a url for an image. The blocks have image data in many formats so a helper function for this is useful.
+      1. You maybe also decide to use your framework or hosting solution for image resizing
+8. Listing Blocks
+   - You can come up with your own pagination scheme. 
+     - For example by embedding page into your url instead of as a query param you can having listings be statically generated.
+   - In your component setup take the page and listing block json and do a RESTAPI call to get the items
+   - Render the items
+   - Render the pagination
+9.  Redirects
+   1.  if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
+   2.  if you are using SSG then you will need to some special code to download all the redirects at generate time add in redirect routes
+10. Error Pages
+    1.  If your RESTAPI call returns an error you will need to handle this within the framework to display the error and set the status code
+11. Search Blocks and Form Blocks
+   - these are a little more complex but also not so hard. TODO: example code
 
-### Choose Your Framework
+## Deployment
 
-- You can use any frontend framework (e.g., Next.js/React, Nuxt.js/Vue, Astro etc or plain js).
-- Fetch content from the Plone backend using the [@plone/client](https://github.com/plone/volto/tree/main/packages/client) 
-  library or directly use [Plone restAPI](https://plonerestapi.readthedocs.io/en/latest/). You should be able to use [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) also.
-- You can start small with just simple navigation and just a few basic blocks and work up to supporting more kinds of blocks as you need them.
-- There is a [set of example frontends](https://github.com/collective/volto-hydra/tree/main/examples) in different frameworks.
+### SPA/Hybrid with Hydra
 
-### Choose your deployment method
-- A SSR/SPA/hybrid frontend deployment works well with Hydra and will allow Visual Editing.
-  - A pure SPA will either need a catchall route or hash style path routing in order to allow new pages to be added during editing.
-- If want to use static site generation (SSG) then you will need the following:
-  - A draft mode or preview server that is used only while the editor is logged in (such as nuxt.js in SPA mode). Hydra relies on loading changes in the browser.
-    - Normally the same code can be used to generate the SSG version which is published. This build would remove hydra.js.
-  - [c.webhook](https://github.com/collective/collective.webhook) or similar to trigger the static page build process on edits or publishing.
-  - This will let you have free hosting if you put plone and hydra admin UI onto a host like fly.io that will only load the CMS when someone logs in to to edit.
-  - The nuxt.js example frontend works this way so can be used as an example
-- Pure server side rendering frameworks like Flask won't currently work but could in the future via something like a websocket proxy? but live updates could come too be too slow in practice.
-- if you currently use Volto as your frontend then you should still be able to do so with a few modifications to disable it's builtin editing UI and use hydra instead (TODO)
-   - This provides a backwards compatible step before you are willing to rewrite your frontend and has the benefit that  
+Hydra requires a SPA/Hybrid frontend if you want to have full Visual Editing.
+- Deploy your frontend in as either a Single Page App or Hybrid (Server side rendering with client side rendering after first load)
+- Deploy Hydra and the plone api server.
+- Login in to hydra and set your frontend url.
 
-TODO: link to more documentation on creating a frontend using @plone/client
+### SSG/SSR with Hydra
 
+It is still possible to achieve the speed and cost savings of Server Side Generation (SSG)
+while still getting the benefits of Visual Editing with Hydra. Or you might require a
+pure Server Side Rendered (SSR) mode.
 
-### Test your frontend
+This is achieved by 
+- deploy your production frontend in SSG mode
+- deploy Hydra
+- deploy Plone api server with [c.webhook](https://github.com/collective/collective.webhook) and configure this to rebuild your SSG on edit.
+- deploy your frontend in SPA mode and use this in Hydra for editing
+- if you deploy everything (other than SSG) on a scale-to-zero hoster (like fly.io) then 
+  only pay when you edit greatly reducing your costs.
 
-The easiest way is to connect it directly to https://hydra-api.pretagov.com/++api++ <br />
-**NOTE:** If you are testing against https://hydra-api.pretagov.com/++api++ you will need to ensure you are running on https locally via a proxy to ensure there
-are no CORS errors
+### Two-Window editing (without hydra)
 
-Or You can [run a local hydra + plone instance](#Local-Development) (see below).
+You can use Plone Headless without Hydra but it could confuse your users as the site won't look like your frontend.
 
-### Deploy your frontend
+- Deploy a Volto site with a default theme
+- Deploy your frontend
+- Setup your content types and block types
+  - Currently adding new blocks requires a custom Volto theme to be deployed.
+- This will come with an out of the box theme so it won't look the same as your frontend
+  - Any new blocks you create will have a skeleton presentation within the preview
+- Once done editing a page, you can switch to the frontend URL and see how the changes look on your frontend
+  - if the page is private you will additionally have to implement a way to login on your frontend to see these pages
+- If you need a more WYSIWYG editing experience
+  - Either use Hydra
+  - Or use Volto theming to recreate design inside volto, or close enough so your editors are happy.
 
-Use Netlify or similar and make your frontend publicly accessible.
-Ensure you have correctly set the CORS headers to allow access by the hydra editor. How to do this will depend
-on how you host your frontend.
+## Enabling Visual Editing (with hydra)
 
+Hydra provides a live preview of your frontend using an iframe.
+With no added integration the page will not change until after save.
+None of the follow steps require much work but each adds a richer editing experience for the
+editors.
 
-## Make your Frontend editable
+### Level 1: Schemas and Page Switching
 
-As an integrator you have a choice on how nice you want the editor user experience to be.
-The hydra.js bridge is designed with a staged approach so minimal effort will allow for basic editing
-and further integration work will get you back to the full inline editing experience similar to Volto.
-
-### Level 1: Enable Switching pages and showing changes *after* save
-
-To do this you will include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
-
-- Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
-- Import `initBridge` from [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js).
-- Call the `initBridge` and pass the origin of your adminUI as the argument to the initBridge method.
-- For example, if you are trying out demo editor, it will be: `https://hydra.pretagov.com`
-  ```js
-  // In Layout.js or App.js
-  import { initBridge } from './hydra.js';
-  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
-  ```
-- Log into https://hydra.pretagov.com/ (or your test hydra), go to ```User Preferences``` and paste in your local running frontend or deployed frontend to test.
-   - You can also add this url to the env ```RAZZLE_DEFAULT_IFRAME_URL``` on a local hydra instance to have this frontend selectable by the user.
-   - The url should be the prefix to which the current path is appended so both /#!/path and /path style routing is supported.
-- Your frontend will know to initialize the hydra iframe bridge when it is being edited using hydra as it will have an added url parameter ```_edit=true```
-   - you might choose to [load `hydra.js` asynchronously](#asynchronously-load-the-bridge) so no additional js is loaded unless editing.
-- You will need to [change your authentication token]((#authenticate-frontend-to-access-private-content)) you are using with the rest api so you can access the same content as the logged in editor.
-
-Now an editor can :-
+This will enable an Editor to :-
 - login to hydra and see the frontend in an iframe. The result will look similar to Volto.
 - browse in hydra (contents view) and your frontend page will change. 
 - browse in your frontend and Hydra will change context so AdminUI actions are on the current page you are seeing.
@@ -178,7 +179,34 @@ Now an editor can :-
 - remove a page.
 - all other Volto features outside editing work the same.
 
+
+To do this you will include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
+
+- Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
+- During editing, tnitilize it with the url of Hydra and Volto settings
+  ```js
+  import { initBridge } from './hydra.js';
+  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
+  ```
+- To know you are in edit mode an extra url param is added to your frontend ```_edit=true``` (see [Lazy Loading](#lazy-load-the-bridge))
+- To see private content you will need to [change your authentication token]((#authenticate-frontend-to-access-private-content))
+- You can configure any Volto settings during init. Such as
+   - change allowedBlock types
+   - Add a new block type including it's schema (TODO)
+   - disable existing blocks or adjust their schema (TODO)
+   - You can also install content type definitions. (TODO)
+   - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
+   - determine which shortcuts appear on the quanta toolbar for a given block (TODO)
+- You can pass in a function to map plone url paths to frontend paths if there is not a one to one mapping
+- Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
+
+
 ### Level 2: Enable Frontend block selection and Quanta Toolbar
+
+This will enable an Editor to :-
+- click directly on your block on the frontend preview to select it and edit the block settings in the sidebar. 
+   - The block will be highlighted and a toolbar (called the quanta toolbar) will appear above it.
+- selecting a block in the sidebar will highlight that block on the frontend
 
 In your frontend insert the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most html element of the rendered block html.
 
@@ -207,29 +235,18 @@ you would add in the ```data-block-uid``` so it becomes
 
 Hydra.js will find these block markers and register click handlers and insert css to for you.
 
-Now an editor can :-
-- click directly on your block on the frontend preview to select it and edit the block settings in the sidebar. 
-   - The block will be highlighted and a toolbar (called the quanta toolbar) will appear above it.
-- selecting a block in the sidebar will highlight that block on the frontend
-
-If are using a 3rd party library to render a block, then you might not be able to easily modify the markup 
-to put in the ```data-block-uid```. Instead you can use an alternative 
-comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113)) where a comment goes
-directly before the block markup.
-
-e.g.
-``` html
-<!-- hydra_block_uid:... -->
-<div class="teaser">
-<img src="/big_news.jpg"/>
-<h2>Big News</h2>
-<div>Check out <b>hydra</b>, it will change everything</div>
-<div><a href="/big_news">Read more</a><div>
-</div>
-```
-
+If are using a 3rd party library to render a block and you can't change the markup then use 
+the alternative [Comment systax](#comment-syntax) 
 
 ### Level 3: Enable Realtime changes while editing
+
+This will enable an Editor to:-
+- change a block in the sidebar and have it change on the frontend even as you type in WYSIWYG style
+- Add and remove blocks in the sidebar and have them appear on the frontend preview
+- Change page metadata and have blocks that depend on this like the "Title" block change.
+
+Note: For level 3 and beyond you need a frontend deployed as SPA or hybrid (rather than SSR or SSG). If your production deploy is
+SSG or SSR then deploy another edit only preview frontend. For many modern frameworks this is just a settings toggle.
 
 The `onEditChange` callback can be registered with the hydra.js bridge at initialisation.
 When the user clicks edit on a page your frontend will now get an updated 'data' object that
@@ -241,14 +258,8 @@ e.g.
 const bridge = initBridge('https://hydra.pretagov.com');
 bridge.onEditChange(handleEditChange);
 ```
-
 Since the data structure is that same as returned by the contents RESTApi it's normally easy to rerender your page dynamically using the same
 code your frontend used to render the page previously.
-
-Now an editor can:-
-- change a block in the sidebar and have it change on the frontend even as you type in WYSIWYG style
-- Add and remove blocks in the sidebar and have them appear on the frontend preview
-- Change page metadata and have blocks that depend on this like the "Title" block change.
 
 These updates are sent frequently as the user makes changes in the sidebar but can adjust the frequency of updates for
 performance reasons (TODO)
@@ -257,7 +268,7 @@ performance reasons (TODO)
 
 If you completed levels 1 to 3 (made blocks clickable and enabled live updates) then visual block management is automatically enabled.
 
-Now an editor can :-
+This will enable an Editor to :-
 - click on '+' Icon directly on the frontend to add a block after the current block. This will make the BlockChooser popup appear.
    - The '+' Icon appears outside the corner of the element with ```data-bloc-uid="<<BLOCK_UID>>>``` in the direction the block will be added.
 - remove a block via the Quanta toolbar dropdown
@@ -270,6 +281,17 @@ Now an editor can :-
 #### Container Blocks ([TODO](https://github.com/collective/volto-hydra/issues/99))
 
 Many blocks are best handled as containers of other blocks and hydra will provide a UI for you manage these sub-blocks.
+
+This will enable an Editor to :-
+- Add a new sub-block visually on the frontend. The add icon is in the direction the new block will appear.
+- You can see all container settings on the sidebar when a sub-block is selected, e.g. Column settings and ColumnBlock settings.
+- To add another column select the parent column and click add and a new column will appear next to it.
+   - Select the column by clicking "up" on the quanta toolbar or close the sub-block settings.
+- remove blocks from a container
+- DND blocks in and out of containers or to reorder them
+- To select the container close sub-block section on the sidebar. This also allows you
+  to manage the containers sub blocks from the side panel 
+
 
 Lets say you have a ColumnsBlock. A ColumnsBlock containers one or more ColumnBlock, which is a container of other blocks.
 In the simplest case you don't need any special markup. Just render the blocks from "blocks" and "blocks_layout" fields with the 
@@ -289,15 +311,6 @@ In the simplest case you don't need any special markup. Just render the blocks f
 </table>
 ```
 
-Now an editor can do the following:
-- Add a new sub-block visually on the frontend. The add icon is in the direction the new block will appear.
-- You can see all container settings on the sidebar when a sub-block is selected, e.g. Column settings and ColumnBlock settings.
-- To add another column select the parent column and click add and a new column will appear next to it.
-   - Select the column by clicking "up" on the quanta toolbar or close the sub-block settings.
-- remove blocks from a container
-- DND blocks in and out of containers or to reorder them
-- To select the container close sub-block section on the sidebar. This also allows you
-  to manage the containers sub blocks from the side panel 
 
 During editing containers are never empty to ensure they take up space and are easy to select and navigate.
 This means all containers have a default block type that will get created if the last block is removed. 
@@ -350,7 +363,11 @@ can change text, links or media directly on your frontend page instead of via fi
 
 #### Visual text editing
 
-Can enable live editing of non-rich text such as the title of the teaser block, or the title of the page.
+This will enable an Editor to :-
+- click into the text on a block on the frontend and type, adding, removing and cut and pasting.
+- Edit metadata of the page inside a block, e.g. Title block
+- type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
+    - Using the enter key to split the block into two text blocks and backspace to join them ([TODO](https://github.com/collective/volto-hydra/issues/33))
 
 e.g. our example teaser block above we will make the title inline editable
 by adding ```data-editable-field="title"``` to the html element that contains the text you want to make editable and hydra.js will do the rest.
@@ -372,13 +389,17 @@ If the text comes from the metadata and not a block then use ```data-editable-me
 ```
 
 
-Now an editor can :-
-- click into the text on the frontend and type, adding, removing and cut and pasting
-- type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
-    - Using the enter key to split the block into two text blocks and backspace to join them ([TODO](https://github.com/collective/volto-hydra/issues/33))
-
-
 #### Visual Rich Text editing
+
+This will enable an Editor to :-
+- select text to see what formatting has been applied and can be applied via buttons on the quanta toolbar
+- select text and apply character styles (currently BOLD, ITALIC & STRIKETHROUGH)
+- create or edit linked text.
+- apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
+- use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
+- paste rich text from the clipboard (TODO)
+- and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
+
 
 For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text.
 For hydra.js to allow you to select and format text no matter how your frontend decides to render that formatting
@@ -427,20 +448,9 @@ My Paragraph with <span class="custom_link" data-node-id="5"><a href="...">a lin
 </p>
 ```
 
-Now an editor can :-
-- select text to see what formatting has been applied and can be applied via buttons on the quanta toolbar
-- select text and apply character styles (currently BOLD, ITALIC & STRIKETHROUGH)
-- create or edit linked text.
-- apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
-- use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
-- paste rich text from the clipboard (TODO)
-- and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
-
 Additionally your frontend can
-- determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
 - specify parts of the text that aren't editable by the user which could be needed for some use-cases where style includes text that needs to appear. (TODO)
-
 
 Known bugs
    - if you select the whole text and change its formats your frontend might throw slate error saying `Cannot get the leaf node at path [0,0] because it refers to a non-leaf node:` but it is due to proper syncing of json b/w  hydra.js & adminUI.
@@ -451,10 +461,13 @@ Known bugs
 
 #### Visual media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
 
-You can let the user upload images/videos or pick an existing file by clicking on the image on your frontend.
+This will enable an Editor to :-
+- Be presented with a empty media element on the frontend and and a prompt to upload or pick media ([TODO](https://github.com/collective/volto-hydra/issues/112))
+- Remove the currently selected media to pick a different one ([TODO](https://github.com/collective/volto-hydra/issues/36))
+- DND an image diretly only a media element on the frontend ([TODO](https://github.com/collective/volto-hydra/issues/108))
 
 for example we can make the teaser image editable using ```data-editible-field```.
-``` html
+```html
 <div class="teaser" data-block-uid="....">
 <img data-editible-field="image" src="/big_news.jpg"/>
 <h2>Big News</h2>
@@ -463,12 +476,11 @@ for example we can make the teaser image editable using ```data-editible-field``
 </div>
 ```
 
-Now an editor can :-
-- Be presented with a empty media element on the frontend and and a prompt to upload or pick media ([TODO](https://github.com/collective/volto-hydra/issues/112))
-- Remove the currently selected media to pick a different one ([TODO](https://github.com/collective/volto-hydra/issues/36))
-- DND an image diretly only a media element on the frontend ([TODO](https://github.com/collective/volto-hydra/issues/108))
-
 #### Visual link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
+
+This will enable an Editor to :-
+- Click on a link or button on the frontend to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
+- Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
 
 You might have a block with a link field like the Teaser block. You can also make this visually
 editable using ```data-editable-field```. In edit mode the click behaviour of that element will be altered and instead
@@ -483,18 +495,14 @@ the editor can pick content to link to, enter an external url of open the url in
 </div>
 ```
 
-Now as editor can :-
-- Click on a link or button on the frontend to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
-- Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
-
 #### Custom Visual Editing (TODO)
-In some rare cases you might want to provide editors with more visual editing than hydra currently supports. For example a newly create table block 
+In some rare cases you might want to provide editors with more visual editing than hydra currently supports. For example a newly created table block 
 might display a form to set the initial number of columns and rows. In this case you can use
 - ```sendBlockUpdate``` hydra.js api to send an updated version of the block after changes.
 - ```sendBlockAction``` hydra.hs api to do actions like select,add, move, copy or remove blocks or perform custom actions on the Volto block edit component.
 - more direct support for initial setup widgets that appear on empty blocks might be supported by hydra in the future.
 
-### Comment syntax (TODO)
+### Comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113))
 
 If you can't easily modify the markup (for example using a 3rd party component library) you can use the alternative comment syntax to specify which elements are editable.
 Use css selectors to specify which elements are editable. The selectors are applied just to the following element.
@@ -511,103 +519,86 @@ e.g.
 ```
 
 
-### Congratulations
 
-You have now made your frontend fully editable.
+## How Hydra works
 
-If created a frontend that works with hydra.pretagov.com and you want others to try editing it
-then let us know by [creating a ticket](https://github.com/collective/volto-hydra/issues)
+Instead of combining editing and rendering into one framework and codebase, these are separated and during editing
+a two way communication channel is opened across an iframe so that the editing UI is no longer
+part of the frontend code. Instead a small js file called ```hydra.js``` is included in your frontend during editing
+that handles the iframe bridge communication to hydra which is running in the same browser window. Hydra.js also 
+handles small parts of UI that need to be displayed on the frontend during editing.
 
+You could think of it as splitting Volto into two parts, Rendering and CMSUI/AdminUI while keeping the same UI and then 
+making the Rendering part easily replaceable with other implementations.
 
-## Local Development
-
-To test against a local hydra instance
-
-**1. Clone the Volto-Hydra Repository**
-
-- Clone the Volto-Hydra repository from GitHub:
-
-    ```bash
-    git clone https://github.com/collective/volto-hydra.git
-    cd volto-hydra
-    ```
-**2. Start Volto-Hydra**
-
-- Run the following command to start the Volto-Hydra site:
-    ```bash
-    make start
-    ```
-- You can also set your preset frontend URLs with environment variables, making them available in the admin UI. This allows you to switch between them seamlessly:
-    ```bash
-    RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3002,https://hydra-blogsite-nextjs.vercel.app pnpm start
-    ```
-    You can find `.env.example` at root directory of the project.
-- Ensure Volto is running on port 3000.
-
-**3. Start the Plone Backend**
-
-- You can start the Plone backend using Docker images:
-    ```bash
-    make backend-docker-start
-    ```
-  ***Note :***  This will also set [`CORS_ALLOW_ORIGIN` to `'*'`](https://6.docs.plone.org/install/containers/images/backend.html?highlight=cors#cors-variables), so there are no cors error.
-
-### Using the example frontend
-
-You can use one of the example frontends available at `./examples` directory.
-
-- Running Volto Hydra:
-  ```bash
-  make example-nextjs-admin
-  ```
-- Running example frontend:
-  ```bash
-  make example-nextjs-frontend
-  ```
+```
+                          Browser            RestAPI             Server              
+                                                                                     
+                                                                                     
+                      ┌──────────────┐                       ┌─────────────┐         
+                      │              │                       │             │         
+   Anon/Editing       │    Volto     │◄─────────────────────►│    Plone    │         
+                      │              │                       │             │         
+                      └──────────────┘                       └─────────────┘         
+                                                                                     
+                                                                                     
+─────────────────────────────────────────────────────────────────────────────────────
+                                                                                     
+                                                                                     
+                  │   ┌──────────────┐                       ┌─────────────┐         
+                  │   │              │                       │             │         
+                  │   │   Frontend   │◄──────────────────────┤    Plone    │         
+                  │   │              │                       │             │         
+                  │   └──hydra.js────┘                       └─────────────┘         
+                  │          ▲                                  ▲                    
+   Editing       UI          │ iFrame Bridge                    │                    
+                  │          ▼                                  │                    
+                  │   ┌──────────────┐                          │                    
+                  │   │              │                          │                    
+                  │   │    Hydra     │◄─────────────────────────┘                    
+                  │   │              │                                               
+                  │   └──────────────┘                                               
+                                                                                     
+                                                                                     
+                      ┌──────────────┐                       ┌─────────────┐         
+                      │              │                       │             │         
+   Anon               │   Frontend   │◄──────────────────────┤    Plone    │         
+                      │              │                       │             │         
+                      └──────────────┘                       └─────────────┘         
+             
+```
 
 
-## Code Examples
+### Advanced
 
-There is a [set of example frontends](https://github.com/collective/volto-hydra/tree/main/examples) in different frameworks 
-in the github repo that might help you. In addition, here are some examples on how you could handle 
-hooking into the hydra bridge.
+#### Lazy Load the Hydra.js Bridge
 
-#### To run Nextjs example:
-
-You can run ```npm run dev``` in `examples/hydra-nextjs/` to start the nextjs frontend at localhost:3002
-
-#### To run Vue F7 example:
-
-You can run ```npm run dev``` in `examples/hydra-vue-f7/` to start the vue-f7 frontend at localhost:5173
-
-#### Asynchronously Load the Hydra.js Bridge
-
-You don't need to load the hydra bridge until the user logs into the editor so it’s recommended to load the bridge only when necessary, such as in edit mode (```window.location.search.includes('_edit=true')```)
-To load the bridge asynchronously, add a function that checks if the bridge is already present. If it isn't, the function will load it and then call a callback function. This ensures the bridge is loaded only when needed.
-
+One way of loading the bridge lazily is by adding this function and calling the function at any point where you want to load the bridge.
+Since your application will be loaded inside an iframe in Volto Hydra, the iframe will be passed a `_edit={true/false}` parameter that we can check for.
+If this parameter is present and set to true, we should be inside the editor & are in edit mode.
 ```js
 function loadBridge(callback) {
-  const existingScript = document.getElementById("hydraBridge");
-  if (!existingScript) {
-    const script = document.createElement("script");
-    script.src = "./hydra.js";
-    script.id = "hydraBridge";
-    document.body.appendChild(script);
-    script.onload = () => {
+    const existingScript = document.getElementById("hydraBridge");
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "your-hydra-js-path";
+      script.id = "hydraBridge";
+      document.body.appendChild(script);
+      script.onload = () => {
+        callback();
+      };
+    } else {
       callback();
-    };
-  } else {
-    callback();
-  }
+    }
 }
 
-// Initialize the bridge only inside the admin UI
-if (window.location.search.includes('_edit=true')) {
+if (window.location.search.includes('_edit')) {
   loadBridge(() => {
-    const { initBridge } = window;
-    initBridge('https://hydra.pretagov.com');
-  });
+    const { initBridge } = window
+    const hydraBridgeInstance = new initBridge()
+  })
 }
+
 ```
 
 
@@ -687,32 +678,3 @@ function createBlockList(data) {
 createBlockList(data);
 ```
 
-### asynchronously-load-the-bridge
-
-One way of loading the bridge asynchronously is by adding this function and calling the function at any point where you want to load the bridge.
-Since your application will be loaded inside an iframe in Volto Hydra, the iframe will be passed a `_edit={true/false}` parameter that we can check for.
-If this parameter is present and set to true, we should be inside the editor & are in edit mode.
-```js
-function loadBridge(callback) {
-    const existingScript = document.getElementById("hydraBridge");
-    if (!existingScript) {
-      const script = document.createElement("script");
-      script.src = "your-hydra-js-path";
-      script.id = "hydraBridge";
-      document.body.appendChild(script);
-      script.onload = () => {
-        callback();
-      };
-    } else {
-      callback();
-    }
-}
-
-if (window.location.search.includes('_edit')) {
-  loadBridge(() => {
-    const { initBridge } = window
-    const hydraBridgeInstance = new initBridge()
-  })
-}
-
-```
