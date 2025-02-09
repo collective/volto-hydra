@@ -59,6 +59,7 @@ const {block_uid, block, data} = defineProps({
     },
 });
 
+const runtimeConfig = useRuntimeConfig();
 function nav(data) {
         if (!data) {
             return []
@@ -66,10 +67,10 @@ function nav(data) {
         return data?.navigation?.items;
     };
 function getUrl(item) {
-        return item['@id'].replace('https://hydra-api.pretagov.com/', '/').replace('https://hydra-api.pretagov.com', '/')
+        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '/').replace(runtimeConfig.public.backendBaseUrl, '/')
     };
 function getId(item) {
-        return item['@id'].replace('https://hydra-api.pretagov.com/', '/').replace('https://hydra-api.pretagov.com', '/')
+        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '/').replace(runtimeConfig.public.backendBaseUrl, '/')
     };
 
 function chunkArray(array, chunkSize) {

@@ -52,7 +52,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       image_alias: '_plone_', // needed so we don't use image alias when no SSR
-      api_url: 'https://hydra-api.pretagov.com'
+      backendBaseUrl: 'https://hydra-api.pretagov.com'
     }
   },
   css: ['/assets/css/main.css'],

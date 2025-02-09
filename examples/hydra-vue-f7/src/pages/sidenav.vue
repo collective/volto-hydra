@@ -26,7 +26,7 @@
       },
       methods: {
         getUrl(item) {
-          return item['@id'].replace(runtimeConfig.backend_base_url+'/', '/').replace(runtimeConfig.backend_base_url, '/')
+          return item['@id'].replace(runtimeConfig.public.backendBaseUrl+'/', '/').replace(runtimeConfig.public.backendBaseUrl, '/')
         }
       },
       data() {      

@@ -44,10 +44,10 @@ export default function imageProps(block, bgStyles=false) {
         class: bg_class
         }
     } 
-    image_url = image_url.startsWith("/") ? `${runtimeConfig.backend_base_url}${image_url}`: image_url;
+    image_url = image_url.startsWith("/") ? `${runtimeConfig.public.backendBaseUrl}${image_url}`: image_url;
     if (runtimeConfig.public.image_alias != '') {
         // in edit mode we are SPA so this won't work
-        image_url = image_url.replace(runtimeConfig.backend_base_url, runtimeConfig.public.image_alias); // nuxt image alias
+        image_url = image_url.replace(runtimeConfig.public.backendBaseUrl, runtimeConfig.public.image_alias); // nuxt image alias
     }
     var srcset = "";
     var sizes = "";
