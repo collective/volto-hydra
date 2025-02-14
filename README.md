@@ -1,21 +1,21 @@
 # Volto Hydra (volto-hydra)
 
-A Google summer of code project to create a proof of concept of a Visual Headless CMS
-using Plone/Nick as a server, Visual editor (based on Volto) but giving you the freedom to
-build your frontend in any framework.
+A Visual Headless CMS using Plone/Nick as a server, an Administration interface (based on Volto).
+Hydra provides true visual editor with drag and drop blocks and editable text but with any frontend stack you choose. 
+No assumptions. No learning curve.
 
 A unique open source Headless CMS
 - Quick to enable Visual editing of frontend blocks regardless of framework
 - Switch between multiple frontends while visual editing
 - Enterpise features such as versioning, i18n, workflow and automated content rules.
 - Unique hierarchical database letting you mix and match collections and trees for storage
-- Easy to implement design systems to enforce governance of content and design.
+- Easier to implement design systems that enforce governance of content and design.
 - Customisable Administration Interface
 - Choice of python or javascript for your server
 - Scalable and Secure with a mature battle hardened backend used by both CIA and FBI.
 
 Note: It is a [Work in Progress: Hydra Project](https://github.com/orgs/collective/projects/3/views/4).
-It shouldn't be used in production.
+It shouldn't be used in production. It was kicked off as a GSoC project.
 
 
 ## Online demo
@@ -25,9 +25,8 @@ You can try out the editing experience now by logging into https://hydra.pretago
 - select one of the available preset frontends 
 - or paste in your own frontend url to test.
 
-Note that the Nuxt.js frontend is deployed as a SSG to demonstrate
-scale-to-zero editing so it is deploy as [SSG](https://hydra-nuxt-flowbrite.netlify.app/) 
-while the edit preview is [SPA](https://hydra-nuxt-flowbrite-edit.netlify.app/).
+Note that the default is a Nuxt.js frontend, deployed as a [SSG](https://hydra-nuxt-flowbrite.netlify.app/) 
+to demonstrate scale-to-zero editing (free hosting) see [SSG/SSR with Hydra](./ssg_ssr_with_hydra)
 
 ## Run locally
 
@@ -123,8 +122,8 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 ### SPA/Hybrid with Hydra
 
-Hydra requires a SPA/Hybrid frontend if you want to have full Visual Editing.
-- Deploy your frontend in as either a Single Page App or Hybrid (Server side rendering with client side rendering after first load)
+Hydra requires a SPA or Hybrid frontend if you want to have full Visual Editing.
+- Deploy your frontend in as either a Single Page App (SPA) or Hybrid (Server side rendering with client side rendering after first load)
 - Deploy Hydra and the plone api server.
 - Login in to hydra and set your frontend url.
 
@@ -134,13 +133,22 @@ It is still possible to achieve the speed and cost savings of Server Side Genera
 while still getting the benefits of Visual Editing with Hydra. Or you might require a
 pure Server Side Rendered (SSR) mode.
 
-This is achieved by 
-- deploy your production frontend in SSG mode
-- deploy Hydra
-- deploy Plone api server with [c.webhook](https://github.com/collective/collective.webhook) and configure this to rebuild your SSG on edit.
-- deploy your frontend in SPA mode and use this in Hydra for editing
-- if you deploy everything (other than SSG) on a scale-to-zero hoster (like fly.io) then 
-  only pay when you edit greatly reducing your costs.
+To achieve this
+- deploy your production frontend in SSG or SSR mode
+- deploy Hydra and Plone api server
+   - note this only has to run during editing so scale-to-zero/serverless is an option
+- deploy your same frontend in SPA mode to another url which is only used in Hydra for editing
+- For SSG you will also need [c.webhook](https://github.com/collective/collective.webhook) and configure this to rebuild your SSG on edit.
+   - For a SSR frontend c.webhook is not needed 
+
+
+For example, fro the default Nuxt.js demo frontend:
+- The production frontend is deployed as a [SSG on netlify](https://hydra-nuxt-flowbrite.netlify.app/).
+   - Images and listings are all statically generated
+   - Search can't be SSG but with scale-to-zero and suspend hosting the cold start delay of a search might be an acceptable tradeoff.
+- The Administration interface (https://hydra.pretagrov.com) and Plone server is deployed to fly.io using scale-to-zero so the cost is free or minimal
+- During editing, a different deployment ([SPA on netlify](https://hydra-nuxt-flowbrite-edit.netlify.app/)) of the same frontend is used
+
 
 ### Two-Window editing (without hydra)
 
@@ -495,7 +503,7 @@ This will enable an Editor to :-
 - Click on a link or button on the frontend to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
 - Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
 
-You might have a block with a link field like the Teaser block. You can also make this visually
+You might have a block with a link field like the Slide block. You can also make this visually
 editable using ```data-editable-field```. In edit mode the click behaviour of that element will be altered and instead
 the editor can pick content to link to, enter an external url of open the url in a separate tab.
 
@@ -513,15 +521,13 @@ Use css selectors to specify which elements are editable. The selectors are appl
 e.g.
 ``` html
 <!-- hydra_block_uid:...; img:image; h2:title; .description:desc_field; div a:url  -->
-<div class="teaser">
+<div class="slide">
 <img src="/big_news.jpg"/>
 <h2>Big News</h2>
 <div class="desciption">Check out <b>hydra</b>, it will change everything</div>
 <div><a href="/big_news">Read more</a></div>
 </div>
 ```
-
-
 
 ## How Hydra works
 
