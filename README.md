@@ -6,7 +6,7 @@ No assumptions. No learning curve.
 
 A unique open source Headless CMS
 - Quick to enable Visual editing of frontend blocks regardless of framework
-- Switch between multiple frontends while visual editing
+- Switch between multiple frontends while visual editing. Perfect for omni-channel.
 - Enterpise features such as versioning, i18n, workflow and automated content rules.
 - Unique hierarchical database letting you mix and match collections and trees for storage
 - Easier to implement design systems that enforce governance of content and design.
