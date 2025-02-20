@@ -169,37 +169,38 @@ You can use Plone Headless without Hydra but it could confuse your users as the 
 ## Enabling Visual Editing (with hydra)
 
 Hydra provides a live preview of your frontend using an iframe which is in the middle of the screen.
+By adding simple optional levels of hints, hydra will add overlays so Visual DND editing is possible.
 
 
 ```
-CMS-Toolbar         Frontend in iframe (hydra adds minimal block select/edit UI)             CMS-Sidebar               
+CMS-Toolbar           Frontend in iframe (hydra adds minimal block select/edit UI)             CMS-Sidebar               
                                                                                                                          
 ┌───────┐───────────────────────────────────────────────────────────────────────────────┌───────────────────────────────┐
 │       │                                                                               │                               │
 │ ┌──┐  │                                                                               │   Page                        │
 │ │  │  │                                                                               │                               │
 │ └──┘  │      ┌──┬┬──┬┬──┐                                                             │     Title                     │
-│ ┌──┐  │      │  ││  ││  │                                                             │     ┌────────────────────┐    │
+│ ┌──┐  │      │::││  ││…⋎│                                                             │     ┌────────────────────┐    │
 │ │  │  │      └──┴┴──┴┴──┘                                                             │     │ My Page Title      │    │
-│ └──┘  │      ┌──────────────────────────────────────────────────────────┐             │     └────────────────────┘    │
-│       │      │                              ┌─────────────────────────┐ │             │                               │
-│       │      │  Big News Slide              │                         │ │             │                               │
+│ └──┘  │      ┌──────────────────────────────────────────────────────────┐┌───┐        │     └────────────────────┘    │
+│       │      │                              ┌─────────────────────────┐ ││ + │        │                               │
+│       │      │  Big News                    │                         │ │└───┘        │                               │
 │       │      │                              │                         │ │             │   Slider Block                │
-│       │      │                              │                         │ │             │                               │
-│       │    < │                              │                         │ │ >           │     Slide delay               │
+│       │      │  Checkout hydra, it will     │                         │ │             │                               │
+│       │    < │  change everything           │                         │ │ >           │     Slide delay               │
 │       │      │                              │                         │ │             │     ┌──────────┐              │
-│       │      │                              │                         │ │             │     │ 5        │              │
-│       │      │                              │                         │ │             │     └──────────┘              │
-│       │      │                              └─────────────────────────┘ │             │                               │
+│       │      │  ┌───────────┐               │                         │ │             │     │ 5        │              │
+│       │      │  │ Read more │               │                         │ │             │     └──────────┘              │
+│       │      │  └───────────┘               └─────────────────────────┘ │             │                               │
 │       │      └──────────────────────────────────────────────────────────┘             │                               │
-│       │                                                            ┌───┐              │   Slide Block                 │
-│       │                                                            │ + │              │                               │
-│       │                                                            └───┘              │     Slide Title               │
+│       │                                 1 2 3 4                                       │   Slide Block                 │
+│       │                                                                               │                               │
+│       │                                                                               │     Slide Title               │
 │       │                                                                               │     ┌────────────────────┐    │
-│       │      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed             │     │ Big News Slide     │    │
+│       │      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed             │     │ Big News           │    │
 │       │                                                                               │     └────────────────────┘    │
 │       │      do eiusmod tempor incididunt ut labore et dolore magna aliqua.           │                               │
-│       │                                                                               │     Image 1                   │
+│       │                                                                               │     Image                     │
 │       │      Ut enim ad minim veniam, quis nostrud exercitation ullamco               │     ┌────────────────────┐    │
 │       │                                                                               │     │                    │    │
 │       │      laboris nisi ut aliquip ex ea commodo consequat.                         │     │                    │    │
@@ -248,10 +249,14 @@ This will enable an Editor to :-
 - add a page in hydra and it will appear.
    - Note: You now need to create a page and give it a title before editing.
       - This has the benefit that images added during editing always default to being contained inside the page.  
-- edit a page and after you save it will reload the iframe and the changes will appear on your frontend.
-   - they will be able to add blocks the frontend specifies that it can support. (?)
+- edit a page
+   - selecting, adding, editing and rearranging the block layout all is done via the sidebar
+      - You will see more fields than normal volto to make this possible 
+   - only after you save it will reload the iframe and the changes will appear on your frontend.
+   - (later it should be possible do live updates even with SSR but via the RESTAPI) - TODO
 - remove a page.
-- all other Volto features outside editing work the same.
+- all other CMS features such as site setup, contents, worklow will work the same as Volto
+   - History won't show a visual diff (TODO explore if there is a way...) 
 
 To do this you will include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
 
