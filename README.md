@@ -85,14 +85,14 @@ The steps involved in creating a frontend are roughly the same for all these fra
    - e.g. in Nuxt.js you create a file ```pages/[..slug].vue```
 2. The page has a template with the static parts of your theme like header and footer etc.
    1. You might also check the content type to render each differently.
-3. On page setup it takes the path, does a RESTAPI call to the contents endpoint to get the json for this page
+3. On page setup it takes the path, does a [RESTAPI call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the json for this page
    - You can either use plone/client for this 
    - but in some frameworks, such as Nuxt.js, is better to use their inbuilt fetch.
    - You can also [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) 
      - however note this is just a wrapper on the RESTAPI rather than a server side implementation so it's not more efficient than using the RESTAPI directly.
 4. In your page template fill title etc from the content metadata
 5. For navigation
-   1. adjust the contents api call to use @expand and return navigation data in the same call
+   1. adjust the contents api call to use [@expand](https://6.docs.plone.org/volto/configuration/expanders.html) and return [navigation data](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/navigation.html) in the same call
    2. Create a component for your top level nav that uses this nav json to create a menu
 6. For Blocks
    1. create Block component that takes the id and block json as arguments
@@ -107,16 +107,25 @@ The steps involved in creating a frontend are roughly the same for all these fra
 8. Listing Blocks
    - You can come up with your own pagination scheme. 
      - For example by embedding page into your url instead of as a query param you can having listings be statically generated.
-   - In your component setup take the page and listing block json and do a RESTAPI call to get the items
+   - In your component setup take the page and listing block json and do a [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
    - Render the items
    - Render the pagination
 9.  Redirects
    1.  if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
-   2.  if you are using SSG then you will need to some special code to download all the redirects at generate time add in redirect routes
+   2.  if you are using SSG then you will need to some special code to [query all the redirects](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json) at generate time add in redirect routes
 10. Error Pages
-    1.  If your RESTAPI call returns an error you will need to handle this within the framework to display the error and set the status code
-11. Search Blocks and Form Blocks
-   - these are a little more complex but also not so hard. TODO: example code
+    1.  If your [RESTAPI call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html) you will need to handle this within the framework to display the error and set the status code
+11. Search Blocks
+    - if you choose to allow Voltos builtin Search Block for end user customisable search
+    - you will need to render Facets/Filters (currently not as subblocks but this could change in the future)
+    - build your query and do [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html) 
+12. Form Blocks
+   - Form-block is a plugin that allows a visual form builder
+   - Currently not a container with sub-blocks but this could change in the future
+   - Render each field type component (or limit which are available)
+   - Produce a compatible json submission to the form-block endpoint
+   - handle field validation errors
+   - handle thank you page
 
 ## Deployment
 
@@ -152,24 +161,30 @@ For example, fro the default Nuxt.js demo frontend:
 
 ### Two-Window editing (without hydra)
 
-You can use Plone Headless without Hydra but it could confuse your users as the site won't look like your frontend.
+You can use Plone Headless without Hydra using Volto instead
 
-- Deploy a Volto site with a default theme
+- Deploy the Plone api server
 - Deploy your frontend
+- Deploy a Volto site with a default theme
 - Setup your content types and block types
   - Currently adding new blocks requires a custom Volto theme to be deployed.
-- This will come with an out of the box theme so it won't look the same as your frontend
+  - Content types can be added by site setup
+- During Editing
+  - You will use Volto which will come with an out of the box theme so it won't look the same as your frontend
   - Any new blocks you create will have a skeleton presentation within the preview
-- Once done editing a page, you can switch to the frontend URL and see how the changes look on your frontend
-  - if the page is private you will additionally have to implement a way to login on your frontend to see these pages
+  - Any header/footer css etc won't reflect your frontend
+  - Once done editing a page, you can ask users to switch to another tab and use the frontend URL and see how the changes look on your frontend
+     - if the page is private you will additionally have to implement a way to login on your frontend to see these pages
 - If you need a more WYSIWYG editing experience
-  - Either use Hydra
-  - Or use Volto theming to recreate design inside volto, or close enough so your editors are happy.
+  - Use Volto theming to recreate design inside volto, or close enough so your editors are happy.
+    - this would be a duplicate any effort you did on the frontend.
+  - Or just use Hydra
 
 ## Enabling Visual Editing (with hydra)
 
 Hydra provides a live preview of your frontend using an iframe which is in the middle of the screen.
-By adding simple optional levels of hints, hydra will add overlays so Visual DND editing is possible.
+By adding simple optional levels of hints in your frontend code, hydra will add overlays so 
+Visual DND editing is enabled.
 
 
 ```
@@ -425,7 +440,7 @@ e.g.
 const bridge = initBridge('https://hydra.pretagov.com');
 bridge.onEditChange(handleEditChange);
 ```
-Since the data structure is that same as returned by the contents RESTApi it's normally easy to rerender your page dynamically using the same
+Since the data structure is that same as returned by the contents [RESTApi](https://6.docs.plone.org/plone.restapi/docs/source/index.html) it's normally easy to rerender your page dynamically using the same
 code your frontend used to render the page previously.
 
 These updates are sent frequently as the user makes changes in the sidebar but can adjust the frequency of updates for
@@ -578,8 +593,8 @@ might display a form to set the initial number of columns and rows. In this case
 #### Custom API endpoints
 
 With an open source headless CMS you have a choice between creating custom server side functionality as 
-- a seperatly deployed microservice or 
-- by adding API endpoints as addons to the backend api server. 
+- a separately deployed microservice or 
+- by [adding API endpoints as addons](https://2022.training.plone.org/mastering-plone/endpoints.html) to the backend api server. 
 
 
 ### Comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113))
