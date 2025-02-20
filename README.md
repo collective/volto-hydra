@@ -60,7 +60,9 @@ RAZZLE_API_PATH="http://localhost:8080/Plone" RAZZLE_DEFAULT_IFRAME_URL=https://
 Now you can login to Hydra to edit
 - http://localhost:3001
 
-## Run a local frontend with the demo CMS
+## Run local frontend only
+
+You can develop your frontend locally against a deployed CMS, for example.
 
 ```bash
     cd examples/nuxt-blog-starter
@@ -71,7 +73,7 @@ Now you can login to Hydra to edit
 Login to https://hydra.pretagov.com/ and in personal preferences add your front url of https://localhost:3000
 
 
-## Building a Frontend for Headless Plone
+## Building your Frontend
 
 The actual code you will write will depend on the framework you choose. You can look these examples to help you.
 
@@ -79,53 +81,8 @@ The actual code you will write will depend on the framework you choose. You can 
 - [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
 - [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
 
-The steps involved in creating a frontend are roughly the same for all these frameworks
-
-1. Create a route for any path which goes to a single page.
-   - e.g. in Nuxt.js you create a file ```pages/[..slug].vue```
-2. The page has a template with the static parts of your theme like header and footer etc.
-   1. You might also check the content type to render each differently.
-3. On page setup it takes the path, does a [RESTAPI call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the json for this page
-   - You can either use plone/client for this 
-   - but in some frameworks, such as Nuxt.js, is better to use their inbuilt fetch.
-   - You can also [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) 
-     - however note this is just a wrapper on the RESTAPI rather than a server side implementation so it's not more efficient than using the RESTAPI directly.
-4. In your page template fill title etc from the content metadata
-5. For navigation
-   1. adjust the contents api call to use [@expand](https://6.docs.plone.org/volto/configuration/expanders.html) and return [navigation data](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/navigation.html) in the same call
-   2. Create a component for your top level nav that uses this nav json to create a menu
-6. For Blocks
-   1. create Block component that takes the id and block json as arguments
-   2. You can use a bunch of if statements to check the Block type to determine how to render than block
-   3. If the block is a container you can call the Block component recursively
-   4. In your page iterate down the ```blocks_layout``` list and render a Block component for each
-   5. Rendering Slate you will want to split into a separate component as it's used in many blocks and is also recursive
-7. There are several helper functions get reused in many blocks
-   1. Generating a url for links. All RESTAPI urls are relative to the api url, so you need to convert these to the right frontend url. 
-   2. Generating a url for an image. The blocks have image data in many formats so a helper function for this is useful.
-      1. You maybe also decide to use your framework or hosting solution for image resizing
-8. Listing Blocks
-   - You can come up with your own pagination scheme. 
-     - For example by embedding page into your url instead of as a query param you can having listings be statically generated.
-   - In your component setup take the page and listing block json and do a [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
-   - Render the items
-   - Render the pagination
-9.  Redirects
-   1.  if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
-   2.  if you are using SSG then you will need to some special code to [query all the redirects](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json) at generate time add in redirect routes
-10. Error Pages
-    1.  If your [RESTAPI call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html) you will need to handle this within the framework to display the error and set the status code
-11. Search Blocks
-    - if you choose to allow Voltos builtin Search Block for end user customisable search
-    - you will need to render Facets/Filters (currently not as subblocks but this could change in the future)
-    - build your query and do [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html) 
-12. Form Blocks
-   - Form-block is a plugin that allows a visual form builder
-   - Currently not a container with sub-blocks but this could change in the future
-   - Render each field type component (or limit which are available)
-   - Produce a compatible json submission to the form-block endpoint
-   - handle field validation errors
-   - handle thank you page
+The steps involved in creating a frontend are roughly the same for all these frameworks so we have written a [guide to 
+building a Headless Frontend to Plone RESTAPI](./#building-a-frontend-for-headless-plone)
 
 ## Deployment
 
@@ -660,9 +617,64 @@ making the Rendering part easily replaceable with other implementations.
                       └──────────────┘                       └─────────────┘         
              
 ```
+ 
+## Building a Frontend for Headless Plone
 
+The actual code you will write will depend on the framework you choose. You can look these examples to help you.
 
-### Advanced
+- [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter)
+- [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
+- [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
+
+The steps involved in creating a frontend are roughly the same for all these frameworks
+
+1. Create a route for any path which goes to a single page.
+   - e.g. in Nuxt.js you create a file ```pages/[..slug].vue```
+2. The page has a template with the static parts of your theme like header and footer etc.
+   1. You might also check the content type to render each differently.
+3. On page setup it takes the path, does a [RESTAPI call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the json for this page
+   - You can either use plone/client for this 
+   - but in some frameworks, such as Nuxt.js, is better to use their inbuilt fetch.
+   - You can also [Plone GraphQL api](https://2022.training.plone.org/gatsby/data.html) 
+     - however note this is just a wrapper on the RESTAPI rather than a server side implementation so it's not more efficient than using the RESTAPI directly.
+4. In your page template fill title etc from the content metadata
+5. For navigation
+   1. adjust the contents api call to use [@expand](https://6.docs.plone.org/volto/configuration/expanders.html) and return [navigation data](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/navigation.html) in the same call
+   2. Create a component for your top level nav that uses this nav json to create a menu
+6. For Blocks
+   1. create Block component that takes the id and block json as arguments
+   2. You can use a bunch of if statements to check the Block type to determine how to render than block
+   3. If the block is a container you can call the Block component recursively
+   4. In your page iterate down the ```blocks_layout``` list and render a Block component for each
+   5. Rendering Slate you will want to split into a separate component as it's used in many blocks and is also recursive
+7. There are several helper functions get reused in many blocks
+   1. Generating a url for links. All RESTAPI urls are relative to the api url, so you need to convert these to the right frontend url. 
+   2. Generating a url for an image. The blocks have image data in many formats so a helper function for this is useful.
+      1. You maybe also decide to use your framework or hosting solution for image resizing
+8. Listing Blocks
+   - You can come up with your own pagination scheme. 
+     - For example by embedding page into your url instead of as a query param you can having listings be statically generated.
+   - In your component setup take the page and listing block json and do a [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
+   - Render the items
+   - Render the pagination
+9.  Redirects
+   1.  if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
+   2.  if you are using SSG then you will need to some special code to [query all the redirects](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json) at generate time add in redirect routes
+10. Error Pages
+    1.  If your [RESTAPI call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html) you will need to handle this within the framework to display the error and set the status code
+11. Search Blocks
+    - if you choose to allow Voltos builtin Search Block for end user customisable search
+    - you will need to render Facets/Filters (currently not as subblocks but this could change in the future)
+    - build your query and do [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html) 
+12. Form Blocks
+   - Form-block is a plugin that allows a visual form builder
+   - Currently not a container with sub-blocks but this could change in the future
+   - Render each field type component (or limit which are available)
+   - Produce a compatible json submission to the form-block endpoint
+   - handle field validation errors
+   - handle thank you page
+
+## Advanced
 
 #### Lazy Load the Hydra.js Bridge
 
