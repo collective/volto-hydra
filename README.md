@@ -169,12 +169,55 @@ You can use Plone Headless without Hydra but it could confuse your users as the 
 ## Enabling Visual Editing (with hydra)
 
 Hydra provides a live preview of your frontend using an iframe which is in the middle of the screen.
+
+
+```
+CMS-Toolbar         Frontend in iframe (hydra adds minimal block select/edit UI)             CMS-Sidebar               
+                                                                                                                         
+┌───────┐───────────────────────────────────────────────────────────────────────────────┌───────────────────────────────┐
+│       │                                                                               │                               │
+│ ┌──┐  │                                                                               │   Page                        │
+│ │  │  │                                                                               │                               │
+│ └──┘  │      ┌──┬┬──┬┬──┐                                                             │     Title                     │
+│ ┌──┐  │      │  ││  ││  │                                                             │     ┌────────────────────┐    │
+│ │  │  │      └──┴┴──┴┴──┘                                                             │     │ My Page Title      │    │
+│ └──┘  │      ┌──────────────────────────────────────────────────────────┐             │     └────────────────────┘    │
+│       │      │                              ┌─────────────────────────┐ │             │                               │
+│       │      │  Big News Slide              │                         │ │             │                               │
+│       │      │                              │                         │ │             │   Slider Block                │
+│       │      │                              │                         │ │             │                               │
+│       │    < │                              │                         │ │ >           │     Slide delay               │
+│       │      │                              │                         │ │             │     ┌──────────┐              │
+│       │      │                              │                         │ │             │     │ 5        │              │
+│       │      │                              │                         │ │             │     └──────────┘              │
+│       │      │                              └─────────────────────────┘ │             │                               │
+│       │      └──────────────────────────────────────────────────────────┘             │                               │
+│       │                                                            ┌───┐              │   Slide Block                 │
+│       │                                                            │ + │              │                               │
+│       │                                                            └───┘              │     Slide Title               │
+│       │                                                                               │     ┌────────────────────┐    │
+│       │      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed             │     │ Big News Slide     │    │
+│       │                                                                               │     └────────────────────┘    │
+│       │      do eiusmod tempor incididunt ut labore et dolore magna aliqua.           │                               │
+│       │                                                                               │     Image 1                   │
+│       │      Ut enim ad minim veniam, quis nostrud exercitation ullamco               │     ┌────────────────────┐    │
+│       │                                                                               │     │                    │    │
+│       │      laboris nisi ut aliquip ex ea commodo consequat.                         │     │                    │    │
+│       │                                                                               │     │                    │    │
+│       │                                                                               │     │                    │    │
+│       │                                                                               │     └────────────────────┘    │
+│       │                                                                               │                               │
+│       │                                                                               │                               │
+└───────┘───────────────────────────────────────────────────────────────────────────────└───────────────────────────────┘
+```
+
 - With no added integration the page will not change until after save.
-- Step 1 allow the editor to use the frontend to navigate to a page to edit including private pages
-- Step 2 allows your frontend to define custom content types and block types
-- Step 3 will allow you to select blocks inside this preview but not see any changes
-- Step 4 allows you to see changes in realtime and lets you manage blocks
-- Step 5 lets the user edit text, images and links directly on the preview
+- Level 1 allow the editor to use the frontend to navigate to a page to edit including private pages
+- Level 2 allows your frontend to define custom content types and block types
+- Level 3 will allow you to select blocks inside this preview but not see any changes
+- Level 4 allows you to see changes in realtime and lets you manage blocks
+- Level 5 lets the user edit text, images and links directly on the preview
+- Level 6 customise CMS or Visual editing if needed
 
 Let's take a specific example of a slider which you are given and has to have the following markup
 
@@ -315,6 +358,7 @@ import { initBridge } from './hydra.js';
 const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'slider'], customBlocks: customBlocks});
 ```
 
+Alternatively you can create a plugin for the CMS to add these schemas.
 
 ### Level 3: Enable Frontend block selection and Quanta Toolbar
 
@@ -507,11 +551,31 @@ You might have a block with a link field like the Slide block. You can also make
 editable using ```data-editable-field```. In edit mode the click behaviour of that element will be altered and instead
 the editor can pick content to link to, enter an external url of open the url in a separate tab.
 
+### Level 6: Custom UI
+
+#### Custom sidebar/CMS UI
+
+If the autogenerated UI of the block or content schemas is not suitable there is an addon system for the React Volto framework
+to override CMS components. This could be at a widget level, block settings level or even whole views like contents or site settings.
+For example you might want to provide a special map editor.
+
+- https://6.docs.plone.org/volto/blocks/editcomponent.html
+
+Note: Volto is built as a monolith CMS framework so ignore that parts of the documentation that apply to the presentation layer.
+
 #### Custom Visual Editing (TODO)
-In some cases you might want to provide editors with more visual editing than hydra currently supports. For example a newly created table block 
+In some cases you might want to provide editors with more visual editing inside the preview than hydra currently supports. For example a newly created table block 
 might display a form to set the initial number of columns and rows. In this case you can use
 - ```sendBlockUpdate``` hydra.js api to send an updated version of the block after changes.
 - ```sendBlockAction``` hydra.hs api to do actions like select,add, move, copy or remove blocks or perform custom actions on the Volto block edit component.
+- You can disable hydra handling of selection, DND or other actions if you'd like to replace some parts of hydra and no others (TODO).
+
+#### Custom API endpoints
+
+With an open source headless CMS you have a choice between creating custom server side functionality as 
+- a seperatly deployed microservice or 
+- by adding API endpoints as addons to the backend api server. 
+
 
 ### Comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113))
 
