@@ -184,13 +184,13 @@ CMS-Toolbar           Frontend in iframe (hydra adds minimal block select/edit U
 └───────┘───────────────────────────────────────────────────────────────────────────────└───────────────────────────────┘
 ```
 
-- With no added integration the page will not change until after save.
-- Level 1 allow the editor to use the frontend to navigate to a page to edit including private pages
-- Level 2 allows your frontend to define custom content types and block types
-- Level 3 will allow you to select blocks inside this preview but not see any changes
-- Level 4 allows you to see changes in realtime and lets you manage blocks
-- Level 5 lets the user edit text, images and links directly on the preview
-- Level 6 customise CMS or Visual editing if needed
+- With no integration the preview frontend tracks CMS navigation and refresh after save.
+- Level 1: tracks frontend to navigate to change CMS context to quickly edit the current page including private pages
+- Level 2: allows your frontend to define custom content types and block types
+- Level 3: will allow you to select blocks inside this preview but not see any changes
+- Level 4: allows you to see changes in realtime and lets you manage blocks
+- Level 5: lets the user edit text, images and links directly on the preview
+- Level 6: if needed, customise CMS UI or more complex visual editing in the frontend
 
 Let's take a specific example of a slider which you are given and has to have the following markup
 
