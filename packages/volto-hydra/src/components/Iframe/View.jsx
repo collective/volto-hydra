@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
-import { compose } from 'redux';
 import Cookies from 'js-cookie';
 import {
   applyBlockDefaults,
@@ -75,6 +74,34 @@ const getUrlWithAdminParams = (url, token) => {
         )
     : null;
 };
+function _isObject(item) {
+  return typeof item === 'object' && !Array.isArray(item);
+}
+function deepMerge(entry, newConfig) {
+  let output = Object.assign({}, entry);
+  if (_isObject(entry) && _isObject(newConfig)) {
+    Object.keys(newConfig).forEach((key) => {
+      if (_isObject(newConfig[key])) {
+        if (!(key in entry)) {
+          Object.assign(output, {
+            [key]: newConfig[key],
+          });
+        } else {
+          output[key] = deepMerge(entry[key], newConfig[key]);
+        }
+      } else {
+        Object.assign(output, { [key]: newConfig[key] });
+      }
+    });
+  }
+  return output;
+}
+function recurseUpdateVoltoConfig(newConfig) {
+  // Config object is not directly editable, update all the keys only.
+  Object.entries(newConfig).forEach(([configKey, configValue]) => {
+    config[configKey] = deepMerge(config[configKey], configValue);
+  });
+}
 
 const Iframe = (props) => {
   const {
@@ -202,6 +229,11 @@ const Iframe = (props) => {
         case 'PATH_CHANGE': // PATH change from the iframe
           history.push(event.data.path);
 
+          break;
+
+        case 'VOLTO_CONFIG':
+          const newConfig = event.data.voltoConfig || {};
+          recurseUpdateVoltoConfig(newConfig);
           break;
 
         case 'OPEN_SETTINGS':
