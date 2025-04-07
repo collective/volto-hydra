@@ -53,8 +53,8 @@ export default defineNuxtConfig({
     public: {
       image_alias: '_plone_', // needed so we don't use image alias when no SSR
       backendBaseUrl: 'https://hydra-api.pretagov.com',
-      adminUrl: 'http://localhost:3000',
-    }
+      adminUrl: 'https://hydra.pretagov.com',
+    },
   },
   css: ['/assets/css/main.css'],
   devtools: { enabled: true },
