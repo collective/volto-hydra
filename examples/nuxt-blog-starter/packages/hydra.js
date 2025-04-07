@@ -1729,7 +1729,7 @@ class Bridge {
           background: none;
           border: none;
           cursor: pointer;
-          padding: 0.5em;
+          padding: 6px;
           margin: 0;
         }
         .volto-hydra-format-button {
@@ -1739,6 +1739,12 @@ class Bridge {
           height: 32px;
           width: 32px;
         }
+        .volto-hydra-format-button svg {
+          display: block;
+          height: 100%;
+          width: 100%;
+        }
+
         .volto-hydra-format-button.show {
           display: block !important;
         }
@@ -1932,6 +1938,7 @@ if (typeof window !== 'undefined') {
 
 //////////////////////////////////////////////////////////////////////////////
 // SVGs & Images should be exported using CDN to reduce the size of this file
+// Icons from https://github.com/plone/quanta-icons/tree/main/icons unless specified as Pastanaga, in which case they're from https://pastanaga.io/icons/
 //////////////////////////////////////////////////////////////////////////////
 const deleteSVG = `<svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M4 6H20M16 6L15.7294 5.18807C15.4671 4.40125 15.3359 4.00784 15.0927 3.71698C14.8779 3.46013 14.6021 3.26132 14.2905 3.13878C13.9376 3 13.523 3 12.6936 3H11.3064C10.477 3 10.0624 3 9.70951 3.13878C9.39792 3.26132 9.12208 3.46013 8.90729 3.71698C8.66405 4.00784 8.53292 4.40125 8.27064 5.18807L8 6M18 6V16.2C18 17.8802 18 18.7202 17.673 19.362C17.3854 19.9265 16.9265 20.3854 16.362 20.673C15.7202 21 14.8802 21 13.2 21H10.8C9.11984 21 8.27976 21 7.63803 20.673C7.07354 20.3854 6.6146 19.9265 6.32698 19.362C6 18.7202 6 17.8802 6 16.2V6M14 10V17M10 10V17" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1941,11 +1948,25 @@ const dragSVG = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none"
   <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/>
   <g id="SVGRepo_iconCarrier"> <path d="M8 6.5C9.38071 6.5 10.5 5.38071 10.5 4C10.5 2.61929 9.38071 1.5 8 1.5C6.61929 1.5 5.5 2.61929 5.5 4C5.5 5.38071 6.61929 6.5 8 6.5Z" fill="#4A5B68"/> <path d="M15.5 6.5C16.8807 6.5 18 5.38071 18 4C18 2.61929 16.8807 1.5 15.5 1.5C14.1193 1.5 13 2.61929 13 4C13 5.38071 14.1193 6.5 15.5 6.5Z" fill="#4A5B68"/> <path d="M10.5 12C10.5 13.3807 9.38071 14.5 8 14.5C6.61929 14.5 5.5 13.3807 5.5 12C5.5 10.6193 6.61929 9.5 8 9.5C9.38071 9.5 10.5 10.6193 10.5 12Z" fill="#4A5B68"/> <path d="M15.5 14.5C16.8807 14.5 18 13.3807 18 12C18 10.6193 16.8807 9.5 15.5 9.5C14.1193 9.5 13 10.6193 13 12C13 13.3807 14.1193 14.5 15.5 14.5Z" fill="#4A5B68"/> <path d="M10.5 20C10.5 21.3807 9.38071 22.5 8 22.5C6.61929 22.5 5.5 21.3807 5.5 20C5.5 18.6193 6.61929 17.5 8 17.5C9.38071 17.5 10.5 18.6193 10.5 20Z" fill="#4A5B68"/> <path d="M15.5 22.5C16.8807 22.5 18 21.3807 18 20C18 18.6193 16.8807 17.5 15.5 17.5C14.1193 17.5 13 18.6193 13 20C13 21.3807 14.1193 22.5 15.5 22.5Z" fill="#4A5B68"/> </g>
   </svg>`;
-const boldSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAACLUlEQVR4nO3az4tOURzH8RejZiNFKUWywD+g/AEo2VioCWWnlBVCLERCiZ2dGFmQJgtFfmxkYsvCyiyI8iMpRndGfjXz6NZ5aprM85wxZu7t3POuz/ae+313O9/z45LJZDKZTCaTyfwLBVr/IT/wJeQ9XmAQ13AaG9ArYQGtiIzgHJZoqIBWyDC2abCAFsZwQIMFtEJ2Nl3AMFY1WUALA3UWMIK+KbIDeybkII7gGG7g6zTmgxV1FfB5Bs9ehP5ICXslKKDN7QgBlyQsYH2EgDsSFjAf37uMc1fCAoTndBrnqoQFLAwzfadx9ktYwK4uY4xjrUQFLMe7LmM8VCHFLAnoCYulbsWPhS5RWwHfwupuco7ibMh5XAy5Emb0TxGtr8zJKouvei/QH1pk4wT8xCHMUwOKOS7+I9apEUUFX0B5gHoda9SAosI54BeOVz0PFBUKaOcWFtRVwG887ZAhvMKHcCcwOoOOkMxCqBersR0PpiFhq0T3Apsjv4yhKlpjMQcCSrZEfgWbJCqg5HGEgHJZnayAwxECygvVZAX0RQgob5UbLeCNhAWciBDwXKICekKb6ybgpkQFnIlsg+U2OSkBy3A5svhWFYejRZcXGp10ATpV9k04LjsV1vaD4fAjtvhHc118XXaD7WzUYAEDVRRfFwEvsVhDBbxu8i8y97G0yuKrEvCkqsOP2RAwPuEX2XbehmOyZ2ELfA8XsBsr//oWmUwmk8lkMpmM6fIH83xLt33EM5cAAAAASUVORK5CYII=">`;
-const italicSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAq0lEQVR4nO3WsQnCYBRF4ZvSXjKA2EsGkPTiAGIvDiBZIziA2AcHEFsjDhDSSwYQayslEOGC2B4R/wOvesXXPZ4UCr1XSnp8mHb3FfgooK2BC4EdDJ6QcG3wiIRvBvcptGfoXVJEwUODLwJLDT6R8NzggoQzg3MSXhu8IuGdwTMSPhs8JuHG4AGFRt3ReMHtMUGKDb0KLDG4IuGpwXsSXhq8IcDyb3+t0G/1BLG4VBFDInqeAAAAAElFTkSuQmCC">`;
-const delSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAB70lEQVR4nO3ZTatOURjG8d/xiEjolAiZUYoopYgiH8EpiSi+gIGBEhMdE2WgdAYGjokyRJgYMCGKAYZeyrtS5O1RJ45WrVOrncHzvp9V61+rPdr3uq6991r3ve5NoVAoFIaAEWzGKdzAS3zBdLy+wC2MYzsahoQGDuJ5FNvqeIfjWFCn+JW436bw6niLvXWIX4UPFTFfcSEK2oBlmIXFWIMxnI9Pv2rkzCDFz8bDZPImTmJ+G/fvx+skxjcDZKwifleHcYLhiSg+LP6BcTMxEHaV7HiVGFgrQ34nBubJkPeJgXUy5Epi4PowZdVW2Yq/iYnbWC0zTlcSUVgXk9hSt7BCoU/fe7PLqrOT0exFpg8Hle81iJ+OI8zdNeM5v4F+EM4IB/AxERvyym6ZEQ48jxMTn7FQZiyKDYAZE0dlyKHEwB0ZsiIxENZFdsyt1FTZsTExEE57fSXsyz9xNia5XjCRGLikz/xIJgs9oDldxtuBP0nMnfrMuUq2vBc7dJ2wLTbDZmJdMwAa8TVX65UTGG0xxmgsEKeSGG/ibjQQRmJjNhUQxi9cxmGsx9JoeElsv4Ru3MX/FIef6moOhOPjoy4LtrtYrubCbB8etCn8CfbE+4eG8NkcwVU8jVl1Kl6fxR8cx7Cph1twoVAoFHTFPycjIDOxcKkjAAAAAElFTkSuQmCC">`;
-const addSVG = `<img widht="20px" height="20px" src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjgzMjggMi41MDAwMkg5LjE2NjE4VjkuMTY2NjhIMi40OTk1MVYxMC44MzMzSDkuMTY2MThWMTcuNUgxMC44MzI4VjEwLjgzMzNIMTcuNDk5NVY5LjE2NjY4SDEwLjgzMjhWMi41MDAwMloiIGZpbGw9IiM0QTVCNjgiLz4KPC9zdmc+Cg=='/>`;
-const linkSVG = `<img widht="20px" height="20px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAArUlEQVR4nO2VXQrCMBCEv2P4cyQt3sb4LgUvpe2VtL74FFkYQZa2ohtE1IF5SAfmC2nIwodoBbTAWW6AqlT5DsgDrkvsPAMXYA3M5KRvli0jgFYlVuiVlB0igE4l055souwUAWT51fxpQH6w/kGAV/FCrz/gC29RfjfAKwzoVGBPtNdc2TECaEae642yfQRQ3Q2cNDBwFgRVj4zMbbT8JhuLNrnsn5jtWMI7L6IrN6JmJYjJ8jsAAAAASUVORK5CYII=">`;
+const boldSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M4.83252 20.9999H14.2185C17.6505 20.9999 20.0945 19.0239 20.0945 16.1639C20.0945 14.1879 18.8725 12.5239 16.7925 11.5879C18.3785 10.7559 19.3145 9.42994 19.3145 7.60994C19.3145 5.00994 17.0785 3.13794 13.8805 3.13794H4.83252V20.9999ZM8.65452 10.3399V6.41394H12.9445C14.3485 6.41394 15.3625 7.24594 15.3625 8.36394C15.3625 9.50794 14.3485 10.3399 12.9445 10.3399H8.65452ZM8.65452 17.7239V13.3559H13.5165C15.0505 13.3559 16.1425 14.2659 16.1425 15.5399C16.1425 16.8139 15.0505 17.7239 13.5165 17.7239H8.65452Z" fill="black"/>
+</svg>`;
+const italicSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M10 3H17V5H14.3584L11.4443 19H14V21L11.028 21H9L7 21V19H9.4163L12.3304 5H10V3Z" fill="black"/>
+</svg>`;
+// Pastanaga
+const delSVG = `<svg xmlns="http://www.w3.org/2000/svg" height=24" width="24" viewBox="0 0 36 36" fill="none">
+  <path fill-rule="evenodd" d="M31,17 L19.114,17 C18.533,16.863 15.451,16.107 13.666,15.066 C13.115,14.746 12.68,14.223 12.441,13.594 C11.776,11.844 11.589,9.432 14.551,7.834 C14.579,7.816 17.423,5.99 21.531,7.883 C21.556,7.897 24.074,9.269 24,11.911 L24,12 L25,12 L26,12.041 L26,12 L26,6 L24,6 L24,7.281 C23.227,6.53 22.507,6.138 22.419,6.092 C17.265,3.714 13.603,6.064 13.526,6.119 C8.981,8.563 9.946,12.657 10.572,14.304 C10.973,15.36 11.714,16.245 12.659,16.795 C12.779,16.865 12.905,16.933 13.033,17 L5,17 L5,19 L18.863,19 C23.002,20.084 24.039,22.3 24.057,22.333 C25.122,25.348 23.361,27.222 23.323,27.264 C20.638,29.732 16.212,29.021 16.103,29.005 C11.896,28.569 11.02,24.017 10.984,23.824 L10,24 L9,24 L9,30 L11,30 L11,28.359 C12.089,29.669 13.657,30.761 15.831,30.985 C15.909,30.999 16.631,31.118 17.683,31.118 C19.562,31.118 22.498,30.739 24.708,28.706 C24.821,28.593 27.438,25.9 25.924,21.617 C25.889,21.534 25.338,20.264 23.608,19 L31,19 L31,17 Z" fill="black"></path>
+</svg>`;
+const addSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M13 3H11V11H3V13H11V21H13V13H21V11H13V3Z" fill="black"/>
+</svg>`;
+const linkSVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M15 7V10H17V7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7V10H9V7C9 5.34315 10.3431 4 12 4C13.6569 4 15 5.34315 15 7Z" fill="black"/>
+  <path d="M15 17V14H17V17C17 19.7614 14.7614 22 12 22C9.23858 22 7 19.7614 7 17V14H9V17C9 18.6569 10.3431 20 12 20C13.6569 20 15 18.6569 15 17Z" fill="black"/>
+  <path d="M13 8H11V16H13V8Z" fill="black"/>
+</svg>`;
 const threeDotsSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M5 10C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12C3 10.8954 3.89543 10 5 10Z" fill="#000000"/>
   <path d="M12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12C10 10.8954 10.8954 10 12 10Z" fill="#000000"/>
