@@ -57,6 +57,9 @@
 
 import { initBridge } from '../packages/hydra.js';
 
+const runtimeConfig = useRuntimeConfig();
+const adminUrl = runtimeConfig.public.adminUrl;
+
 // initialize components based on data attribute selectors
 onMounted(() => {
     useFlowbite(() => {
@@ -68,8 +71,9 @@ onMounted(() => {
         const isEdit = url.searchParams.get("_edit");
 
         if (isEdit) {
-
-            const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
+            const bridge = initBridge(adminUrl, {
+                allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'],
+            });
             bridge.onEditChange((page) => {
                 if (page) {
                     data.value.page = page;
