@@ -1,0 +1,96 @@
+---
+import type { NavigationResponse, NavigationItem, Content } from '@plone/types';
+import MainLayout from '../layouts/MainLayout.astro';
+
+export async function getStaticPaths() {
+  function flattenToAppUrl(url: string) {
+    // TODO: Replace URL with config
+    return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
+  }
+  const response = await fetch(
+    'http://localhost:8080/Plone/++api++/@navigation?expand.navigation.depth=2',
+  );
+  const result: NavigationResponse = await response.json();
+  const items = result.items
+    .map((item) => {
+      return item.items.length > 0
+        ? [item, ...(item.items as NavigationItem[])]
+        : item;
+    })
+    .flat();
+
+  //   console.log('items', items);
+  const contentPromise = Promise.all(
+    items.map(async (item) => {
+      const pageId = flattenToAppUrl(item['@id']);
+      const response = await fetch(
+        `http://localhost:8080/Plone/++api++${pageId}`,
+      );
+      const result: Content = await response.json();
+      return result;
+    }),
+  );
+  const contents = await contentPromise;
+
+  return contents.map((item) => {
+    const pageId = flattenToAppUrl(item['@id']);
+    return {
+      params: {
+        page: pageId === '/' ? undefined : pageId,
+      },
+      props: { title: item.title },
+    };
+  });
+}
+
+const { title } = Astro.props;
+---
+
+<MainLayout>
+  <p>
+    I won't change in view mode because I'm generated at build time. But check
+    me out on edit!
+  </p>
+  <p>
+    If you see some JSON below, that's been fetched from the private page at
+    `/private-page`.
+  </p>
+  <h1 id="title">{title}</h1>
+</MainLayout>
+
+<script>
+  import { initBridge, onEditChange } from '@volto-hydra/hydra-js';
+  import type { Content } from '@plone/types';
+
+  const bridge = initBridge('http://localhost:3000');
+  const token = bridge._getTokenFromCookie();
+
+  onEditChange((newData: Content) => {
+    if (newData['title']) {
+      const titleElement = document.getElementById('title');
+      if (titleElement) {
+        titleElement.textContent = newData['title'];
+      }
+    }
+  });
+
+  const response = await fetch(
+    'http://localhost:8080/Plone/++api++/private-page',
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  if (response.ok) {
+    const data = await response.json();
+    const titleElement = document.getElementById('title');
+    if (titleElement) {
+      const dataElement = document.createElement('pre');
+      dataElement.style.fontSize = '10';
+      // dataElement.style['font-size'] = 10;
+      dataElement.textContent = JSON.stringify(data, null, 3);
+      titleElement.insertAdjacentElement('afterend', dataElement);
+    }
+  }
+</script>

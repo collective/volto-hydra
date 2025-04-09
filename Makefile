@@ -139,3 +139,12 @@ example-nuxt-admin:
 .PHONY: example-nuxt-frontend
 example-nuxt-frontend: ## Starts nuxt example frontend
 	cd examples/nuxt-blog-starter && npm install && npm run dev
+
+# Astro
+.PHONY: example-astro-admin
+example-astro-admin: ## Starts Volto, allowing reloading of the add-on during development
+	RAZZLE_DEFAULT_IFRAME_URL=http://localhost:4321 pnpm start
+
+.PHONY: example-astro-frontend
+example-astro-frontend: ## Starts Volto, allowing reloading of the add-on during development
+	pnpm example:astro

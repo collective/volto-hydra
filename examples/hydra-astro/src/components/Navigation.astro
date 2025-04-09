@@ -1,0 +1,41 @@
+---
+import type { NavigationResponse, NavigationItem } from '@plone/types';
+
+const response = await fetch(
+  'http://localhost:8080/Plone/++api++/@navigation?expand.navigation.depth=2',
+);
+const result: NavigationResponse = await response.json();
+const items = result.items
+  .map((item) => {
+    return item.items.length > 0
+      ? [item, ...(item.items as NavigationItem[])]
+      : item;
+  })
+  .flat();
+
+function flattenToAppUrl(url: string) {
+  // TODO: Replace URL with config
+  return (url && url.replace('http://localhost:8080/Plone', '')) || '/';
+}
+---
+
+<header class="header u-unselectable header-animated">
+  <div class="header-brand">
+    <div class="nav-item no-hover">
+      <a href="/"><h6 class="title">Hydra Astro</h6></a>
+    </div>
+  </div>
+  <nav class="header-nav" id="header-menu" role="button">
+    <ul class="nav-left">
+      {
+        items.map((item) => {
+          return (
+            <div class="nav-item text-center">
+              <a href={flattenToAppUrl(item['@id'])}>{item.title}</a>
+            </div>
+          );
+        })
+      }
+    </ul>
+  </nav>
+</header>
