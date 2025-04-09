@@ -13,7 +13,10 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Setup pnpm
-        run: corepack enable
+        run: |
+          npm install -g corepack
+          corepack cache clean
+          corepack enable
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:

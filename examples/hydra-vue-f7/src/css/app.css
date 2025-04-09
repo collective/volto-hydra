@@ -1,0 +1,31 @@
+/* Your app custom styles here */
+
+.image-align-right {
+    float: right;
+}
+
+.image-align-left {
+    float: left;
+}
+
+.image-size-s {
+    width: 100px;
+    height: 100px;
+}
+
+.image-size-m {
+    width: 200px;
+    height: 200px;
+}
+
+.image-size-l {
+    width: 100%;
+}
+
+.grid.style-bg-none * {
+    background-color: lightgray;
+}
+
+.grid.style-bg-grey {
+    background-color: lightgrey;
+}

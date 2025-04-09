@@ -1,14 +1,12 @@
-'use client';
-import { notFound } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { initBridge, getTokenFromCookie } from '@volto-hydra/hydra-js';
-import BlocksList from '@/components/BlocksList';
+"use client";
+import { notFound } from "next/navigation";
+import { useEffect, useState } from "react";
+import { initBridge, getTokenFromCookie } from "#utils/hydra";
+import BlocksList from "@/components/BlocksList";
 import { fetchContent } from '#utils/api';
 
 export default function Home({ params }) {
-  const bridge = initBridge(process.env.NEXT_PUBLIC_ADMINUI_ORIGIN, {
-    allowedBlocks: ['slate', 'image', 'video'],
-  });
+  const bridge = initBridge(process.env.NEXT_PUBLIC_ADMINUI_ORIGIN, {allowedBlocks: [ "slate", "image", "video", "teaser"]});
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [value, setValue] = useState(data);
@@ -29,7 +27,7 @@ export default function Home({ params }) {
 
     const url = new URL(window.location.href);
     const tokenFromUrl =
-      url.searchParams.get('access_token') || getTokenFromCookie();
+      url.searchParams.get("access_token") || getTokenFromCookie();
     getData(tokenFromUrl);
   }, [params.blogs]);
 
@@ -39,7 +37,7 @@ export default function Home({ params }) {
         setValue(updatedData);
       }
     });
-  }, [bridge]);
+  },[bridge]);
 
   if (loading) {
     return <div>Loading...</div>;

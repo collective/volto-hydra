@@ -142,49 +142,48 @@ const Login = (props) => {
           <Grid.Column>
             <Segment raised>
               <Header as="h1" textAlign="center">
-                Welcome to Project Hydra
+                Hydra: Plone Visual Headless PoC
               </Header>
-              <p>
-                A multi-headed decoupled CMS editor for Plone that works with
-                frontends, separated from Volto, yet still keeping the Volto
-                editing experience. It's a work in{' '}
-                <a href="https://github.com/collective/volto-hydra">progress</a>
-              </p>
-              <p>
-                Login below with username "hydraedit" and password "hydraedit"
-                to see the progress of the editor experience. You can try any of
-                the following frontends:
-              </p>
               <List bulleted>
+                <List.Item>
+                  <a
+                    href="https://hydra-nuxt-flowbrite.netlify.app/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Nuxt.js/Vue Example
+                  </a>
+                </List.Item>
                 <List.Item>
                   <a
                     href="https://hydra-blogsite-nextjs.vercel.app/"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Next.js Frontend
+                    Next.js/React Example
                   </a>
                 </List.Item>
                 <List.Item>
-                  Or{' '}
-                  <a href="https://github.com/collective/volto-hydra">
-                    create your own "editable" frontend
-                  </a>{' '}
-                  in your favourite framework and let us know if it was easy.
+                  <a
+                    href="https://hydra-vue-f7.netlify.app/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    framework7/Vue Example (mobile app)
+                  </a>
                 </List.Item>
               </List>
               <p>
-                The instructions and latest updates on what works and what
-                doesn't are in the{' '}
                 <a href="https://github.com/collective/volto-hydra">
                   Hydra README
-                </a>
-                . Report bugs to{' '}
-                <a href="https://github.com/collective/volto-hydra/issues">
-                  Hydra Issues
-                </a>
-                .
+                </a>{' '}
+                - currently implemented features and tutorial.
               </p>
+              <ul>
+                <li>Use "admin" and password "admin" to edit sites above</li> 
+                <li>User preferences: to Switch headless frontend</li> 
+              </ul>
+
             </Segment>
           </Grid.Column>
         </Grid>

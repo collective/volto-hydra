@@ -1,0 +1,32 @@
+{
+  "name": "nuxt-blog-starter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "dev_edit": "nuxt dev --envName edit",
+    "generate": "nuxt generate",
+    "edit": "nuxt generate --envName edit",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@vueuse/core": "^11.2.0",
+    "flowbite": "^2.5.2",
+    "nitropack": "^2.10.4",
+    "nuxi": "^3.15.0",
+    "nuxt": "^3.14.159",
+    "nuxt-security": "^2.0.0",
+    "sharp": "^0.33.5",
+    "vite": "^5.4.11",
+    "vite-plugin-mkcert": "^1.17.6",
+    "vue": "latest",
+    "vue-router": "latest"
+  },
+  "devDependencies": {
+    "@nuxt/image": "^1.8.1",
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "tailwindcss": "^3.4.15"
+  }
+}

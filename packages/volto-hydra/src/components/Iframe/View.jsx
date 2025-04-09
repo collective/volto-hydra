@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
+import { compose } from 'redux';
 import Cookies from 'js-cookie';
 import {
   applyBlockDefaults,
@@ -23,6 +24,32 @@ import {
   getAllowedBlocksList,
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
+import toggleMark from '../../utils/toggleMark';
+import OpenObjectBrowser from './OpenObjectBrowser';
+
+/**
+ * Returns url with query params + proper paths
+ * @param {String} url
+ * @param {Object} qParams
+ * @param {String} pathname
+ * @returns {String}
+ */
+const addUrlParams = (url, qParams, pathname) => {
+  const urlObj = new URL(url);
+  for (const [key, value] of Object.entries(qParams)) {
+    urlObj.searchParams.set(key, value);
+  }
+  // console.log('pathname', appendPathToURL(newUrl, pathname));
+
+  const path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
+  if (urlObj.hash) {
+    urlObj.hash += `/${path}`;
+  } else {
+    urlObj.pathname += `${path}`;
+  }
+  const newURL = urlObj.toString();
+  return newURL;
+};
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -33,13 +60,23 @@ import {
 const getUrlWithAdminParams = (url, token) => {
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
-      ? `${url}${window.location.pathname.replace('/edit', '')}?access_token=${token}&_edit=true`
-      : `${url}${window.location.pathname}?access_token=${token}&_edit=false`
+      ? addUrlParams(
+          `${url}`,
+          { access_token: token, _edit: true },
+          `${window.location.pathname.replace('/edit', '')}`,
+        )
+      : addUrlParams(
+          `${url}`,
+          {
+            access_token: token,
+            _edit: false,
+          },
+          `${window.location.pathname}`,
+        )
     : null;
 };
 
 const Iframe = (props) => {
-  // ----Experimental----
   const {
     onSelectBlock,
     properties,
@@ -53,6 +90,8 @@ const Iframe = (props) => {
     navRoot,
     type: contentType,
     selectedBlock,
+    openObjectBrowser,
+    closeObjectBrowser,
   } = props;
 
   const dispatch = useDispatch();
@@ -79,14 +118,19 @@ const Iframe = (props) => {
     ],
   });
   useEffect(() => {
-    document
-      .getElementById('previewIframe')
-      .contentWindow.postMessage(
-        { type: 'SELECT_BLOCK', uid: selectedBlock },
-        '*',
+    const origin = iframeSrc && new URL(iframeSrc).origin;
+
+    !isInlineEditingRef.current &&
+      document.getElementById('previewIframe').contentWindow.postMessage(
+        {
+          type: 'SELECT_BLOCK',
+          uid: selectedBlock,
+          method: 'select',
+          data: form,
+        },
+        origin,
       );
   }, [selectedBlock]);
-  //-------------------------
 
   const isInlineEditingRef = useRef(false);
   const [iframeSrc, setIframeSrc] = useState(null);
@@ -102,12 +146,14 @@ const Iframe = (props) => {
   }, [token, u]);
   const history = useHistory();
 
-  //-----Experimental-----
   const intl = useIntl();
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
-      value = { ...value, value: [{ type: 'p', children: [{ text: '' }] }] };
+      value = {
+        ...value,
+        value: [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }],
+      };
     }
     const [newId, newFormData] = insertBlock(
       properties,
@@ -134,40 +180,18 @@ const Iframe = (props) => {
     const newFormData = mutateBlock(properties, id, value);
     onChangeFormData(newFormData);
   };
-  //---------------------------
-
-  const handleNavigateToUrl = useCallback(
-    (givenUrl = null) => {
-      if (!isValidUrl(givenUrl)) {
-        return;
-      }
-      // Update adminUI URL with the new URL
-      const formattedUrl = new URL(givenUrl);
-      const newOrigin = formattedUrl.origin;
-      Cookies.set('iframe_url', newOrigin, { expires: 7 });
-
-      history.push(`${formattedUrl.pathname}`);
-    },
-    [history],
-  );
 
   useEffect(() => {
-    //----------------Experimental----------------
     const onDeleteBlock = (id, selectPrev) => {
       const previous = previousBlockId(properties, id);
       const newFormData = deleteBlock(properties, id);
+      isInlineEditingRef.current = false;
       onChangeFormData(newFormData);
-
       onSelectBlock(selectPrev ? previous : null);
-      const origin = new URL(iframeSrc).origin;
-      document
-        .getElementById('previewIframe')
-        .contentWindow.postMessage(
-          { type: 'SELECT_BLOCK', uid: previous },
-          origin,
-        );
+      setAddNewBlockOpened(false);
+      dispatch(setSidebarTab(1));
     };
-    //----------------------------------------------
+
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
@@ -175,8 +199,9 @@ const Iframe = (props) => {
       }
       const { type } = event.data;
       switch (type) {
-        case 'URL_CHANGE': // URL change from the iframe
-          handleNavigateToUrl(event.data.url);
+        case 'PATH_CHANGE': // PATH change from the iframe
+          history.push(event.data.path);
+
           break;
 
         case 'OPEN_SETTINGS':
@@ -188,7 +213,6 @@ const Iframe = (props) => {
           break;
 
         case 'ADD_BLOCK':
-          //----Experimental----
           setAddNewBlockOpened(true);
           break;
 
@@ -207,12 +231,80 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           isInlineEditingRef.current = true;
+          // console.log('INLINE_EDIT_DATA is triggered, true', event.data?.from);
+
           onChangeFormData(event.data.data);
           break;
 
         case 'INLINE_EDIT_EXIT':
           isInlineEditingRef.current = false;
           break;
+
+        case 'TOGGLE_MARK':
+          // console.log('TOGGLE_BOLD', event.data.html);
+          isInlineEditingRef.current = true;
+          const deserializedHTMLData = toggleMark(event.data.html);
+          // console.log('deserializedHTMLData', deserializedHTMLData);
+          onChangeFormData({
+            ...form,
+            blocks: {
+              ...form.blocks,
+              [selectedBlock]: {
+                ...form.blocks[selectedBlock],
+                value: deserializedHTMLData,
+              },
+            },
+          });
+          event.source.postMessage(
+            {
+              type: 'TOGGLE_MARK_DONE',
+              data: {
+                ...form,
+                blocks: {
+                  ...form.blocks,
+                  [selectedBlock]: {
+                    ...form.blocks[selectedBlock],
+                    value: deserializedHTMLData,
+                  },
+                },
+              },
+            },
+            event.origin,
+          );
+          break;
+
+        case 'UPDATE_BLOCKS_LAYOUT':
+          isInlineEditingRef.current = false;
+          onChangeFormData(event.data.data);
+          break;
+
+        case 'GET_INITIAL_DATA':
+          event.source.postMessage(
+            {
+              type: 'INITIAL_DATA',
+              data: form,
+            },
+            event.origin,
+          );
+          break;
+
+        // case 'OPEN_OBJECT_BROWSER':
+        //   openObjectBrowser({
+        //     mode: event.data.mode,
+        //     propDataName: 'data',
+        //     onSelectItem: (item) => {
+        //       event.source.postMessage(
+        //         {
+        //           type: 'OBJECT_SELECTED',
+        //           path: item,
+        //         },
+        //         event.origin,
+        //       );
+        //       closeObjectBrowser();
+        //       isInlineEditingRef.current = true;
+        //     },
+        //   });
+        //   break;
 
         default:
           break;
@@ -227,17 +319,23 @@ const Iframe = (props) => {
       window.removeEventListener('message', messageHandler);
     };
   }, [
+    closeObjectBrowser,
     dispatch,
-    handleNavigateToUrl,
+    form,
+    form?.blocks,
+    history,
     history.location.pathname,
     iframeSrc,
     onChangeFormData,
     onSelectBlock,
+    openObjectBrowser,
     properties,
+    selectedBlock,
     token,
   ]);
 
   useEffect(() => {
+    // console.log('isInlineEditingRef.current', isInlineEditingRef.current);
     if (
       !isInlineEditingRef.current &&
       form &&
@@ -252,8 +350,40 @@ const Iframe = (props) => {
     }
   }, [form, iframeSrc]);
 
+  const sidebarFocusEventListenerRef = useRef(null);
+
+  useEffect(() => {
+    const handleMouseHover = (e) => {
+      e.stopPropagation();
+      isInlineEditingRef.current = false;
+      // console.log(
+      //   'Sidebar or its child element focused!',
+      //   isInlineEditingRef.current,
+      // );
+    };
+    sidebarFocusEventListenerRef.current = handleMouseHover;
+    const sidebarElement = document.getElementById('sidebar');
+    sidebarElement.addEventListener('mouseover', handleMouseHover, true);
+
+    // Cleanup on component unmount
+    return () => {
+      // ... (your other cleanup code)
+      if (sidebarElement && sidebarFocusEventListenerRef.current) {
+        sidebarElement.removeEventListener(
+          'mouseover',
+          sidebarFocusEventListenerRef.current,
+          true,
+        );
+      }
+    };
+  }, []);
+
   return (
     <div id="iframeContainer">
+      <OpenObjectBrowser
+        isInlineEditingRef={isInlineEditingRef}
+        origin={iframeSrc && new URL(iframeSrc).origin}
+      />
       {addNewBlockOpened &&
         createPortal(
           <div
@@ -274,17 +404,11 @@ const Iframe = (props) => {
                 onInsertBlock
                   ? (id, value) => {
                       setAddNewBlockOpened(false);
+                      isInlineEditingRef.current = false;
                       const newId = onInsertBlock(id, value);
-                      const origin = new URL(iframeSrc).origin;
-                      document
-                        .getElementById('previewIframe')
-                        .contentWindow.postMessage(
-                          {
-                            type: 'SELECT_BLOCK',
-                            uid: newId,
-                          },
-                          origin,
-                        );
+                      onSelectBlock(newId);
+                      setAddNewBlockOpened(false);
+                      dispatch(setSidebarTab(1));
                     }
                   : null
               }

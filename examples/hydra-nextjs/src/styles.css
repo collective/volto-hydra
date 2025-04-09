@@ -6,6 +6,12 @@ body {
   padding: 0;
 }
 
+a {
+  color: green !important;
+}
+a:hover {
+  color: #0070f3 !important;
+}
 .container {
   width: 80%;
   margin: 0 auto;
@@ -30,7 +36,8 @@ body {
   padding: 15px;
   border-radius: 5px;
   transition: background-color 0.3s;
-  display: grid;
+  display: flex;
+  width: fit-content;
 }
 .blog-list-item-img {
   display: flex;
