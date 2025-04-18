@@ -259,56 +259,10 @@ For our slider example, we need to configure this new block.
 
 ```js
 const customBlocks = {
-  slide: {
-    id: 'slide', // The name (id) of the block
-    title: 'Slide', // The display name of the block
-    restricted: ['slider'],
-    blockSchema: {
-      title: "Slide",
-      block: 'slide',
-      fieldsets: [
-        {
-          id: 'default',
-          title: "Settings",
-          fields: ['url', 'title', 'image', 'description'],
-        },
-      ],
-      properties: {
-        url: {
-          title: "Link",
-          widget: 'url',
-        },
-        title: {
-          title: "Title",
-        },
-        image: {
-          title: "Image",
-          widget: "image"
-        },
-        description: {
-          title: "Description",
-          widget: "slate"
-        },
-      },
-      required: [],
-    },
-    // A block can define variations (it should include the stock, default one)
-    variations: [
-      {
-        id: 'default',
-        title: 'Default',
-        isDefault: true,
-      },
-      {
-        id: 'card',
-        label: 'Card',
-      }
-    ],
-  },
   slider: {
     id: 'slider', // The name (id) of the block
     title: 'Slider', // The display name of the block
-    icon: sliderSVG, // The icon used in the block chooser
+    icon: 'data:...', // The icon used in the block chooser
     group: 'common', // The group (blocks can be grouped, displayed in the chooser)
     restricted: false,
     mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
@@ -320,10 +274,43 @@ const customBlocks = {
         }
         slides: {
           title: "Slides",
-          widget: 'blocks',
-          allowedBlocks: ['slide'],
-          min:1,
-          max=10
+          type: 'blocks',
+          allowedBlocks: ['slide', 'image'],
+          defaultBlock: 'slide',
+          maxLength=10,
+          blocksConfig={
+            slide: {
+              id: 'slide', // The name (id) of the block
+              title: 'Slide', // The display name of the block
+              blockSchema: {
+                fieldsets: [
+                  {
+                    id: 'default',
+                    title: "Settings",
+                    fields: ['url', 'title', 'image', 'description'],
+                  },
+                ],
+                properties: {
+                  url: {
+                    title: "Link",
+                    widget: 'url',
+                  },
+                  title: {
+                    title: "Title",
+                  },
+                  image: {
+                    title: "Image",
+                    widget: "image"
+                  },
+                  description: {
+                    title: "Description",
+                    widget: "slate"
+                  },
+                },
+                required: [],
+              },            
+            },
+          }
         }
       },
     }
@@ -405,8 +392,12 @@ performance reasons (TODO)
 
 #### Container Blocks ([TODO](https://github.com/collective/volto-hydra/issues/99))
 
-There is nothing special you need to do to enable container editing on the frontend, as long as each block is tagged with a UID and
-sub-blocks are contained inside the html element of the container block.
+In the slider example we added a schema that included a special field type of "blocks". This renders a blocks widget in the sidebar and 
+changes the container blocks json adding two attributes, 
+```<fieldname>={<fieldid>={@type="..."}}``` and ```<fieldname>_layout=[<fieldid>,<fieldid>]```. 
+
+On the frontend side just add the blockids of the subblocks as you would normally and hydra will make block selection, DND and adding
+inside the container work for you. An add  button will be added after the current selected block.
 
 Note
 - Clicking on the frontend will always select the inner most nested block on desktop (and outer most on mobile)
