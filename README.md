@@ -4,7 +4,17 @@ A Visual Headless CMS using Plone/Nick as a server, an Administration interface 
 Hydra provides true visual editor with drag and drop blocks and editable text but with any frontend stack you choose. 
 No assumptions. No learning curve.
 
-A unique open source Headless CMS
+Why Headless CMS
+- You want a very custom "theme" for your site using frontend technologies you likely already know such as Next/Nuxt/Astro, inc. the ability to easily integrate 3rd party components not specifically designed for the CMS.
+- You don't want learn how to customise it to do this, or have to redeploy your CMS everytime you make a frontend change.
+- You want your frontend and CMS to be able to be upgraded independtly.
+- You may have many frontends for the same content (omni-channel)
+
+Why Visual Headless CMS
+- Your editors don't want to think hard about how its going to look when they are editing. They want direct DnD editing.
+
+Why Hydra
+- A unique open source Headless CMS
 - Quick to enable Visual editing of frontend blocks regardless of framework
 - Switch between multiple frontends while visual editing. Perfect for omni-channel.
 - Enterpise features such as versioning, i18n, workflow and automated content rules.
@@ -13,6 +23,9 @@ A unique open source Headless CMS
 - Customisable Administration Interface
 - Choice of python or javascript for your server
 - Scalable and Secure with a mature battle hardened backend used by both CIA and FBI.
+
+When not to use hydra
+- You want a no-code solution "non custom" website. Site builders like wix or squarespace are better for this. Or pick an open source CMS with an off the shelf theme or sitebuilder plugin.
 
 Note: It is a [Work in Progress: Hydra Project](https://github.com/orgs/collective/projects/3/views/4).
 It shouldn't be used in production. It was kicked off as a GSoC project.
