@@ -75,7 +75,11 @@ const getUrlWithAdminParams = (url, token) => {
     : null;
 };
 function _isObject(item) {
-  return typeof item === 'object' && !Array.isArray(item);
+  return (
+    ![undefined, null].includes(item) &&
+    typeof item === 'object' &&
+    !Array.isArray(item)
+  );
 }
 function deepMerge(entry, newConfig) {
   let output = Object.assign({}, entry);
