@@ -121,7 +121,10 @@ class Bridge {
   /**
    * Initializes the bridge, setting up event listeners and communication channels.
    *
+   * @typedef {import('@plone/registry').ConfigData} VoltoConfigData
    * @param {Object} options - Options for initialization.
+   * @param {string[]} options.allowedBlocks - List of allowed blocks.
+   * @param {VoltoConfigData} options.voltoConfig - Extra config to add to Volto in edit mode.
    */
   init(options = {}) {
     if (typeof window === 'undefined') {
@@ -226,9 +229,25 @@ class Bridge {
         };
         window.removeEventListener('message', reciveInitialData);
         window.addEventListener('message', reciveInitialData);
+
+        if (options.voltoConfig) {
+          this._updateVoltoConfig(options.voltoConfig);
+        }
       }
     }
   }
+
+  /**
+   * @typedef {import('@plone/registry').ConfigData} VoltoConfigData
+   * @param {VoltoConfigData} voltoConfig
+   */
+  _updateVoltoConfig(voltoConfig) {
+    window.parent.postMessage(
+      { type: 'VOLTO_CONFIG', voltoConfig: voltoConfig },
+      this.adminOrigin,
+    );
+  }
+
   /**
    * Sets the access token in a cookie.
    *
