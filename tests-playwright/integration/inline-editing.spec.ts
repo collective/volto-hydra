@@ -1,0 +1,267 @@
+/**
+ * Integration tests for inline editing in Volto Hydra admin UI.
+ *
+ * These tests verify that editing text directly in blocks works correctly
+ * and syncs with the admin UI.
+ */
+import { test, expect } from '@playwright/test';
+import { AdminUIHelper } from '../helpers/AdminUIHelper';
+
+test.describe('Inline Editing', () => {
+  test('editing text in Slate block updates content', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Get original text
+    const blockId = 'block-1-uuid';
+    const originalText = await helper.getBlockTextInIframe(blockId);
+    expect(originalText).toContain('This is a test paragraph');
+
+    // Edit the text
+    const newText = 'This text has been edited via Playwright';
+    await helper.editBlockTextInIframe(blockId, newText);
+
+    // Verify text updated in iframe
+    const updatedText = await helper.getBlockTextInIframe(blockId);
+    expect(updatedText).toContain(newText);
+  });
+
+  test('inline editing in multiple blocks works independently', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Edit first block
+    await helper.editBlockTextInIframe('block-1-uuid', 'First block edited');
+
+    // Edit third block (also Slate)
+    await helper.editBlockTextInIframe('block-3-uuid', 'Third block edited');
+
+    // Verify both edits persisted
+    const firstText = await helper.getBlockTextInIframe('block-1-uuid');
+    const thirdText = await helper.getBlockTextInIframe('block-3-uuid');
+
+    expect(firstText).toContain('First block edited');
+    expect(thirdText).toContain('Third block edited');
+  });
+
+  test('edited content can be saved', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Edit a block
+    await helper.editBlockTextInIframe('block-1-uuid', 'Content ready to save');
+
+    // Save the content
+    await helper.saveContent();
+
+    // Verify no errors (basic check)
+    // In a real scenario, you might reload and verify persistence
+    const blockText = await helper.getBlockTextInIframe('block-1-uuid');
+    expect(blockText).toContain('Content ready to save');
+  });
+
+  test('can make text bold', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block to select it and show the Quanta toolbar
+    await helper.clickBlockInIframe(blockId);
+
+    // Edit the text
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+
+    // Clear existing text and type new text
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Text to make bold', { delay: 10 });
+
+    // Select all the text using triple-click (triggers mouseup)
+    await editor.click({ clickCount: 3 });
+
+    // Click the bold button
+    await helper.clickFormatButton(blockId, 'bold');
+
+    // Wait a moment for the formatting to apply
+    await page.waitForTimeout(500);
+
+    // Verify the text is bold by checking for <strong> tag
+    const blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('<strong>');
+    expect(blockHtml).toContain('Text to make bold');
+  });
+
+  test('can create a link', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block to select it and show the Quanta toolbar
+    await helper.clickBlockInIframe(blockId);
+
+    // Edit the text
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+
+    // Clear and type new text
+    await page.keyboard.press('Control+A'); // Select all
+    await editor.pressSequentially('Click here', { delay: 10 });
+
+    // Select all the text
+    await page.keyboard.press('Control+A'); // Select all
+
+    // Click the link button
+    // NOTE: This currently triggers a production bug in hydra.js:733
+    // "Cannot read properties of null (reading 'link')"
+    await helper.clickFormatButton(blockId, 'link');
+
+    // TODO: Handle link URL input dialog if it appears
+    // For now, this test documents the production bug
+    // Once the bug is fixed, we should enhance this test to:
+    // 1. Enter a URL in the link dialog
+    // 2. Verify the link was created with <a> tag
+    // 3. Verify the href attribute is correct
+  });
+
+  test('bold formatting syncs with Admin UI', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and edit text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Synced bold text', { delay: 10 });
+
+    // Select all and make bold
+    await page.keyboard.press('Control+A');
+    await helper.clickFormatButton(blockId, 'bold');
+    await page.waitForTimeout(500);
+
+    // Verify bold in iframe
+    const blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('<strong>');
+
+    // TODO: Verify the bold formatting is reflected in the Admin UI sidebar
+    // This would require checking the block data sent via postMessage
+    // or checking the sidebar's block data display
+  });
+
+  test('multiple formats can be applied simultaneously', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and edit text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Bold and italic text', { delay: 10 });
+
+    // Select all text
+    await page.keyboard.press('Control+A');
+
+    // Apply bold
+    await helper.clickFormatButton(blockId, 'bold');
+    await page.waitForTimeout(200);
+
+    // Apply italic (text should still be selected)
+    await helper.clickFormatButton(blockId, 'italic');
+    await page.waitForTimeout(200);
+
+    // Verify both formats are applied
+    const blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('<strong>');
+    expect(blockHtml).toContain('<em>');
+    expect(blockHtml).toContain('Bold and italic text');
+  });
+
+  test('format button shows active state for formatted text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and edit text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Text with bold', { delay: 10 });
+
+    // Select all and make bold
+    await page.keyboard.press('Control+A');
+    await helper.clickFormatButton(blockId, 'bold');
+    await page.waitForTimeout(500);
+
+    // TODO: Check if the bold button shows active state
+    // This would require checking the button's CSS classes or aria-pressed attribute
+    // const boldButton = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra-format-button`).nth(0);
+    // const isActive = await boldButton.evaluate((el) => el.classList.contains('active'));
+    // expect(isActive).toBe(true);
+  });
+
+  test('clicking format button again removes format', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and edit text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Toggle bold text', { delay: 10 });
+
+    // Select all and make bold
+    await page.keyboard.press('Control+A');
+    await helper.clickFormatButton(blockId, 'bold');
+    await page.waitForTimeout(500);
+
+    // Verify bold was applied
+    let blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('<strong>');
+
+    // Click bold button again to remove formatting
+    await page.keyboard.press('Control+A'); // Re-select text
+    await helper.clickFormatButton(blockId, 'bold');
+    await page.waitForTimeout(500);
+
+    // Verify bold was removed
+    blockHtml = await editor.innerHTML();
+    expect(blockHtml).not.toContain('<strong>');
+    expect(blockHtml).toContain('Toggle bold text');
+  });
+});

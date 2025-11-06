@@ -17,3 +17,7 @@ examples/hydra-vue-f7/src/.vite-ssg-temp/
 # Local Netlify folder
 .netlify
 /core
+# Test outputs
+test-results/
+playwright-report/
+*.txt

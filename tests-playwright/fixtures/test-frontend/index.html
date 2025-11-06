@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #content {
+            margin-top: 20px;
+        }
+        [data-block-uid] {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+        [data-block-uid]:hover {
+            background-color: #f5f5f5;
+        }
+        [data-block-uid].selected {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="page-title">Loading...</h1>
+    <div id="content"></div>
+
+    <script src="renderer.js"></script>
+    <script type="module">
+        import { initBridge } from './hydra.js';
+
+        // Initialize the page
+        async function initializePage() {
+            try {
+                // Get content path from current URL (e.g., /test-page)
+                const contentPath = window.location.pathname;
+
+                // Fetch content from mock API using ++api++ prefix
+                const response = await fetch(`/++api++${contentPath}`);
+                const content = await response.json();
+
+                // Render the page
+                document.getElementById('page-title').textContent = content.title;
+                renderContent(content);
+
+                // Initialize Hydra bridge if in edit mode
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('_edit') === 'true') {
+                    console.log('[TEST-FRONTEND] Initializing Hydra bridge');
+
+                    // In tests, the admin UI is always at http://localhost:3001
+                    const adminOrigin = 'http://localhost:3001';
+
+                    console.log('[TEST-FRONTEND] Admin origin:', adminOrigin);
+
+                    // Initialize bridge with admin origin and allowed blocks
+                    window.bridge = initBridge(adminOrigin, {
+                        allowedBlocks: ['slate', 'image']
+                    });
+
+                    console.log('[TEST-FRONTEND] Bridge initialized, setting up change listener');
+
+                    // Listen for changes from the admin UI and update blocks
+                    window.bridge.onEditChange((formData) => {
+                        console.log('[TEST-FRONTEND] Bridge connected! Received form data:', formData);
+
+                        // Re-render content with updated data
+                        if (formData.blocks && formData.blocks_layout) {
+                            console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');
+                            renderContent(formData);
+                        }
+                    });
+
+                    console.log('[TEST-FRONTEND] Bridge setup complete, waiting for connection');
+                }
+            } catch (error) {
+                console.error('Failed to initialize page:', error);
+                document.getElementById('content').innerHTML = '<p>Error loading content</p>';
+            }
+        }
+
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializePage);
+        } else {
+            initializePage();
+        }
+    </script>
+</body>
+</html>

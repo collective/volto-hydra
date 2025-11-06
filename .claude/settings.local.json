@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(superpowers:test-driven-development)",
+      "Bash(uv pip install:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(pytest:*)",
+      "Bash(tee:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(pnpm exec playwright install:*)",
+      "Bash(node:*)",
+      "Bash(RAZZLE_API_PATH=http://localhost:8888 pnpm start:*)",
+      "Bash(curl:*)",
+      "Bash(awk:*)",
+      "Bash(DEBUG=1 node:*)",
+      "Bash(pnpm exec playwright test:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(cat:*)",
+      "Bash(DEBUG=1 pnpm exec playwright test:*)",
+      "WebSearch",
+      "WebFetch(domain:demo.plone.org)",
+      "Bash(find:*)",
+      "Bash(xargs cat:*)",
+      "Bash(kill:*)",
+      "Bash(n 20)",
+      "Bash(pnpm env use:*)",
+      "Bash(make install:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pkill:*)",
+      "Bash(gh issue list:*)",
+      "Bash(npx tsc:*)",
+      "Bash(gh pr list --state closed --limit 20 --json number,title,body,closedAt,mergedAt)",
+      "Bash(gh issue view:*)",
+      "Bash(killall:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
