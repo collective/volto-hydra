@@ -25,6 +25,7 @@ import {
   setAllowedBlocksList,
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
+import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 
 /**
@@ -271,6 +272,216 @@ const Iframe = (props) => {
             },
             event.origin,
           );
+          break;
+
+        case 'SLATE_FORMAT_REQUEST':
+          // New Slate transforms-based formatting handler
+          try {
+            console.log('[VIEW] Received SLATE_FORMAT_REQUEST:', event.data);
+            const { blockId, format, action, selection, url } = event.data;
+            console.log('[VIEW] Looking for block:', blockId);
+            const block = form.blocks[blockId];
+            console.log('[VIEW] Block found:', !!block, 'Block value:', block?.value);
+
+            if (!block?.value) {
+              console.error('[VIEW] No value found for block:', blockId);
+              event.source.postMessage(
+                {
+                  type: 'SLATE_ERROR',
+                  blockId,
+                  error: 'Block not found or no value available',
+                  originalRequest: event.data,
+                },
+                event.origin,
+              );
+              break;
+            }
+
+            // Apply format using Slate transforms
+            console.log('[VIEW] Calling slateTransforms.applyFormat');
+            const { value: updatedValue, selection: transformedSelection } = slateTransforms.applyFormat(
+              block.value,
+              selection,
+              format,
+              action,
+              { url },
+            );
+            console.log('[VIEW] updatedValue:', updatedValue);
+            console.log('[VIEW] transformedSelection:', transformedSelection);
+            console.log('[VIEW] transformedSelection.anchor:', JSON.stringify(transformedSelection?.anchor));
+            console.log('[VIEW] transformedSelection.focus:', JSON.stringify(transformedSelection?.focus));
+
+            // Update form state
+            isInlineEditingRef.current = true;
+            const updatedForm = {
+              ...form,
+              blocks: {
+                ...form.blocks,
+                [blockId]: {
+                  ...block,
+                  value: updatedValue,
+                },
+              },
+            };
+
+            onChangeFormData(updatedForm);
+
+            // Send FORM_DATA with complete updated form data AND transformed selection
+            // The iframe's onEditChange callback will receive this and re-render using renderer.js
+            // NO HTML is sent over the bridge - frontend is responsible for rendering
+            // The transformed selection allows hydra.js to restore cursor position after DOM changes
+            const message = {
+              type: 'FORM_DATA',
+              data: updatedForm,
+              selection: transformedSelection,
+            };
+            console.log('[VIEW] Sending FORM_DATA with updated Slate JSON and transformed selection:', message);
+
+            // Send response
+            event.source.postMessage(message, event.origin);
+          } catch (error) {
+            console.error('Error applying Slate format:', error);
+            event.source.postMessage(
+              {
+                type: 'SLATE_ERROR',
+                blockId: event.data.blockId,
+                error: error.message,
+                originalRequest: event.data,
+              },
+              event.origin,
+            );
+          }
+          break;
+
+        case 'SLATE_PASTE_REQUEST':
+          try {
+            console.log('[VIEW] Received SLATE_PASTE_REQUEST:', event.data);
+            const { blockId, html, selection } = event.data;
+            const block = form.blocks[blockId];
+
+            if (!block) {
+              console.error('[VIEW] Block not found:', blockId);
+              event.source.postMessage(
+                {
+                  type: 'SLATE_ERROR',
+                  blockId,
+                  error: 'Block not found',
+                  originalRequest: event.data,
+                },
+                event.origin,
+              );
+              break;
+            }
+
+            // Deserialize pasted HTML to Slate
+            const pastedSlate = slateTransforms.htmlToSlate(html);
+
+            // Insert at selection
+            const updatedValue = slateTransforms.insertNodes(
+              block.value,
+              selection,
+              pastedSlate,
+            );
+
+            // Update form state
+            isInlineEditingRef.current = true;
+            const updatedForm = {
+              ...form,
+              blocks: {
+                ...form.blocks,
+                [blockId]: {
+                  ...block,
+                  value: updatedValue,
+                },
+              },
+            };
+
+            onChangeFormData(updatedForm);
+
+            // Send FORM_DATA to iframe (hydra.js will add nodeIds and render HTML)
+            event.source.postMessage(
+              {
+                type: 'FORM_DATA',
+                data: updatedForm,
+              },
+              event.origin,
+            );
+          } catch (error) {
+            console.error('Error applying Slate paste:', error);
+            event.source.postMessage(
+              {
+                type: 'SLATE_ERROR',
+                blockId: event.data.blockId,
+                error: error.message,
+                originalRequest: event.data,
+              },
+              event.origin,
+            );
+          }
+          break;
+
+        case 'SLATE_DELETE_REQUEST':
+          try {
+            console.log('[VIEW] Received SLATE_DELETE_REQUEST:', event.data);
+            const { blockId: delBlockId, direction, selection: delSelection } = event.data;
+            const block = form.blocks[delBlockId];
+
+            if (!block) {
+              console.error('[VIEW] Block not found:', delBlockId);
+              event.source.postMessage(
+                {
+                  type: 'SLATE_ERROR',
+                  blockId: delBlockId,
+                  error: 'Block not found',
+                  originalRequest: event.data,
+                },
+                event.origin,
+              );
+              break;
+            }
+
+            // Apply deletion transform
+            const updatedValue = slateTransforms.applyDeletion(
+              block.value,
+              delSelection,
+              direction,
+            );
+
+            // Update form state
+            isInlineEditingRef.current = true;
+            const updatedForm = {
+              ...form,
+              blocks: {
+                ...form.blocks,
+                [delBlockId]: {
+                  ...block,
+                  value: updatedValue,
+                },
+              },
+            };
+
+            onChangeFormData(updatedForm);
+
+            // Send FORM_DATA to iframe (hydra.js will add nodeIds and render HTML)
+            event.source.postMessage(
+              {
+                type: 'FORM_DATA',
+                data: updatedForm,
+              },
+              event.origin,
+            );
+          } catch (error) {
+            console.error('Error applying Slate deletion:', error);
+            event.source.postMessage(
+              {
+                type: 'SLATE_ERROR',
+                blockId: event.data.blockId,
+                error: error.message,
+                originalRequest: event.data,
+              },
+              event.origin,
+            );
+          }
           break;
 
         case 'UPDATE_BLOCKS_LAYOUT':

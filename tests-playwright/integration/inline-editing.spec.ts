@@ -86,17 +86,64 @@ test.describe('Inline Editing', () => {
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Text to make bold', { delay: 10 });
 
-    // Select all the text using triple-click (triggers mouseup)
-    await editor.click({ clickCount: 3 });
+    // STEP 1: Verify the text content is correct
+    const textContent = await editor.textContent();
+    expect(textContent).toBe('Text to make bold');
+    console.log('[TEST] Step 1: Text content verified:', textContent);
 
-    // Click the bold button
-    await helper.clickFormatButton(blockId, 'bold');
+    // STEP 2: Select all the text programmatically
+    // IMPORTANT: Must select the text node directly, not use selectNodeContents on parent element
+    // Otherwise serializePoint() will reset offset to 0 for element nodes
+    await editor.evaluate((el) => {
+      // Find the text node inside the editor
+      const textNode = el.firstChild;
+      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+        throw new Error('[TEST] Expected first child to be a text node, got: ' + textNode?.nodeName);
+      }
 
-    // Wait a moment for the formatting to apply
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.setEnd(textNode, textNode.textContent.length);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      console.log('[TEST] Selection created in iframe:', selection.toString());
+    });
+
+    // STEP 3: Verify selection was created correctly
+    await helper.assertTextSelection(editor, 'Text to make bold', {
+      shouldExist: true,
+      shouldBeCollapsed: false,
+      message: 'Step 3: After creating selection'
+    });
+
+    // STEP 4: Wait a moment to ensure selection is stable
+    await page.waitForTimeout(100);
+
+    // STEP 5: Verify selection still exists just before clicking button
+    await helper.assertTextSelection(editor, 'Text to make bold', {
+      shouldExist: true,
+      shouldBeCollapsed: false,
+      message: 'Step 5: Before clicking bold button'
+    });
+
+    // STEP 6: Trigger the bold button using dispatchEvent
+    const formatButtons = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra-format-button`);
+    const boldButton = formatButtons.nth(0);
+    console.log('[TEST] Step 6: Clicking bold button...');
+    await boldButton.dispatchEvent('mousedown');
+
+    // STEP 7: Wait a moment for the formatting to apply
     await page.waitForTimeout(500);
 
-    // Verify the text is bold by checking for <strong> tag
+    // STEP 8: Check selection after button click
+    await helper.assertTextSelection(editor, undefined, {
+      message: 'Step 8: After clicking bold button'
+    });
+
+    // STEP 9: Verify the text is bold by checking for <strong> tag
     const blockHtml = await editor.innerHTML();
+    console.log('[TEST] Step 9: Final HTML:', blockHtml);
     expect(blockHtml).toContain('<strong>');
     expect(blockHtml).toContain('Text to make bold');
   });
