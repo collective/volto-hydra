@@ -67,16 +67,22 @@ export default defineConfig({
   webServer: {
     // Volto admin UI on port 3001 with volto-hydra plugin
     // Frontend is served from the same server as the API (port 8888)
-    // Start with: PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm start
-    command: 'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm start',
-    port: 3001,
+    // NOTE: Skips build:deps to avoid parcel segfault in non-interactive shell
+    // Dependencies must be built manually once with: pnpm build:deps
+    command: 'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start',
     timeout: 300 * 1000, // 5 minutes for Volto's initial webpack compilation
     reuseExistingServer: true, // Always reuse - expect it to be running manually
+    // Health check endpoint that returns 503 during compilation, 200 when ready
+    // This polls until compilation completes before starting tests
+    url: 'http://localhost:3001/health',
     env: {
       PORT: '3001',
       RAZZLE_API_PATH: 'http://localhost:8888',
       RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
       VOLTOCONFIG: process.cwd() + '/volto.config.js',
+      // Prevent parcel from trying to access TTY (fixes segfault in background process)
+      CI: 'true',
+      NO_COLOR: '1',
     },
   },
 });
