@@ -12,7 +12,14 @@ export class AdminUIHelper {
     this.page.on('console', (msg) => {
       const type = msg.type();
       const text = msg.text();
-      if (type === 'error' || type === 'warning' || text.includes('[REDUX ACTION]')) {
+      if (
+        type === 'error' ||
+        type === 'warning' ||
+        text.includes('[REDUX ACTION]') ||
+        text.includes('[HYDRA]') ||
+        text.includes('[VIEW]') ||
+        text.includes('applyFormat')
+      ) {
         console.log(`[BROWSER ${type.toUpperCase()}] ${text}`);
       }
     });
@@ -150,12 +157,26 @@ export class AdminUIHelper {
   async clickBlockInIframe(blockId: string): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Verify block exists before trying to click
+    const blockCount = await block.count();
+    if (blockCount === 0) {
+      throw new Error(`Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`);
+    }
+
     // Scroll into view to ensure the block and its toolbar are visible
     await block.scrollIntoViewIfNeeded();
     await block.click();
 
     // Wait for the block to actually be selected (have the outline class)
-    await iframe.locator(`[data-block-uid="${blockId}"].volto-hydra--outline`).waitFor({ state: 'visible' });
+    try {
+      await iframe.locator(`[data-block-uid="${blockId}"].volto-hydra--outline`).waitFor({
+        state: 'visible',
+        timeout: 5000
+      });
+    } catch (e) {
+      throw new Error(`Block "${blockId}" was clicked but the outline class (.volto-hydra--outline) never appeared. This likely means selectBlock() in hydra.js is not adding the outline class. Check that hydra.js is loaded and selectBlock() is being called.`);
+    }
 
     // Wait for the Quanta toolbar to appear on the selected block
     await this.waitForQuantaToolbar(blockId);
@@ -208,6 +229,24 @@ export class AdminUIHelper {
     const tab = this.page.locator('.sidebar-container .tabs-wrapper .menu .item', {
       hasText: tabName
     });
+
+    // Check if tab exists
+    const tabCount = await tab.count();
+    if (tabCount === 0) {
+      throw new Error(
+        `Sidebar tab "${tabName}" not found. ` +
+        `Check that the sidebar is open and the tab name is correct. ` +
+        `Available tabs are typically: Page, Block, Order.`
+      );
+    }
+
+    // Verify tab is visible
+    try {
+      await tab.waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      throw new Error(`Sidebar tab "${tabName}" exists but is not visible. Check sidebar state.`);
+    }
+
     await tab.click();
     // Wait for tab content to load
     await this.page.waitForTimeout(300);
@@ -335,7 +374,17 @@ export class AdminUIHelper {
     const toolbar = iframe.locator(
       `[data-block-uid="${blockId}"] .volto-hydra-quantaToolbar`
     );
-    await toolbar.waitFor({ state: 'visible', timeout });
+
+    try {
+      await toolbar.waitFor({ state: 'visible', timeout });
+    } catch (e) {
+      throw new Error(
+        `Quanta toolbar did not appear for block "${blockId}" within ${timeout}ms. ` +
+        `The toolbar should be created by hydra.js createQuantaToolbar(). ` +
+        `Check that: (1) hydra.js is loaded, (2) selectBlock() calls createQuantaToolbar(), ` +
+        `and (3) the toolbar element is being appended to the DOM.`
+      );
+    }
 
     // Scroll the toolbar into view since it appears BELOW the block
     // and might be outside the viewport even if the block is visible
@@ -354,13 +403,41 @@ export class AdminUIHelper {
     const menuButton = iframe.locator(
       `[data-block-uid="${blockId}"] .volto-hydra-menu-button`
     );
+
+    // Check if menu button exists
+    const buttonCount = await menuButton.count();
+    if (buttonCount === 0) {
+      throw new Error(
+        `Menu button not found in Quanta toolbar for block "${blockId}". ` +
+        `The menu button should be created by hydra.js createQuantaToolbar().`
+      );
+    }
+
+    // Verify button is visible
+    try {
+      await menuButton.waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      throw new Error(
+        `Menu button exists but is not visible for block "${blockId}". ` +
+        `Check toolbar CSS or positioning.`
+      );
+    }
+
     await menuButton.click();
 
     // Wait for dropdown to appear
     const dropdown = iframe.locator(
       `[data-block-uid="${blockId}"] .volto-hydra-dropdown-menu`
     );
-    await dropdown.waitFor({ state: 'visible' });
+
+    try {
+      await dropdown.waitFor({ state: 'visible', timeout: 3000 });
+    } catch (e) {
+      throw new Error(
+        `Dropdown menu did not appear after clicking menu button for block "${blockId}". ` +
+        `Check that the click handler is working and the dropdown is being shown.`
+      );
+    }
   }
 
   /**
@@ -426,8 +503,41 @@ export class AdminUIHelper {
       `[data-block-uid="${blockId}"] .volto-hydra-format-button`
     );
 
+    // Check if format buttons exist at all
+    const buttonCount = await formatButtons.count();
+    if (buttonCount === 0) {
+      throw new Error(
+        `No format buttons found for block "${blockId}". ` +
+        `Format buttons should be created by hydra.js for slate blocks. ` +
+        `Check that: (1) the block is a slate block, (2) hydra.js is loaded, ` +
+        `(3) formData is set in hydra.js, and (4) createQuantaToolbar() was called with formatBtns=true.`
+      );
+    }
+
     const index = { bold: 0, italic: 1, strikethrough: 2, link: 3 }[format];
-    await formatButtons.nth(index).click();
+
+    // Check if the specific button we need exists
+    if (buttonCount <= index) {
+      throw new Error(
+        `Format button "${format}" (index ${index}) not found. ` +
+        `Only ${buttonCount} format buttons exist for block "${blockId}". ` +
+        `Expected at least ${index + 1} buttons (bold, italic, strikethrough, link).`
+      );
+    }
+
+    const button = formatButtons.nth(index);
+
+    // Verify button is visible before clicking
+    try {
+      await button.waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      throw new Error(
+        `Format button "${format}" exists but is not visible for block "${blockId}". ` +
+        `Check CSS or toolbar positioning.`
+      );
+    }
+
+    await button.click();
   }
 
   /**
@@ -470,13 +580,27 @@ export class AdminUIHelper {
 
   /**
    * Edit text in a contenteditable block within the iframe.
+   * Handles both cases: block already editable, or needs to be clicked to become editable.
    */
   async editBlockTextInIframe(blockId: string, newText: string): Promise<void> {
     const iframe = this.getIframe();
+    const blockContainer = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // First, click the block to select it and show the toolbar
+    await blockContainer.click();
+
+    // Wait for the toolbar to appear (indicating block is selected)
+    await this.page.locator('#slate-inline-toolbar, .slate-inline-toolbar').waitFor({
+      state: 'visible',
+      timeout: 5000
+    });
+
+    // Now wait for the contenteditable element to appear
     const editor = iframe.locator(
       `[data-block-uid="${blockId}"] [contenteditable="true"]`
     );
-    await editor.click();
+    await editor.waitFor({ state: 'visible', timeout: 5000 });
+
     // Clear existing text
     await editor.evaluate((el) => {
       el.textContent = '';
@@ -887,5 +1011,204 @@ export class AdminUIHelper {
 
     // Wait for postMessage round-trip and DOM updates
     await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Wait for the block count to reach a specific value.
+   * This is a condition-based wait that replaces arbitrary timeouts.
+   *
+   * @param expectedCount - The expected number of blocks
+   * @param timeout - Maximum time to wait in milliseconds (default 10000)
+   * @throws Error if the expected count is not reached within the timeout
+   */
+  async waitForBlockCountToBe(expectedCount: number, timeout: number = 10000): Promise<void> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      const currentCount = await this.getBlockCount();
+
+      if (currentCount === expectedCount) {
+        return; // Success!
+      }
+
+      // Wait a bit before checking again
+      await this.page.waitForTimeout(100);
+    }
+
+    // Timeout reached - get final count for error message
+    const finalCount = await this.getBlockCount();
+    throw new Error(
+      `Block count did not reach expected value within ${timeout}ms. ` +
+      `Expected: ${expectedCount}, Actual: ${finalCount}. ` +
+      `This likely means the block add/remove operation did not complete. ` +
+      `Check that postMessage communication is working and the Admin UI is processing block changes.`
+    );
+  }
+
+  /**
+   * Wait for a sidebar field value to change to a specific value.
+   * This is a condition-based wait that replaces arbitrary timeouts.
+   *
+   * @param fieldName - The field name to check
+   * @param expectedValue - The expected value
+   * @param timeout - Maximum time to wait in milliseconds (default 5000)
+   * @throws Error if the expected value is not reached within the timeout
+   */
+  async waitForFieldValueToBe(
+    fieldName: string,
+    expectedValue: string,
+    timeout: number = 5000
+  ): Promise<void> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      const currentValue = await this.getSidebarFieldValue(fieldName);
+
+      if (currentValue === expectedValue) {
+        return; // Success!
+      }
+
+      // Wait a bit before checking again
+      await this.page.waitForTimeout(100);
+    }
+
+    // Timeout reached - get final value for error message
+    const finalValue = await this.getSidebarFieldValue(fieldName);
+    throw new Error(
+      `Field "${fieldName}" did not reach expected value within ${timeout}ms. ` +
+      `Expected: "${expectedValue}", Actual: "${finalValue}". ` +
+      `This likely means the field update did not propagate or the form did not update.`
+    );
+  }
+
+  /**
+   * Logout from the Admin UI.
+   * Clicks the user menu and then the logout button.
+   * This is a complex operation that handles various UI patterns.
+   *
+   * @throws Error if logout UI elements cannot be found
+   */
+  async logout(): Promise<void> {
+    // Look for user menu
+    const userMenu = this.page.locator('[aria-label="User menu"]').or(
+      this.page.locator('.user.menu')
+    ).first();
+
+    const menuCount = await userMenu.count();
+    if (menuCount === 0) {
+      throw new Error(
+        'User menu not found. Check that user is logged in and the user menu element exists.'
+      );
+    }
+
+    // Verify menu is visible before clicking
+    try {
+      await userMenu.waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      throw new Error(
+        'User menu exists but is not visible. Check that the UI is fully loaded.'
+      );
+    }
+
+    await userMenu.click();
+
+    // Wait for dropdown to appear
+    const logoutButton = this.page.locator('text=Logout').or(
+      this.page.locator('text=Log out')
+    );
+
+    try {
+      await logoutButton.waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      throw new Error(
+        'Logout button did not appear after clicking user menu. ' +
+        'Check that the menu dropdown is working correctly.'
+      );
+    }
+
+    await logoutButton.click();
+
+    // Wait for redirect to login page
+    try {
+      await this.page.waitForURL(/.*login.*/, { timeout: 5000 });
+    } catch (e) {
+      // Check if we're on login page by looking for login form
+      const loginForm = this.page.locator('input[type="password"]');
+      const isOnLoginPage = await loginForm.isVisible();
+
+      if (!isOnLoginPage) {
+        throw new Error(
+          'Logout did not redirect to login page. Check that logout is working correctly.'
+        );
+      }
+    }
+  }
+
+  /**
+   * Assert text selection in the iframe.
+   * Returns selection information for further assertions.
+   *
+   * @param locator - The element locator (usually contenteditable element)
+   * @param expectedText - Optional expected selected text
+   * @param options - Optional assertion options
+   * @returns Selection information object
+   */
+  async assertTextSelection(
+    locator: Locator,
+    expectedText?: string,
+    options?: {
+      shouldExist?: boolean;
+      shouldBeCollapsed?: boolean;
+      message?: string;
+    }
+  ): Promise<{
+    hasSelection: boolean;
+    isCollapsed: boolean;
+    selectedText: string;
+    rangeCount: number;
+  }> {
+    const {
+      shouldExist = true,
+      shouldBeCollapsed = false,
+      message = 'Selection assertion'
+    } = options || {};
+
+    const selectionInfo = await locator.evaluate(() => {
+      const sel = window.getSelection();
+      return {
+        hasSelection: sel !== null && sel.rangeCount > 0,
+        isCollapsed: sel?.isCollapsed || false,
+        selectedText: sel?.toString() || '',
+        rangeCount: sel?.rangeCount || 0,
+      };
+    });
+
+    console.log(`[TEST] ${message}:`, selectionInfo);
+
+    if (shouldExist) {
+      if (!selectionInfo.hasSelection) {
+        throw new Error(`${message}: Expected selection to exist, but no selection found`);
+      }
+    } else {
+      if (selectionInfo.hasSelection) {
+        throw new Error(`${message}: Expected no selection, but found: "${selectionInfo.selectedText}"`);
+      }
+    }
+
+    if (shouldExist && shouldBeCollapsed !== selectionInfo.isCollapsed) {
+      throw new Error(
+        `${message}: Expected selection to be ${shouldBeCollapsed ? 'collapsed' : 'not collapsed'}, ` +
+        `but it was ${selectionInfo.isCollapsed ? 'collapsed' : 'not collapsed'}`
+      );
+    }
+
+    if (expectedText !== undefined && selectionInfo.selectedText !== expectedText) {
+      throw new Error(
+        `${message}: Expected selected text "${expectedText}", ` +
+        `but got "${selectionInfo.selectedText}"`
+      );
+    }
+
+    return selectionInfo;
   }
 }

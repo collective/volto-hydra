@@ -70,6 +70,7 @@ export default defineConfig({
     // NOTE: Skips build:deps to avoid parcel segfault in non-interactive shell
     // Dependencies must be built manually once with: pnpm build:deps
     command: 'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start',
+    port: 3001, // Temporarily using port instead of health URL for testing
     timeout: 300 * 1000, // 5 minutes for Volto's initial webpack compilation
     reuseExistingServer: true, // Always reuse - expect it to be running manually
     // Health check endpoint that returns 503 during compilation, 200 when ready
