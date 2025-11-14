@@ -34,11 +34,12 @@ test.describe('Authentication and Access Control', () => {
 
     // Check that iframe URL contains access_token parameter
     const iframeSrc = await page.locator('iframe').getAttribute('src');
+    expect(iframeSrc, 'iframe src attribute should exist').toBeTruthy();
     expect(iframeSrc).toContain('access_token');
 
     // Verify token format (should be a JWT-style token)
     const tokenMatch = iframeSrc?.match(/access_token=([^&]+)/);
-    expect(tokenMatch).toBeTruthy();
+    expect(tokenMatch, 'access_token parameter should be found in iframe src').toBeTruthy();
 
     if (tokenMatch) {
       const token = tokenMatch[1];
@@ -59,34 +60,20 @@ test.describe('Authentication and Access Control', () => {
     const sidebar = page.locator('#sidebar-properties');
     await expect(sidebar).toBeVisible();
 
-    // Logout (look for user menu and logout button)
-    const userMenu = page.locator('[aria-label="User menu"]').or(
-      page.locator('.user.menu')
-    ).first();
+    // Logout using helper
+    await helper.logout();
 
-    if (await userMenu.count() > 0) {
-      await userMenu.click();
-      await page.waitForTimeout(200);
-
-      const logoutButton = page.locator('text=Logout').or(
-        page.locator('text=Log out')
-      );
-
-      if (await logoutButton.count() > 0) {
-        await logoutButton.click();
-        await page.waitForTimeout(500);
-
-        // Verify we're redirected to login page
-        const currentUrl = page.url();
-        expect(currentUrl).toContain('login');
-      }
-    }
+    // Verify we're redirected to login page
+    const currentUrl = page.url();
+    expect(currentUrl).toContain('login');
   });
 
   test('Unauthenticated access redirects to login', async ({ page }) => {
     // Try to access edit page without logging in
     await page.goto('http://localhost:3001/test-page/edit');
-    await page.waitForTimeout(2000);
+
+    // Wait for page to load and potentially redirect
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // In production, Volto would redirect to login for unauthenticated edit access
     // In test environment with mock API (no auth enforcement), verify page loads
@@ -116,7 +103,7 @@ test.describe('Authentication and Access Control', () => {
 
     // Navigate away and back
     await page.goto('http://localhost:3001/contents');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Navigate back to edit
     await helper.navigateToEdit('/test-page');

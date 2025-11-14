@@ -14,13 +14,14 @@ test.describe('Navigation and URL Handling', () => {
 
     // Verify the test page loaded in the iframe (not an external URL)
     const heading = await iframe.locator('h1').first().textContent();
-    expect(heading).toContain('Test Page');
+    expect(heading, 'Iframe should load test page content').toContain('Test Page');
 
     // Get iframe element to check its src
     const iframeElement = page.locator('#previewIframe');
     const iframeSrc = await iframeElement.getAttribute('src');
 
-    // Iframe should be pointing to localhost, not external URL
+    // Iframe src should exist and point to localhost
+    expect(iframeSrc, 'Iframe src attribute should exist').toBeTruthy();
     expect(iframeSrc).toContain('localhost');
     expect(iframeSrc).not.toContain('example.com');
   });
@@ -32,7 +33,7 @@ test.describe('Navigation and URL Handling', () => {
 
     // Try navigating with hash bang style URL
     await page.goto('http://localhost:3001/#!/test-page/edit');
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Volto may redirect or handle hash bangs differently
     // Verify the page doesn't crash and we can still navigate normally
@@ -61,7 +62,7 @@ test.describe('Navigation and URL Handling', () => {
 
     // Navigate to hash bang URL
     await page.goto('http://localhost:3001/#!/');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Navigate back to normal URL
     await helper.navigateToEdit('/test-page');
@@ -85,7 +86,7 @@ test.describe('Navigation and URL Handling', () => {
 
     // Navigate to contents view
     await page.goto('http://localhost:3001/contents');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Verify sidebar is no longer visible (exited edit mode)
     sidebar = page.locator('#sidebar-properties');

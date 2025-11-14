@@ -59,8 +59,13 @@ function renderSlateBlock(block) {
     const value = block.value || [];
     let html = '';
 
-    value.forEach(node => {
+    value.forEach((node) => {
         if (node.type === 'p') {
+            // nodeId MUST be present - hydra.js is responsible for adding it
+            if (node.nodeId === undefined) {
+                throw new Error(`Missing nodeId on Slate node. hydra.js should add nodeIds before rendering. Node: ${JSON.stringify(node)}`);
+            }
+
             const text = node.children.map(child => {
                 let content = child.text || '';
                 // Handle formatting
@@ -69,11 +74,12 @@ function renderSlateBlock(block) {
                 if (child.code) content = `<code>${content}</code>`;
                 return content;
             }).join('');
-            html += `<p contenteditable="true" data-slate-editor="true">${text}</p>`;
+            // Use data-editable-field="value" so hydra.js will make it contenteditable
+            html += `<p data-editable-field="value" data-node-id="${node.nodeId}">${text}</p>`;
         }
     });
 
-    return html || '<p contenteditable="true" data-slate-editor="true"></p>';
+    return html || '<p data-editable-field="value">Empty block</p>';
 }
 
 /**

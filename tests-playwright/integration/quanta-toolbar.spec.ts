@@ -158,8 +158,8 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     // Click Remove
     await helper.clickQuantaToolbarMenuOption(blockId, 'Remove');
 
-    // Give time for block to be removed
-    await page.waitForTimeout(500);
+    // Wait for block to be removed
+    await helper.waitForBlockCountToBe(2);
 
     // Verify block count decreased
     blockCount = await helper.getBlockCountInIframe();

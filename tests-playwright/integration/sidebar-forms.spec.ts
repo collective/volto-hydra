@@ -186,8 +186,8 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     // Edit alt field
     await helper.setSidebarFieldValue('alt', 'Updated alt text');
 
-    // Give time for update to propagate
-    await page.waitForTimeout(500);
+    // Wait for update to propagate
+    await helper.waitForFieldValueToBe('alt', 'Updated alt text');
 
     // Verify alt field shows new value
     const newAltValue = await helper.getSidebarFieldValue('alt');

@@ -541,6 +541,24 @@ export class AdminUIHelper {
   }
 
   /**
+   * Select all text in a contenteditable element using JavaScript Selection API.
+   * This is more reliable than using keyboard shortcuts.
+   */
+  async selectAllTextInEditor(editor: Locator): Promise<void> {
+    await editor.evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+    // Give the selection time to register and trigger selectionchange event
+    await this.page.waitForTimeout(100);
+  }
+
+  /**
    * Get the number of blocks rendered in the iframe.
    */
   async getBlockCountInIframe(): Promise<number> {

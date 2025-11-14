@@ -49,8 +49,8 @@ test.describe('Adding Blocks', () => {
     // Select Slate block type
     await helper.selectBlockType('slate');
 
-    // Wait a moment for block to be added
-    await page.waitForTimeout(1000);
+    // Wait for block to be added
+    await helper.waitForBlockCountToBe(initialCount + 1);
 
     // Verify block count increased
     const newCount = await helper.getBlockCount();
@@ -70,7 +70,7 @@ test.describe('Adding Blocks', () => {
     await helper.clickAddBlockButton();
     await helper.selectBlockType('image');
 
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialCount + 1);
 
     // Verify block was added
     const newCount = await helper.getBlockCount();
@@ -91,7 +91,7 @@ test.describe('Adding Blocks', () => {
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
 
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialBlocks.length + 1);
 
     // Get new block IDs
     const newBlocks = await helper.getBlockOrder();
@@ -101,11 +101,11 @@ test.describe('Adding Blocks', () => {
 
     // Find the new block ID (the one that's not in initialBlocks)
     const newBlockId = newBlocks.find(id => !initialBlocks.includes(id));
-    expect(newBlockId).toBeDefined();
+    expect(newBlockId, `New block should be found in block order`).toBeDefined();
 
     // Verify the new block exists in iframe
     const exists = await helper.blockExists(newBlockId!);
-    expect(exists).toBe(true);
+    expect(exists, `New block ${newBlockId} should exist in iframe`).toBe(true);
   });
 
   test('can add multiple blocks in succession', async ({ page }) => {
@@ -120,7 +120,7 @@ test.describe('Adding Blocks', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
-    await page.waitForTimeout(500);
+    await helper.waitForBlockCountToBe(initialCount + 1);
 
     const countAfterFirst = await helper.getBlockCount();
     expect(countAfterFirst).toBe(initialCount + 1);
@@ -129,7 +129,7 @@ test.describe('Adding Blocks', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.clickAddBlockButton();
     await helper.selectBlockType('image');
-    await page.waitForTimeout(500);
+    await helper.waitForBlockCountToBe(initialCount + 2);
 
     const countAfterSecond = await helper.getBlockCount();
     expect(countAfterSecond).toBe(initialCount + 2);
@@ -138,7 +138,7 @@ test.describe('Adding Blocks', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
-    await page.waitForTimeout(500);
+    await helper.waitForBlockCountToBe(initialCount + 3);
 
     const finalCount = await helper.getBlockCount();
     expect(finalCount).toBe(initialCount + 3);
@@ -158,7 +158,7 @@ test.describe('Adding Blocks', () => {
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
 
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialBlocks.length + 1);
 
     // Get new block order
     const newBlocks = await helper.getBlockOrder();
@@ -223,7 +223,7 @@ test.describe('Removing Blocks', () => {
     await helper.clickQuantaToolbarMenuOption(blockIdToRemove, 'Remove');
 
     // Wait for block to be removed
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialCount - 1);
 
     // Verify block count decreased
     const newCount = await helper.getBlockCount();
@@ -269,7 +269,7 @@ test.describe('Removing Blocks', () => {
     await helper.openQuantaToolbarMenu(blockToRemove);
     await helper.clickQuantaToolbarMenuOption(blockToRemove, 'Remove');
 
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(2);
 
     // Get new block order
     const newBlocks = await helper.getBlockOrder();
@@ -299,7 +299,7 @@ test.describe('Removing Blocks', () => {
     await helper.openQuantaToolbarMenu(middle);
     await helper.clickQuantaToolbarMenuOption(middle, 'Remove');
 
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(2);
 
     const newBlocks = await helper.getBlockOrder();
 
@@ -352,7 +352,7 @@ test.describe('Add and Remove Combined', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialCount + 1);
 
     // Verify it was added
     const countAfterAdd = await helper.getBlockCount();
@@ -367,7 +367,7 @@ test.describe('Add and Remove Combined', () => {
     await helper.clickBlockInIframe(newBlockId!);
     await helper.openQuantaToolbarMenu(newBlockId!);
     await helper.clickQuantaToolbarMenuOption(newBlockId!, 'Remove');
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialCount);
 
     // Should be back to original count
     const finalCount = await helper.getBlockCount();
@@ -389,7 +389,7 @@ test.describe('Add and Remove Combined', () => {
     await helper.clickBlockInIframe('block-2-uuid');
     await helper.openQuantaToolbarMenu('block-2-uuid');
     await helper.clickQuantaToolbarMenuOption('block-2-uuid', 'Remove');
-    await page.waitForTimeout(500);
+    await helper.waitForBlockCountToBe(initialCount - 1);
 
     const countAfterRemove = await helper.getBlockCount();
     expect(countAfterRemove).toBe(initialCount - 1);
@@ -399,7 +399,7 @@ test.describe('Add and Remove Combined', () => {
     await helper.clickBlockInIframe(remainingBlocks[0]);
     await helper.clickAddBlockButton();
     await helper.selectBlockType('image');
-    await page.waitForTimeout(1000);
+    await helper.waitForBlockCountToBe(initialCount);
 
     // Should be back to original count
     const finalCount = await helper.getBlockCount();

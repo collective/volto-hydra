@@ -33,7 +33,15 @@
       "Bash(npx tsc:*)",
       "Bash(gh pr list --state closed --limit 20 --json number,title,body,closedAt,mergedAt)",
       "Bash(gh issue view:*)",
-      "Bash(killall:*)"
+      "Bash(killall:*)",
+      "Bash(python3:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(pnpm list:*)",
+      "WebFetch(domain:docs.slatejs.org)",
+      "Bash(pnpm -w run test:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git submodule:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Parent Window - Hydra Format Testing</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+    #iframe-container {
+      border: 2px solid #ccc;
+      margin-top: 20px;
+    }
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    #log {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .log-entry {
+      margin: 2px 0;
+    }
+    .log-sent {
+      color: blue;
+    }
+    .log-received {
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mock Parent Window - Testing Hydra Format Protocol</h1>
+  <p>This page mocks the Admin UI parent window to test iframe formatting without Volto.</p>
+
+  <div id="iframe-container">
+    <iframe id="test-iframe" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
+  </div>
+
+  <div id="log">
+    <div class="log-entry"><strong>Message Log:</strong></div>
+  </div>
+
+  <script type="module">
+    console.log('[MOCK_PARENT] Loaded');
+
+    // Mock form data with a single slate block
+    // This will be sent to iframe to override API content
+    const mockFormData = {
+      '@id': 'http://localhost:8888/test-page',
+      '@type': 'Document',
+      title: 'Mock Test Page',
+      blocks: {
+        'mock-block-1': {
+          '@type': 'slate',
+          value: [
+            {
+              type: 'p',
+              children: [
+                {
+                  text: 'Text to format',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      blocks_layout: {
+        items: ['mock-block-1'],
+      },
+    };
+
+    // Mock Slate JSON responses for different formats
+    // In a real scenario, these would be computed by slateTransforms.applyFormat()
+    // But for testing the postMessage protocol, we just return hardcoded updated Slate values
+    const mockSlateResponses = {
+      'bold-add': [
+        {
+          type: 'p',
+          children: [
+            {
+              text: 'Text to format',
+              bold: true,
+            },
+          ],
+        },
+      ],
+      'bold-toggle': [
+        {
+          type: 'p',
+          children: [
+            {
+              text: 'Text to format',
+              bold: true,
+            },
+          ],
+        },
+      ],
+      'italic-add': [
+        {
+          type: 'p',
+          children: [
+            {
+              text: 'Text to format',
+              italic: true,
+            },
+          ],
+        },
+      ],
+      'italic-toggle': [
+        {
+          type: 'p',
+          children: [
+            {
+              text: 'Text to format',
+              italic: true,
+            },
+          ],
+        },
+      ],
+      'strikethrough-add': [
+        {
+          type: 'p',
+          children: [
+            {
+              text: 'Text to format',
+              strikethrough: true,
+            },
+          ],
+        },
+      ],
+      'strikethrough-toggle': [
+        {
+          type: 'p',
+          children: [
+            {
+              text: 'Text to format',
+              strikethrough: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    // Message log
+    const logEl = document.getElementById('log');
+    function logMessage(direction, type, data) {
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${direction}`;
+      entry.textContent = `[${direction.toUpperCase()}] ${type}: ${JSON.stringify(data)}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Listen for messages from iframe
+    window.addEventListener('message', async (event) => {
+      // Only handle messages from our iframe
+      if (event.source !== document.getElementById('test-iframe').contentWindow) {
+        return;
+      }
+
+      const message = event.data;
+      console.log('[MOCK_PARENT] Received message:', message);
+      logMessage('received', message.type, message);
+
+      // Handle different message types
+      switch (message.type) {
+        case 'GET_INITIAL_DATA': {
+          // Respond with INITIAL_DATA (not FORM_DATA!)
+          // hydra.js converts INITIAL_DATA to FORM_DATA internally
+          const response = {
+            type: 'INITIAL_DATA',
+            data: mockFormData,
+          };
+          console.log('[MOCK_PARENT] Sending INITIAL_DATA:', response);
+          event.source.postMessage(response, event.origin);
+          logMessage('sent', 'INITIAL_DATA', response.data);
+
+          // Auto-select the first block after a short delay to allow hydra.js to initialize
+          setTimeout(() => {
+            const firstBlockId = mockFormData.blocks_layout.items[0];
+            if (firstBlockId) {
+              console.log('[MOCK_PARENT] Auto-selecting first block:', firstBlockId);
+              event.source.postMessage(
+                {
+                  type: 'SELECT_BLOCK',
+                  uid: firstBlockId,  // hydra.js expects 'uid' not 'blockId'
+                  data: mockFormData,  // hydra.js also expects the form data
+                },
+                event.origin,
+              );
+              logMessage('sent', 'SELECT_BLOCK', { uid: firstBlockId, data: mockFormData });
+            }
+          }, 100);
+          break;
+        }
+
+        case 'SLATE_FORMAT_REQUEST': {
+          const { blockId, format, action, selection } = message;
+          console.log('[MOCK_PARENT] Processing SLATE_FORMAT_REQUEST:', { blockId, format, action, selection });
+
+          // Get current value
+          const currentValue = mockFormData.blocks[blockId].value;
+          let updatedValue;
+
+          // Check if this is a partial selection (not the whole text)
+          const fullTextLength = currentValue[0].children[0].text.length;
+          const isPartialSelection = selection &&
+            selection.anchor.path[0] === selection.focus.path[0] && // Same paragraph
+            selection.anchor.path[1] === selection.focus.path[1] && // Same text node
+            (selection.anchor.offset !== 0 || selection.focus.offset !== fullTextLength);
+
+          console.log('[MOCK_PARENT] Selection check:', {
+            hasSelection: !!selection,
+            anchorPath: selection?.anchor?.path,
+            focusPath: selection?.focus?.path,
+            anchorOffset: selection?.anchor?.offset,
+            focusOffset: selection?.focus?.offset,
+            fullTextLength,
+            isPartialSelection
+          });
+
+          if (isPartialSelection) {
+            // Handle partial selection - split the text node
+            const paragraph = currentValue[0];
+            const originalText = paragraph.children[0].text;
+            const start = Math.min(selection.anchor.offset, selection.focus.offset);
+            const end = Math.max(selection.anchor.offset, selection.focus.offset);
+
+            console.log('[MOCK_PARENT] Partial selection detected:', { start, end, originalText });
+
+            const children = [];
+
+            // Add text before selection (if any)
+            if (start > 0) {
+              children.push({ text: originalText.substring(0, start) });
+            }
+
+            // Add selected text with format
+            const formatObj = {};
+            if (action === 'add' || action === 'toggle') {
+              formatObj[format] = true;
+            }
+            children.push({
+              text: originalText.substring(start, end),
+              ...formatObj
+            });
+
+            // Add text after selection (if any)
+            if (end < originalText.length) {
+              children.push({ text: originalText.substring(end) });
+            }
+
+            updatedValue = [{
+              type: paragraph.type,
+              children: children
+            }];
+
+            console.log('[MOCK_PARENT] Split text nodes:', updatedValue);
+          } else {
+            // Full selection - use hardcoded responses
+            const responseKey = `${format}-${action}`;
+            updatedValue = mockSlateResponses[responseKey] || currentValue;
+            console.log('[MOCK_PARENT] Using mock Slate response:', updatedValue);
+          }
+
+          // Update the block in mockFormData
+          mockFormData.blocks[blockId] = {
+            ...mockFormData.blocks[blockId],
+            value: updatedValue,
+          };
+
+          // Send FORM_DATA with complete updated form data AND transformed selection
+          const response = {
+            type: 'FORM_DATA',
+            data: mockFormData,
+            selection: selection,
+          };
+          console.log('[MOCK_PARENT] Sending FORM_DATA with selection:', response);
+          event.source.postMessage(response, event.origin);
+          logMessage('sent', 'FORM_DATA', { blockId, updatedValue, selection });
+          break;
+        }
+
+        case 'SELECT_BLOCK':
+        case 'FORM_DATA':
+        case 'INLINE_EDIT_DATA': {
+          // Just log these for now
+          console.log('[MOCK_PARENT] Received but not handling:', message.type);
+          break;
+        }
+
+        default: {
+          console.log('[MOCK_PARENT] Unknown message type:', message.type);
+        }
+      }
+    });
+
+    console.log('[MOCK_PARENT] Message listener registered');
+
+    // Make mock parent available to tests
+    window.mockParent = {
+      getFormData: () => mockFormData,
+      getBlock: (blockId) => mockFormData.blocks[blockId],
+    };
+  </script>
+</body>
+</html>

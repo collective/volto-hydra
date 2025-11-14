@@ -47,21 +47,28 @@
                 // Get content path from current URL (e.g., /test-page)
                 const contentPath = window.location.pathname;
 
+                // Check if in edit mode first
+                const urlParams = new URLSearchParams(window.location.search);
+                const isEditMode = urlParams.get('_edit') === 'true';
+
                 // Fetch content from mock API using ++api++ prefix
                 const response = await fetch(`/++api++${contentPath}`);
                 const content = await response.json();
 
-                // Render the page
-                document.getElementById('page-title').textContent = content.title;
-                renderContent(content);
+                // Only render initial content if NOT in edit mode
+                // In edit mode, we wait for hydra.js to provide content with nodeIds
+                if (!isEditMode) {
+                    document.getElementById('page-title').textContent = content.title;
+                    renderContent(content);
+                }
 
                 // Initialize Hydra bridge if in edit mode
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('_edit') === 'true') {
+                if (isEditMode) {
                     console.log('[TEST-FRONTEND] Initializing Hydra bridge');
 
-                    // In tests, the admin UI is always at http://localhost:3001
-                    const adminOrigin = 'http://localhost:3001';
+                    // Allow custom admin origin via query param (for mock parent tests)
+                    // Default to http://localhost:3001 for full Volto tests
+                    const adminOrigin = urlParams.get('_admin_origin') || 'http://localhost:3001';
 
                     console.log('[TEST-FRONTEND] Admin origin:', adminOrigin);
 

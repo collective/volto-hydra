@@ -9,37 +9,31 @@ const applyConfig = (config) => {
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
 
   // Add the slate block in the sidebar
-  config.blocks.blocksConfig.slate.schemaEnhancer = ({
-    formData,
-    schema,
-    intl,
-  }) => {
-    schema.properties.value = {
-      title: 'Body',
-      widget: 'slate',
-    };
-    schema.fieldsets[0].fields.push('value');
-    return schema;
-  };
-  // Set the sidebarTab to 1 & set most used to true
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
+    schemaEnhancer: ({ formData, schema, intl }) => {
+      schema.properties.value = {
+        title: 'Body',
+        widget: 'slate',
+      };
+      schema.fieldsets[0].fields.push('value');
+      return schema;
+    },
     sidebarTab: 1,
     mostUsed: true,
   };
 
   // Add image from sidebar
-  config.blocks.blocksConfig.image.schemaEnhancer = ({
-    formData,
-    schema,
-    intl,
-  }) => {
-    schema.properties.url = {
-      title: 'Image Src',
-      widget: 'image',
-    };
-    schema.fieldsets[0].fields.push('url');
-    return schema;
+  config.blocks.blocksConfig.image = {
+    ...config.blocks.blocksConfig.image,
+    schemaEnhancer: ({ formData, schema, intl }) => {
+      schema.properties.url = {
+        title: 'Image Src',
+        widget: 'image',
+      };
+      schema.fieldsets[0].fields.push('url');
+      return schema;
+    },
   };
 
   const updateAllowedBlocks = () => {

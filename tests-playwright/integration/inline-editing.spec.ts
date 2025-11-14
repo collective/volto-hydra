@@ -200,8 +200,8 @@ test.describe('Inline Editing', () => {
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Synced bold text', { delay: 10 });
 
-    // Select all and make bold
-    await page.keyboard.press('Control+A');
+    // Select all text in the editor using JavaScript Selection API
+    await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton(blockId, 'bold');
     await page.waitForTimeout(500);
 
@@ -209,9 +209,11 @@ test.describe('Inline Editing', () => {
     const blockHtml = await editor.innerHTML();
     expect(blockHtml).toContain('<strong>');
 
-    // TODO: Verify the bold formatting is reflected in the Admin UI sidebar
-    // This would require checking the block data sent via postMessage
-    // or checking the sidebar's block data display
+    // TODO: Verify bold formatting also appears in Admin UI sidebar Slate editor
+    // Currently the sidebar Slate editor exists but doesn't show <strong> tags
+    // after inline editing in the iframe. This may be a sync issue that needs
+    // investigation - the data syncs to the form but the sidebar editor doesn't
+    // re-render with the formatting.
   });
 
   test('multiple formats can be applied simultaneously', async ({ page }) => {
@@ -230,8 +232,15 @@ test.describe('Inline Editing', () => {
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Bold and italic text', { delay: 10 });
 
-    // Select all text
-    await page.keyboard.press('Control+A');
+    // Select all text using JavaScript Selection API
+    await helper.selectAllTextInEditor(editor);
+
+    // Assert selection exists and covers all text
+    await helper.assertTextSelection(editor, 'Bold and italic text', {
+      shouldExist: true,
+      shouldBeCollapsed: false,
+      message: 'After selecting all, selection should exist and cover all text',
+    });
 
     // Apply bold
     await helper.clickFormatButton(blockId, 'bold');
@@ -264,8 +273,8 @@ test.describe('Inline Editing', () => {
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Text with bold', { delay: 10 });
 
-    // Select all and make bold
-    await page.keyboard.press('Control+A');
+    // Select all text in the editor using JavaScript Selection API
+    await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton(blockId, 'bold');
     await page.waitForTimeout(500);
 
@@ -292,8 +301,8 @@ test.describe('Inline Editing', () => {
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Toggle bold text', { delay: 10 });
 
-    // Select all and make bold
-    await page.keyboard.press('Control+A');
+    // Select all text in the editor using JavaScript Selection API
+    await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton(blockId, 'bold');
     await page.waitForTimeout(500);
 
@@ -302,7 +311,7 @@ test.describe('Inline Editing', () => {
     expect(blockHtml).toContain('<strong>');
 
     // Click bold button again to remove formatting
-    await page.keyboard.press('Control+A'); // Re-select text
+    await helper.selectAllTextInEditor(editor); // Re-select text
     await helper.clickFormatButton(blockId, 'bold');
     await page.waitForTimeout(500);
 

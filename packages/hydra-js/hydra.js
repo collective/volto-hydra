@@ -111,6 +111,8 @@ class Bridge {
     this.handleMouseUp = null;
     this.blockObserver = null;
     this.handleObjectBrowserMessage = null;
+    this.pendingTransforms = {}; // Track pending transform requests for timeout handling
+    this.savedSelection = null; // Store selection for format operations
     this.init(options); // Initialize the bridge
   }
 
@@ -212,7 +214,22 @@ class Bridge {
         const reciveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
+              console.log('[HYDRA] Received INITIAL_DATA');
               this.formData = JSON.parse(JSON.stringify(e.data.data));
+              console.log('[HYDRA] formData has blocks:', Object.keys(this.formData?.blocks || {}));
+
+              // Add nodeIds to all slate blocks
+              if (this.formData && this.formData.blocks) {
+                Object.keys(this.formData.blocks).forEach((blockId) => {
+                  const block = this.formData.blocks[blockId];
+                  if (block['@type'] === 'slate') {
+                    console.log('[HYDRA] Adding nodeIds to slate block:', blockId);
+                    this.formData.blocks[blockId] = this.addNodeIds(block);
+                    console.log('[HYDRA] Added nodeIds successfully');
+                  }
+                });
+              }
+
               window.postMessage(
                 {
                   type: 'FORM_DATA',
@@ -263,12 +280,39 @@ class Bridge {
           event.data.type === 'FORM_DATA' ||
           event.data.type === 'TOGGLE_MARK_DONE'
         ) {
+          console.log('[HYDRA] Received', event.data.type, 'message');
           if (event.data.data) {
-            this.isInlineEditing = false;
+            // Don't set isInlineEditing to false - user is still editing
             this.formData = JSON.parse(JSON.stringify(event.data.data));
 
+            // Add nodeIds to all slate blocks before rendering
+            // Admin UI never sends nodeIds, so we always need to add them
+            if (this.formData && this.formData.blocks) {
+              Object.keys(this.formData.blocks).forEach((blockId) => {
+                const block = this.formData.blocks[blockId];
+                if (block['@type'] === 'slate' && block.value) {
+                  console.log('[HYDRA] Adding nodeIds to slate block:', blockId);
+                  this.formData.blocks[blockId] = this.addNodeIds(block);
+                }
+              });
+            }
+
             // Call the callback first to trigger the re-render
-            callback(event.data.data);
+            callback(this.formData);
+
+            // Restore cursor position after re-render (use timeout to ensure DOM is updated)
+            // If the message includes a transformed Slate selection, use that
+            // Otherwise fall back to the old DOM-based cursor saving approach
+            setTimeout(() => {
+              if (event.data.selection) {
+                console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.selection);
+                this.restoreSlateSelection(event.data.selection, this.formData);
+              } else {
+                console.log('[HYDRA] No transformed selection provided, using DOM-based cursor restoration');
+                const savedCursor = this.saveCursorPosition();
+                this.restoreCursorPosition(savedCursor);
+              }
+            }, 0);
 
             // After the re-render, add the toolbar
             /**
@@ -321,6 +365,14 @@ class Bridge {
                   this.prevSelectedBlock = blockElement;
                   this.observeBlockTextChanges(blockElement);
                 }
+
+                // Unblock input after TOGGLE_MARK_DONE completes
+                if (
+                  event.data.type === 'TOGGLE_MARK_DONE' &&
+                  this.selectedBlockUid
+                ) {
+                  this.setBlockProcessing(this.selectedBlockUid, false);
+                }
               } else {
                 // console.warn('No block is selected to add Toolbar');
               }
@@ -344,8 +396,10 @@ class Bridge {
    *   - formatBtns: Whether to show format buttons (true/false).
    */
   createQuantaToolbar(blockUid, show = { formatBtns: true }) {
+    console.log('[HYDRA] createQuantaToolbar called:', { blockUid, show });
     // Check if the toolbar already exists
     if (this.quantaToolbar) {
+      console.log('[HYDRA] Toolbar already exists, returning early');
       return;
     }
     const blockElement = document.querySelector(
@@ -500,9 +554,15 @@ class Bridge {
           if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
             blocks_layout.splice(draggedBlockIndex, 1);
 
+            // Adjust targetBlockIndex if dragged block was before it
+            // (removing the dragged block shifts all subsequent indexes down by 1)
+            const adjustedTargetIndex = draggedBlockIndex < targetBlockIndex
+              ? targetBlockIndex - 1
+              : targetBlockIndex;
+
             // Determine insertion point based on hover position
             const insertIndex =
-              insertAt === 1 ? targetBlockIndex + 1 : targetBlockIndex;
+              insertAt === 1 ? adjustedTargetIndex + 1 : adjustedTargetIndex;
 
             blocks_layout.splice(insertIndex, 0, draggedBlockId);
             if (insertAt === 0) {
@@ -533,15 +593,59 @@ class Bridge {
     let linkButton = null;
 
     if (show.formatBtns) {
+      console.log('[HYDRA] Creating format buttons for block:', blockUid);
       // Create the bold button
       boldButton = document.createElement('button');
       boldButton.className = `volto-hydra-format-button ${
         show.formatBtns ? 'show' : ''
       }`;
+      boldButton.setAttribute('data-testid', 'bold-button');
       boldButton.innerHTML = boldSVG;
-      boldButton.addEventListener('click', () => {
-        currentFormats &&
-          this.formatSelectedText('bold', currentFormats['bold'].present);
+      console.log('[HYDRA] Bold button created, attaching mousedown handler');
+      // Use mousedown instead of click to prevent selection loss
+      boldButton.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevent focus change
+
+        console.log('[HYDRA] Bold button mousedown triggered');
+
+        // IMPORTANT: Try to serialize the current selection FIRST, before it collapses
+        // This handles cases like Ctrl+A where selection might not have been saved yet
+        const currentSelection = window.getSelection();
+        let selectionData = null;
+
+        if (currentSelection && currentSelection.rangeCount > 0 && !currentSelection.isCollapsed) {
+          // We have an active selection right now - use it
+          selectionData = this.serializeSelection();
+          console.log('[HYDRA] Using current active selection:', selectionData);
+        } else if (this.savedSelection) {
+          // No active selection, but we have a saved one - use that
+          selectionData = this.savedSelection;
+          console.log('[HYDRA] Using previously saved selection:', selectionData);
+        } else {
+          console.log('[HYDRA] No selection available (current or saved)');
+        }
+
+        if (!selectionData) {
+          console.log('[HYDRA] No selection data available, returning early');
+          return;
+        }
+
+        console.log('[HYDRA] Using selection data:', selectionData);
+
+        // Block input while transform is processing
+        this.setBlockProcessing(blockUid, true);
+
+        const message = {
+          type: 'SLATE_FORMAT_REQUEST',
+          blockId: blockUid,
+          format: 'bold',
+          action: 'toggle',
+          selection: selectionData,
+        };
+
+        console.log('[HYDRA] Sending SLATE_FORMAT_REQUEST:', message);
+        // Send SLATE_FORMAT_REQUEST to admin UI
+        window.parent.postMessage(message, this.adminOrigin);
       });
 
       // Create the italic button
@@ -549,10 +653,39 @@ class Bridge {
       italicButton.className = `volto-hydra-format-button ${
         show.formatBtns ? 'show' : ''
       }`;
+      italicButton.setAttribute('data-testid', 'italic-button');
       italicButton.innerHTML = italicSVG;
-      italicButton.addEventListener('click', () => {
-        currentFormats &&
-          this.formatSelectedText('italic', currentFormats['italic'].present);
+      italicButton.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevent focus change
+
+        // IMPORTANT: Try to serialize the current selection FIRST, before it collapses
+        const currentSelection = window.getSelection();
+        let selectionData = null;
+
+        if (currentSelection && currentSelection.rangeCount > 0 && !currentSelection.isCollapsed) {
+          // We have an active selection right now - use it
+          selectionData = this.serializeSelection();
+        } else if (this.savedSelection) {
+          // No active selection, but we have a saved one - use that
+          selectionData = this.savedSelection;
+        }
+
+        if (!selectionData) return;
+
+        // Block input while transform is processing
+        this.setBlockProcessing(blockUid, true);
+
+        // Send SLATE_FORMAT_REQUEST to admin UI
+        window.parent.postMessage(
+          {
+            type: 'SLATE_FORMAT_REQUEST',
+            blockId: blockUid,
+            format: 'italic',
+            action: 'toggle',
+            selection: selectionData,
+          },
+          this.adminOrigin,
+        );
       });
 
       // Create the del button
@@ -560,10 +693,36 @@ class Bridge {
       delButton.className = `volto-hydra-format-button ${
         show.formatBtns ? 'show' : ''
       }`;
+      delButton.setAttribute('data-testid', 'strikethrough-button');
       delButton.innerHTML = delSVG;
-      delButton.addEventListener('click', () => {
-        currentFormats &&
-          this.formatSelectedText('del', currentFormats['del'].present);
+      delButton.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevent focus change
+
+        // Use saved selection if available, otherwise try current selection
+        let selectionData = this.savedSelection;
+        if (!selectionData) {
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+            selectionData = this.serializeSelection();
+          }
+        }
+
+        if (!selectionData) return;
+
+        // Block input while transform is processing
+        this.setBlockProcessing(blockUid, true);
+
+        // Send SLATE_FORMAT_REQUEST to admin UI
+        window.parent.postMessage(
+          {
+            type: 'SLATE_FORMAT_REQUEST',
+            blockId: blockUid,
+            format: 'del',
+            action: 'toggle',
+            selection: selectionData,
+          },
+          this.adminOrigin,
+        );
       });
 
       // Create the del button
@@ -672,7 +831,7 @@ class Bridge {
         submitBtn.innerHTML = linkSubmitSVG;
         submitBtn.addEventListener('click', () => {
           const url = inputField.value;
-          if (!currentFormats['link'].present) {
+          if (!currentFormats || !currentFormats['link'].present) {
             const link = document.createElement('a');
             link.href = url;
             range.surroundContents(link);
@@ -689,9 +848,12 @@ class Bridge {
               }
             }
           }
-          this.isInlineEditing = false;
+          // Don't set isInlineEditing to false - keep it true for text changes
           const editableParent = this.findEditableParent(commonAncestor);
           const htmlString = editableParent?.outerHTML;
+
+          // Block input while transform is processing
+          this.setBlockProcessing(blockUid, true);
 
           window.parent.postMessage(
             {
@@ -709,7 +871,7 @@ class Bridge {
         cancelBtn.classList.add('link-cancel-btn');
         cancelBtn.innerHTML = linkCancelSVG;
         cancelBtn.addEventListener('click', () => {
-          if (currentFormats['link'].present) {
+          if (currentFormats && currentFormats['link'].present) {
             this.unwrapFormatting(range, 'link');
             this.sendFormattedHTMLToAdminUI(selection);
           }
@@ -724,7 +886,7 @@ class Bridge {
         container.appendChild(submitBtn);
         container.appendChild(cancelBtn);
 
-        if (currentFormats['link'].present) {
+        if (currentFormats && currentFormats['link'].present) {
           if (currentFormats['link'].enclosing) {
             inputField.value = commonAncestor.parentNode
               ?.closest('a')
@@ -870,14 +1032,262 @@ class Bridge {
     document.removeEventListener('click', this.blockClickHandler);
     document.addEventListener('click', this.blockClickHandler);
   }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Transform Blocking API - Prevent user input during Slate transforms
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Blocks or unblocks user input on a block while Slate transforms are processing.
+   * This prevents race conditions where the user makes changes while waiting for
+   * the Admin UI to process and return transformed content.
+   *
+   * @param {string} blockId - Block UID to block/unblock
+   * @param {boolean} processing - true to block input, false to unblock
+   */
+  setBlockProcessing(blockId, processing = true) {
+    const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+    const editableField = block?.querySelector('[data-editable-field="value"]');
+
+    if (!editableField) return;
+
+    if (processing) {
+      // Block input
+      editableField.setAttribute('contenteditable', 'false');
+      editableField.style.cursor = 'wait';
+
+      // Disable format buttons
+      if (this.quantaToolbar) {
+        this.quantaToolbar.querySelectorAll('button').forEach((btn) => {
+          btn.disabled = true;
+          btn.style.cursor = 'wait';
+        });
+      }
+
+      // Start timeout (2 seconds)
+      if (this.pendingTransforms[blockId]) {
+        clearTimeout(this.pendingTransforms[blockId]);
+      }
+      this.pendingTransforms[blockId] = setTimeout(() => {
+        this.handleTransformTimeout(blockId);
+      }, 2000);
+    } else {
+      // Unblock input
+      editableField.setAttribute('contenteditable', 'true');
+      editableField.style.cursor = 'text';
+
+      // Re-enable format buttons
+      if (this.quantaToolbar) {
+        this.quantaToolbar.querySelectorAll('button').forEach((btn) => {
+          btn.disabled = false;
+          btn.style.cursor = 'pointer';
+        });
+      }
+
+      // Clear timeout
+      if (this.pendingTransforms[blockId]) {
+        clearTimeout(this.pendingTransforms[blockId]);
+        delete this.pendingTransforms[blockId];
+      }
+    }
+  }
+
+  /**
+   * Handles timeout when a Slate transform takes too long to respond.
+   * Shows error state and permanently disables editing to prevent data corruption.
+   *
+   * @param {string} blockId - Block UID that timed out
+   */
+  handleTransformTimeout(blockId) {
+    const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+    const editableField = block?.querySelector('[data-editable-field="value"]');
+
+    if (editableField) {
+      // Show error state - permanently disable editing
+      editableField.setAttribute('contenteditable', 'false');
+      editableField.style.cursor = 'not-allowed';
+      editableField.style.opacity = '0.5';
+      editableField.title =
+        'Transform timeout - refresh page to continue editing';
+    }
+
+    console.error('[HYDRA] Transform timeout for block:', blockId);
+    delete this.pendingTransforms[blockId];
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Selection Serialization - Convert DOM selection to Slate selection
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Serializes the current DOM selection to Slate selection format.
+   * Converts browser Selection/Range into Slate's {anchor, focus} format.
+   *
+   * @returns {Object|null} Slate selection with anchor and focus points, or null if no selection
+   */
+  serializeSelection() {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount || selection.isCollapsed) {
+      return null;
+    }
+
+    const range = selection.getRangeAt(0);
+
+    // Get anchor and focus points
+    const anchorNode = range.startContainer;
+    const focusNode = range.endContainer;
+
+    // Serialize both points
+    const anchor = this.serializePoint(anchorNode, range.startOffset);
+    const focus = this.serializePoint(focusNode, range.endOffset);
+
+    if (!anchor || !focus) {
+      console.warn('[HYDRA] Could not serialize selection points');
+      return null;
+    }
+
+    return { anchor, focus };
+  }
+
+  /**
+   * Serializes a single point (anchor or focus) to Slate format.
+   *
+   * @param {Node} node - DOM node
+   * @param {number} offset - Character offset within the node
+   * @returns {Object|null} Slate point with path and offset, or null if invalid
+   */
+  serializePoint(node, offset) {
+    // Find the text node (might be element node in some cases)
+    let textNode = node;
+    let textOffset = offset;
+
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // Element node with offset means "before/after child at offset"
+      // For Ctrl+A: anchor is (element, 0), focus is (element, childCount)
+
+      if (offset === 0) {
+        // Offset 0 = start of first child
+        textNode = node.firstChild;
+        textOffset = 0;
+      } else {
+        // Offset N = after Nth child, so we want end of Nth child
+        // childNodes[offset-1] is the last child included in selection
+        const childNode = node.childNodes[offset - 1];
+        if (childNode) {
+          if (childNode.nodeType === Node.TEXT_NODE) {
+            textNode = childNode;
+            textOffset = childNode.textContent.length;
+          } else if (childNode.nodeType === Node.ELEMENT_NODE) {
+            // Recurse into element to find last text node
+            textNode = this.getLastTextNode(childNode);
+            textOffset = textNode ? textNode.textContent.length : 0;
+          }
+        } else {
+          // Fallback to first child if offset is invalid
+          textNode = node.firstChild;
+          textOffset = 0;
+        }
+      }
+    }
+
+    // Walk up to find the path through the Slate structure
+    const path = this.getNodePath(textNode);
+    if (!path) {
+      return null;
+    }
+
+    return { path, offset: textOffset };
+  }
+
+  /**
+   * Helper to find the last text node within an element
+   */
+  getLastTextNode(element) {
+    if (element.nodeType === Node.TEXT_NODE) {
+      return element;
+    }
+
+    // Recursively find last text node
+    for (let i = element.childNodes.length - 1; i >= 0; i--) {
+      const child = element.childNodes[i];
+      if (child.nodeType === Node.TEXT_NODE) {
+        return child;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const result = this.getLastTextNode(child);
+        if (result) return result;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Gets the Slate path for a DOM node by walking up the tree.
+   * Uses data-node-id to identify Slate nodes.
+   *
+   * @param {Node} node - DOM node to find path for
+   * @returns {Array|null} Slate path as array of indices, or null if not found
+   */
+  getNodePath(node) {
+    const path = [];
+    let current = node;
+
+    // Walk up the DOM tree building the path
+    while (current) {
+      // Process current node first
+      if (current.hasAttribute?.('data-node-id')) {
+        // This is a Slate node, find its index among siblings
+        const parent = current.parentNode;
+        const siblings = Array.from(parent.children).filter((child) =>
+          child.hasAttribute('data-node-id'),
+        );
+        const index = siblings.indexOf(current);
+        if (index !== -1) {
+          path.unshift(index);
+        }
+      } else if (current.nodeType === Node.TEXT_NODE) {
+        // Text node - find index among text siblings
+        const parent = current.parentNode;
+        const textNodes = Array.from(parent.childNodes).filter(
+          (child) => child.nodeType === Node.TEXT_NODE,
+        );
+        const index = textNodes.indexOf(current);
+        if (index !== -1) {
+          path.unshift(index);
+        }
+      }
+
+      // Stop if we've reached the editable field container or slate editor
+      if (current.hasAttribute?.('data-editable-field') || current.hasAttribute?.('data-slate-editor')) {
+        break;
+      }
+
+      current = current.parentNode;
+    }
+
+    // If we didn't find the editable field or slate editor, path is invalid
+    if (!current) {
+      return null;
+    }
+
+    // Ensure path has at least block index (0 for paragraph)
+    if (path.length === 0) {
+      return [0, 0]; // Default to first block, first text
+    }
+
+    return path;
+  }
+
   /**
    * Selects a block and communicates the selection to the adminUI.
    *
    * @param {HTMLElement} blockElement - The block element to select.
    */
   selectBlock(blockElement) {
+    console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'));
     if (!blockElement) return;
     this.isInlineEditing = true;
+    console.log('[HYDRA] Set isInlineEditing = true');
     // Remove border and button from the previously selected block
     if (
       this.prevSelectedBlock === null ||
@@ -934,11 +1344,11 @@ class Bridge {
           },
           this.adminOrigin,
         );
-      } else {
-        // Add border to the currently selected block
-        blockElement.classList.add('volto-hydra--outline');
-        this.createQuantaToolbar(this.selectedBlockUid, show);
       }
+
+      // Add border to the currently selected block (regardless of block type)
+      blockElement.classList.add('volto-hydra--outline');
+      this.createQuantaToolbar(this.selectedBlockUid, show);
       handleElementAndChildren(blockElement);
 
       // if (this.formData) {
@@ -956,6 +1366,26 @@ class Bridge {
       }
     }
     this.observeBlockTextChanges(blockElement);
+
+    // Track selection changes to preserve selection across format operations
+    if (!this.selectionChangeListener) {
+      this.selectionChangeListener = () => {
+        const selection = window.getSelection();
+        console.log('[HYDRA] selectionchange event fired:', {
+          rangeCount: selection?.rangeCount,
+          isCollapsed: selection?.isCollapsed,
+          text: selection?.toString()
+        });
+        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+          this.savedSelection = this.serializeSelection();
+          console.log('[HYDRA] Selection saved:', this.savedSelection);
+        } else {
+          console.log('[HYDRA] Selection not saved (collapsed or no ranges)');
+        }
+      };
+      document.addEventListener('selectionchange', this.selectionChangeListener);
+    }
+
     const editableChildren = blockElement.querySelectorAll(
       '[data-editable-field]',
     );
@@ -1085,6 +1515,76 @@ class Bridge {
     childNodes.forEach((node) => {
       node.setAttribute('contenteditable', 'true');
     });
+
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const editableField = blockElement.querySelector('[data-editable-field="value"]');
+
+    if (editableField && blockUid) {
+      // Add paste event listener
+      editableField.addEventListener('paste', (e) => {
+        e.preventDefault(); // Prevent default paste
+
+        const pastedHtml = e.clipboardData.getData('text/html');
+        const pastedText = e.clipboardData.getData('text/plain');
+
+        // Block input while processing paste
+        this.setBlockProcessing(blockUid, true);
+
+        // Send to Admin UI for Slate deserialization and transform
+        window.parent.postMessage(
+          {
+            type: 'SLATE_PASTE_REQUEST',
+            blockId: blockUid,
+            html: pastedHtml || pastedText,
+            selection: this.serializeSelection() || {},
+          },
+          this.adminOrigin,
+        );
+      });
+
+      // Add keydown listener for delete/backspace at node boundaries
+      editableField.addEventListener('keydown', (e) => {
+        if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        const node = range.startContainer;
+
+        // Check if at node boundary
+        const atStart = range.startOffset === 0;
+        const atEnd =
+          range.startOffset === node.textContent?.length ||
+          range.startOffset === node.length;
+
+        // If deleting and at boundary, might need transform
+        if ((e.key === 'Backspace' && atStart) || (e.key === 'Delete' && atEnd)) {
+          // Check if there's an adjacent node with different formatting
+          const parentElement =
+            node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          const hasNodeId = parentElement?.closest('[data-node-id]');
+
+          if (hasNodeId) {
+            e.preventDefault(); // Block the delete
+
+            this.setBlockProcessing(blockUid, true);
+
+            // Send delete request to Admin UI for Slate transform
+            window.parent.postMessage(
+              {
+                type: 'SLATE_DELETE_REQUEST',
+                blockId: blockUid,
+                direction: e.key === 'Backspace' ? 'backward' : 'forward',
+                selection: this.serializeSelection() || {},
+              },
+              this.adminOrigin,
+            );
+          }
+        }
+        // Otherwise let normal delete happen (no blocking needed)
+      });
+    }
   }
 
   /**
@@ -1093,22 +1593,29 @@ class Bridge {
    * @param {HTMLElement} blockElement - The block element to observe.
    */
   observeBlockTextChanges(blockElement) {
+    console.log('[HYDRA] observeBlockTextChanges called for block:', blockElement.getAttribute('data-block-uid'));
     if (this.blockTextMutationObserver) {
       this.blockTextMutationObserver.disconnect();
     }
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
+      console.log('[HYDRA] Mutation observer detected', mutations.length, 'mutations, isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
+        console.log('[HYDRA] Mutation type:', mutation.type, 'target:', mutation.target);
         if (mutation.type === 'characterData') {
           const targetElement =
-            mutation.target?.parentElement.closest('[data-node-id]');
+            mutation.target?.parentElement?.closest('[data-node-id]');
+          console.log('[HYDRA] Found targetElement with data-node-id:', targetElement);
 
           if (targetElement && this.isInlineEditing) {
+            console.log('[HYDRA] Calling handleTextChangeOnSlate');
             this.handleTextChangeOnSlate(targetElement);
           } else if (this.isInlineEditing) {
-            const targetElement = mutation.target?.parentElement.closest(
+            const targetElement = mutation.target?.parentElement?.closest(
               '[data-editable-field]',
             );
+            console.log('[HYDRA] Looking for data-editable-field, found:', targetElement);
             if (targetElement) {
+              console.log('[HYDRA] Calling handleTextChange');
               this.handleTextChange(targetElement);
             }
           }
@@ -1119,6 +1626,7 @@ class Bridge {
       subtree: true,
       characterData: true,
     });
+    console.log('[HYDRA] Mutation observer set up');
   }
 
   /**
@@ -1185,6 +1693,12 @@ class Bridge {
       // Clone the object to ensure it's extensible
       json = JSON.parse(JSON.stringify(json));
 
+      // Skip text nodes - they shouldn't have nodeIds
+      // Text nodes are identified by having a 'text' property
+      if (json.hasOwnProperty('text')) {
+        return json;
+      }
+
       if (json.hasOwnProperty('data')) {
         json.nodeId = nodeIdCounter.current++;
         for (const key in json) {
@@ -1202,6 +1716,262 @@ class Bridge {
       }
     }
     return json;
+  }
+
+  /**
+   * Save current cursor/selection position
+   * @returns {Object|null} Saved cursor state or null if no selection
+   */
+  saveCursorPosition() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return null;
+    }
+
+    try {
+      const range = selection.getRangeAt(0);
+      const startContainer = range.startContainer;
+      const endContainer = range.endContainer;
+
+      // Find the closest element with data-node-id for both start and end
+      const startElement = startContainer.nodeType === Node.TEXT_NODE
+        ? startContainer.parentElement
+        : startContainer;
+      const endElement = endContainer.nodeType === Node.TEXT_NODE
+        ? endContainer.parentElement
+        : endContainer;
+
+      const startNode = startElement?.closest('[data-node-id]');
+      const endNode = endElement?.closest('[data-node-id]');
+
+      if (!startNode || !endNode) {
+        return null;
+      }
+
+      return {
+        startNodeId: startNode.getAttribute('data-node-id'),
+        endNodeId: endNode.getAttribute('data-node-id'),
+        startOffset: range.startOffset,
+        endOffset: range.endOffset,
+        isCollapsed: range.collapsed,
+      };
+    } catch (e) {
+      console.error('[HYDRA] Error saving cursor position:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Restore cursor/selection position
+   * @param {Object|null} savedCursor Saved cursor state from saveCursorPosition()
+   */
+  restoreCursorPosition(savedCursor) {
+    if (!savedCursor) {
+      return;
+    }
+
+    try {
+      const startNode = document.querySelector(`[data-node-id="${savedCursor.startNodeId}"]`);
+      const endNode = document.querySelector(`[data-node-id="${savedCursor.endNodeId}"]`);
+
+      if (!startNode || !endNode) {
+        return;
+      }
+
+      // Get the text nodes inside the elements
+      const startTextNode = startNode.childNodes[0] || startNode;
+      const endTextNode = endNode.childNodes[0] || endNode;
+
+      const range = document.createRange();
+      const selection = window.getSelection();
+
+      // Ensure offsets are within bounds
+      const startOffset = Math.min(savedCursor.startOffset, startTextNode.textContent?.length || 0);
+      const endOffset = Math.min(savedCursor.endOffset, endTextNode.textContent?.length || 0);
+
+      range.setStart(startTextNode, startOffset);
+      range.setEnd(endTextNode, endOffset);
+
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    } catch (e) {
+      console.error('[HYDRA] Error restoring cursor position:', e);
+    }
+  }
+
+  /**
+   * Restore cursor/selection from Slate selection format
+   * @param {Object} slateSelection - Slate selection object with anchor and focus
+   * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
+   */
+  restoreSlateSelection(slateSelection, formData) {
+    if (!slateSelection || !slateSelection.anchor || !slateSelection.focus) {
+      console.warn('[HYDRA] Invalid Slate selection:', slateSelection);
+      return;
+    }
+
+    try {
+      console.log('[HYDRA] Restoring Slate selection:', slateSelection);
+      console.log('[HYDRA] Anchor:', JSON.stringify(slateSelection.anchor));
+      console.log('[HYDRA] Focus:', JSON.stringify(slateSelection.focus));
+
+      // Find the selected block (assume it's the currently selected block)
+      if (!this.selectedBlockUid) {
+        console.warn('[HYDRA] No selected block');
+        return;
+      }
+
+      const block = formData.blocks[this.selectedBlockUid];
+      if (!block || block['@type'] !== 'slate' || !block.value) {
+        console.warn('[HYDRA] Selected block is not a slate block');
+        return;
+      }
+
+      // Get nodeId for anchor and focus by walking the Slate tree
+      const anchorNodeId = this.getNodeIdFromPath(block.value, slateSelection.anchor.path);
+      const focusNodeId = this.getNodeIdFromPath(block.value, slateSelection.focus.path);
+
+      console.log('[HYDRA] Anchor nodeId:', anchorNodeId, 'Focus nodeId:', focusNodeId);
+
+      if (!anchorNodeId || !focusNodeId) {
+        console.warn('[HYDRA] Could not find nodeIds for selection paths');
+        return;
+      }
+
+      // Find DOM elements
+      const anchorElement = document.querySelector(`[data-node-id="${anchorNodeId}"]`);
+      const focusElement = document.querySelector(`[data-node-id="${focusNodeId}"]`);
+
+      if (!anchorElement || !focusElement) {
+        console.warn('[HYDRA] Could not find DOM elements for nodeIds');
+        return;
+      }
+
+      // Find the actual text node and offset within the parent element
+      // After formatting, the DOM structure may have changed (e.g., <p><strong>Text</strong> rest</p>)
+      // We need to walk through all text nodes to find the right position
+      const anchorResult = this.findTextNodeAndOffset(anchorElement, slateSelection.anchor.offset);
+      const focusResult = this.findTextNodeAndOffset(focusElement, slateSelection.focus.offset);
+
+      if (!anchorResult || !focusResult) {
+        console.warn('[HYDRA] Could not find text nodes for selection offsets');
+        return;
+      }
+
+      // Create range
+      const range = document.createRange();
+      const selection = window.getSelection();
+
+      console.log('[HYDRA] Setting range start:', anchorResult.node, 'offset:', anchorResult.offset);
+      console.log('[HYDRA] Setting range end:', focusResult.node, 'offset:', focusResult.offset);
+
+      range.setStart(anchorResult.node, anchorResult.offset);
+      range.setEnd(focusResult.node, focusResult.offset);
+
+      console.log('[HYDRA] Range collapsed?', range.collapsed);
+      console.log('[HYDRA] Range toString:', range.toString());
+
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+
+      console.log('[HYDRA] Selection after addRange - collapsed?', selection?.isCollapsed);
+      console.log('[HYDRA] Selection after addRange - toString:', selection?.toString());
+      console.log('[HYDRA] Successfully restored Slate selection');
+    } catch (e) {
+      console.error('[HYDRA] Error restoring Slate selection:', e);
+    }
+  }
+
+  /**
+   * Find the text node and offset within an element given a character offset
+   * Walks through all text nodes in the element to find the right position
+   *
+   * @param {HTMLElement} element - Parent element to search within
+   * @param {number} targetOffset - Character offset from start of element's text content
+   * @returns {{node: Text, offset: number}|null} Text node and offset, or null if not found
+   */
+  findTextNodeAndOffset(element, targetOffset) {
+    let currentOffset = 0;
+
+    // Walk through all child nodes recursively
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let textNode = walker.nextNode();
+    while (textNode) {
+      const nodeLength = textNode.textContent.length;
+
+      // Check if the target offset falls within this text node
+      if (currentOffset + nodeLength >= targetOffset) {
+        const offset = targetOffset - currentOffset;
+        return { node: textNode, offset };
+      }
+
+      currentOffset += nodeLength;
+      textNode = walker.nextNode();
+    }
+
+    // If we didn't find it, return the last text node with its max offset
+    // This handles the case where targetOffset is at the very end
+    walker.currentNode = element;
+    let lastTextNode = null;
+    textNode = walker.nextNode();
+    while (textNode) {
+      lastTextNode = textNode;
+      textNode = walker.nextNode();
+    }
+
+    if (lastTextNode) {
+      return { node: lastTextNode, offset: lastTextNode.textContent.length };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get nodeId from a Slate path by walking the tree
+   * @param {Array} slateValue - Slate document value
+   * @param {Array} path - Path array from Slate selection
+   * @returns {string|null} NodeId or null if not found
+   */
+  getNodeIdFromPath(slateValue, path) {
+    let node = slateValue;
+    let parentNode = null;
+
+    // Walk the path
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+
+      parentNode = node;
+
+      if (Array.isArray(node)) {
+        node = node[index];
+      } else if (node.children) {
+        node = node.children[index];
+      } else {
+        console.warn('[HYDRA] Could not follow path:', path, 'at index', i);
+        return null;
+      }
+
+      if (!node) {
+        console.warn('[HYDRA] Node not found at path:', path, 'index', i);
+        return null;
+      }
+    }
+
+    // If this is a text node (has 'text' property), use the parent element's nodeId
+    // Text nodes don't have nodeIds in the DOM - only element nodes do
+    if (node.hasOwnProperty('text') && parentNode && parentNode.nodeId) {
+      console.log('[HYDRA] Path points to text node, using parent nodeId:', parentNode.nodeId);
+      return parentNode.nodeId;
+    }
+
+    // Return the nodeId if it exists
+    return node.nodeId || null;
   }
 
   /**
@@ -1257,9 +2027,12 @@ class Bridge {
    * @param {HTMLElement} target
    */
   handleTextChangeOnSlate(target) {
+    console.log('[HYDRA] handleTextChangeOnSlate called, target:', target);
     const closestNode = target.closest('[data-node-id]');
+    console.log('[HYDRA] closestNode:', closestNode, 'has data-node-id:', closestNode?.getAttribute('data-node-id'));
     if (closestNode) {
       const nodeId = closestNode.getAttribute('data-node-id');
+      console.log('[HYDRA] Updating JSON node', nodeId, 'with text:', closestNode.innerText);
       const updatedJson = this.updateJsonNode(
         this.formData?.blocks[this.selectedBlockUid],
         nodeId,
@@ -1445,7 +2218,7 @@ class Bridge {
    * @param {boolean} remove - Whether to remove the format (true) or apply it (false).
    */
   formatSelectedText(format, remove) {
-    this.isInlineEditing = false;
+    // Don't set isInlineEditing to false - keep it true for text changes
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
 
