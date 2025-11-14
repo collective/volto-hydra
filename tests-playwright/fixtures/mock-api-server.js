@@ -193,6 +193,14 @@ app.post('/@login', (req, res) => {
 });
 
 /**
+ * GET /health
+ * Health check endpoint for server readiness
+ */
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+/**
  * GET /@site
  * Get site information
  */
@@ -394,6 +402,10 @@ app.get('/hydra.js', (req, res) => {
   const hydraJsPath = path.join(__dirname, '../../packages/hydra-js/hydra.js');
   res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Cache-busting headers to force reload during development
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(hydraJsPath);
 });
 
@@ -415,6 +427,7 @@ app.get('*', (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`Mock Plone API server running on http://localhost:${PORT}`);
   console.log(`Mock frontend server also running on http://localhost:${PORT}`);
+  console.log(`Health endpoint: http://localhost:${PORT}/health`);
   console.log(`Content endpoints available:`);
   Object.keys(contentDB).forEach((path) => {
     console.log(`  - http://localhost:${PORT}${path}`);

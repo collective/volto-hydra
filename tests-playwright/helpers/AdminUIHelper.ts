@@ -590,7 +590,8 @@ export class AdminUIHelper {
     await blockContainer.click();
 
     // Wait for the toolbar to appear (indicating block is selected)
-    await this.page.locator('#slate-inline-toolbar, .slate-inline-toolbar').waitFor({
+    // Use .first() since there might be multiple toolbars on the page
+    await this.page.locator('#slate-inline-toolbar, .slate-inline-toolbar').first().waitFor({
       state: 'visible',
       timeout: 5000
     });
