@@ -192,27 +192,36 @@ CMS-Toolbar           Frontend in iframe (hydra adds minimal block select/edit U
 - Level 5: lets the user edit text, images and links directly on the preview
 - Level 6: if needed, customise CMS UI or more complex visual editing in the frontend
 
-Let's take a specific example of a slider which you are given and has to have the following markup
+### Level 0: Headless frontend with vanila volto (no hydra visual editing)
 
-``` html
-<div class="slider">
-  <div>
-    <div class="slide">
-      <img src="/big_news.jpg"/>
-      <h2>Big News</h2>
-      <div>Check out <b>hydra</b>, it will change everything</div>
-      <div><a href="/big_news">Read more</a><div>
-    </div>
-    <div class="slide">
-      ...
-    </div>
-  </div>
-  <a link="">Prev></a><a link="">Next></a>
-</div>
+First is to start with a frontend technology of your choice.
+Since our goal is to no modify the CMS we will initially be stuck with the out of the box volto block types.
+
+A very minimal vue/nuxt.js example would have 
+
+a code to get content from the backend rest api
+
+```
+//TODO
 ```
 
+a template for a page
 
-### Level 1: Page Switching and authentication
+```
+//TODO
+```
+
+and another to render blocks
+
+```
+//TODO
+```
+
+Now you have Headless Plone and you can edit using a volto instance (that will look like out of the box Plone)
+and your custom frontend. After saving en edit in volto can refresh your frontend tab and see the changes.
+
+
+### Level 1: Preview with Page Switching and authentication
 
 This will enable an Editor to :-
 - login to hydra and see the frontend in an iframe. The result will look similar to Volto.
@@ -243,6 +252,7 @@ To do this you will include the hydra iframe bridge which creates a two way link
 
 ### Level 2: Custom Content types and Blocks
 
+
 - You can configure any Volto settings during init. Such as
    - change allowedBlock types
    - Add a new block type including it's schema (TODO)
@@ -254,8 +264,12 @@ To do this you will include the hydra iframe bridge which creates a two way link
 - You can pass in a function to map plone url paths to frontend paths if there is not a one to one mapping
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
 
-For our slider example, we need to configure this new block.
 
+Let's take a specific example of a slider block you want to have available for your editors. This is not a default block type so 
+you will need to add it custom. Normally this would require developing a volto plugin and installing it into your custom volto instance.
+
+
+For our slider example, we can configure this new block directly in the frontend
 
 ```js
 const customBlocks = {
@@ -322,7 +336,27 @@ import { initBridge } from './hydra.js';
 const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'slider'], customBlocks: customBlocks});
 ```
 
-Alternatively you can create a plugin for the CMS to add these schemas.
+We have been given the following html which our frontend slider will have to adhere to.
+
+``` html
+<div class="slider">
+  <div>
+    <div class="slide">
+      <img src="/big_news.jpg"/>
+      <h2>Big News</h2>
+      <div>Check out <b>hydra</b>, it will change everything</div>
+      <div><a href="/big_news">Read more</a><div>
+    </div>
+    <div class="slide">
+      ...
+    </div>
+  </div>
+  <a link="">Prev></a><a link="">Next></a>
+</div>
+```
+
+We can add this as a slide and sliler block to our block templates on the frontend and now our editors can add, remove slider blocks and the slides inside of them.
+A detail sidebar UI for any "blocks" type allows for managing even complex composable blocks like a slider (TODO)
 
 ### Level 3: Enable Frontend block selection and Quanta Toolbar
 
