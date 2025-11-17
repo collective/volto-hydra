@@ -812,6 +812,7 @@ export class AdminUIHelper {
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
     if (await input.isVisible()) {
       await input.fill(value);
+      await input.blur(); // Trigger blur to commit the value
       return;
     }
 
@@ -820,6 +821,7 @@ export class AdminUIHelper {
     if (await contentEditable.isVisible()) {
       await contentEditable.click();
       await contentEditable.fill(value);
+      await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
   }

@@ -26,6 +26,7 @@ import {
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
+import { Editor, Transforms } from 'slate';
 import OpenObjectBrowser from './OpenObjectBrowser';
 
 /**
@@ -83,7 +84,7 @@ const Iframe = (props) => {
     properties,
     onChangeFormData,
     metadata,
-    formData: form,
+    formData: form, // Keep for compatibility, but we'll use Redux selector for sync
     token,
     allowedBlocks,
     showRestricted,
@@ -119,27 +120,35 @@ const Iframe = (props) => {
     ],
   });
   useEffect(() => {
-    const origin = iframeSrc && new URL(iframeSrc).origin;
-
-    !isInlineEditingRef.current &&
-      document.getElementById('previewIframe').contentWindow.postMessage(
+    // Only send SELECT_BLOCK if iframe is ready (has sent GET_INITIAL_DATA)
+    if (!isInlineEditingRef.current && iframeOriginRef.current && selectedBlock) {
+      document.getElementById('previewIframe')?.contentWindow?.postMessage(
         {
           type: 'SELECT_BLOCK',
           uid: selectedBlock,
           method: 'select',
           data: form,
         },
-        origin,
+        iframeOriginRef.current,
       );
-  }, [selectedBlock]);
+    }
+  }, [selectedBlock, form]);
 
   const isInlineEditingRef = useRef(false);
+  const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   const [iframeSrc, setIframeSrc] = useState(null);
   const urlFromEnv = getURlsFromEnv();
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get('iframe_url') ||
     urlFromEnv[0];
+
+  // Subscribe to form data from Redux to detect changes
+  // This provides a new reference on updates, unlike the mutated form prop
+  const formDataFromRedux = useSelector((state) => {
+    console.log('[VIEW] useSelector evaluating, state.form.global:', state.form?.global);
+    return state.form?.global;
+  });
 
   useEffect(() => {
     setIframeSrc(getUrlWithAdminParams(u, token));
@@ -197,6 +206,10 @@ const Iframe = (props) => {
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
         return;
+      }
+      // Store the actual iframe origin from the first message we receive
+      if (!iframeOriginRef.current) {
+        iframeOriginRef.current = event.origin;
       }
       const { type } = event.data;
       switch (type) {
@@ -275,7 +288,7 @@ const Iframe = (props) => {
           break;
 
         case 'SLATE_FORMAT_REQUEST':
-          // New Slate transforms-based formatting handler
+          // Slate formatting handler - prefers using sidebar widget's editor directly
           try {
             console.log('[VIEW] Received SLATE_FORMAT_REQUEST:', event.data);
             const { blockId, format, action, selection, url } = event.data;
@@ -297,48 +310,137 @@ const Iframe = (props) => {
               break;
             }
 
-            // Apply format using Slate transforms
-            console.log('[VIEW] Calling slateTransforms.applyFormat');
-            const { value: updatedValue, selection: transformedSelection } = slateTransforms.applyFormat(
-              block.value,
-              selection,
-              format,
-              action,
-              { url },
-            );
-            console.log('[VIEW] updatedValue:', updatedValue);
-            console.log('[VIEW] transformedSelection:', transformedSelection);
-            console.log('[VIEW] transformedSelection.anchor:', JSON.stringify(transformedSelection?.anchor));
-            console.log('[VIEW] transformedSelection.focus:', JSON.stringify(transformedSelection?.focus));
+            // Try to get the sidebar widget's Slate editor
+            // The widget registers with the field ID which is "value" for the slate block
+            // We need to check if the currently selected block matches this editor
+            const fieldId = 'value';
+            let sidebarEditor = typeof window !== 'undefined' && window.voltoHydraSidebarEditors?.get(fieldId);
 
-            // Update form state
-            isInlineEditingRef.current = true;
-            const updatedForm = {
-              ...form,
-              blocks: {
-                ...form.blocks,
-                [blockId]: {
-                  ...block,
-                  value: updatedValue,
+            // Verify this editor is for the current block by checking if it's mounted
+            // and the selected block in the form matches our blockId
+            if (sidebarEditor && selectedBlock !== blockId) {
+              console.log('[VIEW] Sidebar editor exists but selected block does not match:', selectedBlock, 'vs', blockId);
+              sidebarEditor = null; // Don't use editor if it's for a different block
+            }
+
+            if (!sidebarEditor && typeof window !== 'undefined' && __CLIENT__) {
+              // Debug: log all registered editor IDs
+              console.log('[VIEW] Available sidebar editor IDs:', Array.from(window.voltoHydraSidebarEditors?.keys() || []));
+            }
+
+            if (sidebarEditor) {
+              console.log('[VIEW] Using sidebar widget editor for field:', fieldId);
+
+              // Apply transform directly to the widget's editor
+              try {
+                // Set selection
+                Transforms.select(sidebarEditor, selection);
+                console.log('[VIEW] Selection set on sidebar editor');
+
+                // Handle link format (element, not mark)
+                if (format === 'link') {
+                  if (action === 'add' && url) {
+                    // TODO: Implement wrapLink for sidebar editor
+                    console.warn('[VIEW] Link wrapping not yet implemented for sidebar editor');
+                  } else if (action === 'remove' || action === 'toggle') {
+                    // TODO: Implement unwrapLink for sidebar editor
+                    console.warn('[VIEW] Link unwrapping not yet implemented for sidebar editor');
+                  }
+                } else {
+                  // Handle mark formats (bold, italic, del)
+                  if (action === 'toggle') {
+                    const marks = Editor.marks(sidebarEditor);
+                    const isActive = marks?.[format] === true;
+                    console.log('[VIEW] Current format active?', isActive);
+
+                    if (isActive) {
+                      Editor.removeMark(sidebarEditor, format);
+                      console.log('[VIEW] Removed mark:', format);
+                    } else {
+                      Editor.addMark(sidebarEditor, format, true);
+                      console.log('[VIEW] Added mark:', format);
+                    }
+                  } else if (action === 'add') {
+                    Editor.addMark(sidebarEditor, format, true);
+                    console.log('[VIEW] Added mark (action=add):', format);
+                  } else if (action === 'remove') {
+                    Editor.removeMark(sidebarEditor, format);
+                    console.log('[VIEW] Removed mark (action=remove):', format);
+                  }
+                }
+
+                // Get the updated value and selection from the editor
+                const updatedValue = sidebarEditor.children;
+                const transformedSelection = sidebarEditor.selection;
+                console.log('[VIEW] Widget editor updated, selection:', transformedSelection);
+
+                // Update form state with the new value from the widget
+                // The widget's onChange would normally fire, but we're modifying the editor directly
+                // so we need to update the form ourselves
+                isInlineEditingRef.current = true;
+                const updatedForm = {
+                  ...form,
+                  blocks: {
+                    ...form.blocks,
+                    [blockId]: {
+                      ...block,
+                      value: updatedValue,
+                    },
+                  },
+                };
+
+                onChangeFormData(updatedForm);
+
+                // Send FORM_DATA to the iframe with the new data and selection
+                const message = {
+                  type: 'FORM_DATA',
+                  data: updatedForm,
+                  selection: transformedSelection,
+                };
+                console.log('[VIEW] Sending FORM_DATA with updated data and selection to iframe');
+                event.source.postMessage(message, event.origin);
+              } catch (error) {
+                console.error('[VIEW] Error applying format to sidebar editor:', error);
+                // Fallback to headless approach
+                console.log('[VIEW] Falling back to headless editor');
+                throw error; // Will be caught by outer catch and use fallback
+              }
+            } else {
+              // Fallback to headless editor approach
+              console.log('[VIEW] No sidebar editor found for field:', fieldId, '- using headless editor');
+
+              const { value: updatedValue, selection: transformedSelection } = slateTransforms.applyFormat(
+                block.value,
+                selection,
+                format,
+                action,
+                { url },
+              );
+              console.log('[VIEW] Headless editor updated value');
+
+              // Update form state
+              isInlineEditingRef.current = true;
+              const updatedForm = {
+                ...form,
+                blocks: {
+                  ...form.blocks,
+                  [blockId]: {
+                    ...block,
+                    value: updatedValue,
+                  },
                 },
-              },
-            };
+              };
 
-            onChangeFormData(updatedForm);
+              onChangeFormData(updatedForm);
 
-            // Send FORM_DATA with complete updated form data AND transformed selection
-            // The iframe's onEditChange callback will receive this and re-render using renderer.js
-            // NO HTML is sent over the bridge - frontend is responsible for rendering
-            // The transformed selection allows hydra.js to restore cursor position after DOM changes
-            const message = {
-              type: 'FORM_DATA',
-              data: updatedForm,
-              selection: transformedSelection,
-            };
-            console.log('[VIEW] Sending FORM_DATA with updated Slate JSON and transformed selection:', message);
-
-            // Send response
-            event.source.postMessage(message, event.origin);
+              const message = {
+                type: 'FORM_DATA',
+                data: updatedForm,
+                selection: transformedSelection,
+              };
+              console.log('[VIEW] Sending FORM_DATA from headless editor');
+              event.source.postMessage(message, event.origin);
+            }
           } catch (error) {
             console.error('Error applying Slate format:', error);
             event.source.postMessage(
@@ -484,12 +586,91 @@ const Iframe = (props) => {
           }
           break;
 
+        case 'SLATE_ENTER_REQUEST':
+          console.log('[VIEW] ========== SLATE_ENTER_REQUEST RECEIVED ==========');
+          try {
+            const { blockId: enterBlockId, selection } = event.data;
+            console.log('[VIEW] Block ID:', enterBlockId);
+            console.log('[VIEW] Selection:', selection);
+
+            // Get the current block data
+            const currentBlock = form.blocks[enterBlockId];
+            if (!currentBlock || currentBlock['@type'] !== 'slate') {
+              console.error('[VIEW] Block not found or not a slate block');
+              break;
+            }
+
+            console.log('[VIEW] Current block data:', currentBlock);
+
+            // Split the block at the cursor using slateTransforms
+            const { topValue, bottomValue } = slateTransforms.splitBlock(
+              currentBlock.value,
+              selection,
+            );
+
+            console.log('[VIEW] Split content:', { topValue, bottomValue });
+
+            // Create new form data with updated blocks
+            const newFormData = { ...form };
+            const blocksFieldname = getBlocksFieldname(newFormData);
+
+            // Update current block with content before cursor
+            newFormData[blocksFieldname][enterBlockId] = {
+              ...currentBlock,
+              value: topValue,
+            };
+
+            // Create new block with content after cursor
+            const [newBlockId, updatedFormData] = insertBlock(
+              newFormData,
+              enterBlockId,
+              {
+                '@type': 'slate',
+                value: bottomValue,
+              },
+              {},
+              1,
+              config.blocks.blocksConfig,
+            );
+
+            console.log('[VIEW] Created new block:', newBlockId);
+
+            // Set isInlineEditing to false BEFORE updating Redux
+            // This allows the useEffect to send SELECT_BLOCK when we call onSelectBlock
+            isInlineEditingRef.current = false;
+
+            // Update Redux state with the formData returned by insertBlock
+            onChangeFormData(updatedFormData);
+            onSelectBlock(newBlockId);
+
+            // Send FORM_DATA message to trigger iframe re-render with new block
+            if (iframeOriginRef.current) {
+              event.source.postMessage(
+                { type: 'FORM_DATA', data: updatedFormData },
+                event.origin,
+              );
+            }
+          } catch (error) {
+            console.error('[VIEW] Error handling SLATE_ENTER_REQUEST:', error);
+            event.source.postMessage(
+              {
+                type: 'SLATE_ERROR',
+                blockId: event.data.blockId,
+                error: error.message,
+              },
+              event.origin,
+            );
+          }
+          break;
+
         case 'UPDATE_BLOCKS_LAYOUT':
           isInlineEditingRef.current = false;
           onChangeFormData(event.data.data);
           break;
 
         case 'GET_INITIAL_DATA':
+          // Store the iframe's actual origin when it first contacts us
+          iframeOriginRef.current = event.origin;
           event.source.postMessage(
             {
               type: 'INITIAL_DATA',
@@ -497,6 +678,18 @@ const Iframe = (props) => {
             },
             event.origin,
           );
+          // If there's a selected block, send SELECT_BLOCK now that iframe is ready
+          if (selectedBlock && !isInlineEditingRef.current) {
+            event.source.postMessage(
+              {
+                type: 'SELECT_BLOCK',
+                uid: selectedBlock,
+                method: 'select',
+                data: form,
+              },
+              event.origin,
+            );
+          }
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -546,20 +739,36 @@ const Iframe = (props) => {
   ]);
 
   useEffect(() => {
-    // console.log('isInlineEditingRef.current', isInlineEditingRef.current);
+    // Use formDataFromRedux if available (for change detection), otherwise fall back to form prop
+    const formToUse = formDataFromRedux || form;
+
+    console.log('[VIEW] FORM_DATA useEffect triggered:', {
+      isInlineEditing: isInlineEditingRef.current,
+      iframeReady: !!iframeOriginRef.current,
+      hasForm: !!formToUse,
+      selectedBlock,
+      blockData: formToUse?.blocks?.[selectedBlock],
+      usingRedux: !!formDataFromRedux,
+      formDataFromReduxIdentity: formDataFromRedux,
+      formPropIdentity: form,
+    });
+    // Only send FORM_DATA if iframe is ready (has sent GET_INITIAL_DATA)
     if (
       !isInlineEditingRef.current &&
-      form &&
-      Object.keys(form).length > 0 &&
-      isValidUrl(iframeSrc)
+      iframeOriginRef.current &&
+      formToUse &&
+      Object.keys(formToUse).length > 0
     ) {
+      console.log('[VIEW] Sending FORM_DATA to iframe');
       // Send the form data to the iframe
-      const origin = new URL(iframeSrc).origin;
       document
         .getElementById('previewIframe')
-        .contentWindow.postMessage({ type: 'FORM_DATA', data: form }, origin);
+        ?.contentWindow?.postMessage(
+          { type: 'FORM_DATA', data: formToUse },
+          iframeOriginRef.current,
+        );
     }
-  }, [form, iframeSrc]);
+  }, [formDataFromRedux, form, selectedBlock]);
 
   const sidebarFocusEventListenerRef = useRef(null);
 

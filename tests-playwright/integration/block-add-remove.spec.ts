@@ -125,6 +125,9 @@ test.describe('Adding Blocks', () => {
     const countAfterFirst = await helper.getBlockCount();
     expect(countAfterFirst).toBe(initialCount + 1);
 
+    // Wait for iframe to stabilize after adding block
+    await page.waitForTimeout(500);
+
     // Add second block
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.clickAddBlockButton();
@@ -133,6 +136,9 @@ test.describe('Adding Blocks', () => {
 
     const countAfterSecond = await helper.getBlockCount();
     expect(countAfterSecond).toBe(initialCount + 2);
+
+    // Wait for iframe to stabilize after adding block
+    await page.waitForTimeout(500);
 
     // Add third block
     await helper.clickBlockInIframe('block-1-uuid');
@@ -326,6 +332,9 @@ test.describe('Removing Blocks', () => {
 
     const countAfterFirst = await helper.getBlockCount();
     expect(countAfterFirst).toBe(initialCount - 1);
+
+    // Wait for iframe to stabilize after removing block
+    await page.waitForTimeout(500);
 
     // Remove another block (what was originally the second block)
     const remainingBlocks = await helper.getBlockOrder();

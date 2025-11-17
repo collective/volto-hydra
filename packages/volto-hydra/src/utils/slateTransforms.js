@@ -373,6 +373,36 @@ export function htmlToSlate(html) {
   return slateValue;
 }
 
+/**
+ * Splits a Slate block at the current selection point
+ * Used when Enter key is pressed to create a new block
+ * Uses Volto's existing splitEditorInTwoFragments utility
+ *
+ * @param {Array} value - Slate document value
+ * @param {Object} selection - Selection object
+ * @returns {Object} Object with 'topValue' (content before split) and 'bottomValue' (content after split)
+ */
+export function splitBlock(value, selection) {
+  const editor = createHeadlessEditor(value);
+
+  try {
+    Transforms.select(editor, selection);
+
+    // Use Volto's existing utility function from volto-slate/utils/ops
+    const { splitEditorInTwoFragments } = require('@plone/volto-slate/utils/ops');
+    const [topValue, bottomValue] = splitEditorInTwoFragments(editor, selection);
+
+    return { topValue, bottomValue };
+  } catch (error) {
+    console.warn('Failed to split block:', error);
+    // Return original value if split fails
+    return {
+      topValue: value,
+      bottomValue: [{ type: 'p', children: [{ text: '' }] }],
+    };
+  }
+}
+
 // Export default for backwards compatibility with toggleMark.js
 export default {
   createHeadlessEditor,
@@ -382,4 +412,5 @@ export default {
   insertText,
   insertNodes,
   htmlToSlate,
+  splitBlock,
 };

@@ -1,6 +1,20 @@
 /**
  * Block renderer for test frontend.
  * Renders blocks based on their @type.
+ *
+ * IMPORTANT: This renderer ONLY generates HTML markup following the Hydra specification.
+ * It uses data attributes (like data-editable-field, data-node-id) to mark what SHOULD
+ * be editable, but it does NOT set contenteditable attributes directly.
+ *
+ * The hydra.js bridge is responsible for:
+ * - Reading these data attributes
+ * - Setting contenteditable="true" on the appropriate elements
+ * - Attaching event listeners for editing
+ *
+ * This separation ensures:
+ * - Renderers stay simple and framework-agnostic
+ * - hydra.js has full control over edit mode behavior
+ * - No nested contenteditable conflicts
  */
 
 /**
@@ -74,7 +88,7 @@ function renderSlateBlock(block) {
                 if (child.code) content = `<code>${content}</code>`;
                 return content;
             }).join('');
-            // Use data-editable-field="value" so hydra.js will make it contenteditable
+            // Mark as editable field - hydra.js will read this and set contenteditable="true"
             html += `<p data-editable-field="value" data-node-id="${node.nodeId}">${text}</p>`;
         }
     });

@@ -36,6 +36,42 @@ test.describe('Sidebar Forms - Slate Block Behavior', () => {
     expect(hasValueField).toBe(true);
   });
 
+  test('editing Slate text in sidebar updates iframe', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click on Slate block
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+
+    // Open Block tab
+    await helper.openSidebarTab('Block');
+
+    // Get original text from iframe
+    const iframe = helper.getIframe();
+    const iframeBlock = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const originalText = await iframeBlock.textContent();
+    expect(originalText).toContain('This is a test paragraph');
+
+    // Edit the value field in the sidebar (Volto Hydra feature)
+    // This is a Slate editor field, so we need to interact with it properly
+    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    await valueField.click();
+    await valueField.fill('Updated text content');
+
+    // Wait for changes to sync to iframe
+    await page.waitForTimeout(500);
+
+    // Verify the text updated in the iframe
+    const updatedText = await iframeBlock.textContent();
+    expect(updatedText).toContain('Updated text content');
+    expect(updatedText).not.toBe(originalText);
+  });
+
   test('Slate blocks show TOC settings on Block tab', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -192,6 +228,37 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     // Verify alt field shows new value
     const newAltValue = await helper.getSidebarFieldValue('alt');
     expect(newAltValue).toBe('Updated alt text');
+  });
+
+  test('editing image alt text in sidebar updates iframe', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-2-uuid';
+
+    // Click the image block to select it and open sidebar
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Get original image alt from iframe
+    const iframe = helper.getIframe();
+    const iframeImage = iframe.locator(`[data-block-uid="${blockId}"] img`);
+    const originalAlt = await iframeImage.getAttribute('alt');
+    expect(originalAlt).toBe('Test image');
+
+    // Change the alt text in the sidebar using helper
+    await helper.setSidebarFieldValue('alt', 'Updated image description');
+
+    // Wait for changes to sync to iframe
+    await page.waitForTimeout(500);
+
+    // Verify the image alt updated in the iframe
+    const updatedAlt = await iframeImage.getAttribute('alt');
+    expect(updatedAlt).toBe('Updated image description');
+    expect(updatedAlt).not.toBe(originalAlt);
   });
 });
 

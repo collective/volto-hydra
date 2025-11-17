@@ -16,7 +16,8 @@ const applyConfig = (config) => {
         title: 'Body',
         widget: 'slate',
       };
-      schema.fieldsets[0].fields.push('value');
+      // Add to the beginning of the fields array to make it more visible
+      schema.fieldsets[0].fields.unshift('value');
       return schema;
     },
     sidebarTab: 1,

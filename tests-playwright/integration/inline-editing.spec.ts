@@ -371,4 +371,328 @@ test.describe('Inline Editing', () => {
     expect(updatedText).toContain('Edited from sidebar');
     expect(updatedText).not.toBe(originalText);
   });
+
+  test('can type at cursor position', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block to activate it
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+
+    // Clear and type initial text
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Hello World', { delay: 10 });
+
+    // Click in the middle of the text (between 'Hello' and 'World')
+    await editor.evaluate((el) => {
+      const textNode = el.firstChild;
+      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+        throw new Error('Expected first child to be a text node');
+      }
+      const range = document.createRange();
+      range.setStart(textNode, 6); // Position after "Hello "
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+
+    // Type at cursor position
+    await page.keyboard.type('Beautiful ');
+
+    // Verify text was inserted at cursor position
+    const finalText = await editor.textContent();
+    expect(finalText).toBe('Hello Beautiful World');
+  });
+
+  test('can undo and redo', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and edit text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('First', { delay: 10 });
+
+    // Type more text
+    await editor.pressSequentially(' Second', { delay: 10 });
+    let text = await editor.textContent();
+    expect(text).toBe('First Second');
+
+    // Undo - should remove "Second"
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(200);
+    text = await editor.textContent();
+    expect(text).toBe('First');
+
+    // Redo - should restore "Second"
+    await page.keyboard.press('Control+Shift+z');
+    await page.waitForTimeout(200);
+    text = await editor.textContent();
+    expect(text).toBe('First Second');
+  });
+
+  test('format persists after typing', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and type text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Bold text', { delay: 10 });
+
+    // Select all and make it bold
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton(blockId, 'bold');
+    await page.waitForTimeout(300);
+
+    // Move cursor to end
+    await editor.evaluate((el) => {
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false); // Collapse to end
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+
+    // Type more text at the end
+    await page.keyboard.type(' more');
+    await page.waitForTimeout(200);
+
+    // Check if new text inherits bold formatting
+    const html = await editor.innerHTML();
+    expect(html).toContain('<strong>');
+    const text = await editor.textContent();
+    expect(text).toContain('Bold text more');
+  });
+
+  test('can edit link URL', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and create text with a link
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Click here', { delay: 10 });
+
+    // Select all text
+    await helper.selectAllTextInEditor(editor);
+
+    // Apply link format (this test documents current behavior)
+    // NOTE: There's a known bug with link creation (hydra.js:733)
+    // Once fixed, we should extend this test to:
+    // 1. Create the link with an initial URL
+    // 2. Click on the link
+    // 3. Edit the URL
+    // 4. Verify the href attribute changed
+
+    // For now, just verify we can select text for linking
+    const selection = await editor.evaluate(() => {
+      const sel = window.getSelection();
+      return sel ? sel.toString() : '';
+    });
+    expect(selection).toBe('Click here');
+  });
+
+  test('can arrow out of link', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Create a simple text with a link manually using innerHTML
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+
+    // Insert HTML with a link
+    await editor.evaluate((el) => {
+      el.innerHTML = 'Text <a href="https://example.com">link</a> more';
+    });
+
+    // Click inside the link
+    await editor.evaluate((el) => {
+      const link = el.querySelector('a');
+      if (!link || !link.firstChild) throw new Error('Link not found');
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.setStart(link.firstChild, 2); // Inside "link"
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+
+    // Press right arrow to move cursor
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(100);
+
+    // Cursor should move (basic verification that arrow keys work)
+    // More detailed link boundary tests would require Slate-specific checks
+    const html = await editor.innerHTML();
+    expect(html).toContain('<a href="https://example.com">link</a>');
+  });
+
+  test('can paste plain text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and prepare for paste
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Start ', { delay: 10 });
+
+    // Simulate paste by using clipboard API
+    await page.evaluate(() => {
+      return navigator.clipboard.writeText('pasted content');
+    });
+
+    // Paste using keyboard shortcut
+    await page.keyboard.press('Control+v');
+    await page.waitForTimeout(300);
+
+    // Verify pasted text appears
+    const text = await editor.textContent();
+    expect(text).toContain('pasted content');
+  });
+
+  test('can cut text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and type text
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('Text to cut', { delay: 10 });
+
+    // Select all text
+    await helper.selectAllTextInEditor(editor);
+
+    // Cut using keyboard shortcut
+    await page.keyboard.press('Control+x');
+    await page.waitForTimeout(300);
+
+    // Verify text was removed
+    const text = await editor.textContent();
+    expect(text).toBe('');
+
+    // Verify text is in clipboard by pasting it back
+    await page.keyboard.press('Control+v');
+    await page.waitForTimeout(300);
+    const pastedText = await editor.textContent();
+    expect(pastedText).toBe('Text to cut');
+  });
+
+  test('pressing Enter at end of line creates new Slate block', async ({ page }) => {
+    // This test verifies the expected Volto behavior where pressing Enter
+    // creates a new Slate block (like standard Volto does via withSplitBlocksOnBreak).
+    // In Volto Hydra, the iframe communicates with the parent Admin UI to create a new block.
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Get initial block count
+    const iframe = helper.getIframe();
+    const initialBlocks = await iframe.locator('[data-block-uid]').count();
+
+    // Click the first block and type text
+    await helper.clickBlockInIframe(blockId);
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+    await editor.pressSequentially('First line', { delay: 10 });
+
+    // Move cursor to end of line
+    await editor.evaluate((el) => {
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false); // Collapse to end
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+
+    // Press Enter - in standard Volto this would create a new block
+    // Must press Enter in the iframe context, not the page context
+    await editor.press('Enter');
+
+    // Wait for the correct number of blocks to be created
+    await expect(iframe.locator('[data-block-uid]')).toHaveCount(initialBlocks + 1, { timeout: 3000 });
+
+    // Wait for the old block's Quanta toolbar to disappear (means new block got selected)
+    const oldBlockToolbar = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra--quanta-toolbar`);
+    await expect(oldBlockToolbar).not.toBeVisible({ timeout: 2000 });
+
+    // Get the new block (should be right after the old block)
+    const allBlocks = await iframe.locator('[data-block-uid]').all();
+    const newBlockIndex = allBlocks.findIndex(async (block) => {
+      const uid = await block.getAttribute('data-block-uid');
+      return uid === blockId;
+    }) + 1;
+    const newBlock = allBlocks[newBlockIndex];
+    const newBlockUid = await newBlock.getAttribute('data-block-uid');
+
+    // Verify the new block is contenteditable
+    const newEditor = iframe.locator(`[data-block-uid="${newBlockUid}"] [contenteditable="true"]`);
+    await expect(newEditor).toBeVisible({ timeout: 2000 });
+    const isContentEditable = await newEditor.getAttribute('contenteditable');
+    expect(isContentEditable).toBe('true');
+
+    // Type in the new block (focus should have moved to it automatically)
+    await page.keyboard.type('Second line');
+    await page.waitForTimeout(200);
+
+    // Verify the new block contains 'Second line'
+    const newBlockText = await newBlock.textContent();
+    expect(newBlockText).toContain('Second line');
+  });
 });

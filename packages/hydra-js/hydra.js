@@ -348,20 +348,22 @@ class Bridge {
                     );
                   this.quantaToolbar = null;
                   this.createQuantaToolbar(this.selectedBlockUid, show);
+
+                  // Check if this is a Slate block (has data-node-id children)
+                  const hasSlateContent = blockElement.querySelectorAll('[data-node-id]').length > 0;
+
                   const editableField = blockElement.getAttribute(
                     'data-editable-field',
                   );
-                  if (editableField === 'value') {
+
+                  // Make block editable if it has data-editable-field="value" OR if it's a Slate block
+                  if (editableField === 'value' || hasSlateContent) {
+                    // makeBlockContentEditable handles setting contenteditable on children
                     this.makeBlockContentEditable(blockElement);
                   } else if (editableField !== null) {
                     blockElement.setAttribute('contenteditable', 'true');
                   }
-                  const editableChildren = blockElement.querySelectorAll(
-                    '[data-editable-field]',
-                  );
-                  editableChildren.forEach((child) => {
-                    child.setAttribute('contenteditable', 'true');
-                  });
+                  // Note: Other field types (like image blocks) will be handled later
                   this.prevSelectedBlock = blockElement;
                   this.observeBlockTextChanges(blockElement);
                 }
@@ -416,6 +418,7 @@ class Bridge {
     this.addButton = document.createElement('button');
     this.addButton.className = 'volto-hydra-add-button';
     this.addButton.innerHTML = addSVG;
+    this.addButton.tabIndex = -1; // Prevent stealing focus from contenteditable
     this.addButton.onclick = (e) => {
       e.stopPropagation();
       this.clickOnBtn = true;
@@ -430,6 +433,7 @@ class Bridge {
     const dragButton = document.createElement('button');
     dragButton.className = 'volto-hydra-drag-button';
     dragButton.innerHTML = dragSVG;
+    dragButton.tabIndex = -1; // Prevent stealing focus from contenteditable
     let isDragging = false;
     let startY;
     // dragButton.disabled = true;
@@ -600,6 +604,7 @@ class Bridge {
         show.formatBtns ? 'show' : ''
       }`;
       boldButton.setAttribute('data-testid', 'bold-button');
+      boldButton.tabIndex = -1; // Prevent stealing focus from contenteditable
       boldButton.innerHTML = boldSVG;
       console.log('[HYDRA] Bold button created, attaching mousedown handler');
       // Use mousedown instead of click to prevent selection loss
@@ -655,6 +660,7 @@ class Bridge {
       }`;
       italicButton.setAttribute('data-testid', 'italic-button');
       italicButton.innerHTML = italicSVG;
+      italicButton.tabIndex = -1; // Prevent stealing focus from contenteditable
       italicButton.addEventListener('mousedown', (e) => {
         e.preventDefault(); // Prevent focus change
 
@@ -695,6 +701,7 @@ class Bridge {
       }`;
       delButton.setAttribute('data-testid', 'strikethrough-button');
       delButton.innerHTML = delSVG;
+      delButton.tabIndex = -1; // Prevent stealing focus from contenteditable
       delButton.addEventListener('mousedown', (e) => {
         e.preventDefault(); // Prevent focus change
 
@@ -725,12 +732,13 @@ class Bridge {
         );
       });
 
-      // Create the del button
+      // Create the link button
       linkButton = document.createElement('button');
       linkButton.className = `volto-hydra-format-button ${
         show.formatBtns ? 'show' : ''
       }`;
       linkButton.innerHTML = linkSVG;
+      linkButton.tabIndex = -1; // Prevent stealing focus from contenteditable
       linkButton.addEventListener('click', () => {
         const selection = window.getSelection();
         if (!selection.rangeCount || selection.isCollapsed) return;
@@ -951,6 +959,7 @@ class Bridge {
     const menuButton = document.createElement('button');
     menuButton.className = 'volto-hydra-menu-button';
     menuButton.innerHTML = threeDotsSVG;
+    menuButton.tabIndex = -1; // Prevent stealing focus from contenteditable
 
     // Create the dropdown menu
     const dropdownMenu = document.createElement('div');
@@ -959,6 +968,7 @@ class Bridge {
     // Create the 'Remove' option
     const removeOption = document.createElement('div');
     removeOption.className = 'volto-hydra-dropdown-item';
+    removeOption.tabIndex = -1; // Prevent stealing focus from contenteditable
     removeOption.innerHTML = `${deleteSVG} <div class="volto-hydra-dropdown-text">Remove</div>`;
     removeOption.onclick = () => {
       this.clickOnBtn = true;
@@ -971,6 +981,7 @@ class Bridge {
     // Create the 'Settings' option
     const settingsOption = document.createElement('div');
     settingsOption.className = 'volto-hydra-dropdown-item';
+    settingsOption.tabIndex = -1; // Prevent stealing focus from contenteditable
     settingsOption.innerHTML = `${settingsSVG} <div class="volto-hydra-dropdown-text">Settings</div>`;
     // ---Add settings click handler here (currently does nothing)---
 
@@ -1025,6 +1036,8 @@ class Bridge {
       event.stopPropagation();
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
+        // Store the click event for cursor positioning
+        this.lastClickEvent = event;
         this.selectBlock(blockElement);
       }
     };
@@ -1127,7 +1140,7 @@ class Bridge {
    */
   serializeSelection() {
     const selection = window.getSelection();
-    if (!selection || !selection.rangeCount || selection.isCollapsed) {
+    if (!selection || !selection.rangeCount) {
       return null;
     }
 
@@ -1392,6 +1405,41 @@ class Bridge {
     editableChildren.forEach((child) => {
       child.setAttribute('contenteditable', 'true');
     });
+
+    // Focus the contenteditable element for Slate text blocks and position cursor at click location
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    if (this.formData?.blocks[blockUid]?.['@type'] === 'slate') {
+      // Use double requestAnimationFrame to wait for ALL DOM updates including Quanta toolbar
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const currentBlockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+          console.log('[HYDRA] selectBlock focus handler:', { blockUid, found: !!currentBlockElement });
+          if (currentBlockElement) {
+            const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
+            console.log('[HYDRA] Editable field:', { found: !!editableField, hasClickEvent: !!this.lastClickEvent });
+            if (editableField) {
+              editableField.focus();
+              console.log('[HYDRA] Called focus(), activeElement:', document.activeElement);
+
+              if (this.lastClickEvent) {
+                // Position cursor at the click location using caretRangeFromPoint
+                const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
+                console.log('[HYDRA] caretRangeFromPoint:', { x: this.lastClickEvent.clientX, y: this.lastClickEvent.clientY, hasRange: !!range });
+                if (range) {
+                  const selection = window.getSelection();
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                  console.log('[HYDRA] Set selection at click point, rangeCount:', selection.rangeCount);
+                }
+
+                // Clear the stored click event
+                this.lastClickEvent = null;
+              }
+            }
+          }
+        });
+      });
+    }
   }
 
   /**
@@ -1467,6 +1515,7 @@ class Bridge {
         this.formData = JSON.parse(JSON.stringify(event.data.data));
         if (
           this.selectedBlockUid &&
+          this.formData.blocks[this.selectedBlockUid] &&
           this.formData.blocks[this.selectedBlockUid]['@type'] === 'slate' &&
           typeof this.formData.blocks[this.selectedBlockUid].nodeId ===
             'undefined'
@@ -1490,6 +1539,34 @@ class Bridge {
         if (blockElement) {
           !this.elementIsVisibleInViewport(blockElement) &&
             blockElement.scrollIntoView();
+
+          // Focus the contenteditable element for Slate text blocks
+          if (this.formData.blocks[uid]?.['@type'] === 'slate') {
+            // Use double requestAnimationFrame to wait for ALL DOM updates including Quanta toolbar
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                // Re-query the block element to ensure we get the updated DOM element
+                const currentBlockElement = document.querySelector(`[data-block-uid="${uid}"]`);
+                console.log('[HYDRA] SELECT_BLOCK focus handler:', { uid, found: !!currentBlockElement });
+                if (currentBlockElement) {
+                  const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
+                  console.log('[HYDRA] Editable field:', { found: !!editableField, isConnected: editableField?.isConnected });
+                  if (editableField) {
+                    editableField.focus();
+                    console.log('[HYDRA] Called focus(), activeElement:', document.activeElement);
+                    // Move cursor to end of content
+                    const range = document.createRange();
+                    const selection = window.getSelection();
+                    range.selectNodeContents(editableField);
+                    range.collapse(false); // false = collapse to end
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    console.log('[HYDRA] Set selection, rangeCount:', selection.rangeCount);
+                  }
+                }
+              });
+            });
+          }
         }
         // this.isInlineEditing = true;
         // this.observeForBlock(uid);
@@ -1510,13 +1587,15 @@ class Bridge {
    * @param {HTMLElement} blockElement - The block element to make editable.
    */
   makeBlockContentEditable(blockElement) {
-    blockElement.setAttribute('contenteditable', 'true');
     const childNodes = blockElement.querySelectorAll('[data-node-id]');
+    const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // For Slate blocks (with data-node-id children), make them individually editable
     childNodes.forEach((node) => {
       node.setAttribute('contenteditable', 'true');
     });
 
-    const blockUid = blockElement.getAttribute('data-block-uid');
+    // For blocks with data-editable-field (e.g., from widgets/forms)
     const editableField = blockElement.querySelector('[data-editable-field="value"]');
 
     if (editableField && blockUid) {
@@ -1542,8 +1621,47 @@ class Bridge {
         );
       });
 
-      // Add keydown listener for delete/backspace at node boundaries
+      // Add keydown listener for Enter, Delete, and Backspace
       editableField.addEventListener('keydown', (e) => {
+        console.log('[HYDRA] Keydown event in editable field:', e.key, 'shiftKey:', e.shiftKey);
+
+        // Handle Enter key to create new block
+        if (e.key === 'Enter' && !e.shiftKey) {
+          console.log('[HYDRA] Enter key detected (no Shift)');
+          const selection = window.getSelection();
+          console.log('[HYDRA] Selection rangeCount:', selection.rangeCount);
+          if (!selection.rangeCount) return;
+
+          const range = selection.getRangeAt(0);
+          const node = range.startContainer;
+
+          // Check if this is a Slate block (has data-node-id)
+          const parentElement =
+            node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          const hasNodeId = parentElement?.closest('[data-node-id]');
+          console.log('[HYDRA] Has data-node-id?', !!hasNodeId);
+
+          if (hasNodeId) {
+            console.log('[HYDRA] Preventing default Enter and sending SLATE_ENTER_REQUEST for block:', blockUid);
+            e.preventDefault(); // Block the default Enter behavior
+
+            this.setBlockProcessing(blockUid, true);
+
+            // Send Enter request to Admin UI for Slate block split
+            window.parent.postMessage(
+              {
+                type: 'SLATE_ENTER_REQUEST',
+                blockId: blockUid,
+                selection: this.serializeSelection() || {},
+              },
+              this.adminOrigin,
+            );
+            console.log('[HYDRA] SLATE_ENTER_REQUEST message sent');
+            return;
+          }
+        }
+
+        // Handle Delete/Backspace at node boundaries
         if (e.key !== 'Delete' && e.key !== 'Backspace') return;
 
         const selection = window.getSelection();

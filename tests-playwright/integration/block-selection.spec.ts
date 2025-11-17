@@ -151,4 +151,77 @@ test.describe('Block Selection', () => {
     expect(stillHasUrlField).toBe(false);
     expect(stillHasAltField).toBe(false);
   });
+
+  test('clicking block in Order tab selects it in iframe', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click first block to open sidebar
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+
+    // Open Order tab
+    await helper.openSidebarTab('Order');
+
+    // Wait for Order tab content to be visible (uses @dnd-kit, not react-beautiful-dnd)
+    const orderTab = page.locator('#sidebar-order');
+    await expect(orderTab).toBeVisible({ timeout: 2000 });
+
+    // Find the second block in the order list (using .tree-item-wrapper)
+    // Note: test-page has 3 blocks total (block-1-uuid, block-2-uuid, block-3-uuid)
+    const blockItems = page.locator('.tree-item-wrapper');
+    await expect(blockItems.first()).toBeVisible();
+
+    // Click the second block's tree-item div (block-2-uuid which is an image block)
+    const secondBlockInList = blockItems.nth(1).locator('.tree-item');
+    await expect(secondBlockInList).toBeVisible();
+    await secondBlockInList.click();
+    await page.waitForTimeout(500);
+
+    // Verify the second block is now selected
+    // Check that Block tab shows the image block fields
+    await helper.openSidebarTab('Block');
+
+    // The sidebar should now show image block fields (url, alt)
+    const hasUrlField = await helper.hasSidebarField('url');
+    expect(hasUrlField).toBe(true);
+
+    // Verify Quanta toolbar appears on the selected block in iframe
+    const hasQuantaToolbar = await helper.isQuantaToolbarVisibleInIframe('block-2-uuid');
+    expect(hasQuantaToolbar).toBe(true);
+  });
+
+  test('clicking text block puts cursor focus at correct position', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a text block (block-3-uuid - "Another paragraph for testing")
+    const blockId = 'block-3-uuid';
+    await helper.clickBlockInIframe(blockId);
+
+    // Wait for Quanta toolbar to appear (indicates block is selected)
+    const hasQuantaToolbar = await helper.isQuantaToolbarVisibleInIframe(blockId);
+    expect(hasQuantaToolbar).toBe(true);
+
+    // Get the contenteditable element
+    const editableField = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await expect(editableField).toBeVisible({ timeout: 2000 });
+
+    // Wait a moment for focus to be set asynchronously
+    await page.waitForTimeout(300);
+
+    // Verify we can type immediately
+    await page.keyboard.type('TYPED');
+    await page.waitForTimeout(200);
+
+    // Verify the text was inserted into the block
+    const blockText = await iframe.locator(`[data-block-uid="${blockId}"]`).textContent();
+    expect(blockText).toContain('TYPED');
+  });
 });
