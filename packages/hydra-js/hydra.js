@@ -285,11 +285,13 @@ class Bridge {
                 console.log('[HYDRA] Field changed from', previousFieldName, 'to', editableField, '- recreating toolbar');
 
                 // Determine if we should show format buttons based on field type
-                const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
-                const fieldType = blockFieldTypes[editableField];
+                // blockFieldTypes maps blockType -> fieldName -> fieldType
+                const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
+                const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+                const fieldType = blockTypeFields[editableField];
                 const showFormatBtns = fieldType === 'slate';
 
-                console.log('[HYDRA] Recreating toolbar with formatBtns:', showFormatBtns, 'for field type:', fieldType);
+                console.log('[HYDRA] Recreating toolbar with formatBtns:', showFormatBtns, 'for blockType:', blockType, 'field:', editableField, 'type:', fieldType);
 
                 if (this.quantaToolbar) {
                   this.quantaToolbar.remove();
@@ -481,14 +483,30 @@ class Bridge {
     }
 
     // Set contenteditable on text and slate fields only
-    const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
+    // Get blockType to look up field types
+    const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     const editableFields = blockElement.querySelectorAll('[data-editable-field]');
     editableFields.forEach((field) => {
       const fieldName = field.getAttribute('data-editable-field');
-      const fieldType = blockFieldTypes[fieldName];
-      // Only set contenteditable for text and slate fields
-      if (fieldType === 'text' || fieldType === 'slate') {
+      const fieldType = blockTypeFields[fieldName];
+      // Only set contenteditable for string, textarea, and slate fields
+      if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
         field.setAttribute('contenteditable', 'true');
+
+        // For string fields (single-line), prevent Enter key from creating new lines
+        if (fieldType === 'string') {
+          // Store the handler so we can remove it later if needed
+          if (!field._enterKeyHandler) {
+            field._enterKeyHandler = (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                console.log('[HYDRA] Prevented Enter key in string field');
+              }
+            };
+            field.addEventListener('keydown', field._enterKeyHandler);
+          }
+        }
       }
     });
 
@@ -554,15 +572,18 @@ class Bridge {
 
     // Check field types to determine if we should show format buttons
     // Use the currently focused field to determine field type
+    // blockFieldTypes maps blockType -> fieldName -> fieldType
     const fieldName = this.focusedFieldName;
-    const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
-    const fieldType = blockFieldTypes[fieldName];
+    const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+    const fieldType = blockTypeFields[fieldName];
 
     console.log('[HYDRA] Field type check:', {
       blockUid,
+      blockType,
       focusedFieldName: fieldName,
       fieldType,
-      blockFieldTypes,
+      blockTypeFields,
       allBlockFieldTypes: this.blockFieldTypes
     });
 
@@ -1277,13 +1298,29 @@ class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
 
-    // Helper function to handle each element - just sets contenteditable
+    // Helper function to handle each element - sets contenteditable and handles string fields
     const handleElement = (element) => {
       const editableField = element.getAttribute('data-editable-field');
       if (editableField === 'value') {
         this.makeBlockContentEditable(element);
       } else if (editableField !== null) {
         element.setAttribute('contenteditable', 'true');
+
+        // Check field type to determine if this is a string field (single-line)
+        const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
+        const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+        const fieldType = blockTypeFields[editableField];
+
+        // For string fields (single-line), prevent Enter key from creating new lines
+        if (fieldType === 'string' && !element._enterKeyHandler) {
+          element._enterKeyHandler = (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              console.log('[HYDRA] Prevented Enter key in string field');
+            }
+          };
+          element.addEventListener('keydown', element._enterKeyHandler);
+        }
       }
     };
 

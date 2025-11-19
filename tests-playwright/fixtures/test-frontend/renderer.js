@@ -57,6 +57,9 @@ function renderBlock(blockId, block) {
         case 'text':
             wrapper.innerHTML = renderTextBlock(block);
             break;
+        case 'textarea':
+            wrapper.innerHTML = renderTextareaBlock(block);
+            break;
         case 'image':
             wrapper.innerHTML = renderImageBlock(block);
             break;
@@ -155,6 +158,20 @@ function renderTextBlock(block) {
     // Mark as editable field - hydra.js will read this and set contenteditable="true"
     // No data-node-id needed for simple text blocks
     return `<div data-editable-field="text">${text}</div>`;
+}
+
+/**
+ * Render a textarea block (multiline text, non-Slate).
+ * @param {Object} block - Textarea block data
+ * @returns {string} HTML string
+ */
+function renderTextareaBlock(block) {
+    const content = block.content || '';
+    // Mark as editable field - hydra.js will read this and set contenteditable="true"
+    // No data-node-id needed for textarea blocks
+    // Preserve newlines by replacing \n with <br> for display (hydra.js will convert back to \n when sending)
+    const displayContent = content.replace(/\n/g, '<br>');
+    return `<div data-editable-field="content">${displayContent}</div>`;
 }
 
 /**

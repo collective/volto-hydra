@@ -171,9 +171,13 @@
             },
           ]),
         },
+        'mock-textarea-block': {
+          '@type': 'textarea',
+          content: 'First line of textarea',
+        },
       },
       blocks_layout: {
-        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block'],
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block'],
       },
     };
 
@@ -207,26 +211,18 @@
           // hydra.js converts INITIAL_DATA to FORM_DATA internally
 
           // Build block field types metadata based on block types
-          const blockFieldTypes = {};
-          Object.keys(mockFormData.blocks).forEach(blockId => {
-            const block = mockFormData.blocks[blockId];
-            const blockType = block['@type'];
-
-            // Map block types to their field types
-            if (blockType === 'slate') {
-              blockFieldTypes[blockId] = { value: 'slate' };
-            } else if (blockType === 'text') {
-              blockFieldTypes[blockId] = { text: 'text' };
-            } else if (blockType === 'multifield') {
-              blockFieldTypes[blockId] = { title: 'text', description: 'slate' };
-            }
-            // Add more block type mappings as needed
-          });
+          // Map blockType -> fieldName -> fieldType (not blockId!)
+          const blockFieldTypes = {
+            'slate': { value: 'slate' },
+            'text': { text: 'string' },  // Simple string field
+            'multifield': { title: 'string', description: 'slate' },  // title is string, description is slate
+            'textarea': { content: 'textarea' }  // Multiline text field
+          };
 
           const response = {
             type: 'INITIAL_DATA',
             data: mockFormData,
-            blockFieldTypes: blockFieldTypes,  // Block ID -> field name -> field type
+            blockFieldTypes: blockFieldTypes,  // Block type -> field name -> field type
             slateConfig: {
               hotkeys: {},
               toolbarButtons: [], // Not used by current implementation

@@ -116,4 +116,98 @@ test.describe('Non-Slate Text Field Editing', () => {
     // Verify text was appended
     await expect(textField).toContainText('Simple text field - more text');
   });
+
+  test('string field prevents Enter key from creating new line', async ({ page }) => {
+    // String fields should be single-line inputs
+    // Pressing Enter should NOT create a new line within the field
+
+    // Select the text block using helper - returns the block locator
+    const textBlock = await helper.clickBlockInIframe('mock-text-block');
+    const textField = textBlock.locator('[data-editable-field="text"]');
+
+    // Clear and type initial text
+    await textField.click();
+    await page.keyboard.press('Meta+A');
+    await page.keyboard.type('First line');
+
+    // Press Enter - should NOT create a new line in string field
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(200);
+
+    // Verify no newline was created
+    const text = await textField.textContent();
+    expect(text).toBe('First line'); // Should not have newline or additional text
+
+    // Verify HTML doesn't contain <br> or newlines
+    const html = await textField.innerHTML();
+    expect(html).not.toContain('<br');
+    expect(html).not.toContain('\n');
+  });
+
+  test('slate field allows Enter key (not prevented by string handler)', async ({ page }) => {
+    // Slate fields are multiline and have their own Enter handling
+    // Our string field Enter prevention should NOT affect slate fields
+    // This test verifies that pressing Enter in a slate field is not prevented
+
+    // Capture console messages to verify Enter is not prevented by our string handler
+    const messages: string[] = [];
+    page.on('console', msg => {
+      const text = msg.text();
+      messages.push(text);
+    });
+
+    // Select the slate block
+    const slateBlock = await helper.clickBlockInIframe('mock-block-1');
+    const slateField = slateBlock.locator('[data-editable-field="value"]');
+
+    // Clear and type initial text
+    await slateField.click();
+    await page.keyboard.press('Meta+A');
+    await page.keyboard.type('First line');
+
+    // Press Enter - should NOT be prevented by our string handler
+    // (Slate has its own Enter handling that sends SLATE_ENTER_REQUEST)
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+
+    // Verify our string handler did NOT prevent the Enter key
+    const preventedMessage = messages.find(m => m.includes('[HYDRA] Prevented Enter key in string field'));
+    expect(preventedMessage).toBeUndefined();
+
+    // Verify that Slate's own Enter handling occurred
+    const slateEnterMessage = messages.find(m => m.includes('SLATE_ENTER_REQUEST'));
+    expect(slateEnterMessage).toBeDefined();
+  });
+
+  test('textarea field allows Enter to create newlines with \\n', async ({ page }) => {
+    // Textarea fields should be multiline
+    // Pressing Enter should create a newline character (\n) not <br> HTML
+    // The field value should be sent as plain text with \n
+
+    // Select the textarea block
+    const textareaBlock = await helper.clickBlockInIframe('mock-textarea-block');
+    const textareaField = textareaBlock.locator('[data-editable-field="content"]');
+
+    // Clear and type initial text
+    await textareaField.click();
+    await page.keyboard.press('Meta+A');
+    await page.keyboard.type('First line');
+
+    // Press Enter - should create a newline within the field
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(200);
+
+    // Type second line
+    await page.keyboard.type('Second line');
+    await page.waitForTimeout(500); // Wait for debounced update
+
+    // Verify the content contains both lines (displayed content)
+    const text = await textareaField.textContent();
+    expect(text).toContain('First line');
+    expect(text).toContain('Second line');
+
+    // Verify the innerText (which is what gets sent) contains \n
+    const innerText = await textareaField.evaluate(el => el.innerText);
+    expect(innerText).toBe('First line\nSecond line');
+  });
 });

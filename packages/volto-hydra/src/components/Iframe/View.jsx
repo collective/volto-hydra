@@ -44,6 +44,55 @@ import HiddenSlateToolbar from '../../widgets/HiddenSlateToolbar';
  * - Works with React context (buttons are properly rendered)
  * - Extracts the actual format, title, and icon from component props
  */
+/**
+ * Extract field types for all block types from schema registry
+ * @returns {Object} - Object mapping blockType -> fieldName -> fieldType
+ *
+ * We look up schemas from config.blocks.blocksConfig for each registered block type
+ * and identify which fields are Slate fields (widget: 'slate') vs text fields.
+ * This way it works for all blocks of that type, including ones added later.
+ */
+const extractBlockFieldTypes = () => {
+  const blockFieldTypes = {};
+
+  if (!config.blocks?.blocksConfig) {
+    return blockFieldTypes;
+  }
+
+  // Iterate through all registered block types
+  Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
+    const blockConfig = config.blocks.blocksConfig[blockType];
+    if (!blockConfig) {
+      return;
+    }
+
+    // Get schema - can be a function or an object
+    const schema = typeof blockConfig.blockSchema === 'function'
+      ? blockConfig.blockSchema({ ...config, formData: {}, intl: {} })
+      : blockConfig.blockSchema;
+
+    if (!schema?.properties) {
+      return;
+    }
+
+    // Map each field to its type for this block type
+    blockFieldTypes[blockType] = {};
+    Object.keys(schema.properties).forEach((fieldName) => {
+      const field = schema.properties[fieldName];
+      // Determine field type based on widget
+      if (field.widget === 'slate') {
+        blockFieldTypes[blockType][fieldName] = 'slate';
+      } else if (field.widget === 'textarea') {
+        blockFieldTypes[blockType][fieldName] = 'textarea';
+      } else if (field.type === 'string') {
+        blockFieldTypes[blockType][fieldName] = 'string';
+      }
+    });
+  });
+
+  return blockFieldTypes;
+};
+
 const extractButtonMetadata = (hiddenButtonsRef, toolbarButtons) => {
   const buttonConfigs = {};
 
@@ -942,6 +991,9 @@ const Iframe = (props) => {
           // Use button metadata from state (extracted in useEffect after hidden widget mounts)
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
+          // Extract block field types from schema registry (maps blockType -> fieldName -> fieldType)
+          const blockFieldTypes = extractBlockFieldTypes();
+
           // If metadata not ready yet, wait and retry
           if (!buttonMetadata) {
             console.log('[VIEW] Button metadata not ready, waiting...');
@@ -950,6 +1002,7 @@ const Iframe = (props) => {
                 {
                   type: 'INITIAL_DATA',
                   data: form,
+                  blockFieldTypes,
                   slateConfig: {
                     hotkeys: config.settings.slate?.hotkeys || {},
                     toolbarButtons,
@@ -966,6 +1019,7 @@ const Iframe = (props) => {
             {
               type: 'INITIAL_DATA',
               data: form,
+              blockFieldTypes,
               slateConfig: {
                 hotkeys: config.settings.slate?.hotkeys || {},
                 toolbarButtons,
