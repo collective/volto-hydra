@@ -127,6 +127,10 @@ test.describe('Inline Editing', () => {
       message: 'Step 5: Before clicking bold button'
     });
 
+    // STEP 5.5: Wait for toolbar to be fully ready and stable
+    await iframe.locator('.volto-hydra-format-button[title*="Bold" i]').first().waitFor({ state: 'attached', timeout: 3000 });
+    await page.waitForTimeout(100); // Let toolbar settle
+
     // STEP 6: Trigger the bold button using dispatchEvent
     console.log('[TEST] Step 6: Clicking bold button...');
     await helper.clickFormatButton('bold');
@@ -139,10 +143,10 @@ test.describe('Inline Editing', () => {
       message: 'Step 8: After clicking bold button'
     });
 
-    // STEP 9: Verify the text is bold by checking for <strong> tag
+    // STEP 9: Verify the text is bold by checking for <span style="font-weight: bold"> tag
     const blockHtml = await editor.innerHTML();
     console.log('[TEST] Step 9: Final HTML:', blockHtml);
-    expect(blockHtml).toContain('<strong>');
+    expect(blockHtml).toContain('style="font-weight: bold"');
     expect(blockHtml).toContain('Text to make bold');
   });
 
@@ -205,7 +209,7 @@ test.describe('Inline Editing', () => {
 
     // Verify bold in iframe
     const blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('<strong>');
+    expect(blockHtml).toContain('style="font-weight: bold"');
 
     // Verify the formatting data is in the sidebar widget's Slate editor state
     // Even if the widget doesn't visually show it immediately in the DOM,
@@ -266,7 +270,7 @@ test.describe('Inline Editing', () => {
 
     // Verify both formats are applied
     const blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('<strong>');
+    expect(blockHtml).toContain('style="font-weight: bold"');
     expect(blockHtml).toContain('<em>');
     expect(blockHtml).toContain('Bold and italic text');
   });
@@ -325,7 +329,7 @@ test.describe('Inline Editing', () => {
 
     // Verify bold was applied
     let blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('<strong>');
+    expect(blockHtml).toContain('style="font-weight: bold"');
 
     // Click bold button again to remove formatting
     await helper.selectAllTextInEditor(editor); // Re-select text
@@ -334,7 +338,7 @@ test.describe('Inline Editing', () => {
 
     // Verify bold was removed
     blockHtml = await editor.innerHTML();
-    expect(blockHtml).not.toContain('<strong>');
+    expect(blockHtml).not.toContain('style="font-weight: bold"');
     expect(blockHtml).toContain('Toggle bold text');
   });
 
@@ -500,7 +504,7 @@ test.describe('Inline Editing', () => {
 
     // Check if new text inherits bold formatting
     const html = await editor.innerHTML();
-    expect(html).toContain('<strong>');
+    expect(html).toContain('style="font-weight: bold"');
     const text = await editor.textContent();
     expect(text).toContain('Bold text more');
   });
@@ -786,4 +790,51 @@ test.describe('Inline Editing', () => {
     const newBlockText = await newBlock.textContent();
     expect(newBlockText).toContain('Second line');
   });
+
+  test('Ctrl+B applies bold to subsequently typed text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block and clear it
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+
+    // Type "Hello "
+    await editor.pressSequentially('Hello ', { delay: 10 });
+
+    // Press Ctrl+B to enable bold
+    await page.keyboard.press('Control+b');
+
+    // Type "world"
+    await editor.pressSequentially('world', { delay: 10 });
+
+    // Press Ctrl+B again to disable bold
+    await page.keyboard.press('Control+b');
+
+    // Type " testing"
+    await editor.pressSequentially(' testing', { delay: 10 });
+
+    // Wait a bit for rendering
+    await page.waitForTimeout(200);
+
+    // Check the HTML structure
+    const html = await editor.innerHTML();
+    console.log('[TEST] Editor HTML:', html);
+
+    // Verify structure: should have "Hello " + bold "world" + " testing"
+    // The renderer uses non-standard markup to prove architectural decoupling
+    expect(html).toContain('Hello');
+    expect(html).toContain('world');
+    expect(html).toContain('testing');
+
+    // More specific: verify "world" is inside bold span (non-standard markup)
+    expect(html).toMatch(/style="font-weight: bold">world<\/span>/);
+  });  
 });

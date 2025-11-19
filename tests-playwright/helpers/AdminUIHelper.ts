@@ -562,8 +562,14 @@ export class AdminUIHelper {
    */
   async getBlockTextInIframe(blockId: string): Promise<string> {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    return (await block.textContent()) || '';
+    // Get text from the editable field (data-editable-field), not the entire block (which includes toolbar buttons)
+    // Don't require contenteditable="true" because it's only set when the block is selected
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+
+    // Wait a moment for any pending mutations to complete
+    await this.page.waitForTimeout(100);
+
+    return (await editor.textContent()) || '';
   }
 
   /**
@@ -597,12 +603,8 @@ export class AdminUIHelper {
     // First, click the block to select it and show the toolbar
     await blockContainer.click();
 
-    // Wait for the toolbar to appear (indicating block is selected)
-    // Use .first() since there might be multiple toolbars on the page
-    await this.page.locator('#slate-inline-toolbar, .slate-inline-toolbar').first().waitFor({
-      state: 'visible',
-      timeout: 5000
-    });
+    // Wait for the Quanta toolbar to appear (indicating block is selected)
+    await this.waitForQuantaToolbar(blockId, 5000);
 
     // Now wait for the contenteditable element to appear
     const editor = iframe.locator(
@@ -610,11 +612,30 @@ export class AdminUIHelper {
     );
     await editor.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Clear existing text
-    await editor.evaluate((el) => {
-      el.textContent = '';
+    // ASSERT: Verify the field is actually editable and focused before typing
+    const isEditable = await editor.getAttribute('contenteditable');
+    if (isEditable !== 'true') {
+      throw new Error(`Block ${blockId} field is not editable (contenteditable="${isEditable}")`);
+    }
+
+    const isFocused = await editor.evaluate((el) => {
+      const doc = el.ownerDocument;
+      const activeEl = doc.activeElement;
+      const activeTag = activeEl?.tagName;
+      const activeEditable = activeEl?.getAttribute?.('data-editable-field');
+      return {
+        isFocused: activeEl === el,
+        activeElement: `${activeTag}[data-editable-field="${activeEditable}"]`
+      };
     });
-    // Type new text to trigger characterData mutations
+    if (!isFocused.isFocused) {
+      throw new Error(`Block ${blockId} field is not focused. Active element: ${isFocused.activeElement}`);
+    }
+
+    // Clear existing text by selecting all within the contenteditable field
+    await this.selectAllTextInEditor(editor);
+
+    // Type new text (will replace the selection)
     await editor.pressSequentially(newText, { delay: 10 });
   }
 

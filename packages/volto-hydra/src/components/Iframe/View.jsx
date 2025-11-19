@@ -46,18 +46,24 @@ import HiddenSlateToolbar from '../../widgets/HiddenSlateToolbar';
  */
 /**
  * Extract field types for all block types from schema registry
+ * @param {Object} intl - The react-intl intl object for internationalization
  * @returns {Object} - Object mapping blockType -> fieldName -> fieldType
  *
  * We look up schemas from config.blocks.blocksConfig for each registered block type
  * and identify which fields are Slate fields (widget: 'slate') vs text fields.
  * This way it works for all blocks of that type, including ones added later.
  */
-const extractBlockFieldTypes = () => {
+const extractBlockFieldTypes = (intl) => {
   const blockFieldTypes = {};
 
   if (!config.blocks?.blocksConfig) {
     return blockFieldTypes;
   }
+
+  // Hardcode known block types that don't have schemas
+  // Slate blocks always have a 'value' field that is a slate field
+  blockFieldTypes.slate = { value: 'slate' };
+  blockFieldTypes.detachedSlate = { value: 'slate' };
 
   // Iterate through all registered block types
   Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
@@ -66,28 +72,40 @@ const extractBlockFieldTypes = () => {
       return;
     }
 
-    // Get schema - can be a function or an object
-    const schema = typeof blockConfig.blockSchema === 'function'
-      ? blockConfig.blockSchema({ ...config, formData: {}, intl: {} })
-      : blockConfig.blockSchema;
+    try {
+      // Get schema - can be a function or an object
+      const schema = typeof blockConfig.blockSchema === 'function'
+        ? blockConfig.blockSchema({ ...config, formData: {}, intl })
+        : blockConfig.blockSchema;
 
-    if (!schema?.properties) {
-      return;
-    }
-
-    // Map each field to its type for this block type
-    blockFieldTypes[blockType] = {};
-    Object.keys(schema.properties).forEach((fieldName) => {
-      const field = schema.properties[fieldName];
-      // Determine field type based on widget
-      if (field.widget === 'slate') {
-        blockFieldTypes[blockType][fieldName] = 'slate';
-      } else if (field.widget === 'textarea') {
-        blockFieldTypes[blockType][fieldName] = 'textarea';
-      } else if (field.type === 'string') {
-        blockFieldTypes[blockType][fieldName] = 'string';
+      if (!schema?.properties) {
+        console.log(`[VIEW] Skipping block type "${blockType}" - no schema.properties. Schema:`, schema);
+        return;
       }
-    });
+
+      // Map each field to its type for this block type
+      blockFieldTypes[blockType] = {};
+      Object.keys(schema.properties).forEach((fieldName) => {
+        const field = schema.properties[fieldName];
+        // Determine field type based on widget
+        let fieldType = null;
+        if (field.widget === 'slate') {
+          fieldType = 'slate';
+        } else if (field.widget === 'textarea') {
+          fieldType = 'textarea';
+        } else if (field.type === 'string') {
+          fieldType = 'string';
+        }
+
+        if (fieldType) {
+          console.log(`[VIEW] Extracted ${blockType}.${fieldName} = ${fieldType}`);
+          blockFieldTypes[blockType][fieldName] = fieldType;
+        }
+      });
+    } catch (error) {
+      console.warn(`[VIEW] Error extracting field types for block type "${blockType}":`, error);
+      // Continue with other block types
+    }
   });
 
   return blockFieldTypes;
@@ -992,7 +1010,8 @@ const Iframe = (props) => {
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
           // Extract block field types from schema registry (maps blockType -> fieldName -> fieldType)
-          const blockFieldTypes = extractBlockFieldTypes();
+          const blockFieldTypes = extractBlockFieldTypes(intl);
+          console.log('[VIEW] Final blockFieldTypes:', JSON.stringify(blockFieldTypes));
 
           // If metadata not ready yet, wait and retry
           if (!buttonMetadata) {

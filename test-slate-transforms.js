@@ -39,7 +39,7 @@ try {
   // Serialize to HTML
   const html = slateTransforms.serialize(result);
   console.log('\nSerialized HTML:', html);
-  console.log('\nContains <strong>?', html.includes('<strong>'));
+  console.log('\nContains style="font-weight: bold">?', html.includes('style="font-weight: bold"'));
 
 } catch (error) {
   console.error('Error:', error);

@@ -382,70 +382,17 @@ class Bridge {
             });
 
             // After the re-render, add the toolbar
-            /**
-             * (THIS IS THE PART WHICH MAKES TOOLBAR ADDITON SLOW IN REACTJS
-             * BASED FRAMEWORKS BUT ESSENTIAL FOR FRAMEWORKS LIKE F7 WHICH UPGRADES
-             * WHOLE UI ON DATA UPDATE)
-             */
-            setTimeout(() => {
-              if (this.selectedBlockUid) {
-                // Check if a block is selected
-                const blockElement = document.querySelector(
-                  `[data-block-uid="${this.selectedBlockUid}"]`,
-                );
-                const isToolbarPresent = blockElement?.contains(
-                  this.quantaToolbar,
-                );
-                if (blockElement && !isToolbarPresent) {
-                  // Add border to the currently selected block
-                  blockElement.classList.add('volto-hydra--outline');
-                  let show = { formatBtns: false };
-                  if (
-                    this.formData &&
-                    this.formData.blocks[this.selectedBlockUid] &&
-                    this.formData.blocks[this.selectedBlockUid]['@type'] ===
-                      'slate'
-                  ) {
-                    show.formatBtns = true;
-                  }
-                  this.prevSelectedBlock &&
-                    this.deselectBlock(
-                      this.prevSelectedBlock.getAttribute('data-block-uid'),
-                      this.selectedBlockUid,
-                    );
-                  this.quantaToolbar = null;
-                  this.createQuantaToolbar(this.selectedBlockUid, show);
+            // Note: Toolbar creation and block selection should NOT happen in FORM_DATA handler
+            // Those are triggered by user clicks (selectBlock()) or SELECT_BLOCK messages
+            // FORM_DATA is just data synchronization - it updates the rendered blocks
+            // but should not change which block is selected or create/destroy toolbars
 
-                  // Check if this is a Slate block (has data-node-id children)
-                  const hasSlateContent = blockElement.querySelectorAll('[data-node-id]').length > 0;
-
-                  const editableField = blockElement.getAttribute(
-                    'data-editable-field',
-                  );
-
-                  // Make block editable if it has data-editable-field="value" OR if it's a Slate block
-                  if (editableField === 'value' || hasSlateContent) {
-                    // makeBlockContentEditable handles setting contenteditable on children
-                    this.makeBlockContentEditable(blockElement);
-                  } else if (editableField !== null) {
-                    blockElement.setAttribute('contenteditable', 'true');
-                  }
-                  // Note: Other field types (like image blocks) will be handled later
-                  this.prevSelectedBlock = blockElement;
-                  this.observeBlockTextChanges(blockElement);
-                }
-
-                // Unblock input after TOGGLE_MARK_DONE completes
-                if (
-                  event.data.type === 'TOGGLE_MARK_DONE' &&
-                  this.selectedBlockUid
-                ) {
-                  this.setBlockProcessing(this.selectedBlockUid, false);
-                }
-              } else {
-                // console.warn('No block is selected to add Toolbar');
-              }
-            }, 0); // Use setTimeout to ensure execution after the current call stack
+            // Unblock input after any FORM_DATA is received (indicates transform completed)
+            // Check all blocks for pending transforms and unblock them
+            Object.keys(this.pendingTransforms).forEach((blockId) => {
+              console.log('[HYDRA] Unblocking input for', blockId, 'after FORM_DATA');
+              this.setBlockProcessing(blockId, false);
+            });
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
@@ -1024,14 +971,20 @@ class Bridge {
    * @param {boolean} processing - true to block input, false to unblock
    */
   setBlockProcessing(blockId, processing = true) {
+    console.log('[HYDRA] setBlockProcessing:', { blockId, processing });
     const block = document.querySelector(`[data-block-uid="${blockId}"]`);
     const editableField = block?.querySelector('[data-editable-field="value"]');
 
-    if (!editableField) return;
+    if (!editableField) {
+      console.log('[HYDRA] setBlockProcessing: No editable field found for', blockId);
+      return;
+    }
 
     if (processing) {
+      console.log('[HYDRA] BLOCKING input for', blockId);
       // Create keyboard blocker function
       const blockKeyboard = (e) => {
+        console.log('[HYDRA] BLOCKED keyboard event:', e.type, 'key:', e.key, 'for block:', blockId);
         e.preventDefault();
         e.stopPropagation();
         return false;
@@ -1068,6 +1021,7 @@ class Bridge {
         this.handleTransformTimeout(blockId);
       }, 2000);
     } else {
+      console.log('[HYDRA] UNBLOCKING input for', blockId);
       // Remove keyboard blocker
       if (editableField._keyboardBlocker) {
         editableField.removeEventListener('keydown', editableField._keyboardBlocker, true);
@@ -1407,7 +1361,10 @@ class Bridge {
     }
 
     // Determine if we should show format buttons based on the focused field type
-    const focusedFieldType = this.focusedFieldName ? blockFieldTypes[this.focusedFieldName] : undefined;
+    // blockFieldTypes maps blockType -> fieldName -> fieldType
+    const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+    const focusedFieldType = this.focusedFieldName ? blockTypeFields[this.focusedFieldName] : undefined;
     let show = { formatBtns: focusedFieldType === 'slate' };
 
     console.log('[HYDRA] Creating toolbar with:', {
@@ -1440,11 +1397,12 @@ class Bridge {
           isCollapsed: selection?.isCollapsed,
           text: selection?.toString()
         });
-        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        // Save both cursor positions (collapsed) and text selections (non-collapsed)
+        if (selection && selection.rangeCount > 0) {
           this.savedSelection = this.serializeSelection();
           console.log('[HYDRA] Selection saved:', this.savedSelection);
         } else {
-          console.log('[HYDRA] Selection not saved (collapsed or no ranges)');
+          console.log('[HYDRA] Selection not saved (no ranges)');
         }
       };
       document.addEventListener('selectionchange', this.selectionChangeListener);
@@ -1468,10 +1426,13 @@ class Bridge {
           const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
           if (editableField) {
             const fieldName = editableField.getAttribute('data-editable-field');
-            const fieldType = this.blockFieldTypes?.[this.selectedBlockUid]?.[fieldName];
-            console.log('[HYDRA] Editable field:', { found: true, fieldName, fieldType });
+            // Look up field type: blockFieldTypes maps blockType -> fieldName -> fieldType
+            const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
+            const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+            const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
+            console.log('[HYDRA] Editable field:', { found: true, fieldName, blockType, fieldType });
 
-            if (fieldType === 'text' || fieldType === 'slate') {
+            if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
               editableField.focus();
               console.log('[HYDRA] Called focus(), activeElement:', document.activeElement);
 
@@ -1613,6 +1574,10 @@ class Bridge {
         if (blockElement) {
           !this.elementIsVisibleInViewport(blockElement) &&
             blockElement.scrollIntoView();
+
+          // Call selectBlock() to properly set up toolbar and contenteditable
+          // This ensures blocks selected via Order tab work the same as clicking
+          this.selectBlock(blockElement);
 
           // Focus the contenteditable element for Slate text blocks
           if (this.formData.blocks[uid]?.['@type'] === 'slate') {
