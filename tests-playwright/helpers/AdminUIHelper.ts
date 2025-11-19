@@ -154,7 +154,7 @@ export class AdminUIHelper {
    * Click on a block within the preview iframe.
    * Waits for the block to be selected (have the outline) after clicking.
    */
-  async clickBlockInIframe(blockId: string): Promise<void> {
+  async clickBlockInIframe(blockId: string) {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -182,7 +182,10 @@ export class AdminUIHelper {
     await this.waitForQuantaToolbar(blockId);
 
     // Wait for the sidebar to open and show this block's info
-    await this.waitForSidebarOpen();
+    // await this.waitForSidebarOpen();
+
+    // Return the block locator for chaining
+    return block;
   }
 
   /**
@@ -192,12 +195,15 @@ export class AdminUIHelper {
   /**
    * Wait for a block to be selected in the iframe.
    */
-  async waitForBlockSelected(blockId: string, timeout: number = 5000): Promise<void> {
+  async waitForBlockSelected(blockId: string, timeout: number = 5000) {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
     await block.waitFor({ state: 'visible', timeout });
     // Also wait a bit for the selected class to be applied
     await this.page.waitForTimeout(300);
+
+    // Return the block locator for chaining
+    return block;
   }
 
   /**
@@ -492,52 +498,36 @@ export class AdminUIHelper {
   }
 
   /**
-   * Click a format button (bold, italic, strikethrough, link) in Quanta Toolbar.
+   * Click a format button (bold, italic, strikethrough, link) in the currently visible Quanta Toolbar.
+   * Searches for the button by title attribute containing the format keyword.
+   * Since only one toolbar can be open at a time, no blockId is needed.
    */
   async clickFormatButton(
-    blockId: string,
     format: 'bold' | 'italic' | 'strikethrough' | 'link'
   ): Promise<void> {
     const iframe = this.getIframe();
-    const formatButtons = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-format-button`
+
+    // Find button by title attribute (case-insensitive search)
+    const formatKeyword = format.charAt(0).toUpperCase() + format.slice(1); // Capitalize first letter
+    const button = iframe.locator(
+      `.volto-hydra-format-button[title*="${formatKeyword}" i]`
     );
 
-    // Check if format buttons exist at all
-    const buttonCount = await formatButtons.count();
-    if (buttonCount === 0) {
+    const count = await button.count();
+
+    if (count === 0) {
       throw new Error(
-        `No format buttons found for block "${blockId}". ` +
-        `Format buttons should be created by hydra.js for slate blocks. ` +
-        `Check that: (1) the block is a slate block, (2) hydra.js is loaded, ` +
-        `(3) formData is set in hydra.js, and (4) createQuantaToolbar() was called with formatBtns=true.`
+        `Format button "${format}" not found in visible toolbar. ` +
+        `Expected button with title containing "${formatKeyword}". ` +
+        `Check that: (1) a block with a slate field is selected, (2) hydra.js is loaded, ` +
+        `(3) createQuantaToolbar() was called with formatBtns=true, and ` +
+        `(4) the button has a title attribute set.`
       );
     }
 
-    const index = { bold: 0, italic: 1, strikethrough: 2, link: 3 }[format];
-
-    // Check if the specific button we need exists
-    if (buttonCount <= index) {
-      throw new Error(
-        `Format button "${format}" (index ${index}) not found. ` +
-        `Only ${buttonCount} format buttons exist for block "${blockId}". ` +
-        `Expected at least ${index + 1} buttons (bold, italic, strikethrough, link).`
-      );
-    }
-
-    const button = formatButtons.nth(index);
-
-    // Verify button is visible before clicking
-    try {
-      await button.waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-      throw new Error(
-        `Format button "${format}" exists but is not visible for block "${blockId}". ` +
-        `Check CSS or toolbar positioning.`
-      );
-    }
-
-    await button.click();
+    // Use first match if multiple found
+    await button.first().waitFor({ state: 'visible', timeout: 2000 });
+    await button.first().click();
   }
 
   /**

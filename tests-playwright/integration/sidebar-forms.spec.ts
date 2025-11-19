@@ -72,6 +72,54 @@ test.describe('Sidebar Forms - Slate Block Behavior', () => {
     expect(updatedText).not.toBe(originalText);
   });
 
+  test('undo works when editing via sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click on Slate block
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Get original text from iframe
+    const iframe = helper.getIframe();
+    const iframeBlock = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const originalText = await iframeBlock.textContent();
+    expect(originalText).toContain('This is a test paragraph');
+
+    // Edit the value field in the sidebar - first change
+    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    await valueField.click();
+    await valueField.fill('First change');
+    await page.waitForTimeout(500);
+
+    // Verify first change applied
+    let text = await iframeBlock.textContent();
+    expect(text).toContain('First change');
+
+    // Make second change
+    await valueField.click();
+    await valueField.fill('Second change');
+    await page.waitForTimeout(500);
+
+    // Verify second change applied
+    text = await iframeBlock.textContent();
+    expect(text).toContain('Second change');
+
+    // Press Ctrl+Z to undo - should revert to "First change"
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(500);
+
+    // Verify undo worked
+    text = await iframeBlock.textContent();
+    expect(text).toContain('First change');
+    expect(text).not.toContain('Second change');
+  });
+
   test('Slate blocks show TOC settings on Block tab', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

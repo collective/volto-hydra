@@ -48,26 +48,101 @@
   <p>This page mocks the Admin UI parent window to test iframe formatting without Volto.</p>
 
   <div id="iframe-container">
-    <iframe id="test-iframe" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
+    <iframe id="previewIframe" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
   </div>
 
   <div id="log">
     <div class="log-entry"><strong>Message Log:</strong></div>
   </div>
 
-  <script type="module">
+  <script>
     console.log('[MOCK_PARENT] Loaded');
 
-    // Mock form data with a single slate block
+    // Helper to add nodeIds to Slate JSON (matching hydra.js logic)
+    function addNodeIds(nodes, startId = 1) {
+      let currentId = startId;
+
+      function processNode(node) {
+        // Check if it's an element node (has type or children properties)
+        if (node.type || (node.children && !node.text)) {
+          // Add nodeId to element nodes
+          node.nodeId = currentId++;
+
+          if (node.children) {
+            node.children = node.children.map(child => processNode(child));
+          }
+        }
+        return node;
+      }
+
+      return nodes.map(node => processNode(node));
+    }
+
+    // Simple Slate transformation without needing full Slate library
+    // This manually creates the expected structure for testing
+    function applySlateTransform(value, selection, format, action) {
+      const result = JSON.parse(JSON.stringify(value)); // Deep clone
+
+      if (!selection || !result[0] || !result[0].children) {
+        return result;
+      }
+
+      const paragraph = result[0];
+      const anchor = selection.anchor;
+      const focus = selection.focus;
+
+      // Get selection bounds
+      const start = Math.min(anchor.offset, focus.offset);
+      const end = Math.max(anchor.offset, focus.offset);
+
+      // Get the text from first child (assuming simple structure for now)
+      const textNode = paragraph.children[0];
+      if (!textNode || !textNode.text) {
+        return result;
+      }
+
+      const originalText = textNode.text;
+
+      // Split into three parts: before, selected, after
+      const before = originalText.substring(0, start);
+      const selected = originalText.substring(start, end);
+      const after = originalText.substring(end);
+
+      // Build new children array
+      const newChildren = [];
+
+      if (before) {
+        newChildren.push({ text: before });
+      }
+
+      // Wrap selected text in format element
+      if (selected) {
+        newChildren.push({
+          type: format,
+          children: [{ text: selected }]
+        });
+      }
+
+      if (after) {
+        newChildren.push({ text: after });
+      }
+
+      paragraph.children = newChildren;
+
+      // Add nodeIds to the result
+      return addNodeIds(result);
+    }
+
+    // Mock form data with both a slate block and a simple text block
     // This will be sent to iframe to override API content
-    const mockFormData = {
+    let mockFormData = {
       '@id': 'http://localhost:8888/test-page',
       '@type': 'Document',
       title: 'Mock Test Page',
       blocks: {
         'mock-block-1': {
           '@type': 'slate',
-          value: [
+          value: addNodeIds([
             {
               type: 'p',
               children: [
@@ -76,85 +151,33 @@
                 },
               ],
             },
-          ],
+          ]),
+        },
+        'mock-text-block': {
+          '@type': 'text',
+          text: 'Simple text field',
+        },
+        'mock-multi-field-block': {
+          '@type': 'multifield',
+          title: 'Block Title',
+          description: addNodeIds([
+            {
+              type: 'p',
+              children: [
+                {
+                  text: 'Block description with slate',
+                },
+              ],
+            },
+          ]),
         },
       },
       blocks_layout: {
-        items: ['mock-block-1'],
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block'],
       },
     };
 
-    // Mock Slate JSON responses for different formats
-    // In a real scenario, these would be computed by slateTransforms.applyFormat()
-    // But for testing the postMessage protocol, we just return hardcoded updated Slate values
-    const mockSlateResponses = {
-      'bold-add': [
-        {
-          type: 'p',
-          children: [
-            {
-              text: 'Text to format',
-              bold: true,
-            },
-          ],
-        },
-      ],
-      'bold-toggle': [
-        {
-          type: 'p',
-          children: [
-            {
-              text: 'Text to format',
-              bold: true,
-            },
-          ],
-        },
-      ],
-      'italic-add': [
-        {
-          type: 'p',
-          children: [
-            {
-              text: 'Text to format',
-              italic: true,
-            },
-          ],
-        },
-      ],
-      'italic-toggle': [
-        {
-          type: 'p',
-          children: [
-            {
-              text: 'Text to format',
-              italic: true,
-            },
-          ],
-        },
-      ],
-      'strikethrough-add': [
-        {
-          type: 'p',
-          children: [
-            {
-              text: 'Text to format',
-              strikethrough: true,
-            },
-          ],
-        },
-      ],
-      'strikethrough-toggle': [
-        {
-          type: 'p',
-          children: [
-            {
-              text: 'Text to format',
-              strikethrough: true,
-            },
-          ],
-        },
-      ],
-    };
+    // Hardcoded responses are no longer needed - we use real Slate transformations
 
     // Message log
     const logEl = document.getElementById('log');
@@ -166,10 +189,10 @@
       logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // Listen for messages from iframe
+    // Listen for messages from iframe (async to support delayed transforms)
     window.addEventListener('message', async (event) => {
       // Only handle messages from our iframe
-      if (event.source !== document.getElementById('test-iframe').contentWindow) {
+      if (event.source !== document.getElementById('previewIframe').contentWindow) {
         return;
       }
 
@@ -182,11 +205,43 @@
         case 'GET_INITIAL_DATA': {
           // Respond with INITIAL_DATA (not FORM_DATA!)
           // hydra.js converts INITIAL_DATA to FORM_DATA internally
+
+          // Build block field types metadata based on block types
+          const blockFieldTypes = {};
+          Object.keys(mockFormData.blocks).forEach(blockId => {
+            const block = mockFormData.blocks[blockId];
+            const blockType = block['@type'];
+
+            // Map block types to their field types
+            if (blockType === 'slate') {
+              blockFieldTypes[blockId] = { value: 'slate' };
+            } else if (blockType === 'text') {
+              blockFieldTypes[blockId] = { text: 'text' };
+            } else if (blockType === 'multifield') {
+              blockFieldTypes[blockId] = { title: 'text', description: 'slate' };
+            }
+            // Add more block type mappings as needed
+          });
+
           const response = {
             type: 'INITIAL_DATA',
             data: mockFormData,
+            blockFieldTypes: blockFieldTypes,  // Block ID -> field name -> field type
+            slateConfig: {
+              hotkeys: {},
+              toolbarButtons: [], // Not used by current implementation
+              buttonConfigs: {
+                // Simple mock button config for testing
+                'bold': {
+                  format: 'strong',
+                  svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>',
+                  title: 'Bold',
+                  testId: 'bold-button',
+                },
+              },
+            },
           };
-          console.log('[MOCK_PARENT] Sending INITIAL_DATA:', response);
+          console.log('[MOCK_PARENT] Sending INITIAL_DATA with blockFieldTypes:', response);
           event.source.postMessage(response, event.origin);
           logMessage('sent', 'INITIAL_DATA', response.data);
 
@@ -195,6 +250,7 @@
             const firstBlockId = mockFormData.blocks_layout.items[0];
             if (firstBlockId) {
               console.log('[MOCK_PARENT] Auto-selecting first block:', firstBlockId);
+
               event.source.postMessage(
                 {
                   type: 'SELECT_BLOCK',
@@ -213,70 +269,28 @@
           const { blockId, format, action, selection } = message;
           console.log('[MOCK_PARENT] Processing SLATE_FORMAT_REQUEST:', { blockId, format, action, selection });
 
+          // Simulate slow transform with configurable delay
+          const transformDelay = window.mockTransformDelay || 0;
+          const processTransform = async () => {
+            if (transformDelay > 0) {
+              console.log(`[MOCK_PARENT] Simulating slow transform with ${transformDelay}ms delay`);
+              await new Promise(resolve => setTimeout(resolve, transformDelay));
+            }
+
           // Get current value
           const currentValue = mockFormData.blocks[blockId].value;
-          let updatedValue;
 
-          // Check if this is a partial selection (not the whole text)
-          const fullTextLength = currentValue[0].children[0].text.length;
-          const isPartialSelection = selection &&
-            selection.anchor.path[0] === selection.focus.path[0] && // Same paragraph
-            selection.anchor.path[1] === selection.focus.path[1] && // Same text node
-            (selection.anchor.offset !== 0 || selection.focus.offset !== fullTextLength);
-
-          console.log('[MOCK_PARENT] Selection check:', {
-            hasSelection: !!selection,
-            anchorPath: selection?.anchor?.path,
-            focusPath: selection?.focus?.path,
-            anchorOffset: selection?.anchor?.offset,
-            focusOffset: selection?.focus?.offset,
-            fullTextLength,
-            isPartialSelection
+          console.log('[MOCK_PARENT] Applying Slate transformation:', {
+            format,
+            action,
+            selection,
+            currentValue: JSON.stringify(currentValue)
           });
 
-          if (isPartialSelection) {
-            // Handle partial selection - split the text node
-            const paragraph = currentValue[0];
-            const originalText = paragraph.children[0].text;
-            const start = Math.min(selection.anchor.offset, selection.focus.offset);
-            const end = Math.max(selection.anchor.offset, selection.focus.offset);
+          // Apply the real Slate transformation
+          const updatedValue = applySlateTransform(currentValue, selection, format, action);
 
-            console.log('[MOCK_PARENT] Partial selection detected:', { start, end, originalText });
-
-            const children = [];
-
-            // Add text before selection (if any)
-            if (start > 0) {
-              children.push({ text: originalText.substring(0, start) });
-            }
-
-            // Add selected text with format
-            const formatObj = {};
-            if (action === 'add' || action === 'toggle') {
-              formatObj[format] = true;
-            }
-            children.push({
-              text: originalText.substring(start, end),
-              ...formatObj
-            });
-
-            // Add text after selection (if any)
-            if (end < originalText.length) {
-              children.push({ text: originalText.substring(end) });
-            }
-
-            updatedValue = [{
-              type: paragraph.type,
-              children: children
-            }];
-
-            console.log('[MOCK_PARENT] Split text nodes:', updatedValue);
-          } else {
-            // Full selection - use hardcoded responses
-            const responseKey = `${format}-${action}`;
-            updatedValue = mockSlateResponses[responseKey] || currentValue;
-            console.log('[MOCK_PARENT] Using mock Slate response:', updatedValue);
-          }
+          console.log('[MOCK_PARENT] Transformation result:', JSON.stringify(updatedValue));
 
           // Update the block in mockFormData
           mockFormData.blocks[blockId] = {
@@ -293,14 +307,28 @@
           console.log('[MOCK_PARENT] Sending FORM_DATA with selection:', response);
           event.source.postMessage(response, event.origin);
           logMessage('sent', 'FORM_DATA', { blockId, updatedValue, selection });
+          };
+
+          // Execute the async transform (with optional delay) - await to ensure delay happens
+          await processTransform();
           break;
         }
 
         case 'SELECT_BLOCK':
-        case 'FORM_DATA':
-        case 'INLINE_EDIT_DATA': {
+        case 'FORM_DATA': {
           // Just log these for now
           console.log('[MOCK_PARENT] Received but not handling:', message.type);
+          break;
+        }
+
+        case 'INLINE_EDIT_DATA': {
+          // Handle text changes from non-Slate blocks
+          console.log('[MOCK_PARENT] Received INLINE_EDIT_DATA:', message);
+          // Update mockFormData with the changes
+          mockFormData = message.data;
+          // DO NOT send FORM_DATA back - this would trigger re-render and interrupt typing
+          // Just update our local state and log it
+          logMessage('RECEIVED', 'INLINE_EDIT_DATA', message);
           break;
         }
 
@@ -316,6 +344,7 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlock: (blockId) => mockFormData.blocks[blockId],
+      setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
     };
   </script>
 </body>

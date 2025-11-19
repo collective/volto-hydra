@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 /**
  * Mock Parent Window Inline Editing Tests
@@ -21,22 +22,19 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Inline Editing with Mock Parent', () => {
+  let helper: AdminUIHelper;
+
   test.beforeEach(async ({ page }) => {
-    // Enable console logging for debugging
-    page.on('console', msg => {
-      // Log ALL console messages to debug the issue
-      console.log('[BROWSER]', msg.type(), msg.text());
-    });
+    helper = new AdminUIHelper(page);
 
     // Load the mock parent page from the mock API server
     await page.goto('http://localhost:8888/mock-parent.html');
 
-    // Wait for iframe to load and receive mock content
-    const iframe = page.frameLocator('#test-iframe');
-    await iframe.locator('[contenteditable="true"]').first().waitFor({ state: 'visible', timeout: 10000 });
+    // Wait for iframe to load using helper (waits for [data-block-uid] not contenteditable)
+    await helper.waitForIframeReady();
 
-    // Wait for content to update (mock parent sends INITIAL_DATA)
-    await iframe.locator('[contenteditable="true"]:has-text("Text to format")').first().waitFor({ timeout: 5000 });
+    // Mock parent auto-selects first block, wait for it to be selected
+    await helper.waitForBlockSelected('mock-block-1');
 
     console.log('[TEST] Mock parent page loaded');
   });
@@ -45,9 +43,12 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Verify parent page loaded
     await expect(page.locator('h1')).toContainText('Mock Parent Window');
 
-    // Verify iframe loaded
-    const iframe = page.frameLocator('#test-iframe');
-    await expect(iframe.locator('[contenteditable="true"]').first()).toBeVisible();
+    // Verify iframe loaded with blocks
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid="mock-block-1"]')).toBeVisible();
+
+    // Click block to select it (this will set contenteditable)
+    await helper.clickBlockInIframe('mock-block-1');
 
     // Verify initial content
     const content = await iframe.locator('[contenteditable="true"]').first().textContent();
@@ -55,9 +56,12 @@ test.describe('Inline Editing with Mock Parent', () => {
   });
 
   test('should handle selection and apply formatting', async ({ page }) => {
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
+
+    // Click block to select it (this will set contenteditable)
+    await helper.clickBlockInIframe('mock-block-1');
+
     const editable = iframe.locator('[contenteditable="true"]');
-    const boldButton = iframe.locator('[data-testid="bold-button"]');
 
     // Click to focus the editable
     await editable.click();
@@ -73,21 +77,21 @@ test.describe('Inline Editing with Mock Parent', () => {
     console.log('[TEST] Selected text:', selectedText);
 
     // Click bold button
-    await boldButton.click();
+    await helper.clickFormatButton("bold");
 
     // Wait for FORM_DATA response and re-render
     await page.waitForTimeout(500);
 
-    // Verify bold was applied
+    // Verify bold was applied (renderer converts {type: "strong"} to styled span)
     const html = await editable.innerHTML();
     console.log('[TEST] HTML after formatting:', html);
 
-    expect(html).toContain('<strong');
+    expect(html).toContain('font-weight: bold');
     expect(html).toContain('Text to format');
   });
 
   test('should maintain cursor position after typing', async ({ page }) => {
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
     // Click at the beginning - use smaller x position to ensure cursor is before first character
@@ -103,7 +107,7 @@ test.describe('Inline Editing with Mock Parent', () => {
   });
 
   test('should handle deleting text with backspace', async ({ page }) => {
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
     // Click at the end
@@ -120,39 +124,102 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(content).not.toContain('mat'); // 'format' should have lost 'mat'
   });
 
-  test('should block input during formatting operation', async ({ page }) => {
-    const iframe = page.frameLocator('#test-iframe');
-    const editable = iframe.locator('[contenteditable="true"]');
-    const boldButton = iframe.locator('[data-testid="bold-button"]');
+  test('should block input during slow transform to prevent content desync', async ({ page }) => {
+    // Configure mock parent to simulate a slow transform (500ms delay)
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
 
-    // Select all text
+    const iframe = helper.getIframe();
+    // Use data-editable-field selector which persists regardless of contenteditable state
+    const editable = iframe.locator('[data-editable-field="value"]');
+
+    // Select all text programmatically to ensure selection exists
     await editable.click();
-    await page.keyboard.press('Meta+A');
+    const selectionSet = await iframe.locator('[contenteditable="true"]').evaluate(() => {
+      const el = document.querySelector('[contenteditable="true"]');
+      const textNode = el?.firstChild;
+      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        return {
+          success: true,
+          text: selection?.toString(),
+          rangeCount: selection?.rangeCount
+        };
+      }
+      return { success: false };
+    });
+    console.log('[TEST] Selection set:', selectionSet);
+    expect(selectionSet.success).toBe(true);
+    expect(selectionSet.text).toBe('Text to format');
     await page.waitForTimeout(200);
 
-    // Click bold button
-    await boldButton.click();
+    // Verify contenteditable is initially true
+    const initialEditableState = await editable.getAttribute('contenteditable');
+    expect(initialEditableState).toBe('true');
 
-    // Immediately try to type (should be blocked)
+    // Click bold button to trigger transform
+    await helper.clickFormatButton('bold');
+    await page.waitForTimeout(50); // Small delay for blocking to kick in
+
+    // Verify contenteditable is now false (input is blocked)
+    const blockedEditableState = await editable.getAttribute('contenteditable');
+    console.log('[TEST] contenteditable during transform:', blockedEditableState);
+    expect(blockedEditableState).toBe('false');
+
+    // Verify cursor shows "wait"
+    const cursorStyle = await editable.evaluate(el => window.getComputedStyle(el).cursor);
+    console.log('[TEST] cursor during transform:', cursorStyle);
+    expect(cursorStyle).toBe('wait');
+
+    // Verify pointer-events is set to "none" to prevent clicks
+    const pointerEvents = await editable.evaluate(el => window.getComputedStyle(el).pointerEvents);
+    console.log('[TEST] pointer-events during transform:', pointerEvents);
+    expect(pointerEvents).toBe('none');
+
+    // Capture text content before attempting to type
+    const textBeforeTyping = await editable.textContent();
+    console.log('[TEST] Text before typing:', textBeforeTyping);
+
+    // Try to type WITHOUT clicking first - should be blocked by keyboard event handlers
+    // Note: We don't click because pointer-events: none would block it anyway
     await page.keyboard.type('BLOCKED');
-    await page.waitForTimeout(10);
+    await page.waitForTimeout(100);
 
-    // Wait for formatting to complete
+    // Verify the text was NOT inserted (blocked by keyboard event handlers)
+    const textDuringBlock = await editable.textContent();
+    console.log('[TEST] Text after typing attempt:', textDuringBlock);
+    expect(textDuringBlock).toBe(textBeforeTyping);
+    expect(textDuringBlock).not.toContain('BLOCKED');
+
+    // Wait for transform to complete (500ms delay + processing time)
+    // We've already waited ~150ms (50ms + 100ms), so wait another 500ms to be safe
     await page.waitForTimeout(500);
 
-    // Verify the immediate typing was blocked (shouldn't contain 'BLOCKED')
-    const content = await editable.textContent();
-    console.log('[TEST] Content after blocked typing:', content);
+    // Verify contenteditable is restored to true
+    const restoredEditableState = await editable.getAttribute('contenteditable');
+    console.log('[TEST] contenteditable after transform:', restoredEditableState);
+    expect(restoredEditableState).toBe('true');
 
-    // This might be tricky to verify - the text might or might not appear
-    // depending on timing. The key is that the contenteditable should have
-    // contenteditable="false" during processing
+    // Verify bold was applied (renderer converts {type: "strong"} to styled span)
+    const html = await editable.innerHTML();
+    console.log('[TEST] HTML after formatting:', html);
+    expect(html).toContain('font-weight: bold');
+    expect(html).toContain('Text to format');
+
+    // Reset delay for other tests
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
   });
 
   test('should handle partial text selection', async ({ page }) => {
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
-    const boldButton = iframe.locator('[data-testid="bold-button"]');
 
     await editable.click();
 
@@ -195,14 +262,14 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.waitForTimeout(200);
 
     // Apply bold - use dispatchEvent instead of click() to preserve selection
-    await boldButton.dispatchEvent('mousedown');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
     const html = await editable.innerHTML();
     console.log('[TEST] HTML after partial selection formatting:', html);
 
-    // Should have bold tag
-    expect(html).toContain('<strong');
+    // Should have bold styling (renderer converts {type: "strong"} to styled span)
+    expect(html).toContain('font-weight: bold');
     // Should still have all the text
     expect(html).toContain('Text');
     expect(html).toContain('to format');
@@ -249,15 +316,14 @@ test.describe('Inline Editing with Mock Parent', () => {
       }
     });
 
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
-    const boldButton = iframe.locator('[data-testid="bold-button"]');
 
     await editable.click();
     await page.keyboard.press('Meta+A');
     await page.waitForTimeout(200);
 
-    await boldButton.click();
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
     // Verify we saw the expected messages
@@ -270,9 +336,8 @@ test.describe('Inline Editing with Mock Parent', () => {
   });
 
   test('should render data-node-id attributes in HTML after formatting', async ({ page }) => {
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
-    const boldButton = iframe.locator('[data-testid="bold-button"]');
 
     // Click to focus the editable
     await editable.click();
@@ -282,7 +347,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.waitForTimeout(200);
 
     // Click bold button to apply formatting
-    await boldButton.click();
+    await helper.clickFormatButton('bold');
 
     // Wait for FORM_DATA response and re-render
     await page.waitForTimeout(500);
@@ -293,8 +358,8 @@ test.describe('Inline Editing with Mock Parent', () => {
     console.log('[TEST] Rendered innerHTML after formatting:', html);
     console.log('[TEST] Rendered outerHTML after formatting:', outerHtml);
 
-    // Verify bold was applied
-    expect(html).toContain('<strong');
+    // Verify bold was applied (renderer converts {type: "strong"} to styled span)
+    expect(html).toContain('font-weight: bold');
     expect(html).toContain('Text to format');
 
     // Verify the paragraph element has data-node-id attribute
@@ -314,9 +379,8 @@ test.describe('Inline Editing with Mock Parent', () => {
 
   test('should handle selection across node boundaries and delete', async ({ page }) => {
     // First, create content with multiple text nodes by applying bold to part of the text
-    const iframe = page.frameLocator('#test-iframe');
+    const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
-    const boldButton = iframe.locator('[data-testid="bold-button"]');
 
     await editable.click();
 
@@ -341,29 +405,32 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.waitForTimeout(200);
 
     // Apply bold to create multiple nodes
-    await boldButton.dispatchEvent('mousedown');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
-    // Verify we have bold and normal text
+    // Verify we have bold and normal text (renderer converts {type: "strong"} to styled span)
     let html = await editable.innerHTML();
     console.log('[TEST] HTML after bold formatting:', html);
-    expect(html).toMatch(/<strong>Text<\/strong>\s*to format/);
+    expect(html).toContain('font-weight: bold');
+    expect(html).toContain('Text');
+    expect(html).toContain('to format');
 
-    // Now select across the boundary: from "xt" in <strong>Text</strong> to "to" in " to format"
-    // This creates a selection that spans from inside the <strong> element to outside it
+    // Now select across the boundary: from "xt" in styled span to "to" in " to format"
+    // This creates a selection that spans from inside the styled span element to outside it
     const crossBoundarySelection = await iframe.locator('[contenteditable="true"]').evaluate(() => {
       const el = document.querySelector('[contenteditable="true"]');
-      const strongElement = el?.querySelector('strong');
-      const textAfterStrong = strongElement?.nextSibling;
+      // The renderer creates <span style="font-weight: bold">Text</span>
+      const boldSpan = el?.querySelector('span[style*="font-weight: bold"]');
+      const textAfterBold = boldSpan?.nextSibling;
 
-      if (strongElement && textAfterStrong && textAfterStrong.nodeType === Node.TEXT_NODE) {
-        const boldTextNode = strongElement.firstChild;
+      if (boldSpan && textAfterBold && textAfterBold.nodeType === Node.TEXT_NODE) {
+        const boldTextNode = boldSpan.firstChild;
         if (boldTextNode && boldTextNode.nodeType === Node.TEXT_NODE) {
           const range = document.createRange();
           // Start at position 2 in "Text" (at "xt")
           range.setStart(boldTextNode, 2);
           // End at position 3 in " to format" (after " to")
-          range.setEnd(textAfterStrong, 3);
+          range.setEnd(textAfterBold, 3);
 
           const selection = window.getSelection();
           selection?.removeAllRanges();
@@ -374,7 +441,7 @@ test.describe('Inline Editing with Mock Parent', () => {
             selectedText: selection?.toString(),
             anchorNode: boldTextNode.textContent,
             anchorOffset: 2,
-            focusNode: textAfterStrong.textContent,
+            focusNode: textAfterBold.textContent,
             focusOffset: 3,
           };
         }
@@ -397,7 +464,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     console.log('[TEST] HTML after delete:', html);
 
     // Should have "Te" (from "Text") + "format" (from " to format")
-    // The <strong> tag might remain around "Te" or the formatting might be normalized
+    // The styled span might remain around "Te" or the formatting might be normalized
     expect(html).toContain('Te');
     expect(html).toContain('format');
     expect(html).not.toContain('xt to');

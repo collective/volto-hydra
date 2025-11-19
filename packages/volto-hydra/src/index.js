@@ -3,10 +3,14 @@ import {
   getAllowedBlocksList,
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
+import HydraSlateWidget from './widgets/HydraSlateWidget';
 
 const applyConfig = (config) => {
   // Add the frontendPreviwUrl reducer
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
+
+  // Register the HydraSlateWidget that exposes editor instances
+  config.widgets.widget.hydra_slate = HydraSlateWidget;
 
   // Add the slate block in the sidebar
   config.blocks.blocksConfig.slate = {
@@ -14,7 +18,7 @@ const applyConfig = (config) => {
     schemaEnhancer: ({ formData, schema, intl }) => {
       schema.properties.value = {
         title: 'Body',
-        widget: 'slate',
+        widget: 'hydra_slate',
       };
       // Add to the beginning of the fields array to make it more visible
       schema.fieldsets[0].fields.unshift('value');

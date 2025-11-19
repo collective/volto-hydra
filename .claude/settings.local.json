@@ -41,7 +41,18 @@
       "WebFetch(domain:docs.slatejs.org)",
       "Bash(pnpm -w run test:*)",
       "WebFetch(domain:github.com)",
-      "Bash(git submodule:*)"
+      "Bash(git submodule:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "WebFetch(domain:docs.dndkit.com)",
+      "WebFetch(domain:web.dev)",
+      "WebFetch(domain:css-tricks.com)",
+      "Bash(wait:*)",
+      "Bash(pnpm test:mock:*)",
+      "Bash(while pgrep -f \"playwright test\")",
+      "Bash(do sleep 2)",
+      "Bash(done)",
+      "WebFetch(domain:ray.run)"
     ],
     "deny": [],
     "ask": []

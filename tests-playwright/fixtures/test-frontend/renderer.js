@@ -54,8 +54,14 @@ function renderBlock(blockId, block) {
         case 'slate':
             wrapper.innerHTML = renderSlateBlock(block);
             break;
+        case 'text':
+            wrapper.innerHTML = renderTextBlock(block);
+            break;
         case 'image':
             wrapper.innerHTML = renderImageBlock(block);
+            break;
+        case 'multifield':
+            wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
         default:
             wrapper.innerHTML = `<p>Unknown block type: ${block['@type']}</p>`;
@@ -80,20 +86,100 @@ function renderSlateBlock(block) {
                 throw new Error(`Missing nodeId on Slate node. hydra.js should add nodeIds before rendering. Node: ${JSON.stringify(node)}`);
             }
 
-            const text = node.children.map(child => {
-                let content = child.text || '';
-                // Handle formatting
-                if (child.bold) content = `<strong>${content}</strong>`;
-                if (child.italic) content = `<em>${content}</em>`;
-                if (child.code) content = `<code>${content}</code>`;
-                return content;
-            }).join('');
+            const text = renderChildren(node.children);
             // Mark as editable field - hydra.js will read this and set contenteditable="true"
             html += `<p data-editable-field="value" data-node-id="${node.nodeId}">${text}</p>`;
         }
     });
 
     return html || '<p data-editable-field="value">Empty block</p>';
+}
+
+/**
+ * Recursively render Slate children nodes.
+ * Handles both old format (marks) and new format (inline element nodes).
+ * Uses non-standard markup to prove architectural decoupling.
+ * @param {Array} children - Array of Slate nodes
+ * @returns {string} HTML string
+ */
+function renderChildren(children) {
+    return children.map(child => {
+        // Handle inline element nodes (new format from toggleInlineFormat)
+        // Add data-node-id for selection restoration
+        if (child.type === 'strong') {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<span style="font-weight: bold"${nodeId}>${renderChildren(child.children)}</span>`;
+        }
+        if (child.type === 'em') {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<span style="font-style: italic"${nodeId}>${renderChildren(child.children)}</span>`;
+        }
+        if (child.type === 'del') {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<span style="text-decoration: line-through"${nodeId}>${renderChildren(child.children)}</span>`;
+        }
+        if (child.type === 'u') {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<span style="text-decoration: underline"${nodeId}>${renderChildren(child.children)}</span>`;
+        }
+        if (child.type === 'code') {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<code${nodeId}>${renderChildren(child.children)}</code>`;
+        }
+
+        // Handle text nodes (leaf nodes)
+        if (child.text !== undefined) {
+            let content = child.text || '';
+
+            // Also handle old format (marks) for backward compatibility
+            if (child.bold) content = `<span style="font-weight: bold">${content}</span>`;
+            if (child.italic) content = `<span style="font-style: italic">${content}</span>`;
+            if (child.code) content = `<code>${content}</code>`;
+            if (child.del) content = `<span style="text-decoration: line-through">${content}</span>`;
+
+            return content;
+        }
+
+        // Unknown node type - return empty string
+        return '';
+    }).join('');
+}
+
+/**
+ * Render a simple text block (non-Slate).
+ * @param {Object} block - Text block data
+ * @returns {string} HTML string
+ */
+function renderTextBlock(block) {
+    const text = block.text || '';
+    // Mark as editable field - hydra.js will read this and set contenteditable="true"
+    // No data-node-id needed for simple text blocks
+    return `<div data-editable-field="text">${text}</div>`;
+}
+
+/**
+ * Render a multi-field block (with both text and slate fields).
+ * @param {Object} block - Multi-field block data
+ * @returns {string} HTML string
+ */
+function renderMultiFieldBlock(block) {
+    const title = block.title || '';
+    const description = block.description || [];
+
+    let html = `<div data-editable-field="title">${title}</div>`;
+
+    // Render description as slate field
+    description.forEach((node) => {
+        if (node.type === 'p') {
+            if (node.nodeId === undefined) {
+                throw new Error(`Missing nodeId on Slate node in multifield description`);
+            }
+            const text = renderChildren(node.children);
+            html += `<p data-editable-field="description" data-node-id="${node.nodeId}">${text}</p>`;
+        }
+    });
+
+    return html;
 }
 
 /**

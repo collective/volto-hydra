@@ -298,7 +298,7 @@ export function getFormatState(value, selection) {
  * @param {Array} value - Slate document value
  * @param {Object} selection - Selection object
  * @param {string} direction - 'forward' or 'backward'
- * @returns {Array} Updated Slate document value
+ * @returns {Object} Object with 'value' (updated Slate document) and 'selection' (cursor position after deletion)
  */
 export function applyDeletion(value, selection, direction) {
   const editor = createHeadlessEditor(value);
@@ -311,11 +311,15 @@ export function applyDeletion(value, selection, direction) {
     } else {
       Transforms.delete(editor, { unit: 'character' });
     }
+
+    // After deletion, cursor should be at the start of the original selection
+    // The delete transform automatically collapses the selection to the anchor point
+    return { value: editor.children, selection: editor.selection };
   } catch (error) {
     console.warn('Failed to apply deletion:', error);
+    // Return original value and selection if deletion fails
+    return { value: editor.children, selection };
   }
-
-  return editor.children;
 }
 
 /**

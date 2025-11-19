@@ -13,6 +13,7 @@ import {
 import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
+import { buttons as slateButtons } from '@plone/volto-slate/editor/config';
 import isValidUrl from '../../utils/isValidUrl';
 import { BlockChooser } from '@plone/volto/components';
 import { createPortal } from 'react-dom';
@@ -27,7 +28,165 @@ import {
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
 import { Editor, Transforms } from 'slate';
+import { toggleInlineFormat } from '@plone/volto-slate/utils/blocks';
 import OpenObjectBrowser from './OpenObjectBrowser';
+import HiddenSlateToolbar from '../../widgets/HiddenSlateToolbar';
+
+/**
+ * Extract button metadata from rendered Slate toolbar buttons via React fiber nodes
+ * @param {React.RefObject} hiddenButtonsRef - Ref to the hidden container with rendered buttons
+ * @param {Array} toolbarButtons - Array of button names from config
+ * @returns {Object} - Object mapping button names to their metadata (format, title, svg)
+ *
+ * This function accesses React internals (fiber nodes) to extract component props.
+ * This approach:
+ * - Is truly dynamic and supports custom buttons added by plugins
+ * - Works with React context (buttons are properly rendered)
+ * - Extracts the actual format, title, and icon from component props
+ */
+const extractButtonMetadata = (hiddenButtonsRef, toolbarButtons) => {
+  const buttonConfigs = {};
+
+  if (!hiddenButtonsRef.current) {
+    console.warn('[VOLTO-HYDRA] Hidden buttons container not ready');
+    return buttonConfigs;
+  }
+
+  // Find all toolbar elements (buttons and separators)
+  // Note: SlateToolbar uses createPortal to render to document.body, not to our container
+  // So we need to find the toolbar in document.body instead
+  const toolbar = document.body.querySelector('.slate-inline-toolbar');
+  if (!toolbar) {
+    console.warn('[VIEW] Slate toolbar not found in document.body');
+    return buttonConfigs;
+  }
+
+  const allElements = toolbar.querySelectorAll('.button-wrapper, .toolbar-separator');
+  console.log('[VIEW] Found toolbar elements:', allElements.length);
+
+  // Build a map from button elements to their React fiber props
+  const fiberPropsMap = new Map();
+
+  allElements.forEach((element, index) => {
+    // Check if this is a separator
+    if (element.classList.contains('toolbar-separator')) {
+      fiberPropsMap.set(element, { buttonType: 'Separator' });
+      console.log(`[VIEW] Found Separator at index ${index}`);
+      return;
+    }
+
+    // Access React fiber node for buttons - React 16/17/18 use different keys
+    const fiberKey = Object.keys(element).find(key =>
+      key.startsWith('__reactFiber') ||
+      key.startsWith('__reactInternalInstance')
+    );
+
+    if (fiberKey) {
+      let fiber = element[fiberKey];
+      let buttonProps = null;
+      let formatProp = null;
+
+      // Walk up the fiber tree to find button component
+      // Look for any component with title and icon props (common to all toolbar buttons)
+      while (fiber) {
+        const props = fiber.memoizedProps || fiber.pendingProps;
+        const componentName = fiber.type?.name;
+
+        // Check if this fiber has button props (title and icon)
+        if (props && props.title && props.icon && !buttonProps) {
+          buttonProps = { buttonType: componentName || 'UnknownButton', ...props };
+        }
+
+        // Check if this fiber has the format prop (from BlockButton/MarkElementButton)
+        if (props && props.format && !formatProp) {
+          formatProp = props.format;
+        }
+
+        // If we found both button props and format, we're done
+        if (buttonProps && formatProp) {
+          buttonProps.format = formatProp;
+          console.log(`[VIEW] Found button props for button ${index} (${buttonProps.buttonType}):`, {
+            format: formatProp,
+            title: buttonProps.title,
+            icon: buttonProps.icon ? 'present' : 'missing'
+          });
+          fiberPropsMap.set(element, buttonProps);
+          break;
+        }
+
+        fiber = fiber.return;
+      }
+
+      // If we found button props but no format, still save it (for link button, etc.)
+      if (buttonProps && !formatProp) {
+        console.log(`[VIEW] Found button props for button ${index} (${buttonProps.buttonType}):`, {
+          format: buttonProps.format,
+          title: buttonProps.title,
+          icon: buttonProps.icon ? 'present' : 'missing'
+        });
+        fiberPropsMap.set(element, buttonProps);
+      }
+    }
+  });
+
+  // Match toolbar buttons config order with rendered elements
+  let elementIndex = 0;
+  toolbarButtons.forEach((buttonName) => {
+    const element = allElements[elementIndex];
+    const props = fiberPropsMap.get(element);
+
+    if (buttonName === 'separator') {
+      // Add separator to config
+      buttonConfigs[buttonName] = {
+        buttonType: 'Separator'
+      };
+      console.log(`[VIEW] Extracted separator at index ${elementIndex}`);
+      elementIndex++;
+      return;
+    }
+
+    if (props && (props.format || props.title)) {
+      // Extract icon SVG from the button element
+      const buttonElement = element.querySelector('button, a');
+      const iconElement = buttonElement?.querySelector('.icon, [class*="icon"]');
+
+      // The iconElement might BE the svg element (if svg has class="icon")
+      // or it might be a container with an svg inside
+      const svgElement = iconElement?.tagName === 'svg'
+        ? iconElement
+        : iconElement?.querySelector('svg');
+
+      const svg = svgElement?.outerHTML || '';
+
+      // Extract title - if it's a React element/object, get the text from the DOM element instead
+      let title;
+      if (typeof props.title === 'string') {
+        title = props.title;
+      } else if (props.title && typeof props.title === 'object') {
+        // Title is a React element - extract text from the DOM button
+        title = buttonElement?.getAttribute('title') || buttonElement?.getAttribute('aria-label') || buttonElement?.textContent?.trim() || buttonName;
+      } else {
+        title = buttonName;
+      }
+
+      buttonConfigs[buttonName] = {
+        buttonType: props.buttonType, // 'MarkElementButton', 'BlockButton', or 'ClearFormattingButton'
+        format: props.format || undefined,
+        title: title,
+        svg: svg,
+        testId: `${buttonName}-button`
+      };
+
+      console.log(`[VIEW] Extracted metadata for ${buttonName}:`, buttonConfigs[buttonName]);
+    } else {
+      console.warn(`[VIEW] Could not extract props for button: ${buttonName}`);
+    }
+
+    elementIndex++;
+  });
+
+  return buttonConfigs;
+};
 
 /**
  * Returns url with query params + proper paths
@@ -100,7 +259,9 @@ const Iframe = (props) => {
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
+  const [buttonMetadata, setButtonMetadata] = useState(null); // Store extracted button metadata
   const blockChooserRef = useRef();
+  const hiddenButtonsRef = useRef(null); // Ref to hidden container for extracting button metadata
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     strategy: 'fixed',
     placement: 'bottom',
@@ -119,9 +280,31 @@ const Iframe = (props) => {
       },
     ],
   });
+
+  // Extract button metadata from hidden toolbar after it mounts
+  useEffect(() => {
+    // Wait a tick for HiddenSlateToolbar to render on client-side
+    const timer = setTimeout(() => {
+      if (hiddenButtonsRef.current) {
+        console.log('[VIEW] Hidden container HTML:', hiddenButtonsRef.current.innerHTML);
+        console.log('[VIEW] Hidden container children:', hiddenButtonsRef.current.children);
+
+        const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+        const metadata = extractButtonMetadata(hiddenButtonsRef, toolbarButtons);
+        setButtonMetadata(metadata);
+        console.log('[VIEW] Button metadata extracted:', metadata);
+      } else {
+        console.log('[VIEW] Hidden container ref is null');
+      }
+    }, 100); // Small delay to ensure client-side rendering completes
+
+    return () => clearTimeout(timer);
+  }, []); // Run once on mount
+
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent GET_INITIAL_DATA)
-    if (!isInlineEditingRef.current && iframeOriginRef.current && selectedBlock) {
+    // Skip if we're processing a format request - we don't want to interfere with selection restoration
+    if (iframeOriginRef.current && selectedBlock && !processingFormatRequestRef.current) {
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         {
           type: 'SELECT_BLOCK',
@@ -134,8 +317,10 @@ const Iframe = (props) => {
     }
   }, [selectedBlock, form]);
 
-  const isInlineEditingRef = useRef(false);
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
+  const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
+  const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
+  const processingFormatRequestRef = useRef(false); // True while processing SLATE_FORMAT_REQUEST
   const [iframeSrc, setIframeSrc] = useState(null);
   const urlFromEnv = getURlsFromEnv();
   const u =
@@ -145,10 +330,7 @@ const Iframe = (props) => {
 
   // Subscribe to form data from Redux to detect changes
   // This provides a new reference on updates, unlike the mutated form prop
-  const formDataFromRedux = useSelector((state) => {
-    console.log('[VIEW] useSelector evaluating, state.form.global:', state.form?.global);
-    return state.form?.global;
-  });
+  const formDataFromRedux = useSelector((state) => state.form?.global);
 
   useEffect(() => {
     setIframeSrc(getUrlWithAdminParams(u, token));
@@ -195,7 +377,7 @@ const Iframe = (props) => {
     const onDeleteBlock = (id, selectPrev) => {
       const previous = previousBlockId(properties, id);
       const newFormData = deleteBlock(properties, id);
-      isInlineEditingRef.current = false;
+      
       onChangeFormData(newFormData);
       onSelectBlock(selectPrev ? previous : null);
       setAddNewBlockOpened(false);
@@ -244,19 +426,19 @@ const Iframe = (props) => {
           break;
 
         case 'INLINE_EDIT_DATA':
-          isInlineEditingRef.current = true;
-          // console.log('INLINE_EDIT_DATA is triggered, true', event.data?.from);
+          inlineEditCounterRef.current += 1;
+          console.log('[VIEW] INLINE_EDIT_DATA received, counter:', inlineEditCounterRef.current);
 
           onChangeFormData(event.data.data);
           break;
 
         case 'INLINE_EDIT_EXIT':
-          isInlineEditingRef.current = false;
+          
           break;
 
         case 'TOGGLE_MARK':
           // console.log('TOGGLE_BOLD', event.data.html);
-          isInlineEditingRef.current = true;
+          
           const deserializedHTMLData = toggleMark(event.data.html);
           // console.log('deserializedHTMLData', deserializedHTMLData);
           onChangeFormData({
@@ -290,6 +472,8 @@ const Iframe = (props) => {
         case 'SLATE_FORMAT_REQUEST':
           // Slate formatting handler - prefers using sidebar widget's editor directly
           try {
+            // Set flag to prevent useEffect from sending duplicate FORM_DATA
+            processingFormatRequestRef.current = true;
             console.log('[VIEW] Received SLATE_FORMAT_REQUEST:', event.data);
             const { blockId, format, action, selection, url } = event.data;
             console.log('[VIEW] Looking for block:', blockId);
@@ -347,37 +531,23 @@ const Iframe = (props) => {
                     console.warn('[VIEW] Link unwrapping not yet implemented for sidebar editor');
                   }
                 } else {
-                  // Handle mark formats (bold, italic, del)
-                  if (action === 'toggle') {
-                    const marks = Editor.marks(sidebarEditor);
-                    const isActive = marks?.[format] === true;
-                    console.log('[VIEW] Current format active?', isActive);
+                  // Handle inline formats using toggleInlineFormat
+                  // Format name already mapped in hydra.js based on button config
+                  console.log('[VIEW] Applying inline format:', format);
 
-                    if (isActive) {
-                      Editor.removeMark(sidebarEditor, format);
-                      console.log('[VIEW] Removed mark:', format);
-                    } else {
-                      Editor.addMark(sidebarEditor, format, true);
-                      console.log('[VIEW] Added mark:', format);
-                    }
-                  } else if (action === 'add') {
-                    Editor.addMark(sidebarEditor, format, true);
-                    console.log('[VIEW] Added mark (action=add):', format);
-                  } else if (action === 'remove') {
-                    Editor.removeMark(sidebarEditor, format);
-                    console.log('[VIEW] Removed mark (action=remove):', format);
-                  }
+                  // toggleInlineFormat handles all actions (toggle, add, remove)
+                  // It creates inline element nodes like { type: 'strong', children: [...] }
+                  // This enables sticky formatting at cursor positions
+                  toggleInlineFormat(sidebarEditor, format);
+                  console.log('[VIEW] Applied toggleInlineFormat for:', format);
                 }
 
-                // Get the updated value and selection from the editor
+                // Get the updated value and selection from the editor after applying the transform
                 const updatedValue = sidebarEditor.children;
                 const transformedSelection = sidebarEditor.selection;
                 console.log('[VIEW] Widget editor updated, selection:', transformedSelection);
 
-                // Update form state with the new value from the widget
-                // The widget's onChange would normally fire, but we're modifying the editor directly
-                // so we need to update the form ourselves
-                isInlineEditingRef.current = true;
+                // Build the updated form with the new block value
                 const updatedForm = {
                   ...form,
                   blocks: {
@@ -389,57 +559,36 @@ const Iframe = (props) => {
                   },
                 };
 
-                onChangeFormData(updatedForm);
-
-                // Send FORM_DATA to the iframe with the new data and selection
+                // Send FORM_DATA immediately to the iframe with the selection
+                // IMPORTANT: Do NOT call onChangeFormData() here - that would trigger the useEffect
+                // and cause a double-send that might not include the selection
                 const message = {
                   type: 'FORM_DATA',
                   data: updatedForm,
                   selection: transformedSelection,
                 };
-                console.log('[VIEW] Sending FORM_DATA with updated data and selection to iframe');
+                console.log('[VIEW] Sending FORM_DATA with selection directly to iframe');
                 event.source.postMessage(message, event.origin);
+
+                // The sidebar widget's onChange will fire naturally (Slate triggers it automatically)
+                // and will update the Redux form state, which would normally trigger the useEffect
+                // However, we set processingFormatRequestRef which prevents the useEffect from sending
+
+                // Clear the flag after a short delay to allow the editor's onChange to complete
+                setTimeout(() => {
+                  processingFormatRequestRef.current = false;
+                  console.log('[VIEW] Cleared processingFormatRequest flag');
+                }, 100);
               } catch (error) {
                 console.error('[VIEW] Error applying format to sidebar editor:', error);
-                // Fallback to headless approach
-                console.log('[VIEW] Falling back to headless editor');
-                throw error; // Will be caught by outer catch and use fallback
+                processingFormatRequestRef.current = false; // Clear flag on error
+                throw error; // Will be caught by outer catch
               }
             } else {
-              // Fallback to headless editor approach
-              console.log('[VIEW] No sidebar editor found for field:', fieldId, '- using headless editor');
-
-              const { value: updatedValue, selection: transformedSelection } = slateTransforms.applyFormat(
-                block.value,
-                selection,
-                format,
-                action,
-                { url },
-              );
-              console.log('[VIEW] Headless editor updated value');
-
-              // Update form state
-              isInlineEditingRef.current = true;
-              const updatedForm = {
-                ...form,
-                blocks: {
-                  ...form.blocks,
-                  [blockId]: {
-                    ...block,
-                    value: updatedValue,
-                  },
-                },
-              };
-
-              onChangeFormData(updatedForm);
-
-              const message = {
-                type: 'FORM_DATA',
-                data: updatedForm,
-                selection: transformedSelection,
-              };
-              console.log('[VIEW] Sending FORM_DATA from headless editor');
-              event.source.postMessage(message, event.origin);
+              // No sidebar editor found - this is an error condition
+              const errorMsg = `No sidebar editor found for field: ${fieldId}. Make sure the HydraSlateWidget is properly registered.`;
+              console.error('[VIEW]', errorMsg);
+              throw new Error(errorMsg);
             }
           } catch (error) {
             console.error('Error applying Slate format:', error);
@@ -455,18 +604,42 @@ const Iframe = (props) => {
           }
           break;
 
+        case 'SLATE_UNDO_REQUEST':
+          console.log('[VIEW] Received SLATE_UNDO_REQUEST, triggering global undo');
+          // Dispatch a synthetic Ctrl+Z event to trigger Volto's global undo manager
+          const undoEvent = new KeyboardEvent('keydown', {
+            key: 'z',
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(undoEvent);
+          break;
+
+        case 'SLATE_REDO_REQUEST':
+          console.log('[VIEW] Received SLATE_REDO_REQUEST, triggering global redo');
+          // Dispatch a synthetic Ctrl+Y event to trigger Volto's global undo manager
+          const redoEvent = new KeyboardEvent('keydown', {
+            key: 'y',
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(redoEvent);
+          break;
+
         case 'SLATE_PASTE_REQUEST':
           try {
             console.log('[VIEW] Received SLATE_PASTE_REQUEST:', event.data);
-            const { blockId, html, selection } = event.data;
-            const block = form.blocks[blockId];
+            const { blockId: pasteBlockId, html, selection: pasteSelection } = event.data;
+            const block = form.blocks[pasteBlockId];
 
             if (!block) {
-              console.error('[VIEW] Block not found:', blockId);
+              console.error('[VIEW] Block not found:', pasteBlockId);
               event.source.postMessage(
                 {
                   type: 'SLATE_ERROR',
-                  blockId,
+                  blockId: pasteBlockId,
                   error: 'Block not found',
                   originalRequest: event.data,
                 },
@@ -475,23 +648,80 @@ const Iframe = (props) => {
               break;
             }
 
-            // Deserialize pasted HTML to Slate
-            const pastedSlate = slateTransforms.htmlToSlate(html);
+            // Try to get the sidebar widget's Slate editor
+            const fieldId = 'value';
+            let sidebarEditor = typeof window !== 'undefined' &&
+              window.voltoHydraSidebarEditors?.get(fieldId);
 
-            // Insert at selection
-            const updatedValue = slateTransforms.insertNodes(
-              block.value,
-              selection,
-              pastedSlate,
-            );
+            // Verify this editor is for the current block
+            if (sidebarEditor && selectedBlock !== pasteBlockId) {
+              console.log('[VIEW] Sidebar editor exists but selected block does not match');
+              sidebarEditor = null;
+            }
 
-            // Update form state
-            isInlineEditingRef.current = true;
+            let updatedValue;
+            let transformedSelection;
+
+            if (sidebarEditor) {
+              console.log('[VIEW] Using real sidebar editor for paste');
+
+              // Set selection on editor
+              Transforms.select(sidebarEditor, pasteSelection);
+
+              // Deserialize pasted HTML to Slate fragment
+              const pastedSlate = slateTransforms.htmlToSlate(html);
+              console.log('[VIEW] Deserialized paste content:', JSON.stringify(pastedSlate));
+
+              // For paste, we need to insert the text nodes, not block nodes
+              // Extract text/inline nodes from the deserialized blocks
+              let fragment = [];
+              pastedSlate.forEach(node => {
+                if (node.children) {
+                  fragment.push(...node.children);
+                } else {
+                  fragment.push(node);
+                }
+              });
+
+              console.log('[VIEW] Fragment to insert:', JSON.stringify(fragment));
+
+              // Insert text using insertText for plain text or insertNodes for formatted
+              if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
+                // Plain text - use insertText
+                Transforms.insertText(sidebarEditor, fragment[0].text);
+              } else {
+                // Formatted text - use insertNodes
+                Transforms.insertNodes(sidebarEditor, fragment);
+              }
+
+              // Get updated value and selection from the editor
+              updatedValue = sidebarEditor.children;
+              transformedSelection = sidebarEditor.selection;
+
+              console.log('[VIEW] Paste applied, new selection:', transformedSelection);
+            } else {
+              console.log('[VIEW] Sidebar editor not available, falling back to headless editor');
+
+              // Fallback to headless editor
+              const pastedSlate = slateTransforms.htmlToSlate(html);
+              let fragment = [];
+              pastedSlate.forEach(node => {
+                if (node.children) {
+                  fragment.push(...node.children);
+                } else {
+                  fragment.push(node);
+                }
+              });
+
+              updatedValue = slateTransforms.insertNodes(block.value, pasteSelection, fragment);
+              transformedSelection = pasteSelection; // Best guess
+            }
+
             const updatedForm = {
               ...form,
               blocks: {
                 ...form.blocks,
-                [blockId]: {
+                [pasteBlockId]: {
                   ...block,
                   value: updatedValue,
                 },
@@ -500,11 +730,11 @@ const Iframe = (props) => {
 
             onChangeFormData(updatedForm);
 
-            // Send FORM_DATA to iframe (hydra.js will add nodeIds and render HTML)
             event.source.postMessage(
               {
                 type: 'FORM_DATA',
                 data: updatedForm,
+                transformedSelection,
               },
               event.origin,
             );
@@ -542,15 +772,51 @@ const Iframe = (props) => {
               break;
             }
 
-            // Apply deletion transform
-            const updatedValue = slateTransforms.applyDeletion(
-              block.value,
-              delSelection,
-              direction,
-            );
+            // Try to get the sidebar widget's Slate editor
+            const fieldId = 'value';
+            let sidebarEditor = typeof window !== 'undefined' &&
+              window.voltoHydraSidebarEditors?.get(fieldId);
+
+            // Verify this editor is for the current block
+            if (sidebarEditor && selectedBlock !== delBlockId) {
+              console.log('[VIEW] Sidebar editor exists but selected block does not match');
+              sidebarEditor = null;
+            }
+
+            let updatedValue;
+            let transformedSelection;
+
+            if (sidebarEditor) {
+              console.log('[VIEW] Using real sidebar editor for deletion');
+
+              // Apply deletion transform directly to the widget's editor
+              Transforms.select(sidebarEditor, delSelection);
+
+              if (direction === 'backward') {
+                Transforms.delete(sidebarEditor, { unit: 'character', reverse: true });
+              } else {
+                Transforms.delete(sidebarEditor, { unit: 'character' });
+              }
+
+              // Get updated value and selection from the editor
+              updatedValue = sidebarEditor.children;
+              transformedSelection = sidebarEditor.selection;
+
+              console.log('[VIEW] Deletion applied, new selection:', transformedSelection);
+            } else {
+              console.log('[VIEW] Sidebar editor not available, falling back to headless editor');
+
+              // Fallback to headless editor
+              const result = slateTransforms.applyDeletion(
+                block.value,
+                delSelection,
+                direction,
+              );
+              updatedValue = result.value;
+              transformedSelection = result.selection;
+            }
 
             // Update form state
-            isInlineEditingRef.current = true;
             const updatedForm = {
               ...form,
               blocks: {
@@ -569,6 +835,7 @@ const Iframe = (props) => {
               {
                 type: 'FORM_DATA',
                 data: updatedForm,
+                transformedSelection,
               },
               event.origin,
             );
@@ -637,7 +904,7 @@ const Iframe = (props) => {
 
             // Set isInlineEditing to false BEFORE updating Redux
             // This allows the useEffect to send SELECT_BLOCK when we call onSelectBlock
-            isInlineEditingRef.current = false;
+            
 
             // Update Redux state with the formData returned by insertBlock
             onChangeFormData(updatedFormData);
@@ -664,22 +931,51 @@ const Iframe = (props) => {
           break;
 
         case 'UPDATE_BLOCKS_LAYOUT':
-          isInlineEditingRef.current = false;
+          
           onChangeFormData(event.data.data);
           break;
 
         case 'GET_INITIAL_DATA':
           // Store the iframe's actual origin when it first contacts us
           iframeOriginRef.current = event.origin;
+
+          // Use button metadata from state (extracted in useEffect after hidden widget mounts)
+          const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+
+          // If metadata not ready yet, wait and retry
+          if (!buttonMetadata) {
+            console.log('[VIEW] Button metadata not ready, waiting...');
+            setTimeout(() => {
+              event.source.postMessage(
+                {
+                  type: 'INITIAL_DATA',
+                  data: form,
+                  slateConfig: {
+                    hotkeys: config.settings.slate?.hotkeys || {},
+                    toolbarButtons,
+                    buttonConfigs: buttonMetadata || {}, // Use metadata from state
+                  },
+                },
+                event.origin,
+              );
+            }, 150); // Wait for metadata extraction to complete
+            return;
+          }
+
           event.source.postMessage(
             {
               type: 'INITIAL_DATA',
               data: form,
+              slateConfig: {
+                hotkeys: config.settings.slate?.hotkeys || {},
+                toolbarButtons,
+                buttonConfigs: buttonMetadata, // Use metadata from state
+              },
             },
             event.origin,
           );
           // If there's a selected block, send SELECT_BLOCK now that iframe is ready
-          if (selectedBlock && !isInlineEditingRef.current) {
+          if (selectedBlock) {
             event.source.postMessage(
               {
                 type: 'SELECT_BLOCK',
@@ -705,7 +1001,7 @@ const Iframe = (props) => {
         //         event.origin,
         //       );
         //       closeObjectBrowser();
-        //       isInlineEditingRef.current = true;
+        //       
         //     },
         //   });
         //   break;
@@ -742,31 +1038,44 @@ const Iframe = (props) => {
     // Use formDataFromRedux if available (for change detection), otherwise fall back to form prop
     const formToUse = formDataFromRedux || form;
 
+    // Check if this formData change is from an INLINE_EDIT_DATA we haven't processed yet
+    const hasUnprocessedInlineEdit = processedInlineEditCounterRef.current < inlineEditCounterRef.current;
+
     console.log('[VIEW] FORM_DATA useEffect triggered:', {
-      isInlineEditing: isInlineEditingRef.current,
       iframeReady: !!iframeOriginRef.current,
       hasForm: !!formToUse,
       selectedBlock,
       blockData: formToUse?.blocks?.[selectedBlock],
-      usingRedux: !!formDataFromRedux,
-      formDataFromReduxIdentity: formDataFromRedux,
-      formPropIdentity: form,
+      inlineEditCounter: inlineEditCounterRef.current,
+      processedCounter: processedInlineEditCounterRef.current,
+      hasUnprocessedInlineEdit,
     });
-    // Only send FORM_DATA if iframe is ready (has sent GET_INITIAL_DATA)
-    if (
-      !isInlineEditingRef.current &&
-      iframeOriginRef.current &&
-      formToUse &&
-      Object.keys(formToUse).length > 0
-    ) {
-      console.log('[VIEW] Sending FORM_DATA to iframe');
-      // Send the form data to the iframe
-      document
-        .getElementById('previewIframe')
-        ?.contentWindow?.postMessage(
-          { type: 'FORM_DATA', data: formToUse },
-          iframeOriginRef.current,
-        );
+
+    if (hasUnprocessedInlineEdit) {
+      // This is the formData update FROM the iframe's inline edit, don't send it back
+      processedInlineEditCounterRef.current += 1;
+      console.log('[VIEW] Skipping FORM_DATA send - this is from iframe inline edit, processed:', processedInlineEditCounterRef.current);
+    } else if (processingFormatRequestRef.current) {
+      // Skip sends while processing a format request - we're sending directly from the handler
+      console.log('[VIEW] Skipping FORM_DATA send - processing format request');
+    } else if (iframeOriginRef.current && formToUse && Object.keys(formToUse).length > 0) {
+      // Check if the sidebar has focus (user is editing there)
+      const sidebarElement = document.querySelector('.sidebar-container, [class*="sidebar"]');
+      const sidebarHasFocus = sidebarElement?.contains(document.activeElement);
+
+      if (sidebarHasFocus) {
+        // Sidebar has focus - user is editing there, send updates to iframe
+        console.log('[VIEW] Sending FORM_DATA to iframe - sidebar has focus');
+        document
+          .getElementById('previewIframe')
+          ?.contentWindow?.postMessage(
+            { type: 'FORM_DATA', data: formToUse },
+            iframeOriginRef.current,
+          );
+      } else {
+        // Sidebar doesn't have focus - user is editing in iframe, don't send
+        console.log('[VIEW] Skipping FORM_DATA send - sidebar does not have focus');
+      }
     }
   }, [formDataFromRedux, form, selectedBlock]);
 
@@ -775,10 +1084,9 @@ const Iframe = (props) => {
   useEffect(() => {
     const handleMouseHover = (e) => {
       e.stopPropagation();
-      isInlineEditingRef.current = false;
+      
       // console.log(
       //   'Sidebar or its child element focused!',
-      //   isInlineEditingRef.current,
       // );
     };
     sidebarFocusEventListenerRef.current = handleMouseHover;
@@ -800,8 +1108,9 @@ const Iframe = (props) => {
 
   return (
     <div id="iframeContainer">
+      {/* Hidden Slate widget to extract toolbar button metadata */}
+      <HiddenSlateToolbar containerRef={hiddenButtonsRef} />
       <OpenObjectBrowser
-        isInlineEditingRef={isInlineEditingRef}
         origin={iframeSrc && new URL(iframeSrc).origin}
       />
       {addNewBlockOpened &&
@@ -824,7 +1133,7 @@ const Iframe = (props) => {
                 onInsertBlock
                   ? (id, value) => {
                       setAddNewBlockOpened(false);
-                      isInlineEditingRef.current = false;
+
                       const newId = onInsertBlock(id, value);
                       onSelectBlock(newId);
                       setAddNewBlockOpened(false);
@@ -849,6 +1158,7 @@ const Iframe = (props) => {
         title="Preview"
         src={iframeSrc}
         ref={setReferenceElement}
+        allow="clipboard-read; clipboard-write"
       />
     </div>
   );

@@ -11,31 +11,33 @@ This builds `@plone/registry` and `@plone/components`. Only needed once unless y
 
 ## Running Tests
 
+### Mock Parent Tests (Fast - No Volto)
+
+For quick iteration on hydra.js bridge and formatting logic without full Volto stack:
+
+```bash
+pnpm test:mock              # Run all mock parent tests (~4s)
+pnpm test:mock:headed       # Run with visible browser
+pnpm test:mock:ui           # Run in UI mode
+```
+
+These tests use only the mock API server and test frontend (no Volto compilation needed).
+
+### Full Integration Tests (With Volto)
+
 Playwright automatically starts the Volto server and waits for compilation before running tests.
 
-### Run all tests
 ```bash
-pnpm exec playwright test
+pnpm test:e2e               # Run all integration tests (~48s+)
+pnpm test:e2e:headed        # Run with visible browser
+pnpm test:e2e:ui            # Run in UI mode
+pnpm test:e2e:debug         # Run in debug mode
 ```
 
-### Run a specific test file
+### Run specific tests
 ```bash
 pnpm exec playwright test tests-playwright/integration/block-selection.spec.ts
-```
-
-### Run a specific test by line number
-```bash
 pnpm exec playwright test tests-playwright/integration/sidebar-forms.spec.ts:14
-```
-
-### Run tests with UI mode (interactive)
-```bash
-pnpm exec playwright test --ui
-```
-
-### Run tests in headed mode (see browser)
-```bash
-pnpm exec playwright test --headed
 ```
 
 ### View test report
@@ -146,3 +148,4 @@ lsof -ti:8888,3001,3002 2>/dev/null | xargs kill -9 2>/dev/null
 - only git commit when I ask you to
 - Playwright's `webServer.reuseExistingServer: true` means it will use a manually-started Volto server if available
 - The test setup skips `build:deps` to avoid parcel segfault in non-interactive shells
+- **NEVER* kill node processes. check if you really need to kill a process as some tests reload

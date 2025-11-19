@@ -128,10 +128,8 @@ test.describe('Inline Editing', () => {
     });
 
     // STEP 6: Trigger the bold button using dispatchEvent
-    const formatButtons = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra-format-button`);
-    const boldButton = formatButtons.nth(0);
     console.log('[TEST] Step 6: Clicking bold button...');
-    await boldButton.dispatchEvent('mousedown');
+    await helper.clickFormatButton('bold');
 
     // STEP 7: Wait a moment for the formatting to apply
     await page.waitForTimeout(500);
@@ -174,7 +172,7 @@ test.describe('Inline Editing', () => {
     // Click the link button
     // NOTE: This currently triggers a production bug in hydra.js:733
     // "Cannot read properties of null (reading 'link')"
-    await helper.clickFormatButton(blockId, 'link');
+    await helper.clickFormatButton('link');
 
     // TODO: Handle link URL input dialog if it appears
     // For now, this test documents the production bug
@@ -202,7 +200,7 @@ test.describe('Inline Editing', () => {
 
     // Select all text in the editor using JavaScript Selection API
     await helper.selectAllTextInEditor(editor);
-    await helper.clickFormatButton(blockId, 'bold');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
     // Verify bold in iframe
@@ -259,11 +257,11 @@ test.describe('Inline Editing', () => {
     });
 
     // Apply bold
-    await helper.clickFormatButton(blockId, 'bold');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(200);
 
     // Apply italic (text should still be selected)
-    await helper.clickFormatButton(blockId, 'italic');
+    await helper.clickFormatButton('italic');
     await page.waitForTimeout(200);
 
     // Verify both formats are applied
@@ -291,7 +289,7 @@ test.describe('Inline Editing', () => {
 
     // Select all text in the editor using JavaScript Selection API
     await helper.selectAllTextInEditor(editor);
-    await helper.clickFormatButton(blockId, 'bold');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
     // TODO: Check if the bold button shows active state
@@ -299,6 +297,9 @@ test.describe('Inline Editing', () => {
     // const boldButton = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra-format-button`).nth(0);
     // const isActive = await boldButton.evaluate((el) => el.classList.contains('active'));
     // expect(isActive).toBe(true);
+    const isActive = await helper.isActiveFormatButton('bold')
+    expect(isActive).toBeTruthy();
+
   });
 
   test('clicking format button again removes format', async ({ page }) => {
@@ -319,7 +320,7 @@ test.describe('Inline Editing', () => {
 
     // Select all text in the editor using JavaScript Selection API
     await helper.selectAllTextInEditor(editor);
-    await helper.clickFormatButton(blockId, 'bold');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
     // Verify bold was applied
@@ -328,7 +329,7 @@ test.describe('Inline Editing', () => {
 
     // Click bold button again to remove formatting
     await helper.selectAllTextInEditor(editor); // Re-select text
-    await helper.clickFormatButton(blockId, 'bold');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
     // Verify bold was removed
@@ -428,14 +429,30 @@ test.describe('Inline Editing', () => {
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('First', { delay: 10 });
 
-    // Type more text
+    // Wait for text batch to be sent (300ms debounce + buffer)
+    await page.waitForTimeout(400);
+
+    // Type more text - this will be a separate undo snapshot
     await editor.pressSequentially(' Second', { delay: 10 });
     let text = await editor.textContent();
     expect(text).toBe('First Second');
 
-    // Undo - should remove "Second"
+    // Check what's in the sidebar before undo
+    await helper.openSidebarTab('Block');
+    let sidebarValue = await helper.getSidebarFieldValue('value');
+    console.log('[TEST] Sidebar text before undo:', sidebarValue);
+    expect(sidebarValue).toBe('First Second');
+
+    // Undo - should remove " Second"
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(200);
+
+    // Check sidebar first
+    sidebarValue = await helper.getSidebarFieldValue('value');
+    console.log('[TEST] Sidebar text after undo:', sidebarValue);
+    expect(sidebarValue).toBe('First');
+
+    // Then check iframe
     text = await editor.textContent();
     expect(text).toBe('First');
 
@@ -464,7 +481,7 @@ test.describe('Inline Editing', () => {
 
     // Select all and make it bold
     await helper.selectAllTextInEditor(editor);
-    await helper.clickFormatButton(blockId, 'bold');
+    await helper.clickFormatButton('bold');
     await page.waitForTimeout(300);
 
     // Move cursor to end
@@ -592,6 +609,80 @@ test.describe('Inline Editing', () => {
     // Verify pasted text appears
     const text = await editor.textContent();
     expect(text).toContain('pasted content');
+  });
+
+  test('can delete across formatted text boundaries', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click the block
+    await helper.clickBlockInIframe(blockId);
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await editor.click();
+    await editor.evaluate((el) => { el.textContent = ''; });
+
+    // Type "Hello " then make "world" bold, then type " testing"
+    await editor.pressSequentially('Hello ', { delay: 10 });
+
+    // Apply bold formatting to "world"
+    await page.keyboard.press('Control+b');
+    await editor.pressSequentially('world', { delay: 10 });
+    await page.keyboard.press('Control+b'); // toggle bold off
+
+    await editor.pressSequentially(' testing', { delay: 10 });
+    await page.waitForTimeout(500); // Wait for batched updates
+
+    // Verify we have "Hello world testing" with "world" in bold
+    const initialText = await editor.textContent();
+    expect(initialText).toBe('Hello world testing');
+
+    // Select from "lo w" to "ld te" (crosses bold boundary)
+    // This means we're selecting: "lo w" (plain) + "or" (bold) + "ld" (plain) + " te" (plain)
+    await editor.evaluate((el) => {
+      const range = document.createRange();
+      const selection = window.getSelection();
+
+      // Find text nodes
+      const walker = document.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      const textNodes = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        textNodes.push(node);
+      }
+
+      // Select from position 3 of "Hello " to position 2 of " testing"
+      // "Hello " = positions 0-5
+      // "world" = positions 0-4 (in bold element)
+      // " testing" = positions 0-7
+
+      // Start: position 3 in "Hello " (after "Hel")
+      range.setStart(textNodes[0], 3);
+      // End: position 9 in last text node (after "ld te")
+      range.setEnd(textNodes[textNodes.length - 1], 5);
+
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+
+    await page.waitForTimeout(100);
+
+    // Press Delete to remove selected text
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(500);
+
+    // Verify result - should be "Helsting" (removed "lo world te")
+    const finalText = await editor.textContent();
+    expect(finalText).toBe('Helsting');
   });
 
   test('can cut text', async ({ page }) => {
