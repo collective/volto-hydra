@@ -198,15 +198,9 @@ test.describe('Adding Blocks', () => {
     const chooserVisible = await helper.isBlockChooserVisible();
     expect(chooserVisible).toBe(true);
 
-    // Verify common block types are present
-    const slateBlock = page.locator('button:has-text("Text")').or(
-      page.locator('button:has-text("Slate")')
-    );
-    const imageBlock = page.locator('button:has-text("Image")');
-
-    // At minimum, Slate/Text and Image blocks should be available
-    await expect(slateBlock.first()).toBeVisible();
-    await expect(imageBlock.first()).toBeVisible();
+    // Verify common block types are present - at minimum, Slate/Text and Image blocks should be available
+    expect(await helper.isBlockTypeVisible('slate')).toBe(true);
+    expect(await helper.isBlockTypeVisible('image')).toBe(true);
   });
 });
 

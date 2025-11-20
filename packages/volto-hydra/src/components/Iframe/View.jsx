@@ -32,20 +32,9 @@ import slateTransforms from '../../utils/slateTransforms';
 import { Editor, Transforms } from 'slate';
 import { toggleInlineFormat, toggleBlock } from '@plone/volto-slate/utils/blocks';
 import OpenObjectBrowser from './OpenObjectBrowser';
-import HiddenSlateToolbar from '../../widgets/HiddenSlateToolbar';
+import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
+import DropdownMenu from '../Toolbar/DropdownMenu';
 
-/**
- * Extract button metadata from rendered Slate toolbar buttons via React fiber nodes
- * @param {React.RefObject} hiddenButtonsRef - Ref to the hidden container with rendered buttons
- * @param {Array} toolbarButtons - Array of button names from config
- * @returns {Object} - Object mapping button names to their metadata (format, title, svg)
- *
- * This function accesses React internals (fiber nodes) to extract component props.
- * This approach:
- * - Is truly dynamic and supports custom buttons added by plugins
- * - Works with React context (buttons are properly rendered)
- * - Extracts the actual format, title, and icon from component props
- */
 /**
  * Extract field types for all block types from schema registry
  * @param {Object} intl - The react-intl intl object for internationalization
@@ -111,150 +100,6 @@ const extractBlockFieldTypes = (intl) => {
   });
 
   return blockFieldTypes;
-};
-
-const extractButtonMetadata = (hiddenButtonsRef, toolbarButtons) => {
-  const buttonConfigs = {};
-
-  if (!hiddenButtonsRef.current) {
-    console.warn('[VOLTO-HYDRA] Hidden buttons container not ready');
-    return buttonConfigs;
-  }
-
-  // Find all toolbar elements (buttons and separators)
-  // Note: SlateToolbar uses createPortal to render to document.body, not to our container
-  // So we need to find the toolbar in document.body instead
-  const toolbar = document.body.querySelector('.slate-inline-toolbar');
-  if (!toolbar) {
-    console.warn('[VIEW] Slate toolbar not found in document.body');
-    return buttonConfigs;
-  }
-
-  const allElements = toolbar.querySelectorAll('.button-wrapper, .toolbar-separator');
-  console.log('[VIEW] Found toolbar elements:', allElements.length);
-
-  // Build a map from button elements to their React fiber props
-  const fiberPropsMap = new Map();
-
-  allElements.forEach((element, index) => {
-    // Check if this is a separator
-    if (element.classList.contains('toolbar-separator')) {
-      fiberPropsMap.set(element, { buttonType: 'Separator' });
-      console.log(`[VIEW] Found Separator at index ${index}`);
-      return;
-    }
-
-    // Access React fiber node for buttons - React 16/17/18 use different keys
-    const fiberKey = Object.keys(element).find(key =>
-      key.startsWith('__reactFiber') ||
-      key.startsWith('__reactInternalInstance')
-    );
-
-    if (fiberKey) {
-      let fiber = element[fiberKey];
-      let buttonProps = null;
-      let formatProp = null;
-
-      // Walk up the fiber tree to find button component
-      // Look for any component with title and icon props (common to all toolbar buttons)
-      while (fiber) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        const componentName = fiber.type?.name;
-
-        // Check if this fiber has button props (title and icon)
-        if (props && props.title && props.icon && !buttonProps) {
-          buttonProps = { buttonType: componentName || 'UnknownButton', ...props };
-        }
-
-        // Check if this fiber has the format prop (from BlockButton/MarkElementButton)
-        if (props && props.format && !formatProp) {
-          formatProp = props.format;
-        }
-
-        // If we found both button props and format, we're done
-        if (buttonProps && formatProp) {
-          buttonProps.format = formatProp;
-          console.log(`[VIEW] Found button props for button ${index} (${buttonProps.buttonType}):`, {
-            format: formatProp,
-            title: buttonProps.title,
-            icon: buttonProps.icon ? 'present' : 'missing'
-          });
-          fiberPropsMap.set(element, buttonProps);
-          break;
-        }
-
-        fiber = fiber.return;
-      }
-
-      // If we found button props but no format, still save it (for link button, etc.)
-      if (buttonProps && !formatProp) {
-        console.log(`[VIEW] Found button props for button ${index} (${buttonProps.buttonType}):`, {
-          format: buttonProps.format,
-          title: buttonProps.title,
-          icon: buttonProps.icon ? 'present' : 'missing'
-        });
-        fiberPropsMap.set(element, buttonProps);
-      }
-    }
-  });
-
-  // Match toolbar buttons config order with rendered elements
-  let elementIndex = 0;
-  toolbarButtons.forEach((buttonName) => {
-    const element = allElements[elementIndex];
-    const props = fiberPropsMap.get(element);
-
-    if (buttonName === 'separator') {
-      // Add separator to config
-      buttonConfigs[buttonName] = {
-        buttonType: 'Separator'
-      };
-      console.log(`[VIEW] Extracted separator at index ${elementIndex}`);
-      elementIndex++;
-      return;
-    }
-
-    if (props && (props.format || props.title)) {
-      // Extract icon SVG from the button element
-      const buttonElement = element.querySelector('button, a');
-      const iconElement = buttonElement?.querySelector('.icon, [class*="icon"]');
-
-      // The iconElement might BE the svg element (if svg has class="icon")
-      // or it might be a container with an svg inside
-      const svgElement = iconElement?.tagName === 'svg'
-        ? iconElement
-        : iconElement?.querySelector('svg');
-
-      const svg = svgElement?.outerHTML || '';
-
-      // Extract title - if it's a React element/object, get the text from the DOM element instead
-      let title;
-      if (typeof props.title === 'string') {
-        title = props.title;
-      } else if (props.title && typeof props.title === 'object') {
-        // Title is a React element - extract text from the DOM button
-        title = buttonElement?.getAttribute('title') || buttonElement?.getAttribute('aria-label') || buttonElement?.textContent?.trim() || buttonName;
-      } else {
-        title = buttonName;
-      }
-
-      buttonConfigs[buttonName] = {
-        buttonType: props.buttonType, // 'MarkElementButton', 'BlockButton', or 'ClearFormattingButton'
-        format: props.format || undefined,
-        title: title,
-        svg: svg,
-        testId: `${buttonName}-button`
-      };
-
-      console.log(`[VIEW] Extracted metadata for ${buttonName}:`, buttonConfigs[buttonName]);
-    } else {
-      console.warn(`[VIEW] Could not extract props for button: ${buttonName}`);
-    }
-
-    elementIndex++;
-  });
-
-  return buttonConfigs;
 };
 
 /**
@@ -328,52 +173,12 @@ const Iframe = (props) => {
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
-  const [buttonMetadata, setButtonMetadata] = useState(null); // Store extracted button metadata
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, showFormatButtons }
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false); // Track dropdown menu visibility
   const [menuButtonRect, setMenuButtonRect] = useState(null); // Store menu button position for portal positioning
   const [currentSelection, setCurrentSelection] = useState(null); // Store current selection from iframe
   const blockChooserRef = useRef();
-  const hiddenButtonsRef = useRef(null); // Ref to hidden container for extracting button metadata
   const applyFormatRef = useRef(null); // Ref to shared format handler
-
-  // Helper to check if a format is active at the given selection in the node tree
-  const isFormatActiveAtSelection = (nodes, selection, format) => {
-    if (!nodes || !selection) return false;
-
-    // Helper to get node at path
-    const getNodeAtPath = (root, path) => {
-      let current = root;
-      for (const index of path) {
-        if (!current[index]) return null;
-        current = current[index];
-      }
-      return current;
-    };
-
-    // Helper to check if any ancestor of the selection has the format type
-    const checkPath = (path) => {
-      // Walk up the path checking each node
-      for (let i = 0; i < path.length; i++) {
-        const partialPath = path.slice(0, i + 1);
-        const node = getNodeAtPath(nodes, partialPath);
-        if (node && node.type === format) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    // Check both anchor and focus paths
-    if (selection.anchor && checkPath(selection.anchor.path)) {
-      return true;
-    }
-    if (selection.focus && checkPath(selection.focus.path)) {
-      return true;
-    }
-
-    return false;
-  };
 
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     strategy: 'fixed',
@@ -393,26 +198,6 @@ const Iframe = (props) => {
       },
     ],
   });
-
-  // Extract button metadata from hidden toolbar after it mounts
-  useEffect(() => {
-    // Wait a tick for HiddenSlateToolbar to render on client-side
-    const timer = setTimeout(() => {
-      if (hiddenButtonsRef.current) {
-        console.log('[VIEW] Hidden container HTML:', hiddenButtonsRef.current.innerHTML);
-        console.log('[VIEW] Hidden container children:', hiddenButtonsRef.current.children);
-
-        const toolbarButtons = config.settings.slate?.toolbarButtons || [];
-        const metadata = extractButtonMetadata(hiddenButtonsRef, toolbarButtons);
-        setButtonMetadata(metadata);
-        console.log('[VIEW] Button metadata extracted:', metadata);
-      } else {
-        console.log('[VIEW] Hidden container ref is null');
-      }
-    }, 100); // Small delay to ensure client-side rendering completes
-
-    return () => clearTimeout(timer);
-  }, []); // Run once on mount
 
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent GET_INITIAL_DATA)
@@ -434,12 +219,12 @@ const Iframe = (props) => {
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
   const processingFormatRequestRef = useRef(false); // True while processing SLATE_FORMAT_REQUEST
-  const [iframeSrc, setIframeSrc] = useState(null);
   const urlFromEnv = getURlsFromEnv();
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get('iframe_url') ||
     urlFromEnv[0];
+  const [iframeSrc, setIframeSrc] = useState(getUrlWithAdminParams(u, token));
 
   // Subscribe to form data from Redux to detect changes
   // This provides a new reference on updates, unlike the mutated form prop
@@ -497,12 +282,9 @@ const Iframe = (props) => {
       dispatch(setSidebarTab(1));
     };
 
-    // Shared format handler for both toolbar buttons and keyboard shortcuts
+    // Keyboard shortcut handler - uses the same editor as toolbar buttons
     const applyFormat = ({ blockId, format, selection, action = 'toggle', url, buttonType }) => {
-      console.log('[VIEW] applyFormat called:', { blockId, format, selection, action, buttonType });
-
-      // Make sure we're using the latest form data from closure
-      const currentForm = form;
+      console.log('[VIEW] applyFormat called (keyboard shortcut):', { blockId, format, selection, action, buttonType });
 
       const block = form.blocks[blockId];
       if (!block?.value) {
@@ -510,26 +292,25 @@ const Iframe = (props) => {
         return false;
       }
 
-      // Get the sidebar widget's Slate editor
-      const fieldId = 'value';
-      const sidebarEditor = typeof window !== 'undefined' && window.voltoHydraSidebarEditors?.get(fieldId);
+      // Get the toolbar editor (same one used by toolbar buttons)
+      const toolbarEditor = typeof window !== 'undefined' && window.voltoHydraToolbarEditor;
 
       // Verify this editor is for the current block
-      if (sidebarEditor && selectedBlock !== blockId) {
-        console.log('[VIEW] Sidebar editor exists but selected block does not match:', selectedBlock, 'vs', blockId);
+      if (toolbarEditor && selectedBlock !== blockId) {
+        console.log('[VIEW] Toolbar editor exists but selected block does not match:', selectedBlock, 'vs', blockId);
         return false;
       }
 
-      if (!sidebarEditor) {
-        console.warn('[VIEW] No sidebar editor available');
+      if (!toolbarEditor) {
+        console.warn('[VIEW] No toolbar editor available - SyncedSlateToolbar may not be mounted');
         return false;
       }
 
       try {
-        // Set selection if provided
+        // Set selection if provided (keyboard shortcuts restore cursor position)
         if (selection) {
-          Transforms.select(sidebarEditor, selection);
-          console.log('[VIEW] Selection set on sidebar editor');
+          Transforms.select(toolbarEditor, selection);
+          console.log('[VIEW] Selection set on toolbar editor');
         }
 
         // Handle link format (element, not mark)
@@ -541,45 +322,17 @@ const Iframe = (props) => {
           }
         } else if (buttonType === 'BlockButton') {
           // Apply block-level format (headings, lists, etc.)
-          toggleBlock(sidebarEditor, format);
-          console.log('[VIEW] Applied block format:', format);
+          toggleBlock(toolbarEditor, format);
+          console.log('[VIEW] Applied block format via keyboard:', format);
         } else {
           // Apply inline format (bold, italic, etc.) - default for MarkElementButton
-          toggleInlineFormat(sidebarEditor, format);
-          console.log('[VIEW] Applied inline format:', format);
+          toggleInlineFormat(toolbarEditor, format);
+          console.log('[VIEW] Applied inline format via keyboard:', format);
         }
 
-        // Get updated value and selection
-        const updatedValue = sidebarEditor.children;
-        const transformedSelection = sidebarEditor.selection;
-
-        // Build updated form
-        const updatedForm = {
-          ...form,
-          blocks: {
-            ...form.blocks,
-            [blockId]: {
-              ...block,
-              value: updatedValue,
-            },
-          },
-        };
-
-        // Send to iframe with selection
-        if (iframeOriginRef.current && referenceElement) {
-          referenceElement.contentWindow.postMessage(
-            {
-              type: 'FORM_DATA',
-              data: updatedForm,
-              selection: transformedSelection,
-            },
-            iframeOriginRef.current
-          );
-          console.log('[VIEW] Sent updated form to iframe with selection');
-        }
-
-        // Update Redux form data
-        onChangeFormData(updatedForm);
+        // The toolbar editor's onChange will automatically handle updating Redux and iframe
+        // No need to manually send messages - just return success
+        console.log('[VIEW] Format applied, toolbar onChange will handle updates');
         return true;
       } catch (error) {
         console.error('[VIEW] Error applying format:', error);
@@ -1034,7 +787,10 @@ const Iframe = (props) => {
             blockUid: event.data.blockUid,
             rect: event.data.rect,
             showFormatButtons: event.data.showFormatButtons,
+            focusedFieldName: event.data.focusedFieldName, // Track which field is focused
           });
+          // Call onSelectBlock to open sidebar and update selectedBlock in parent
+          onSelectBlock(event.data.blockUid);
           break;
 
         case 'HIDE_BLOCK_UI':
@@ -1046,33 +802,11 @@ const Iframe = (props) => {
           // Store the iframe's actual origin when it first contacts us
           iframeOriginRef.current = event.origin;
 
-          // Use button metadata from state (extracted in useEffect after hidden widget mounts)
-          const toolbarButtons = config.settings.slate?.toolbarButtons || [];
-
           // Extract block field types from schema registry (maps blockType -> fieldName -> fieldType)
           const blockFieldTypes = extractBlockFieldTypes(intl);
           console.log('[VIEW] Final blockFieldTypes:', JSON.stringify(blockFieldTypes));
 
-          // If metadata not ready yet, wait and retry
-          if (!buttonMetadata) {
-            console.log('[VIEW] Button metadata not ready, waiting...');
-            setTimeout(() => {
-              event.source.postMessage(
-                {
-                  type: 'INITIAL_DATA',
-                  data: form,
-                  blockFieldTypes,
-                  slateConfig: {
-                    hotkeys: config.settings.slate?.hotkeys || {},
-                    toolbarButtons,
-                    buttonConfigs: buttonMetadata || {}, // Use metadata from state
-                  },
-                },
-                event.origin,
-              );
-            }, 150); // Wait for metadata extraction to complete
-            return;
-          }
+          const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
           event.source.postMessage(
             {
@@ -1082,7 +816,6 @@ const Iframe = (props) => {
               slateConfig: {
                 hotkeys: config.settings.slate?.hotkeys || {},
                 toolbarButtons,
-                buttonConfigs: buttonMetadata, // Use metadata from state
               },
             },
             event.origin,
@@ -1257,8 +990,6 @@ const Iframe = (props) => {
 
   return (
     <div id="iframeContainer">
-      {/* Hidden Slate widget to extract toolbar button metadata */}
-      <HiddenSlateToolbar containerRef={hiddenButtonsRef} />
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
       />
@@ -1331,119 +1062,19 @@ const Iframe = (props) => {
             }}
           />
 
-          {/* Quanta Toolbar - floating toolbar */}
-          <div
-            className="volto-hydra-quantaToolbar"
-            style={{
-              position: 'fixed',
-              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
-              top: `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 48}px`,
-              zIndex: 10,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0',
-              background: '#fff',
-              border: '1px solid #c7d5d8',
-              borderRadius: '3px',
-              padding: '4px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              pointerEvents: 'none', // Let events pass through to iframe
+          {/* Quanta Toolbar with real Slate buttons */}
+          <SyncedSlateToolbar
+            selectedBlock={selectedBlock}
+            form={properties}
+            currentSelection={currentSelection}
+            onChangeFormData={onChangeFormData}
+            blockUI={blockUI}
+            iframeElement={referenceElement}
+            onOpenMenu={(rect) => {
+              setMenuButtonRect(rect);
+              setMenuDropdownOpen(!menuDropdownOpen);
             }}
-          >
-            {/* Drag handle - visual only, events pass through to iframe */}
-            <button
-              style={{
-                background: '#fff',
-                border: 'none',
-                borderRight: '1px solid #e0e0e0',
-                padding: '8px 10px',
-                cursor: 'grab',
-                fontSize: '16px',
-                color: '#666',
-                display: 'flex',
-                alignItems: 'center',
-                marginRight: '4px',
-                pointerEvents: 'none',
-              }}
-              title="Drag to reorder"
-            >
-              ⋮⋮
-            </button>
-            {blockUI.showFormatButtons && buttonMetadata && (
-              <>
-                {/* Format buttons - rendered from extracted metadata */}
-                {Object.entries(buttonMetadata).map(([buttonName, config]) => {
-                  if (config.buttonType === 'Separator') {
-                    return (
-                      <div
-                        key={buttonName}
-                        style={{ width: '1px', height: '28px', background: '#e0e0e0', margin: '0 4px' }}
-                      />
-                    );
-                  }
-
-                  // Check if this format is active at the current selection
-                  const block = selectedBlock && form.blocks[selectedBlock];
-                  const isActive = config.format && block?.value && currentSelection
-                    ? isFormatActiveAtSelection(block.value, currentSelection, config.format)
-                    : false;
-
-                  return (
-                    <button
-                      key={buttonName}
-                      style={{
-                        background: isActive ? '#e0e0e0' : '#fff',
-                        border: 'none',
-                        padding: '8px 10px',
-                        cursor: 'pointer',
-                        color: isActive ? '#007bff' : '#333',
-                        pointerEvents: 'auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      title={config.title}
-                      onClick={() => {
-                        // Apply format using shared applyFormat function via ref
-                        console.log('[VIEW] Format button clicked:', config.format, config.buttonType);
-                        if (config.format && selectedBlock && applyFormatRef.current) {
-                          applyFormatRef.current({
-                            blockId: selectedBlock,
-                            format: config.format,
-                            selection: currentSelection,
-                            action: 'toggle',
-                            buttonType: config.buttonType,
-                          });
-                        }
-                      }}
-                      dangerouslySetInnerHTML={{ __html: config.svg }}
-                    />
-                  );
-                })}
-              </>
-            )}
-            <button
-              style={{
-                background: '#fff',
-                border: 'none',
-                padding: '8px 10px',
-                cursor: 'pointer',
-                fontSize: '18px',
-                color: '#666',
-                pointerEvents: 'auto',
-                position: 'relative',
-              }}
-              title="More options"
-              onClick={(e) => {
-                e.stopPropagation();
-                const rect = e.currentTarget.getBoundingClientRect();
-                setMenuButtonRect(rect);
-                setMenuDropdownOpen(!menuDropdownOpen);
-              }}
-            >
-              ⋯
-            </button>
-          </div>
+          />
 
           {/* Add Button - below block, right-aligned */}
           <button
@@ -1475,71 +1106,16 @@ const Iframe = (props) => {
         </>
       )}
 
-      {/* Dropdown menu - rendered as portal to avoid container clipping */}
-      {menuDropdownOpen && menuButtonRect && createPortal(
-        <div
-          className="volto-hydra-dropdown-menu"
-          style={{
-            position: 'fixed',
-            left: `${menuButtonRect.right - 180}px`, // Align right edge with button
-            top: `${menuButtonRect.bottom + 4}px`,
-            background: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-            zIndex: 10000,
-            width: '180px',
-            pointerEvents: 'auto',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
-            className="volto-hydra-dropdown-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px',
-              cursor: 'pointer',
-              fontSize: '15px',
-              fontWeight: '500',
-            }}
-            onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
-            onMouseLeave={(e) => e.target.style.background = 'transparent'}
-            onClick={() => {
-              setMenuDropdownOpen(false);
-              // TODO: Open settings sidebar
-            }}
-          >
-            ⚙️ Settings
-          </div>
-          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
-          <div
-            className="volto-hydra-dropdown-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px',
-              cursor: 'pointer',
-              fontSize: '15px',
-              fontWeight: '500',
-            }}
-            onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
-            onMouseLeave={(e) => e.target.style.background = 'transparent'}
-            onClick={() => {
-              setMenuDropdownOpen(false);
-              if (selectedBlock) {
-                const previous = previousBlockId(properties, selectedBlock);
-                const newFormData = deleteBlock(properties, selectedBlock);
-                onChangeFormData(newFormData);
-                onSelectBlock(previous);
-                dispatch(setSidebarTab(1));
-              }
-            }}
-          >
-            🗑️ Remove
-          </div>
-        </div>,
-        document.body
+      {/* Dropdown menu */}
+      {menuDropdownOpen && (
+        <DropdownMenu
+          selectedBlock={selectedBlock}
+          properties={properties}
+          onChangeFormData={onChangeFormData}
+          onSelectBlock={onSelectBlock}
+          menuButtonRect={menuButtonRect}
+          onClose={() => setMenuDropdownOpen(false)}
+        />
       )}
     </div>
   );

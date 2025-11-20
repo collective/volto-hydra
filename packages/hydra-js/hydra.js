@@ -308,6 +308,7 @@ class Bridge {
                         height: rect.height,
                       },
                       showFormatButtons: showFormatBtns,
+                      focusedFieldName: editableField, // Send field name so toolbar knows which field to sync
                     },
                     this.adminOrigin,
                   );
@@ -437,6 +438,7 @@ class Bridge {
                           height: rect.height,
                         },
                         showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+                        focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
                       },
                       this.adminOrigin,
                     );
@@ -995,8 +997,9 @@ class Bridge {
       showFormatBtns: show.formatBtns
     });
 
-    // Send BLOCK_SELECTED message to parent with position and format button visibility
-    // Parent will render selection outline, toolbar, and add button overlays
+    // Send BLOCK_SELECTED message to parent with BLOCK CONTAINER position and format button visibility
+    // Parent will render selection outline, toolbar, and add button overlays positioned relative to the BLOCK CONTAINER
+    // NOTE: rect is the block container ([data-block-uid]), NOT the editable field rect
     const rect = blockElement.getBoundingClientRect();
     window.parent.postMessage(
       {
@@ -1234,9 +1237,11 @@ class Bridge {
         return;
       }
 
+      // Position drag button to match parent toolbar position
+      // IMPORTANT: Use BLOCK CONTAINER rect (same as BLOCK_SELECTED message), NOT editable field rect
       const rect = blockElement.getBoundingClientRect();
-      const toolbarLeft = rect.left;
-      const toolbarTop = rect.top - 48; // 48px above block (matches parent toolbar height)
+      const toolbarLeft = rect.left;  // Left edge of block container
+      const toolbarTop = rect.top - 48; // 48px above block container (matches parent toolbar height)
 
       dragButton.style.left = `${toolbarLeft}px`;
       dragButton.style.top = `${toolbarTop}px`;
@@ -2824,11 +2829,17 @@ class Bridge {
         .grabbing {
           cursor: grabbing !important;
         }
+        /* During drag operations, disable pointer events on toolbar so elementFromPoint can detect blocks underneath */
+        .grabbing .quanta-toolbar,
+        .grabbing .volto-hydra-add-button,
+        .grabbing .volto-hydra-block-outline {
+          pointer-events: none !important;
+        }
         .dragging {
-          position: fixed !important; 
-          opacity: 0.5; 
-          pointer-events: none; 
-          z-index: 1000; 
+          position: fixed !important;
+          opacity: 0.5;
+          pointer-events: none;
+          z-index: 1000;
         }
         .highlighted-block {
           border-top: 5px solid blue; 

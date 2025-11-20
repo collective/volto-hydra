@@ -31,15 +31,14 @@ test.describe('Block Drag and Drop', () => {
     await helper.clickBlockInIframe(firstBlockUid!);
     await helper.waitForSidebarOpen();
 
-    // Find the drag button in the Quanta toolbar (inside the iframe)
-    const dragButton = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragButton).toBeVisible({ timeout: 2000 });
+    // Get the drag handle from the toolbar (in parent window, not iframe)
+    const dragHandle = await helper.getDragHandle();
 
     // Get the second block element to drag to
     const secondBlock = iframe.locator(`[data-block-uid="${secondBlockUid}"]`);
 
     // Drag using mouse events (hydra.js uses mousedown/mousemove/mouseup, not HTML5 DND)
-    await helper.dragBlockWithMouse(dragButton, secondBlock, true);
+    await helper.dragBlockWithMouse(dragHandle, secondBlock, true);
 
     // Verify block order changed
     const newBlocks = await iframe.locator('[data-block-uid]').all();
@@ -90,14 +89,13 @@ test.describe('Block Drag and Drop', () => {
     // Select first block
     await helper.clickBlockInIframe(firstBlock);
 
-    // Find drag button in Quanta toolbar
-    const dragButton = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragButton).toBeVisible({ timeout: 2000 });
+    // Get drag handle from toolbar
+    const dragHandle = await helper.getDragHandle();
 
     const lastBlockElement = iframe.locator(`[data-block-uid="${lastBlock}"]`);
 
     // Drag using mouse events to place after the last block
-    await helper.dragBlockWithMouse(dragButton, lastBlockElement, true);
+    await helper.dragBlockWithMouse(dragHandle, lastBlockElement, true);
 
     const newBlocks = await helper.getBlockOrder();
     // First block should now be at the end
@@ -119,14 +117,13 @@ test.describe('Block Drag and Drop', () => {
     // Select last block
     await helper.clickBlockInIframe(lastBlock);
 
-    // Find drag button in Quanta toolbar
-    const dragButton = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragButton).toBeVisible({ timeout: 2000 });
+    // Get drag handle from toolbar
+    const dragHandle = await helper.getDragHandle();
 
     const firstBlockElement = iframe.locator(`[data-block-uid="${firstBlock}"]`);
 
     // Drag using mouse events to place before the first block
-    await helper.dragBlockWithMouse(dragButton, firstBlockElement, false);
+    await helper.dragBlockWithMouse(dragHandle, firstBlockElement, false);
 
     const newBlocks = await helper.getBlockOrder();
     // Last block should now be at the start
@@ -149,14 +146,13 @@ test.describe('Block Drag and Drop', () => {
     // Select first block
     await helper.clickBlockInIframe(initialBlocks[0]);
 
-    // Find drag button in Quanta toolbar
-    const dragButton = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragButton).toBeVisible({ timeout: 2000 });
+    // Get drag handle from toolbar
+    const dragHandle = await helper.getDragHandle();
 
     const targetBlock = iframe.locator(`[data-block-uid="${initialBlocks[1]}"]`);
 
     // Drag using mouse events to place after second block
-    await helper.dragBlockWithMouse(dragButton, targetBlock, true);
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
 
     const newCount = await helper.getBlockCount();
     expect(newCount).toBe(initialCount);
@@ -177,14 +173,13 @@ test.describe('Block Drag and Drop', () => {
     // Select first block
     await helper.clickBlockInIframe(initialBlocks[0]);
 
-    // Find drag button in Quanta toolbar
-    const dragButton = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragButton).toBeVisible({ timeout: 2000 });
+    // Get drag handle from toolbar
+    const dragHandle = await helper.getDragHandle();
 
     const targetBlock = iframe.locator(`[data-block-uid="${initialBlocks[1]}"]`);
 
     // Drag using mouse events to verify no duplication
-    await helper.dragBlockWithMouse(dragButton, targetBlock, true);
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
 
     const newBlocks = await helper.getBlockOrder();
     const uniqueNewBlocks = new Set(newBlocks);
@@ -217,14 +212,13 @@ test.describe('Block Drag and Drop', () => {
     // Select middle block
     await helper.clickBlockInIframe(middleBlock);
 
-    // Find drag button in Quanta toolbar
-    const dragButton = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragButton).toBeVisible({ timeout: 2000 });
+    // Get drag handle from toolbar
+    const dragHandle = await helper.getDragHandle();
 
     const lastBlockElement = iframe.locator(`[data-block-uid="${lastBlock}"]`);
 
     // Drag middle block using mouse events to place after last block
-    await helper.dragBlockWithMouse(dragButton, lastBlockElement, true);
+    await helper.dragBlockWithMouse(dragHandle, lastBlockElement, true);
 
     const newBlocks = await helper.getBlockOrder();
 
