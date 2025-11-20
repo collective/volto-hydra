@@ -83,15 +83,43 @@ function renderSlateBlock(block) {
     let html = '';
 
     value.forEach((node) => {
-        if (node.type === 'p') {
-            // nodeId MUST be present - hydra.js is responsible for adding it
-            if (node.nodeId === undefined) {
-                throw new Error(`Missing nodeId on Slate node. hydra.js should add nodeIds before rendering. Node: ${JSON.stringify(node)}`);
-            }
+        // nodeId MUST be present - hydra.js is responsible for adding it
+        if (node.nodeId === undefined) {
+            throw new Error(`Missing nodeId on Slate node. hydra.js should add nodeIds before rendering. Node: ${JSON.stringify(node)}`);
+        }
 
-            const text = renderChildren(node.children);
-            // Mark as editable field - hydra.js will read this and set contenteditable="true"
-            html += `<p data-editable-field="value" data-node-id="${node.nodeId}">${text}</p>`;
+        const text = renderChildren(node.children);
+        // Mark as editable field - hydra.js will read this and set contenteditable="true"
+
+        // Render based on node type
+        switch (node.type) {
+            case 'p':
+                html += `<p data-editable-field="value" data-node-id="${node.nodeId}">${text}</p>`;
+                break;
+            case 'h1':
+                html += `<h1 data-editable-field="value" data-node-id="${node.nodeId}">${text}</h1>`;
+                break;
+            case 'h2':
+                html += `<h2 data-editable-field="value" data-node-id="${node.nodeId}">${text}</h2>`;
+                break;
+            case 'h3':
+                html += `<h3 data-editable-field="value" data-node-id="${node.nodeId}">${text}</h3>`;
+                break;
+            case 'h4':
+                html += `<h4 data-editable-field="value" data-node-id="${node.nodeId}">${text}</h4>`;
+                break;
+            case 'h5':
+                html += `<h5 data-editable-field="value" data-node-id="${node.nodeId}">${text}</h5>`;
+                break;
+            case 'h6':
+                html += `<h6 data-editable-field="value" data-node-id="${node.nodeId}">${text}</h6>`;
+                break;
+            case 'blockquote':
+                html += `<blockquote data-editable-field="value" data-node-id="${node.nodeId}">${text}</blockquote>`;
+                break;
+            default:
+                // Fallback for unknown block types
+                html += `<p data-editable-field="value" data-node-id="${node.nodeId}">${text}</p>`;
         }
     });
 

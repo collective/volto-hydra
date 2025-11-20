@@ -6,7 +6,9 @@ import {
   applyBlockDefaults,
   deleteBlock,
   getBlocksFieldname,
+  getBlocksLayoutFieldname,
   insertBlock,
+  moveBlock,
   mutateBlock,
   previousBlockId,
 } from '@plone/volto/helpers';
@@ -28,7 +30,7 @@ import {
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
 import { Editor, Transforms } from 'slate';
-import { toggleInlineFormat } from '@plone/volto-slate/utils/blocks';
+import { toggleInlineFormat, toggleBlock } from '@plone/volto-slate/utils/blocks';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import HiddenSlateToolbar from '../../widgets/HiddenSlateToolbar';
 
@@ -327,8 +329,52 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [buttonMetadata, setButtonMetadata] = useState(null); // Store extracted button metadata
+  const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, showFormatButtons }
+  const [menuDropdownOpen, setMenuDropdownOpen] = useState(false); // Track dropdown menu visibility
+  const [menuButtonRect, setMenuButtonRect] = useState(null); // Store menu button position for portal positioning
+  const [currentSelection, setCurrentSelection] = useState(null); // Store current selection from iframe
   const blockChooserRef = useRef();
   const hiddenButtonsRef = useRef(null); // Ref to hidden container for extracting button metadata
+  const applyFormatRef = useRef(null); // Ref to shared format handler
+
+  // Helper to check if a format is active at the given selection in the node tree
+  const isFormatActiveAtSelection = (nodes, selection, format) => {
+    if (!nodes || !selection) return false;
+
+    // Helper to get node at path
+    const getNodeAtPath = (root, path) => {
+      let current = root;
+      for (const index of path) {
+        if (!current[index]) return null;
+        current = current[index];
+      }
+      return current;
+    };
+
+    // Helper to check if any ancestor of the selection has the format type
+    const checkPath = (path) => {
+      // Walk up the path checking each node
+      for (let i = 0; i < path.length; i++) {
+        const partialPath = path.slice(0, i + 1);
+        const node = getNodeAtPath(nodes, partialPath);
+        if (node && node.type === format) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Check both anchor and focus paths
+    if (selection.anchor && checkPath(selection.anchor.path)) {
+      return true;
+    }
+    if (selection.focus && checkPath(selection.focus.path)) {
+      return true;
+    }
+
+    return false;
+  };
+
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     strategy: 'fixed',
     placement: 'bottom',
@@ -444,12 +490,105 @@ const Iframe = (props) => {
     const onDeleteBlock = (id, selectPrev) => {
       const previous = previousBlockId(properties, id);
       const newFormData = deleteBlock(properties, id);
-      
+
       onChangeFormData(newFormData);
       onSelectBlock(selectPrev ? previous : null);
       setAddNewBlockOpened(false);
       dispatch(setSidebarTab(1));
     };
+
+    // Shared format handler for both toolbar buttons and keyboard shortcuts
+    const applyFormat = ({ blockId, format, selection, action = 'toggle', url, buttonType }) => {
+      console.log('[VIEW] applyFormat called:', { blockId, format, selection, action, buttonType });
+
+      // Make sure we're using the latest form data from closure
+      const currentForm = form;
+
+      const block = form.blocks[blockId];
+      if (!block?.value) {
+        console.error('[VIEW] No value found for block:', blockId);
+        return false;
+      }
+
+      // Get the sidebar widget's Slate editor
+      const fieldId = 'value';
+      const sidebarEditor = typeof window !== 'undefined' && window.voltoHydraSidebarEditors?.get(fieldId);
+
+      // Verify this editor is for the current block
+      if (sidebarEditor && selectedBlock !== blockId) {
+        console.log('[VIEW] Sidebar editor exists but selected block does not match:', selectedBlock, 'vs', blockId);
+        return false;
+      }
+
+      if (!sidebarEditor) {
+        console.warn('[VIEW] No sidebar editor available');
+        return false;
+      }
+
+      try {
+        // Set selection if provided
+        if (selection) {
+          Transforms.select(sidebarEditor, selection);
+          console.log('[VIEW] Selection set on sidebar editor');
+        }
+
+        // Handle link format (element, not mark)
+        if (format === 'link') {
+          if (action === 'add' && url) {
+            console.warn('[VIEW] Link wrapping not yet implemented');
+          } else if (action === 'remove' || action === 'toggle') {
+            console.warn('[VIEW] Link unwrapping not yet implemented');
+          }
+        } else if (buttonType === 'BlockButton') {
+          // Apply block-level format (headings, lists, etc.)
+          toggleBlock(sidebarEditor, format);
+          console.log('[VIEW] Applied block format:', format);
+        } else {
+          // Apply inline format (bold, italic, etc.) - default for MarkElementButton
+          toggleInlineFormat(sidebarEditor, format);
+          console.log('[VIEW] Applied inline format:', format);
+        }
+
+        // Get updated value and selection
+        const updatedValue = sidebarEditor.children;
+        const transformedSelection = sidebarEditor.selection;
+
+        // Build updated form
+        const updatedForm = {
+          ...form,
+          blocks: {
+            ...form.blocks,
+            [blockId]: {
+              ...block,
+              value: updatedValue,
+            },
+          },
+        };
+
+        // Send to iframe with selection
+        if (iframeOriginRef.current && referenceElement) {
+          referenceElement.contentWindow.postMessage(
+            {
+              type: 'FORM_DATA',
+              data: updatedForm,
+              selection: transformedSelection,
+            },
+            iframeOriginRef.current
+          );
+          console.log('[VIEW] Sent updated form to iframe with selection');
+        }
+
+        // Update Redux form data
+        onChangeFormData(updatedForm);
+        return true;
+      } catch (error) {
+        console.error('[VIEW] Error applying format:', error);
+        return false;
+      }
+    };
+
+    // Store in ref so it's accessible outside useEffect
+    applyFormatRef.current = applyFormat;
 
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
@@ -537,133 +676,15 @@ const Iframe = (props) => {
           break;
 
         case 'SLATE_FORMAT_REQUEST':
-          // Slate formatting handler - prefers using sidebar widget's editor directly
-          try {
-            // Set flag to prevent useEffect from sending duplicate FORM_DATA
-            processingFormatRequestRef.current = true;
-            console.log('[VIEW] Received SLATE_FORMAT_REQUEST:', event.data);
-            const { blockId, format, action, selection, url } = event.data;
-            console.log('[VIEW] Looking for block:', blockId);
-            const block = form.blocks[blockId];
-            console.log('[VIEW] Block found:', !!block, 'Block value:', block?.value);
-
-            if (!block?.value) {
-              console.error('[VIEW] No value found for block:', blockId);
-              event.source.postMessage(
-                {
-                  type: 'SLATE_ERROR',
-                  blockId,
-                  error: 'Block not found or no value available',
-                  originalRequest: event.data,
-                },
-                event.origin,
-              );
-              break;
-            }
-
-            // Try to get the sidebar widget's Slate editor
-            // The widget registers with the field ID which is "value" for the slate block
-            // We need to check if the currently selected block matches this editor
-            const fieldId = 'value';
-            let sidebarEditor = typeof window !== 'undefined' && window.voltoHydraSidebarEditors?.get(fieldId);
-
-            // Verify this editor is for the current block by checking if it's mounted
-            // and the selected block in the form matches our blockId
-            if (sidebarEditor && selectedBlock !== blockId) {
-              console.log('[VIEW] Sidebar editor exists but selected block does not match:', selectedBlock, 'vs', blockId);
-              sidebarEditor = null; // Don't use editor if it's for a different block
-            }
-
-            if (!sidebarEditor && typeof window !== 'undefined' && __CLIENT__) {
-              // Debug: log all registered editor IDs
-              console.log('[VIEW] Available sidebar editor IDs:', Array.from(window.voltoHydraSidebarEditors?.keys() || []));
-            }
-
-            if (sidebarEditor) {
-              console.log('[VIEW] Using sidebar widget editor for field:', fieldId);
-
-              // Apply transform directly to the widget's editor
-              try {
-                // Set selection
-                Transforms.select(sidebarEditor, selection);
-                console.log('[VIEW] Selection set on sidebar editor');
-
-                // Handle link format (element, not mark)
-                if (format === 'link') {
-                  if (action === 'add' && url) {
-                    // TODO: Implement wrapLink for sidebar editor
-                    console.warn('[VIEW] Link wrapping not yet implemented for sidebar editor');
-                  } else if (action === 'remove' || action === 'toggle') {
-                    // TODO: Implement unwrapLink for sidebar editor
-                    console.warn('[VIEW] Link unwrapping not yet implemented for sidebar editor');
-                  }
-                } else {
-                  // Handle inline formats using toggleInlineFormat
-                  // Format name already mapped in hydra.js based on button config
-                  console.log('[VIEW] Applying inline format:', format);
-
-                  // toggleInlineFormat handles all actions (toggle, add, remove)
-                  // It creates inline element nodes like { type: 'strong', children: [...] }
-                  // This enables sticky formatting at cursor positions
-                  toggleInlineFormat(sidebarEditor, format);
-                  console.log('[VIEW] Applied toggleInlineFormat for:', format);
-                }
-
-                // Get the updated value and selection from the editor after applying the transform
-                const updatedValue = sidebarEditor.children;
-                const transformedSelection = sidebarEditor.selection;
-                console.log('[VIEW] Widget editor updated, selection:', transformedSelection);
-
-                // Build the updated form with the new block value
-                const updatedForm = {
-                  ...form,
-                  blocks: {
-                    ...form.blocks,
-                    [blockId]: {
-                      ...block,
-                      value: updatedValue,
-                    },
-                  },
-                };
-
-                // Send FORM_DATA immediately to the iframe with the selection
-                // IMPORTANT: Do NOT call onChangeFormData() here - that would trigger the useEffect
-                // and cause a double-send that might not include the selection
-                const message = {
-                  type: 'FORM_DATA',
-                  data: updatedForm,
-                  selection: transformedSelection,
-                };
-                console.log('[VIEW] Sending FORM_DATA with selection directly to iframe');
-                event.source.postMessage(message, event.origin);
-
-                // The sidebar widget's onChange will fire naturally (Slate triggers it automatically)
-                // and will update the Redux form state, which would normally trigger the useEffect
-                // However, we set processingFormatRequestRef which prevents the useEffect from sending
-
-                // Clear the flag after a short delay to allow the editor's onChange to complete
-                setTimeout(() => {
-                  processingFormatRequestRef.current = false;
-                  console.log('[VIEW] Cleared processingFormatRequest flag');
-                }, 100);
-              } catch (error) {
-                console.error('[VIEW] Error applying format to sidebar editor:', error);
-                processingFormatRequestRef.current = false; // Clear flag on error
-                throw error; // Will be caught by outer catch
-              }
-            } else {
-              // No sidebar editor found - this is an error condition
-              const errorMsg = `No sidebar editor found for field: ${fieldId}. Make sure the HydraSlateWidget is properly registered.`;
-              console.error('[VIEW]', errorMsg);
-              throw new Error(errorMsg);
-            }
-          } catch (error) {
-            console.error('Error applying Slate format:', error);
+          // Slate formatting handler - uses shared applyFormat function
+          console.log('[VIEW] Received SLATE_FORMAT_REQUEST:', event.data);
+          const success = applyFormat(event.data);
+          if (!success) {
             event.source.postMessage(
               {
                 type: 'SLATE_ERROR',
                 blockId: event.data.blockId,
-                error: error.message,
+                error: 'Failed to apply format',
                 originalRequest: event.data,
               },
               event.origin,
@@ -998,8 +1019,27 @@ const Iframe = (props) => {
           break;
 
         case 'UPDATE_BLOCKS_LAYOUT':
-          
+
           onChangeFormData(event.data.data);
+          break;
+
+        case 'SELECTION_CHANGE':
+          // Store current selection from iframe for format operations
+          setCurrentSelection(event.data.selection);
+          break;
+
+        case 'BLOCK_SELECTED':
+          // Update block UI state to render overlays (selection outline, toolbar, add button)
+          setBlockUI({
+            blockUid: event.data.blockUid,
+            rect: event.data.rect,
+            showFormatButtons: event.data.showFormatButtons,
+          });
+          break;
+
+        case 'HIDE_BLOCK_UI':
+          // Hide all block UI overlays
+          setBlockUI(null);
           break;
 
         case 'GET_INITIAL_DATA':
@@ -1047,18 +1087,8 @@ const Iframe = (props) => {
             },
             event.origin,
           );
-          // If there's a selected block, send SELECT_BLOCK now that iframe is ready
-          if (selectedBlock) {
-            event.source.postMessage(
-              {
-                type: 'SELECT_BLOCK',
-                uid: selectedBlock,
-                method: 'select',
-                data: form,
-              },
-              event.origin,
-            );
-          }
+          // Don't send SELECT_BLOCK here - let the useEffect handle it after content is rendered
+          // The useEffect at line ~375 will send SELECT_BLOCK once iframe is ready and content is rendered
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -1179,6 +1209,52 @@ const Iframe = (props) => {
     };
   }, []);
 
+  // Handle window resize to update block UI overlay positions
+  useEffect(() => {
+    const handleResize = () => {
+      // On window resize, request updated positions from iframe
+      if (blockUI && iframeOriginRef.current) {
+        const iframe = document.getElementById('previewIframe');
+        if (iframe?.contentWindow) {
+          iframe.contentWindow.postMessage(
+            {
+              type: 'REQUEST_BLOCK_RESELECT',
+              blockUid: blockUI.blockUid,
+            },
+            iframeOriginRef.current,
+          );
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [blockUI]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (menuDropdownOpen) {
+      const handleClickOutside = (event) => {
+        // Close dropdown if clicking anywhere outside
+        if (!event.target.closest('.volto-hydra-dropdown-menu')) {
+          setMenuDropdownOpen(false);
+        }
+      };
+
+      // Add slight delay to avoid immediate close from the button click that opened it
+      setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [menuDropdownOpen]);
+
   return (
     <div id="iframeContainer">
       {/* Hidden Slate widget to extract toolbar button metadata */}
@@ -1233,6 +1309,238 @@ const Iframe = (props) => {
         ref={setReferenceElement}
         allow="clipboard-read; clipboard-write"
       />
+
+      {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
+      {blockUI && referenceElement && (
+        <>
+          {/* Selection Outline - blue border or bottom line depending on block type */}
+          <div
+            className="volto-hydra-block-outline"
+            style={{
+              position: 'fixed',
+              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
+              top: blockUI.showFormatButtons
+                ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 1}px`
+                : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 2}px`,
+              width: `${blockUI.rect.width}px`,
+              height: blockUI.showFormatButtons ? '3px' : `${blockUI.rect.height + 4}px`,
+              background: blockUI.showFormatButtons ? '#007eb1' : 'transparent',
+              border: blockUI.showFormatButtons ? 'none' : '2px solid #007eb1',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+
+          {/* Quanta Toolbar - floating toolbar */}
+          <div
+            className="volto-hydra-quantaToolbar"
+            style={{
+              position: 'fixed',
+              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
+              top: `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 48}px`,
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0',
+              background: '#fff',
+              border: '1px solid #c7d5d8',
+              borderRadius: '3px',
+              padding: '4px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              pointerEvents: 'none', // Let events pass through to iframe
+            }}
+          >
+            {/* Drag handle - visual only, events pass through to iframe */}
+            <button
+              style={{
+                background: '#fff',
+                border: 'none',
+                borderRight: '1px solid #e0e0e0',
+                padding: '8px 10px',
+                cursor: 'grab',
+                fontSize: '16px',
+                color: '#666',
+                display: 'flex',
+                alignItems: 'center',
+                marginRight: '4px',
+                pointerEvents: 'none',
+              }}
+              title="Drag to reorder"
+            >
+              ⋮⋮
+            </button>
+            {blockUI.showFormatButtons && buttonMetadata && (
+              <>
+                {/* Format buttons - rendered from extracted metadata */}
+                {Object.entries(buttonMetadata).map(([buttonName, config]) => {
+                  if (config.buttonType === 'Separator') {
+                    return (
+                      <div
+                        key={buttonName}
+                        style={{ width: '1px', height: '28px', background: '#e0e0e0', margin: '0 4px' }}
+                      />
+                    );
+                  }
+
+                  // Check if this format is active at the current selection
+                  const block = selectedBlock && form.blocks[selectedBlock];
+                  const isActive = config.format && block?.value && currentSelection
+                    ? isFormatActiveAtSelection(block.value, currentSelection, config.format)
+                    : false;
+
+                  return (
+                    <button
+                      key={buttonName}
+                      style={{
+                        background: isActive ? '#e0e0e0' : '#fff',
+                        border: 'none',
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        color: isActive ? '#007bff' : '#333',
+                        pointerEvents: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title={config.title}
+                      onClick={() => {
+                        // Apply format using shared applyFormat function via ref
+                        console.log('[VIEW] Format button clicked:', config.format, config.buttonType);
+                        if (config.format && selectedBlock && applyFormatRef.current) {
+                          applyFormatRef.current({
+                            blockId: selectedBlock,
+                            format: config.format,
+                            selection: currentSelection,
+                            action: 'toggle',
+                            buttonType: config.buttonType,
+                          });
+                        }
+                      }}
+                      dangerouslySetInnerHTML={{ __html: config.svg }}
+                    />
+                  );
+                })}
+              </>
+            )}
+            <button
+              style={{
+                background: '#fff',
+                border: 'none',
+                padding: '8px 10px',
+                cursor: 'pointer',
+                fontSize: '18px',
+                color: '#666',
+                pointerEvents: 'auto',
+                position: 'relative',
+              }}
+              title="More options"
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMenuButtonRect(rect);
+                setMenuDropdownOpen(!menuDropdownOpen);
+              }}
+            >
+              ⋯
+            </button>
+          </div>
+
+          {/* Add Button - below block, right-aligned */}
+          <button
+            className="volto-hydra-add-button"
+            style={{
+              position: 'fixed',
+              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left + blockUI.rect.width - 30}px`,
+              top: `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height + 8}px`,
+              zIndex: 10,
+              width: '30px',
+              height: '30px',
+              background: 'transparent',
+              color: '#b8b8b8',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '28px',
+              lineHeight: '1',
+              fontWeight: '300',
+              padding: 0,
+            }}
+            onClick={() => setAddNewBlockOpened(true)}
+            title="Add block"
+          >
+            +
+          </button>
+        </>
+      )}
+
+      {/* Dropdown menu - rendered as portal to avoid container clipping */}
+      {menuDropdownOpen && menuButtonRect && createPortal(
+        <div
+          className="volto-hydra-dropdown-menu"
+          style={{
+            position: 'fixed',
+            left: `${menuButtonRect.right - 180}px`, // Align right edge with button
+            top: `${menuButtonRect.bottom + 4}px`,
+            background: 'white',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+            zIndex: 10000,
+            width: '180px',
+            pointerEvents: 'auto',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+            onMouseLeave={(e) => e.target.style.background = 'transparent'}
+            onClick={() => {
+              setMenuDropdownOpen(false);
+              // TODO: Open settings sidebar
+            }}
+          >
+            ⚙️ Settings
+          </div>
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#f0f0f0'}
+            onMouseLeave={(e) => e.target.style.background = 'transparent'}
+            onClick={() => {
+              setMenuDropdownOpen(false);
+              if (selectedBlock) {
+                const previous = previousBlockId(properties, selectedBlock);
+                const newFormData = deleteBlock(properties, selectedBlock);
+                onChangeFormData(newFormData);
+                onSelectBlock(previous);
+                dispatch(setSidebarTab(1));
+              }
+            }}
+          >
+            🗑️ Remove
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
