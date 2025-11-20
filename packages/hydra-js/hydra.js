@@ -90,6 +90,7 @@ class Bridge {
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
+    this.learnOriginFromFirstMessage = options._learnOriginFromFirstMessage || false;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
     this.realTimeDataHandler = null; // Handler for message events
@@ -97,10 +98,7 @@ class Bridge {
     this.selectBlockHandler = null; // Handler for select block events
     this.currentlySelectedBlock = null;
     this.prevSelectedBlock = null;
-    this.addButton = null;
-    this.deleteButton = null;
     this.clickOnBtn = false;
-    this.quantaToolbar = null;
     this.currentUrl =
       typeof window !== 'undefined' ? new URL(window.location.href) : null;
     this.formData = null;
@@ -116,6 +114,7 @@ class Bridge {
     this.savedSelection = null; // Store selection for format operations
     this.textUpdateTimer = null; // Timer for batching text updates
     this.pendingTextUpdate = null; // Pending text update data
+    this.scrollTimeout = null; // Timer for scroll debouncing
     this.init(options); // Initialize the bridge
   }
 
@@ -210,6 +209,7 @@ class Bridge {
         this.enableBlockClickListener();
         this.injectCSS();
         this.listenForSelectBlockMessage();
+        this.setupScrollHandler();
         window.parent.postMessage(
           { type: 'GET_INITIAL_DATA' },
           this.adminOrigin,
@@ -280,9 +280,9 @@ class Bridge {
               const previousFieldName = this.focusedFieldName;
               this.focusedFieldName = editableField;
 
-              // Only recreate toolbar if field actually changed
+              // Only update toolbar if field actually changed
               if (previousFieldName !== editableField) {
-                console.log('[HYDRA] Field changed from', previousFieldName, 'to', editableField, '- recreating toolbar');
+                console.log('[HYDRA] Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
 
                 // Determine if we should show format buttons based on field type
                 // blockFieldTypes maps blockType -> fieldName -> fieldType
@@ -291,13 +291,27 @@ class Bridge {
                 const fieldType = blockTypeFields[editableField];
                 const showFormatBtns = fieldType === 'slate';
 
-                console.log('[HYDRA] Recreating toolbar with formatBtns:', showFormatBtns, 'for blockType:', blockType, 'field:', editableField, 'type:', fieldType);
+                console.log('[HYDRA] Updating toolbar with formatBtns:', showFormatBtns, 'for blockType:', blockType, 'field:', editableField, 'type:', fieldType);
 
-                if (this.quantaToolbar) {
-                  this.quantaToolbar.remove();
-                  this.quantaToolbar = null;
+                // Send BLOCK_SELECTED message to update toolbar visibility
+                const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+                if (blockElement) {
+                  const rect = blockElement.getBoundingClientRect();
+                  window.parent.postMessage(
+                    {
+                      type: 'BLOCK_SELECTED',
+                      blockUid,
+                      rect: {
+                        top: rect.top,
+                        left: rect.left,
+                        width: rect.width,
+                        height: rect.height,
+                      },
+                      showFormatButtons: showFormatBtns,
+                    },
+                    this.adminOrigin,
+                  );
                 }
-                this.createQuantaToolbar(this.selectedBlockUid, { formatBtns: showFormatBtns });
               }
             }
           }
@@ -331,6 +345,13 @@ class Bridge {
    */
   onEditChange(callback) {
     this.realTimeDataHandler = (event) => {
+      // Learn admin origin from first message if needed
+      if (this.learnOriginFromFirstMessage && !this.adminOrigin) {
+        this.adminOrigin = event.origin;
+        this.learnOriginFromFirstMessage = false;
+        console.log('[HYDRA] Learned admin origin from first postMessage:', this.adminOrigin);
+      }
+
       if (
         event.origin === this.adminOrigin ||
         event.origin === window.location.origin
@@ -393,6 +414,36 @@ class Bridge {
               console.log('[HYDRA] Unblocking input for', blockId, 'after FORM_DATA');
               this.setBlockProcessing(blockId, false);
             });
+
+            // Update block UI overlay positions after form data changes
+            // Blocks might have resized after form updates
+            if (this.selectedBlockUid) {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  if (blockElement) {
+                    const rect = blockElement.getBoundingClientRect();
+                    const blockData = this.formData?.blocks?.[this.selectedBlockUid];
+                    const isSlateBlock = blockData?.['@type'] === 'slate';
+
+                    window.parent.postMessage(
+                      {
+                        type: 'BLOCK_SELECTED',
+                        blockUid: this.selectedBlockUid,
+                        rect: {
+                          top: rect.top,
+                          left: rect.left,
+                          width: rect.width,
+                          height: rect.height,
+                        },
+                        showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+                      },
+                      this.adminOrigin,
+                    );
+                  }
+                });
+              });
+            }
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
@@ -485,17 +536,31 @@ class Bridge {
       console.log('[HYDRA] Updating focusedFieldName from', this.focusedFieldName, 'to', fieldToFocus);
       this.focusedFieldName = fieldToFocus;
 
-      // Recreate toolbar with the correct field type
+      // Update toolbar with the correct field type
       // Only show format buttons if the focused field is a slate field
-      const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
+      const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
       const focusedFieldType = fieldToFocus ? blockFieldTypes[fieldToFocus] : undefined;
-      const show = { formatBtns: focusedFieldType === 'slate' };
+      const showFormatBtns = focusedFieldType === 'slate';
 
-      if (this.quantaToolbar) {
-        this.quantaToolbar.remove();
-        this.quantaToolbar = null;
+      // Send BLOCK_SELECTED message to update toolbar visibility
+      const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+      if (blockElement) {
+        const rect = blockElement.getBoundingClientRect();
+        window.parent.postMessage(
+          {
+            type: 'BLOCK_SELECTED',
+            blockUid,
+            rect: {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+            },
+            showFormatButtons: showFormatBtns,
+          },
+          this.adminOrigin,
+        );
       }
-      this.createQuantaToolbar(blockUid, show);
     }
   }
 
@@ -505,443 +570,6 @@ class Bridge {
    * @param {string} blockUid - The UID of the selected block.
    * @param {Object} show - Options for showing/hiding toolbar elements:
    *   - formatBtns: Whether to show format buttons (true/false).
-   */
-  createQuantaToolbar(blockUid, show = { formatBtns: true }) {
-    console.log('[HYDRA] createQuantaToolbar called:', { blockUid, show });
-    // Check if the toolbar already exists
-    if (this.quantaToolbar) {
-      console.log('[HYDRA] Toolbar already exists, returning early');
-      return;
-    }
-    const blockElement = document.querySelector(
-      `[data-block-uid="${blockUid}"]`,
-    );
-
-    // Check field types to determine if we should show format buttons
-    // Use the currently focused field to determine field type
-    // blockFieldTypes maps blockType -> fieldName -> fieldType
-    const fieldName = this.focusedFieldName;
-    const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const fieldType = blockTypeFields[fieldName];
-
-    console.log('[HYDRA] Field type check:', {
-      blockUid,
-      blockType,
-      focusedFieldName: fieldName,
-      fieldType,
-      blockTypeFields,
-      allBlockFieldTypes: this.blockFieldTypes
-    });
-
-    // Only show format buttons for Slate fields
-    if (fieldType !== 'slate') {
-      console.log('[HYDRA] Field is not Slate type, hiding format buttons');
-      show = { ...show, formatBtns: false };
-    }
-
-    // Create the quantaToolbar
-    this.quantaToolbar = document.createElement('div');
-    this.quantaToolbar.className = 'volto-hydra-quantaToolbar';
-
-    // Prevent click event propagation for the quantaToolbar
-    this.quantaToolbar.addEventListener('click', (e) => e.stopPropagation());
-
-    // Create the Add button
-    this.addButton = document.createElement('button');
-    this.addButton.className = 'volto-hydra-add-button';
-    this.addButton.innerHTML = addSVG;
-    this.addButton.tabIndex = -1; // Prevent stealing focus from contenteditable
-    this.addButton.onclick = (e) => {
-      e.stopPropagation();
-      this.clickOnBtn = true;
-      window.parent.postMessage(
-        { type: 'ADD_BLOCK', uid: blockUid },
-        this.adminOrigin,
-      );
-    };
-    blockElement.appendChild(this.addButton);
-
-    // Create the drag button
-    const dragButton = document.createElement('button');
-    dragButton.className = 'volto-hydra-drag-button';
-    dragButton.innerHTML = dragSVG;
-    dragButton.tabIndex = -1; // Prevent stealing focus from contenteditable
-    let isDragging = false;
-    let startY;
-    // dragButton.disabled = true;
-    dragButton.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      document.querySelector('body').classList.add('grabbing');
-      // Create a copy of the block
-      const draggedBlock = blockElement.cloneNode(true);
-      draggedBlock.classList.add('dragging');
-      document.body.appendChild(draggedBlock);
-
-      // Position the copy under the cursor
-      const rect = blockElement.getBoundingClientRect();
-      draggedBlock.style.width = `${rect.width}px`;
-      draggedBlock.style.height = `${rect.height}px`;
-      draggedBlock.style.left = `${e.clientX}px`;
-      draggedBlock.style.top = `${e.clientY}px`;
-      let closestBlockUid = null;
-      let throttleTimeout; // Throttle the mousemove event for performance (maybe not needed but if we got larger blocks than yeah needed!)
-      let insertAt = null; // 0 for top & 1 for bottom
-      isDragging = true;
-      startY = e.clientY;
-      let startYTimeout;
-      // Handle mouse movement
-      const onMouseMove = (e) => {
-        draggedBlock.style.left = `${e.clientX}px`;
-        draggedBlock.style.top = `${e.clientY}px`;
-        if (!throttleTimeout) {
-          throttleTimeout = setTimeout(() => {
-            const elementBelow = document.elementFromPoint(
-              e.clientX,
-              e.clientY,
-            );
-            let closestBlock = elementBelow;
-            // Find the closest ancestor with 'data-block-id'
-            while (
-              closestBlock &&
-              !closestBlock.hasAttribute('data-block-uid')
-            ) {
-              closestBlock = closestBlock.parentElement;
-            }
-
-            if (closestBlock) {
-              // Remove border from any previously highlighted block
-              const prevHighlighted =
-                insertAt === 0
-                  ? document.querySelector('.highlighted-block')
-                  : document.querySelector('.highlighted-block-bottom');
-
-              if (prevHighlighted) {
-                prevHighlighted.classList.remove(
-                  'highlighted-block',
-                  'highlighted-block-bottom',
-                );
-              }
-
-              // Determine if hovering over top or bottom half (not effiecient but lets try!)
-              const closestBlockRect = closestBlock.getBoundingClientRect();
-              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
-              const isHoveringOverTopHalf =
-                mouseYRelativeToBlock < closestBlockRect.height / 2;
-
-              if (isHoveringOverTopHalf) {
-                insertAt = 0;
-              } else {
-                insertAt = 1;
-              }
-              closestBlock.classList.add(
-                `${
-                  insertAt === 0
-                    ? 'highlighted-block'
-                    : 'highlighted-block-bottom'
-                }`,
-                `${
-                  insertAt === 0
-                    ? 'highlighted-block'
-                    : 'highlighted-block-bottom'
-                }`,
-              );
-              closestBlockUid = closestBlock.getAttribute('data-block-uid');
-            } else {
-              // console.log("Not hovering over any block");
-            }
-            throttleTimeout = null;
-          }, 100);
-        }
-        if (isDragging) {
-          const currentY = e.clientY;
-          const deltaY = currentY - startY;
-          clearTimeout(startYTimeout);
-          startYTimeout = setTimeout(() => {
-            startY = currentY;
-          }, 153);
-
-          // Check if the mouse is near the top or bottom of the viewport
-          const scrollThreshold = 50; // distance from the top/bottom of the viewport
-          const scrollSpeedFactor = 0.1; // for speeed scrolling (try/error)
-
-          if (currentY < scrollThreshold) {
-            // Scroll up, speed based on deltaY
-            window.scrollBy(0, -Math.abs(deltaY) * scrollSpeedFactor);
-          } else if (currentY > window.innerHeight - scrollThreshold) {
-            // Scroll down, speed based on deltaY
-            window.scrollBy(0, Math.abs(deltaY) * scrollSpeedFactor);
-          }
-        }
-      };
-      // Cleanup on mouseup & updating the blocks layout & sending it to adminUI
-      const onMouseUp = () => {
-        document.querySelector('body').classList.remove('grabbing');
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        isDragging = false;
-        clearTimeout(startYTimeout);
-        draggedBlock.remove();
-        if (closestBlockUid) {
-          const draggedBlockId = blockElement.getAttribute('data-block-uid');
-
-          const blocks_layout = this.formData.blocks_layout.items;
-          const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
-          const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
-          if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
-            blocks_layout.splice(draggedBlockIndex, 1);
-
-            // Adjust targetBlockIndex if dragged block was before it
-            // (removing the dragged block shifts all subsequent indexes down by 1)
-            const adjustedTargetIndex = draggedBlockIndex < targetBlockIndex
-              ? targetBlockIndex - 1
-              : targetBlockIndex;
-
-            // Determine insertion point based on hover position
-            const insertIndex =
-              insertAt === 1 ? adjustedTargetIndex + 1 : adjustedTargetIndex;
-
-            blocks_layout.splice(insertIndex, 0, draggedBlockId);
-            if (insertAt === 0) {
-              document
-                .querySelector('.highlighted-block')
-                .classList.remove('highlighted-block');
-            } else {
-              document
-                .querySelector('.highlighted-block-bottom')
-                .classList.remove('highlighted-block-bottom');
-            }
-            window.parent.postMessage(
-              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
-              this.adminOrigin,
-            );
-          }
-        }
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    });
-
-    let currentFormats = null;
-    const formatButtons = {}; // Store buttons by format name
-
-    // Get toolbar buttons from config, fallback to default basic formatting buttons
-    let toolbarButtons = this.slateConfig?.toolbarButtons || ['bold', 'italic', 'strikethrough'];
-
-    // Get button configs from Volto's registry (passed via slateConfig.buttonConfigs)
-    // This contains format, title, svg, and testId for each button
-    const buttonConfigs = this.slateConfig?.buttonConfigs || {};
-
-    // If toolbarButtons is empty but we have buttonConfigs, use the buttonConfigs keys
-    // This happens when mock parent provides buttonConfigs directly without toolbarButtons list
-    if ((!toolbarButtons || toolbarButtons.length === 0) && Object.keys(buttonConfigs).length > 0) {
-      toolbarButtons = Object.keys(buttonConfigs);
-      console.log('[HYDRA] Using buttonConfigs keys as toolbarButtons:', toolbarButtons);
-    }
-
-    if (show.formatBtns) {
-      console.log('[HYDRA] Creating format buttons for block:', blockUid);
-
-      // Create buttons dynamically based on config
-      for (const buttonName of toolbarButtons) {
-        const config = buttonConfigs[buttonName];
-        if (!config) {
-          // Skip buttons we don't have config for (like 'styleMenu')
-          continue;
-        }
-        if (config.buttonType === 'Separator') {
-          // Skip separators for now
-          continue;
-        }
-
-        const button = document.createElement('button');
-        button.className = `volto-hydra-format-button ${show.formatBtns ? 'show' : ''}`;
-        button.setAttribute('data-testid', config.testId);
-        button.setAttribute('title', config.title || buttonName); // Add tooltip from config
-        button.tabIndex = -1; // Prevent stealing focus from contenteditable
-
-        console.log(`[HYDRA] Creating button for ${buttonName}, svg length = ${config.svg?.length || 0}, has svg = ${!!config.svg}`);
-        button.innerHTML = config.svg;
-
-        // Use mousedown instead of click to prevent selection loss
-        button.addEventListener('mousedown', (e) => {
-          e.preventDefault(); // Prevent focus change
-
-          console.log(`[HYDRA] ${buttonName} button mousedown triggered`);
-
-          // Handle link button specially - it doesn't have a format
-          if (!config.format) {
-            console.log('[HYDRA] Link button clicked - not yet implemented');
-            // TODO: Open link dialog
-            return;
-          }
-
-          // IMPORTANT: Try to serialize the current selection FIRST, before it collapses
-          // This handles cases like Ctrl+A where selection might not have been saved yet
-          const currentSelection = window.getSelection();
-          let selectionData = null;
-
-          if (currentSelection && currentSelection.rangeCount > 0 && !currentSelection.isCollapsed) {
-            // We have an active selection right now - use it
-            selectionData = this.serializeSelection();
-            console.log('[HYDRA] Using current active selection:', selectionData);
-          } else if (this.savedSelection) {
-            // No active selection, but we have a saved one - use that
-            selectionData = this.savedSelection;
-            console.log('[HYDRA] Using previously saved selection:', selectionData);
-          } else {
-            console.log('[HYDRA] No selection available (current or saved)');
-          }
-
-          if (!selectionData) {
-            console.log('[HYDRA] No selection data available, returning early');
-            return;
-          }
-
-          console.log('[HYDRA] Using selection data:', selectionData);
-
-          // Block input while transform is processing
-          this.setBlockProcessing(blockUid, true);
-
-          const message = {
-            type: 'SLATE_FORMAT_REQUEST',
-            blockId: blockUid,
-            format: config.format,
-            action: 'toggle',
-            selection: selectionData,
-          };
-
-          console.log('[HYDRA] Sending SLATE_FORMAT_REQUEST:', message);
-          // Send SLATE_FORMAT_REQUEST to admin UI (auto-flushes pending text)
-          this.sendMessageToParent(message);
-        });
-
-        // Store button by format (or buttonName for buttons without format like link)
-        const buttonKey = config.format || buttonName;
-        formatButtons[buttonKey] = button;
-      }
-
-      // Function to handle text selection and update button active states dynamically
-      const handleSelectionChange = () => {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-
-        const range = selection.getRangeAt(0);
-        currentFormats = this.isFormatted(range);
-
-        // Dynamically toggle active class for all format buttons based on current formats
-        for (const [format, button] of Object.entries(formatButtons)) {
-          if (button && currentFormats[format]) {
-            button.classList.toggle(
-              'active',
-              currentFormats[format].enclosing || currentFormats[format].present,
-            );
-          }
-        }
-      };
-
-      // Add event listener to handle text selection within the block
-      this.handleMouseUp = (e) => {
-        if (
-          e.target.closest('[data-editable-field="value"]') &&
-          !e.target.closest('.volto-hydra-quantaToolbar') &&
-          e.target
-            .closest('[data-block-uid]')
-            .getAttribute('data-block-uid') === blockUid
-        ) {
-          handleSelectionChange();
-        }
-      };
-      blockElement.addEventListener('mouseup', this.handleMouseUp);
-    }
-
-    // Create the three-dot menu button
-    const menuButton = document.createElement('button');
-    menuButton.className = 'volto-hydra-menu-button';
-    menuButton.innerHTML = threeDotsSVG;
-    menuButton.tabIndex = -1; // Prevent stealing focus from contenteditable
-
-    // Create the dropdown menu
-    const dropdownMenu = document.createElement('div');
-    dropdownMenu.className = 'volto-hydra-dropdown-menu';
-
-    // Create the 'Remove' option
-    const removeOption = document.createElement('div');
-    removeOption.className = 'volto-hydra-dropdown-item';
-    removeOption.tabIndex = -1; // Prevent stealing focus from contenteditable
-    removeOption.innerHTML = `${deleteSVG} <div class="volto-hydra-dropdown-text">Remove</div>`;
-    removeOption.onclick = () => {
-      this.clickOnBtn = true;
-      window.parent.postMessage(
-        { type: 'DELETE_BLOCK', uid: blockUid },
-        this.adminOrigin,
-      );
-    };
-
-    // Create the 'Settings' option
-    const settingsOption = document.createElement('div');
-    settingsOption.className = 'volto-hydra-dropdown-item';
-    settingsOption.tabIndex = -1; // Prevent stealing focus from contenteditable
-    settingsOption.innerHTML = `${settingsSVG} <div class="volto-hydra-dropdown-text">Settings</div>`;
-    // ---Add settings click handler here (currently does nothing)---
-
-    // Create the divider
-    const divider = document.createElement('div');
-    divider.className = 'volto-hydra-divider';
-
-    // Append options to the dropdown menu
-    dropdownMenu.appendChild(settingsOption);
-    dropdownMenu.appendChild(divider);
-    dropdownMenu.appendChild(removeOption);
-
-    // Add event listener to toggle dropdown visibility
-    menuButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdownMenu.classList.toggle('visible');
-      document.addEventListener(
-        'click',
-        (e) => {
-          if (!e.target.closest('.volto-hydra-dropdown-menu')) {
-            dropdownMenu.classList.remove('visible');
-          }
-        },
-        { once: true },
-      );
-    });
-
-    // Append elements to the quantaToolbar
-    this.quantaToolbar.appendChild(dragButton);
-    if (show.formatBtns) {
-      // Dynamically append format buttons based on config
-      console.log('[HYDRA] Appending format buttons, toolbarButtons:', toolbarButtons);
-      console.log('[HYDRA] Available formatButtons keys:', Object.keys(formatButtons));
-      for (const buttonName of toolbarButtons) {
-        const config = buttonConfigs[buttonName];
-        const buttonKey = config?.format || buttonName;
-        console.log(`[HYDRA] Checking ${buttonName}, config:`, config, `formatButtons['${buttonKey}']:`, formatButtons[buttonKey]);
-        if (config && config.buttonType !== 'Separator' && formatButtons[buttonKey]) {
-          console.log(`[HYDRA] Appending button for ${buttonName} (key: ${buttonKey})`);
-          this.quantaToolbar.appendChild(formatButtons[buttonKey]);
-        } else {
-          console.log(`[HYDRA] Skipping ${buttonName} - missing config or button or is separator`);
-        }
-      }
-      // TODO: Add link button support once we can extract it from toolbar config
-    }
-    this.quantaToolbar.appendChild(menuButton);
-    this.quantaToolbar.appendChild(dropdownMenu);
-
-    // Append the quantaToolbar to the currently selected block
-    blockElement.appendChild(this.quantaToolbar);
-  }
-
-  ////////////////////////////////////////////////////////////////////////////////
-  // Block Selection and Deselection
-  ////////////////////////////////////////////////////////////////////////////////
-
-  /**
-   * Enables listening for block clicks to open block settings.
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
@@ -1005,13 +633,7 @@ class Bridge {
       editableField.style.pointerEvents = 'none'; // Prevent clicks from re-enabling editing
       editableField.blur(); // Remove focus to actually prevent keyboard input
 
-      // Disable format buttons
-      if (this.quantaToolbar) {
-        this.quantaToolbar.querySelectorAll('button').forEach((btn) => {
-          btn.disabled = true;
-          btn.style.cursor = 'wait';
-        });
-      }
+      // TODO: Send message to parent to disable format buttons
 
       // Start timeout (2 seconds)
       if (this.pendingTransforms[blockId]) {
@@ -1036,13 +658,7 @@ class Bridge {
       editableField.style.cursor = 'text';
       editableField.style.pointerEvents = 'auto'; // Re-enable interaction
 
-      // Re-enable format buttons
-      if (this.quantaToolbar) {
-        this.quantaToolbar.querySelectorAll('button').forEach((btn) => {
-          btn.disabled = false;
-          btn.style.cursor = 'pointer';
-        });
-      }
+      // TODO: Send message to parent to re-enable format buttons
 
       // Clear timeout
       if (this.pendingTransforms[blockId]) {
@@ -1339,8 +955,10 @@ class Bridge {
     // Set the currently selected block (do this every time)
     this.selectedBlockUid = blockUid;
 
-    // Detect focused field immediately from click location
-    const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
+    // Reset focusedFieldName for new block - don't keep stale value from previous block
+    this.focusedFieldName = null;
+
+    // Detect focused field from click location or first editable field
     if (this.lastClickEvent) {
       // Find the clicked editable field
       const clickedElement = this.lastClickEvent.target;
@@ -1351,12 +969,15 @@ class Bridge {
       }
     }
 
-    // If no focused field yet, use the first editable field
+    // If no clicked field, use the first editable field in this block
     if (!this.focusedFieldName) {
       const firstEditableField = blockElement.querySelector('[data-editable-field]');
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-editable-field');
-        console.log('[HYDRA] Defaulting to first editable field:', this.focusedFieldName);
+        console.log('[HYDRA] Set focusedFieldName to first editable field:', this.focusedFieldName);
+      } else {
+        // No editable fields in this block (e.g., image blocks)
+        console.log('[HYDRA] No editable fields found, focusedFieldName remains null');
       }
     }
 
@@ -1367,22 +988,35 @@ class Bridge {
     const focusedFieldType = this.focusedFieldName ? blockTypeFields[this.focusedFieldName] : undefined;
     let show = { formatBtns: focusedFieldType === 'slate' };
 
-    console.log('[HYDRA] Creating toolbar with:', {
+    console.log('[HYDRA] Block selected, sending UI messages:', {
       blockUid,
       focusedFieldName: this.focusedFieldName,
       focusedFieldType,
       showFormatBtns: show.formatBtns
     });
 
-    // Add border to the currently selected block (regardless of block type)
-    blockElement.classList.add('volto-hydra--outline');
+    // Send BLOCK_SELECTED message to parent with position and format button visibility
+    // Parent will render selection outline, toolbar, and add button overlays
+    const rect = blockElement.getBoundingClientRect();
+    window.parent.postMessage(
+      {
+        type: 'BLOCK_SELECTED',
+        blockUid,
+        rect: {
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+        showFormatButtons: show.formatBtns,
+      },
+      this.adminOrigin,
+    );
 
-    // Remove existing toolbar before creating a new one
-    if (this.quantaToolbar) {
-      this.quantaToolbar.remove();
-      this.quantaToolbar = null;
-    }
-    this.createQuantaToolbar(this.selectedBlockUid, show);
+    // Create drag handle for block reordering
+    // This creates an invisible button in the iframe positioned under the parent's visual drag handle
+    // Mouse events pass through the parent's visual (which has pointerEvents: 'none') to this button
+    this.createDragHandle(blockElement);
 
     // Set contenteditable on all editable fields in the block
     handleElementAndChildren(blockElement);
@@ -1401,6 +1035,18 @@ class Bridge {
         if (selection && selection.rangeCount > 0) {
           this.savedSelection = this.serializeSelection();
           console.log('[HYDRA] Selection saved:', this.savedSelection);
+
+          // Send selection to parent for toolbar state updates
+          if (this.savedSelection && this.selectedBlockUid) {
+            window.parent.postMessage(
+              {
+                type: 'SELECTION_CHANGE',
+                blockId: this.selectedBlockUid,
+                selection: this.savedSelection,
+              },
+              this.adminOrigin,
+            );
+          }
         } else {
           console.log('[HYDRA] Selection not saved (no ranges)');
         }
@@ -1494,22 +1140,27 @@ class Bridge {
       prevBlockUid !== currBlockUid &&
       prevBlockElement
     ) {
-      prevBlockElement.classList.remove('volto-hydra--outline');
+      // Send HIDE_BLOCK_UI message to parent to hide selection outline, toolbar, and add button
+      window.parent.postMessage(
+        { type: 'HIDE_BLOCK_UI' },
+        this.adminOrigin,
+      );
+
+      // Remove drag handle and its event listeners
+      const dragHandle = document.querySelector('.volto-hydra-drag-button');
+      if (dragHandle) {
+        dragHandle.remove();
+      }
+      if (this.dragHandleScrollListener) {
+        window.removeEventListener('scroll', this.dragHandleScrollListener, true);
+        this.dragHandleScrollListener = null;
+      }
+      this.dragHandlePositioner = null;
+
       if (this.blockObserver) {
         this.blockObserver.disconnect();
       }
-      if (this.addButton) {
-        this.addButton.remove();
-        this.addButton = null;
-      }
-      if (this.deleteButton) {
-        this.deleteButton.remove();
-        this.deleteButton = null;
-      }
-      if (this.quantaToolbar) {
-        this.quantaToolbar.remove();
-        this.quantaToolbar = null;
-      }
+
       // Remove contenteditable attribute
       prevBlockElement.removeAttribute('contenteditable');
       const childNodes = prevBlockElement.querySelectorAll('[data-node-id]');
@@ -1537,14 +1188,282 @@ class Bridge {
   }
 
   /**
+   * Sets up mouse tracking to position drag handle dynamically.
+   * The drag handle is positioned on mousemove to avoid being destroyed by re-renders.
+   */
+  createDragHandle() {
+    console.log('[HYDRA] createDragHandle called for block:', this.selectedBlockUid);
+
+    // Remove any existing drag handle
+    const existingDragHandle = document.querySelector('.volto-hydra-drag-button');
+    if (existingDragHandle) {
+      console.log('[HYDRA] Removing existing drag handle');
+      existingDragHandle.remove();
+    }
+
+    // Create a single persistent drag button that follows the mouse
+    const dragButton = document.createElement('button');
+    dragButton.className = 'volto-hydra-drag-button';
+    Object.assign(dragButton.style, {
+      position: 'fixed',
+      width: '40px',
+      height: '48px',
+      opacity: '0', // Invisible - parent shows the visual
+      cursor: 'grab',
+      zIndex: '9999',
+      background: 'transparent',
+      border: 'none',
+      padding: '0',
+      pointerEvents: 'auto',
+      display: 'none', // Hidden until positioned
+    });
+
+    document.body.appendChild(dragButton);
+    console.log('[HYDRA] Drag handle appended to body');
+
+    // Position the drag handle immediately (not on mousemove)
+    const positionDragHandle = () => {
+      if (!this.selectedBlockUid) {
+        dragButton.style.display = 'none';
+        return;
+      }
+
+      const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+      if (!blockElement) {
+        dragButton.style.display = 'none';
+        return;
+      }
+
+      const rect = blockElement.getBoundingClientRect();
+      const toolbarLeft = rect.left;
+      const toolbarTop = rect.top - 48; // 48px above block (matches parent toolbar height)
+
+      dragButton.style.left = `${toolbarLeft}px`;
+      dragButton.style.top = `${toolbarTop}px`;
+      dragButton.style.display = 'block';
+      console.log('[HYDRA] Drag handle positioned at:', { left: toolbarLeft, top: toolbarTop });
+    };
+
+    // Position immediately
+    positionDragHandle();
+
+    // Reposition on scroll
+    window.addEventListener('scroll', positionDragHandle, true);
+
+    // Store for cleanup
+    this.dragHandlePositioner = positionDragHandle;
+    this.dragHandleScrollListener = positionDragHandle;
+
+    // Create the drag handler
+    const dragHandler = (e) => {
+      e.preventDefault();
+
+      // Get the current block element
+      const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+      if (!blockElement) return;
+
+      const rect = blockElement.getBoundingClientRect();
+      document.querySelector('body').classList.add('grabbing');
+
+      // Create a visual copy of the block being dragged
+      const draggedBlock = blockElement.cloneNode(true);
+      draggedBlock.classList.add('dragging');
+      document.body.appendChild(draggedBlock);
+
+      // Position the copy under the cursor
+      Object.assign(draggedBlock.style, {
+        position: 'fixed',
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+        left: `${e.clientX}px`,
+        top: `${e.clientY}px`,
+        opacity: '0.5',
+        pointerEvents: 'none',
+        zIndex: '10000',
+      });
+
+      let closestBlockUid = null;
+      let throttleTimeout;
+      let insertAt = null; // 0 for top, 1 for bottom
+
+      // Handle mouse movement
+      const onMouseMove = (e) => {
+        draggedBlock.style.left = `${e.clientX}px`;
+        draggedBlock.style.top = `${e.clientY}px`;
+
+        if (!throttleTimeout) {
+          throttleTimeout = setTimeout(() => {
+            const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+            let closestBlock = elementBelow;
+
+            // Find the closest ancestor with 'data-block-uid'
+            while (closestBlock && !closestBlock.hasAttribute('data-block-uid')) {
+              closestBlock = closestBlock.parentElement;
+            }
+
+            if (closestBlock) {
+              // Get or create drop indicator
+              let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
+              if (!dropIndicator) {
+                dropIndicator = document.createElement('div');
+                dropIndicator.className = 'volto-hydra-drop-indicator';
+                dropIndicator.style.cssText = `
+                  position: absolute;
+                  left: 0;
+                  right: 0;
+                  height: 4px;
+                  background: #007bff;
+                  pointer-events: none;
+                  z-index: 9998;
+                `;
+                document.body.appendChild(dropIndicator);
+              }
+
+              // Determine if hovering over top or bottom half
+              const closestBlockRect = closestBlock.getBoundingClientRect();
+              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
+              const isHoveringOverTopHalf =
+                mouseYRelativeToBlock < closestBlockRect.height / 2;
+
+              insertAt = isHoveringOverTopHalf ? 0 : 1;
+              closestBlockUid = closestBlock.getAttribute('data-block-uid');
+
+              // Position drop indicator between blocks
+              // Center it in the gap between adjacent blocks
+              const indicatorHeight = 4;
+              let indicatorY;
+
+              if (insertAt === 0) {
+                // Inserting before this block - find the previous block
+                const prevBlock = closestBlock.previousElementSibling;
+                if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
+                  // Position exactly halfway between previous block bottom and current block top
+                  const prevBlockRect = prevBlock.getBoundingClientRect();
+                  const gap = closestBlockRect.top - prevBlockRect.bottom;
+                  indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+                } else {
+                  // No previous block - position at top of first block
+                  indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
+                }
+              } else {
+                // Inserting after this block - find the next block
+                const nextBlock = closestBlock.nextElementSibling;
+                if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
+                  // Position exactly halfway between current block bottom and next block top
+                  const nextBlockRect = nextBlock.getBoundingClientRect();
+                  const gap = nextBlockRect.top - closestBlockRect.bottom;
+                  indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+                } else {
+                  // No next block - position at bottom of last block
+                  indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
+                }
+              }
+
+              dropIndicator.style.top = `${indicatorY}px`;
+              dropIndicator.style.display = 'block';
+            }
+            throttleTimeout = null;
+          }, 100);
+        }
+      };
+
+      // Cleanup on mouseup & update blocks layout
+      const onMouseUp = () => {
+        document.querySelector('body').classList.remove('grabbing');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        draggedBlock.remove();
+
+        if (closestBlockUid) {
+          const draggedBlockId = blockElement.getAttribute('data-block-uid');
+          const blocks_layout = this.formData.blocks_layout.items;
+          const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
+          const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
+
+          if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
+            // Remove dragged block from its current position
+            blocks_layout.splice(draggedBlockIndex, 1);
+
+            // Determine insertion point based on hover position
+            // If dragging down, adjust target index since we removed the dragged block
+            let adjustedTargetIndex = targetBlockIndex;
+            if (draggedBlockIndex < targetBlockIndex) {
+              adjustedTargetIndex--;
+            }
+            const insertIndex = insertAt === 1 ? adjustedTargetIndex + 1 : adjustedTargetIndex;
+
+            // Insert at new position
+            blocks_layout.splice(insertIndex, 0, draggedBlockId);
+
+            // Clean up drop indicator
+            const dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (dropIndicator) {
+              dropIndicator.style.display = 'none';
+            }
+
+            // Send updated blocks_layout to parent
+            window.parent.postMessage(
+              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
+              this.adminOrigin,
+            );
+          }
+        }
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    // Add the event listener
+    dragButton.addEventListener('mousedown', dragHandler);
+
+    // Store reference for cleanup
+    dragButton._dragHandler = dragHandler;
+  }
+
+  /**
    * Listens for 'SELECT_BLOCK' messages from the adminUI to select a block.
    */
   listenForSelectBlockMessage() {
     this.selectBlockHandler = (event) => {
-      if (
-        event.origin === this.adminOrigin &&
-        event.data.type === 'SELECT_BLOCK'
-      ) {
+      if (event.origin !== this.adminOrigin) {
+        return;
+      }
+
+      // Handle REQUEST_BLOCK_RESELECT - parent wants updated block position after scroll/resize
+      if (event.data.type === 'REQUEST_BLOCK_RESELECT') {
+        const { blockUid } = event.data;
+        const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+
+        if (blockElement) {
+          // Re-calculate block position and send BLOCK_SELECTED message
+          const rect = blockElement.getBoundingClientRect();
+
+          // Determine if format buttons should be shown
+          const blockData = this.formData?.blocks?.[blockUid];
+          const isSlateBlock = blockData?.['@type'] === 'slate';
+
+          window.parent.postMessage(
+            {
+              type: 'BLOCK_SELECTED',
+              blockUid,
+              rect: {
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+              },
+              showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+            },
+            this.adminOrigin,
+          );
+        }
+        return;
+      }
+
+      // Handle SELECT_BLOCK - select a new block from Admin UI
+      if (event.data.type === 'SELECT_BLOCK') {
         const { uid } = event.data;
         this.selectedBlockUid = uid;
         this.formData = JSON.parse(JSON.stringify(event.data.data));
@@ -1605,14 +1524,96 @@ class Bridge {
               });
             });
           }
+        } else {
+          // Block element not found - content may not be rendered yet
+          // Retry after a short delay (happens on initial page load)
+          console.log('[HYDRA] Block element not found for SELECT_BLOCK, retrying in 100ms:', uid);
+          setTimeout(() => {
+            // Re-trigger the same SELECT_BLOCK message
+            window.postMessage(
+              {
+                type: 'SELECT_BLOCK_RETRY',
+                uid: uid,
+                data: this.formData,
+              },
+              window.location.origin,
+            );
+          }, 100);
         }
         // this.isInlineEditing = true;
         // this.observeForBlock(uid);
+      }
+
+      // Handle retry of SELECT_BLOCK when initial attempt failed
+      if (event.data.type === 'SELECT_BLOCK_RETRY') {
+        const { uid } = event.data;
+        const blockElement = document.querySelector(
+          `[data-block-uid="${uid}"]`,
+        );
+        if (blockElement) {
+          console.log('[HYDRA] Block element found on retry, selecting:', uid);
+          this.selectBlock(blockElement);
+        } else {
+          console.warn('[HYDRA] Block element still not found after retry:', uid);
+        }
       }
     };
 
     window.removeEventListener('message', this.selectBlockHandler);
     window.addEventListener('message', this.selectBlockHandler);
+  }
+
+  /**
+   * Sets up scroll handler to hide/show block UI overlays on scroll
+   */
+  setupScrollHandler() {
+    const handleScroll = () => {
+      // Hide overlays immediately when scrolling
+      if (this.selectedBlockUid) {
+        window.parent.postMessage(
+          { type: 'HIDE_BLOCK_UI' },
+          this.adminOrigin,
+        );
+      }
+
+      // Clear any existing timeout
+      if (this.scrollTimeout) {
+        clearTimeout(this.scrollTimeout);
+      }
+
+      // After scroll stops, re-send BLOCK_SELECTED with updated positions
+      this.scrollTimeout = setTimeout(() => {
+        if (this.selectedBlockUid) {
+          const blockElement = document.querySelector(
+            `[data-block-uid="${this.selectedBlockUid}"]`,
+          );
+
+          if (blockElement) {
+            const rect = blockElement.getBoundingClientRect();
+            const blockData = this.formData?.blocks?.[this.selectedBlockUid];
+            const isSlateBlock = blockData?.['@type'] === 'slate';
+
+            window.parent.postMessage(
+              {
+                type: 'BLOCK_SELECTED',
+                blockUid: this.selectedBlockUid,
+                rect: {
+                  top: rect.top,
+                  left: rect.left,
+                  width: rect.width,
+                  height: rect.height,
+                },
+                showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+              },
+              this.adminOrigin,
+            );
+
+          }
+        }
+      }, 150);
+    };
+
+    window.addEventListener('scroll', handleScroll);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -2955,6 +2956,27 @@ let bridgeInstance = null;
  * @returns new Bridge()
  */
 export function initBridge(adminOrigin, options = {}) {
+  // 1. Explicit parameter (highest priority)
+  if (adminOrigin) {
+    console.log('[HYDRA] Using explicit admin origin:', adminOrigin);
+  }
+  // 2. Auto-detect from referrer (most secure)
+  else if (document.referrer) {
+    try {
+      adminOrigin = new URL(document.referrer).origin;
+      console.log('[HYDRA] Auto-detected admin origin from referrer:', adminOrigin);
+    } catch (e) {
+      console.error('[HYDRA] Failed to parse referrer URL:', e);
+    }
+  }
+  // 3. Learn from first postMessage (fallback, less secure)
+  else {
+    console.warn('[HYDRA] No referrer available, will learn origin from first postMessage (less secure)');
+    // Set a flag to learn from first message
+    options._learnOriginFromFirstMessage = true;
+    adminOrigin = null; // Will be set when first message is received
+  }
+
   if (!bridgeInstance) {
     bridgeInstance = new Bridge(adminOrigin, options);
   }

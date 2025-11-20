@@ -168,14 +168,15 @@ export class AdminUIHelper {
     await block.scrollIntoViewIfNeeded();
     await block.click();
 
-    // Wait for the block to actually be selected (have the outline class)
+    // Wait for the block UI overlays to appear in the parent window (toolbar and selection outline)
+    // The selection outline and toolbar are now rendered in the parent window, not in the iframe
     try {
-      await iframe.locator(`[data-block-uid="${blockId}"].volto-hydra--outline`).waitFor({
+      await this.page.locator('.volto-hydra-quantaToolbar').waitFor({
         state: 'visible',
         timeout: 5000
       });
     } catch (e) {
-      throw new Error(`Block "${blockId}" was clicked but the outline class (.volto-hydra--outline) never appeared. This likely means selectBlock() in hydra.js is not adding the outline class. Check that hydra.js is loaded and selectBlock() is being called.`);
+      throw new Error(`Block "${blockId}" was clicked but the toolbar overlay never appeared in parent window. This likely means selectBlock() in hydra.js is not sending BLOCK_SELECTED message. Check that hydra.js is loaded and selectBlock() is being called.`);
     }
 
     // Wait for the Quanta toolbar to appear on the selected block
@@ -300,26 +301,13 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if the Quanta Toolbar is visible for a block (inside iframe).
-   * The toolbar is created by hydra.js inside the iframe.
+   * Check if the Quanta Toolbar is visible for a block.
+   * The toolbar is rendered in the parent window (admin UI), not inside the iframe.
    */
   async isQuantaToolbarVisibleInIframe(blockId: string): Promise<boolean> {
-    const iframe = this.getIframe();
-    const toolbar = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-quantaToolbar`
-    );
+    // Toolbar is now rendered in parent window, not in iframe
+    const toolbar = this.page.locator('.volto-hydra-quantaToolbar');
     return await toolbar.isVisible();
-  }
-
-  /**
-   * Wait for the Quanta Toolbar to appear for a block (inside iframe).
-   */
-  async waitForQuantaToolbar(blockId: string, timeout: number = 5000): Promise<void> {
-    const iframe = this.getIframe();
-    const toolbar = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-quantaToolbar`
-    );
-    await toolbar.waitFor({ state: 'visible', timeout });
   }
 
   /**
@@ -376,25 +364,19 @@ export class AdminUIHelper {
    * Wait for the Quanta toolbar to appear on a block.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
-    const iframe = this.getIframe();
-    const toolbar = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-quantaToolbar`
-    );
+    // Toolbar is now rendered in the parent window, not in the iframe
+    const toolbar = this.page.locator('.volto-hydra-quantaToolbar');
 
     try {
       await toolbar.waitFor({ state: 'visible', timeout });
     } catch (e) {
       throw new Error(
-        `Quanta toolbar did not appear for block "${blockId}" within ${timeout}ms. ` +
-        `The toolbar should be created by hydra.js createQuantaToolbar(). ` +
-        `Check that: (1) hydra.js is loaded, (2) selectBlock() calls createQuantaToolbar(), ` +
-        `and (3) the toolbar element is being appended to the DOM.`
+        `Quanta toolbar overlay did not appear for block "${blockId}" within ${timeout}ms. ` +
+        `The toolbar is now rendered in the parent window as an overlay. ` +
+        `Check that: (1) hydra.js is loaded, (2) selectBlock() sends BLOCK_SELECTED message, ` +
+        `and (3) View.jsx renders the toolbar overlay on BLOCK_SELECTED.`
       );
     }
-
-    // Scroll the toolbar into view since it appears BELOW the block
-    // and might be outside the viewport even if the block is visible
-    await toolbar.scrollIntoViewIfNeeded();
   }
 
   /**
@@ -573,13 +555,15 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if a block is selected in the iframe.
+   * Check if a block is selected.
+   * Since the toolbar is now in the parent window, we check if it's visible.
+   * Note: This only tells us if ANY block is selected, not specifically which one.
+   * For block-specific selection state, check the Admin UI's selectedBlock state.
    */
   async isBlockSelectedInIframe(blockId: string): Promise<boolean> {
-    const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    const classAttr = await block.getAttribute('class');
-    return classAttr ? classAttr.includes('volto-hydra--outline') : false;
+    // Check if toolbar overlay is visible in parent window
+    const toolbar = this.page.locator('.volto-hydra-quantaToolbar');
+    return await toolbar.isVisible();
   }
 
   /**

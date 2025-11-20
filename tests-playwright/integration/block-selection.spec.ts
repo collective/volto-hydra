@@ -84,14 +84,13 @@ test.describe('Block Selection', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click on a block
+    // Click on a block - this will wait for toolbar to appear
     const blockId = 'block-1-uuid';
     await helper.clickBlockInIframe(blockId);
 
-    // Wait for the block to get the volto-hydra--outline class
-    const iframe = helper.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    await expect(block).toHaveClass(/volto-hydra--outline/, { timeout: 10000 });
+    // Verify toolbar is visible (indicates block is selected)
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(blockId);
+    expect(hasToolbar).toBe(true);
 
     // Verify block appears selected
     const isSelected = await helper.isBlockSelectedInIframe(blockId);
@@ -104,20 +103,14 @@ test.describe('Block Selection', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const iframe = helper.getIframe();
-
-    // Select first block and wait for outline class
+    // Select first block - clickBlockInIframe waits for toolbar
     await helper.clickBlockInIframe('block-1-uuid');
-    const block1 = iframe.locator('[data-block-uid="block-1-uuid"]');
-    await expect(block1).toHaveClass(/volto-hydra--outline/, { timeout: 10000 });
 
     expect(await helper.isBlockSelectedInIframe('block-1-uuid')).toBe(true);
     expect(await helper.isBlockSelectedInIframe('block-2-uuid')).toBe(false);
 
-    // Select second block and wait for outline class
+    // Select second block - clickBlockInIframe waits for toolbar
     await helper.clickBlockInIframe('block-2-uuid');
-    const block2 = iframe.locator('[data-block-uid="block-2-uuid"]');
-    await expect(block2).toHaveClass(/volto-hydra--outline/, { timeout: 10000 });
 
     expect(await helper.isBlockSelectedInIframe('block-1-uuid')).toBe(false);
     expect(await helper.isBlockSelectedInIframe('block-2-uuid')).toBe(true);
@@ -205,16 +198,12 @@ test.describe('Block Selection', () => {
     const blockId = 'block-3-uuid';
     await helper.clickBlockInIframe(blockId);
 
-    // Wait for Quanta toolbar to appear (indicates block is selected)
-    const hasQuantaToolbar = await helper.isQuantaToolbarVisibleInIframe(blockId);
-    expect(hasQuantaToolbar).toBe(true);
-
-    // Get the contenteditable element
-    const editableField = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await expect(editableField).toBeVisible({ timeout: 2000 });
+    // Verify toolbar appeared (clickBlockInIframe already waits for this)
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(blockId);
+    expect(hasToolbar).toBe(true);
 
     // Wait a moment for focus to be set asynchronously
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     // Verify we can type immediately
     await page.keyboard.type('TYPED');

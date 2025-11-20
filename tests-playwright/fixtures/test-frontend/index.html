@@ -67,12 +67,16 @@
                     console.log('[TEST-FRONTEND] Initializing Hydra bridge');
 
                     // Allow custom admin origin via query param (for mock parent tests)
-                    // Default to http://localhost:3001 for full Volto tests
-                    const adminOrigin = urlParams.get('_admin_origin') || 'http://localhost:3001';
+                    // If not provided, hydra.js will auto-detect from document.referrer
+                    const adminOrigin = urlParams.get('_admin_origin');
 
-                    console.log('[TEST-FRONTEND] Admin origin:', adminOrigin);
+                    if (adminOrigin) {
+                        console.log('[TEST-FRONTEND] Using explicit admin origin:', adminOrigin);
+                    } else {
+                        console.log('[TEST-FRONTEND] Admin origin will be auto-detected from referrer');
+                    }
 
-                    // Initialize bridge with admin origin and allowed blocks
+                    // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
                     window.bridge = initBridge(adminOrigin, {
                         allowedBlocks: ['slate', 'image']
                     });
