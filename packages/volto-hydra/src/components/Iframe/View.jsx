@@ -208,12 +208,11 @@ const Iframe = (props) => {
           type: 'SELECT_BLOCK',
           uid: selectedBlock,
           method: 'select',
-          data: form,
         },
         iframeOriginRef.current,
       );
     }
-  }, [selectedBlock, form]);
+  }, [selectedBlock]);
 
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
@@ -387,8 +386,13 @@ const Iframe = (props) => {
         case 'INLINE_EDIT_DATA':
           inlineEditCounterRef.current += 1;
           console.log('[VIEW] INLINE_EDIT_DATA received, counter:', inlineEditCounterRef.current);
+          console.log('[VIEW] INLINE_EDIT_DATA has blocks?:', !!event.data.data?.blocks);
+          console.log('[VIEW] INLINE_EDIT_DATA has id?:', !!event.data.data?.id);
+          console.log('[VIEW] INLINE_EDIT_DATA selected block value:', JSON.stringify(event.data.data?.blocks?.[selectedBlock]?.value));
+          console.log('[VIEW] Calling onChangeFormData with data');
 
           onChangeFormData(event.data.data);
+          console.log('[VIEW] onChangeFormData completed');
           break;
 
         case 'INLINE_EDIT_EXIT':
@@ -881,7 +885,7 @@ const Iframe = (props) => {
       iframeReady: !!iframeOriginRef.current,
       hasForm: !!formToUse,
       selectedBlock,
-      blockData: formToUse?.blocks?.[selectedBlock],
+      blockData: formToUse?.blocks?.[selectedBlock]?.value,
       inlineEditCounter: inlineEditCounterRef.current,
       processedCounter: processedInlineEditCounterRef.current,
       hasUnprocessedInlineEdit,
@@ -894,26 +898,18 @@ const Iframe = (props) => {
     } else if (processingFormatRequestRef.current) {
       // Skip sends while processing a format request - we're sending directly from the handler
       console.log('[VIEW] Skipping FORM_DATA send - processing format request');
-    } else if (iframeOriginRef.current && formToUse && Object.keys(formToUse).length > 0) {
-      // Check if the sidebar has focus (user is editing there)
-      const sidebarElement = document.querySelector('.sidebar-container, [class*="sidebar"]');
-      const sidebarHasFocus = sidebarElement?.contains(document.activeElement);
-
-      if (sidebarHasFocus) {
-        // Sidebar has focus - user is editing there, send updates to iframe
-        console.log('[VIEW] Sending FORM_DATA to iframe - sidebar has focus');
-        document
-          .getElementById('previewIframe')
-          ?.contentWindow?.postMessage(
-            { type: 'FORM_DATA', data: formToUse },
-            iframeOriginRef.current,
-          );
-      } else {
-        // Sidebar doesn't have focus - user is editing in iframe, don't send
-        console.log('[VIEW] Skipping FORM_DATA send - sidebar does not have focus');
-      }
+    } else if (iframeOriginRef.current && formToUse && formToUse.blocks && Object.keys(formToUse.blocks).length > 0) {
+      // Send FORM_DATA to iframe for any form data change (except inline edits, handled above)
+      // Only send if we have actual blocks data
+      console.log('[VIEW] Sending FORM_DATA to iframe - form data changed');
+      document
+        .getElementById('previewIframe')
+        ?.contentWindow?.postMessage(
+          { type: 'FORM_DATA', data: formToUse },
+          iframeOriginRef.current,
+        );
     }
-  }, [formDataFromRedux, form, selectedBlock]);
+  }, [formDataFromRedux]);
 
   const sidebarFocusEventListenerRef = useRef(null);
 

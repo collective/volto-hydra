@@ -236,16 +236,8 @@ class Bridge {
                 });
               }
 
-              // Add nodeIds to all slate blocks
-              if (this.formData && this.formData.blocks) {
-                Object.keys(this.formData.blocks).forEach((blockId) => {
-                  const block = this.formData.blocks[blockId];
-                  if (block['@type'] === 'slate') {
-                    this.formData.blocks[blockId] = this.addNodeIds(block);
-                    console.log('[HYDRA] Added nodeIds successfully');
-                  }
-                });
-              }
+              // Add nodeIds to all slate fields in all blocks
+              this.addNodeIdsToAllSlateFields();
 
               window.postMessage(
                 {
@@ -368,14 +360,7 @@ class Bridge {
 
             // Add nodeIds to all slate blocks before rendering
             // Admin UI never sends nodeIds, so we always need to add them
-            if (this.formData && this.formData.blocks) {
-              Object.keys(this.formData.blocks).forEach((blockId) => {
-                const block = this.formData.blocks[blockId];
-                if (block['@type'] === 'slate' && block.value) {
-                  this.formData.blocks[blockId] = this.addNodeIds(block);
-                }
-              });
-            }
+            this.addNodeIdsToAllSlateFields();
 
             // Log the block data to see if bold formatting is present
             if (this.selectedBlockUid && this.formData.blocks[this.selectedBlockUid]) {
@@ -395,10 +380,11 @@ class Bridge {
                 if (event.data.selection) {
                   console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.selection);
                   this.restoreSlateSelection(event.data.selection, this.formData);
+                } else if (this.savedSelection) {
+                  console.log('[HYDRA] No transformed selection provided, using saved selection from selectionchange');
+                  this.restoreSlateSelection(this.savedSelection, this.formData);
                 } else {
-                  console.log('[HYDRA] No transformed selection provided, using DOM-based cursor restoration');
-                  const savedCursor = this.saveCursorPosition();
-                  this.restoreCursorPosition(savedCursor);
+                  console.log('[HYDRA] No saved selection available');
                 }
               });
             });
@@ -423,6 +409,45 @@ class Bridge {
                 requestAnimationFrame(() => {
                   const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
                   if (blockElement) {
+                    // Restore contenteditable on fields after renderer updates
+                    // The renderer may have replaced DOM elements, removing contenteditable attributes
+                    this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
+
+                    // Focus and position cursor in the focused field
+                    // This ensures clicking a field focuses it immediately (no double-click required)
+                    if (this.focusedFieldName) {
+                      const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+                      const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
+                      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+                      const fieldType = blockTypeFields[this.focusedFieldName];
+
+                      if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
+                        // Focus the field
+                        focusedField.focus();
+
+                        // Position cursor at click location if we saved it
+                        if (this.savedClickPosition) {
+                          const selection = window.getSelection();
+                          if (selection) {
+                            // Only restore click position if there's no existing non-collapsed selection
+                            if (!selection.rangeCount || selection.isCollapsed) {
+                              // Position cursor at the click location using caretRangeFromPoint
+                              const range = document.caretRangeFromPoint(
+                                this.savedClickPosition.clientX,
+                                this.savedClickPosition.clientY
+                              );
+                              if (range) {
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                              }
+                            }
+                          }
+                          // Clear saved click position after using it
+                          this.savedClickPosition = null;
+                        }
+                      }
+                    }
+
                     const rect = blockElement.getBoundingClientRect();
                     const blockData = this.formData?.blocks?.[this.selectedBlockUid];
                     const isSlateBlock = blockData?.['@type'] === 'slate';
@@ -857,6 +882,32 @@ class Bridge {
   }
 
   /**
+   * Restores contenteditable attributes on editable fields within a block.
+   * This is needed after renderer updates that may have replaced DOM elements.
+   *
+   * @param {HTMLElement} blockElement - The block element to restore contenteditable on
+   * @param {string} caller - The caller for debugging (e.g., 'selectBlock', 'FORM_DATA')
+   */
+  restoreContentEditableOnFields(blockElement, caller = 'unknown') {
+    const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+    const editableFields = blockElement.querySelectorAll('[data-editable-field]');
+    console.log(`[HYDRA] restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
+    editableFields.forEach((field) => {
+      const fieldName = field.getAttribute('data-editable-field');
+      const fieldType = blockTypeFields[fieldName];
+      const wasEditable = field.getAttribute('contenteditable') === 'true';
+      // Only set contenteditable for string, textarea, and slate fields
+      if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
+        field.setAttribute('contenteditable', 'true');
+        console.log(`[HYDRA]   ${fieldName}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+      } else {
+        console.log(`[HYDRA]   ${fieldName}: skipped (type: ${fieldType})`);
+      }
+    });
+  }
+
+  /**
    * Selects a block and communicates the selection to the adminUI.
    *
    * @param {HTMLElement} blockElement - The block element to select.
@@ -864,11 +915,18 @@ class Bridge {
   selectBlock(blockElement) {
     console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'));
     if (!blockElement) return;
-    this.isInlineEditing = true;
-    console.log('[HYDRA] Set isInlineEditing = true');
 
     const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
+
+    // Flush any pending text updates from the previous block before switching
+    if (!isSelectingSameBlock) {
+      console.log('[HYDRA] Switching blocks - flushing pending text updates');
+      this.flushPendingTextUpdates();
+    }
+
+    this.isInlineEditing = true;
+    console.log('[HYDRA] Set isInlineEditing = true');
 
     // Helper function to handle each element - sets contenteditable and handles string fields
     const handleElement = (element) => {
@@ -1058,7 +1116,6 @@ class Bridge {
     }
 
     // Use double requestAnimationFrame to wait for ALL DOM updates including rendering editable fields
-    // contenteditable will be set in detectFocusedFieldAndUpdateToolbar after DOM is ready
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const currentBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
@@ -1071,13 +1128,13 @@ class Bridge {
             this.needsFieldDetection = false;
           }
 
+          // Set contenteditable on editable fields immediately (not waiting for FORM_DATA)
+          this.restoreContentEditableOnFields(currentBlockElement, 'selectBlock');
+
           // Focus and position cursor for editable fields (text or slate type)
           const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
           if (editableField) {
             const fieldName = editableField.getAttribute('data-editable-field');
-            // Look up field type: blockFieldTypes maps blockType -> fieldName -> fieldType
-            const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
-            const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
             const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
             console.log('[HYDRA] Editable field:', { found: true, fieldName, blockType, fieldType });
 
@@ -1086,6 +1143,12 @@ class Bridge {
               console.log('[HYDRA] Called focus(), activeElement:', document.activeElement);
 
               if (this.lastClickEvent) {
+                // Save click position for FORM_DATA handler to use after renderer updates
+                this.savedClickPosition = {
+                  clientX: this.lastClickEvent.clientX,
+                  clientY: this.lastClickEvent.clientY,
+                };
+
                 // Only restore click position if there's no existing non-collapsed selection
                 // (e.g., from Meta+A or programmatic selection)
                 const currentSelection = window.getSelection();
@@ -1471,26 +1534,9 @@ class Bridge {
       if (event.data.type === 'SELECT_BLOCK') {
         const { uid } = event.data;
         this.selectedBlockUid = uid;
-        this.formData = JSON.parse(JSON.stringify(event.data.data));
-        if (
-          this.selectedBlockUid &&
-          this.formData.blocks[this.selectedBlockUid] &&
-          this.formData.blocks[this.selectedBlockUid]['@type'] === 'slate' &&
-          typeof this.formData.blocks[this.selectedBlockUid].nodeId ===
-            'undefined'
-        ) {
-          this.formData.blocks[this.selectedBlockUid] = this.addNodeIds(
-            this.formData.blocks[this.selectedBlockUid],
-          );
-        }
-        window.postMessage(
-          {
-            type: 'FORM_DATA',
-            data: this.formData,
-            sender: 'hydrajs-select',
-          },
-          window.location.origin,
-        );
+        // Don't update formData here - it's managed via FORM_DATA messages
+        // Don't post FORM_DATA - form data syncing is handled separately
+
         // console.log("select block", event.data?.method);
         const blockElement = document.querySelector(
           `[data-block-uid="${uid}"]`,
@@ -1539,7 +1585,6 @@ class Bridge {
               {
                 type: 'SELECT_BLOCK_RETRY',
                 uid: uid,
-                data: this.formData,
               },
               window.location.origin,
             );
@@ -1939,14 +1984,40 @@ class Bridge {
   ////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * Add nodeIds in the json object to each of the Selected Block's children
+   * Add nodeIds to all Slate fields in all blocks
+   * This centralizes the logic for adding nodeIds to ensure consistency
+   */
+  addNodeIdsToAllSlateFields() {
+    if (this.formData && this.formData.blocks) {
+      Object.keys(this.formData.blocks).forEach((blockId) => {
+        const block = this.formData.blocks[blockId];
+        const blockType = block['@type'];
+        const fieldTypes = this.blockFieldTypes?.[blockType] || {};
+
+        // Check each field in the block
+        Object.keys(fieldTypes).forEach((fieldName) => {
+          if (fieldTypes[fieldName] === 'slate' && block[fieldName]) {
+            // Add nodeIds to the slate field's value
+            block[fieldName] = this.addNodeIds(block[fieldName]);
+            console.log(`[HYDRA] Added nodeIds to ${blockType}.${fieldName}`);
+          }
+        });
+      });
+    }
+  }
+
+  /**
+   * Add path-based nodeIds to each element in the Slate block's children
    * @param {JSON} json Selected Block's data
-   * @param {BigInteger} nodeIdCounter (Optional) Counter to keep track of the nodeIds
+   * @param {string} path Path in the Slate structure (e.g., "0.1.2")
    * @returns {JSON} block's data with nodeIds added
    */
-  addNodeIds(json, nodeIdCounter = { current: 0 }) {
+  addNodeIds(json, path = '') {
     if (Array.isArray(json)) {
-      return json.map((item) => this.addNodeIds(item, nodeIdCounter));
+      return json.map((item, index) => {
+        const itemPath = path ? `${path}.${index}` : `${index}`;
+        return this.addNodeIds(item, itemPath);
+      });
     } else if (typeof json === 'object' && json !== null) {
       // Clone the object to ensure it's extensible
       json = JSON.parse(JSON.stringify(json));
@@ -1957,18 +2028,27 @@ class Bridge {
         return json;
       }
 
-      if (json.hasOwnProperty('data')) {
-        json.nodeId = nodeIdCounter.current++;
-        for (const key in json) {
-          if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-            json[key] = this.addNodeIds(json[key], nodeIdCounter);
-          }
-        }
-      } else {
-        json.nodeId = nodeIdCounter.current++;
-        for (const key in json) {
-          if (json.hasOwnProperty(key) && key !== 'nodeId') {
-            json[key] = this.addNodeIds(json[key], nodeIdCounter);
+      // Assign path-based nodeId to this element
+      json.nodeId = path;
+
+      // Recursively process children
+      for (const key in json) {
+        if (json.hasOwnProperty(key) && key !== 'nodeId') {
+          // For children arrays, build paths like "0.0", "0.1", etc.
+          if (key === 'children' && Array.isArray(json[key])) {
+            json[key] = json[key].map((child, index) => {
+              const childPath = `${path}.${index}`;
+              return this.addNodeIds(child, childPath);
+            });
+          } else if (Array.isArray(json[key])) {
+            // Handle other arrays (less common in Slate)
+            json[key] = json[key].map((item, index) => {
+              const itemPath = `${path}.${key}.${index}`;
+              return this.addNodeIds(item, itemPath);
+            });
+          } else {
+            // For non-array properties, pass the same path
+            json[key] = this.addNodeIds(json[key], path);
           }
         }
       }
@@ -2307,9 +2387,11 @@ class Bridge {
    * @param {HTMLElement} target
    */
   handleTextChangeOnSlate(target) {
+    console.log('[HYDRA] handleTextChangeOnSlate called, target text:', target.innerText?.substring(0, 50));
     const closestNode = target.closest('[data-node-id]');
     if (closestNode) {
       const nodeId = closestNode.getAttribute('data-node-id');
+      console.log('[HYDRA] closestNode found, nodeId:', nodeId, 'text:', closestNode.innerText?.substring(0, 50));
       const updatedJson = this.updateJsonNode(
         this.formData?.blocks[this.selectedBlockUid],
         nodeId,
@@ -2365,7 +2447,8 @@ class Bridge {
     if (Array.isArray(json)) {
       return json.map((item) => this.updateJsonNode(item, nodeId, newText));
     } else if (typeof json === 'object' && json !== null) {
-      if (json.nodeId === parseInt(nodeId, 10)) {
+      // Compare nodeIds as strings (path-based IDs like "0", "0.0", etc.)
+      if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
         if (json.hasOwnProperty('text')) {
           json.text = newText;
         } else {

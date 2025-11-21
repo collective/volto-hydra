@@ -8,6 +8,133 @@ import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing', () => {
+  test('cursor position remains stable while typing', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and get the editor
+    const editor = await helper.enterEditMode(blockId);
+
+    // Clear existing text
+    await helper.selectAllTextInEditor(editor);
+
+    // PART 1: Type text at the end character by character and verify cursor after each character
+    const testText = 'Hello world';
+    for (let i = 0; i < testText.length; i++) {
+      const char = testText[i];
+      await editor.press(char);
+
+      // Small delay to let any updates propagate
+      await page.waitForTimeout(50);
+
+      // Verify cursor is still at the end and element is focused
+      const expectedCursorPos = i + 1; // After typing i+1 characters
+      await helper.assertCursorAtPosition(editor, expectedCursorPos, blockId);
+    }
+
+    // Verify text after part 1
+    let currentText = await editor.textContent();
+    expect(currentText).toBe('Hello world');
+
+    // Wait a bit longer to catch any async cursor resets
+    await page.waitForTimeout(200);
+
+    // Verify cursor is STILL at the end (didn't get reset asynchronously)
+    await helper.assertCursorAtPosition(editor, testText.length, blockId);
+
+    // PART 2: Move cursor to the middle and type more text
+    // Move cursor to position 6 (after "Hello ")
+    await helper.moveCursorToPosition(editor, 6);
+
+    // Verify cursor is at position 6
+    await helper.assertCursorAtPosition(editor, 6, blockId);
+
+    // Type "beautiful " character by character in the middle
+    const insertText = 'beautiful ';
+    const startOffset = 6; // Where we started typing
+
+    for (let i = 0; i < insertText.length; i++) {
+      const char = insertText[i];
+      await page.keyboard.type(char);
+
+      // Small delay to let any updates propagate
+      await page.waitForTimeout(50);
+
+      // Verify cursor is at the expected position after each character
+      const expectedCursorPos = startOffset + i + 1;
+      await helper.assertCursorAtPosition(editor, expectedCursorPos, blockId);
+    }
+
+    // Verify final text
+    const finalText = await editor.textContent();
+    expect(finalText).toBe('Hello beautiful world');
+
+    // Wait a bit longer to catch any async cursor resets
+    await page.waitForTimeout(200);
+
+    // Verify cursor is STILL at the final position (didn't get reset asynchronously)
+    const finalCursorPos = startOffset + insertText.length;
+    await helper.assertCursorAtPosition(editor, finalCursorPos, blockId);
+  });
+
+  test('typing does not cause DOM element to be replaced (no re-render)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode
+    const editor = await helper.enterEditMode(blockId);
+
+    // Clear existing text
+    await helper.selectAllTextInEditor(editor);
+
+    // Get a reference to the contenteditable element and mark it
+    const elementId = await editor.evaluate((el) => {
+      // Add a unique marker to track this specific element instance
+      const uniqueId = 'test-element-' + Date.now();
+      el.setAttribute('data-test-element-id', uniqueId);
+      return uniqueId;
+    });
+
+    // Type some text
+    await page.keyboard.type('Hello world');
+
+    // Wait for any potential async re-renders
+    await page.waitForTimeout(300);
+
+    // Check if the element is still the same instance
+    const stillSameElement = await iframe
+      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
+      .evaluate((el, id) => {
+        return el.getAttribute('data-test-element-id') === id;
+      }, elementId);
+
+    expect(stillSameElement).toBe(true);
+
+    // Type more text
+    await page.keyboard.type(' more text');
+
+    // Wait again
+    await page.waitForTimeout(300);
+
+    // Verify element is STILL the same instance
+    const stillSameAfterMoreTyping = await iframe
+      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
+      .evaluate((el, id) => {
+        return el.getAttribute('data-test-element-id') === id;
+      }, elementId);
+
+    expect(stillSameAfterMoreTyping).toBe(true);
+  });
+
   test('editing text in Slate block updates content', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -74,41 +201,18 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block to select it and show the Quanta toolbar
-    await helper.clickBlockInIframe(blockId);
-
-    // Edit the text
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
-
-    // Clear existing text and type new text
-    await editor.evaluate((el) => { el.textContent = ''; });
-    await editor.pressSequentially('Text to make bold', { delay: 10 });
+    // Edit the text (also clicks block, waits for toolbar, and types)
+    await helper.editBlockTextInIframe(blockId, 'Text to make bold');
 
     // STEP 1: Verify the text content is correct
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
     const textContent = await editor.textContent();
     expect(textContent).toBe('Text to make bold');
     console.log('[TEST] Step 1: Text content verified:', textContent);
 
     // STEP 2: Select all the text programmatically
-    // IMPORTANT: Must select the text node directly, not use selectNodeContents on parent element
-    // Otherwise serializePoint() will reset offset to 0 for element nodes
-    await editor.evaluate((el) => {
-      // Find the text node inside the editor
-      const textNode = el.firstChild;
-      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
-        throw new Error('[TEST] Expected first child to be a text node, got: ' + textNode?.nodeName);
-      }
-
-      const range = document.createRange();
-      range.setStart(textNode, 0);
-      range.setEnd(textNode, textNode.textContent.length);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-      console.log('[TEST] Selection created in iframe:', selection.toString());
-    });
+    await helper.selectAllTextInEditor(editor);
 
     // STEP 3: Verify selection was created correctly
     await helper.assertTextSelection(editor, 'Text to make bold', {
@@ -128,7 +232,7 @@ test.describe('Inline Editing', () => {
     });
 
     // STEP 5.5: Wait for toolbar to be fully ready and stable
-    await iframe.locator('.volto-hydra-format-button[title*="Bold" i]').first().waitFor({ state: 'attached', timeout: 3000 });
+    await helper.waitForQuantaToolbar(blockId);
     await page.waitForTimeout(100); // Let toolbar settle
 
     // STEP 6: Trigger the bold button using dispatchEvent
@@ -158,20 +262,13 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block to select it and show the Quanta toolbar
-    await helper.clickBlockInIframe(blockId);
+    // Edit the text (this also clicks the block, waits for toolbar, and selects all before typing)
+    await helper.editBlockTextInIframe(blockId, 'Click here');
 
-    // Edit the text
+    // Select all the text for link button test
     const iframe = helper.getIframe();
     const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
-
-    // Clear and type new text
-    await page.keyboard.press('Control+A'); // Select all
-    await editor.pressSequentially('Click here', { delay: 10 });
-
-    // Select all the text
-    await page.keyboard.press('Control+A'); // Select all
+    await helper.selectAllTextInEditor(editor);
 
     // Click the link button
     // NOTE: This currently triggers a production bug in hydra.js:733
@@ -194,11 +291,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and edit text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and edit text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Synced bold text', { delay: 10 });
 
@@ -242,11 +336,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and edit text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and edit text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Bold and italic text', { delay: 10 });
 
@@ -283,11 +374,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and edit text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and edit text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Text with bold', { delay: 10 });
 
@@ -314,11 +402,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and edit text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and edit text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Toggle bold text', { delay: 10 });
 
@@ -385,29 +470,13 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block to activate it
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-
-    // Clear and type initial text
-    await editor.click();
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Hello World', { delay: 10 });
 
-    // Click in the middle of the text (between 'Hello' and 'World')
-    await editor.evaluate((el) => {
-      const textNode = el.firstChild;
-      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
-        throw new Error('Expected first child to be a text node');
-      }
-      const range = document.createRange();
-      range.setStart(textNode, 6); // Position after "Hello "
-      range.collapse(true);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
+    // Move cursor to the middle of the text (between 'Hello' and 'World')
+    await helper.moveCursorToPosition(editor, 6); // Position after "Hello "
 
     // Type at cursor position
     await page.keyboard.type('Beautiful ');
@@ -425,11 +494,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and edit text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and edit text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('First', { delay: 10 });
 
@@ -475,11 +541,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and type text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and type text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Bold text', { delay: 10 });
 
@@ -489,14 +552,7 @@ test.describe('Inline Editing', () => {
     await page.waitForTimeout(300);
 
     // Move cursor to end
-    await editor.evaluate((el) => {
-      const range = document.createRange();
-      const selection = window.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(false); // Collapse to end
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
+    await helper.moveCursorToEnd(editor);
 
     // Type more text at the end
     await page.keyboard.type(' more');
@@ -623,11 +679,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
 
     // Type "Hello " then make "world" bold, then type " testing"
@@ -697,11 +750,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and type text
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and type text
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('Text to cut', { delay: 10 });
 
@@ -747,14 +797,7 @@ test.describe('Inline Editing', () => {
     await editor.pressSequentially('First line', { delay: 10 });
 
     // Move cursor to end of line
-    await editor.evaluate((el) => {
-      const range = document.createRange();
-      const selection = window.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(false); // Collapse to end
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
+    await helper.moveCursorToEnd(editor);
 
     // Press Enter - in standard Volto this would create a new block
     // Must press Enter in the iframe context, not the page context
@@ -799,11 +842,8 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and clear it
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
 
     // Type "Hello "
