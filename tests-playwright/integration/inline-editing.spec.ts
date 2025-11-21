@@ -384,11 +384,10 @@ test.describe('Inline Editing', () => {
     await helper.clickFormatButton('bold');
     await page.waitForTimeout(500);
 
-    // TODO: Check if the bold button shows active state
-    // This would require checking the button's CSS classes or aria-pressed attribute
-    // const boldButton = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra-format-button`).nth(0);
-    // const isActive = await boldButton.evaluate((el) => el.classList.contains('active'));
-    // expect(isActive).toBe(true);
+    // Verify selection is still on the formatted text
+    await helper.verifySelectionMatches(editor, 'Text with bold');
+
+    // Check if the bold button shows active state
     const isActive = await helper.isActiveFormatButton('bold')
     expect(isActive).toBeTruthy();
 
@@ -876,5 +875,135 @@ test.describe('Inline Editing', () => {
 
     // More specific: verify "world" is inside bold span (non-standard markup)
     expect(html).toMatch(/style="font-weight: bold">world<\/span>/);
-  });  
+  });
+
+  test('should handle bolding same text twice without path error', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode
+    const editor = await helper.enterEditMode(blockId);
+
+    // Wait for toolbar
+    await helper.waitForQuantaToolbar(blockId);
+
+    // Clear and type text
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Text with bold', { delay: 10 });
+
+    // Wait for text to stabilize
+    await page.waitForTimeout(300);
+
+    // Select the word "bold" (last 4 characters)
+    await page.keyboard.press('End');
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Shift+ArrowLeft');
+    }
+
+    // Wait for selection
+    await page.waitForTimeout(200);
+
+    console.log('[TEST] About to click Bold button first time');
+
+    // Click Bold button FIRST TIME using helper
+    await helper.clickFormatButton('bold');
+
+    console.log('[TEST] First bold click done');
+
+    // Wait for structure to update
+    await page.waitForTimeout(500);
+
+    // Verify bold markup exists
+    const html1 = await editor.innerHTML();
+    console.log('[TEST] HTML after first bold:', html1);
+    expect(html1).toMatch(/style="font-weight: bold">bold<\/span>/);
+
+    // Now select the bolded word again and unbold it
+    // Use keyboard to select: Shift+Ctrl+Left to select word
+    await page.keyboard.press('Shift+Control+ArrowLeft');
+
+    // Wait for selection
+    await page.waitForTimeout(200);
+
+    console.log('[TEST] About to click Bold button second time');
+
+    // Click Bold button SECOND TIME
+    // This should NOT throw an error about path [0,0,0] not found
+    await helper.clickFormatButton('bold');
+
+    console.log('[TEST] Second bold click done - should have unbolded without error');
+
+    // Wait for update
+    await page.waitForTimeout(500);
+
+    // Verify bold markup is gone
+    const html2 = await editor.innerHTML();
+    console.log('[TEST] HTML after second bold:', html2);
+    expect(html2).not.toMatch(/style="font-weight: bold">bold<\/span>/);
+  });
+
+  test('selection remains after bolding and unbolding a word', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode
+    const editor = await helper.enterEditMode(blockId);
+
+    // Wait for toolbar
+    await helper.waitForQuantaToolbar(blockId);
+
+    // Clear and type text
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('This is a test', { delay: 10 });
+
+    // Wait for text to stabilize
+    await page.waitForTimeout(300);
+
+    // Select the word "test" (last 4 characters)
+    await page.keyboard.press('End');
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Shift+ArrowLeft');
+    }
+
+    // Wait for selection to stabilize
+    await page.waitForTimeout(200);
+
+    // Verify "test" is selected before formatting
+    await helper.verifySelectionMatches(editor, 'test');
+    console.log('[TEST] Selection verified before bold: "test"');
+
+    // Click Bold button to apply bold formatting
+    await helper.clickFormatButton('bold');
+    await page.waitForTimeout(500);
+
+    // Verify "test" is still selected after applying bold
+    await helper.verifySelectionMatches(editor, 'test');
+    console.log('[TEST] Selection still "test" after applying bold');
+
+    // Verify bold markup exists
+    const html1 = await editor.innerHTML();
+    expect(html1).toContain('style="font-weight: bold"');
+    expect(html1).toContain('test');
+
+    // Click Bold button again to remove bold formatting
+    await helper.clickFormatButton('bold');
+    await page.waitForTimeout(500);
+
+    // Verify "test" is still selected after removing bold
+    await helper.verifySelectionMatches(editor, 'test');
+    console.log('[TEST] Selection still "test" after removing bold');
+
+    // Verify bold markup is gone
+    const html2 = await editor.innerHTML();
+    expect(html2).not.toContain('style="font-weight: bold"');
+    expect(html2).toContain('test');
+  });
 });

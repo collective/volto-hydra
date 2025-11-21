@@ -377,9 +377,9 @@ class Bridge {
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
-                if (event.data.selection) {
-                  console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.selection);
-                  this.restoreSlateSelection(event.data.selection, this.formData);
+                if (event.data.transformedSelection) {
+                  console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.transformedSelection);
+                  this.restoreSlateSelection(event.data.transformedSelection, this.formData);
                 } else if (this.savedSelection) {
                   console.log('[HYDRA] No transformed selection provided, using saved selection from selectionchange');
                   this.restoreSlateSelection(this.savedSelection, this.formData);
@@ -794,11 +794,14 @@ class Bridge {
     }
 
     // Walk up to find the path through the Slate structure
+    console.log('[HYDRA] serializePoint calling getNodePath with textNode:', textNode?.nodeName, 'textOffset:', textOffset);
     const path = this.getNodePath(textNode);
     if (!path) {
+      console.warn('[HYDRA] serializePoint: getNodePath returned null for textNode:', textNode);
       return null;
     }
 
+    console.log('[HYDRA] serializePoint result: path:', JSON.stringify(path), 'offset:', textOffset);
     return { path, offset: textOffset };
   }
 
@@ -831,53 +834,124 @@ class Bridge {
    * @param {Node} node - DOM node to find path for
    * @returns {Array|null} Slate path as array of indices, or null if not found
    */
+  /**
+   * Calculate the Slate index of a node among its siblings.
+   * Elements with data-node-id use their ID's last component.
+   * Text nodes use the next index after the previous sibling.
+   */
+  getSlateIndexAmongSiblings(node, parent) {
+    const siblings = Array.from(parent.childNodes);
+    const nodeIndex = siblings.indexOf(node);
+
+    // Look at all siblings before this node to determine Slate index
+    let slateIndex = 0;
+    for (let i = 0; i < nodeIndex; i++) {
+      const sibling = siblings[i];
+      if (sibling.nodeType === Node.ELEMENT_NODE && sibling.hasAttribute('data-node-id')) {
+        // Element with data-node-id: parse its index from the ID
+        const nodeId = sibling.getAttribute('data-node-id');
+        const parts = nodeId.split(/[.-]/); // Split on . or -
+        const lastIndex = parseInt(parts[parts.length - 1], 10);
+        slateIndex = lastIndex + 1; // Next index after this element
+      } else if (sibling.nodeType === Node.TEXT_NODE) {
+        // Text node: takes the next index
+        slateIndex++;
+      }
+    }
+
+    return slateIndex;
+  }
+
   getNodePath(node) {
     const path = [];
     let current = node;
 
+    console.log('[HYDRA] getNodePath START - node type:', node.nodeType === Node.TEXT_NODE ? 'TEXT_NODE' : node.nodeName, 'content:', node.textContent?.substring(0, 30));
+
+    // If starting with a text node, calculate its Slate index
+    if (node.nodeType === Node.TEXT_NODE) {
+      console.log('[HYDRA]   Starting from text node, parent:', node.parentNode?.nodeName);
+      const parent = node.parentNode;
+
+      // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
+      // Inline elements wrap their text directly, blocks (p, div) may have multiple text children
+      if (
+        parent.hasAttribute?.('data-node-id') &&
+        parent.nodeName !== 'P' &&
+        parent.nodeName !== 'DIV' &&
+        !parent.hasAttribute?.('data-editable-field')
+      ) {
+        const nodeId = parent.getAttribute('data-node-id');
+        console.log(`[HYDRA]   Parent is inline element with data-node-id: ${nodeId}`);
+
+        // Parse the parent's path from its node ID
+        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        console.log(`[HYDRA]   Parsed parent path: [${parts.join(', ')}]`);
+
+        // Text node index within the parent element
+        const siblings = Array.from(parent.childNodes);
+        const textIndex = siblings.indexOf(node);
+        console.log(`[HYDRA]   Text at DOM index ${textIndex} in inline parent`);
+
+        // Build path: parent path + text index
+        path.push(...parts, textIndex);
+        console.log('[HYDRA] getNodePath FINAL path:', JSON.stringify(path));
+        return path;
+      } else {
+        // Parent is a block element or doesn't have data-node-id
+        // Calculate Slate index among siblings considering node IDs
+        const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
+        console.log(`[HYDRA]   Text node at Slate index ${slateIndex} among siblings`);
+        path.push(slateIndex);
+        current = parent;
+      }
+    }
+
     // Walk up the DOM tree building the path
+    let depth = 0;
     while (current) {
-      // Process current node first
-      if (current.hasAttribute?.('data-node-id')) {
-        // This is a Slate node, find its index among siblings
-        const parent = current.parentNode;
-        const siblings = Array.from(parent.children).filter((child) =>
-          child.hasAttribute('data-node-id'),
-        );
-        const index = siblings.indexOf(current);
-        if (index !== -1) {
-          path.unshift(index);
-        }
-      } else if (current.nodeType === Node.TEXT_NODE) {
-        // Text node - find index among text siblings
-        const parent = current.parentNode;
-        const textNodes = Array.from(parent.childNodes).filter(
-          (child) => child.nodeType === Node.TEXT_NODE,
-        );
-        const index = textNodes.indexOf(current);
-        if (index !== -1) {
-          path.unshift(index);
+      const hasNodeId = current.hasAttribute?.('data-node-id');
+      const hasEditableField = current.hasAttribute?.('data-editable-field');
+      const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
+
+      console.log(`[HYDRA]   [${depth}] ${current.nodeName} - nodeId: ${hasNodeId ? current.getAttribute('data-node-id') : 'NO'}, editable: ${hasEditableField}, slate: ${hasSlateEditor}`);
+
+      // Process current node
+      if (hasNodeId) {
+        const nodeId = current.getAttribute('data-node-id');
+        // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
+        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        console.log(`[HYDRA]     → Parsed data-node-id="${nodeId}" to path: [${parts.join(', ')}]`);
+
+        // Prepend these path components
+        for (let i = parts.length - 1; i >= 0; i--) {
+          path.unshift(parts[i]);
         }
       }
 
       // Stop if we've reached the editable field container or slate editor
-      if (current.hasAttribute?.('data-editable-field') || current.hasAttribute?.('data-slate-editor')) {
+      if (hasEditableField || hasSlateEditor) {
+        console.log('[HYDRA] getNodePath END - reached container');
         break;
       }
 
       current = current.parentNode;
+      depth++;
     }
 
     // If we didn't find the editable field or slate editor, path is invalid
     if (!current) {
+      console.warn('[HYDRA] getNodePath - no container found, returning null');
       return null;
     }
 
-    // Ensure path has at least block index (0 for paragraph)
+    // Ensure path has at least block index
     if (path.length === 0) {
+      console.warn('[HYDRA] getNodePath - empty path, defaulting to [0, 0]');
       return [0, 0]; // Default to first block, first text
     }
 
+    console.log('[HYDRA] getNodePath FINAL path:', JSON.stringify(path));
     return path;
   }
 
@@ -985,18 +1059,8 @@ class Bridge {
           this.formData.blocks[blockUid] = this.addNodeIds(
             this.formData.blocks[blockUid],
           );
-          window.postMessage(
-            { type: 'FORM_DATA', data: this.formData, sender: 'hydrajs-nodeids' },
-            window.location.origin,
-          );
-          window.parent.postMessage(
-            {
-              type: 'INLINE_EDIT_DATA',
-              data: this.formData,
-              from: 'selectBlock',
-            },
-            this.adminOrigin,
-          );
+          // NodeIds are now added to this.formData for internal use
+          // No need to send anywhere - they're already in memory for DOM manipulation
         }
       }
 
@@ -1904,23 +1968,13 @@ class Bridge {
       console.log('[HYDRA] Mutation observer detected', mutations.length, 'mutations, isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
         console.log('[HYDRA] Mutation type:', mutation.type, 'target:', mutation.target);
-        if (mutation.type === 'characterData') {
-          const targetElement =
-            mutation.target?.parentElement?.closest('[data-node-id]');
-          console.log('[HYDRA] Found targetElement with data-node-id:', targetElement);
+        if (mutation.type === 'characterData' && this.isInlineEditing) {
+          // Find the editable field element (works for both Slate and non-Slate fields)
+          const targetElement = mutation.target?.parentElement?.closest('[data-editable-field]');
 
-          if (targetElement && this.isInlineEditing) {
-            console.log('[HYDRA] Calling handleTextChangeOnSlate');
-            this.handleTextChangeOnSlate(targetElement);
-          } else if (this.isInlineEditing) {
-            const targetElement = mutation.target?.parentElement?.closest(
-              '[data-editable-field]',
-            );
-            console.log('[HYDRA] Looking for data-editable-field, found:', targetElement);
-            if (targetElement) {
-              console.log('[HYDRA] Calling handleTextChange');
-              this.handleTextChange(targetElement);
-            }
+          if (targetElement) {
+            console.log('[HYDRA] Calling unified handleTextChange');
+            this.handleTextChange(targetElement);
           }
         }
       });
@@ -2325,6 +2379,21 @@ class Bridge {
     }
   }
 
+  /**
+   * Get formData with nodeIds stripped for sending to Admin UI
+   * NodeIds are internal to hydra.js for DOM<->Slate translation
+   * @returns {Object} Deep copy of formData without nodeIds
+   */
+  getFormDataWithoutNodeIds() {
+    const formDataCopy = JSON.parse(JSON.stringify(this.formData));
+    if (formDataCopy.blocks) {
+      Object.keys(formDataCopy.blocks).forEach((blockId) => {
+        this.resetJsonNodeIds(formDataCopy.blocks[blockId]);
+      });
+    }
+    return formDataCopy;
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Handling Text Changes in Blocks
   ////////////////////////////////////////////////////////////////////////////////
@@ -2339,18 +2408,70 @@ class Bridge {
       .closest('[data-block-uid]')
       .getAttribute('data-block-uid');
     const editableField = target.getAttribute('data-editable-field');
-    if (editableField)
-      this.formData.blocks[blockUid][editableField] = target.innerText;
-    if (this.formData.blocks[blockUid]['@type'] !== 'slate') {
-      window.parent.postMessage(
-        {
-          type: 'INLINE_EDIT_DATA',
-          data: this.formData,
-          from: 'textChange',
-        },
-        this.adminOrigin,
-      );
+
+    if (!editableField) {
+      console.log('[HYDRA] handleTextChange: No data-editable-field found');
+      return;
     }
+
+    // Determine field type from block schema metadata
+    const blockType = this.formData?.blocks[blockUid]?.['@type'];
+    const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
+    const fieldType = blockFieldTypes[editableField];
+
+    console.log('[HYDRA] handleTextChange:', editableField, 'type:', fieldType, 'text:', target.innerText?.substring(0, 50));
+
+    if (fieldType === 'slate') {
+      // Slate field - update JSON structure using nodeId
+      const closestNode = target.closest('[data-node-id]');
+      if (!closestNode) {
+        console.log('[HYDRA] Slate field but no data-node-id found!');
+        return;
+      }
+
+      const nodeId = closestNode.getAttribute('data-node-id');
+      const updatedJson = this.updateJsonNode(
+        this.formData?.blocks[blockUid],
+        nodeId,
+        closestNode.innerText?.replace(/\n$/, ''),
+      );
+
+      const currBlock = document.querySelector(
+        `[data-block-uid="${blockUid}"]`,
+      );
+      this.formData.blocks[blockUid] = {
+        ...updatedJson,
+        plaintext: currBlock.innerText,
+      };
+    } else {
+      // Non-Slate field - update field directly with text content
+      this.formData.blocks[blockUid][editableField] = target.innerText;
+    }
+
+    // Store the pending update - create a deep copy and strip nodeIds
+    // NodeIds are internal to hydra.js and should not be sent to Admin UI
+    this.pendingTextUpdate = {
+      type: 'INLINE_EDIT_DATA',
+      data: this.getFormDataWithoutNodeIds(),
+      from: fieldType === 'slate' ? 'textChangeSlate' : 'textChange',
+    };
+
+    // Clear existing timer and set new one - batches rapid changes
+    if (this.textUpdateTimer) {
+      console.log('[HYDRA] Clearing existing batch timer');
+      clearTimeout(this.textUpdateTimer);
+    }
+
+    // Send update after 300ms of no typing (debounce)
+    console.log('[HYDRA] Setting batch timer (300ms)');
+    this.textUpdateTimer = setTimeout(() => {
+      if (this.pendingTextUpdate) {
+        console.log('[HYDRA] Batch timer fired, sending update');
+        this.sendMessageToParent(this.pendingTextUpdate);
+        this.pendingTextUpdate = null;
+        this.textUpdateTimer = null; // Clear the timer reference
+      }
+    }, 300);
   }
 
   /**
@@ -2381,59 +2502,6 @@ class Bridge {
     window.parent.postMessage(message, this.adminOrigin);
   }
 
-  /**
-   * Handle the text changed in the slate block element, by updating the json data
-   * and sending it to the adminUI
-   * @param {HTMLElement} target
-   */
-  handleTextChangeOnSlate(target) {
-    console.log('[HYDRA] handleTextChangeOnSlate called, target text:', target.innerText?.substring(0, 50));
-    const closestNode = target.closest('[data-node-id]');
-    if (closestNode) {
-      const nodeId = closestNode.getAttribute('data-node-id');
-      console.log('[HYDRA] closestNode found, nodeId:', nodeId, 'text:', closestNode.innerText?.substring(0, 50));
-      const updatedJson = this.updateJsonNode(
-        this.formData?.blocks[this.selectedBlockUid],
-        nodeId,
-        closestNode.innerText?.replace(/\n$/, ''),
-      );
-      // this.resetJsonNodeIds(updatedJson);
-      const currBlock = document.querySelector(
-        `[data-block-uid="${this.selectedBlockUid}"]`,
-      );
-      this.formData.blocks[this.selectedBlockUid] = {
-        ...updatedJson,
-        plaintext: currBlock.innerText,
-      };
-
-      // Store the pending update - create a deep copy so mutations don't affect it
-      this.pendingTextUpdate = {
-        type: 'INLINE_EDIT_DATA',
-        data: JSON.parse(JSON.stringify(this.formData)),
-        from: 'textChangeSlate',
-      };
-
-      // Clear existing timer and set new one - batches rapid changes
-      if (this.textUpdateTimer) {
-        console.log('[HYDRA] Clearing existing batch timer');
-        clearTimeout(this.textUpdateTimer);
-      }
-
-      // Send update after 300ms of no typing (debounce)
-      console.log('[HYDRA] Setting batch timer (300ms)');
-      this.textUpdateTimer = setTimeout(() => {
-        if (this.pendingTextUpdate) {
-          const blockData = this.pendingTextUpdate.data.blocks[this.selectedBlockUid];
-          console.log('[HYDRA] Batch timer fired, sending update with block data:', JSON.stringify(blockData?.value));
-          this.sendMessageToParent(this.pendingTextUpdate);
-          this.pendingTextUpdate = null;
-          this.textUpdateTimer = null; // Clear the timer reference
-        }
-      }, 300);
-
-      // this.sendUpdatedJsonToAdminUI(updatedJson);
-    }
-  }
 
   /**
    * Update the JSON object with the new text,

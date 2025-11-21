@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Slate } from 'slate-react';
-import { createEditor } from 'slate';
-import { withReact } from 'slate-react';
-import { Editor } from 'slate';
+import { Transforms, Editor } from 'slate';
+import { isEqual } from 'lodash';
 import config from '@plone/volto/registry';
+import { makeEditor } from '@plone/volto-slate/utils';
 
 /**
  * Synced Slate Toolbar - Renders real Slate buttons with synchronized editor
@@ -29,21 +29,21 @@ const SyncedSlateToolbar = ({
   form,
   currentSelection,
   onChangeFormData,
+  onSelectionChange,
   blockUI,
   iframeElement,
   onOpenMenu,
 }) => {
 
-  // Create Slate editor once
+  // Create Slate editor once using Volto's makeEditor (includes all plugins)
   const [editor] = useState(() => {
-    const ed = withReact(createEditor());
+    const ed = makeEditor();
+
     // Add custom methods that Slate/Volto expects
     ed.getSavedSelection = () => null;
     ed.setSavedSelection = () => {};
     ed.isSidebarOpen = false;
-    // Initialize with empty paragraph to avoid undefined error on first render
-    // IMPORTANT: Must include nodeId properties - this is a Volto Slate requirement
-    ed.children = [{type: 'p', children: [{text: '', nodeId: 2}], nodeId: 1}];
+
     return ed;
   });
 
@@ -59,40 +59,68 @@ const SyncedSlateToolbar = ({
     };
   }, [editor]);
 
-  // Sync editor state with current block and selection
+  // Track internal value to detect external changes (like Volto does)
+  const internalValueRef = useRef(null);
+
+  // Force re-renders when value changes (to update button active states)
+  const [renderKey, setRenderKey] = useState(0);
+
+  // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
   useEffect(() => {
     if (!selectedBlock || !form.blocks[selectedBlock]) return;
 
     const block = form.blocks[selectedBlock];
-    const fieldName = blockUI?.focusedFieldName || 'value'; // Default to 'value' for simple slate blocks
+    const fieldName = blockUI?.focusedFieldName || 'value';
     const fieldValue = block[fieldName];
 
-    if (!fieldValue || !Array.isArray(fieldValue)) {
-      return;
+    // Update editor.children if external value changed (like Volto line 158)
+    if (fieldValue && !isEqual(fieldValue, editor.children)) {
+      console.log('[TOOLBAR] Syncing editor.children from form data (structure changed)');
+      editor.children = fieldValue;
+      internalValueRef.current = fieldValue;
+      // Force re-render to update button active states (like Volto's setState)
+      setRenderKey(k => k + 1);
+    } else if (fieldValue && !isEqual(fieldValue, internalValueRef.current)) {
+      console.log('[TOOLBAR] Updating internalValueRef (children already synced)');
+      internalValueRef.current = fieldValue;
     }
 
-    // Update editor children with the focused field's value
-    editor.children = fieldValue;
-
-    // Update editor selection
-    if (currentSelection) {
-      editor.selection = currentSelection;
+    // Update editor selection using Transforms (like Volto line 167)
+    if (currentSelection && !isEqual(currentSelection, editor.selection)) {
+      console.log('[TOOLBAR] Setting editor selection via Transforms (selection changed)');
+      try {
+        Transforms.select(editor, currentSelection);
+        // Force re-render to update button active states when selection changes
+        setRenderKey(k => k + 1);
+      } catch (e) {
+        console.log('[TOOLBAR] Selection transform failed:', e);
+      }
+    } else if (currentSelection) {
+      console.log('[TOOLBAR] Skipping selection sync - already matches editor.selection');
     }
-
-    // Normalize if needed
-    Editor.normalize(editor, { force: true });
   }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName]);
 
-  // Handle changes from button clicks
+  // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
     (newValue) => {
-      // Avoid update loops - only update if value actually changed
-      if (JSON.stringify(newValue) === JSON.stringify(editor.children)) {
+      console.error('[TOOLBAR] handleChange called, newValue:', JSON.stringify(newValue));
+      console.error('[TOOLBAR] editor.children after change:', JSON.stringify(editor.children));
+      console.error('[TOOLBAR] editor.selection after change:', JSON.stringify(editor.selection));
+
+      // Update internal value tracker
+      internalValueRef.current = newValue;
+
+      // Only call onChange if value actually changed (like Volto line 108)
+      const block = form.blocks[selectedBlock];
+      const fieldName = blockUI?.focusedFieldName || 'value';
+      const currentFieldValue = block?.[fieldName];
+
+      if (isEqual(newValue, currentFieldValue)) {
+        console.log('[TOOLBAR] Skipping update - value unchanged');
         return;
       }
 
-      // Determine which field to update
-      const fieldName = blockUI?.focusedFieldName || 'value';
+      console.log('[TOOLBAR] Updating field:', fieldName);
 
       // Build updated form data with the correct field
       const updatedForm = {
@@ -106,15 +134,29 @@ const SyncedSlateToolbar = ({
         },
       };
 
+      console.log('[TOOLBAR] Calling onChangeFormData with updated form');
       // Send to parent (which updates Redux and iframe)
       onChangeFormData(updatedForm);
+
+      // Send updated selection to parent so it can be sent to iframe
+      if (onSelectionChange && editor.selection) {
+        console.log('[TOOLBAR] Sending updated selection:', JSON.stringify(editor.selection));
+        onSelectionChange(editor.selection);
+      }
+
+      // DON'T increment renderKey here - it would remount <Slate> and reset editor.children
+      // Buttons will re-render naturally when React processes the state updates
     },
-    [editor.children, form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName],
+    [form, selectedBlock, onChangeFormData, onSelectionChange, blockUI?.focusedFieldName, editor],
   );
 
   // Get button configuration
   const toolbarButtons = config.settings.slate?.toolbarButtons || [];
   const buttons = config.settings.slate?.buttons || {};
+
+  console.log('[TOOLBAR] toolbarButtons config:', toolbarButtons);
+  console.log('[TOOLBAR] Available buttons:', Object.keys(buttons));
+  console.log('[TOOLBAR] Bold button exists?', !!buttons.bold);
 
   if (!blockUI || !selectedBlock) {
     return null;
@@ -141,6 +183,16 @@ const SyncedSlateToolbar = ({
   // CRITICAL: Only show Slate if we actually have a valid field value array
   // Don't trust blockUI.showFormatButtons alone - verify the data exists!
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;
+
+  // For controlled mode, we need the current value from form data
+  // Always provide a valid array to avoid Slate errors
+  // IMPORTANT: Use internalValueRef if available (means we just applied formatting)
+  // This prevents the editor from resetting to old value when it remounts with new renderKey
+  const currentValue = internalValueRef.current
+    ? internalValueRef.current
+    : hasValidSlateValue
+    ? fieldValue
+    : [{type: 'p', children: [{text: '', nodeId: 2}], nodeId: 1}];
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
@@ -190,32 +242,44 @@ const SyncedSlateToolbar = ({
       </div>
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
+      {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
+          while parent toolbar has pointerEvents: 'none' for drag-and-drop passthrough */}
       {blockUI.showFormatButtons && hasValidSlateValue && (
-        <Slate editor={editor} initialValue={editor.children} onChange={handleChange}>
-          {toolbarButtons.map((name, i) => {
-            if (name === 'separator') {
-              return (
-                <div
-                  key={i}
-                  className="toolbar-separator"
-                  style={{
-                    width: '1px',
-                    height: '28px',
-                    background: '#e0e0e0',
-                    margin: '0 4px',
-                  }}
-                />
-              );
-            }
+        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '4px' }}>
+          {console.log('[TOOLBAR] About to render Slate with:', { initialValue: currentValue, type: typeof currentValue, isArray: Array.isArray(currentValue) })}
+          <Slate
+            key={renderKey}
+            editor={editor}
+            initialValue={currentValue}
+            onChange={handleChange}
+          >
+            {toolbarButtons.map((name, i) => {
+              if (name === 'separator') {
+                return (
+                  <div
+                    key={i}
+                    className="toolbar-separator"
+                    style={{
+                      width: '1px',
+                      height: '28px',
+                      background: '#e0e0e0',
+                      margin: '0 4px',
+                    }}
+                  />
+                );
+              }
 
-            const Btn = buttons[name];
-            if (!Btn) {
-              return null;
-            }
+              const Btn = buttons[name];
+              if (!Btn) {
+                console.log(`[TOOLBAR] Button "${name}" not found in buttons config`);
+                return null;
+              }
 
-            return <Btn key={`${name}-${i}`} />;
-          })}
-        </Slate>
+              console.log(`[TOOLBAR] Rendering button: ${name}, editor.children:`, JSON.stringify(editor.children));
+              return <Btn key={`${name}-${i}`} />;
+            })}
+          </Slate>
+        </div>
       )}
 
       {/* Three-dots menu button */}
