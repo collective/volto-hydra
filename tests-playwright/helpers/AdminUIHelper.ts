@@ -65,10 +65,10 @@ export class AdminUIHelper {
 
     // Create a valid JWT format token (header.payload.signature)
     // Header: {"alg":"HS256","typ":"JWT"}
-    // Payload: {"sub":"admin","exp":9999999999} (expires far in future)
+    // Payload: {"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400} (expires in 24 hours)
     // Signature: fake but valid base64
     const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
-    const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":9999999999})).toString('base64').replace(/=/g, '');
+    const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400})).toString('base64').replace(/=/g, '');
     const signature = 'fake-signature';
     const authToken = `${header}.${payload}.${signature}`;
 
@@ -490,12 +490,12 @@ export class AdminUIHelper {
   async clickFormatButton(
     format: 'bold' | 'italic' | 'strikethrough' | 'link'
   ): Promise<void> {
-    const iframe = this.getIframe();
-
+    // Toolbar is now rendered in parent window (admin UI), not iframe
     // Find button by title attribute (case-insensitive search)
+    // Note: Semantic UI buttons render as <a> tags, not <button> tags
     const formatKeyword = format.charAt(0).toUpperCase() + format.slice(1); // Capitalize first letter
-    const button = iframe.locator(
-      `.volto-hydra-format-button[title*="${formatKeyword}" i]`
+    const button = this.page.locator(
+      `.quanta-toolbar [title*="${formatKeyword}" i]`
     );
 
     const count = await button.count();
@@ -504,9 +504,8 @@ export class AdminUIHelper {
       throw new Error(
         `Format button "${format}" not found in visible toolbar. ` +
         `Expected button with title containing "${formatKeyword}". ` +
-        `Check that: (1) a block with a slate field is selected, (2) hydra.js is loaded, ` +
-        `(3) createQuantaToolbar() was called with formatBtns=true, and ` +
-        `(4) the button has a title attribute set.`
+        `Check that: (1) a block with a slate field is selected, (2) toolbar is visible in admin UI, ` +
+        `(3) the button has a title attribute set.`
       );
     }
 
@@ -516,13 +515,62 @@ export class AdminUIHelper {
   }
 
   /**
+   * Check if a format button is in active state.
+   * Semantic UI Button with active={true} gets the "active" CSS class.
+   */
+  async isActiveFormatButton(
+    format: 'bold' | 'italic' | 'strikethrough' | 'link'
+  ): Promise<boolean> {
+    const formatKeyword = format.charAt(0).toUpperCase() + format.slice(1);
+    const button = this.page.locator(
+      `.quanta-toolbar [title*="${formatKeyword}" i]`
+    );
+
+    const count = await button.count();
+    if (count === 0) {
+      throw new Error(`Format button "${format}" not found in visible toolbar`);
+    }
+
+    // Check if button has "active" class (added by Semantic UI when active={true})
+    const hasActiveClass = await button.first().evaluate((el) =>
+      el.classList.contains('active')
+    );
+
+    return hasActiveClass;
+  }
+
+  /**
+   * Verify that the current selection matches the expected text.
+   */
+  async verifySelectionMatches(editor: Locator, expectedText: string): Promise<void> {
+    const selectedText = await editor.evaluate((el) => {
+      const selection = window.getSelection();
+      return selection ? selection.toString() : '';
+    });
+
+    if (selectedText !== expectedText) {
+      throw new Error(
+        `Selection mismatch. Expected: "${expectedText}", Got: "${selectedText}"`
+      );
+    }
+  }
+
+  /**
    * Select all text in a contenteditable element using JavaScript Selection API.
    * This is more reliable than using keyboard shortcuts.
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
     await editor.evaluate((el) => {
+      // IMPORTANT: Must select the text node directly, not use selectNodeContents on parent element
+      // Otherwise serializePoint() will reset offset to 0 for element nodes
+      const textNode = el.firstChild;
+      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+        throw new Error(`Expected first child to be a text node, got: ${textNode?.nodeName}`);
+      }
+
       const range = document.createRange();
-      range.selectNodeContents(el);
+      range.setStart(textNode, 0);
+      range.setEnd(textNode, textNode.textContent.length);
       const selection = window.getSelection();
       if (selection) {
         selection.removeAllRanges();
@@ -706,50 +754,260 @@ export class AdminUIHelper {
   }
 
   /**
-   * Edit text in a contenteditable block within the iframe.
-   * Handles both cases: block already editable, or needs to be clicked to become editable.
+   * Get cursor position information for a contenteditable element.
+   * Returns details about the cursor position, selection, and text content.
    */
-  async editBlockTextInIframe(blockId: string, newText: string): Promise<void> {
-    const iframe = this.getIframe();
-    const blockContainer = iframe.locator(`[data-block-uid="${blockId}"]`);
+  async getCursorInfo(editor: any): Promise<{
+    text: string;
+    textLength: number;
+    selectionCollapsed: boolean;
+    cursorOffset: number | undefined;
+    cursorContainerText: string;
+    isFocused: boolean;
+  }> {
+    return await editor.evaluate((el: HTMLElement) => {
+      const doc = el.ownerDocument;
+      const selection = doc.getSelection();
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      const text = el.innerText || el.textContent || '';
 
-    // First, click the block to select it and show the toolbar
-    await blockContainer.click();
+      return {
+        text: text,
+        textLength: text.length,
+        selectionCollapsed: selection?.isCollapsed ?? true,
+        cursorOffset: range?.startOffset,
+        cursorContainerText: range?.startContainer?.textContent || '',
+        isFocused: doc.activeElement === el,
+      };
+    });
+  }
 
-    // Wait for the Quanta toolbar to appear (indicating block is selected)
-    await this.waitForQuantaToolbar(blockId, 5000);
+  /**
+   * Assert that the cursor is at the end of the text in a contenteditable element.
+   * Throws an error if the cursor position is not as expected.
+   */
+  async assertCursorAtEnd(editor: any, blockId: string, expectedText?: string): Promise<void> {
+    const cursorInfo = await this.getCursorInfo(editor);
 
-    // Now wait for the contenteditable element to appear
-    const editor = iframe.locator(
-      `[data-block-uid="${blockId}"] [contenteditable="true"]`
-    );
-    await editor.waitFor({ state: 'visible', timeout: 5000 });
-
-    // ASSERT: Verify the field is actually editable and focused before typing
-    const isEditable = await editor.getAttribute('contenteditable');
-    if (isEditable !== 'true') {
-      throw new Error(`Block ${blockId} field is not editable (contenteditable="${isEditable}")`);
+    if (!cursorInfo.isFocused) {
+      throw new Error(
+        `Block ${blockId} lost focus. ` +
+        `Expected text: "${expectedText || 'N/A'}", actual: "${cursorInfo.text}"`
+      );
     }
 
-    const isFocused = await editor.evaluate((el) => {
+    if (!cursorInfo.selectionCollapsed) {
+      throw new Error(
+        `Block ${blockId} cursor is not collapsed (text is selected). ` +
+        `This indicates the cursor was reset.`
+      );
+    }
+
+    // Cursor should be at or near the end of the text
+    const expectedEnd = cursorInfo.textLength;
+    if (cursorInfo.cursorOffset !== undefined &&
+        Math.abs(cursorInfo.cursorOffset - expectedEnd) > 2) {
+      throw new Error(
+        `Block ${blockId} cursor position unexpected. ` +
+        `Expected near end (${expectedEnd}), but at offset ${cursorInfo.cursorOffset}. ` +
+        `Text: "${cursorInfo.text}". This indicates cursor was reset.`
+      );
+    }
+  }
+
+  /**
+   * Assert that the text content matches what was expected.
+   * Allows for some variation in whitespace and formatting.
+   */
+  async assertTextMatches(editor: any, blockId: string, expectedText: string): Promise<void> {
+    const cursorInfo = await this.getCursorInfo(editor);
+
+    // Check if the text contains at least the beginning of expected text
+    if (!cursorInfo.text.includes(expectedText.substring(0, Math.min(5, expectedText.length)))) {
+      throw new Error(
+        `Block ${blockId} text doesn't match after typing. ` +
+        `Expected: "${expectedText}", actual: "${cursorInfo.text}"`
+      );
+    }
+  }
+
+  /**
+   * Move cursor to the end of the text in a contenteditable element.
+   */
+  async moveCursorToEnd(editor: any): Promise<void> {
+    await editor.evaluate((el: any) => {
+      const range = el.ownerDocument.createRange();
+      const selection = el.ownerDocument.defaultView.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false); // Collapse to end
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+  }
+
+  /**
+   * Move cursor to a specific position in a contenteditable element.
+   *
+   * @param editor - The contenteditable element
+   * @param position - The character offset position to move to (0-based)
+   */
+  async moveCursorToPosition(editor: any, position: number): Promise<void> {
+    await editor.evaluate(
+      (el: any, pos: number) => {
+        const textNode = el.firstChild;
+        if (!textNode || textNode.nodeType !== 3) {
+          // Node.TEXT_NODE = 3
+          throw new Error('Expected first child to be a text node');
+        }
+        const range = el.ownerDocument.createRange();
+        const selection = el.ownerDocument.defaultView.getSelection();
+        range.setStart(textNode, pos);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      },
+      position,
+    );
+  }
+
+  /**
+   * Check if an editor element is currently focused.
+   *
+   * @param editor - The editor element to check
+   * @returns Object with isFocused boolean and activeElement info
+   */
+  async isEditorFocused(editor: any): Promise<{
+    isFocused: boolean;
+    activeElement: string;
+  }> {
+    return await editor.evaluate((el: HTMLElement) => {
       const doc = el.ownerDocument;
       const activeEl = doc.activeElement;
       const activeTag = activeEl?.tagName;
       const activeEditable = activeEl?.getAttribute?.('data-editable-field');
       return {
         isFocused: activeEl === el,
-        activeElement: `${activeTag}[data-editable-field="${activeEditable}"]`
+        activeElement: `${activeTag}[data-editable-field="${activeEditable}"]`,
       };
     });
-    if (!isFocused.isFocused) {
-      throw new Error(`Block ${blockId} field is not focused. Active element: ${isFocused.activeElement}`);
+  }
+
+  /**
+   * Check if the cursor is at a specific position in the editor.
+   *
+   * @param editor - The editor element to check
+   * @param expectedPosition - The expected cursor position (0-based)
+   * @param blockId - Optional block ID for error messages
+   * @throws Error if cursor is not at the expected position, not focused, or not collapsed
+   */
+  async assertCursorAtPosition(
+    editor: any,
+    expectedPosition: number,
+    blockId?: string,
+  ): Promise<void> {
+    const cursorInfo = await this.getCursorInfo(editor);
+    const blockDesc = blockId ? `Block ${blockId}` : 'Editor';
+
+    if (!cursorInfo.isFocused) {
+      throw new Error(
+        `${blockDesc}: Lost focus. Expected cursor at position ${expectedPosition}. ` +
+          `Text: "${cursorInfo.text}"`,
+      );
     }
+
+    if (!cursorInfo.selectionCollapsed) {
+      throw new Error(
+        `${blockDesc}: Cursor not collapsed (text is selected). ` +
+          `Expected cursor at position ${expectedPosition}. This indicates cursor was reset.`,
+      );
+    }
+
+    if (
+      cursorInfo.cursorOffset !== undefined &&
+      cursorInfo.cursorOffset !== expectedPosition
+    ) {
+      throw new Error(
+        `${blockDesc}: Cursor position wrong. ` +
+          `Expected at position ${expectedPosition}, but at ${cursorInfo.cursorOffset}. ` +
+          `Text: "${cursorInfo.text}". This indicates cursor was reset.`,
+      );
+    }
+  }
+
+  /**
+   * Enter edit mode on a specific block and return the contenteditable editor element.
+   * This helper checks if already editable/focused, and only clicks if necessary.
+   *
+   * @param blockId - The block UID to enter edit mode on
+   * @returns The contenteditable editor element, ready for text input
+   */
+  async enterEditMode(blockId: string): Promise<any> {
+    const iframe = this.getIframe();
+    const editor = iframe.locator(
+      `[data-block-uid="${blockId}"] [contenteditable="true"]`,
+    );
+
+    // Check if the editor is already visible and focused
+    const isVisible = await editor.isVisible().catch(() => false);
+
+    if (isVisible) {
+      // Check if already editable
+      const isEditable = await editor.getAttribute('contenteditable');
+      if (isEditable === 'true') {
+        // Check if already focused
+        const focusInfo = await this.isEditorFocused(editor);
+        if (focusInfo.isFocused) {
+          // Already in edit mode, return the editor
+          return editor;
+        }
+      }
+    }
+
+    // Not in edit mode yet, need to click the block
+    const blockContainer = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await blockContainer.click();
+
+    // Wait for the Quanta toolbar to appear (indicating block is selected)
+    await this.waitForQuantaToolbar(blockId, 5000);
+
+    // Wait for the contenteditable element to appear
+    await editor.waitFor({ state: 'visible', timeout: 5000 });
+
+    // ASSERT: Verify the field is actually editable and focused
+    const isEditable = await editor.getAttribute('contenteditable');
+    if (isEditable !== 'true') {
+      throw new Error(
+        `Block ${blockId} field is not editable (contenteditable="${isEditable}")`,
+      );
+    }
+
+    const focusInfo = await this.isEditorFocused(editor);
+    if (!focusInfo.isFocused) {
+      throw new Error(
+        `Block ${blockId} field is not focused. Active element: ${focusInfo.activeElement}`,
+      );
+    }
+
+    return editor;
+  }
+
+  /**
+   * Edit text in a contenteditable block within the iframe.
+   * Handles both cases: block already editable, or needs to be clicked to become editable.
+   */
+  async editBlockTextInIframe(blockId: string, newText: string): Promise<void> {
+    // Enter edit mode and get the editor
+    const editor = await this.enterEditMode(blockId);
 
     // Clear existing text by selecting all within the contenteditable field
     await this.selectAllTextInEditor(editor);
 
     // Type new text (will replace the selection)
     await editor.pressSequentially(newText, { delay: 10 });
+
+    // ASSERT: Verify cursor and text after typing
+    await this.assertTextMatches(editor, blockId, newText);
+    await this.assertCursorAtEnd(editor, blockId, newText);
   }
 
   /**
