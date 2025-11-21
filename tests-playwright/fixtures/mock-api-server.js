@@ -19,9 +19,9 @@ const contentDB = {};
 
 // Create a valid JWT format token (header.payload.signature)
 // Header: {"alg":"HS256","typ":"JWT"}
-// Payload: {"sub":"admin","exp":9999999999} (expires far in future)
+// Payload: {"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400} (expires in 24 hours)
 const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
-const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":9999999999})).toString('base64').replace(/=/g, '');
+const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400})).toString('base64').replace(/=/g, '');
 const signature = 'fake-signature';
 const AUTH_TOKEN = `${header}.${payload}.${signature}`;
 

@@ -87,6 +87,11 @@
                     window.bridge.onEditChange((formData) => {
                         console.log('[TEST-FRONTEND] Bridge connected! Received form data:', formData);
 
+                        // Update page title if provided
+                        if (formData.title) {
+                            document.getElementById('page-title').textContent = formData.title;
+                        }
+
                         // Re-render content with updated data
                         if (formData.blocks && formData.blocks_layout) {
                             console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');

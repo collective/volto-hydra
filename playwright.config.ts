@@ -9,6 +9,9 @@ import * as path from 'path';
 export default defineConfig({
   testDir: './tests-playwright',
 
+  /* Global setup - verifies servers are healthy before running tests */
+  globalSetup: require.resolve('./tests-playwright/global-setup.ts'),
+
   /* Maximum time one test can run for */
   timeout: 30 * 1000, // 30s - with manual server management, tests should complete quickly
 
@@ -89,6 +92,8 @@ export default defineConfig({
       url: 'http://localhost:3002/health', // Health check on webpack-dev-server (returns 200 when ready)
       timeout: 300 * 1000, // 5 minutes for initial webpack compilation
       reuseExistingServer: !process.env.CI, // Reuse in local dev, start fresh in CI
+      // IMPORTANT: When reuseExistingServer is true, Playwright SKIPS the health check!
+      // This means tests can run against a broken/compiling server. We should add a manual check.
       cwd: process.cwd(),
       stdout: 'pipe',
       stderr: 'pipe',
