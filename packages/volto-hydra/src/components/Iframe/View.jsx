@@ -180,6 +180,11 @@ const Iframe = (props) => {
   const blockChooserRef = useRef();
   const applyFormatRef = useRef(null); // Ref to shared format handler
 
+  // Ref to store selection that should be sent with next FORM_DATA
+  // This is updated synchronously when toolbar applies formatting,
+  // ensuring the useEffect that sends FORM_DATA includes the updated selection
+  const selectionToSendRef = useRef(null);
+
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     strategy: 'fixed',
     placement: 'bottom',
@@ -493,74 +498,68 @@ const Iframe = (props) => {
               break;
             }
 
-            // Try to get the sidebar widget's Slate editor
-            const fieldId = 'value';
-            let sidebarEditor = typeof window !== 'undefined' &&
-              window.voltoHydraSidebarEditors?.get(fieldId);
+            // Get the toolbar editor (same editor used by format buttons)
+            const toolbarEditor = typeof window !== 'undefined' && window.voltoHydraToolbarEditor;
 
             // Verify this editor is for the current block
-            if (sidebarEditor && selectedBlock !== pasteBlockId) {
-              console.log('[VIEW] Sidebar editor exists but selected block does not match');
-              sidebarEditor = null;
+            if (toolbarEditor && selectedBlock !== pasteBlockId) {
+              console.log('[VIEW] Toolbar editor exists but selected block does not match');
+              toolbarEditor = null;
             }
 
             let updatedValue;
             let transformedSelection;
 
-            if (sidebarEditor) {
-              console.log('[VIEW] Using real sidebar editor for paste');
-
-              // Set selection on editor
-              Transforms.select(sidebarEditor, pasteSelection);
-
-              // Deserialize pasted HTML to Slate fragment
-              const pastedSlate = slateTransforms.htmlToSlate(html);
-              console.log('[VIEW] Deserialized paste content:', JSON.stringify(pastedSlate));
-
-              // For paste, we need to insert the text nodes, not block nodes
-              // Extract text/inline nodes from the deserialized blocks
-              let fragment = [];
-              pastedSlate.forEach(node => {
-                if (node.children) {
-                  fragment.push(...node.children);
-                } else {
-                  fragment.push(node);
-                }
-              });
-
-              console.log('[VIEW] Fragment to insert:', JSON.stringify(fragment));
-
-              // Insert text using insertText for plain text or insertNodes for formatted
-              if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
-                // Plain text - use insertText
-                Transforms.insertText(sidebarEditor, fragment[0].text);
-              } else {
-                // Formatted text - use insertNodes
-                Transforms.insertNodes(sidebarEditor, fragment);
-              }
-
-              // Get updated value and selection from the editor
-              updatedValue = sidebarEditor.children;
-              transformedSelection = sidebarEditor.selection;
-
-              console.log('[VIEW] Paste applied, new selection:', transformedSelection);
-            } else {
-              console.log('[VIEW] Sidebar editor not available, falling back to headless editor');
-
-              // Fallback to headless editor
-              const pastedSlate = slateTransforms.htmlToSlate(html);
-              let fragment = [];
-              pastedSlate.forEach(node => {
-                if (node.children) {
-                  fragment.push(...node.children);
-                } else {
-                  fragment.push(node);
-                }
-              });
-
-              updatedValue = slateTransforms.insertNodes(block.value, pasteSelection, fragment);
-              transformedSelection = pasteSelection; // Best guess
+            if (!toolbarEditor) {
+              console.error('[VIEW] Toolbar editor not available - cannot paste');
+              event.source.postMessage(
+                {
+                  type: 'SLATE_ERROR',
+                  blockId: pasteBlockId,
+                  error: 'Toolbar editor not available',
+                  originalRequest: event.data,
+                },
+                event.origin,
+              );
+              break;
             }
+
+            console.log('[VIEW] Using toolbar editor for paste');
+
+            // Set selection on editor
+            Transforms.select(toolbarEditor, pasteSelection);
+
+            // Deserialize pasted HTML to Slate fragment
+            const pastedSlate = slateTransforms.htmlToSlate(html);
+            console.log('[VIEW] Deserialized paste content:', JSON.stringify(pastedSlate));
+
+            // For paste, we need to insert the text nodes, not block nodes
+            // Extract text/inline nodes from the deserialized blocks
+            let fragment = [];
+            pastedSlate.forEach(node => {
+              if (node.children) {
+                fragment.push(...node.children);
+              } else {
+                fragment.push(node);
+              }
+            });
+
+            console.log('[VIEW] Fragment to insert:', JSON.stringify(fragment));
+
+            // Insert text using insertText for plain text or insertNodes for formatted
+            if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
+              // Plain text - use insertText
+              Transforms.insertText(toolbarEditor, fragment[0].text);
+            } else {
+              // Formatted text - use insertNodes
+              Transforms.insertNodes(toolbarEditor, fragment);
+            }
+
+            // Get updated value and selection from the editor
+            updatedValue = toolbarEditor.children;
+            transformedSelection = toolbarEditor.selection;
+
+            console.log('[VIEW] Paste applied, new selection:', transformedSelection);
 
             const updatedForm = {
               ...form,
@@ -617,49 +616,45 @@ const Iframe = (props) => {
               break;
             }
 
-            // Try to get the sidebar widget's Slate editor
-            const fieldId = 'value';
-            let sidebarEditor = typeof window !== 'undefined' &&
-              window.voltoHydraSidebarEditors?.get(fieldId);
+            // Get the toolbar editor (same editor used by format buttons)
+            const toolbarEditor = typeof window !== 'undefined' && window.voltoHydraToolbarEditor;
 
             // Verify this editor is for the current block
-            if (sidebarEditor && selectedBlock !== delBlockId) {
-              console.log('[VIEW] Sidebar editor exists but selected block does not match');
-              sidebarEditor = null;
+            if (toolbarEditor && selectedBlock !== delBlockId) {
+              console.log('[VIEW] Toolbar editor exists but selected block does not match');
+              toolbarEditor = null;
             }
 
-            let updatedValue;
-            let transformedSelection;
-
-            if (sidebarEditor) {
-              console.log('[VIEW] Using real sidebar editor for deletion');
-
-              // Apply deletion transform directly to the widget's editor
-              Transforms.select(sidebarEditor, delSelection);
-
-              if (direction === 'backward') {
-                Transforms.delete(sidebarEditor, { unit: 'character', reverse: true });
-              } else {
-                Transforms.delete(sidebarEditor, { unit: 'character' });
-              }
-
-              // Get updated value and selection from the editor
-              updatedValue = sidebarEditor.children;
-              transformedSelection = sidebarEditor.selection;
-
-              console.log('[VIEW] Deletion applied, new selection:', transformedSelection);
-            } else {
-              console.log('[VIEW] Sidebar editor not available, falling back to headless editor');
-
-              // Fallback to headless editor
-              const result = slateTransforms.applyDeletion(
-                block.value,
-                delSelection,
-                direction,
+            if (!toolbarEditor) {
+              console.error('[VIEW] Toolbar editor not available - cannot delete');
+              event.source.postMessage(
+                {
+                  type: 'SLATE_ERROR',
+                  blockId: delBlockId,
+                  error: 'Toolbar editor not available',
+                  originalRequest: event.data,
+                },
+                event.origin,
               );
-              updatedValue = result.value;
-              transformedSelection = result.selection;
+              break;
             }
+
+            console.log('[VIEW] Using toolbar editor for deletion');
+
+            // Apply deletion transform directly to the toolbar editor
+            Transforms.select(toolbarEditor, delSelection);
+
+            if (direction === 'backward') {
+              Transforms.delete(toolbarEditor, { unit: 'character', reverse: true });
+            } else {
+              Transforms.delete(toolbarEditor, { unit: 'character' });
+            }
+
+            // Get updated value and selection from the editor
+            const updatedValue = toolbarEditor.children;
+            const transformedSelection = toolbarEditor.selection;
+
+            console.log('[VIEW] Deletion applied, new selection:', transformedSelection);
 
             // Update form state
             const updatedForm = {
@@ -902,10 +897,22 @@ const Iframe = (props) => {
       // Send FORM_DATA to iframe for any form data change (except inline edits, handled above)
       // Only send if we have actual blocks data
       console.log('[VIEW] Sending FORM_DATA to iframe - form data changed');
+      console.log('[VIEW] selectionToSendRef.current:', JSON.stringify(selectionToSendRef.current));
+      const message = { type: 'FORM_DATA', data: formToUse };
+      // Include selection from ref if it was updated by toolbar formatting
+      // The ref is updated synchronously when toolbar calls onSelectionChange,
+      // so it's available when this useEffect runs (even though state hasn't updated yet)
+      if (selectionToSendRef.current) {
+        console.log('[VIEW] Including transformedSelection:', JSON.stringify(selectionToSendRef.current));
+        message.transformedSelection = selectionToSendRef.current;
+        selectionToSendRef.current = null; // Clear after sending
+      } else {
+        console.log('[VIEW] No transformedSelection to send');
+      }
       document
         .getElementById('previewIframe')
         ?.contentWindow?.postMessage(
-          { type: 'FORM_DATA', data: formToUse },
+          message,
           iframeOriginRef.current,
         );
     }
@@ -1064,6 +1071,15 @@ const Iframe = (props) => {
             form={properties}
             currentSelection={currentSelection}
             onChangeFormData={onChangeFormData}
+            onSelectionChange={(selection) => {
+              console.log('[VIEW] onSelectionChange called with:', JSON.stringify(selection));
+              // Update ref synchronously so useEffect can include it in FORM_DATA
+              selectionToSendRef.current = selection;
+              console.log('[VIEW] Set selectionToSendRef.current to:', JSON.stringify(selectionToSendRef.current));
+              // Update state so toolbar's currentSelection prop stays in sync
+              // The toolbar's useEffect will skip the remount if selection hasn't changed
+              setCurrentSelection(selection);
+            }}
             blockUI={blockUI}
             iframeElement={referenceElement}
             onOpenMenu={(rect) => {

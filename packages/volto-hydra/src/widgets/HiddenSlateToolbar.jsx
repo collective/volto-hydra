@@ -17,6 +17,16 @@ const HiddenSlateToolbar = ({ containerRef }) => {
   // Only render on client-side (not during SSR)
   const [isClient, setIsClient] = useState(false);
 
+  // Create a simple document with text
+  // IMPORTANT: Must include nodeId properties - this is a Volto Slate requirement
+  const initialValue = [
+    {
+      type: 'p',
+      children: [{ text: 'Sample text for toolbar', nodeId: 2 }],
+      nodeId: 1
+    }
+  ];
+
   // Create a real Slate editor
   const [editor] = useState(() => {
     const ed = withReact(createEditor());
@@ -25,16 +35,10 @@ const HiddenSlateToolbar = ({ containerRef }) => {
     ed.setSavedSelection = () => {};
     // Ensure sidebar is not open (prevents toolbar from returning early)
     ed.isSidebarOpen = false;
+    // IMPORTANT: Initialize editor.children to avoid undefined error
+    ed.children = initialValue;
     return ed;
   });
-
-  // Create a simple document with text
-  const [value] = useState([
-    {
-      type: 'p',
-      children: [{ text: 'Sample text for toolbar' }]
-    }
-  ]);
 
   useEffect(() => {
     setIsClient(true);
@@ -64,7 +68,7 @@ const HiddenSlateToolbar = ({ containerRef }) => {
   // The Editable component creates the DOM nodes that Editor.nodes() needs
   return (
     <div ref={containerRef} style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none', width: '500px' }}>
-      <Slate editor={editor} initialValue={value} onChange={() => {}}>
+      <Slate editor={editor} onChange={() => {}}>
         <SlateToolbar
           selected={true}
           show={true}
