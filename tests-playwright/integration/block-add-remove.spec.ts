@@ -9,6 +9,17 @@
  * - Block appears in iframe
  * - Block count changes
  * - Changes sync with Admin UI
+ * TODO: Extra tests
+ * - / short cut to add block
+ * - enter on any block adds new block below
+ * - enter on 2nd last field goes to next field
+ * - removing last block adds new blank block
+ * 
+ * Container tests
+ * - empty container shows add block
+ * - empty container shows only allowed block type
+ * - add appears in direction block will be added
+ * - can add another block in a container
  */
 import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -101,11 +112,11 @@ test.describe('Adding Blocks', () => {
 
     // Find the new block ID (the one that's not in initialBlocks)
     const newBlockId = newBlocks.find(id => !initialBlocks.includes(id));
-    expect(newBlockId, `New block should be found in block order`).toBeDefined();
+    expect(newBlockId).toBeDefined();
 
     // Verify the new block exists in iframe
     const exists = await helper.blockExists(newBlockId!);
-    expect(exists, `New block ${newBlockId} should exist in iframe`).toBe(true);
+    expect(exists).toBe(true);
   });
 
   test('can add multiple blocks in succession', async ({ page }) => {

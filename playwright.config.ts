@@ -70,7 +70,7 @@ export default defineConfig({
       name: 'Mock API + Frontend',
       command: `node ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
       url: 'http://localhost:8888/health',
-      timeout: 30 * 1000,
+      timeout: 50 * 1000,
       reuseExistingServer: !process.env.CI,
       cwd: process.cwd(),
       stdout: 'pipe',

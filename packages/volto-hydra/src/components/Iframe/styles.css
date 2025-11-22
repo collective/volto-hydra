@@ -38,3 +38,41 @@
   height: 100vh;
   border: none;
 }
+
+/* Compact Quanta Toolbar Styles */
+.quanta-toolbar {
+  /* Make Slate buttons more compact */
+}
+
+.quanta-toolbar .ui.basic.button,
+.quanta-toolbar .button {
+  min-height: 24px !important;
+  padding: 4px 8px !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #666 !important;
+}
+
+.quanta-toolbar .ui.basic.button:hover,
+.quanta-toolbar .button:hover {
+  background: #f5f5f5 !important;
+  color: #333 !important;
+}
+
+.quanta-toolbar .ui.basic.button.active,
+.quanta-toolbar .button.active {
+  background: #e8e8e8 !important;
+  color: #000 !important;
+}
+
+.quanta-toolbar .ui.basic.icon.button {
+  padding: 4px 6px !important;
+}
+
+.quanta-toolbar .ui.basic.button > i.icon {
+  margin: 0 !important;
+  font-size: 14px !important;
+}

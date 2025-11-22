@@ -3,6 +3,22 @@
  *
  * These tests verify that editing text directly in blocks works correctly
  * and syncs with the admin UI.
+ * 
+ * TODO - additional tests
+ * - backspace into bold text (click off or apply another format it will go funny)
+ * - click at end of block puts cursor at end of line
+ * - paste a link
+ * - DND a word within the same block
+ * - DND a word between blocks
+ * - paste rich text
+ * - paste multi-paragraph rich text
+ * - paste formatting from one field to another
+ * - format button still works when sidebar is closed
+ * - multiple slate fields in one block
+ * - heading shortcuts (## for h2, ### for h3)
+ * - bullet list shortcuts (- or * for ul, 1. for ol)
+ * - multiple formats on same text (bold + italic, etc)
+ * - paragraph formats as dropdown?
  */
 import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -270,17 +286,59 @@ test.describe('Inline Editing', () => {
     const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
     await helper.selectAllTextInEditor(editor);
 
-    // Click the link button
-    // NOTE: This currently triggers a production bug in hydra.js:733
-    // "Cannot read properties of null (reading 'link')"
+    // Click the link button - should show an extra toolbar for entering URL
     await helper.clickFormatButton('link');
 
-    // TODO: Handle link URL input dialog if it appears
-    // For now, this test documents the production bug
-    // Once the bug is fixed, we should enhance this test to:
-    // 1. Enter a URL in the link dialog
-    // 2. Verify the link was created with <a> tag
-    // 3. Verify the href attribute is correct
+    // Wait for the extra link toolbar to appear
+    await page.waitForTimeout(500);
+
+    // Look for the extra toolbar that appears for link input
+    // Common selectors for Slate link toolbar
+    const linkToolbar = page.locator('.slate-inline-toolbar, .link-toolbar, .slate-link-toolbar, [data-slate-toolbar]').first();
+
+    const toolbarVisible = await linkToolbar.isVisible().catch(() => false);
+    console.log('[TEST] Link toolbar visible:', toolbarVisible);
+
+    if (toolbarVisible) {
+      // Inspect the toolbar HTML to find the input field
+      const toolbarHTML = await linkToolbar.innerHTML();
+      console.log('[TEST] Link toolbar HTML:', toolbarHTML);
+    }
+
+    // Try multiple selectors for the URL input
+    const linkUrlInput = page.locator('input[placeholder*="url" i], input[placeholder*="link" i], input[type="url"], .slate-inline-toolbar input, .link-toolbar input').first();
+    const urlInputVisible = await linkUrlInput.isVisible().catch(() => false);
+    console.log('[TEST] URL input visible:', urlInputVisible);
+
+    // Verify the extra toolbar appeared
+    const linkUIAppeared = toolbarVisible || urlInputVisible;
+    expect(linkUIAppeared).toBe(true);
+
+    if (urlInputVisible) {
+      // Enter a URL
+      await linkUrlInput.fill('https://example.com');
+      await page.waitForTimeout(200);
+
+      // Look for submit/confirm button
+      const submitButton = page.locator('button:has-text("Save"), button:has-text("OK"), button:has-text("Apply"), button[type="submit"]').first();
+      const submitVisible = await submitButton.isVisible().catch(() => false);
+
+      if (submitVisible) {
+        await submitButton.click();
+        await page.waitForTimeout(500);
+      } else {
+        // Maybe press Enter to submit
+        await linkUrlInput.press('Enter');
+        await page.waitForTimeout(500);
+      }
+
+      // Verify link was created
+      const blockHtml = await editor.innerHTML();
+      console.log('[TEST] Block HTML after creating link:', blockHtml);
+
+      expect(blockHtml).toContain('<a ');
+      expect(blockHtml).toContain('https://example.com');
+    }
   });
 
   test('bold formatting syncs with Admin UI', async ({ page }) => {

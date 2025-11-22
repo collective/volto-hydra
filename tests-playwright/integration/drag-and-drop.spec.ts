@@ -3,6 +3,11 @@
  *
  * These tests verify that blocks can be reordered via drag and drop,
  * and that block data is preserved during reordering.
+ * 
+ * TODO - bugs and extra tests
+ * - dragging the same block to bottom then back up (without re-clicking it) - BUG
+ * - can DND from inside container to outside container and vice versa
+ * - can't DND to container where block is not allowed (e.g. image into text-only container)
  */
 import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -226,5 +231,87 @@ test.describe('Block Drag and Drop', () => {
     expect(newBlocks).toContain(firstBlock);
     expect(newBlocks).toContain(lastBlock);
     expect(newBlocks).toContain(middleBlock);
+  });
+
+  test('can drag the same block to bottom then back up', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial block order
+    const initialBlocks = await helper.getBlockOrder();
+    expect(initialBlocks.length).toBeGreaterThanOrEqual(3);
+
+    const [firstBlock] = initialBlocks;
+    const lastBlock = initialBlocks[initialBlocks.length - 1];
+    const secondLastBlock = initialBlocks[initialBlocks.length - 2];
+
+    console.log('[TEST] Initial order:', initialBlocks);
+    console.log('[TEST] Will drag first block:', firstBlock, 'to after last:', lastBlock);
+
+    // First drag: Move first block to BOTTOM (after last block)
+    await helper.clickBlockInIframe(firstBlock);
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    const dragHandle1 = await helper.getDragHandle();
+    const lastBlockElement = iframe.locator(`[data-block-uid="${lastBlock}"]`);
+
+    // Drag to bottom (after last block)
+    await helper.dragBlockWithMouse(dragHandle1, lastBlockElement, true);
+    await page.waitForTimeout(500);
+
+    // Verify first drag worked - first block should now be last
+    const orderAfterFirstDrag = await helper.getBlockOrder();
+    console.log('[TEST] After dragging to bottom:', orderAfterFirstDrag);
+
+    const newLastBlock = orderAfterFirstDrag[orderAfterFirstDrag.length - 1];
+    expect(newLastBlock).toBe(firstBlock);
+
+    // Second drag: Move the same block (now at bottom) back UP
+    // CRITICAL: Don't click the block - test if drag works immediately after first drag
+    await page.waitForTimeout(300);
+
+    console.log('[TEST] Now dragging back up WITHOUT clicking block again');
+
+    // BUG: After first drag completes, trying to drag again without clicking
+    // the block should work, but it doesn't - the drag handle is non-functional
+    // until you click the block again to "reset" the toolbar
+
+    // DON'T click the block again - just try to get the drag handle
+    // (In real usage, the block is still selected and toolbar is still visible)
+    const dragHandle2 = await helper.getDragHandle();
+    const secondBlock = orderAfterFirstDrag[1]; // Get what's now at position 1
+    const secondBlockElement = iframe.locator(`[data-block-uid="${secondBlock}"]`);
+
+    // Try to drag immediately after first drag (without clicking to reset)
+    await helper.startDrag(dragHandle2);
+    await helper.moveDragToBlock(secondBlockElement, false); // false = insert before
+
+    // If bug exists, the drop indicator won't show because drag didn't actually start
+    const isVisible = await helper.isDropIndicatorVisible();
+    console.log('[TEST] Drop indicator visible during second drag (without clicking):', isVisible);
+
+    // This should be true, but if bug exists it will be false
+    expect(isVisible).toBe(true);
+
+    // Complete the drag
+    await helper.completeDrag(dragHandle2);
+
+    await page.waitForTimeout(100);
+
+    // Verify second drag worked - block should have moved up
+    const finalOrder = await helper.getBlockOrder();
+    console.log('[TEST] Final order after dragging back up:', finalOrder);
+
+    // First block should NOT be at the bottom anymore
+    const finalPosition = finalOrder.indexOf(firstBlock);
+    expect(finalPosition).toBeLessThan(finalOrder.length - 1);
+
+    // All blocks should still be present (no duplication or loss)
+    expect(finalOrder.length).toBe(initialBlocks.length);
   });
 });

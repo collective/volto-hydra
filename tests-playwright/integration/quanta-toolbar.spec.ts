@@ -3,6 +3,9 @@
  *
  * The Quanta Toolbar is created by hydra.js inside the iframe when a block is selected.
  * It provides buttons for: Add, Drag, Format (for text blocks), Menu (Settings/Remove).
+ * 
+ * TODO - additional tests
+ * - cut, copy and paste blocks
  */
 import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -110,15 +113,15 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     await helper.clickBlockInIframe(blockId);
 
     // Initially dropdown should not be visible
-    let menuOpen = await helper.isQuantaToolbarMenuOpen(blockId);
-    expect(menuOpen).toBe(false);
+    let menu = await helper.getQuantaToolbarMenu(blockId);
+    await expect(menu).not.toBeVisible();
 
     // Click menu button
     await helper.openQuantaToolbarMenu(blockId);
 
     // Dropdown should now be visible
-    menuOpen = await helper.isQuantaToolbarMenuOpen(blockId);
-    expect(menuOpen).toBe(true);
+    menu = await helper.getQuantaToolbarMenu(blockId);
+    await expect(menu).toBeVisible();
   });
 
   test('Dropdown menu contains Settings and Remove options', async ({ page }) => {
