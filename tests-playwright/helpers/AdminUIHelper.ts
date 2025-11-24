@@ -1,7 +1,7 @@
 /**
  * Helper class for interacting with Volto Hydra admin UI in tests.
  */
-import { Page, Locator, FrameLocator, expect } from '@playwright/test';
+import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 
 export class AdminUIHelper {
   constructor(
@@ -382,17 +382,9 @@ export class AdminUIHelper {
     }
   }
 
-  /**
-   * Click the dropdown menu button to reveal Settings/Remove options.
-   */
-  async openQuantaToolbarMenu(blockId: string): Promise<void> {
-    const iframe = this.getIframe();
-
-    // First wait for the Quanta toolbar to appear
-    await this.waitForQuantaToolbar(blockId);
-
-    const menuButton = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-menu-button`
+  async getMenuButtonInQuantaToolbar(blockId: string, formatKeyword:string): Promise<void> {
+    const menuButton = this.page.locator(
+      `.quanta-toolbar [title*="${formatKeyword}" i]`
     );
 
     // Check if menu button exists
@@ -414,11 +406,23 @@ export class AdminUIHelper {
       );
     }
 
-    await menuButton.click();
+    return menuButton;
+  }
+
+  /**
+   * Click the dropdown menu button to reveal Settings/Remove options.
+   */
+  async openQuantaToolbarMenu(blockId: string): Promise<void> {
+
+    // First wait for the Quanta toolbar to appear
+    await this.waitForQuantaToolbar(blockId);
+
+    const menuButton = await this.getMenuButtonInQuantaToolbar(blockId, 'options');
+    menuButton.click();
 
     // Wait for dropdown to appear
-    const dropdown = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-dropdown-menu`
+    const dropdown = this.page.locator(
+      `.volto-hydra-dropdown-menu`
     );
 
     try {
@@ -432,14 +436,11 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if the Quanta Toolbar dropdown menu is visible.
+   * get the Quanta Toolbar dropdown menu.
    */
-  async isQuantaToolbarMenuOpen(blockId: string): Promise<boolean> {
-    const iframe = this.getIframe();
-    const dropdown = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-dropdown-menu.visible`
-    );
-    return await dropdown.isVisible();
+  async getQuantaToolbarMenu(blockId: string): Promise<Locator> {
+    const dropdown = this.page.locator(`.volto-hydra-dropdown-menu.visible`);
+    return dropdown;
   }
 
   /**
@@ -472,9 +473,8 @@ export class AdminUIHelper {
     blockId: string,
     optionText: 'Settings' | 'Remove'
   ): Promise<void> {
-    const iframe = this.getIframe();
-    const dropdown = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-dropdown-menu`
+    const dropdown = this.page.locator(
+      `.volto-hydra-dropdown-menu`
     );
     const option = dropdown.locator(
       `.volto-hydra-dropdown-item:has-text("${optionText}")`
@@ -1213,10 +1213,9 @@ export class AdminUIHelper {
    * This should open the block chooser.
    */
   async clickAddBlockButton(): Promise<void> {
-    const iframe = this.getIframe();
 
     // The add button has class volto-hydra-add-button and is appended to the selected block element
-    const addButton = iframe.locator('.volto-hydra-add-button');
+    const addButton = this.page.locator('.volto-hydra-add-button');
 
     await addButton.click({ timeout: 10000 });
     await this.page.waitForTimeout(500); // Wait for chooser to appear
@@ -1421,15 +1420,82 @@ export class AdminUIHelper {
       }
     }
 
-    // Return the IFRAME drag button (not the toolbar handle) since that's what hydra.js listens to
-    return iframeDragButton;
+    // we will mouse down in this but it will actually fall through to the iframe button
+    return dragHandle;
   }
 
   /**
-   * Drag a block using actual mouse events (compatible with hydra.js implementation).
-   * Dispatches MouseEvents programmatically inside the iframe to trigger hydra.js's handlers.
+   * Start a drag operation using realistic mouse events at coordinates.
+   * Clicks at the visual toolbar icon position.
+   * Returns the starting coordinates.
+   */
+  async startDrag(dragHandle: Locator): Promise<{ startX: number; startY: number }> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    const toolbarDragIcon = toolbar.locator('.drag-handle');
+    const toolbarIconRect = await toolbarDragIcon.boundingBox();
+
+    if (!toolbarIconRect) {
+      throw new Error('Could not get toolbar drag icon bounding box');
+    }
+
+    const startX = toolbarIconRect.x + toolbarIconRect.width / 2;
+    const startY = toolbarIconRect.y + toolbarIconRect.height / 2;
+
+    // Use realistic mouse events at coordinates (not element-specific dispatch)
+    await this.page.mouse.move(startX, startY);
+    await this.page.mouse.down();
+    await this.page.waitForTimeout(50);
+
+    return { startX, startY };
+  }
+
+  /**
+   * Move mouse during drag operation to a target block using realistic coordinates.
+   * @param targetBlock - The block to move over
+   * @param insertAfter - If true, position for insert after (75% down). If false, insert before (25% down).
+   */
+  async moveDragToBlock(targetBlock: Locator, insertAfter: boolean = true): Promise<void> {
+    const targetRect = await targetBlock.boundingBox();
+    if (!targetRect) {
+      throw new Error('Could not get target block bounding box');
+    }
+
+    const clientY = insertAfter
+      ? targetRect.y + targetRect.height * 0.75
+      : targetRect.y + targetRect.height * 0.25;
+    const clientX = targetRect.x + targetRect.width / 2;
+
+    // Use realistic mouse movement
+    await this.page.mouse.move(clientX, clientY);
+    await this.page.waitForTimeout(100);
+  }
+
+  /**
+   * Complete a drag operation by releasing the mouse using realistic events.
+   */
+  async completeDrag(dragHandle: Locator): Promise<void> {
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Check if the drop indicator is visible in the iframe.
+   */
+  async isDropIndicatorVisible(): Promise<boolean> {
+    const iframe = this.getIframe();
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    return await dropIndicator.isVisible();
+  }
+
+  /**
+   * Drag a block using realistic mouse events at coordinates.
+   * Simulates actual user interaction by clicking at visual coordinates
+   * where the toolbar drag icon appears, rather than dispatching on specific elements.
    *
-   * @param dragHandle - The drag handle element (usually .drag-handle in the toolbar)
+   * This realistic approach will FAIL if the iframe drag button is not correctly
+   * positioned under the toolbar icon, which helps catch positioning bugs.
+   *
+   * @param dragHandle - The toolbar drag handle (used to get visual coordinates)
    * @param targetBlock - The target block to drag to
    * @param insertAfter - If true, insert after target (past halfway). If false, insert before (top half).
    */
@@ -1438,70 +1504,125 @@ export class AdminUIHelper {
     targetBlock: Locator,
     insertAfter: boolean = true
   ): Promise<void> {
-    // Dispatch mousedown event on the drag button
-    await dragHandle.evaluate((el) => {
-      const rect = el.getBoundingClientRect();
-      const mousedownEvent = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-        button: 0,
-      });
-      el.dispatchEvent(mousedownEvent);
-      console.log('[TEST] Dispatched mousedown', {
-        clientX: mousedownEvent.clientX,
-        clientY: mousedownEvent.clientY,
-      });
-    });
+    // Get toolbar drag icon position (where user SEES the draggable element)
+    const toolbar = this.page.locator('.quanta-toolbar');
+    const toolbarDragIcon = toolbar.locator('.drag-handle');
+    const toolbarIconRect = await toolbarDragIcon.boundingBox();
 
+    if (!toolbarIconRect) {
+      throw new Error('Could not get toolbar drag icon bounding box');
+    }
+
+    // Calculate center point where user would click
+    const startX = toolbarIconRect.x + toolbarIconRect.width / 2;
+    const startY = toolbarIconRect.y + toolbarIconRect.height / 2;
+
+    console.log('[TEST] Realistic drag: clicking at toolbar visual position', { startX, startY });
+
+    // Use Playwright's mouse API to click at coordinates
+    // This will hit whatever element is actually at those coordinates in the browser
+    // If the iframe drag button is correctly positioned, it will receive the event
+    // If it's mispositioned (the bug), the event will miss it and drag will fail
+    await this.page.mouse.move(startX, startY);
+    await this.page.mouse.down();
     await this.page.waitForTimeout(50);
 
-    // Get target block UID
-    const targetBlockUid = await targetBlock.getAttribute('data-block-uid');
+    // Get target block position
+    const targetRect = await targetBlock.boundingBox();
+    if (!targetRect) {
+      throw new Error('Could not get target block bounding box');
+    }
 
-    // Dispatch mousemove events at target position using targetBlock's evaluate
-    await targetBlock.evaluate((targetEl, insertAfter) => {
-      const rect = targetEl.getBoundingClientRect();
-      // Calculate Y position: insertAfter = bottom half, insertBefore = top half
-      const clientY = insertAfter
-        ? rect.top + (rect.height * 0.75)  // 75% down
-        : rect.top + (rect.height * 0.25); // 25% down
-      const clientX = rect.left + rect.width / 2;
+    // Calculate target coordinates (insertAfter determines position)
+    // Note: targetRect is already in page coordinates (Playwright handles iframe offset)
+    const targetY = insertAfter
+      ? targetRect.y + targetRect.height * 0.75  // 75% down
+      : targetRect.y + targetRect.height * 0.25; // 25% down
+    const targetX = targetRect.x + targetRect.width / 2;
 
-      // Dispatch multiple mousemove events to simulate dragging
-      for (let i = 0; i <= 10; i++) {
-        const mousemoveEvent = new MouseEvent('mousemove', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          clientX,
-          clientY,
-          button: 0,
-        });
-        document.dispatchEvent(mousemoveEvent);
-        console.log(`[TEST] Dispatched mousemove #${i}`, { clientX, clientY });
+    // Get iframe position to check for coordinate offset
+    const iframeElement = this.page.locator('#previewIframe');
+    const iframeRect = await iframeElement.boundingBox();
+    console.log('[TEST] Iframe position:', iframeRect);
+    console.log('[TEST] Target block rect (page coords):', targetRect);
+    console.log('[TEST] Moving mouse to (page coords):', { targetX, targetY, insertAfter });
+
+    // Move to target with steps to simulate dragging motion
+    await this.page.mouse.move(targetX, targetY, { steps: 10 });
+
+    // Wait for throttled mousemove handler in hydra.js (100ms throttle + processing time)
+    await this.page.waitForTimeout(150);
+
+    // Trigger one final mousemove at the exact target position to ensure throttled handler
+    // processes the final position (not just an intermediate step position)
+    await this.page.mouse.move(targetX, targetY);
+    await this.page.waitForTimeout(150);
+
+    // Verify drop indicator is showing during drag
+    const isDropIndicatorVisible = await this.isDropIndicatorVisible();
+    console.log('[TEST] Drop indicator visible during drag:', isDropIndicatorVisible);
+
+    if (!isDropIndicatorVisible) {
+      throw new Error('Drop indicator not visible during drag - drag may have failed');
+    }
+
+    // Get drop indicator position and verify it's between the correct blocks
+    const iframe = this.getIframe();
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    const dropIndicatorRect = await dropIndicator.boundingBox();
+    const targetBlockRect = await targetBlock.boundingBox();
+
+    if (!dropIndicatorRect || !targetBlockRect || !iframeRect) {
+      throw new Error('Could not get drop indicator, target block, or iframe position');
+    }
+
+    // Convert drop indicator position from iframe coords to page coords
+    const dropIndicatorPageY = dropIndicatorRect.y + iframeRect.y;
+
+    console.log('[TEST] Drop indicator Y (iframe coords):', dropIndicatorRect.y);
+    console.log('[TEST] Drop indicator Y (page coords):', dropIndicatorPageY);
+    console.log('[TEST] Target block top:', targetBlockRect.y, 'bottom:', targetBlockRect.y + targetBlockRect.height);
+
+    // Verify drop indicator position relative to target block
+    if (insertAfter) {
+      // Should be at or below the bottom of the target block
+      const isAfterTarget = dropIndicatorPageY >= targetBlockRect.y + targetBlockRect.height - 5; // 5px tolerance
+      console.log('[TEST] Drop indicator is after target block:', isAfterTarget);
+
+      if (!isAfterTarget) {
+        throw new Error(
+          `Drop indicator positioned incorrectly for insertAfter. ` +
+          `Expected at/below ${targetBlockRect.y + targetBlockRect.height}, got ${dropIndicatorPageY}`
+        );
       }
-    }, insertAfter);
+    } else {
+      // Should be at or above the top of the target block
+      const isBeforeTarget = dropIndicatorPageY <= targetBlockRect.y + 5; // 5px tolerance
+      console.log('[TEST] Drop indicator is before target block:', isBeforeTarget);
 
-    await this.page.waitForTimeout(100);
+      if (!isBeforeTarget) {
+        throw new Error(
+          `Drop indicator positioned incorrectly for insertBefore. ` +
+          `Expected at/above ${targetBlockRect.y}, got ${dropIndicatorPageY}`
+        );
+      }
+    }
 
-    // Dispatch mouseup event using dragHandle's context
-    // Use .first() since after mousedown, hydra.js creates a dragging overlay with a duplicate drag button
-    await dragHandle.first().evaluate(() => {
-      const mouseupEvent = new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        button: 0,
-      });
-      document.dispatchEvent(mouseupEvent);
-      console.log('[TEST] Dispatched mouseup');
-    });
+    // Release mouse to complete the drag
+    await this.page.mouse.up();
 
     // Wait for postMessage round-trip and DOM updates
     await this.page.waitForTimeout(500);
+
+    // Verify drop indicator disappears after drop
+    const isDropIndicatorVisibleAfter = await this.isDropIndicatorVisible();
+    console.log('[TEST] Drop indicator visible after drop:', isDropIndicatorVisibleAfter);
+
+    if (isDropIndicatorVisibleAfter) {
+      console.warn('[TEST] Warning: Drop indicator still visible after drop');
+    }
+
+    console.log('[TEST] Realistic drag: completed');
   }
 
   /**

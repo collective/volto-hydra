@@ -6,6 +6,7 @@
  * 
  * TODO - bugs and extra tests
  * - dragging the same block to bottom then back up (without re-clicking it) - BUG
+ * - sometimes a drop marker isn't cleaned up - how to reproduce?
  * - can DND from inside container to outside container and vice versa
  * - can't DND to container where block is not allowed (e.g. image into text-only container)
  */

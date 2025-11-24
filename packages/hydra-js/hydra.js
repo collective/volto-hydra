@@ -409,64 +409,7 @@ class Bridge {
                 requestAnimationFrame(() => {
                   const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
                   if (blockElement) {
-                    // Restore contenteditable on fields after renderer updates
-                    // The renderer may have replaced DOM elements, removing contenteditable attributes
-                    this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
-
-                    // Focus and position cursor in the focused field
-                    // This ensures clicking a field focuses it immediately (no double-click required)
-                    if (this.focusedFieldName) {
-                      const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
-                      const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
-                      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-                      const fieldType = blockTypeFields[this.focusedFieldName];
-
-                      if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
-                        // Focus the field
-                        focusedField.focus();
-
-                        // Position cursor at click location if we saved it
-                        if (this.savedClickPosition) {
-                          const selection = window.getSelection();
-                          if (selection) {
-                            // Only restore click position if there's no existing non-collapsed selection
-                            if (!selection.rangeCount || selection.isCollapsed) {
-                              // Position cursor at the click location using caretRangeFromPoint
-                              const range = document.caretRangeFromPoint(
-                                this.savedClickPosition.clientX,
-                                this.savedClickPosition.clientY
-                              );
-                              if (range) {
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                              }
-                            }
-                          }
-                          // Clear saved click position after using it
-                          this.savedClickPosition = null;
-                        }
-                      }
-                    }
-
-                    const rect = blockElement.getBoundingClientRect();
-                    const blockData = this.formData?.blocks?.[this.selectedBlockUid];
-                    const isSlateBlock = blockData?.['@type'] === 'slate';
-
-                    window.parent.postMessage(
-                      {
-                        type: 'BLOCK_SELECTED',
-                        blockUid: this.selectedBlockUid,
-                        rect: {
-                          top: rect.top,
-                          left: rect.left,
-                          width: rect.width,
-                          height: rect.height,
-                        },
-                        showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
-                        focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
-                      },
-                      this.adminOrigin,
-                    );
+                    this.updateBlockUIAfterFormData(blockElement);
                   }
                 });
               });
@@ -982,6 +925,81 @@ class Bridge {
   }
 
   /**
+   * Updates block UI positions and states after form data changes.
+   * Centralizes all UI updates that need to happen when blocks are re-rendered,
+   * including after drag-and-drop reordering.
+   *
+   * @param {HTMLElement} blockElement - The currently selected block element.
+   */
+  updateBlockUIAfterFormData(blockElement) {
+    // Restore contenteditable on fields after renderer updates
+    // The renderer may have replaced DOM elements, removing contenteditable attributes
+    this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
+
+    // Focus and position cursor in the focused field
+    // This ensures clicking a field focuses it immediately (no double-click required)
+    if (this.focusedFieldName) {
+      const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+      const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
+      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+      const fieldType = blockTypeFields[this.focusedFieldName];
+
+      if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
+        // Focus the field
+        focusedField.focus();
+
+        // Position cursor at click location if we saved it
+        if (this.savedClickPosition) {
+          const selection = window.getSelection();
+          if (selection) {
+            // Only restore click position if there's no existing non-collapsed selection
+            if (!selection.rangeCount || selection.isCollapsed) {
+              // Position cursor at the click location using caretRangeFromPoint
+              const range = document.caretRangeFromPoint(
+                this.savedClickPosition.clientX,
+                this.savedClickPosition.clientY
+              );
+              if (range) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
+            }
+          }
+          // Clear saved click position after using it
+          this.savedClickPosition = null;
+        }
+      }
+    }
+
+    // Send updated block position to Admin UI for toolbar/overlay positioning
+    const rect = blockElement.getBoundingClientRect();
+    const blockData = this.formData?.blocks?.[this.selectedBlockUid];
+    const isSlateBlock = blockData?.['@type'] === 'slate';
+
+    window.parent.postMessage(
+      {
+        type: 'BLOCK_SELECTED',
+        blockUid: this.selectedBlockUid,
+        rect: {
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+        showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+        focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
+      },
+      this.adminOrigin,
+    );
+
+    // Reposition drag button after blocks have moved (e.g., after drag-and-drop)
+    // The drag button needs to follow the selected block's new position
+    if (this.dragHandlePositioner) {
+      this.dragHandlePositioner();
+    }
+  }
+
+  /**
    * Selects a block and communicates the selection to the adminUI.
    *
    * @param {HTMLElement} blockElement - The block element to select.
@@ -1456,6 +1474,12 @@ class Bridge {
               const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
               const isHoveringOverTopHalf =
                 mouseYRelativeToBlock < closestBlockRect.height / 2;
+
+              console.error('[HYDRA-DND] Mouse coords:', { clientX: e.clientX, clientY: e.clientY, scrollY: window.scrollY });
+              console.error('[HYDRA-DND] Closest block:', closestBlock.getAttribute('data-block-uid'));
+              console.error('[HYDRA-DND] Block rect:', { top: closestBlockRect.top, bottom: closestBlockRect.bottom, height: closestBlockRect.height });
+              console.error('[HYDRA-DND] Mouse Y relative to block:', mouseYRelativeToBlock, '| Half height:', closestBlockRect.height / 2);
+              console.error('[HYDRA-DND] Is top half?', isHoveringOverTopHalf, '| Insert at:', isHoveringOverTopHalf ? 'BEFORE (0)' : 'AFTER (1)');
 
               insertAt = isHoveringOverTopHalf ? 0 : 1;
               closestBlockUid = closestBlock.getAttribute('data-block-uid');
