@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
 import { compose } from 'redux';
 import Cookies from 'js-cookie';
@@ -173,7 +173,7 @@ const Iframe = (props) => {
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
-  const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, showFormatButtons }
+  const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false); // Track dropdown menu visibility
   const [menuButtonRect, setMenuButtonRect] = useState(null); // Store menu button position for portal positioning
   const [currentSelection, setCurrentSelection] = useState(null); // Store current selection from iframe
@@ -241,6 +241,9 @@ const Iframe = (props) => {
   const history = useHistory();
 
   const intl = useIntl();
+
+  // Extract block field types once and memoize (maps blockType -> fieldName -> fieldType)
+  const blockFieldTypes = useMemo(() => extractBlockFieldTypes(intl), [intl]);
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
@@ -785,7 +788,6 @@ const Iframe = (props) => {
           setBlockUI({
             blockUid: event.data.blockUid,
             rect: event.data.rect,
-            showFormatButtons: event.data.showFormatButtons,
             focusedFieldName: event.data.focusedFieldName, // Track which field is focused
           });
           // Call onSelectBlock to open sidebar and update selectedBlock in parent
@@ -1081,6 +1083,7 @@ const Iframe = (props) => {
               setCurrentSelection(selection);
             }}
             blockUI={blockUI}
+            blockFieldTypes={blockFieldTypes}
             iframeElement={referenceElement}
             onOpenMenu={(rect) => {
               setMenuButtonRect(rect);

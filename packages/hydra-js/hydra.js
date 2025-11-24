@@ -936,13 +936,15 @@ class Bridge {
     // The renderer may have replaced DOM elements, removing contenteditable attributes
     this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
 
+    // Determine field type for focused field
+    const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+    const fieldType = this.focusedFieldName ? blockTypeFields[this.focusedFieldName] : null;
+
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
     if (this.focusedFieldName) {
       const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
-      const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
-      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-      const fieldType = blockTypeFields[this.focusedFieldName];
 
       if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
         // Focus the field
@@ -973,8 +975,6 @@ class Bridge {
 
     // Send updated block position to Admin UI for toolbar/overlay positioning
     const rect = blockElement.getBoundingClientRect();
-    const blockData = this.formData?.blocks?.[this.selectedBlockUid];
-    const isSlateBlock = blockData?.['@type'] === 'slate';
 
     window.parent.postMessage(
       {
@@ -986,7 +986,6 @@ class Bridge {
           width: rect.width,
           height: rect.height,
         },
-        showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
         focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
       },
       this.adminOrigin,

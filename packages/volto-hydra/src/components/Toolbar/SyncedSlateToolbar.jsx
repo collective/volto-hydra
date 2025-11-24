@@ -31,6 +31,7 @@ const SyncedSlateToolbar = ({
   onChangeFormData,
   onSelectionChange,
   blockUI,
+  blockFieldTypes,
   iframeElement,
   onOpenMenu,
 }) => {
@@ -182,8 +183,13 @@ const SyncedSlateToolbar = ({
   const fieldName = blockUI?.focusedFieldName || 'value';
   const fieldValue = block[fieldName];
 
+  // Determine if we should show format buttons based on field type
+  const blockType = block?.['@type'];
+  const blockTypeFields = blockFieldTypes?.[blockType] || {};
+  const fieldType = blockTypeFields[fieldName];
+  const showFormatButtons = fieldType === 'slate';
+
   // CRITICAL: Only show Slate if we actually have a valid field value array
-  // Don't trust blockUI.showFormatButtons alone - verify the data exists!
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;
 
   // For controlled mode, we need the current value from form data
@@ -249,7 +255,7 @@ const SyncedSlateToolbar = ({
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
           while parent toolbar has pointerEvents: 'none' for drag-and-drop passthrough */}
-      {blockUI.showFormatButtons && hasValidSlateValue && (
+      {showFormatButtons && hasValidSlateValue && (
         <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}>
           {console.log('[TOOLBAR] About to render Slate with:', { initialValue: currentValue, type: typeof currentValue, isArray: Array.isArray(currentValue) })}
           <Slate
@@ -313,7 +319,7 @@ const SyncedSlateToolbar = ({
     </div>
 
     {/* Render persistent helpers (like LinkEditor) outside toolbar - need full interactivity */}
-    {blockUI.showFormatButtons && hasValidSlateValue && (
+    {showFormatButtons && hasValidSlateValue && (
       <Slate
         key={`helpers-${renderKey}`}
         editor={editor}
