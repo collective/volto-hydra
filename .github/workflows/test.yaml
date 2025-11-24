@@ -46,12 +46,22 @@ jobs:
       - name: Build dependencies
         run: |
           pnpm build:deps
+      - name: Build Volto for production
+        run: |
+          pnpm --filter @plone/volto build
+        env:
+          RAZZLE_API_PATH: http://localhost:8888
+          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888
+          VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
       - name: Install Playwright browsers
         run: |
           pnpm exec playwright install --with-deps chromium
       - name: Run Playwright tests
         run: |
           pnpm exec playwright test
+        env:
+          CI: true
+          USE_PREBUILT: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
