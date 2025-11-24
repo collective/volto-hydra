@@ -153,10 +153,12 @@ const SyncedSlateToolbar = ({
   // Get button configuration
   const toolbarButtons = config.settings.slate?.toolbarButtons || [];
   const buttons = config.settings.slate?.buttons || {};
+  const persistentHelpers = config.settings.slate?.persistentHelpers || [];
 
   console.log('[TOOLBAR] toolbarButtons config:', toolbarButtons);
   console.log('[TOOLBAR] Available buttons:', Object.keys(buttons));
   console.log('[TOOLBAR] Bold button exists?', !!buttons.bold);
+  console.log('[TOOLBAR] persistentHelpers count:', persistentHelpers.length);
 
   if (!blockUI || !selectedBlock) {
     return null;
@@ -209,33 +211,36 @@ const SyncedSlateToolbar = ({
   });
 
   return (
-    <div
-      className="quanta-toolbar"
-      style={{
-        position: 'fixed',
-        top: `${toolbarTop}px`,
-        left: `${toolbarLeft}px`,
-        zIndex: 10,
-        display: 'flex',
-        gap: '4px',
-        background: '#fff',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        padding: '4px',
-        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-        pointerEvents: 'none', // Allow events to pass through to iframe drag button
-      }}
-    >
+    <>
+      <div
+        className="quanta-toolbar"
+        style={{
+          position: 'fixed',
+          top: `${toolbarTop}px`,
+          left: `${toolbarLeft}px`,
+          zIndex: 10,
+          display: 'flex',
+          gap: '2px',
+          background: '#fff',
+          border: '1px solid #e0e0e0',
+          borderRadius: '3px',
+          padding: '2px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          pointerEvents: 'none', // Allow events to pass through to iframe drag button
+        }}
+      >
       {/* Drag handle - visual indicator only, pointer events pass through to iframe button */}
       <div
         className="drag-handle"
         style={{
           cursor: 'move',
-          padding: '8px',
+          padding: '4px 6px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           pointerEvents: 'none',
+          color: '#999',
+          fontSize: '14px',
         }}
       >
         ⠿
@@ -245,7 +250,7 @@ const SyncedSlateToolbar = ({
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
           while parent toolbar has pointerEvents: 'none' for drag-and-drop passthrough */}
       {blockUI.showFormatButtons && hasValidSlateValue && (
-        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '4px' }}>
+        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}>
           {console.log('[TOOLBAR] About to render Slate with:', { initialValue: currentValue, type: typeof currentValue, isArray: Array.isArray(currentValue) })}
           <Slate
             key={renderKey}
@@ -261,9 +266,9 @@ const SyncedSlateToolbar = ({
                     className="toolbar-separator"
                     style={{
                       width: '1px',
-                      height: '28px',
+                      height: '20px',
                       background: '#e0e0e0',
-                      margin: '0 4px',
+                      margin: '0 2px',
                     }}
                   />
                 );
@@ -287,10 +292,10 @@ const SyncedSlateToolbar = ({
         style={{
           background: '#fff',
           border: 'none',
-          padding: '8px 10px',
+          padding: '4px 6px',
           cursor: 'pointer',
-          fontSize: '18px',
-          color: '#666',
+          fontSize: '14px',
+          color: '#999',
           pointerEvents: 'auto',
           display: 'flex',
           alignItems: 'center',
@@ -306,6 +311,21 @@ const SyncedSlateToolbar = ({
         ⋯
       </button>
     </div>
+
+    {/* Render persistent helpers (like LinkEditor) outside toolbar - need full interactivity */}
+    {blockUI.showFormatButtons && hasValidSlateValue && (
+      <Slate
+        key={`helpers-${renderKey}`}
+        editor={editor}
+        initialValue={currentValue}
+        onChange={handleChange}
+      >
+        {persistentHelpers.map((Helper, idx) => (
+          <Helper key={idx} editor={editor} />
+        ))}
+      </Slate>
+    )}
+    </>
   );
 };
 
