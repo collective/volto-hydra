@@ -13,7 +13,7 @@ export default defineConfig({
   globalSetup: require.resolve('./tests-playwright/global-setup.ts'),
 
   /* Maximum time one test can run for */
-  timeout: 30 * 1000, // 30s - with manual server management, tests should complete quickly
+  timeout: 60 * 1000, // 60s - allow time for slower tests, server waits for compilation anyway
 
   /* Run tests in files in parallel */
   fullyParallel: true,

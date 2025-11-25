@@ -53,6 +53,9 @@ app.use((req, res, next) => {
   // Handle simple ++api++ prefix: /++api++/@site -> /@site
   cleanPath = cleanPath.replace(/^\/\+\+api\+\+/, '');
 
+  // Normalize multiple slashes to single slash (e.g., //@search -> /@search)
+  cleanPath = cleanPath.replace(/\/+/g, '/');
+
   // Ensure path starts with /
   if (!cleanPath.startsWith('/')) {
     cleanPath = '/' + cleanPath;
@@ -114,13 +117,19 @@ function loadInitialContent() {
   };
   console.log('Loaded content: /');
 
-  // Load test content from file
-  const contentPath = path.join(__dirname, 'api', 'content.json');
-  if (fs.existsSync(contentPath)) {
-    const content = JSON.parse(fs.readFileSync(contentPath, 'utf-8'));
-    const urlPath = new URL(content['@id']).pathname;
-    contentDB[urlPath] = content;
-    console.log(`Loaded content: ${urlPath}`);
+  // Load all JSON files from api directory (except schema files)
+  const apiDir = path.join(__dirname, 'api');
+  if (fs.existsSync(apiDir)) {
+    const files = fs.readdirSync(apiDir);
+    files.forEach((file) => {
+      if (file.endsWith('.json') && !file.startsWith('schema-')) {
+        const filePath = path.join(apiDir, file);
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const urlPath = new URL(content['@id']).pathname;
+        contentDB[urlPath] = content;
+        console.log(`Loaded content: ${urlPath}`);
+      }
+    });
   }
 }
 
@@ -322,6 +331,94 @@ app.get('*/@breadcrumbs', (req, res) => {
   res.json({
     '@id': `http://localhost:8888${req.path}`,
     items,
+  });
+});
+
+/**
+ * GET /@search or /:path/@search
+ * Search for content (used by ObjectBrowser)
+ * Supports path.depth parameter to get children of a specific path
+ */
+app.get('*/@search', (req, res) => {
+  const searchPath = req.path.replace('/@search', '');
+  const pathDepth = req.query['path.depth'];
+
+  let items;
+
+  if (pathDepth === '1') {
+    // Get immediate children of the search path
+    // For site root (/), return all root-level items
+    // For other paths, return their children (if any)
+    if (searchPath === '' || searchPath === '/') {
+      // Root level - return all items that are direct children of root
+      items = Object.entries(contentDB)
+        .filter(([path]) => {
+          if (path === '/') return false; // Exclude site root itself
+          const pathParts = path.split('/').filter(p => p);
+          return pathParts.length === 1; // Only root-level items
+        })
+        .map(([path, content]) => ({
+          '@id': content['@id'],
+          '@type': content['@type'],
+          'id': content.id,
+          'title': content.title,
+          'description': content.description || '',
+          'review_state': content.review_state || 'published',
+          'UID': content.UID,
+        }));
+    } else {
+      // Specific path - return its children
+      // For Documents (non-folderish items), this will be empty
+      const searchContent = contentDB[searchPath];
+      if (searchContent && searchContent.is_folderish) {
+        // Return children if folder
+        items = Object.entries(contentDB)
+          .filter(([path]) => {
+            if (path === searchPath) return false;
+            return path.startsWith(searchPath + '/');
+          })
+          .map(([path, content]) => ({
+            '@id': content['@id'],
+            '@type': content['@type'],
+            'title': content.title,
+            'description': content.description || '',
+            'review_state': content.review_state || 'published',
+            'UID': content.UID,
+          }));
+      } else {
+        // Non-folder or not found - return empty
+        items = [];
+      }
+    }
+  } else {
+    // No depth filter - return all content items
+    items = Object.entries(contentDB)
+      .filter(([path]) => path !== '/')
+      .map(([path, content]) => ({
+        '@id': content['@id'],
+        '@type': content['@type'],
+        'title': content.title,
+        'description': content.description || '',
+        'review_state': content.review_state || 'published',
+        'UID': content.UID,
+      }));
+  }
+
+  const searchUrl = searchPath === '' || searchPath === '/'
+    ? 'http://localhost:8888/@search'
+    : `http://localhost:8888${searchPath}/@search`;
+
+  res.json({
+    '@id': searchUrl,
+    'items': items,
+    'items_total': items.length,
+    'batching': {
+      '@id': searchUrl,
+      'first': `${searchUrl}?b_start=0`,
+      'last': `${searchUrl}?b_start=0`,
+      'next': null,
+      'prev': null,
+    },
   });
 });
 

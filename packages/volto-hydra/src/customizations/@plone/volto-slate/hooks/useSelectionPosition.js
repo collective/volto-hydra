@@ -8,24 +8,45 @@ import { useSlate, ReactEditor, useSlateSelection } from 'slate-react';
  * 2. Sidebar context (normal) - positions using DOM-based selection
  */
 export const useSelectionPosition = () => {
+  // Call ALL hooks at the top level (Rules of Hooks)
   const editor = useSlate();
+  const selection = useSlateSelection();
 
-  // If editor has Hydra positioning data (Quanta toolbar), position over toolbar
-  if (editor.hydra?.iframeElement && editor.hydra?.blockUIRect) {
-    const { iframeElement, blockUIRect } = editor.hydra;
-    const iframeRect = iframeElement.getBoundingClientRect();
+  // For Quanta toolbar context: use hydra data for iframe-aware positioning
+  // For sidebar context: use default DOM-based positioning (don't use window.voltoHydraData)
+  // Toolbar editor has UID starting with "toolbar-", sidebar has different UID pattern
+  const isToolbarContext = editor.uid?.startsWith('toolbar-');
+  const hydraData = editor.hydra || (isToolbarContext && typeof window !== 'undefined' ? window.voltoHydraData : null);
+
+  console.log('[useSelectionPosition] Called - isToolbarContext?', isToolbarContext,
+    'editor.hydra?', !!editor.hydra,
+    'using hydraData?', !!hydraData,
+    'editor.uid:', editor.uid);
+
+  // If we have Hydra positioning data (Quanta toolbar), position over toolbar
+  if (hydraData?.iframeRect && hydraData?.blockUIRect) {
+    const { iframeRect, blockUIRect } = hydraData;
+
+    const calculatedTop = iframeRect.top + blockUIRect.top - 40;
+    const calculatedLeft = iframeRect.left + blockUIRect.left;
 
     console.log('[useSelectionPosition] Hydra mode detected, positioning over toolbar:', {
       iframeTop: iframeRect.top,
       blockTop: blockUIRect.top,
-      calculatedTop: iframeRect.top + blockUIRect.top - 40,
+      calculatedTop,
+      calculatedLeft,
     });
 
+    // Return a DOMRect-like object with all properties
     return {
-      top: iframeRect.top + blockUIRect.top - 40,
-      left: iframeRect.left + blockUIRect.left,
+      top: calculatedTop,
+      left: calculatedLeft,
+      bottom: calculatedTop + 40,
+      right: calculatedLeft + blockUIRect.width,
       width: blockUIRect.width,
       height: 40,
+      x: calculatedLeft,
+      y: calculatedTop,
     };
   }
 
@@ -33,7 +54,6 @@ export const useSelectionPosition = () => {
   console.log('[useSelectionPosition] No Hydra data, using DOM-based positioning');
 
   let rect = {};
-  const selection = useSlateSelection();
 
   if (selection && ReactEditor.isFocused(editor)) {
     try {

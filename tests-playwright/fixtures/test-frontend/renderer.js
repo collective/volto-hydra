@@ -157,6 +157,11 @@ function renderChildren(children) {
             const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
             return `<code${nodeId}>${renderChildren(child.children)}</code>`;
         }
+        if (child.type === 'link') {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            const url = child.data?.url || '#';
+            return `<a href="${url}"${nodeId}>${renderChildren(child.children)}</a>`;
+        }
 
         // Handle text nodes (leaf nodes)
         if (child.text !== undefined) {
@@ -171,7 +176,13 @@ function renderChildren(children) {
             return content;
         }
 
-        // Unknown node type - return empty string
+        // Unknown node type - render children if present, otherwise return empty
+        if (child.children) {
+            const nodeId = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            console.warn(`Unknown Slate node type: ${child.type}, rendering children`);
+            return `<span${nodeId}>${renderChildren(child.children)}</span>`;
+        }
+
         return '';
     }).join('');
 }
