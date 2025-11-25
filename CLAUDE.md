@@ -149,3 +149,4 @@ lsof -ti:8888,3001,3002 2>/dev/null | xargs kill -9 2>/dev/null
 - Playwright's `webServer.reuseExistingServer: true` means it will use a manually-started Volto server if available
 - The test setup skips `build:deps` to avoid parcel segfault in non-interactive shells
 - **NEVER* kill node processes. check if you really need to kill a process as some tests reload
+- to check volto is compiling use http://localhost:3002/health
