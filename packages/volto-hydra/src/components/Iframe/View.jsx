@@ -174,7 +174,6 @@ const Iframe = (props) => {
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false); // Track dropdown menu visibility
   const [menuButtonRect, setMenuButtonRect] = useState(null); // Store menu button position for portal positioning
-  const [currentSelection, setCurrentSelection] = useState(null); // Store current selection from iframe
   const blockChooserRef = useRef();
   const applyFormatRef = useRef(null); // Ref to shared format handler
 
@@ -182,6 +181,8 @@ const Iframe = (props) => {
   // This is updated synchronously when toolbar applies formatting,
   // ensuring the useEffect that sends FORM_DATA includes the updated selection
   const selectionToSendRef = useRef(null);
+  // Track formatRequestId from toolbar format operations for iframe unblocking
+  const formatRequestIdToSendRef = useRef(null);
 
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     strategy: 'fixed',
@@ -204,8 +205,7 @@ const Iframe = (props) => {
 
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent GET_INITIAL_DATA)
-    // Skip if we're processing a format request - we don't want to interfere with selection restoration
-    if (iframeOriginRef.current && selectedBlock && !processingFormatRequestRef.current) {
+    if (iframeOriginRef.current && selectedBlock) {
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         {
           type: 'SELECT_BLOCK',
@@ -220,7 +220,14 @@ const Iframe = (props) => {
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
-  const processingFormatRequestRef = useRef(false); // True while processing SLATE_FORMAT_REQUEST
+  // Combined state for iframe data - formData, selection, and requestId updated atomically
+  // This ensures toolbar sees all three together in the same render
+  // Initialize with properties so we have data from first render
+  const [iframeSyncState, setIframeSyncState] = useState(() => ({
+    formData: properties,
+    selection: null,
+    requestId: null,
+  }));
   const urlFromEnv = getURlsFromEnv();
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
@@ -236,6 +243,19 @@ const Iframe = (props) => {
     setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
   }, [token, u]);
+
+  // Sync iframeSyncState.formData with Redux form changes
+  // This ensures SyncedSlateToolbar sees updates from sidebar widgets (RichTextWidget etc)
+  // Without this, sidebar edits don't propagate to the toolbar, causing selection/content mismatch
+  useEffect(() => {
+    if (formDataFromRedux && formDataFromRedux !== iframeSyncState.formData) {
+      setIframeSyncState(prev => ({
+        ...prev,
+        formData: formDataFromRedux,
+      }));
+    }
+  }, [formDataFromRedux]);
+
   const history = useHistory();
 
   const intl = useIntl();
@@ -377,7 +397,24 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           inlineEditCounterRef.current += 1;
+          // Update combined state atomically - formData, selection, requestId together
+          setIframeSyncState({
+            formData: event.data.data,
+            selection: event.data.selection || null,
+            requestId: event.data.flushRequestId || null,
+          });
+          // Also update Redux for persistence
           onChangeFormData(event.data.data);
+          break;
+
+        case 'BUFFER_FLUSHED':
+          // Iframe had no pending text - update combined state with current form + requestId + selection
+          console.log('[VIEW] Received BUFFER_FLUSHED (no pending text), requestId:', event.data.requestId);
+          setIframeSyncState(prev => ({
+            ...prev,
+            selection: event.data.selection || null,
+            requestId: event.data.requestId,
+          }));
           break;
 
         case 'INLINE_EDIT_EXIT':
@@ -725,7 +762,10 @@ const Iframe = (props) => {
 
         case 'SELECTION_CHANGE':
           // Store current selection from iframe for format operations
-          setCurrentSelection(event.data.selection);
+          setIframeSyncState(prev => ({
+            ...prev,
+            selection: event.data.selection,
+          }));
           break;
 
         case 'BLOCK_SELECTED':
@@ -825,8 +865,7 @@ const Iframe = (props) => {
     if (hasUnprocessedInlineEdit) {
       // This is the formData update FROM the iframe's inline edit, don't send it back
       processedInlineEditCounterRef.current += 1;
-    } else if (processingFormatRequestRef.current) {
-      // Skip sends while processing a format request - we're sending directly from the handler
+      // Flush handling is now done atomically via iframeSyncState
     } else if (iframeOriginRef.current && formToUse && formToUse.blocks && Object.keys(formToUse.blocks).length > 0) {
       // Send FORM_DATA to iframe for any form data change (except inline edits, handled above)
       // Only send if we have actual blocks data
@@ -837,6 +876,13 @@ const Iframe = (props) => {
       if (selectionToSendRef.current) {
         message.transformedSelection = selectionToSendRef.current;
         selectionToSendRef.current = null; // Clear after sending
+      }
+      // Include formatRequestId if this is from a format operation
+      // This allows iframe to match FORM_DATA to FLUSH_BUFFER for unblocking
+      if (formatRequestIdToSendRef.current) {
+        message.formatRequestId = formatRequestIdToSendRef.current;
+        console.log('[VIEW] Sending FORM_DATA with formatRequestId:', message.formatRequestId);
+        formatRequestIdToSendRef.current = null; // Clear after sending
       }
       document
         .getElementById('previewIframe')
@@ -997,15 +1043,26 @@ const Iframe = (props) => {
           {/* Quanta Toolbar with real Slate buttons */}
           <SyncedSlateToolbar
             selectedBlock={selectedBlock}
-            form={properties}
-            currentSelection={currentSelection}
-            onChangeFormData={onChangeFormData}
-            onSelectionChange={(selection) => {
-              // Update ref synchronously so useEffect can include it in FORM_DATA
-              selectionToSendRef.current = selection;
-              // Update state so toolbar's currentSelection prop stays in sync
-              // The toolbar's useEffect will skip the remount if selection hasn't changed
-              setCurrentSelection(selection);
+            form={iframeSyncState.formData}
+            currentSelection={iframeSyncState.selection}
+            completedFlushRequestId={iframeSyncState.requestId}
+            onChangeFormData={(formData, selection, formatRequestId) => {
+              // Store selection in ref so it's included with the FORM_DATA message
+              // This ensures document and selection are sent atomically to iframe
+              // Also update iframeSyncState.formData so toolbar sees the value it just sent
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: formData,
+                selection: selection || prev.selection,
+              }));
+              if (selection) {
+                selectionToSendRef.current = selection;
+              }
+              // Store formatRequestId so iframe can match FORM_DATA to FLUSH_BUFFER for unblocking
+              if (formatRequestId) {
+                formatRequestIdToSendRef.current = formatRequestId;
+              }
+              onChangeFormData(formData);
             }}
             blockUI={blockUI}
             blockFieldTypes={blockFieldTypes}

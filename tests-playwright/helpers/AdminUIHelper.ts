@@ -8,16 +8,9 @@ export class AdminUIHelper {
     public readonly page: Page,
     public readonly adminUrl: string = 'http://localhost:3001'
   ) {
-    // Capture browser console messages - only log specific patterns we care about
-    // (not all warnings/errors, as many are expected SSR hydration issues)
+    // Capture all browser console messages
     this.page.on('console', (msg) => {
-      const text = msg.text();
-      if (
-        text.includes('[HYDRA]') ||
-        text.includes('[VIEW]')
-      ) {
-        console.log(`[BROWSER] ${text}`);
-      }
+      console.log(`[BROWSER] ${msg.text()}`);
     });
 
     // Capture page errors
@@ -546,19 +539,28 @@ export class AdminUIHelper {
   /**
    * Select all text in a contenteditable element using JavaScript Selection API.
    * This is more reliable than using keyboard shortcuts.
+   * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
     await editor.evaluate((el) => {
-      // IMPORTANT: Must select the text node directly, not use selectNodeContents on parent element
-      // Otherwise serializePoint() will reset offset to 0 for element nodes
-      const textNode = el.firstChild;
-      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
-        throw new Error(`Expected first child to be a text node, got: ${textNode?.nodeName}`);
+      // Find the first and last text nodes in the element
+      // This handles both plain text and formatted text (e.g., <span>text</span>)
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      const firstTextNode = walker.nextNode();
+      if (!firstTextNode) {
+        throw new Error('No text nodes found in editor');
+      }
+
+      // Find the last text node
+      let lastTextNode = firstTextNode;
+      let node;
+      while ((node = walker.nextNode())) {
+        lastTextNode = node;
       }
 
       const range = document.createRange();
-      range.setStart(textNode, 0);
-      range.setEnd(textNode, textNode.textContent.length);
+      range.setStart(firstTextNode, 0);
+      range.setEnd(lastTextNode, lastTextNode.textContent?.length || 0);
       const selection = window.getSelection();
       if (selection) {
         selection.removeAllRanges();
@@ -591,6 +593,46 @@ export class AdminUIHelper {
     await this.page.waitForTimeout(100);
 
     return (await editor.textContent()) || '';
+  }
+
+  /**
+   * Wait for editor text to match a regex pattern.
+   * Useful for waiting until text changes stabilize after typing or formatting.
+   * Uses textContent() directly to preserve whitespace (toHaveText normalizes it).
+   */
+  async waitForEditorText(
+    editor: Locator,
+    pattern: RegExp | string,
+    options: { timeout?: number } = {}
+  ): Promise<string> {
+    const timeout = options.timeout ?? 5000;
+    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
+
+    let text = '';
+    await expect(async () => {
+      text = (await editor.textContent()) || '';
+      expect(text).toMatch(regex);
+    }).toPass({ timeout });
+    return text;
+  }
+
+  /**
+   * Wait for formatted text (bold/italic) to appear in the editor.
+   * Useful for waiting until formatting has been applied after Ctrl+B or toolbar clicks.
+   */
+  async waitForFormattedText(
+    editor: Locator,
+    pattern: RegExp | string,
+    format: 'bold' | 'italic',
+    options: { timeout?: number } = {}
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    const selector = format === 'bold'
+      ? 'span[style*="font-weight: bold"]'
+      : 'span[style*="font-style: italic"]';
+    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
+
+    await expect(editor.locator(selector)).toHaveText(regex, { timeout });
   }
 
   /**
@@ -1984,5 +2026,73 @@ export class AdminUIHelper {
     console.log('[TEST] LinkEditor Browse button found');
 
     return browseButton;
+  }
+
+  /**
+   * Wait for the sidebar's Slate inline toolbar to appear and return it.
+   * The sidebar toolbar is a .slate-inline-toolbar that is NOT the main .quanta-toolbar.
+   * It appears when text is selected in the sidebar's Slate editor (e.g., RichTextWidget).
+   *
+   * @param timeout - Maximum time to wait in milliseconds (default: 5000)
+   * @returns ElementHandle for the toolbar element
+   */
+  async waitForSidebarSlateToolbar(timeout: number = 5000): Promise<ElementHandle> {
+    // Wait for a .slate-inline-toolbar with opacity=1 that is NOT the quanta-toolbar
+    await this.page.waitForFunction(() => {
+      const toolbars = document.querySelectorAll('.slate-inline-toolbar:not(.quanta-toolbar)');
+      for (const toolbar of toolbars) {
+        const style = window.getComputedStyle(toolbar);
+        if (style.opacity === '1') {
+          return true;
+        }
+      }
+      return false;
+    }, { timeout });
+
+    // Get the visible toolbar element
+    const toolbarHandle = await this.page.evaluateHandle(() => {
+      const toolbars = document.querySelectorAll('.slate-inline-toolbar:not(.quanta-toolbar)');
+      for (const toolbar of toolbars) {
+        const style = window.getComputedStyle(toolbar);
+        if (style.opacity === '1') {
+          return toolbar;
+        }
+      }
+      return null;
+    });
+
+    if (!toolbarHandle) {
+      throw new Error('Sidebar Slate toolbar not found after waiting');
+    }
+
+    console.log('[TEST] Sidebar Slate toolbar is visible');
+    return toolbarHandle as ElementHandle;
+  }
+
+  /**
+   * Get a format button from the sidebar's Slate toolbar.
+   * Use this to click Bold, Italic, etc. in the sidebar editor's toolbar.
+   *
+   * @param toolbar - ElementHandle returned from waitForSidebarSlateToolbar()
+   * @param format - The format to get: 'bold', 'italic', 'strikethrough', 'link', etc.
+   * @returns ElementHandle for the button element
+   */
+  async getSidebarToolbarButton(
+    toolbar: ElementHandle,
+    format: 'bold' | 'italic' | 'strikethrough' | 'link'
+  ): Promise<ElementHandle> {
+    const formatTitle = format.charAt(0).toUpperCase() + format.slice(1); // Capitalize first letter
+
+    const buttonHandle = await toolbar.evaluateHandle((tb, title) => {
+      const button = tb.querySelector(`[title*="${title}" i]`);
+      return button;
+    }, formatTitle);
+
+    if (!buttonHandle) {
+      throw new Error(`Format button "${format}" not found in sidebar toolbar`);
+    }
+
+    console.log(`[TEST] Found sidebar toolbar button: ${format}`);
+    return buttonHandle as ElementHandle;
   }
 }

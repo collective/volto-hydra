@@ -58,7 +58,7 @@ const SyncedSlateToolbar = ({
   form,
   currentSelection,
   onChangeFormData,
-  onSelectionChange,
+  completedFlushRequestId,
   blockUI,
   blockFieldTypes,
   iframeElement,
@@ -182,6 +182,14 @@ const SyncedSlateToolbar = ({
   // Force re-renders when value changes (to update button active states)
   const [renderKey, setRenderKey] = useState(0);
 
+  // Track the last value we sent to Redux to avoid overwriting local changes
+  const lastSentValueRef = useRef(null);
+
+  // Track pending flush request for button click coordination
+  const pendingFlushRef = useRef(null); // { requestId, button }
+  // Track the requestId of active format operation (persists through handleChange)
+  const activeFormatRequestIdRef = useRef(null);
+
   // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
   useEffect(() => {
     if (!selectedBlock || !form.blocks[selectedBlock]) return;
@@ -191,18 +199,44 @@ const SyncedSlateToolbar = ({
     const fieldValue = block[fieldName];
 
     // Update editor.children if external value changed (like Volto line 158)
+    // BUT don't overwrite local changes - only sync if Redux has caught up to what we sent
+    // or if the value came from somewhere else (iframe text changes)
     if (fieldValue && !isEqual(fieldValue, editor.children)) {
-      console.log('[TOOLBAR] Syncing editor.children from form data (structure changed)');
-      editor.children = fieldValue;
-      internalValueRef.current = fieldValue;
-      // Force re-render to update button active states (like Volto's setState)
-      setRenderKey(k => k + 1);
+      if (lastSentValueRef.current) {
+        // We have pending local changes - check if Redux caught up
+        if (isEqual(fieldValue, lastSentValueRef.current)) {
+          // Redux now has our value, safe to sync
+          console.log('[TOOLBAR] Redux caught up, syncing editor.children');
+          editor.children = fieldValue;
+          internalValueRef.current = fieldValue;
+          lastSentValueRef.current = null;
+          setRenderKey(k => k + 1);
+        } else {
+          // Redux still has old value, don't overwrite our local changes
+          console.log('[TOOLBAR] Skipping sync - Redux has old value, waiting for catch up');
+        }
+      } else {
+        // No pending changes, this is an external change (from iframe), sync it
+        console.log('[TOOLBAR] External change detected, syncing editor.children');
+        // Must deselect before changing children to avoid invalid selection errors
+        // Selection will be synced after children update if currentSelection is valid
+        Transforms.deselect(editor);
+        editor.children = fieldValue;
+        internalValueRef.current = fieldValue;
+        setRenderKey(k => k + 1);
+      }
     } else if (fieldValue && !isEqual(fieldValue, internalValueRef.current)) {
       console.log('[TOOLBAR] Updating internalValueRef (children already synced)');
       internalValueRef.current = fieldValue;
+      lastSentValueRef.current = null;
+    } else if (fieldValue && lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
+      // Redux caught up and editor.children already matches - just clear the ref
+      console.log('[TOOLBAR] Redux caught up, clearing lastSentValueRef');
+      lastSentValueRef.current = null;
     }
 
     // Update editor selection using Transforms (like Volto line 167)
+    // Only sync if selection is valid for current document structure
     if (currentSelection && !isEqual(currentSelection, editor.selection)) {
       console.log('[TOOLBAR] Setting editor selection via Transforms (selection changed)');
       try {
@@ -213,14 +247,48 @@ const SyncedSlateToolbar = ({
         // Force re-render to update button active states when selection changes
         setRenderKey(k => k + 1);
       } catch (e) {
-        console.log('[TOOLBAR] Selection transform failed:', e);
+        // Selection is invalid for current document - likely stale, ignore it
+        console.log('[TOOLBAR] Selection transform failed (ignoring stale selection):', e.message);
       }
     } else if (currentSelection) {
       console.log('[TOOLBAR] Skipping selection sync - already matches editor.selection');
       // Still update savedSelection even if selection hasn't changed
       editor.savedSelection = currentSelection;
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch]);
+
+    // Check if there's a pending flush request to complete
+    // This runs regardless of whether formData changed (handles BUFFER_FLUSHED case)
+    if (completedFlushRequestId && pendingFlushRef.current) {
+      const { requestId, button } = pendingFlushRef.current;
+      if (requestId === completedFlushRequestId) {
+        console.log('[TOOLBAR] Flush completed, triggering button mousedown now');
+        console.log('[TOOLBAR] Current editor.children:', JSON.stringify(editor.children));
+        console.log('[TOOLBAR] Current fieldValue:', JSON.stringify(fieldValue));
+        console.log('[TOOLBAR] Current editor.selection:', JSON.stringify(editor.selection));
+        console.log('[TOOLBAR] Current currentSelection prop:', JSON.stringify(currentSelection));
+        pendingFlushRef.current = null;
+        // Store requestId so handleChange can include it in FORM_DATA
+        // This allows iframe to match FORM_DATA to the FLUSH_BUFFER that started blocking
+        activeFormatRequestIdRef.current = requestId;
+        console.log('[TOOLBAR] Stored activeFormatRequestId:', requestId);
+        button.dataset.bypassCapture = 'true';
+        // Find the actual clickable element - Semantic UI Button renders as <a> tag
+        // The onMouseDown handler is on the <a> tag, not the wrapper
+        const clickableElement = button.querySelector('a.ui.button') || button.querySelector('button') || button;
+        console.log('[TOOLBAR] Dispatching mousedown on:', clickableElement.tagName, clickableElement.className);
+        // Dispatch mousedown event since Slate buttons apply formatting on mousedown
+        const mousedownEvent = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        });
+        clickableElement.dispatchEvent(mousedownEvent);
+        // Also dispatch click for complete event sequence
+        clickableElement.click();
+        delete button.dataset.bypassCapture;
+      }
+    }
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId]);
 
   // Check if LinkEditor is currently open
   const linkEditorOpenRef = useRef(false);
@@ -257,9 +325,13 @@ const SyncedSlateToolbar = ({
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
     (newValue) => {
-      console.error('[TOOLBAR] handleChange called, newValue:', JSON.stringify(newValue));
-      console.error('[TOOLBAR] editor.children after change:', JSON.stringify(editor.children));
-      console.error('[TOOLBAR] editor.selection after change:', JSON.stringify(editor.selection));
+      console.log('[TOOLBAR] handleChange called, newValue:', JSON.stringify(newValue));
+      console.log('[TOOLBAR] editor.children after change:', JSON.stringify(editor.children));
+      console.log('[TOOLBAR] editor.selection after change:', JSON.stringify(editor.selection));
+      // Log stack trace to find what's triggering changes
+      if (JSON.stringify(newValue).includes('strong')) {
+        console.trace('[TOOLBAR] BOLD DETECTED - stack trace:');
+      }
 
       // Update internal value tracker
       internalValueRef.current = newValue;
@@ -288,20 +360,20 @@ const SyncedSlateToolbar = ({
         },
       };
 
-      console.log('[TOOLBAR] Calling onChangeFormData with updated form');
-      // Send to parent (which updates Redux and iframe)
-      onChangeFormData(updatedForm);
-
-      // Send updated selection to parent so it can be sent to iframe
-      if (onSelectionChange && editor.selection) {
-        console.log('[TOOLBAR] Sending updated selection:', JSON.stringify(editor.selection));
-        onSelectionChange(editor.selection);
-      }
+      // Track what we're sending so useEffect doesn't overwrite with stale data
+      lastSentValueRef.current = newValue;
+      // Send form data AND selection together atomically to parent
+      // This ensures the iframe receives both in sync
+      // Include requestId if this is from a format operation (allows iframe to match and unblock)
+      const formatRequestId = activeFormatRequestIdRef.current;
+      activeFormatRequestIdRef.current = null; // Clear after use
+      console.log('[TOOLBAR] Calling onChangeFormData with formatRequestId:', formatRequestId);
+      onChangeFormData(updatedForm, editor.selection, formatRequestId);
 
       // DON'T increment renderKey here - it would remount <Slate> and reset editor.children
       // Buttons will re-render naturally when React processes the state updates
     },
-    [form, selectedBlock, onChangeFormData, onSelectionChange, blockUI?.focusedFieldName, editor],
+    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor],
   );
 
   // Create Redux store for persistent helpers (like LinkEditor)
@@ -413,8 +485,63 @@ const SyncedSlateToolbar = ({
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
           while parent toolbar has pointerEvents: 'none' for drag-and-drop passthrough */}
       {/* Wrapped with Redux Provider for buttons that dispatch Redux actions (like Link button) */}
+      {console.log('[TOOLBAR] Condition check:', { showFormatButtons, hasValidSlateValue })}
       {showFormatButtons && hasValidSlateValue && (
-        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}>
+        <div
+          style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}
+          onMouseDownCapture={(e) => {
+            // Slate buttons apply formatting on mousedown (not click) to prevent focus loss
+            // We must capture mousedown to intercept before format is applied
+            console.log('[TOOLBAR] onMouseDownCapture fired, target:', e.target.tagName, e.target.title || e.target.className);
+            // Find the actual button element - could be button, a (Semantic UI), or our wrapper span
+            const button = e.target.closest('button') || e.target.closest('[data-toolbar-button]');
+            if (!button) {
+              console.log('[TOOLBAR] No button found, target:', e.target.tagName);
+              return;
+            }
+
+            // Check if this is a re-triggered event after flush
+            if (button.dataset.bypassCapture === 'true') {
+              console.log('[TOOLBAR] Bypass capture - letting mousedown through');
+              return; // Let the mousedown proceed normally
+            }
+
+            console.log('[TOOLBAR] Button mousedown intercepted, flushing buffer first');
+
+            // Prevent the immediate mousedown - we'll re-trigger after flush
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Generate unique request ID and store pending request
+            const requestId = `flush-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            pendingFlushRef.current = { requestId, button };
+
+            // Send FLUSH_BUFFER to iframe - response will come via completedFlushRequestId prop
+            const iframe = document.getElementById('previewIframe');
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
+            }
+          }}
+          onClickCapture={(e) => {
+            // Also capture click to prevent it when mousedown was intercepted
+            // Click fires after mousedown, so if we intercepted mousedown, we should also block click
+            const button = e.target.closest('button') || e.target.closest('[data-toolbar-button]');
+            if (!button) return;
+
+            if (button.dataset.bypassCapture === 'true') {
+              console.log('[TOOLBAR] Bypass capture - letting click through');
+              return;
+            }
+
+            // If pendingFlushRef has a request, the mousedown was intercepted
+            // Block this click to prevent double-application
+            if (pendingFlushRef.current) {
+              console.log('[TOOLBAR] Click blocked - waiting for flush');
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
             {console.log('[TOOLBAR] About to render Slate with:', { initialValue: currentValue, type: typeof currentValue, isArray: Array.isArray(currentValue) })}
             <SlateErrorBoundary>
               <Slate
@@ -446,7 +573,11 @@ const SyncedSlateToolbar = ({
                 }
 
                 console.log(`[TOOLBAR] Rendering button: ${name}, editor.children:`, JSON.stringify(editor.children));
-                return <Btn key={`${name}-${i}`} />;
+                return (
+                  <span key={`${name}-${i}`} data-toolbar-button={name}>
+                    <Btn />
+                  </span>
+                );
               })}
 
               {/* Render persistent helpers (like LinkEditor) - they use editor.hydra for positioning */}

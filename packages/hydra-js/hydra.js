@@ -115,6 +115,8 @@ class Bridge {
     this.textUpdateTimer = null; // Timer for batching text updates
     this.pendingTextUpdate = null; // Pending text update data
     this.scrollTimeout = null; // Timer for scroll debouncing
+    this.isProcessingExternalUpdate = false; // Flag to suppress messages during FORM_DATA processing
+    this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.init(options); // Initialize the bridge
   }
 
@@ -367,6 +369,11 @@ class Bridge {
               console.log('[HYDRA] Block data being passed to callback:', JSON.stringify(this.formData.blocks[this.selectedBlockUid].value));
             }
 
+            // Suppress outbound messages during external update processing
+            // This prevents hydra from sending SELECTION_CHANGE or INLINE_EDIT_DATA
+            // back to Admin when the update originated FROM Admin
+            this.isProcessingExternalUpdate = true;
+
             // Call the callback first to trigger the re-render
             console.log('[HYDRA] Calling onEditChange callback to trigger re-render');
             callback(this.formData);
@@ -379,13 +386,18 @@ class Bridge {
               requestAnimationFrame(() => {
                 if (event.data.transformedSelection) {
                   console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.transformedSelection);
+                  // Store expected selection so selectionchange handler can suppress it
+                  this.expectedSelectionFromAdmin = event.data.transformedSelection;
                   this.restoreSlateSelection(event.data.transformedSelection, this.formData);
                 } else if (this.savedSelection) {
                   console.log('[HYDRA] No transformed selection provided, using saved selection from selectionchange');
+                  this.expectedSelectionFromAdmin = this.savedSelection;
                   this.restoreSlateSelection(this.savedSelection, this.formData);
                 } else {
                   console.log('[HYDRA] No saved selection available');
                 }
+                // Clear the processing flag - DOM updates are complete
+                this.isProcessingExternalUpdate = false;
               });
             });
 
@@ -395,12 +407,23 @@ class Bridge {
             // FORM_DATA is just data synchronization - it updates the rendered blocks
             // but should not change which block is selected or create/destroy toolbars
 
-            // Unblock input after any FORM_DATA is received (indicates transform completed)
-            // Check all blocks for pending transforms and unblock them
-            Object.keys(this.pendingTransforms).forEach((blockId) => {
-              console.log('[HYDRA] Unblocking input for', blockId, 'after FORM_DATA');
-              this.setBlockProcessing(blockId, false);
-            });
+            // Unblock input if this FORM_DATA has a matching formatRequestId
+            // This ensures we only unblock for the specific format operation that caused blocking
+            const formatRequestId = event.data.formatRequestId;
+            console.log('[HYDRA] FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransforms:', JSON.stringify(this.pendingTransforms));
+            if (formatRequestId) {
+              Object.keys(this.pendingTransforms).forEach((blockId) => {
+                const pending = this.pendingTransforms[blockId];
+                if (pending?.requestId === formatRequestId) {
+                  console.log('[HYDRA] Unblocking input for', blockId, '- formatRequestId matches pending requestId');
+                  this.setBlockProcessing(blockId, false);
+                } else {
+                  console.log('[HYDRA] formatRequestId', formatRequestId, 'does not match pending requestId:', pending?.requestId, 'for block:', blockId);
+                }
+              });
+            } else {
+              console.log('[HYDRA] No formatRequestId in FORM_DATA, not unblocking');
+            }
 
             // Update block UI overlay positions after form data changes
             // Blocks might have resized after form updates
@@ -417,6 +440,77 @@ class Bridge {
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
+        } else if (event.data.type === 'FLUSH_BUFFER') {
+          // Parent is requesting a buffer flush before applying format
+          // This ensures the parent's Slate editor has the latest text
+          const requestId = event.data.requestId;
+          console.log('[HYDRA] Received FLUSH_BUFFER request, requestId:', requestId);
+
+          // Block input during format operation - will be unblocked when FORM_DATA arrives
+          // This prevents any text changes from being sent while format is being applied
+          // Block input and track requestId for matching with FORM_DATA
+          if (this.selectedBlockUid) {
+            this.setBlockProcessing(this.selectedBlockUid, true, requestId);
+          }
+
+          // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
+          const hadPendingText = this.flushPendingTextUpdates(requestId);
+
+          if (hadPendingText) {
+            // requestId was included in INLINE_EDIT_DATA, parent will handle coordination
+            console.log('[HYDRA] Flushed pending text with requestId, waiting for Redux sync');
+          } else {
+            // No pending text - send BUFFER_FLUSHED immediately (safe to proceed)
+            // Include current selection so toolbar has it when applying format
+            this.sendMessageToParent({
+              type: 'BUFFER_FLUSHED',
+              requestId: requestId,
+              selection: this.serializeSelection(),
+            });
+            console.log('[HYDRA] No pending text, sent BUFFER_FLUSHED immediately');
+          }
+        } else if (event.data.type === 'APPLY_FORMAT') {
+          // Toolbar button was clicked - flush buffer and send format request
+          console.log('[HYDRA] Received APPLY_FORMAT for button:', event.data.buttonName);
+
+          // Flush any pending text changes first
+          this.flushPendingTextUpdates();
+
+          // Get current selection from the DOM
+          const selection = this.serializeSelection();
+
+          // Look up the format from the button name using slateConfig
+          // Button names like 'bold' map to formats like 'strong'
+          const buttonName = event.data.buttonName;
+          let format = event.data.format; // Use provided format if available
+          let buttonType = event.data.buttonType;
+
+          // If format not provided, look up from config
+          if (!format && this.slateConfig?.toolbarButtons) {
+            // The toolbarButtons config contains format info
+            // For MarkElementButton, the format is typically the element type
+            // Common mappings: bold->strong, italic->em, underline->u, strikethrough->del
+            const buttonConfig = this.slateConfig.buttons?.[buttonName];
+            if (buttonConfig) {
+              format = buttonConfig.format || buttonName;
+              buttonType = buttonConfig.type;
+            } else {
+              // Fallback: use button name directly as format
+              format = buttonName;
+            }
+          }
+
+          // Send SLATE_FORMAT_REQUEST to parent with current selection
+          this.sendMessageToParent({
+            type: 'SLATE_FORMAT_REQUEST',
+            blockId: event.data.blockId || this.selectedBlockUid,
+            selection: selection || {},
+            format: format,
+            buttonName: buttonName,
+            action: event.data.action || 'toggle',
+            buttonType: buttonType,
+          });
+          console.log('[HYDRA] Sent SLATE_FORMAT_REQUEST after flush for button:', buttonName, 'format:', format);
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
@@ -568,8 +662,8 @@ class Bridge {
    * @param {string} blockId - Block UID to block/unblock
    * @param {boolean} processing - true to block input, false to unblock
    */
-  setBlockProcessing(blockId, processing = true) {
-    console.log('[HYDRA] setBlockProcessing:', { blockId, processing });
+  setBlockProcessing(blockId, processing = true, requestId = null) {
+    console.log('[HYDRA] setBlockProcessing:', { blockId, processing, requestId });
     const block = document.querySelector(`[data-block-uid="${blockId}"]`);
     const editableField = block?.querySelector('[data-editable-field="value"]');
 
@@ -605,13 +699,10 @@ class Bridge {
 
       // TODO: Send message to parent to disable format buttons
 
-      // Start timeout (2 seconds)
-      if (this.pendingTransforms[blockId]) {
-        clearTimeout(this.pendingTransforms[blockId]);
-      }
-      this.pendingTransforms[blockId] = setTimeout(() => {
-        this.handleTransformTimeout(blockId);
-      }, 2000);
+      // Store requestId to match with FORM_DATA for unblocking
+      this.pendingTransforms[blockId] = {
+        requestId: requestId,
+      };
     } else {
       console.log('[HYDRA] UNBLOCKING input for', blockId);
       // Remove keyboard blocker
@@ -630,11 +721,8 @@ class Bridge {
 
       // TODO: Send message to parent to re-enable format buttons
 
-      // Clear timeout
-      if (this.pendingTransforms[blockId]) {
-        clearTimeout(this.pendingTransforms[blockId]);
-        delete this.pendingTransforms[blockId];
-      }
+      // Clear pending transform
+      delete this.pendingTransforms[blockId];
     }
   }
 
@@ -1168,17 +1256,46 @@ class Bridge {
     if (!this.selectionChangeListener) {
       this.selectionChangeListener = () => {
         const selection = window.getSelection();
-        console.log('[HYDRA] selectionchange event fired:', {
-          rangeCount: selection?.rangeCount,
-          isCollapsed: selection?.isCollapsed,
-          text: selection?.toString()
-        });
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
           this.savedSelection = this.serializeSelection();
-          console.log('[HYDRA] Selection saved:', this.savedSelection);
 
-          // Send selection to parent for toolbar state updates
+          // Don't send SELECTION_CHANGE during external updates (FORM_DATA from Admin)
+          // The selection change was caused by Admin, not user action
+          if (this.isProcessingExternalUpdate) {
+            return;
+          }
+
+          // Check if this selection matches what Admin just sent us
+          // If so, this is the result of restoring their selection - don't echo it back
+          if (this.expectedSelectionFromAdmin && this.savedSelection) {
+            const expected = this.expectedSelectionFromAdmin;
+            const current = this.savedSelection;
+            // Compare anchor and focus paths and offsets
+            const matches =
+              JSON.stringify(expected.anchor) === JSON.stringify(current.anchor) &&
+              JSON.stringify(expected.focus) === JSON.stringify(current.focus);
+            if (matches) {
+              // Same selection as Admin sent - this is the restore, suppress it
+              console.log('[HYDRA] Selection matches Admin restore - not sending back');
+              return;
+            } else {
+              // Different selection - user moved cursor/selected text, clear expected
+              console.log('[HYDRA] Selection differs from Admin restore - user action');
+              this.expectedSelectionFromAdmin = null;
+            }
+          }
+
+          // Don't send SELECTION_CHANGE during typing - selection will be included
+          // when text buffer flushes. This ensures formData and selection stay atomic.
+          // Only send standalone SELECTION_CHANGE when user moves cursor without typing
+          // (clicking, arrow keys, selecting text).
+          if (this.pendingTextUpdate || this.textUpdateTimer) {
+            // Text activity in progress - selection will be sent with the text
+            return;
+          }
+
+          // No pending text - send standalone SELECTION_CHANGE for toolbar state updates
           if (this.savedSelection && this.selectedBlockUid) {
             window.parent.postMessage(
               {
@@ -1189,8 +1306,6 @@ class Bridge {
               this.adminOrigin,
             );
           }
-        } else {
-          console.log('[HYDRA] Selection not saved (no ranges)');
         }
       };
       document.addEventListener('selectionchange', this.selectionChangeListener);
@@ -1762,12 +1877,21 @@ class Bridge {
    *
    * @param {HTMLElement} blockElement - The block element to make editable.
    */
-  makeBlockContentEditable(blockElement) {
-    const blockUid = blockElement.getAttribute('data-block-uid');
+  makeBlockContentEditable(elementOrBlock) {
+    // Handle being called with either a block element or an editable field directly
+    let blockUid;
+    let editableField;
 
-    // For blocks with data-editable-field (e.g., Slate blocks or simple text fields from widgets/forms)
-    // Only make the field-level element contenteditable, not individual inline data-node-id elements
-    const editableField = blockElement.querySelector('[data-editable-field]');
+    if (elementOrBlock.hasAttribute('data-editable-field')) {
+      // Called with the editable field directly - find block-uid from parent
+      editableField = elementOrBlock;
+      const blockElement = elementOrBlock.closest('[data-block-uid]');
+      blockUid = blockElement?.getAttribute('data-block-uid');
+    } else {
+      // Called with a block element - query for child editable field
+      blockUid = elementOrBlock.getAttribute('data-block-uid');
+      editableField = elementOrBlock.querySelector('[data-editable-field]');
+    }
 
     if (editableField) {
       // Make the field contenteditable - child inline elements inherit this
@@ -1799,7 +1923,15 @@ class Bridge {
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
       editableField.addEventListener('keydown', (e) => {
-        console.log('[HYDRA] Keydown event in editable field:', e.key, 'shiftKey:', e.shiftKey);
+        console.log('[HYDRA] Keydown event in editable field:', e.key, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
+
+        // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
+        // to prevent native formatting from conflicting with Slate-based formatting
+        const nativeFormattingKeys = ['b', 'i', 'u', 's'];
+        if ((e.ctrlKey || e.metaKey) && nativeFormattingKeys.includes(e.key.toLowerCase())) {
+          console.log('[HYDRA] Suppressing native formatting for:', e.key);
+          e.preventDefault();
+        }
 
         // Handle formatting keyboard shortcuts (Ctrl+B, Ctrl+I, etc.)
         if (this.slateConfig && this.slateConfig.hotkeys) {
@@ -1819,7 +1951,6 @@ class Bridge {
 
             if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
               console.log('[HYDRA] Formatting shortcut detected:', shortcut, 'format:', config.format);
-              e.preventDefault();
 
               this.sendMessageToParent({
                 type: 'SLATE_FORMAT_REQUEST',
@@ -2437,6 +2568,13 @@ class Bridge {
       return;
     }
 
+    // Don't process text changes during external updates (FORM_DATA from Admin)
+    // The DOM mutation was caused by Admin re-rendering, not user typing
+    if (this.isProcessingExternalUpdate) {
+      console.log('[HYDRA] handleTextChange: Ignoring - external update in progress');
+      return;
+    }
+
     // Determine field type from block schema metadata
     const blockType = this.formData?.blocks[blockUid]?.['@type'];
     const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
@@ -2490,6 +2628,8 @@ class Bridge {
     this.textUpdateTimer = setTimeout(() => {
       if (this.pendingTextUpdate) {
         console.log('[HYDRA] Batch timer fired, sending update');
+        // Add current selection at send time (not creation time)
+        this.pendingTextUpdate.selection = this.serializeSelection();
         this.sendMessageToParent(this.pendingTextUpdate);
         this.pendingTextUpdate = null;
         this.textUpdateTimer = null; // Clear the timer reference
@@ -2500,16 +2640,26 @@ class Bridge {
   /**
    * Flush any pending batched text updates immediately
    * Call this before any operation that needs current state (format, cut, paste, undo, etc.)
+   * @param {string} [flushRequestId] - Optional requestId to include with the update (for FLUSH_BUFFER coordination)
+   * @returns {boolean} - True if there was pending text to flush, false otherwise
    */
-  flushPendingTextUpdates() {
+  flushPendingTextUpdates(flushRequestId) {
     if (this.textUpdateTimer) {
       clearTimeout(this.textUpdateTimer);
       this.textUpdateTimer = null;
     }
     if (this.pendingTextUpdate) {
+      // Include requestId if provided (for FLUSH_BUFFER coordination)
+      if (flushRequestId) {
+        this.pendingTextUpdate.flushRequestId = flushRequestId;
+      }
+      // Add current selection at send time (not creation time)
+      this.pendingTextUpdate.selection = this.serializeSelection();
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
       this.pendingTextUpdate = null;
+      return true; // Had pending text
     }
+    return false; // No pending text
   }
 
   /**

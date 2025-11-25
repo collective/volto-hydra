@@ -471,7 +471,8 @@ app.get('*', (req, res, next) => {
 
 /**
  * PATCH /:path
- * Update content
+ * Update content - returns merged content but does NOT persist changes
+ * This ensures test isolation (each test gets fresh fixture data)
  */
 app.patch('*', (req, res) => {
   const path = req.path;
@@ -480,10 +481,9 @@ app.patch('*', (req, res) => {
   const content = contentDB[cleanPath];
 
   if (content) {
-    // Merge updates
-    Object.assign(content, req.body);
-    contentDB[cleanPath] = content;
-    res.json(content);
+    // Return merged content but don't persist - ensures test isolation
+    const mergedContent = { ...content, ...req.body };
+    res.json(mergedContent);
   } else {
     res.status(404).json({
       error: {
