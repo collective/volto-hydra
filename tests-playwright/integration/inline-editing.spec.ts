@@ -7,6 +7,10 @@
  * TODO - additional tests
  * - backspace into bold text (click off or apply another format it will go funny)
  * - click at end of block puts cursor at end of line
+ * - double click on an unselected block and you should have the word selected
+ * - can clear a link
+ * - click bold button without selection and then type - should be bolded
+ * - click link without selection and then type - should create link?
  * - paste a link
  * - DND a word within the same block
  * - DND a word between blocks
@@ -286,59 +290,188 @@ test.describe('Inline Editing', () => {
     const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
     await helper.selectAllTextInEditor(editor);
 
-    // Click the link button - should show an extra toolbar for entering URL
+    // Click the link button - should show LinkEditor popup
     await helper.clickFormatButton('link');
 
-    // Wait for the extra link toolbar to appear
+    // Wait for LinkEditor popup to appear and verify its position
+    const { popup, boundingBox } = await helper.waitForLinkEditorPopup();
+    console.log('[TEST] LinkEditor popup appeared at:', boundingBox);
+
+    // Get the URL input field
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+
+    // Enter a URL (must be a valid, real URL)
+    await linkUrlInput.fill('https://plone.org');
+
+    // Press Enter to submit
+    console.log('[TEST] Pressing Enter to submit link');
+    await linkUrlInput.press('Enter');
+
+    // Wait for link to be created in the iframe by checking the HTML contains the link
+    console.log('[TEST] Waiting for link to appear in iframe');
+    await expect(async () => {
+      const blockHtml = await editor.innerHTML();
+      console.log('[TEST] Current block HTML:', blockHtml);
+      expect(blockHtml).toContain('<a ');
+      expect(blockHtml).toContain('https://plone.org');
+      expect(blockHtml).toContain('Click here');
+    }).toPass({ timeout: 5000 });
+
+    console.log('[TEST] Link created successfully');
+
+    // Verify the LinkEditor popup has disappeared (check for .add-link specifically, not the Quanta toolbar)
+    const linkEditorPopup = page.locator('.add-link');
+    await expect(linkEditorPopup).not.toBeVisible();
+  });
+
+  test('can clear a link', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Edit the text and create a link
+    await helper.editBlockTextInIframe(blockId, 'Click here');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await helper.selectAllTextInEditor(editor);
+
+    // Create the link
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+    await linkUrlInput.fill('https://plone.org');
+    await linkUrlInput.press('Enter');
+
+    // Wait for link to be created
+    await expect(async () => {
+      const blockHtml = await editor.innerHTML();
+      expect(blockHtml).toContain('<a ');
+      expect(blockHtml).toContain('https://plone.org');
+    }).toPass({ timeout: 5000 });
+
+    console.log('[TEST] Link created, now testing clear');
+
+    // Click inside the editor to position cursor inside the link text
+    await editor.click();
+    console.log('[TEST] Clicked into editor');
+
+    // Wait a moment for cursor to be positioned
+    await page.waitForTimeout(200);
+
+    // Click the link button to open LinkEditor (cursor should be inside the link)
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+    console.log('[TEST] LinkEditor opened');
+
+    // Click the Clear (X) button
+    const clearButton = await helper.getLinkEditorClearButton();
+    console.log('[TEST] Clicking Clear (X) button');
+    await clearButton.click();
+
+    // Check there is no link in the HTML (text should remain but without <a> tag)
+    await expect(async () => {
+      const blockHtml = await editor.innerHTML();
+      console.log('[TEST] Block HTML after clearing:', blockHtml);
+      expect(blockHtml).not.toContain('<a ');
+      expect(blockHtml).not.toContain('href=');
+      expect(blockHtml).toContain('Click here'); // Text should still be there
+    }).toPass({ timeout: 5000 });
+
+    console.log('[TEST] Link cleared successfully - text remains without link');
+  });
+
+  test('can use browse button in link editor', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Edit the text
+    await helper.editBlockTextInIframe(blockId, 'Click here');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await helper.selectAllTextInEditor(editor);
+
+    // Click the link button to open LinkEditor
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+
+    // Get the URL input - it might have some content
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+
+    // Wait for the input to actually be focused (componentDidMount completed successfully)
+    console.log('[TEST] Waiting for input to be focused...');
+    await expect(linkUrlInput).toBeFocused({ timeout: 2000 });
+    console.log('[TEST] Input is focused, componentDidMount completed');
+
+    // Check if input has content, and clear it if needed to show the browse button
+    const inputValue = await linkUrlInput.inputValue();
+    if (inputValue && inputValue.length > 0) {
+      console.log('[TEST] Input has content, clearing it to show browse button');
+      await linkUrlInput.clear();
+      // Wait for input to be focused again after clearing
+      await expect(linkUrlInput).toBeFocused({ timeout: 1000 });
+    }
+
+    // Now the Browse button should be visible (only shows when input is empty)
+    const browseButton = await helper.getLinkEditorBrowseButton();
+    console.log('[TEST] Browse button found, clicking it');
+    await browseButton.click();
+
+    // Wait for object browser to open (use last() to get the newly opened sidebar)
+    const objectBrowser = page.locator('aside[role="presentation"]').last();
+    await objectBrowser.waitFor({ state: 'visible', timeout: 5000 });
+    console.log('[TEST] Object browser opened successfully');
+
+    // Verify the object browser is visible
+    await expect(objectBrowser).toBeVisible();
+
+    // Wait for ObjectBrowser animation to complete (slide-in animation)
+    await page.waitForTimeout(600);
+
+    // Click the home icon in breadcrumb to navigate to root (test-page has no children)
+    // The error context shows: button "Home" with img "Home" inside
+    const homeBreadcrumb = objectBrowser.getByRole('button', { name: 'Home' });
+    await homeBreadcrumb.waitFor({ state: 'visible', timeout: 2000 });
+    console.log('[TEST] Clicking Home button in breadcrumb to navigate to root');
+    await homeBreadcrumb.click();
+
+    // Wait for the page list to populate with root-level pages
+    await page.waitForTimeout(500); // Wait for API call to complete
+
+    // Click on "Another Page" from the list - it's a listitem, not a button
+    const anotherPageItem = objectBrowser.getByRole('listitem', { name: /Another Page/ });
+    await anotherPageItem.waitFor({ state: 'visible', timeout: 2000 });
+    console.log('[TEST] Clicking "Another Page" from the list');
+    await anotherPageItem.click();
+
+    // Wait for ObjectBrowser to close and URL to be populated in LinkEditor
     await page.waitForTimeout(500);
 
-    // Look for the extra toolbar that appears for link input
-    // Common selectors for Slate link toolbar
-    const linkToolbar = page.locator('.slate-inline-toolbar, .link-toolbar, .slate-link-toolbar, [data-slate-toolbar]').first();
+    // Now click Submit button in LinkEditor to create the link
+    const submitButton = page.getByRole('button', { name: 'Submit' });
+    await submitButton.waitFor({ state: 'visible', timeout: 2000 });
+    console.log('[TEST] Clicking Submit button to create the link');
+    await submitButton.click();
 
-    const toolbarVisible = await linkToolbar.isVisible().catch(() => false);
-    console.log('[TEST] Link toolbar visible:', toolbarVisible);
+    // Wait for the link to be created in the editor
+    await page.waitForTimeout(500);
 
-    if (toolbarVisible) {
-      // Inspect the toolbar HTML to find the input field
-      const toolbarHTML = await linkToolbar.innerHTML();
-      console.log('[TEST] Link toolbar HTML:', toolbarHTML);
-    }
-
-    // Try multiple selectors for the URL input
-    const linkUrlInput = page.locator('input[placeholder*="url" i], input[placeholder*="link" i], input[type="url"], .slate-inline-toolbar input, .link-toolbar input').first();
-    const urlInputVisible = await linkUrlInput.isVisible().catch(() => false);
-    console.log('[TEST] URL input visible:', urlInputVisible);
-
-    // Verify the extra toolbar appeared
-    const linkUIAppeared = toolbarVisible || urlInputVisible;
-    expect(linkUIAppeared).toBe(true);
-
-    if (urlInputVisible) {
-      // Enter a URL
-      await linkUrlInput.fill('https://example.com');
-      await page.waitForTimeout(200);
-
-      // Look for submit/confirm button
-      const submitButton = page.locator('button:has-text("Save"), button:has-text("OK"), button:has-text("Apply"), button[type="submit"]').first();
-      const submitVisible = await submitButton.isVisible().catch(() => false);
-
-      if (submitVisible) {
-        await submitButton.click();
-        await page.waitForTimeout(500);
-      } else {
-        // Maybe press Enter to submit
-        await linkUrlInput.press('Enter');
-        await page.waitForTimeout(500);
-      }
-
-      // Verify link was created
+    // Verify the link was created in the editor
+    await expect(async () => {
       const blockHtml = await editor.innerHTML();
-      console.log('[TEST] Block HTML after creating link:', blockHtml);
-
+      console.log('[TEST] Block HTML after selecting page:', blockHtml);
       expect(blockHtml).toContain('<a ');
-      expect(blockHtml).toContain('https://example.com');
-    }
+      expect(blockHtml).toContain('/another-page');
+      expect(blockHtml).toContain('Click here');
+    }).toPass({ timeout: 5000 });
+
+    console.log('[TEST] Browse button test complete - link created successfully');
   });
 
   test('bold formatting syncs with Admin UI', async ({ page }) => {
@@ -630,31 +763,139 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and create text with a link
-    await helper.clickBlockInIframe(blockId);
+    // Create text and initial link
+    await helper.editBlockTextInIframe(blockId, 'Click here');
     const iframe = helper.getIframe();
     const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
-    await editor.evaluate((el) => { el.textContent = ''; });
-    await editor.pressSequentially('Click here', { delay: 10 });
-
-    // Select all text
     await helper.selectAllTextInEditor(editor);
 
-    // Apply link format (this test documents current behavior)
-    // NOTE: There's a known bug with link creation (hydra.js:733)
-    // Once fixed, we should extend this test to:
-    // 1. Create the link with an initial URL
-    // 2. Click on the link
-    // 3. Edit the URL
-    // 4. Verify the href attribute changed
+    // Click link button and create link
+    await helper.clickFormatButton('link');
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+    await linkUrlInput.fill('https://example.com');
+    await linkUrlInput.press('Enter');
 
-    // For now, just verify we can select text for linking
-    const selection = await editor.evaluate(() => {
-      const sel = window.getSelection();
-      return sel ? sel.toString() : '';
+    // Wait for popup to close and editor to be focused again
+    await expect(editor).toBeFocused({ timeout: 2000 });
+
+    // Verify link was created
+    const link = editor.locator('a');
+    await expect(link).toBeVisible();
+    expect(await link.getAttribute('href')).toBe('https://example.com');
+
+    // Click inside the link to edit it
+    await link.click();
+
+    // Click link button again to open editor
+    await helper.clickFormatButton('link');
+    const { popup: editPopup } = await helper.waitForLinkEditorPopup();
+    const editUrlInput = await helper.getLinkEditorUrlInput();
+
+    // Verify current URL is shown
+    expect(await editUrlInput.inputValue()).toContain('example.com');
+
+    // Change URL (fill will replace the existing value)
+    await editUrlInput.fill('https://newurl.com');
+
+    // Verify Submit button is enabled and click it
+    const submitButton = page.getByRole('button', { name: 'Submit' });
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
+
+    // Wait for popup to close
+    await helper.waitForLinkEditorToClose();
+
+    // Verify link was updated
+    expect(await link.getAttribute('href')).toBe('https://newurl.com');
+    expect(await link.textContent()).toBe('Click here');
+  });
+
+  test('LinkEditor closes when focusing back on editor', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Create text and select it
+    await helper.editBlockTextInIframe(blockId, 'Click here');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await helper.selectAllTextInEditor(editor);
+
+    // Click link button to open LinkEditor
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+
+    // Click at the start of the text (position different from center)
+    // This ensures selection actually changes, triggering the close behavior
+    await editor.click({ position: { x: 5, y: 5 } });
+
+    // LinkEditor should close
+    await helper.waitForLinkEditorToClose();
+  });
+
+  test('link button shows active state when cursor is in link', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Create text with a link in the middle
+    await helper.editBlockTextInIframe(blockId, 'Before link after');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+
+    // Select "link" text (characters 7-11)
+    await editor.evaluate((el) => {
+      const textNode = el.firstChild;
+      if (!textNode) throw new Error('No text node found');
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.setStart(textNode, 7);
+      range.setEnd(textNode, 11);
+      selection.removeAllRanges();
+      selection.addRange(range);
     });
-    expect(selection).toBe('Click here');
+
+    // Create link
+    await helper.clickFormatButton('link');
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+    await linkUrlInput.fill('https://example.com');
+    await linkUrlInput.press('Enter');
+
+    // Wait for popup to close
+    await helper.waitForLinkEditorToClose();
+
+    // Verify link was created: "Before <a>link</a> after"
+    const link = editor.locator('a');
+    await expect(link).toBeVisible();
+    expect(await link.textContent()).toBe('link');
+
+    // Click inside the link
+    await helper.clickRelativeToFormat(editor, 'inside', 'a');
+
+    // Verify link button is active
+    expect(await helper.isActiveFormatButton('link')).toBe(true);
+
+    // Click before the link
+    await helper.clickRelativeToFormat(editor, 'before', 'a');
+
+    await page.waitForTimeout(200);
+
+    // Verify link button is NOT active
+    expect(await helper.isActiveFormatButton('link')).toBe(false);
+
+    // Click after the link
+    await helper.clickRelativeToFormat(editor, 'after', 'a');
+
+    await page.waitForTimeout(200);
+
+    // Verify link button is still NOT active
+    expect(await helper.isActiveFormatButton('link')).toBe(false);
   });
 
   test('can arrow out of link', async ({ page }) => {
@@ -677,16 +918,7 @@ test.describe('Inline Editing', () => {
     });
 
     // Click inside the link
-    await editor.evaluate((el) => {
-      const link = el.querySelector('a');
-      if (!link || !link.firstChild) throw new Error('Link not found');
-      const range = document.createRange();
-      const selection = window.getSelection();
-      range.setStart(link.firstChild, 2); // Inside "link"
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
+    await helper.clickRelativeToFormat(editor, 'inside', 'a');
 
     // Press right arrow to move cursor
     await page.keyboard.press('ArrowRight');

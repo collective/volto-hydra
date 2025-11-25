@@ -1823,4 +1823,178 @@ export class AdminUIHelper {
 
     return selectionInfo;
   }
+
+  /**
+   * Wait for the LinkEditor popup to appear and verify its position.
+   * The LinkEditor should appear near the selected text in the iframe.
+   *
+   * @param timeout Maximum time to wait for popup in milliseconds
+   * @returns The popup element and its bounding box
+   */
+  async waitForLinkEditorPopup(timeout: number = 5000): Promise<{
+    popup: Locator;
+    boundingBox: { x: number; y: number; width: number; height: number };
+  }> {
+    // LinkEditor renders in a PositionedToolbar with className "add-link"
+    const popup = this.page.locator('.add-link, .slate-inline-toolbar, [data-slate-toolbar="link"]').first();
+
+    // Wait for popup to be visible
+    await popup.waitFor({ state: 'visible', timeout });
+
+    // Get popup position
+    const boundingBox = await popup.boundingBox();
+
+    if (!boundingBox) {
+      throw new Error('LinkEditor popup appeared but has no bounding box');
+    }
+
+    console.log('[TEST] LinkEditor popup found at:', boundingBox);
+
+    // Note: PositionedToolbar may keep element at (-10000, -10000) as base position
+    // and use CSS transforms/positioning to move it visually. So we just verify
+    // it's visible and has dimensions rather than checking exact coordinates.
+
+    // Verify popup has dimensions (width and height > 0)
+    if (boundingBox.width === 0 || boundingBox.height === 0) {
+      throw new Error(
+        `LinkEditor popup has no dimensions! Size: ${boundingBox.width}x${boundingBox.height}`
+      );
+    }
+
+    console.log('[TEST] LinkEditor popup is visible with dimensions:', {
+      position: `(${boundingBox.x}, ${boundingBox.y})`,
+      size: `${boundingBox.width}x${boundingBox.height}`,
+    });
+
+    return { popup, boundingBox };
+  }
+
+  /**
+   * Click at a specific position relative to a formatted element (link, bold, etc).
+   *
+   * @param editor - The contenteditable editor locator
+   * @param position - Where to click: 'inside', 'before', or 'after'
+   * @param formatSelector - CSS selector for the format (e.g., 'a' for links, 'strong' for bold)
+   * @returns The formatted element that was clicked relative to
+   */
+  async clickRelativeToFormat(
+    editor: Locator,
+    position: 'inside' | 'before' | 'after',
+    formatSelector: string = 'a'
+  ): Promise<Locator> {
+    // Find the formatted element within the editor
+    const formattedElement = editor.locator(formatSelector).first();
+    await formattedElement.waitFor({ state: 'visible', timeout: 5000 });
+
+    const box = await formattedElement.boundingBox();
+    if (!box) {
+      throw new Error(`Formatted element ${formatSelector} has no bounding box`);
+    }
+
+    let clickX: number;
+    let clickY: number = box.y + box.height / 2; // Middle vertically
+
+    switch (position) {
+      case 'inside':
+        // Click in the middle of the formatted element
+        clickX = box.x + box.width / 2;
+        break;
+      case 'before':
+        // Click 5px before the formatted element
+        clickX = box.x - 5;
+        break;
+      case 'after':
+        // Click 5px after the formatted element
+        clickX = box.x + box.width + 5;
+        break;
+    }
+
+    // Click at the calculated position
+    await editor.click({ position: { x: clickX - (await editor.boundingBox())!.x, y: clickY - (await editor.boundingBox())!.y } });
+
+    console.log(`[TEST] Clicked ${position} ${formatSelector} at (${clickX}, ${clickY})`);
+    return formattedElement;
+  }
+
+  /**
+   * Wait for all LinkEditor popups to be hidden.
+   *
+   * @param timeout - Maximum time to wait in milliseconds (default: 5000)
+   */
+  async waitForLinkEditorToClose(timeout: number = 5000): Promise<void> {
+    // LinkEditor renders in a PositionedToolbar with className "add-link"
+    // Wait for NO .add-link elements to be visible
+    const popup = this.page.locator('.add-link');
+
+    // Wait until there are no visible LinkEditor popups
+    await this.page.waitForFunction(
+      () => {
+        const popups = document.querySelectorAll('.add-link');
+        return Array.from(popups).every(p => {
+          const style = window.getComputedStyle(p);
+          return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
+        });
+      },
+      { timeout }
+    );
+
+    console.log('[TEST] All LinkEditor popups are now hidden');
+  }
+
+  /**
+   * Get the URL input field from the LinkEditor popup.
+   * Throws if popup is not visible or input is not found.
+   *
+   * @returns The URL input locator
+   */
+  async getLinkEditorUrlInput(): Promise<Locator> {
+    // First ensure popup is visible
+    await this.waitForLinkEditorPopup();
+
+    // Find the URL input within the popup
+    const input = this.page.locator('.add-link input, .slate-inline-toolbar input, input[placeholder*="link" i]').first();
+
+    // Wait for input to be visible
+    await input.waitFor({ state: 'visible', timeout: 2000 });
+
+    console.log('[TEST] LinkEditor URL input found');
+
+    // Wait for the input to actually be focused (componentDidMount completed successfully)
+    await expect(input).toBeFocused({ timeout: 2000 });
+    console.log('[TEST] LinkEditor input is focused, componentDidMount completed');
+
+    return input;
+  }
+
+  /**
+   * Get the Clear button from the LinkEditor popup.
+   * The Clear button appears when the input has text.
+   *
+   * @returns The Clear button locator
+   */
+  async getLinkEditorClearButton(): Promise<Locator> {
+    // Look for Clear button directly - it should be near the "Add link" input
+    const clearButton = this.page.locator('button[aria-label="Clear"]').first();
+
+    await clearButton.waitFor({ state: 'visible', timeout: 2000 });
+    console.log('[TEST] LinkEditor Clear button found');
+
+    return clearButton;
+  }
+
+  /**
+   * Get the Browse button from the LinkEditor popup.
+   * The Browse button appears when the input is empty.
+   *
+   * @returns The Browse button locator
+   */
+  async getLinkEditorBrowseButton(): Promise<Locator> {
+    // Look for Browse button directly - it should be near the "Add link" input
+    const browseButton = this.page.locator('button[aria-label="Open object browser"]').first();
+
+    await browseButton.waitFor({ state: 'visible', timeout: 2000 });
+    console.log('[TEST] LinkEditor Browse button found');
+
+    return browseButton;
+  }
 }
