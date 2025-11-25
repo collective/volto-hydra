@@ -8,19 +8,15 @@ export class AdminUIHelper {
     public readonly page: Page,
     public readonly adminUrl: string = 'http://localhost:3001'
   ) {
-    // Capture browser console messages for debugging
+    // Capture browser console messages - only log specific patterns we care about
+    // (not all warnings/errors, as many are expected SSR hydration issues)
     this.page.on('console', (msg) => {
-      const type = msg.type();
       const text = msg.text();
       if (
-        type === 'error' ||
-        type === 'warning' ||
-        text.includes('[REDUX ACTION]') ||
         text.includes('[HYDRA]') ||
-        text.includes('[VIEW]') ||
-        text.includes('applyFormat')
+        text.includes('[VIEW]')
       ) {
-        console.log(`[BROWSER ${type.toUpperCase()}] ${text}`);
+        console.log(`[BROWSER] ${text}`);
       }
     });
 
@@ -30,19 +26,11 @@ export class AdminUIHelper {
       console.log(error.stack);
     });
 
-    // Log ALL requests to see what's happening
-    this.page.on('request', (request) => {
-      console.log(`[REQUEST] ${request.method()} ${request.url()}`);
-    });
-
-    // Log ALL responses to see what's failing
+    // Log only failed requests (status >= 400)
     this.page.on('response', async (response) => {
-      const url = response.url();
       const status = response.status();
-      console.log(`[RESPONSE] ${status} ${url}`);
-
-      // Log error details for failed requests
       if (status >= 400) {
+        const url = response.url();
         console.log(`[NETWORK ERROR] ${response.request().method()} ${status} ${url}`);
         try {
           const body = await response.text();

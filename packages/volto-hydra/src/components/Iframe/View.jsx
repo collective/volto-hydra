@@ -70,7 +70,6 @@ const extractBlockFieldTypes = (intl) => {
         : blockConfig.blockSchema;
 
       if (!schema?.properties) {
-        console.log(`[VIEW] Skipping block type "${blockType}" - no schema.properties. Schema:`, schema);
         return;
       }
 
@@ -89,7 +88,6 @@ const extractBlockFieldTypes = (intl) => {
         }
 
         if (fieldType) {
-          console.log(`[VIEW] Extracted ${blockType}.${fieldName} = ${fieldType}`);
           blockFieldTypes[blockType][fieldName] = fieldType;
         }
       });
@@ -291,11 +289,8 @@ const Iframe = (props) => {
 
     // Keyboard shortcut handler - uses the same editor as toolbar buttons
     const applyFormat = ({ blockId, format, selection, action = 'toggle', url, buttonType }) => {
-      console.log('[VIEW] applyFormat called (keyboard shortcut):', { blockId, format, selection, action, buttonType });
-
       const block = form.blocks[blockId];
       if (!block?.value) {
-        console.error('[VIEW] No value found for block:', blockId);
         return false;
       }
 
@@ -304,12 +299,10 @@ const Iframe = (props) => {
 
       // Verify this editor is for the current block
       if (toolbarEditor && selectedBlock !== blockId) {
-        console.log('[VIEW] Toolbar editor exists but selected block does not match:', selectedBlock, 'vs', blockId);
         return false;
       }
 
       if (!toolbarEditor) {
-        console.warn('[VIEW] No toolbar editor available - SyncedSlateToolbar may not be mounted');
         return false;
       }
 
@@ -317,29 +310,20 @@ const Iframe = (props) => {
         // Set selection if provided (keyboard shortcuts restore cursor position)
         if (selection) {
           Transforms.select(toolbarEditor, selection);
-          console.log('[VIEW] Selection set on toolbar editor');
         }
 
         // Handle link format (element, not mark)
         if (format === 'link') {
-          if (action === 'add' && url) {
-            console.warn('[VIEW] Link wrapping not yet implemented');
-          } else if (action === 'remove' || action === 'toggle') {
-            console.warn('[VIEW] Link unwrapping not yet implemented');
-          }
+          // Link wrapping not yet implemented
         } else if (buttonType === 'BlockButton') {
           // Apply block-level format (headings, lists, etc.)
           toggleBlock(toolbarEditor, format);
-          console.log('[VIEW] Applied block format via keyboard:', format);
         } else {
           // Apply inline format (bold, italic, etc.) - default for MarkElementButton
           toggleInlineFormat(toolbarEditor, format);
-          console.log('[VIEW] Applied inline format via keyboard:', format);
         }
 
         // The toolbar editor's onChange will automatically handle updating Redux and iframe
-        // No need to manually send messages - just return success
-        console.log('[VIEW] Format applied, toolbar onChange will handle updates');
         return true;
       } catch (error) {
         console.error('[VIEW] Error applying format:', error);
@@ -393,14 +377,7 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           inlineEditCounterRef.current += 1;
-          console.log('[VIEW] INLINE_EDIT_DATA received, counter:', inlineEditCounterRef.current);
-          console.log('[VIEW] INLINE_EDIT_DATA has blocks?:', !!event.data.data?.blocks);
-          console.log('[VIEW] INLINE_EDIT_DATA has id?:', !!event.data.data?.id);
-          console.log('[VIEW] INLINE_EDIT_DATA selected block value:', JSON.stringify(event.data.data?.blocks?.[selectedBlock]?.value));
-          console.log('[VIEW] Calling onChangeFormData with data');
-
           onChangeFormData(event.data.data);
-          console.log('[VIEW] onChangeFormData completed');
           break;
 
         case 'INLINE_EDIT_EXIT':
@@ -442,7 +419,6 @@ const Iframe = (props) => {
 
         case 'SLATE_FORMAT_REQUEST':
           // Slate formatting handler - uses shared applyFormat function
-          console.log('[VIEW] Received SLATE_FORMAT_REQUEST:', event.data);
           const success = applyFormat(event.data);
           if (!success) {
             event.source.postMessage(
@@ -458,7 +434,6 @@ const Iframe = (props) => {
           break;
 
         case 'SLATE_UNDO_REQUEST':
-          console.log('[VIEW] Received SLATE_UNDO_REQUEST, triggering global undo');
           // Dispatch a synthetic Ctrl+Z event to trigger Volto's global undo manager
           const undoEvent = new KeyboardEvent('keydown', {
             key: 'z',
@@ -470,7 +445,6 @@ const Iframe = (props) => {
           break;
 
         case 'SLATE_REDO_REQUEST':
-          console.log('[VIEW] Received SLATE_REDO_REQUEST, triggering global redo');
           // Dispatch a synthetic Ctrl+Y event to trigger Volto's global undo manager
           const redoEvent = new KeyboardEvent('keydown', {
             key: 'y',
@@ -483,12 +457,10 @@ const Iframe = (props) => {
 
         case 'SLATE_PASTE_REQUEST':
           try {
-            console.log('[VIEW] Received SLATE_PASTE_REQUEST:', event.data);
             const { blockId: pasteBlockId, html, selection: pasteSelection } = event.data;
             const block = form.blocks[pasteBlockId];
 
             if (!block) {
-              console.error('[VIEW] Block not found:', pasteBlockId);
               event.source.postMessage(
                 {
                   type: 'SLATE_ERROR',
@@ -506,7 +478,6 @@ const Iframe = (props) => {
 
             // Verify this editor is for the current block
             if (toolbarEditor && selectedBlock !== pasteBlockId) {
-              console.log('[VIEW] Toolbar editor exists but selected block does not match');
               toolbarEditor = null;
             }
 
@@ -514,7 +485,6 @@ const Iframe = (props) => {
             let transformedSelection;
 
             if (!toolbarEditor) {
-              console.error('[VIEW] Toolbar editor not available - cannot paste');
               event.source.postMessage(
                 {
                   type: 'SLATE_ERROR',
@@ -527,14 +497,11 @@ const Iframe = (props) => {
               break;
             }
 
-            console.log('[VIEW] Using toolbar editor for paste');
-
             // Set selection on editor
             Transforms.select(toolbarEditor, pasteSelection);
 
             // Deserialize pasted HTML to Slate fragment
             const pastedSlate = slateTransforms.htmlToSlate(html);
-            console.log('[VIEW] Deserialized paste content:', JSON.stringify(pastedSlate));
 
             // For paste, we need to insert the text nodes, not block nodes
             // Extract text/inline nodes from the deserialized blocks
@@ -546,8 +513,6 @@ const Iframe = (props) => {
                 fragment.push(node);
               }
             });
-
-            console.log('[VIEW] Fragment to insert:', JSON.stringify(fragment));
 
             // Insert text using insertText for plain text or insertNodes for formatted
             if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
@@ -561,8 +526,6 @@ const Iframe = (props) => {
             // Get updated value and selection from the editor
             updatedValue = toolbarEditor.children;
             transformedSelection = toolbarEditor.selection;
-
-            console.log('[VIEW] Paste applied, new selection:', transformedSelection);
 
             const updatedForm = {
               ...form,
@@ -601,12 +564,10 @@ const Iframe = (props) => {
 
         case 'SLATE_DELETE_REQUEST':
           try {
-            console.log('[VIEW] Received SLATE_DELETE_REQUEST:', event.data);
             const { blockId: delBlockId, direction, selection: delSelection } = event.data;
             const block = form.blocks[delBlockId];
 
             if (!block) {
-              console.error('[VIEW] Block not found:', delBlockId);
               event.source.postMessage(
                 {
                   type: 'SLATE_ERROR',
@@ -624,12 +585,10 @@ const Iframe = (props) => {
 
             // Verify this editor is for the current block
             if (toolbarEditor && selectedBlock !== delBlockId) {
-              console.log('[VIEW] Toolbar editor exists but selected block does not match');
               toolbarEditor = null;
             }
 
             if (!toolbarEditor) {
-              console.error('[VIEW] Toolbar editor not available - cannot delete');
               event.source.postMessage(
                 {
                   type: 'SLATE_ERROR',
@@ -641,8 +600,6 @@ const Iframe = (props) => {
               );
               break;
             }
-
-            console.log('[VIEW] Using toolbar editor for deletion');
 
             // Apply deletion transform directly to the toolbar editor
             Transforms.select(toolbarEditor, delSelection);
@@ -656,8 +613,6 @@ const Iframe = (props) => {
             // Get updated value and selection from the editor
             const updatedValue = toolbarEditor.children;
             const transformedSelection = toolbarEditor.selection;
-
-            console.log('[VIEW] Deletion applied, new selection:', transformedSelection);
 
             // Update form state
             const updatedForm = {
@@ -697,28 +652,20 @@ const Iframe = (props) => {
           break;
 
         case 'SLATE_ENTER_REQUEST':
-          console.log('[VIEW] ========== SLATE_ENTER_REQUEST RECEIVED ==========');
           try {
             const { blockId: enterBlockId, selection } = event.data;
-            console.log('[VIEW] Block ID:', enterBlockId);
-            console.log('[VIEW] Selection:', selection);
 
             // Get the current block data
             const currentBlock = form.blocks[enterBlockId];
             if (!currentBlock || currentBlock['@type'] !== 'slate') {
-              console.error('[VIEW] Block not found or not a slate block');
               break;
             }
-
-            console.log('[VIEW] Current block data:', currentBlock);
 
             // Split the block at the cursor using slateTransforms
             const { topValue, bottomValue } = slateTransforms.splitBlock(
               currentBlock.value,
               selection,
             );
-
-            console.log('[VIEW] Split content:', { topValue, bottomValue });
 
             // Create new form data with updated blocks
             const newFormData = { ...form };
@@ -742,8 +689,6 @@ const Iframe = (props) => {
               1,
               config.blocks.blocksConfig,
             );
-
-            console.log('[VIEW] Created new block:', newBlockId);
 
             // Set isInlineEditing to false BEFORE updating Redux
             // This allows the useEffect to send SELECT_BLOCK when we call onSelectBlock
@@ -805,7 +750,6 @@ const Iframe = (props) => {
 
           // Extract block field types from schema registry (maps blockType -> fieldName -> fieldType)
           const blockFieldTypes = extractBlockFieldTypes(intl);
-          console.log('[VIEW] Final blockFieldTypes:', JSON.stringify(blockFieldTypes));
 
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
@@ -878,38 +822,21 @@ const Iframe = (props) => {
     // Check if this formData change is from an INLINE_EDIT_DATA we haven't processed yet
     const hasUnprocessedInlineEdit = processedInlineEditCounterRef.current < inlineEditCounterRef.current;
 
-    console.log('[VIEW] FORM_DATA useEffect triggered:', {
-      iframeReady: !!iframeOriginRef.current,
-      hasForm: !!formToUse,
-      selectedBlock,
-      blockData: formToUse?.blocks?.[selectedBlock]?.value,
-      inlineEditCounter: inlineEditCounterRef.current,
-      processedCounter: processedInlineEditCounterRef.current,
-      hasUnprocessedInlineEdit,
-    });
-
     if (hasUnprocessedInlineEdit) {
       // This is the formData update FROM the iframe's inline edit, don't send it back
       processedInlineEditCounterRef.current += 1;
-      console.log('[VIEW] Skipping FORM_DATA send - this is from iframe inline edit, processed:', processedInlineEditCounterRef.current);
     } else if (processingFormatRequestRef.current) {
       // Skip sends while processing a format request - we're sending directly from the handler
-      console.log('[VIEW] Skipping FORM_DATA send - processing format request');
     } else if (iframeOriginRef.current && formToUse && formToUse.blocks && Object.keys(formToUse.blocks).length > 0) {
       // Send FORM_DATA to iframe for any form data change (except inline edits, handled above)
       // Only send if we have actual blocks data
-      console.log('[VIEW] Sending FORM_DATA to iframe - form data changed');
-      console.log('[VIEW] selectionToSendRef.current:', JSON.stringify(selectionToSendRef.current));
       const message = { type: 'FORM_DATA', data: formToUse };
       // Include selection from ref if it was updated by toolbar formatting
       // The ref is updated synchronously when toolbar calls onSelectionChange,
       // so it's available when this useEffect runs (even though state hasn't updated yet)
       if (selectionToSendRef.current) {
-        console.log('[VIEW] Including transformedSelection:', JSON.stringify(selectionToSendRef.current));
         message.transformedSelection = selectionToSendRef.current;
         selectionToSendRef.current = null; // Clear after sending
-      } else {
-        console.log('[VIEW] No transformedSelection to send');
       }
       document
         .getElementById('previewIframe')
@@ -1074,10 +1001,8 @@ const Iframe = (props) => {
             currentSelection={currentSelection}
             onChangeFormData={onChangeFormData}
             onSelectionChange={(selection) => {
-              console.log('[VIEW] onSelectionChange called with:', JSON.stringify(selection));
               // Update ref synchronously so useEffect can include it in FORM_DATA
               selectionToSendRef.current = selection;
-              console.log('[VIEW] Set selectionToSendRef.current to:', JSON.stringify(selectionToSendRef.current));
               // Update state so toolbar's currentSelection prop stays in sync
               // The toolbar's useEffect will skip the remount if selection hasn't changed
               setCurrentSelection(selection);
