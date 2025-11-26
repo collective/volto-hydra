@@ -4,12 +4,13 @@
  * These tests verify that editing text directly in blocks works correctly
  * and syncs with the admin UI.
  * 
- * TODO - additional tests
+ * TODO - additional tests and bugs
  * - backspace into bold text (click off or apply another format it will go funny)
  * - click at end of block puts cursor at end of line
  * - double click on an unselected block and you should have the word selected
  * - ctrl-b and other native formatting shortcuts are ignored
- * - can clear a link
+ * - Bug - I can clear a link in the sidebar (causes path exception currently)
+ * - if the we aren't focused on a field then the format buttons should be disabled
  * - click bold button without selection and then type - should be bolded
  * - click link without selection and then type - should create link?
  * - paste a link
@@ -362,22 +363,35 @@ test.describe('Inline Editing', () => {
 
     console.log('[TEST] Link created, now testing clear');
 
-    // Click inside the editor to position cursor inside the link text
-    await editor.click();
-    console.log('[TEST] Clicked into editor');
+    // Click inside the link to position cursor there
+    const linkElement = editor.locator('a');
+    await linkElement.click();
+    console.log('[TEST] Clicked into link');
 
-    // Wait a moment for cursor to be positioned
-    await page.waitForTimeout(200);
+    // Wait for editor to be editable and have a selection
+    await expect(editor).toHaveAttribute('contenteditable', 'true');
+    await expect(async () => {
+      const hasSelection = await editor.evaluate(() => {
+        const selection = window.getSelection();
+        return selection && selection.rangeCount > 0;
+      });
+      expect(hasSelection).toBe(true);
+    }).toPass({ timeout: 5000 });
+    console.log('[TEST] Editor is editable with cursor');
 
     // Click the link button to open LinkEditor (cursor should be inside the link)
     await helper.clickFormatButton('link');
     await helper.waitForLinkEditorPopup();
     console.log('[TEST] LinkEditor opened');
 
-    // Click the Clear (X) button
+    // Click the Clear (X) button - this removes the link and closes the popup
     const clearButton = await helper.getLinkEditorClearButton();
     console.log('[TEST] Clicking Clear (X) button');
     await clearButton.click();
+
+    // Wait for the LinkEditor popup to close (Clear removes link and closes popup)
+    await helper.waitForLinkEditorToClose();
+    console.log('[TEST] LinkEditor closed after Clear');
 
     // Check there is no link in the HTML (text should remain but without <a> tag)
     await expect(async () => {
@@ -821,7 +835,9 @@ test.describe('Inline Editing', () => {
     // Create text and select it
     await helper.editBlockTextInIframe(blockId, 'Click here');
     const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    // Use [data-editable-field] instead of [contenteditable="true"] because
+    // contenteditable may be false when editor is blocked during format operations
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
     await helper.selectAllTextInEditor(editor);
 
     // Click link button to open LinkEditor
@@ -830,7 +846,7 @@ test.describe('Inline Editing', () => {
 
     // Click at the start of the text (position different from center)
     // This ensures selection actually changes, triggering the close behavior
-    await editor.click({ position: { x: 5, y: 5 } });
+    await editor.click({ position: { x: 5, y: 5 }, force: true });
 
     // LinkEditor should close
     await helper.waitForLinkEditorToClose();
