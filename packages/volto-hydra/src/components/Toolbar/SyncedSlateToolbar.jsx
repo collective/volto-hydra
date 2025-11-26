@@ -176,6 +176,29 @@ const SyncedSlateToolbar = ({
     };
   }, [editor]);
 
+  // Detect clicks in iframe to close popups like LinkEditor
+  // Clicks in iframe don't bubble to parent document, so handleClickOutside never fires
+  // Solution: When Admin window loses focus to iframe, dispatch synthetic mousedown
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      // Check if focus went to the iframe
+      const iframe = document.getElementById('previewIframe');
+      if (document.activeElement === iframe) {
+        console.log('[TOOLBAR] Focus moved to iframe, dispatching mousedown to close popups');
+        // Dispatch synthetic mousedown on document to trigger handleClickOutside
+        const mousedownEvent = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        });
+        document.dispatchEvent(mousedownEvent);
+      }
+    };
+
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, []);
+
   // Track internal value to detect external changes (like Volto does)
   const internalValueRef = useRef(null);
 
@@ -189,6 +212,59 @@ const SyncedSlateToolbar = ({
   const pendingFlushRef = useRef(null); // { requestId, button }
   // Track the requestId of active format operation (persists through handleChange)
   const activeFormatRequestIdRef = useRef(null);
+  // Track LinkEditor visibility across effect restarts (persists when dependencies change)
+  const linkEditorWasVisibleRef = useRef(false);
+
+  // Poll for LinkEditor (.add-link) visibility changes to detect when it closes
+  // The LinkEditor doesn't use Redux for visibility - it uses CSS opacity
+  // IMPORTANT: Use linkEditorWasVisibleRef instead of local variable because
+  // effect dependencies change frequently, causing restarts that reset local state
+  useEffect(() => {
+    let pollCount = 0;
+
+    const checkVisibility = () => {
+      const popup = document.querySelector('.add-link');
+      pollCount++;
+
+      if (!popup) {
+        if (linkEditorWasVisibleRef.current) {
+          console.log('[TOOLBAR] LinkEditor removed from DOM, was visible');
+          linkEditorWasVisibleRef.current = false;
+          handlePopupClosed();
+        }
+        return;
+      }
+
+      const style = window.getComputedStyle(popup);
+      const isVisible = style.opacity !== '0' && style.display !== 'none' && style.visibility !== 'hidden';
+
+      // Log periodically to avoid spam
+      if (pollCount % 10 === 0) {
+        console.log('[TOOLBAR] LinkEditor poll:', { wasVisible: linkEditorWasVisibleRef.current, isVisible, opacity: style.opacity, display: style.display });
+      }
+
+      if (linkEditorWasVisibleRef.current && !isVisible) {
+        console.log('[TOOLBAR] LinkEditor became hidden');
+        handlePopupClosed();
+      }
+      linkEditorWasVisibleRef.current = isVisible;
+    };
+
+    const handlePopupClosed = () => {
+      console.log('[TOOLBAR] handlePopupClosed called, activeFormatRequestId:', activeFormatRequestIdRef.current);
+      if (activeFormatRequestIdRef.current) {
+        console.log('[TOOLBAR] LinkEditor closed, sending update to unblock iframe, requestId:', activeFormatRequestIdRef.current);
+        onChangeFormData(form, currentSelection, activeFormatRequestIdRef.current);
+        activeFormatRequestIdRef.current = null;
+      }
+      if (pendingFlushRef.current) {
+        pendingFlushRef.current = null;
+      }
+    };
+
+    const intervalId = setInterval(checkVisibility, 100);
+    return () => clearInterval(intervalId);
+  }, [form, currentSelection, onChangeFormData]);
 
   // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
   useEffect(() => {
@@ -277,32 +353,26 @@ const SyncedSlateToolbar = ({
         const clickableElement = button.querySelector('a.ui.button') || button.querySelector('button') || button;
         console.log('[TOOLBAR] Dispatching mousedown on:', clickableElement.tagName, clickableElement.className);
         // Dispatch mousedown event since Slate buttons apply formatting on mousedown
+        // We need bubbles: true for React's event delegation to work
+        // Mark the event so AddLinkForm's handleClickOutside can ignore it
         const mousedownEvent = new MouseEvent('mousedown', {
           bubbles: true,
           cancelable: true,
           view: window,
         });
+        mousedownEvent._hydraReDispatch = true;
+        // Store on window so handleClickOutside can check it
+        window._hydraReDispatchEvent = mousedownEvent;
         clickableElement.dispatchEvent(mousedownEvent);
-        // Also dispatch click for complete event sequence
-        clickableElement.click();
+        // Clean up after a tick
+        setTimeout(() => {
+          window._hydraReDispatchEvent = null;
+        }, 0);
         delete button.dataset.bypassCapture;
       }
     }
   }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId]);
 
-  // Check if LinkEditor is currently open
-  const linkEditorOpenRef = useRef(false);
-  linkEditorOpenRef.current = useSelector((state) => {
-    return state['slate_plugins']?.[`${editor.uid}-link`]?.show_sidebar_editor || false;
-  });
-
-  // Close LinkEditor when selection changes (user clicked in editor)
-  // Only close if it's actually open to avoid flickering
-  useEffect(() => {
-    if (linkEditorOpenRef.current && currentSelection) {
-      dispatch(setPluginOptions(`${editor.uid}-link`, { show_sidebar_editor: false }));
-    }
-  }, [currentSelection, editor.uid, dispatch]);
 
   // Set editor.hydra with iframe positioning data for persistent helpers
   // NOTE: editor is stable (created once), so we don't include it in dependencies

@@ -1866,23 +1866,38 @@ export class AdminUIHelper {
     boundingBox: { x: number; y: number; width: number; height: number };
   }> {
     // LinkEditor renders in a PositionedToolbar with className "add-link"
-    const popup = this.page.locator('.add-link, .slate-inline-toolbar, [data-slate-toolbar="link"]').first();
+    // There may be multiple elements - find the one that's actually on-screen
+    const popups = this.page.locator('.add-link, .slate-inline-toolbar, [data-slate-toolbar="link"]');
 
-    // Wait for popup to be visible
-    await popup.waitFor({ state: 'visible', timeout });
+    // Wait for at least one to be visible
+    await popups.first().waitFor({ state: 'visible', timeout });
 
-    // Get popup position
-    const boundingBox = await popup.boundingBox();
+    // Find the popup that's actually on-screen (not at -10000)
+    const count = await popups.count();
+    let popup: Locator | null = null;
+    let boundingBox: { x: number; y: number; width: number; height: number } | null = null;
 
-    if (!boundingBox) {
-      throw new Error('LinkEditor popup appeared but has no bounding box');
+    for (let i = 0; i < count; i++) {
+      const candidate = popups.nth(i);
+      const box = await candidate.boundingBox();
+      console.log(`[TEST] LinkEditor popup candidate ${i}:`, box);
+      if (box && box.x > -100 && box.y > -100) {
+        popup = candidate;
+        boundingBox = box;
+        break;
+      }
+    }
+
+    if (!popup || !boundingBox) {
+      // Log all candidates for debugging
+      for (let i = 0; i < count; i++) {
+        const box = await popups.nth(i).boundingBox();
+        console.log(`[TEST] LinkEditor popup ${i} at:`, box);
+      }
+      throw new Error(`LinkEditor popup not found on-screen. Found ${count} candidates but none at valid position.`);
     }
 
     console.log('[TEST] LinkEditor popup found at:', boundingBox);
-
-    // Note: PositionedToolbar may keep element at (-10000, -10000) as base position
-    // and use CSS transforms/positioning to move it visually. So we just verify
-    // it's visible and has dimensions rather than checking exact coordinates.
 
     // Verify popup has dimensions (width and height > 0)
     if (boundingBox.width === 0 || boundingBox.height === 0) {

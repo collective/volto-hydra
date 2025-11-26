@@ -836,6 +836,115 @@ test.describe('Inline Editing', () => {
     await helper.waitForLinkEditorToClose();
   });
 
+  test('cancelling LinkEditor does not block editor', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Create text and select it
+    await helper.editBlockTextInIframe(blockId, 'Test text');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await helper.selectAllTextInEditor(editor);
+
+    // Click link button to open LinkEditor
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+
+    // Press Escape to cancel the LinkEditor without making changes
+    await page.keyboard.press('Escape');
+
+    // Wait for LinkEditor to close
+    await helper.waitForLinkEditorToClose();
+
+    // Verify the editor is still contenteditable (not blocked)
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Verify the selection is preserved (all text still selected)
+    const selectedText = await editor.evaluate(() => window.getSelection()?.toString());
+    expect(selectedText).toBe('Test text');
+  });
+
+  test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Create text and select it
+    await helper.editBlockTextInIframe(blockId, 'Test text');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await helper.selectAllTextInEditor(editor);
+
+    // Click link button to open LinkEditor
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+
+    // Click back on the block to cancel the LinkEditor
+    // Note: We click on the block element, not [contenteditable="true"], because
+    // the iframe may be blocked (contenteditable removed) while popup is open
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await block.click();
+
+    // Wait for LinkEditor to close
+    await helper.waitForLinkEditorToClose();
+
+    // Verify the editor is still contenteditable (not blocked)
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Verify the text content is still there
+    const textContent = await editor.textContent();
+    expect(textContent).toBe('Test text');
+  });
+
+  test('clicking editor after browse button cancels LinkEditor and does not block editor', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Create text and select it
+    await helper.editBlockTextInIframe(blockId, 'Test text');
+    const iframe = helper.getIframe();
+    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    await helper.selectAllTextInEditor(editor);
+
+    // Click link button to open LinkEditor
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+
+    // Click the browse button
+    const browseButton = page.locator('.add-link button[title="Browse"], .add-link button:has(svg.icon)').first();
+    await browseButton.click();
+
+    // Wait a moment for any state changes
+    await page.waitForTimeout(200);
+
+    // Click back on the block to cancel the LinkEditor
+    // Note: We click on the block element, not [contenteditable="true"], because
+    // the iframe may be blocked (contenteditable removed) while popup is open
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await block.click();
+
+    // Wait for LinkEditor to close
+    await helper.waitForLinkEditorToClose();
+
+    // Verify the editor is still contenteditable (not blocked)
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Verify the text content is still there
+    const textContent = await editor.textContent();
+    expect(textContent).toBe('Test text');
+  });
+
   test('link button shows active state when cursor is in link', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
