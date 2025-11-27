@@ -6,6 +6,36 @@ import {
 import HydraSlateWidget from './widgets/HydraSlateWidget';
 
 const applyConfig = (config) => {
+  // Patch setTimeout to catch focus errors from AddLinkForm
+  // AddLinkForm does: setTimeout(() => this.input.focus(), 50)
+  // But if component unmounts before 50ms, this.input is null and focus() throws
+  // We wrap callbacks to catch these errors since we can't easily patch the HOC-wrapped class
+  if (typeof window !== 'undefined' && !window._hydraSetTimeoutPatched) {
+    window._hydraSetTimeoutPatched = true;
+    const originalSetTimeout = window.setTimeout;
+    window.setTimeout = function (callback, delay, ...args) {
+      if (typeof callback === 'function') {
+        const wrappedCallback = function () {
+          try {
+            return callback.apply(this, arguments);
+          } catch (e) {
+            // Suppress focus errors from AddLinkForm unmount race condition
+            if (
+              e &&
+              e.message &&
+              e.message.includes("Cannot read properties of null (reading 'focus')")
+            ) {
+              // Silently ignore - component unmounted before setTimeout fired
+              return;
+            }
+            throw e; // Re-throw other errors
+          }
+        };
+        return originalSetTimeout.call(this, wrappedCallback, delay, ...args);
+      }
+      return originalSetTimeout.call(this, callback, delay, ...args);
+    };
+  }
   // Add the frontendPreviwUrl reducer
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
 

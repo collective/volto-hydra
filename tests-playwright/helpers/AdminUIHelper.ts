@@ -490,9 +490,15 @@ export class AdminUIHelper {
       );
     }
 
-    // Use first match if multiple found
-    await button.first().waitFor({ state: 'visible', timeout: 2000 });
-    await button.first().click();
+    if (count > 1) {
+      throw new Error(
+        `Found ${count} buttons matching "${format}" - test is not deterministic. ` +
+        `Expected exactly one button with title containing "${formatKeyword}".`
+      );
+    }
+
+    await button.waitFor({ state: 'visible', timeout: 2000 });
+    await button.click();
   }
 
   /**
@@ -572,6 +578,59 @@ export class AdminUIHelper {
   }
 
   /**
+   * Copy selected text and return clipboard content.
+   * Uses native keyboard copy (Meta+c) and reads from clipboard API.
+   * Automatically grants clipboard permissions if needed.
+   */
+  async copyAndGetClipboardText(editor: Locator): Promise<string> {
+    // Grant clipboard permissions
+    await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Trigger native copy with keyboard shortcut
+    await editor.press('Meta+c');
+
+    // Small delay for clipboard to be populated
+    await this.page.waitForTimeout(50);
+
+    // Read clipboard from parent page (clipboard is shared)
+    const clipboardText = await this.page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+
+    return clipboardText;
+  }
+
+  /**
+   * Get selection state info from an editor element.
+   * Useful for debugging selection/focus issues.
+   */
+  async getSelectionInfo(editor: Locator): Promise<{
+    rangeCount: number;
+    isCollapsed: boolean;
+    anchorNodeName: string | null;
+    anchorOffset: number;
+    focusNodeName: string | null;
+    focusOffset: number;
+    activeElementTag: string | null;
+    editorHasFocus: boolean;
+  }> {
+    return await editor.evaluate((el) => {
+      const sel = window.getSelection();
+      const activeEl = document.activeElement;
+      return {
+        rangeCount: sel?.rangeCount ?? 0,
+        isCollapsed: sel?.isCollapsed ?? true,
+        anchorNodeName: sel?.anchorNode?.nodeName ?? null,
+        anchorOffset: sel?.anchorOffset ?? 0,
+        focusNodeName: sel?.focusNode?.nodeName ?? null,
+        focusOffset: sel?.focusOffset ?? 0,
+        activeElementTag: activeEl?.tagName ?? null,
+        editorHasFocus: el.contains(activeEl),
+      };
+    });
+  }
+
+  /**
    * Get the number of blocks rendered in the iframe.
    */
   async getBlockCountInIframe(): Promise<number> {
@@ -611,6 +670,9 @@ export class AdminUIHelper {
     let text = '';
     await expect(async () => {
       text = (await editor.textContent()) || '';
+      // Strip zero-width spaces (used for cursor positioning in empty inline elements)
+      // These are invisible to users, so test what users actually see
+      text = text.replace(/[\uFEFF\u200B]/g, '');
       expect(text).toMatch(regex);
     }).toPass({ timeout });
     return text;
@@ -965,17 +1027,22 @@ export class AdminUIHelper {
   }
 
   /**
-   * Enter edit mode on a specific block and return the contenteditable editor element.
+   * Enter edit mode on a specific block and return the editor element.
    * This helper checks if already editable/focused, and only clicks if necessary.
    *
+   * Uses [data-editable-field] selector instead of [contenteditable="true"] because
+   * contenteditable may be temporarily set to "false" when the editor is blocked
+   * during format operations (e.g., waiting for iframe flush to complete).
+   *
    * @param blockId - The block UID to enter edit mode on
-   * @returns The contenteditable editor element, ready for text input
+   * @returns The editor element, ready for text input
    */
   async enterEditMode(blockId: string): Promise<any> {
     const iframe = this.getIframe();
-    const editor = iframe.locator(
-      `[data-block-uid="${blockId}"] [contenteditable="true"]`,
-    );
+    // Use [data-editable-field] to find editor regardless of contenteditable state
+    const editor = iframe
+      .locator(`[data-block-uid="${blockId}"] [data-editable-field]`)
+      .first();
 
     // Check if the editor is already visible and focused
     const isVisible = await editor.isVisible().catch(() => false);
@@ -1000,16 +1067,13 @@ export class AdminUIHelper {
     // Wait for the Quanta toolbar to appear (indicating block is selected)
     await this.waitForQuantaToolbar(blockId, 5000);
 
-    // Wait for the contenteditable element to appear
+    // Wait for the editor element to appear
     await editor.waitFor({ state: 'visible', timeout: 5000 });
 
-    // ASSERT: Verify the field is actually editable and focused
-    const isEditable = await editor.getAttribute('contenteditable');
-    if (isEditable !== 'true') {
-      throw new Error(
-        `Block ${blockId} field is not editable (contenteditable="${isEditable}")`,
-      );
-    }
+    // Wait for contenteditable to become true (may be blocked briefly)
+    await expect(editor).toHaveAttribute('contenteditable', 'true', {
+      timeout: 5000,
+    });
 
     const focusInfo = await this.isEditorFocused(editor);
     if (!focusInfo.isFocused) {
@@ -1858,6 +1922,13 @@ export class AdminUIHelper {
    * Wait for the LinkEditor popup to appear and verify its position.
    * The LinkEditor should appear near the selected text in the iframe.
    *
+   * IMPORTANT: The LinkEditor popup is ALWAYS rendered in the DOM when Redux
+   * show_sidebar_editor is true. It hides itself by positioning off-screen
+   * (at -10000, -10000) rather than using display:none or opacity:0.
+   * This is controlled by PositionedToolbar which positions based on the
+   * selection rect from useSelectionPosition. When no valid selection exists,
+   * the popup is positioned off-screen.
+   *
    * @param timeout Maximum time to wait for popup in milliseconds
    * @returns The popup element and its bounding box
    */
@@ -1866,30 +1937,42 @@ export class AdminUIHelper {
     boundingBox: { x: number; y: number; width: number; height: number };
   }> {
     // LinkEditor renders in a PositionedToolbar with className "add-link"
-    // There may be multiple elements - find the one that's actually on-screen
+    // There may be multiple elements (one per Slate editor context) - find the one that's on-screen
     const popups = this.page.locator('.add-link, .slate-inline-toolbar, [data-slate-toolbar="link"]');
 
-    // Wait for at least one to be visible
+    // Wait for at least one to exist in DOM
     await popups.first().waitFor({ state: 'visible', timeout });
 
-    // Find the popup that's actually on-screen (not at -10000)
-    const count = await popups.count();
+    // Poll for a popup that's actually on-screen (not at -10000,-10000)
+    // The popup may exist but be positioned off-screen until selection position is calculated
     let popup: Locator | null = null;
     let boundingBox: { x: number; y: number; width: number; height: number } | null = null;
+    const startTime = Date.now();
 
-    for (let i = 0; i < count; i++) {
-      const candidate = popups.nth(i);
-      const box = await candidate.boundingBox();
-      console.log(`[TEST] LinkEditor popup candidate ${i}:`, box);
-      if (box && box.x > -100 && box.y > -100) {
-        popup = candidate;
-        boundingBox = box;
+    while (Date.now() - startTime < timeout) {
+      const count = await popups.count();
+
+      for (let i = 0; i < count; i++) {
+        const candidate = popups.nth(i);
+        const box = await candidate.boundingBox();
+        if (box && box.x > -100 && box.y > -100) {
+          popup = candidate;
+          boundingBox = box;
+          break;
+        }
+      }
+
+      if (popup && boundingBox) {
         break;
       }
+
+      // Wait a bit before retrying
+      await this.page.waitForTimeout(100);
     }
 
     if (!popup || !boundingBox) {
       // Log all candidates for debugging
+      const count = await popups.count();
       for (let i = 0; i < count; i++) {
         const box = await popups.nth(i).boundingBox();
         console.log(`[TEST] LinkEditor popup ${i} at:`, box);

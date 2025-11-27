@@ -384,10 +384,27 @@ class Bridge {
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                // IMPORTANT: Ensure ZWS in empty inline elements BEFORE restoring selection
+                // This allows cursor positioning inside empty formatting elements
+                if (this.selectedBlockUid) {
+                  const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  if (blockElement) {
+                    this.ensureZeroWidthSpaces(blockElement);
+                    // Re-attach mutation observer after DOM re-render
+                    // The old observer was watching the old blockElement which no longer exists
+                    this.observeBlockTextChanges(blockElement);
+                    // Re-attach event listeners (keydown, paste, etc.) to the new DOM element
+                    this.makeBlockContentEditable(blockElement);
+                  }
+                }
+
                 if (event.data.transformedSelection) {
                   console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.transformedSelection);
                   // Store expected selection so selectionchange handler can suppress it
                   this.expectedSelectionFromAdmin = event.data.transformedSelection;
+                  // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
+                  // the selection we're about to restore from transformedSelection
+                  this.savedClickPosition = null;
                   this.restoreSlateSelection(event.data.transformedSelection, this.formData);
                 } else if (this.savedSelection) {
                   console.log('[HYDRA] No transformed selection provided, using saved selection from selectionchange');
@@ -691,11 +708,8 @@ class Bridge {
       editableField.addEventListener('input', blockKeyboard, true);
       editableField.addEventListener('beforeinput', blockKeyboard, true);
 
-      // Block input
-      editableField.setAttribute('contenteditable', 'false');
+      // Visual feedback only - keep focus and contenteditable to maintain cursor position
       editableField.style.cursor = 'wait';
-      editableField.style.pointerEvents = 'none'; // Prevent clicks from re-enabling editing
-      editableField.blur(); // Remove focus to actually prevent keyboard input
 
       // TODO: Send message to parent to disable format buttons
 
@@ -714,10 +728,8 @@ class Bridge {
         delete editableField._keyboardBlocker;
       }
 
-      // Unblock input
-      editableField.setAttribute('contenteditable', 'true');
+      // Restore visual feedback
       editableField.style.cursor = 'text';
-      editableField.style.pointerEvents = 'auto'; // Re-enable interaction
 
       // TODO: Send message to parent to re-enable format buttons
 
@@ -1013,6 +1025,124 @@ class Bridge {
   }
 
   /**
+   * Ensure empty inline elements have zero-width spaces for cursor positioning.
+   * Called after DOM is updated to allow cursor placement in empty formatting elements.
+   * Uses \uFEFF (zero-width no-break space) like slate-react.
+   *
+   * @param {HTMLElement} container - The container element to process
+   */
+  ensureZeroWidthSpaces(container) {
+    // Find inline elements with data-node-id that might be empty
+    // Inline formatting elements: strong, em, span (for del/u), code, a
+    const inlineElements = container.querySelectorAll(
+      'strong[data-node-id], em[data-node-id], span[data-node-id], code[data-node-id], a[data-node-id]'
+    );
+
+    inlineElements.forEach(el => {
+      // Check if element has no text content and no child nodes
+      if (el.textContent === '' && el.childNodes.length === 0) {
+        // Insert zero-width no-break space for cursor positioning
+        el.appendChild(document.createTextNode('\uFEFF'));
+        console.log('[HYDRA] Added ZWS to empty inline element:', el.tagName, el.getAttribute('data-node-id'));
+      }
+    });
+  }
+
+  /**
+   * Strip zero-width spaces from text content.
+   * ZWS characters are added for cursor positioning in empty elements and should be
+   * removed when serializing text back to Slate.
+   *
+   * @param {string} text - Text content that may contain ZWS
+   * @returns {string} - Text with ZWS removed
+   */
+  stripZeroWidthSpaces(text) {
+    return text ? text.replace(/[\uFEFF\u200B]/g, '') : text;
+  }
+
+  /**
+   * Clean HTML content for clipboard - removes internal data attributes and ZWS/NBSP.
+   * Only strips ZWS/NBSP from text within editable fields, preserving other content.
+   *
+   * @param {DocumentFragment|HTMLElement} fragment - DOM fragment or element to clean
+   * @returns {string} - Cleaned HTML string
+   */
+  cleanHtmlForClipboard(fragment) {
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(fragment.cloneNode(true));
+
+    // Find editable fields and clean text nodes within them
+    const editableFields = tempDiv.querySelectorAll('[data-editable-field]');
+    editableFields.forEach((field) => {
+      const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        // Strip ZWS and convert NBSP to regular space
+        node.textContent = node.textContent
+          .replace(/[\uFEFF\u200B]/g, '')
+          .replace(/\u00A0/g, ' ');
+      }
+    });
+
+    // Remove internal data attributes from all elements
+    const internalAttrs = [
+      'data-node-id',
+      'data-field-name',
+      'data-slate-node',
+      'data-slate-leaf',
+      'data-slate-string',
+      'data-block-uid',
+      'data-editable-field',
+    ];
+    tempDiv.querySelectorAll('*').forEach((el) => {
+      internalAttrs.forEach((attr) => el.removeAttribute(attr));
+    });
+
+    return tempDiv.innerHTML;
+  }
+
+  /**
+   * Strip zero-width spaces from DOM text nodes within a container.
+   * Called after user types to remove ZWS that was added for cursor positioning.
+   * Only removes ZWS from text nodes that have other content (not from empty-except-ZWS nodes).
+   *
+   * @param {HTMLElement} container - Container element to search for text nodes
+   */
+  stripZeroWidthSpacesFromDOM(container) {
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      null,
+    );
+
+    const nodesToUpdate = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = node.textContent;
+      // Only strip ZWS if there's other content - don't strip from ZWS-only nodes
+      // (ZWS-only nodes are still needed for cursor positioning in empty elements)
+      if (text && text.length > 1 && /[\uFEFF\u200B]/.test(text)) {
+        nodesToUpdate.push(node);
+      }
+    }
+
+    if (nodesToUpdate.length === 0) {
+      return; // Nothing to strip
+    }
+
+    // Update nodes after walking to avoid modifying during iteration
+    // Note: This function is NOT called during typing to avoid cursor corruption.
+    // It may be used for cleanup in other contexts if needed.
+    for (const textNode of nodesToUpdate) {
+      const newText = textNode.textContent.replace(/[\uFEFF\u200B]/g, '');
+      if (newText !== textNode.textContent) {
+        console.log('[HYDRA] stripZeroWidthSpacesFromDOM: Stripping ZWS from:', JSON.stringify(textNode.textContent), '→', JSON.stringify(newText));
+        textNode.textContent = newText;
+      }
+    }
+  }
+
+  /**
    * Updates block UI positions and states after form data changes.
    * Centralizes all UI updates that need to happen when blocks are re-rendered,
    * including after drag-and-drop reordering.
@@ -1023,6 +1153,9 @@ class Bridge {
     // Restore contenteditable on fields after renderer updates
     // The renderer may have replaced DOM elements, removing contenteditable attributes
     this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
+
+    // Ensure empty inline formatting elements have ZWS for cursor positioning
+    this.ensureZeroWidthSpaces(blockElement);
 
     // Determine field type for focused field
     const blockType = this.formData?.blocks?.[this.selectedBlockUid]?.['@type'];
@@ -1899,6 +2032,12 @@ class Bridge {
     }
 
     if (editableField && blockUid) {
+      // Skip if listeners already attached to this element
+      if (editableField._hydraListenersAttached) {
+        return;
+      }
+      editableField._hydraListenersAttached = true;
+
       // Add paste event listener
       editableField.addEventListener('paste', (e) => {
         e.preventDefault(); // Prevent default paste
@@ -1906,19 +2045,31 @@ class Bridge {
         const pastedHtml = e.clipboardData.getData('text/html');
         const pastedText = e.clipboardData.getData('text/plain');
 
-        // Block input while processing paste
-        this.setBlockProcessing(blockUid, true);
+        // Send paste request with current form data included
+        this.sendTransformRequest(blockUid, 'SLATE_PASTE_REQUEST', {
+          html: pastedHtml || pastedText,
+        });
+      });
 
-        // Send to Admin UI for Slate deserialization and transform
-        window.parent.postMessage(
-          {
-            type: 'SLATE_PASTE_REQUEST',
-            blockId: blockUid,
-            html: pastedHtml || pastedText,
-            selection: this.serializeSelection() || {},
-          },
-          this.adminOrigin,
-        );
+      // Add copy event listener on document - strip ZWS/NBSP and internal data attributes from clipboard
+      // Listen on document because keyboard shortcuts may not bubble through contenteditable
+      document.addEventListener('copy', (e) => {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+
+        // Strip ZWS and NBSP (contenteditable artifacts) from text
+        let cleanText = this.stripZeroWidthSpaces(selection.toString());
+        cleanText = cleanText.replace(/\u00A0/g, ' ');
+
+        // cleanHtmlForClipboard only cleans within [data-editable-field] elements
+        const cleanHtml = this.cleanHtmlForClipboard(range.cloneContents());
+
+        console.log('[HYDRA] Copy event - cleaning clipboard');
+        e.preventDefault();
+        e.clipboardData.setData('text/plain', cleanText);
+        e.clipboardData.setData('text/html', cleanHtml);
       });
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
@@ -1952,14 +2103,21 @@ class Bridge {
             if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
               console.log('[HYDRA] Formatting shortcut detected:', shortcut, 'format:', config.format);
 
-              this.sendMessageToParent({
-                type: 'SLATE_FORMAT_REQUEST',
-                blockId: blockUid,
-                selection: this.serializeSelection() || {},
+              // Only apply format hotkeys to slate fields - text/textarea fields don't support formatting
+              if (!this.isSlateField(blockUid, this.focusedFieldName)) {
+                console.log('[HYDRA] Skipping format hotkey - field is not slate');
+                // Still prevent default to avoid native contenteditable formatting
+                e.preventDefault();
+                return;
+              }
+
+              e.preventDefault();
+
+              // Send format request with current form data included
+              // This ensures admin receives latest text along with the format action
+              this.sendTransformRequest(blockUid, 'SLATE_FORMAT_REQUEST', {
                 format: config.format,
-                action: 'toggle',
               });
-              console.log('[HYDRA] SLATE_FORMAT_REQUEST message sent for', config.format);
               return;
             }
           }
@@ -1999,27 +2157,63 @@ class Bridge {
           return;
         }
 
+        // Handle Copy (Ctrl+C / Cmd+C) - strip ZWS from clipboard
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+          const selection = window.getSelection();
+          const selectedText = selection.toString();
+          // Strip ZWS characters before writing to clipboard
+          const cleanText = this.stripZeroWidthSpaces(selectedText);
+          if (cleanText !== selectedText) {
+            console.log('[HYDRA] Copy - stripping ZWS from clipboard');
+            e.preventDefault();
+            navigator.clipboard.writeText(cleanText).catch(err => {
+              console.error('[HYDRA] Failed to write to clipboard:', err);
+            });
+          }
+          // If no ZWS, let native copy happen
+          return;
+        }
+
+        // Handle Cut (Ctrl+X / Cmd+X)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+          console.log('[HYDRA] Cut shortcut detected');
+          e.preventDefault();
+
+          // Get selected text and copy to clipboard
+          const selection = window.getSelection();
+          const selectedText = selection.toString();
+          // Strip ZWS characters before writing to clipboard
+          const cleanText = this.stripZeroWidthSpaces(selectedText);
+          console.log('[HYDRA] Cut text:', cleanText);
+
+          if (cleanText) {
+            // Write to clipboard
+            navigator.clipboard.writeText(cleanText).then(() => {
+              console.log('[HYDRA] Text written to clipboard');
+              // Cut is just delete with clipboard - send delete request
+              this.sendTransformRequest(blockUid, 'SLATE_DELETE_REQUEST', {});
+            }).catch(err => {
+              console.error('[HYDRA] Failed to write to clipboard:', err);
+            });
+          }
+          return;
+        }
+
         // Handle Paste (Ctrl+V / Cmd+V)
         if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
           console.log('[HYDRA] Paste shortcut detected');
           e.preventDefault();
 
-          this.setBlockProcessing(blockUid, true);
-
-          // Read from clipboard
+          // Read from clipboard then send transform request
           navigator.clipboard.readText().then(text => {
             console.log('[HYDRA] Clipboard text:', text);
 
-            this.sendMessageToParent({
-              type: 'SLATE_PASTE_REQUEST',
-              blockId: blockUid,
-              html: text, // Plain text, htmlToSlate will handle it
-              selection: this.serializeSelection() || {},
+            // Send paste request with current form data included
+            this.sendTransformRequest(blockUid, 'SLATE_PASTE_REQUEST', {
+              html: text,
             });
-            console.log('[HYDRA] SLATE_PASTE_REQUEST message sent');
           }).catch(err => {
             console.error('[HYDRA] Failed to read clipboard:', err);
-            this.setBlockProcessing(blockUid, false);
           });
           return;
         }
@@ -2044,18 +2238,8 @@ class Bridge {
             console.log('[HYDRA] Preventing default Enter and sending SLATE_ENTER_REQUEST for block:', blockUid);
             e.preventDefault(); // Block the default Enter behavior
 
-            this.setBlockProcessing(blockUid, true);
-
-            // Send Enter request to Admin UI for Slate block split
-            window.parent.postMessage(
-              {
-                type: 'SLATE_ENTER_REQUEST',
-                blockId: blockUid,
-                selection: this.serializeSelection() || {},
-              },
-              this.adminOrigin,
-            );
-            console.log('[HYDRA] SLATE_ENTER_REQUEST message sent');
+            // Send enter request with current form data included
+            this.sendTransformRequest(blockUid, 'SLATE_ENTER_REQUEST', {});
             return;
           }
         }
@@ -2085,18 +2269,10 @@ class Bridge {
           if (hasNodeId) {
             e.preventDefault(); // Block the delete
 
-            this.setBlockProcessing(blockUid, true);
-
-            // Send delete request to Admin UI for Slate transform
-            window.parent.postMessage(
-              {
-                type: 'SLATE_DELETE_REQUEST',
-                blockId: blockUid,
-                direction: e.key === 'Backspace' ? 'backward' : 'forward',
-                selection: this.serializeSelection() || {},
-              },
-              this.adminOrigin,
-            );
+            // Send delete request with current form data included
+            this.sendTransformRequest(blockUid, 'SLATE_DELETE_REQUEST', {
+              direction: e.key === 'Backspace' ? 'backward' : 'forward',
+            });
           }
         }
         // Otherwise let normal delete happen (no blocking needed)
@@ -2124,11 +2300,16 @@ class Bridge {
         console.log('[HYDRA] Mutation type:', mutation.type, 'target:', mutation.target);
         if (mutation.type === 'characterData' && this.isInlineEditing) {
           // Find the editable field element (works for both Slate and non-Slate fields)
-          const targetElement = mutation.target?.parentElement?.closest('[data-editable-field]');
+          const parentEl = mutation.target?.parentElement;
+          const targetElement = parentEl?.closest('[data-editable-field]');
+
+          console.log('[HYDRA] characterData mutation: parentEl:', parentEl?.tagName, 'targetElement:', targetElement?.tagName, 'textContent:', JSON.stringify(mutation.target?.textContent?.substring(0, 20)));
 
           if (targetElement) {
             console.log('[HYDRA] Calling unified handleTextChange');
             this.handleTextChange(targetElement);
+          } else {
+            console.log('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
         }
       });
@@ -2374,37 +2555,69 @@ class Bridge {
       console.log('[HYDRA] Block value for selection restoration:', JSON.stringify(block.value));
 
       // Get nodeId for anchor and focus by walking the Slate tree
-      const anchorNodeId = this.getNodeIdFromPath(block.value, slateSelection.anchor.path);
-      const focusNodeId = this.getNodeIdFromPath(block.value, slateSelection.focus.path);
+      // Returns {nodeId, textChildIndex, parentChildren} for text nodes
+      const anchorResult = this.getNodeIdFromPath(block.value, slateSelection.anchor.path);
+      const focusResult = this.getNodeIdFromPath(block.value, slateSelection.focus.path);
 
-      if (!anchorNodeId || !focusNodeId) {
+      if (!anchorResult || !focusResult) {
         return;
       }
 
       // Find DOM elements
-      const anchorElement = document.querySelector(`[data-node-id="${anchorNodeId}"]`);
-      const focusElement = document.querySelector(`[data-node-id="${focusNodeId}"]`);
+      const anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
+      const focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
       if (!anchorElement || !focusElement) {
-        console.warn('[HYDRA] Could not find DOM elements for nodeIds:', { anchorNodeId, focusNodeId });
+        console.warn('[HYDRA] Could not find DOM elements for nodeIds:', { anchorResult, focusResult });
         console.warn('[HYDRA] Anchor element:', anchorElement, 'Focus element:', focusElement);
         return;
       }
 
       console.log('[HYDRA] Found DOM elements for selection restoration:', {
-        anchorNodeId,
-        focusNodeId,
+        anchorNodeId: anchorResult.nodeId,
+        focusNodeId: focusResult.nodeId,
         anchorElement: anchorElement.tagName,
-        focusElement: focusElement.tagName
+        focusElement: focusElement.tagName,
+        anchorTextChildIndex: anchorResult.textChildIndex,
+        focusTextChildIndex: focusResult.textChildIndex,
       });
+
+      // Calculate absolute offset for text nodes
+      // When Slate path points to a specific child (e.g., path [0,2] = 3rd child),
+      // we need to sum all text before that child, not just use the Slate offset directly
+      let anchorAbsoluteOffset = slateSelection.anchor.offset;
+      let focusAbsoluteOffset = slateSelection.focus.offset;
+
+      if (anchorResult.textChildIndex !== null && anchorResult.parentChildren) {
+        anchorAbsoluteOffset = this.calculateAbsoluteOffset(
+          anchorResult.parentChildren,
+          anchorResult.textChildIndex,
+          slateSelection.anchor.offset
+        );
+        console.log('[HYDRA] Calculated anchor absolute offset:', anchorAbsoluteOffset, 'from child index:', anchorResult.textChildIndex, 'offset:', slateSelection.anchor.offset);
+      }
+
+      if (focusResult.textChildIndex !== null && focusResult.parentChildren) {
+        focusAbsoluteOffset = this.calculateAbsoluteOffset(
+          focusResult.parentChildren,
+          focusResult.textChildIndex,
+          slateSelection.focus.offset
+        );
+        console.log('[HYDRA] Calculated focus absolute offset:', focusAbsoluteOffset, 'from child index:', focusResult.textChildIndex, 'offset:', slateSelection.focus.offset);
+      }
 
       // Find the actual text node and offset within the parent element
       // After formatting, the DOM structure may have changed (e.g., <p><strong>Text</strong> rest</p>)
       // We need to walk through all text nodes to find the right position
-      const anchorResult = this.findTextNodeAndOffset(anchorElement, slateSelection.anchor.offset);
-      const focusResult = this.findTextNodeAndOffset(focusElement, slateSelection.focus.offset);
+      console.log('[HYDRA] Calling findTextNodeAndOffset for anchor:', anchorElement.tagName, 'offset:', anchorAbsoluteOffset, 'childNodes:', anchorElement.childNodes.length, 'textContent:', JSON.stringify(anchorElement.textContent));
+      const anchorTextResult = this.findTextNodeAndOffset(anchorElement, anchorAbsoluteOffset);
+      console.log('[HYDRA] Calling findTextNodeAndOffset for focus:', focusElement.tagName, 'offset:', focusAbsoluteOffset);
+      const focusTextResult = this.findTextNodeAndOffset(focusElement, focusAbsoluteOffset);
 
-      if (!anchorResult || !focusResult) {
+      console.log('[HYDRA] findTextNodeAndOffset results:', { anchorTextResult, focusTextResult });
+
+      if (!anchorTextResult || !focusTextResult) {
+        console.log('[HYDRA] Selection restoration failed - could not find text nodes');
         return;
       }
 
@@ -2412,11 +2625,18 @@ class Bridge {
       const range = document.createRange();
       const selection = window.getSelection();
 
-      range.setStart(anchorResult.node, anchorResult.offset);
-      range.setEnd(focusResult.node, focusResult.offset);
+      range.setStart(anchorTextResult.node, anchorTextResult.offset);
+      range.setEnd(focusTextResult.node, focusTextResult.offset);
 
       selection?.removeAllRanges();
       selection?.addRange(range);
+
+      console.log('[HYDRA] Selection set, verifying:', {
+        anchorNode: selection?.anchorNode?.nodeName,
+        anchorOffset: selection?.anchorOffset,
+        anchorParent: selection?.anchorNode?.parentElement?.tagName,
+        rangeCount: selection?.rangeCount
+      });
     } catch (e) {
       console.error('[HYDRA] Error restoring Slate selection:', e);
     }
@@ -2447,7 +2667,14 @@ class Bridge {
 
       // Check if the target offset falls within this text node
       if (currentOffset + nodeLength >= targetOffset) {
-        const offset = targetOffset - currentOffset;
+        let offset = targetOffset - currentOffset;
+        // If this is a ZWS-only text node and offset is 0, position AFTER the ZWS
+        // This helps browsers preserve the cursor inside inline elements when typing
+        const zwsPattern = /^[\uFEFF\u200B]+$/;
+        if (offset === 0 && zwsPattern.test(textNode.textContent)) {
+          offset = textNode.textContent.length;
+          console.log('[HYDRA] findTextNodeAndOffset: ZWS node detected, positioning after ZWS, offset:', offset);
+        }
         return { node: textNode, offset };
       }
 
@@ -2476,17 +2703,20 @@ class Bridge {
    * Get nodeId from a Slate path by walking the tree
    * @param {Array} slateValue - Slate document value
    * @param {Array} path - Path array from Slate selection
-   * @returns {string|null} NodeId or null if not found
+   * @returns {{nodeId: string, textChildIndex: number|null, parentChildren: Array|null}|null}
+   *          Returns object with nodeId, and for text nodes: child index and parent's children array
    */
   getNodeIdFromPath(slateValue, path) {
     let node = slateValue;
     let parentNode = null;
+    let lastIndex = null;
 
     // Walk the path
     for (let i = 0; i < path.length; i++) {
       const index = path[i];
 
       parentNode = node;
+      lastIndex = index;
 
       if (Array.isArray(node)) {
         node = node[index];
@@ -2505,13 +2735,52 @@ class Bridge {
 
     // If this is a text node (has 'text' property), use the parent element's nodeId
     // Text nodes don't have nodeIds in the DOM - only element nodes do
+    // Also return the child index so we can calculate absolute offset
     if (node.hasOwnProperty('text') && parentNode && parentNode.nodeId) {
-      console.log('[HYDRA] Path points to text node, using parent nodeId:', parentNode.nodeId);
-      return parentNode.nodeId;
+      console.log('[HYDRA] Path points to text node at index', lastIndex, 'using parent nodeId:', parentNode.nodeId);
+      return {
+        nodeId: parentNode.nodeId,
+        textChildIndex: lastIndex,
+        parentChildren: parentNode.children || null,
+      };
     }
 
-    // Return the nodeId if it exists
-    return node.nodeId || null;
+    // Return the nodeId if it exists (not a text node, no child info needed)
+    return node.nodeId ? { nodeId: node.nodeId, textChildIndex: null, parentChildren: null } : null;
+  }
+
+  /**
+   * Calculate absolute character offset for a text node within its parent
+   * Used for selection restoration when Slate path points to a specific child
+   * @param {Array} children - Parent's children array
+   * @param {number} childIndex - Index of the target text node child
+   * @param {number} offsetWithinChild - Character offset within the target child
+   * @returns {number} Absolute character offset from start of parent's text
+   */
+  calculateAbsoluteOffset(children, childIndex, offsetWithinChild) {
+    let absoluteOffset = 0;
+
+    for (let i = 0; i < childIndex; i++) {
+      const child = children[i];
+      absoluteOffset += this.getTextLength(child);
+    }
+
+    return absoluteOffset + offsetWithinChild;
+  }
+
+  /**
+   * Get total text length of a Slate node recursively
+   * @param {Object} node - Slate node
+   * @returns {number} Total text length
+   */
+  getTextLength(node) {
+    if (node.hasOwnProperty('text')) {
+      return node.text.length;
+    }
+    if (node.children) {
+      return node.children.reduce((sum, child) => sum + this.getTextLength(child), 0);
+    }
+    return 0;
   }
 
   /**
@@ -2548,6 +2817,66 @@ class Bridge {
     return formDataCopy;
   }
 
+  /**
+   * Get the field type for a given block and field name
+   * @param {string} blockUid - The block UID
+   * @param {string} fieldName - The field name (e.g., 'value', 'text', 'description')
+   * @returns {string|undefined} Field type ('slate', 'string', 'textarea') or undefined
+   */
+  getFieldType(blockUid, fieldName) {
+    const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+    return blockTypeFields[fieldName];
+  }
+
+  /**
+   * Check if a field is a slate field
+   * @param {string} blockUid - The block UID
+   * @param {string} fieldName - The field name
+   * @returns {boolean} True if the field is a slate field
+   */
+  isSlateField(blockUid, fieldName) {
+    return this.getFieldType(blockUid, fieldName) === 'slate';
+  }
+
+  /**
+   * Send a transform request (format, paste, delete) with current form data included.
+   * This ensures admin receives the latest text buffer along with the transform action.
+   * @param {string} blockUid - The block UID
+   * @param {string} messageType - The message type (SLATE_FORMAT_REQUEST, SLATE_PASTE_REQUEST, SLATE_DELETE_REQUEST)
+   * @param {Object} transformFields - Additional fields specific to the transform (format, html, direction, etc.)
+   * @returns {string} The requestId for this transform
+   */
+  sendTransformRequest(blockUid, messageType, transformFields) {
+    const requestId = `${messageType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Clear any pending text timer since we're including current formData
+    if (this.textUpdateTimer) {
+      clearTimeout(this.textUpdateTimer);
+      this.textUpdateTimer = null;
+    }
+    this.pendingTextUpdate = null;
+
+    // Block the editor
+    this.setBlockProcessing(blockUid, true, requestId);
+
+    // Get current form data (includes any typed text since formData is updated immediately)
+    const data = this.getFormDataWithoutNodeIds();
+
+    // Send the transform request with form data included
+    window.parent.postMessage({
+      type: messageType,
+      blockId: blockUid,
+      data: data,
+      selection: this.serializeSelection() || {},
+      requestId: requestId,
+      ...transformFields,
+    }, this.adminOrigin);
+
+    console.log(`[HYDRA] ${messageType} sent with data, requestId:`, requestId);
+    return requestId;
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Handling Text Changes in Blocks
   ////////////////////////////////////////////////////////////////////////////////
@@ -2582,6 +2911,10 @@ class Bridge {
 
     console.log('[HYDRA] handleTextChange:', editableField, 'type:', fieldType, 'text:', target.innerText?.substring(0, 50));
 
+    // Note: We intentionally do NOT strip ZWS from DOM during typing.
+    // Like slate-react, we let the frontend re-render (triggered by FORM_DATA) naturally remove ZWS.
+    // Stripping during typing corrupts cursor position. ZWS is stripped on copy events and during serialization.
+
     if (fieldType === 'slate') {
       // Slate field - update JSON structure using nodeId
       const closestNode = target.closest('[data-node-id]');
@@ -2591,10 +2924,12 @@ class Bridge {
       }
 
       const nodeId = closestNode.getAttribute('data-node-id');
+      // Strip ZWS characters before updating - they're only for cursor positioning in DOM
+      const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
       const updatedJson = this.updateJsonNode(
         this.formData?.blocks[blockUid],
         nodeId,
-        closestNode.innerText?.replace(/\n$/, ''),
+        textContent,
       );
 
       const currBlock = document.querySelector(
@@ -2602,11 +2937,11 @@ class Bridge {
       );
       this.formData.blocks[blockUid] = {
         ...updatedJson,
-        plaintext: currBlock.innerText,
+        plaintext: this.stripZeroWidthSpaces(currBlock.innerText),
       };
     } else {
       // Non-Slate field - update field directly with text content
-      this.formData.blocks[blockUid][editableField] = target.innerText;
+      this.formData.blocks[blockUid][editableField] = this.stripZeroWidthSpaces(target.innerText);
     }
 
     // Store the pending update - create a deep copy and strip nodeIds

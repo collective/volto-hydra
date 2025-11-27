@@ -1,15 +1,42 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, Component } from 'react';
 import { Slate, ReactEditor } from 'slate-react';
-import { Transforms, Editor } from 'slate';
+import { Transforms, Node, Range, Editor, Point } from 'slate';
 import { isEqual } from 'lodash';
 import config from '@plone/volto/registry';
-import { makeEditor } from '@plone/volto-slate/utils';
+import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
+import slateTransforms from '../../utils/slateTransforms';
 import { useDispatch, useSelector } from 'react-redux';
 import { setPluginOptions } from '@plone/volto-slate/actions';
 
 /**
- * Error boundary to catch ReactEditor.focus() errors from toolbar editors
- * The toolbar editor isn't in a resolvable DOM tree, so focus calls will fail
+ * Validates if a selection is valid for the given document structure.
+ * Returns true if all paths in the selection exist in the document.
+ */
+function isSelectionValidForDocument(selection, children) {
+  if (!selection) return true; // No selection is always valid
+  if (!children || !Array.isArray(children)) return false;
+
+  // Create a temporary object to check paths against
+  const doc = { children };
+
+  try {
+    // Check if both anchor and focus paths exist in the document
+    if (selection.anchor?.path) {
+      Node.get(doc, selection.anchor.path);
+    }
+    if (selection.focus?.path) {
+      Node.get(doc, selection.focus.path);
+    }
+    return true;
+  } catch (e) {
+    // Path doesn't exist in document
+    return false;
+  }
+}
+
+/**
+ * Error boundary to catch ReactEditor DOM errors from toolbar editors
+ * The toolbar editor isn't in a resolvable DOM tree, so Slate DOM operations fail
  */
 class SlateErrorBoundary extends Component {
   constructor(props) {
@@ -18,11 +45,8 @@ class SlateErrorBoundary extends Component {
   }
 
   static getDerivedStateFromError(error) {
-    // Check if it's an error we should suppress
-    if (error?.message?.includes('Cannot resolve a DOM node') ||
-        error?.message?.includes("Cannot read properties of null (reading 'focus')") ||
-        error?.message?.includes("Cannot read property 'focus' of null")) {
-      console.log('[SlateErrorBoundary] Suppressed error:', error.message);
+    // Suppress Slate DOM errors for toolbar editor
+    if (error?.message?.includes('Cannot resolve a DOM node')) {
       return { hasError: false }; // Don't show error UI, just suppress it
     }
     // Re-throw other errors
@@ -52,6 +76,81 @@ class SlateErrorBoundary extends Component {
  *
  * This editor is also used by keyboard shortcuts - they access it via
  * window.voltoHydraToolbarEditor instead of duplicating format logic.
+ *
+ * ============================================================================
+ * DATA FLOW ARCHITECTURE
+ * ============================================================================
+ *
+ * There are two main flows for how content changes propagate:
+ *
+ * FLOW 1: FORMAT BUTTON CLICKED (Toolbar → Iframe)
+ * ------------------------------------------------
+ * This flow uses a flush/requestId mechanism to ensure the iframe has the
+ * latest text before applying formatting:
+ *
+ * 1. User clicks format button (e.g., Bold) in toolbar
+ * 2. onMouseDownCapture intercepts the click BEFORE Slate handles it
+ * 3. We generate a unique requestId and send FLUSH_BUFFER to iframe
+ *    - This tells iframe to immediately send any pending text changes
+ *    - We also set contenteditable=false to "block" the iframe editor
+ * 4. Iframe receives FLUSH_BUFFER, sends pending text, replies BUFFER_FLUSHED
+ * 5. View.jsx receives BUFFER_FLUSHED, updates form data, sets completedFlushRequestId
+ * 6. useEffect detects completedFlushRequestId matches our pending request
+ * 7. NOW we trigger the actual button mousedown (via pendingButtonRef)
+ * 8. Slate button applies the transform to the toolbar editor
+ * 9. handleChange fires with new value
+ * 10. We send updated value to Redux and iframe (via onChangeFormData)
+ * 11. Iframe receives FORM_DATA with formatRequestId, unblocks editor
+ * 12. Iframe re-renders with formatted content
+ *
+ * Why this complexity? Without flushing, the user might type "hello", click Bold,
+ * but the iframe hasn't sent "hello" yet - so only partial text gets formatted.
+ *
+ * FLOW 2: SIDEBAR EDITING (Sidebar → Redux → Toolbar)
+ * ---------------------------------------------------
+ * When the user edits via the sidebar form (RichTextWidget), changes flow differently:
+ *
+ * 1. User interacts with sidebar editor (types, clicks format buttons)
+ * 2. Sidebar editor's onChange updates Redux form state directly
+ * 3. View.jsx's useEffect detects formDataFromRedux changed
+ * 4. View.jsx validates selection against new value (may clear if invalid)
+ *    - This is CRITICAL: if format removed bold, paths like [0,1,0] become invalid
+ *    - Selection must be cleared before toolbar tries to render buttons
+ * 5. View.jsx updates iframeSyncState.formData (and possibly clears selection)
+ * 6. SyncedSlateToolbar receives new form/currentSelection props
+ * 7. useEffect syncs editor.children with new fieldValue
+ * 8. Toolbar re-renders with updated button states
+ * 9. Iframe receives FORM_DATA and re-renders content
+ *
+ * Key difference: No flush needed because changes originate FROM the sidebar,
+ * not from the iframe. But selection validation IS needed because the document
+ * structure may change (e.g., removing bold unwraps <strong> nodes, changing paths).
+ *
+ * FLOW 3: HOTKEY FORMAT (Iframe → Admin → Iframe)
+ * -----------------------------------------------
+ * When the user presses a keyboard shortcut (e.g., Ctrl+B) in the iframe:
+ *
+ * 1. User presses Ctrl+B in iframe while editing text
+ * 2. hydra.js hotkey handler detects the shortcut
+ * 3. hydra.js checks isSlateField() - only slate fields support formatting
+ * 4. hydra.js flushes pending text updates (synchronous, no round-trip)
+ * 5. hydra.js generates requestId, blocks editor (contenteditable=false)
+ * 6. hydra.js sends SLATE_FORMAT_REQUEST with requestId to admin
+ * 7. View.jsx receives SLATE_FORMAT_REQUEST, calls applyFormat()
+ * 8. applyFormat() stores requestId in formatRequestIdToSendRef
+ * 9. applyFormat() applies format to toolbar editor (same as toolbar buttons)
+ * 10. Toolbar editor's onChange fires, updates Redux
+ * 11. useEffect in View.jsx sends FORM_DATA to iframe with formatRequestId
+ * 12. Iframe receives FORM_DATA, matches requestId to pendingTransforms
+ * 13. Iframe unblocks editor (contenteditable=true), re-renders content
+ *
+ * Key differences from toolbar button flow:
+ * - No FLUSH_BUFFER round-trip needed (iframe already has latest text)
+ * - Request originates from iframe, not admin
+ * - Blocking happens immediately in iframe before sending request
+ * - Same toolbar editor is used for the actual format transform
+ *
+ * ============================================================================
  */
 const SyncedSlateToolbar = ({
   selectedBlock,
@@ -59,6 +158,8 @@ const SyncedSlateToolbar = ({
   currentSelection,
   onChangeFormData,
   completedFlushRequestId,
+  transformAction,
+  onTransformApplied,
   blockUI,
   blockFieldTypes,
   iframeElement,
@@ -92,77 +193,42 @@ const SyncedSlateToolbar = ({
   const dispatch = useDispatch();
 
   // Wrap ReactEditor.focus to handle toolbar editor gracefully
-  // Also set up global error handler to catch focus errors from AddLinkForm
+  // The toolbar editor isn't in a resolvable DOM tree, so focus calls will fail
   useEffect(() => {
     const originalFocus = ReactEditor.focus;
 
     ReactEditor.focus = (editorToFocus) => {
       // Skip focus for our toolbar editor
       if (editorToFocus === editor || editorToFocus?.isToolbarEditor) {
-        console.log('[ReactEditor.focus] Skipping focus for toolbar editor');
         return;
       }
       // Call original for other editors
       try {
         return originalFocus(editorToFocus);
       } catch (e) {
-        // Silently catch and log focus errors to prevent LinkEditor from closing
+        // Silently catch DOM resolution errors for toolbar editor
         console.warn('[ReactEditor.focus] Focus error caught:', e.message);
       }
     };
 
-    // Global error handler to catch ALL focus-related errors
+    // Global error handler for synchronous focus errors (e.g., Clear button in AddLinkForm)
+    // When this.input.focus() is called and this.input is null, the error would break
+    // React's event handling and prevent onClear changes from being committed
     const handleError = (event) => {
       const error = event.error || event.reason;
-      if (error && error.message) {
-        // Suppress focus errors from LinkEditor
-        if (error.message.includes("Cannot read properties of null (reading 'focus')") ||
-            error.message.includes("Cannot read property 'focus' of null") ||
-            error.message.includes("null is not an object (evaluating") && error.message.includes("focus")) {
-          console.warn('[SyncedSlateToolbar] Suppressed focus error:', error.message);
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-          return true;
-        }
+      if (error?.message?.includes("Cannot read properties of null (reading 'focus')")) {
+        event.preventDefault();
+        return true;
       }
     };
 
-    // Capture phase to catch errors before they bubble
     window.addEventListener('error', handleError, true);
-    window.addEventListener('unhandledrejection', handleError, true);
 
     return () => {
-      // Restore original on unmount
       ReactEditor.focus = originalFocus;
       window.removeEventListener('error', handleError, true);
-      window.removeEventListener('unhandledrejection', handleError, true);
     };
   }, [editor]);
-
-  // Override HTMLInputElement.prototype.focus to add null check for automated tests
-  // This prevents errors when AddLinkForm tries to focus an input that hasn't mounted yet
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const originalFocus = HTMLInputElement.prototype.focus;
-
-    HTMLInputElement.prototype.focus = function(...args) {
-      try {
-        // Only call if element is connected to DOM
-        if (this.isConnected) {
-          return originalFocus.apply(this, args);
-        }
-      } catch (e) {
-        // Silently ignore focus errors in tests
-        console.warn('[HTMLInputElement.focus] Focus error suppressed:', e.message);
-      }
-    };
-
-    return () => {
-      HTMLInputElement.prototype.focus = originalFocus;
-    };
-  }, []);
 
   // Expose editor globally for keyboard shortcuts
   useEffect(() => {
@@ -205,6 +271,14 @@ const SyncedSlateToolbar = ({
   // Force re-renders when value changes (to update button active states)
   const [renderKey, setRenderKey] = useState(0);
 
+  // Helper to safely increment renderKey without unmounting popups
+  // When LinkEditor is open, we skip the remount to prevent this.input.focus() errors
+  const safeIncrementRenderKey = useCallback(() => {
+    if (!linkEditorWasVisibleRef.current) {
+      setRenderKey((k) => k + 1);
+    }
+  }, []);
+
   // Track the last value we sent to Redux to avoid overwriting local changes
   const lastSentValueRef = useRef(null);
 
@@ -212,6 +286,8 @@ const SyncedSlateToolbar = ({
   const pendingFlushRef = useRef(null); // { requestId, button }
   // Track the requestId of active format operation (persists through handleChange)
   const activeFormatRequestIdRef = useRef(null);
+  // Track processed transform requestIds to prevent double-application
+  const processedTransformRequestIdRef = useRef(null);
   // Track LinkEditor visibility across effect restarts (persists when dependencies change)
   const linkEditorWasVisibleRef = useRef(false);
 
@@ -238,11 +314,6 @@ const SyncedSlateToolbar = ({
       const style = window.getComputedStyle(popup);
       const isVisible = style.opacity !== '0' && style.display !== 'none' && style.visibility !== 'hidden';
 
-      // Log periodically to avoid spam
-      if (pollCount % 10 === 0) {
-        console.log('[TOOLBAR] LinkEditor poll:', { wasVisible: linkEditorWasVisibleRef.current, isVisible, opacity: style.opacity, display: style.display });
-      }
-
       if (linkEditorWasVisibleRef.current && !isVisible) {
         console.log('[TOOLBAR] LinkEditor became hidden');
         handlePopupClosed();
@@ -257,9 +328,9 @@ const SyncedSlateToolbar = ({
         onChangeFormData(form, currentSelection, activeFormatRequestIdRef.current);
         activeFormatRequestIdRef.current = null;
       }
-      if (pendingFlushRef.current) {
-        pendingFlushRef.current = null;
-      }
+      // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
+      // The polling might detect a stale popup closing while a new button click is pending,
+      // and we don't want to interfere with that pending operation.
     };
 
     const intervalId = setInterval(checkVisibility, 100);
@@ -283,10 +354,27 @@ const SyncedSlateToolbar = ({
         if (isEqual(fieldValue, lastSentValueRef.current)) {
           // Redux now has our value, safe to sync
           console.log('[TOOLBAR] Redux caught up, syncing editor.children');
+          // CRITICAL: When structure changes (e.g., format removed), selection paths may become invalid.
+          // Check if current selection is valid for new children, deselect if not.
+          const hadToDeselect = !isSelectionValidForDocument(editor.selection, fieldValue);
+          if (hadToDeselect) {
+            console.log('[TOOLBAR] Selection invalid for new structure, deselecting');
+            Transforms.deselect(editor);
+          }
           editor.children = fieldValue;
           internalValueRef.current = fieldValue;
           lastSentValueRef.current = null;
-          setRenderKey(k => k + 1);
+          // If we deselected, try to restore selection from currentSelection if it's valid
+          if (hadToDeselect && currentSelection && isSelectionValidForDocument(currentSelection, fieldValue)) {
+            console.log('[TOOLBAR] Restoring valid selection from currentSelection');
+            try {
+              Transforms.select(editor, currentSelection);
+              editor.savedSelection = currentSelection;
+            } catch (e) {
+              console.log('[TOOLBAR] Failed to restore selection:', e.message);
+            }
+          }
+          safeIncrementRenderKey();
         } else {
           // Redux still has old value, don't overwrite our local changes
           console.log('[TOOLBAR] Skipping sync - Redux has old value, waiting for catch up');
@@ -299,7 +387,7 @@ const SyncedSlateToolbar = ({
         Transforms.deselect(editor);
         editor.children = fieldValue;
         internalValueRef.current = fieldValue;
-        setRenderKey(k => k + 1);
+        safeIncrementRenderKey();
       }
     } else if (fieldValue && !isEqual(fieldValue, internalValueRef.current)) {
       console.log('[TOOLBAR] Updating internalValueRef (children already synced)');
@@ -321,7 +409,7 @@ const SyncedSlateToolbar = ({
         editor.savedSelection = currentSelection;
 
         // Force re-render to update button active states when selection changes
-        setRenderKey(k => k + 1);
+        safeIncrementRenderKey();
       } catch (e) {
         // Selection is invalid for current document - likely stale, ignore it
         console.log('[TOOLBAR] Selection transform failed (ignoring stale selection):', e.message);
@@ -373,6 +461,139 @@ const SyncedSlateToolbar = ({
     }
   }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId]);
 
+  // Handle transformAction from iframe (format, paste, delete)
+  // These arrive atomically with form data, so editor already has the latest text
+  useEffect(() => {
+    if (!transformAction || !editor) return;
+
+    const { type, requestId } = transformAction;
+
+    // Skip if we already processed this transform (prevents double-application during re-renders)
+    if (requestId && requestId === processedTransformRequestIdRef.current) {
+      return;
+    }
+    processedTransformRequestIdRef.current = requestId;
+
+    console.log('[TOOLBAR] Processing transformAction:', transformAction);
+
+    // Store requestId so handleChange includes it in FORM_DATA for iframe unblocking
+    if (requestId) {
+      activeFormatRequestIdRef.current = requestId;
+    }
+
+    // Selection is already synced from iframeSyncState via the earlier useEffect
+
+    try {
+      switch (type) {
+        case 'format':
+          const format = transformAction.format;
+          console.log('[TOOLBAR] Applying format:', format);
+
+          // Check if selection is collapsed (cursor, no range)
+          const isCollapsed = editor.selection && Range.isCollapsed(editor.selection);
+          const formatIsActive = isBlockActive(editor, format);
+
+          console.log('[TOOLBAR] Selection collapsed:', isCollapsed, 'Format active:', formatIsActive);
+
+          if (isCollapsed) {
+            // Prospective formatting - handle differently for collapsed selections
+            if (formatIsActive) {
+              // Cursor is inside the format element - exit it (move cursor after)
+              // Find the inline element we're in and move cursor after it
+              const [inlineEntry] = Editor.nodes(editor, {
+                match: n => n.type === format,
+                mode: 'lowest',
+              });
+
+              if (inlineEntry) {
+                const [, inlinePath] = inlineEntry;
+                // Move cursor to after the inline element
+                const afterPoint = Editor.after(editor, inlinePath);
+                if (afterPoint) {
+                  Transforms.select(editor, afterPoint);
+                  console.log('[TOOLBAR] Moved cursor after inline element');
+                  // Selection-only change won't trigger handleChange, so manually send FORM_DATA to unblock
+                  if (requestId) {
+                    onChangeFormData(form, editor.selection, requestId);
+                    activeFormatRequestIdRef.current = null;
+                    console.log('[TOOLBAR] Sent selection-only update with requestId to unblock iframe');
+                  }
+                } else {
+                  // No point after - insert empty text node after and position there
+                  Transforms.insertNodes(editor, { text: '' }, { at: [...inlinePath.slice(0, -1), inlinePath[inlinePath.length - 1] + 1] });
+                  const newAfterPoint = Editor.after(editor, inlinePath);
+                  if (newAfterPoint) {
+                    Transforms.select(editor, newAfterPoint);
+                  }
+                  console.log('[TOOLBAR] Inserted text node and moved cursor after inline element');
+                }
+              }
+            } else {
+              // Cursor is NOT inside the format element - enable prospective formatting
+              // Insert an empty inline element and position cursor inside it
+              const inlineNode = { type: format, children: [{ text: '' }] };
+              Transforms.insertNodes(editor, inlineNode);
+
+              // Move cursor inside the newly inserted inline element
+              // After insertion, cursor should be after the inserted node
+              // We need to move it inside the empty text child
+              const [insertedEntry] = Editor.nodes(editor, {
+                match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '',
+                mode: 'lowest',
+                reverse: true, // Start from cursor position going backwards
+              });
+
+              if (insertedEntry) {
+                const [, insertedPath] = insertedEntry;
+                // Position cursor at the start of the empty text inside the inline element
+                Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
+                console.log('[TOOLBAR] Inserted empty inline element and positioned cursor inside');
+              }
+            }
+          } else {
+            // Range selection - use toggleInlineFormat to wrap/unwrap selected text
+            toggleInlineFormat(editor, format);
+          }
+          break;
+
+        case 'paste':
+          // Paste has no button - use direct Slate transforms
+          const pastedSlate = slateTransforms.htmlToSlate(transformAction.html);
+          let fragment = [];
+          pastedSlate.forEach((node) => {
+            if (node.children) {
+              fragment.push(...node.children);
+            } else {
+              fragment.push(node);
+            }
+          });
+          if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
+            Transforms.insertText(editor, fragment[0].text);
+          } else {
+            Transforms.insertNodes(editor, fragment);
+          }
+          break;
+
+        case 'delete':
+          // Delete has no button - use direct Slate transforms
+          Transforms.delete(editor, {
+            unit: 'character',
+            reverse: transformAction.direction === 'backward',
+          });
+          break;
+
+        default:
+          console.warn('[TOOLBAR] Unknown transform type:', type);
+      }
+
+      console.log('[TOOLBAR] Transform applied successfully');
+    } catch (e) {
+      console.error('[TOOLBAR] Error applying transform:', e);
+    }
+
+    // Clear the transform action
+    onTransformApplied?.();
+  }, [transformAction, editor, onTransformApplied, form, onChangeFormData]);
 
   // Set editor.hydra with iframe positioning data for persistent helpers
   // NOTE: editor is stable (created once), so we don't include it in dependencies
@@ -390,19 +611,10 @@ const SyncedSlateToolbar = ({
   if (typeof window !== 'undefined') {
     window.voltoHydraData = hydraData;
   }
-  console.log('[TOOLBAR] Set editor.hydra and window.voltoHydraData:', hydraData);
 
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
     (newValue) => {
-      console.log('[TOOLBAR] handleChange called, newValue:', JSON.stringify(newValue));
-      console.log('[TOOLBAR] editor.children after change:', JSON.stringify(editor.children));
-      console.log('[TOOLBAR] editor.selection after change:', JSON.stringify(editor.selection));
-      // Log stack trace to find what's triggering changes
-      if (JSON.stringify(newValue).includes('strong')) {
-        console.trace('[TOOLBAR] BOLD DETECTED - stack trace:');
-      }
-
       // Update internal value tracker
       internalValueRef.current = newValue;
 
@@ -412,11 +624,8 @@ const SyncedSlateToolbar = ({
       const currentFieldValue = block?.[fieldName];
 
       if (isEqual(newValue, currentFieldValue)) {
-        console.log('[TOOLBAR] Skipping update - value unchanged');
         return;
       }
-
-      console.log('[TOOLBAR] Updating field:', fieldName);
 
       // Build updated form data with the correct field
       const updatedForm = {
@@ -437,7 +646,6 @@ const SyncedSlateToolbar = ({
       // Include requestId if this is from a format operation (allows iframe to match and unblock)
       const formatRequestId = activeFormatRequestIdRef.current;
       activeFormatRequestIdRef.current = null; // Clear after use
-      console.log('[TOOLBAR] Calling onChangeFormData with formatRequestId:', formatRequestId);
       onChangeFormData(updatedForm, editor.selection, formatRequestId);
 
       // DON'T increment renderKey here - it would remount <Slate> and reset editor.children
@@ -454,11 +662,6 @@ const SyncedSlateToolbar = ({
   const persistentHelpers = config.settings.slate?.persistentHelpers || [];
 
 
-  console.log('[TOOLBAR] toolbarButtons config:', toolbarButtons);
-  console.log('[TOOLBAR] Available buttons:', Object.keys(buttons));
-  console.log('[TOOLBAR] Bold button exists?', !!buttons.bold);
-  console.log('[TOOLBAR] persistentHelpers count:', persistentHelpers.length);
-  console.log('[TOOLBAR] Editor UID:', editor.uid);
 
   if (!blockUI || !selectedBlock) {
     return null;
@@ -507,13 +710,6 @@ const SyncedSlateToolbar = ({
   const toolbarTop = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
   const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Aligned with block container left edge
 
-  // DEBUG: Log positioning calculations
-  console.log('[TOOLBAR] Positioning:', {
-    iframeLeft: toolbarIframeRect.left,
-    blockRectLeft: blockUI.rect.left,
-    calculatedToolbarLeft: toolbarLeft,
-    blockUid: selectedBlock
-  });
 
   return (
     <>
@@ -555,7 +751,6 @@ const SyncedSlateToolbar = ({
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
           while parent toolbar has pointerEvents: 'none' for drag-and-drop passthrough */}
       {/* Wrapped with Redux Provider for buttons that dispatch Redux actions (like Link button) */}
-      {console.log('[TOOLBAR] Condition check:', { showFormatButtons, hasValidSlateValue })}
       {showFormatButtons && hasValidSlateValue && (
         <div
           style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}
@@ -563,6 +758,13 @@ const SyncedSlateToolbar = ({
             // Slate buttons apply formatting on mousedown (not click) to prevent focus loss
             // We must capture mousedown to intercept before format is applied
             console.log('[TOOLBAR] onMouseDownCapture fired, target:', e.target.tagName, e.target.title || e.target.className);
+
+            // Don't intercept clicks inside popups (like LinkEditor's Clear/Submit buttons)
+            if (e.target.closest('.add-link')) {
+              console.log('[TOOLBAR] Click inside popup, not intercepting');
+              return;
+            }
+
             // Find the actual button element - could be button, a (Semantic UI), or our wrapper span
             const button = e.target.closest('button') || e.target.closest('[data-toolbar-button]');
             if (!button) {
@@ -612,7 +814,6 @@ const SyncedSlateToolbar = ({
             }
           }}
         >
-            {console.log('[TOOLBAR] About to render Slate with:', { initialValue: currentValue, type: typeof currentValue, isArray: Array.isArray(currentValue) })}
             <SlateErrorBoundary>
               <Slate
                 key={renderKey}
@@ -642,7 +843,6 @@ const SyncedSlateToolbar = ({
                   return null;
                 }
 
-                console.log(`[TOOLBAR] Rendering button: ${name}, editor.children:`, JSON.stringify(editor.children));
                 return (
                   <span key={`${name}-${i}`} data-toolbar-button={name}>
                     <Btn />

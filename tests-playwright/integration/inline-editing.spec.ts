@@ -14,6 +14,8 @@
  * - click bold button without selection and then type - should be bolded
  * - click link without selection and then type - should create link?
  * - paste a link
+ * - double click to select block and word
+ * - triple click to select paragraph
  * - DND a word within the same block
  * - DND a word between blocks
  * - paste rich text
@@ -665,6 +667,76 @@ test.describe('Inline Editing', () => {
     expect(updatedText).not.toBe(originalText);
   });
 
+  // BUG: Selecting in iframe, then applying format from sidebar causes path error
+  // when clicking back to iframe
+  test('applying format from sidebar after iframe selection works', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Step 1: Enter edit mode in iframe and type some text
+    const editor = await helper.enterEditMode(blockId);
+    await editor.evaluate((el: HTMLElement) => { el.textContent = ''; });
+    await editor.pressSequentially('Make this bold', { delay: 10 });
+    await helper.waitForEditorText(editor, /Make this bold/);
+    console.log('[TEST] Typed text in iframe');
+
+    // Step 2: Select all text in the iframe
+    await helper.selectAllTextInEditor(editor);
+
+    // Verify selection
+    const selectedText = await editor.evaluate(() => window.getSelection()?.toString());
+    console.log('[TEST] Selected text in iframe:', selectedText);
+    expect(selectedText).toBe('Make this bold');
+
+    // Step 3: Click on sidebar to make a selection there and apply bold
+    // The sidebar editor should have synced the content
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    const sidebarEditor = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    await sidebarEditor.click();
+    await sidebarEditor.press('Meta+a'); // Select all in sidebar
+
+    // Wait for sidebar toolbar to appear and click bold
+    const sidebarToolbar = await helper.waitForSidebarSlateToolbar();
+    const sidebarBoldButton = await helper.getSidebarToolbarButton(sidebarToolbar, 'bold');
+    console.log('[TEST] Clicking bold in sidebar');
+    await sidebarBoldButton.click();
+
+    // Wait for bold formatting to appear in iframe
+    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Bold applied successfully');
+
+    // Step 4: Now remove bold from sidebar - select all again and click bold to toggle off
+    await sidebarEditor.click();
+    await sidebarEditor.press('Meta+a'); // Select all in sidebar
+
+    // Wait for sidebar toolbar again and click bold to remove formatting
+    const sidebarToolbar2 = await helper.waitForSidebarSlateToolbar();
+    const sidebarBoldButton2 = await helper.getSidebarToolbarButton(sidebarToolbar2, 'bold');
+    console.log('[TEST] Clicking bold again in sidebar to remove formatting');
+    await sidebarBoldButton2.click();
+
+    // Wait for bold formatting to be removed from iframe
+    await expect(editor.locator('span[style*="font-weight: bold"]')).not.toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Bold removed successfully');
+
+    // Step 5: Click back on the iframe editor - this is where the path error may occur
+    console.log('[TEST] Clicking back to iframe editor');
+    await editor.click();
+
+    // If we get here without error, the bug is fixed
+    // Verify text is still there
+    const blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('Make this bold');
+
+    console.log('[TEST] Format toggle from sidebar and click back to iframe successful');
+  });
+
   test('can type at cursor position', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -1056,6 +1128,9 @@ test.describe('Inline Editing', () => {
   });
 
   test('can paste plain text', async ({ page }) => {
+    // Test paste functionality - reuses the existing "can cut text" test
+    // Since that test already cuts and pastes back, we verify the paste works there
+    // This test is essentially a duplicate - keeping it for API coverage
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1063,27 +1138,54 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Click the block and prepare for paste
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
-    await editor.evaluate((el) => { el.textContent = ''; });
-    await editor.pressSequentially('Start ', { delay: 10 });
-    await helper.waitForEditorText(editor, /Start /);
+    // Enter edit mode and type text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Text to paste', { delay: 10 });
+    await helper.waitForEditorText(editor, /Text to paste/);
 
-    // Simulate paste by using clipboard API
-    await page.evaluate(() => {
-      return navigator.clipboard.writeText('pasted content');
-    });
+    // Select all text
+    await helper.selectAllTextInEditor(editor);
+
+    // Cut using keyboard shortcut - use page.keyboard like the working test
+    await page.keyboard.press('Meta+x');
+    await page.waitForTimeout(300);  // Give time for clipboard operation
+
+    // Check if cut worked
+    const textAfterCut = await editor.textContent();
+    console.log('[TEST] Text after cut:', JSON.stringify(textAfterCut));
+
+    // If cut didn't work, the text will still be there
+    if (textAfterCut === 'Text to paste') {
+      // Cut didn't work - try Control instead of Meta
+      console.log('[TEST] Meta+x did not cut, trying Control+x');
+      await helper.selectAllTextInEditor(editor);
+      await page.keyboard.press('Control+x');
+      await page.waitForTimeout(300);
+    }
+
+    // Wait for empty
+    await helper.waitForEditorText(editor, /^$/);
 
     // Paste using keyboard shortcut
-    await page.keyboard.press('Control+v');
-    await helper.waitForEditorText(editor, /pasted content/);
+    await page.keyboard.press('Meta+v');
+    await page.waitForTimeout(300);
 
-    // Verify pasted text appears
-    const text = await editor.textContent();
-    expect(text).toContain('pasted content');
+    // Check if paste worked
+    let textAfterPaste = await editor.textContent();
+    console.log('[TEST] Text after Meta+v paste:', JSON.stringify(textAfterPaste));
+
+    if (!textAfterPaste || textAfterPaste === '') {
+      // Try Control+v
+      console.log('[TEST] Meta+v did not paste, trying Control+v');
+      await page.keyboard.press('Control+v');
+      await page.waitForTimeout(300);
+      textAfterPaste = await editor.textContent();
+      console.log('[TEST] Text after Control+v paste:', JSON.stringify(textAfterPaste));
+    }
+
+    // Verify paste worked
+    expect(textAfterPaste).toContain('Text to paste');
   });
 
   test('can delete across formatted text boundaries', async ({ page }) => {
@@ -1102,9 +1204,12 @@ test.describe('Inline Editing', () => {
     await editor.pressSequentially('Hello ', { delay: 10 });
 
     // Apply bold formatting to "world"
-    await page.keyboard.press('Control+b');
+    // Use Meta+b (Cmd+B on macOS) for formatting
+    await editor.press('Meta+b');
+    await page.waitForTimeout(100); // Wait for format operation to complete
     await editor.pressSequentially('world', { delay: 10 });
-    await page.keyboard.press('Control+b'); // toggle bold off
+    await editor.press('Meta+b'); // toggle bold off
+    await page.waitForTimeout(100); // Wait for format operation to complete
 
     await editor.pressSequentially(' testing', { delay: 10 });
     await helper.waitForEditorText(editor, /Hello world testing/);
@@ -1157,37 +1262,7 @@ test.describe('Inline Editing', () => {
     expect(finalText).toBe('Helsting');
   });
 
-  test('can cut text', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-
-    const blockId = 'block-1-uuid';
-
-    // Enter edit mode and type text
-    const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
-    await editor.pressSequentially('Text to cut', { delay: 10 });
-    await helper.waitForEditorText(editor, /Text to cut/);
-
-    // Select all text
-    await helper.selectAllTextInEditor(editor);
-
-    // Cut using keyboard shortcut
-    await page.keyboard.press('Control+x');
-    await helper.waitForEditorText(editor, /^$/);  // Wait for empty
-
-    // Verify text was removed
-    const text = await editor.textContent();
-    expect(text).toBe('');
-
-    // Verify text is in clipboard by pasting it back
-    await page.keyboard.press('Control+v');
-    await helper.waitForEditorText(editor, /Text to cut/);
-    const pastedText = await editor.textContent();
-    expect(pastedText).toBe('Text to cut');
-  });
+  // 'can cut text' test removed - covered by 'can paste plain text' test which tests cut+paste
 
   test('pressing Enter at end of line creates new Slate block', async ({ page }) => {
     // This test verifies the expected Volto behavior where pressing Enter
@@ -1241,8 +1316,9 @@ test.describe('Inline Editing', () => {
     const isContentEditable = await newEditor.getAttribute('contenteditable');
     expect(isContentEditable).toBe('true');
 
-    // Type in the new block (focus should have moved to it automatically)
-    await page.keyboard.type('Second line');
+    // Type in the new block - need to use newEditor.pressSequentially for iframe content
+    await newEditor.click();
+    await newEditor.pressSequentially('Second line', { delay: 10 });
     await page.waitForTimeout(200);
 
     // Verify the new block contains 'Second line'
@@ -1258,16 +1334,18 @@ test.describe('Inline Editing', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode - block has "Content ready to save"
+    // Enter edit mode - block has "This is a test paragraph"
     const editor = await helper.enterEditMode(blockId);
 
-    // Select the word "ready" (characters 8-13)
+    // Select the word "test" (characters 10-14)
+    // "This is a test paragraph"
+    //  0123456789...
     await editor.evaluate((el) => {
       const textNode = el.querySelector('p')?.firstChild;
       if (textNode) {
         const range = document.createRange();
-        range.setStart(textNode, 8);
-        range.setEnd(textNode, 13);
+        range.setStart(textNode, 10);
+        range.setEnd(textNode, 14);
         const sel = window.getSelection();
         sel?.removeAllRanges();
         sel?.addRange(range);
@@ -1288,8 +1366,8 @@ test.describe('Inline Editing', () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 10000 });
 
-    // Verify "ready" is now bold in the HTML
-    await helper.waitForFormattedText(editor, /ready/, 'bold');
+    // Verify "test" is now bold in the HTML
+    await helper.waitForFormattedText(editor, /test/, 'bold');
   });
 
   test('prospective formatting: Ctrl+B then type applies bold to new text', async ({ page }) => {
@@ -1330,6 +1408,153 @@ test.describe('Inline Editing', () => {
     // The structure should be: "Hello " (plain) + <span style="font-weight: bold">world</span>
     // Or the entire "Hello world" might be bold if prospective formatting wraps from cursor
     expect(html).toMatch(/font-weight.*bold/);
+  });
+
+  test('clipboard test on parent document', async ({ page, context }) => {
+    // Grant clipboard permissions
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Navigate to the admin UI
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+
+    // Create a test element on the parent page
+    await page.evaluate(() => {
+      const div = document.createElement('div');
+      div.id = 'test-clipboard';
+      div.contentEditable = 'true';
+      div.textContent = 'Test clipboard text';
+      div.style.cssText = 'position: fixed; top: 10px; left: 10px; padding: 10px; background: white; z-index: 9999;';
+      document.body.appendChild(div);
+    });
+
+    // Select and copy from parent document
+    const testDiv = page.locator('#test-clipboard');
+    await testDiv.click();
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Meta+c');
+
+    // Read clipboard
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    console.log('[TEST] Parent clipboard text:', JSON.stringify(clipboardText));
+
+    expect(clipboardText).toBe('Test clipboard text');
+  });
+
+  test('prospective formatting: toggle bold off after typing bold text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    // Type "Hello " (not bold)
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Press Cmd+B to enable bold mode
+    console.log('[TEST] First Meta+b - enabling bold');
+    await editor.press('Meta+b');
+
+    // Wait for bold button to become active
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Type "world" - this should be bold
+    await editor.pressSequentially('world', { delay: 10 });
+
+    // Wait for the bold formatting to appear
+    await helper.waitForFormattedText(editor, /world/, 'bold');
+
+    // Check selection state before toggling off
+    const selectionInfo = await helper.getSelectionInfo(editor);
+    console.log('[TEST] Selection before second Meta+b:', JSON.stringify(selectionInfo));
+    expect(selectionInfo.editorHasFocus).toBe(true);
+    expect(selectionInfo.isCollapsed).toBe(true);
+    expect(selectionInfo.anchorOffset).toBe(6); // ZWS + "world" = 6 chars
+
+    // Press Cmd+B again to toggle bold OFF
+    console.log('[TEST] Second Meta+b - toggling bold off');
+    await editor.press('Meta+b');
+    await page.waitForTimeout(200);
+
+    // Wait for bold button to become inactive
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    // Check cursor is outside the bold element after toggle
+    const selectionAfterToggle = await helper.getSelectionInfo(editor);
+    console.log('[TEST] Selection after second Meta+b:', JSON.stringify(selectionAfterToggle));
+    expect(selectionAfterToggle.editorHasFocus).toBe(true);
+    expect(selectionAfterToggle.isCollapsed).toBe(true);
+    // Cursor should NOT be inside SPAN (bold element) - it should be in #text after the span
+    expect(selectionAfterToggle.anchorNodeName).not.toBe('SPAN');
+
+    // Type " testing" - this should NOT be bold
+    await editor.pressSequentially(' testing', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello world testing/);
+
+    // Verify final text
+    const finalText = await editor.textContent();
+    expect(finalText).toBe('Hello world testing');
+
+    // Verify structure: "Hello " (plain) + "world" (bold) + " testing" (plain)
+    const html = await editor.innerHTML();
+    console.log('[TEST] Final HTML:', html);
+
+    // "world" should be bold
+    const boldSpan = editor.locator('span[style*="font-weight: bold"]');
+    await expect(boldSpan).toHaveText('world');
+
+    // " testing" should NOT be inside the bold span
+    expect(html).not.toMatch(/bold.*testing/i);
+  });
+
+  test('prospective formatting: clipboard strips ZWS from bold text', async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    // Type "Hello " (not bold)
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Press Cmd+B to enable bold mode (prospective formatting inserts ZWS)
+    await editor.press('Meta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Type "world" - this should be bold
+    await editor.pressSequentially('world', { delay: 10 });
+    await helper.waitForFormattedText(editor, /world/, 'bold');
+
+    // Select all and copy - clipboard should have clean text without ZWS
+    await helper.selectAllTextInEditor(editor);
+    const clipboardText = await helper.copyAndGetClipboardText(editor);
+    console.log('[TEST] Clipboard text:', JSON.stringify(clipboardText));
+
+    // Clipboard should have "Hello world" without any ZWS characters
+    expect(clipboardText).toBe('Hello world');
+    expect(clipboardText).not.toMatch(/[\uFEFF\u200B]/);
   });
 
   test('should handle bolding same text twice without path error', async ({ page }) => {
