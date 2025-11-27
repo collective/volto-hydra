@@ -42,7 +42,7 @@ import config from '@plone/volto/registry';
 import { buttons as slateButtons } from '@plone/volto-slate/editor/config';
 import isValidUrl from '../../utils/isValidUrl';
 import { BlockChooser } from '@plone/volto/components';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
@@ -53,8 +53,8 @@ import {
 } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
-import { Editor, Transforms } from 'slate';
-import { toggleInlineFormat, toggleBlock } from '@plone/volto-slate/utils/blocks';
+// Note: Editor, Transforms, toggleInlineFormat, toggleBlock were removed
+// as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
@@ -199,14 +199,10 @@ const Iframe = (props) => {
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false); // Track dropdown menu visibility
   const [menuButtonRect, setMenuButtonRect] = useState(null); // Store menu button position for portal positioning
   const blockChooserRef = useRef();
-  const applyFormatRef = useRef(null); // Ref to shared format handler
 
-  // Ref to store selection that should be sent with next FORM_DATA
-  // This is updated synchronously when toolbar applies formatting,
-  // ensuring the useEffect that sends FORM_DATA includes the updated selection
-  const selectionToSendRef = useRef(null);
-  // Track formatRequestId from toolbar format operations for iframe unblocking
-  const formatRequestIdToSendRef = useRef(null);
+  // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
+  // Selection and toolbarRequestDone are now part of iframeSyncState.
+  // Transforms are handled via SLATE_TRANSFORM_REQUEST and the toolbar's transformAction.
 
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     strategy: 'fixed',
@@ -247,11 +243,21 @@ const Iframe = (props) => {
   // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
   // This ensures toolbar sees all together in the same render
   // Initialize with properties so we have data from first render
+  //
+  // UNIFIED STATE MODEL (see DATA FLOW ARCHITECTURE in SyncedSlateToolbar.jsx):
+  // - formData: current form data to sync with iframe
+  // - selection: current Slate selection
+  // - completedFlushRequestId: iframe completed a FLUSH_BUFFER request (toolbar button flow)
+  // - transformAction: hotkey transform pending (format, paste, delete) - includes its own requestId
+  // - toolbarRequestDone: toolbar completed a format operation, needs to send FORM_DATA to unblock iframe
+  //   This is separate from completedFlushRequestId - that's for iframe→toolbar flow (flush),
+  //   this is for toolbar→iframe flow (format completion, including selection-only changes)
   const [iframeSyncState, setIframeSyncState] = useState(() => ({
     formData: properties,
     selection: null,
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
+    toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
   }));
   const urlFromEnv = getURlsFromEnv();
   const u =
@@ -348,60 +354,6 @@ const Iframe = (props) => {
       dispatch(setSidebarTab(1));
     };
 
-    // Keyboard shortcut handler - uses the same editor as toolbar buttons
-    // requestId is included for hotkey formats to enable blocking/unblocking in iframe
-    const applyFormat = ({ blockId, format, selection, action = 'toggle', url, buttonType, requestId }) => {
-      const block = form.blocks[blockId];
-      if (!block?.value) {
-        return false;
-      }
-
-      // Get the toolbar editor (same one used by toolbar buttons)
-      const toolbarEditor = typeof window !== 'undefined' && window.voltoHydraToolbarEditor;
-
-      // Verify this editor is for the current block
-      if (toolbarEditor && selectedBlock !== blockId) {
-        return false;
-      }
-
-      if (!toolbarEditor) {
-        return false;
-      }
-
-      // If requestId provided (from hotkey), store it so it's included in FORM_DATA
-      // This allows iframe to unblock the editor when FORM_DATA arrives
-      if (requestId) {
-        formatRequestIdToSendRef.current = requestId;
-      }
-
-      try {
-        // Set selection if provided (keyboard shortcuts restore cursor position)
-        if (selection) {
-          Transforms.select(toolbarEditor, selection);
-        }
-
-        // Handle link format (element, not mark)
-        if (format === 'link') {
-          // Link wrapping not yet implemented
-        } else if (buttonType === 'BlockButton') {
-          // Apply block-level format (headings, lists, etc.)
-          toggleBlock(toolbarEditor, format);
-        } else {
-          // Apply inline format (bold, italic, etc.) - default for MarkElementButton
-          toggleInlineFormat(toolbarEditor, format);
-        }
-
-        // The toolbar editor's onChange will automatically handle updating Redux and iframe
-        return true;
-      } catch (error) {
-        console.error('[VIEW] Error applying format:', error);
-        return false;
-      }
-    };
-
-    // Store in ref so it's accessible outside useEffect
-    applyFormatRef.current = applyFormat;
-
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
@@ -445,12 +397,13 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           inlineEditCounterRef.current += 1;
-          // Update combined state atomically - formData, selection, requestId together
-          setIframeSyncState({
+          // Update combined state atomically - formData, selection together
+          // Use spread to preserve other fields (toolbarRequestDone, completedFlushRequestId, transformAction)
+          setIframeSyncState(prev => ({
+            ...prev,
             formData: event.data.data,
             selection: event.data.selection || null,
-            requestId: event.data.flushRequestId || null,
-          });
+          }));
           // Also update Redux for persistence
           onChangeFormData(event.data.data);
           break;
@@ -502,31 +455,114 @@ const Iframe = (props) => {
           );
           break;
 
-        case 'SLATE_FORMAT_REQUEST':
-          // Format request from hotkey - includes form data with buffer
-          if (event.data.data) {
-            // Only set iframeSyncState - toolbar will apply transform and call onChangeFormData via handleChange
-            // DO NOT call onChangeFormData here - it would send premature FORM_DATA without the transform
-            setIframeSyncState({
-              formData: event.data.data,
-              selection: event.data.selection || null,
-              completedFlushRequestId: null, // Not a flush - transform requestId is in transformAction
-              transformAction: { type: 'format', format: event.data.format, requestId: event.data.requestId },
-            });
-          } else {
-            // Legacy: no form data, use applyFormat directly (toolbar button flow)
-            const success = applyFormat(event.data);
-            if (!success) {
+        case 'SLATE_TRANSFORM_REQUEST':
+          // Unified transform request from iframe - always includes form data with buffer
+          // transformType: 'format', 'paste', 'delete', 'enter'
+          // fieldName: which field is being edited (e.g., 'value', 'description')
+          if (event.data.transformType === 'enter') {
+            // Enter is handled directly here since it creates a new block
+            try {
+              const { blockId: enterBlockId, fieldName: enterFieldName, selection: enterSelection, requestId: enterRequestId } = event.data;
+              const formToUseForEnter = event.data.data;
+
+              // Update iframeSyncState to keep it in sync
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: formToUseForEnter,
+                selection: enterSelection || null,
+              }));
+
+              // Get the current block data and check if the field is a slate field
+              const currentBlock = formToUseForEnter.blocks[enterBlockId];
+              if (!currentBlock) {
+                break;
+              }
+              const blockType = currentBlock['@type'];
+              const fieldType = blockFieldTypes[blockType]?.[enterFieldName];
+              if (fieldType !== 'slate') {
+                // Not a slate field - don't split block
+                break;
+              }
+
+              // Get the field value to split
+              const fieldValue = currentBlock[enterFieldName];
+              if (!fieldValue) {
+                break;
+              }
+
+              // Split the block at the cursor using slateTransforms
+              const { topValue, bottomValue } = slateTransforms.splitBlock(
+                fieldValue,
+                enterSelection,
+              );
+
+              // Create new form data with updated blocks
+              const newFormData = { ...formToUseForEnter };
+              const blocksFieldname = getBlocksFieldname(newFormData);
+
+              // Update current block with content before cursor
+              newFormData[blocksFieldname][enterBlockId] = {
+                ...currentBlock,
+                [enterFieldName]: topValue,
+              };
+
+              // Create new block with content after cursor
+              const [newBlockId, updatedFormData] = insertBlock(
+                newFormData,
+                enterBlockId,
+                {
+                  '@type': blockType,
+                  [enterFieldName]: bottomValue,
+                },
+                {},
+                1,
+                config.blocks.blocksConfig,
+              );
+
+              // Update Redux state
+              onChangeFormData(updatedFormData);
+              onSelectBlock(newBlockId);
+
+              // Send FORM_DATA message to trigger iframe re-render with new block
+              if (iframeOriginRef.current) {
+                event.source.postMessage(
+                  { type: 'FORM_DATA', data: updatedFormData, formatRequestId: enterRequestId },
+                  event.origin,
+                );
+              }
+            } catch (error) {
+              console.error('[VIEW] Error handling enter transform:', error);
               event.source.postMessage(
                 {
                   type: 'SLATE_ERROR',
                   blockId: event.data.blockId,
-                  error: 'Failed to apply format',
-                  originalRequest: event.data,
+                  error: error.message,
                 },
                 event.origin,
               );
             }
+          } else {
+            // Format, paste, delete - let toolbar handle via transformAction
+            // Build transformAction based on transformType
+            const transformAction = {
+              type: event.data.transformType,
+              requestId: event.data.requestId,
+            };
+            // Add type-specific fields
+            if (event.data.transformType === 'format') {
+              transformAction.format = event.data.format;
+            } else if (event.data.transformType === 'paste') {
+              transformAction.html = event.data.html;
+            } else if (event.data.transformType === 'delete') {
+              transformAction.direction = event.data.direction;
+            }
+
+            setIframeSyncState(prev => ({
+              ...prev,
+              formData: event.data.data,
+              selection: event.data.selection || null,
+              transformAction: transformAction,
+            }));
           }
           break;
 
@@ -552,307 +588,6 @@ const Iframe = (props) => {
           document.dispatchEvent(redoEvent);
           break;
 
-        case 'SLATE_PASTE_REQUEST':
-          // Paste request from iframe - includes form data with buffer
-          if (event.data.data) {
-            // Only set iframeSyncState - toolbar will apply transform and call onChangeFormData via handleChange
-            setIframeSyncState({
-              formData: event.data.data,
-              selection: event.data.selection || null,
-              completedFlushRequestId: null, // Not a flush - transform requestId is in transformAction
-              transformAction: { type: 'paste', html: event.data.html, requestId: event.data.requestId },
-            });
-            break;
-          }
-          // Legacy: no form data - use direct transform (for backwards compatibility)
-          try {
-            const { blockId: pasteBlockId, html, selection: pasteSelection } = event.data;
-            const block = form.blocks[pasteBlockId];
-
-            if (!block) {
-              event.source.postMessage(
-                {
-                  type: 'SLATE_ERROR',
-                  blockId: pasteBlockId,
-                  error: 'Block not found',
-                  originalRequest: event.data,
-                },
-                event.origin,
-              );
-              break;
-            }
-
-            // Get the toolbar editor (same editor used by format buttons)
-            let toolbarEditor = typeof window !== 'undefined' && window.voltoHydraToolbarEditor;
-
-            // Verify this editor is for the current block
-            if (toolbarEditor && selectedBlock !== pasteBlockId) {
-              toolbarEditor = null;
-            }
-
-            let updatedValue;
-            let transformedSelection;
-
-            if (!toolbarEditor) {
-              event.source.postMessage(
-                {
-                  type: 'SLATE_ERROR',
-                  blockId: pasteBlockId,
-                  error: 'Toolbar editor not available',
-                  originalRequest: event.data,
-                },
-                event.origin,
-              );
-              break;
-            }
-
-            // Set selection on editor
-            Transforms.select(toolbarEditor, pasteSelection);
-
-            // Deserialize pasted HTML to Slate fragment
-            const pastedSlate = slateTransforms.htmlToSlate(html);
-
-            // For paste, we need to insert the text nodes, not block nodes
-            // Extract text/inline nodes from the deserialized blocks
-            let fragment = [];
-            pastedSlate.forEach(node => {
-              if (node.children) {
-                fragment.push(...node.children);
-              } else {
-                fragment.push(node);
-              }
-            });
-
-            // Insert text using insertText for plain text or insertNodes for formatted
-            if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
-              // Plain text - use insertText
-              Transforms.insertText(toolbarEditor, fragment[0].text);
-            } else {
-              // Formatted text - use insertNodes
-              Transforms.insertNodes(toolbarEditor, fragment);
-            }
-
-            // Get updated value and selection from the editor
-            updatedValue = toolbarEditor.children;
-            transformedSelection = toolbarEditor.selection;
-
-            const updatedForm = {
-              ...form,
-              blocks: {
-                ...form.blocks,
-                [pasteBlockId]: {
-                  ...block,
-                  value: updatedValue,
-                },
-              },
-            };
-
-            onChangeFormData(updatedForm);
-
-            event.source.postMessage(
-              {
-                type: 'FORM_DATA',
-                data: updatedForm,
-                transformedSelection,
-              },
-              event.origin,
-            );
-          } catch (error) {
-            console.error('Error applying Slate paste:', error);
-            event.source.postMessage(
-              {
-                type: 'SLATE_ERROR',
-                blockId: event.data.blockId,
-                error: error.message,
-                originalRequest: event.data,
-              },
-              event.origin,
-            );
-          }
-          break;
-
-        case 'SLATE_DELETE_REQUEST':
-          // Delete request from iframe - includes form data with buffer
-          if (event.data.data) {
-            // Only set iframeSyncState - toolbar will apply transform and call onChangeFormData via handleChange
-            setIframeSyncState({
-              formData: event.data.data,
-              selection: event.data.selection || null,
-              completedFlushRequestId: null, // Not a flush - transform requestId is in transformAction
-              transformAction: { type: 'delete', direction: event.data.direction, requestId: event.data.requestId },
-            });
-            break;
-          }
-          // Legacy: no form data - use direct transform (for backwards compatibility)
-          try {
-            const { blockId: delBlockId, direction, selection: delSelection } = event.data;
-            const block = form.blocks[delBlockId];
-
-            if (!block) {
-              event.source.postMessage(
-                {
-                  type: 'SLATE_ERROR',
-                  blockId: delBlockId,
-                  error: 'Block not found',
-                  originalRequest: event.data,
-                },
-                event.origin,
-              );
-              break;
-            }
-
-            // Get the toolbar editor (same editor used by format buttons)
-            let toolbarEditor = typeof window !== 'undefined' && window.voltoHydraToolbarEditor;
-
-            // Verify this editor is for the current block
-            if (toolbarEditor && selectedBlock !== delBlockId) {
-              toolbarEditor = null;
-            }
-
-            if (!toolbarEditor) {
-              event.source.postMessage(
-                {
-                  type: 'SLATE_ERROR',
-                  blockId: delBlockId,
-                  error: 'Toolbar editor not available',
-                  originalRequest: event.data,
-                },
-                event.origin,
-              );
-              break;
-            }
-
-            // Apply deletion transform directly to the toolbar editor
-            Transforms.select(toolbarEditor, delSelection);
-
-            if (direction === 'backward') {
-              Transforms.delete(toolbarEditor, { unit: 'character', reverse: true });
-            } else {
-              Transforms.delete(toolbarEditor, { unit: 'character' });
-            }
-
-            // Get updated value and selection from the editor
-            const updatedValue = toolbarEditor.children;
-            const transformedSelection = toolbarEditor.selection;
-
-            // Update form state
-            const updatedForm = {
-              ...form,
-              blocks: {
-                ...form.blocks,
-                [delBlockId]: {
-                  ...block,
-                  value: updatedValue,
-                },
-              },
-            };
-
-            onChangeFormData(updatedForm);
-
-            // Send FORM_DATA to iframe (hydra.js will add nodeIds and render HTML)
-            event.source.postMessage(
-              {
-                type: 'FORM_DATA',
-                data: updatedForm,
-                transformedSelection,
-              },
-              event.origin,
-            );
-          } catch (error) {
-            console.error('Error applying Slate deletion:', error);
-            event.source.postMessage(
-              {
-                type: 'SLATE_ERROR',
-                blockId: event.data.blockId,
-                error: error.message,
-                originalRequest: event.data,
-              },
-              event.origin,
-            );
-          }
-          break;
-
-        case 'SLATE_ENTER_REQUEST':
-          try {
-            const { blockId: enterBlockId, selection } = event.data;
-
-            // Use form data from iframe if provided (includes pending text), otherwise use current form
-            const formToUseForEnter = event.data.data || form;
-
-            // Update iframeSyncState to keep it in sync (like other transform handlers)
-            if (event.data.data) {
-              setIframeSyncState({
-                formData: event.data.data,
-                selection: event.data.selection || null,
-                completedFlushRequestId: null,
-                transformAction: null, // Enter is handled directly here, not in toolbar
-              });
-            }
-
-            // Get the current block data
-            const currentBlock = formToUseForEnter.blocks[enterBlockId];
-            if (!currentBlock || currentBlock['@type'] !== 'slate') {
-              break;
-            }
-
-            // Split the block at the cursor using slateTransforms
-            const { topValue, bottomValue } = slateTransforms.splitBlock(
-              currentBlock.value,
-              selection,
-            );
-
-            // Create new form data with updated blocks
-            const newFormData = { ...formToUseForEnter };
-            const blocksFieldname = getBlocksFieldname(newFormData);
-
-            // Update current block with content before cursor
-            newFormData[blocksFieldname][enterBlockId] = {
-              ...currentBlock,
-              value: topValue,
-            };
-
-            // Create new block with content after cursor
-            const [newBlockId, updatedFormData] = insertBlock(
-              newFormData,
-              enterBlockId,
-              {
-                '@type': 'slate',
-                value: bottomValue,
-              },
-              {},
-              1,
-              config.blocks.blocksConfig,
-            );
-
-            // Set isInlineEditing to false BEFORE updating Redux
-            // This allows the useEffect to send SELECT_BLOCK when we call onSelectBlock
-            
-
-            // Update Redux state with the formData returned by insertBlock
-            onChangeFormData(updatedFormData);
-            onSelectBlock(newBlockId);
-
-            // Send FORM_DATA message to trigger iframe re-render with new block
-            // Include formatRequestId to unblock the iframe editor
-            if (iframeOriginRef.current) {
-              event.source.postMessage(
-                { type: 'FORM_DATA', data: updatedFormData, formatRequestId: event.data.requestId },
-                event.origin,
-              );
-            }
-          } catch (error) {
-            console.error('[VIEW] Error handling SLATE_ENTER_REQUEST:', error);
-            event.source.postMessage(
-              {
-                type: 'SLATE_ERROR',
-                blockId: event.data.blockId,
-                error: error.message,
-              },
-              event.origin,
-            );
-          }
-          break;
-
         case 'UPDATE_BLOCKS_LAYOUT':
 
           onChangeFormData(event.data.data);
@@ -867,12 +602,18 @@ const Iframe = (props) => {
           break;
 
         case 'BLOCK_SELECTED':
-          // Update block UI state to render overlays (selection outline, toolbar, add button)
+          // Update block UI state and selection atomically
+          // Selection is included in BLOCK_SELECTED to prevent race conditions
           setBlockUI({
             blockUid: event.data.blockUid,
             rect: event.data.rect,
             focusedFieldName: event.data.focusedFieldName, // Track which field is focused
           });
+          // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
+          setIframeSyncState(prev => ({
+            ...prev,
+            selection: event.data.selection || null,
+          }));
           // Call onSelectBlock to open sidebar and update selectedBlock in parent
           onSelectBlock(event.data.blockUid);
           break;
@@ -953,7 +694,11 @@ const Iframe = (props) => {
     token,
   ]);
 
+  // Send FORM_DATA to iframe when:
+  // 1. Redux form data changes (from sidebar editing)
+  // 2. toolbarRequestDone is set (toolbar completed a format, including selection-only changes)
   useEffect(() => {
+    console.log('[VIEW] FORM_DATA useEffect triggered, toolbarRequestDone:', iframeSyncState.toolbarRequestDone);
     // Use formDataFromRedux if available (for change detection), otherwise fall back to form prop
     const formToUse = formDataFromRedux || form;
 
@@ -964,32 +709,53 @@ const Iframe = (props) => {
       // This is the formData update FROM the iframe's inline edit, don't send it back
       processedInlineEditCounterRef.current += 1;
       // Flush handling is now done atomically via iframeSyncState
-    } else if (iframeOriginRef.current && formToUse && formToUse.blocks && Object.keys(formToUse.blocks).length > 0) {
-      // Send FORM_DATA to iframe for any form data change (except inline edits, handled above)
-      // Only send if we have actual blocks data
-      const message = { type: 'FORM_DATA', data: formToUse };
-      // Include selection from ref if it was updated by toolbar formatting
-      // The ref is updated synchronously when toolbar calls onSelectionChange,
-      // so it's available when this useEffect runs (even though state hasn't updated yet)
-      if (selectionToSendRef.current) {
-        message.transformedSelection = selectionToSendRef.current;
-        selectionToSendRef.current = null; // Clear after sending
-      }
-      // Include formatRequestId if this is from a format operation
-      // This allows iframe to match FORM_DATA to FLUSH_BUFFER for unblocking
-      if (formatRequestIdToSendRef.current) {
-        message.formatRequestId = formatRequestIdToSendRef.current;
-        console.log('[VIEW] Sending FORM_DATA with formatRequestId:', message.formatRequestId);
-        formatRequestIdToSendRef.current = null; // Clear after sending
-      }
-      document
-        .getElementById('previewIframe')
-        ?.contentWindow?.postMessage(
-          message,
-          iframeOriginRef.current,
-        );
+      return;
     }
-  }, [formDataFromRedux]);
+
+    // Check if toolbar completed a format operation (includes selection-only changes)
+    if (iframeSyncState.toolbarRequestDone) {
+      const message = {
+        type: 'FORM_DATA',
+        data: iframeSyncState.formData,
+        formatRequestId: iframeSyncState.toolbarRequestDone,
+      };
+      if (iframeSyncState.selection) {
+        message.transformedSelection = iframeSyncState.selection;
+      }
+      console.log('[VIEW] Sending FORM_DATA with formatRequestId:', message.formatRequestId);
+      document.getElementById('previewIframe')?.contentWindow?.postMessage(
+        message,
+        iframeOriginRef.current,
+      );
+      // Clear toolbarRequestDone SYNCHRONOUSLY before updating Redux
+      // Without flushSync, Redux dispatch triggers re-render before this state update commits,
+      // causing the useEffect to see stale toolbarRequestDone and loop infinitely
+      flushSync(() => {
+        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null }));
+      });
+      // Now safe to update Redux - toolbarRequestDone is already cleared
+      onChangeFormData(iframeSyncState.formData);
+      return;
+    }
+
+    // Normal Redux form data change (from sidebar editing)
+    // Skip if formData hasn't actually changed from what we already have synced
+    // This prevents echoing back data we just sent to Redux from toolbar
+    if (JSON.stringify(formToUse?.blocks) === JSON.stringify(iframeSyncState.formData?.blocks)) {
+      return;
+    }
+    if (iframeOriginRef.current && formToUse && formToUse.blocks && Object.keys(formToUse.blocks).length > 0) {
+      const message = { type: 'FORM_DATA', data: formToUse };
+      document.getElementById('previewIframe')?.contentWindow?.postMessage(
+        message,
+        iframeOriginRef.current,
+      );
+    }
+  // NOTE: Only depend on formDataFromRedux and toolbarRequestDone.
+  // Do NOT depend on iframeSyncState.formData/selection - those change during
+  // normal toolbar sync and would cause echo back to iframe.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formDataFromRedux, iframeSyncState.toolbarRequestDone]);
 
   const sidebarFocusEventListenerRef = useRef(null);
 
@@ -1147,22 +913,24 @@ const Iframe = (props) => {
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}
             onChangeFormData={(formData, selection, formatRequestId) => {
-              // Store selection in ref so it's included with the FORM_DATA message
-              // This ensures document and selection are sent atomically to iframe
-              // Also update iframeSyncState.formData so toolbar sees the value it just sent
-              setIframeSyncState(prev => ({
-                ...prev,
-                formData: formData,
-                selection: selection || prev.selection,
-              }));
-              if (selection) {
-                selectionToSendRef.current = selection;
-              }
-              // Store formatRequestId so iframe can match FORM_DATA to FLUSH_BUFFER for unblocking
-              if (formatRequestId) {
-                formatRequestIdToSendRef.current = formatRequestId;
-              }
-              onChangeFormData(formData);
+              console.log('[VIEW] onChangeFormData callback called, formatRequestId:', formatRequestId);
+              // Update iframeSyncState atomically with formData, selection, and toolbarRequestDone
+              // The FORM_DATA useEffect will:
+              // 1. Send to iframe when it sees toolbarRequestDone (with formatRequestId)
+              // 2. THEN update Redux (to avoid race condition where Redux re-render
+              //    happens before toolbarRequestDone is committed)
+              setIframeSyncState(prev => {
+                console.log('[VIEW] setIframeSyncState called, prev toolbarRequestDone:', prev.toolbarRequestDone, 'new:', formatRequestId);
+                return {
+                  ...prev,
+                  formData: formData,
+                  selection: selection || prev.selection,
+                  toolbarRequestDone: formatRequestId || null,
+                };
+              });
+              // NOTE: Don't update Redux here - let the useEffect do it after sending FORM_DATA
+              // This avoids a race condition where Redux dispatch causes re-render before
+              // setIframeSyncState commits, making useEffect see old toolbarRequestDone value
             }}
             blockUI={blockUI}
             blockFieldTypes={blockFieldTypes}

@@ -79,8 +79,9 @@
 
 /**
  * Bridge class creating a two-way link between the Hydra and the frontend.
+ * @exports Bridge - Exported for testing purposes
  */
-class Bridge {
+export class Bridge {
   /**
    * Constructor for the Bridge class.
    *
@@ -486,48 +487,6 @@ class Bridge {
             });
             console.log('[HYDRA] No pending text, sent BUFFER_FLUSHED immediately');
           }
-        } else if (event.data.type === 'APPLY_FORMAT') {
-          // Toolbar button was clicked - flush buffer and send format request
-          console.log('[HYDRA] Received APPLY_FORMAT for button:', event.data.buttonName);
-
-          // Flush any pending text changes first
-          this.flushPendingTextUpdates();
-
-          // Get current selection from the DOM
-          const selection = this.serializeSelection();
-
-          // Look up the format from the button name using slateConfig
-          // Button names like 'bold' map to formats like 'strong'
-          const buttonName = event.data.buttonName;
-          let format = event.data.format; // Use provided format if available
-          let buttonType = event.data.buttonType;
-
-          // If format not provided, look up from config
-          if (!format && this.slateConfig?.toolbarButtons) {
-            // The toolbarButtons config contains format info
-            // For MarkElementButton, the format is typically the element type
-            // Common mappings: bold->strong, italic->em, underline->u, strikethrough->del
-            const buttonConfig = this.slateConfig.buttons?.[buttonName];
-            if (buttonConfig) {
-              format = buttonConfig.format || buttonName;
-              buttonType = buttonConfig.type;
-            } else {
-              // Fallback: use button name directly as format
-              format = buttonName;
-            }
-          }
-
-          // Send SLATE_FORMAT_REQUEST to parent with current selection
-          this.sendMessageToParent({
-            type: 'SLATE_FORMAT_REQUEST',
-            blockId: event.data.blockId || this.selectedBlockUid,
-            selection: selection || {},
-            format: format,
-            buttonName: buttonName,
-            action: event.data.action || 'toggle',
-            buttonType: buttonType,
-          });
-          console.log('[HYDRA] Sent SLATE_FORMAT_REQUEST after flush for button:', buttonName, 'format:', format);
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
@@ -1045,6 +1004,16 @@ class Bridge {
         el.appendChild(document.createTextNode('\uFEFF'));
         console.log('[HYDRA] Added ZWS to empty inline element:', el.tagName, el.getAttribute('data-node-id'));
       }
+
+      // Also ensure there's a text node AFTER inline elements for cursor exit
+      // When toggling format off, cursor needs a place to go after the inline element
+      const nextSibling = el.nextSibling;
+      if (!nextSibling || (nextSibling.nodeType !== Node.TEXT_NODE)) {
+        // No text node after inline element - add ZWS so cursor can exit
+        const zws = document.createTextNode('\uFEFF');
+        el.parentNode.insertBefore(zws, el.nextSibling);
+        console.log('[HYDRA] Added ZWS after inline element for cursor exit:', el.tagName, el.getAttribute('data-node-id'));
+      }
     });
   }
 
@@ -1057,7 +1026,9 @@ class Bridge {
    * @returns {string} - Text with ZWS removed
    */
   stripZeroWidthSpaces(text) {
-    return text ? text.replace(/[\uFEFF\u200B]/g, '') : text;
+    if (!text) return text;
+    // Remove ZWS characters and convert NBSP to regular space
+    return text.replace(/[\uFEFF\u200B]/g, '').replace(/\u00A0/g, ' ');
   }
 
   /**
@@ -1357,24 +1328,19 @@ class Bridge {
       showFormatBtns: show.formatBtns
     });
 
-    // Send BLOCK_SELECTED message to parent with BLOCK CONTAINER position and format button visibility
-    // Parent will render selection outline, toolbar, and add button overlays positioned relative to the BLOCK CONTAINER
-    // NOTE: rect is the block container ([data-block-uid]), NOT the editable field rect
+    // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
     const rect = blockElement.getBoundingClientRect();
-    window.parent.postMessage(
-      {
-        type: 'BLOCK_SELECTED',
-        blockUid,
-        rect: {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        },
-        showFormatButtons: show.formatBtns,
+    this._pendingBlockSelected = {
+      blockUid,
+      rect: {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
       },
-      this.adminOrigin,
-    );
+      showFormatButtons: show.formatBtns,
+      focusedFieldName: this.focusedFieldName,
+    };
 
     // Create drag handle for block reordering
     // This creates an invisible button in the iframe positioned under the parent's visual drag handle
@@ -1512,6 +1478,22 @@ class Bridge {
               console.log('[HYDRA] Non-editable field type, clearing lastClickEvent');
               this.lastClickEvent = null;
             }
+          }
+
+          // Now send BLOCK_SELECTED with selection - both arrive atomically
+          // This prevents race conditions where toolbar gets new block but old selection
+          if (this._pendingBlockSelected) {
+            const serializedSelection = this.serializeSelection();
+            window.parent.postMessage(
+              {
+                type: 'BLOCK_SELECTED',
+                ...this._pendingBlockSelected,
+                selection: serializedSelection,
+              },
+              this.adminOrigin,
+            );
+            console.log('[HYDRA] Sent BLOCK_SELECTED with selection:', { blockUid: this._pendingBlockSelected.blockUid, selection: serializedSelection });
+            this._pendingBlockSelected = null;
           }
         }
       });
@@ -2046,7 +2028,7 @@ class Bridge {
         const pastedText = e.clipboardData.getData('text/plain');
 
         // Send paste request with current form data included
-        this.sendTransformRequest(blockUid, 'SLATE_PASTE_REQUEST', {
+        this.sendTransformRequest(blockUid, 'paste', {
           html: pastedHtml || pastedText,
         });
       });
@@ -2115,7 +2097,7 @@ class Bridge {
 
               // Send format request with current form data included
               // This ensures admin receives latest text along with the format action
-              this.sendTransformRequest(blockUid, 'SLATE_FORMAT_REQUEST', {
+              this.sendTransformRequest(blockUid, 'format', {
                 format: config.format,
               });
               return;
@@ -2191,7 +2173,7 @@ class Bridge {
             navigator.clipboard.writeText(cleanText).then(() => {
               console.log('[HYDRA] Text written to clipboard');
               // Cut is just delete with clipboard - send delete request
-              this.sendTransformRequest(blockUid, 'SLATE_DELETE_REQUEST', {});
+              this.sendTransformRequest(blockUid, 'delete', {});
             }).catch(err => {
               console.error('[HYDRA] Failed to write to clipboard:', err);
             });
@@ -2209,7 +2191,7 @@ class Bridge {
             console.log('[HYDRA] Clipboard text:', text);
 
             // Send paste request with current form data included
-            this.sendTransformRequest(blockUid, 'SLATE_PASTE_REQUEST', {
+            this.sendTransformRequest(blockUid, 'paste', {
               html: text,
             });
           }).catch(err => {
@@ -2235,11 +2217,11 @@ class Bridge {
           console.log('[HYDRA] Has data-node-id?', !!hasNodeId);
 
           if (hasNodeId) {
-            console.log('[HYDRA] Preventing default Enter and sending SLATE_ENTER_REQUEST for block:', blockUid);
+            console.log('[HYDRA] Preventing default Enter and sending transform request for block:', blockUid);
             e.preventDefault(); // Block the default Enter behavior
 
             // Send enter request with current form data included
-            this.sendTransformRequest(blockUid, 'SLATE_ENTER_REQUEST', {});
+            this.sendTransformRequest(blockUid, 'enter', {});
             return;
           }
         }
@@ -2270,7 +2252,7 @@ class Bridge {
             e.preventDefault(); // Block the delete
 
             // Send delete request with current form data included
-            this.sendTransformRequest(blockUid, 'SLATE_DELETE_REQUEST', {
+            this.sendTransformRequest(blockUid, 'delete', {
               direction: e.key === 'Backspace' ? 'backward' : 'forward',
             });
           }
@@ -2307,7 +2289,9 @@ class Bridge {
 
           if (targetElement) {
             console.log('[HYDRA] Calling unified handleTextChange');
-            this.handleTextChange(targetElement);
+            // Pass parentEl so handleTextChange can find the actual node that changed
+            // (e.g., SPAN for inline formatting) rather than the whole editable field (P)
+            this.handleTextChange(targetElement, parentEl);
           } else {
             console.log('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
@@ -2582,39 +2566,41 @@ class Bridge {
         focusTextChildIndex: focusResult.textChildIndex,
       });
 
-      // Calculate absolute offset for text nodes
-      // When Slate path points to a specific child (e.g., path [0,2] = 3rd child),
-      // we need to sum all text before that child, not just use the Slate offset directly
-      let anchorAbsoluteOffset = slateSelection.anchor.offset;
-      let focusAbsoluteOffset = slateSelection.focus.offset;
+      // Find DOM children directly using Slate child index
+      // This preserves the exact child index from Slate path (e.g., path [0,2] = 3rd child)
+      // instead of using ambiguous absolute character offsets
+      let anchorTextResult = null;
+      let focusTextResult = null;
 
-      if (anchorResult.textChildIndex !== null && anchorResult.parentChildren) {
-        anchorAbsoluteOffset = this.calculateAbsoluteOffset(
-          anchorResult.parentChildren,
-          anchorResult.textChildIndex,
-          slateSelection.anchor.offset
-        );
-        console.log('[HYDRA] Calculated anchor absolute offset:', anchorAbsoluteOffset, 'from child index:', anchorResult.textChildIndex, 'offset:', slateSelection.anchor.offset);
+      if (anchorResult.textChildIndex !== null) {
+        // Use direct child lookup - find DOM child at Slate index
+        const anchorChild = this.findChildBySlateIndex(anchorElement, anchorResult.textChildIndex);
+        if (anchorChild) {
+          anchorTextResult = this.findTextNodeInChild(anchorChild, slateSelection.anchor.offset);
+          console.log('[HYDRA] Found anchor via findChildBySlateIndex:', anchorResult.textChildIndex, '-> child:', anchorChild.nodeName, 'offset:', slateSelection.anchor.offset);
+        } else {
+          console.warn('[HYDRA] Could not find anchor child at Slate index:', anchorResult.textChildIndex);
+        }
+      } else {
+        // No textChildIndex - use element directly with offset 0
+        anchorTextResult = this.findTextNodeInChild(anchorElement, slateSelection.anchor.offset);
       }
 
-      if (focusResult.textChildIndex !== null && focusResult.parentChildren) {
-        focusAbsoluteOffset = this.calculateAbsoluteOffset(
-          focusResult.parentChildren,
-          focusResult.textChildIndex,
-          slateSelection.focus.offset
-        );
-        console.log('[HYDRA] Calculated focus absolute offset:', focusAbsoluteOffset, 'from child index:', focusResult.textChildIndex, 'offset:', slateSelection.focus.offset);
+      if (focusResult.textChildIndex !== null) {
+        // Use direct child lookup - find DOM child at Slate index
+        const focusChild = this.findChildBySlateIndex(focusElement, focusResult.textChildIndex);
+        if (focusChild) {
+          focusTextResult = this.findTextNodeInChild(focusChild, slateSelection.focus.offset);
+          console.log('[HYDRA] Found focus via findChildBySlateIndex:', focusResult.textChildIndex, '-> child:', focusChild.nodeName, 'offset:', slateSelection.focus.offset);
+        } else {
+          console.warn('[HYDRA] Could not find focus child at Slate index:', focusResult.textChildIndex);
+        }
+      } else {
+        // No textChildIndex - use element directly with offset 0
+        focusTextResult = this.findTextNodeInChild(focusElement, slateSelection.focus.offset);
       }
 
-      // Find the actual text node and offset within the parent element
-      // After formatting, the DOM structure may have changed (e.g., <p><strong>Text</strong> rest</p>)
-      // We need to walk through all text nodes to find the right position
-      console.log('[HYDRA] Calling findTextNodeAndOffset for anchor:', anchorElement.tagName, 'offset:', anchorAbsoluteOffset, 'childNodes:', anchorElement.childNodes.length, 'textContent:', JSON.stringify(anchorElement.textContent));
-      const anchorTextResult = this.findTextNodeAndOffset(anchorElement, anchorAbsoluteOffset);
-      console.log('[HYDRA] Calling findTextNodeAndOffset for focus:', focusElement.tagName, 'offset:', focusAbsoluteOffset);
-      const focusTextResult = this.findTextNodeAndOffset(focusElement, focusAbsoluteOffset);
-
-      console.log('[HYDRA] findTextNodeAndOffset results:', { anchorTextResult, focusTextResult });
+      console.log('[HYDRA] Selection restoration text results:', { anchorTextResult, focusTextResult });
 
       if (!anchorTextResult || !focusTextResult) {
         console.log('[HYDRA] Selection restoration failed - could not find text nodes');
@@ -2694,6 +2680,94 @@ class Bridge {
 
     if (lastTextNode) {
       return { node: lastTextNode, offset: lastTextNode.textContent.length };
+    }
+
+    return null;
+  }
+
+  /**
+   * Find DOM child node at a given Slate child index.
+   *
+   * Walks through parentElement.childNodes counting Slate children:
+   * - Text nodes count as 1 Slate child
+   * - Elements with data-node-id count as 1 Slate child
+   * - Elements with SAME data-node-id as previous are skipped (they're wrappers)
+   *
+   * This allows renderers to add wrapper elements as long as they have the same node-id.
+   *
+   * @param {HTMLElement} parentElement - The parent element to search within
+   * @param {number} slateChildIndex - The Slate child index to find
+   * @returns {Node|null} The DOM node at that Slate index, or null if not found
+   */
+  findChildBySlateIndex(parentElement, slateChildIndex) {
+    let slateIndex = 0;
+    let lastNodeId = null;
+
+    for (const child of parentElement.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (slateIndex === slateChildIndex) {
+          return child;
+        }
+        slateIndex++;
+        lastNodeId = null;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const nodeId = child.getAttribute('data-node-id');
+        if (nodeId && nodeId !== lastNodeId) {
+          // New node-id element = new Slate child
+          if (slateIndex === slateChildIndex) {
+            return child;
+          }
+          slateIndex++;
+          lastNodeId = nodeId;
+        }
+        // Elements without node-id or with same node-id are skipped (wrappers)
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find text node and validate offset within a DOM child (text node or element)
+   * For text nodes: returns the node directly
+   * For elements: walks to find the first text node within
+   *
+   * @param {Node} child - DOM node (text node or element)
+   * @param {number} offset - Offset within the text content
+   * @returns {{node: Text, offset: number}|null} Text node and validated offset, or null
+   */
+  findTextNodeInChild(child, offset) {
+    // Helper to adjust offset for ZWS-only text nodes
+    // If offset is 0 in a ZWS-only node, position AFTER the ZWS
+    // This helps browsers preserve the cursor inside inline elements when typing
+    const adjustOffsetForZWS = (textNode, requestedOffset) => {
+      const zwsPattern = /^[\uFEFF\u200B]+$/;
+      if (requestedOffset === 0 && zwsPattern.test(textNode.textContent)) {
+        console.log('[HYDRA] findTextNodeInChild: ZWS node detected, positioning after ZWS');
+        return textNode.textContent.length;
+      }
+      return Math.min(requestedOffset, textNode.textContent.length);
+    };
+
+    if (child.nodeType === Node.TEXT_NODE) {
+      // Direct text node - use it with the offset (adjusted for ZWS)
+      const validOffset = adjustOffsetForZWS(child, offset);
+      return { node: child, offset: validOffset };
+    }
+
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      // Element node - find the first text node within
+      const walker = document.createTreeWalker(
+        child,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      const textNode = walker.nextNode();
+      if (textNode) {
+        const validOffset = adjustOffsetForZWS(textNode, offset);
+        return { node: textNode, offset: validOffset };
+      }
     }
 
     return null;
@@ -2842,13 +2916,14 @@ class Bridge {
   /**
    * Send a transform request (format, paste, delete) with current form data included.
    * This ensures admin receives the latest text buffer along with the transform action.
+   * All transforms use unified SLATE_TRANSFORM_REQUEST message type.
    * @param {string} blockUid - The block UID
-   * @param {string} messageType - The message type (SLATE_FORMAT_REQUEST, SLATE_PASTE_REQUEST, SLATE_DELETE_REQUEST)
+   * @param {string} transformType - The transform type ('format', 'paste', 'delete')
    * @param {Object} transformFields - Additional fields specific to the transform (format, html, direction, etc.)
    * @returns {string} The requestId for this transform
    */
-  sendTransformRequest(blockUid, messageType, transformFields) {
-    const requestId = `${messageType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  sendTransformRequest(blockUid, transformType, transformFields) {
+    const requestId = `transform-${transformType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Clear any pending text timer since we're including current formData
     if (this.textUpdateTimer) {
@@ -2863,17 +2938,19 @@ class Bridge {
     // Get current form data (includes any typed text since formData is updated immediately)
     const data = this.getFormDataWithoutNodeIds();
 
-    // Send the transform request with form data included
+    // Send the unified transform request with form data included
     window.parent.postMessage({
-      type: messageType,
+      type: 'SLATE_TRANSFORM_REQUEST',
+      transformType: transformType,
       blockId: blockUid,
+      fieldName: this.focusedFieldName || 'value',
       data: data,
       selection: this.serializeSelection() || {},
       requestId: requestId,
       ...transformFields,
     }, this.adminOrigin);
 
-    console.log(`[HYDRA] ${messageType} sent with data, requestId:`, requestId);
+    console.log(`[HYDRA] SLATE_TRANSFORM_REQUEST (${transformType}) sent with data, requestId:`, requestId);
     return requestId;
   }
 
@@ -2886,7 +2963,7 @@ class Bridge {
    * by getting changed text from DOM and send it to the adminUI
    * @param {HTMLElement} target
    */
-  handleTextChange(target) {
+  handleTextChange(target, mutatedNodeParent = null) {
     const blockUid = target
       .closest('[data-block-uid]')
       .getAttribute('data-block-uid');
@@ -2917,13 +2994,18 @@ class Bridge {
 
     if (fieldType === 'slate') {
       // Slate field - update JSON structure using nodeId
-      const closestNode = target.closest('[data-node-id]');
+      // Use the actual mutated node's parent if provided (e.g., SPAN for inline formatting)
+      // This ensures we update the correct node, not the whole editable field
+      const closestNode = (mutatedNodeParent && mutatedNodeParent.hasAttribute('data-node-id'))
+        ? mutatedNodeParent
+        : target.closest('[data-node-id]');
       if (!closestNode) {
         console.log('[HYDRA] Slate field but no data-node-id found!');
         return;
       }
 
       const nodeId = closestNode.getAttribute('data-node-id');
+      console.log('[HYDRA] handleTextChange: using nodeId:', nodeId, 'from element:', closestNode.tagName);
       // Strip ZWS characters before updating - they're only for cursor positioning in DOM
       const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
       const updatedJson = this.updateJsonNode(

@@ -670,9 +670,10 @@ export class AdminUIHelper {
     let text = '';
     await expect(async () => {
       text = (await editor.textContent()) || '';
-      // Strip zero-width spaces (used for cursor positioning in empty inline elements)
+      // Strip zero-width spaces and other invisible characters
+      // (used for cursor positioning in empty inline elements)
       // These are invisible to users, so test what users actually see
-      text = text.replace(/[\uFEFF\u200B]/g, '');
+      text = text.replace(/[\uFEFF\u200B\u00A0\u2060]/g, ' ').replace(/\s+/g, ' ').trim();
       expect(text).toMatch(regex);
     }).toPass({ timeout });
     return text;
@@ -1083,6 +1084,42 @@ export class AdminUIHelper {
     }
 
     return editor;
+  }
+
+  /**
+   * Select a range of text in an editor element.
+   * The editor element should be a contenteditable element (like a <p> with data-editable-field).
+   *
+   * @param editor - Locator for the editor element
+   * @param startOffset - Character offset to start selection
+   * @param endOffset - Character offset to end selection
+   */
+  async selectTextRange(
+    editor: Locator,
+    startOffset: number,
+    endOffset: number,
+  ): Promise<void> {
+    await editor.evaluate(
+      (el, { start, end }) => {
+        const doc = el.ownerDocument;
+        const win = doc.defaultView;
+        // The editor element itself contains the text node directly
+        const textNode = el.firstChild;
+        if (textNode && textNode.nodeType === 3) {
+          // nodeType 3 = TEXT_NODE
+          const range = doc.createRange();
+          range.setStart(textNode, start);
+          range.setEnd(textNode, end);
+          const sel = win?.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      },
+      { start: startOffset, end: endOffset },
+    );
+
+    // Wait for selection change to propagate
+    await this.page.waitForTimeout(100);
   }
 
   /**

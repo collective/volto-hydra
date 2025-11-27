@@ -105,6 +105,122 @@ test.describe('Inline Editing', () => {
     await helper.assertCursorAtPosition(editor, finalCursorPos, blockId);
   });
 
+  test('double click selects a word', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and set up text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello beautiful world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello beautiful world/);
+
+    // Double click on "beautiful" to select it
+    const box = await editor.boundingBox();
+    if (!box) throw new Error('Could not get editor bounding box');
+
+    // "Hello " is 6 chars, "beautiful" starts at char 6
+    // Estimate ~8px per character, click in the middle of "beautiful" (around char 10)
+    const clickX = box.x + 10 * 8;
+    const clickY = box.y + box.height / 2;
+
+    await page.mouse.dblclick(clickX, clickY);
+
+    // Wait for selection to stabilize
+    await page.waitForTimeout(100);
+
+    // Verify "beautiful" is selected
+    const selectionInfo = await helper.getSelectionInfo(editor);
+    expect(selectionInfo.isCollapsed).toBe(false);
+
+    // Get the selected text
+    const selectedText = await editor.evaluate(() => {
+      return window.getSelection()?.toString() || '';
+    });
+    expect(selectedText).toBe('beautiful');
+  });
+
+  test('triple click selects entire paragraph', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and set up text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello beautiful world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello beautiful world/);
+
+    // Triple click to select entire paragraph
+    await editor.click({ clickCount: 3 });
+
+    // Wait for selection to stabilize
+    await page.waitForTimeout(100);
+
+    // Verify entire text is selected
+    const selectionInfo = await helper.getSelectionInfo(editor);
+    expect(selectionInfo.isCollapsed).toBe(false);
+
+    // Get the selected text
+    const selectedText = await editor.evaluate(() => {
+      return window.getSelection()?.toString() || '';
+    });
+    expect(selectedText).toBe('Hello beautiful world');
+  });
+
+  test('click and drag selects text range', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and set up text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello beautiful world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello beautiful world/);
+
+    // Get the bounding box to calculate drag positions
+    const box = await editor.boundingBox();
+    if (!box) throw new Error('Could not get editor bounding box');
+
+    // Click at the start of the editor and drag to select "Hello"
+    // Start from left edge + small offset, drag to approximately after "Hello"
+    const startX = box.x + 5;
+    const startY = box.y + box.height / 2;
+    // "Hello" is 5 characters, estimate ~8px per character
+    const endX = box.x + 45;
+    const endY = startY;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(endX, endY, { steps: 5 });
+    await page.mouse.up();
+
+    // Wait for selection to stabilize
+    await page.waitForTimeout(100);
+
+    // Verify some text is selected (exact text depends on font metrics)
+    const selectionInfo = await helper.getSelectionInfo(editor);
+    expect(selectionInfo.isCollapsed).toBe(false);
+
+    // The selected text should start with "Hello" or be a subset
+    const selectedText = await editor.evaluate(() => {
+      return window.getSelection()?.toString() || '';
+    });
+    expect(selectedText.length).toBeGreaterThan(0);
+    console.log('[TEST] Click and drag selected:', selectedText);
+  });
+
   test('typing does not cause DOM element to be replaced (no re-render)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -333,6 +449,21 @@ test.describe('Inline Editing', () => {
     // Verify the LinkEditor popup has disappeared (check for .add-link specifically, not the Quanta toolbar)
     const linkEditorPopup = page.locator('.add-link');
     await expect(linkEditorPopup).not.toBeVisible();
+
+    // Click on another block
+    console.log('[TEST] Clicking on another block');
+    await helper.clickBlockInIframe('block-2-uuid');
+    await page.waitForTimeout(500);
+
+    // Click back to the original block with the link
+    console.log('[TEST] Clicking back to the original block');
+    await helper.clickBlockInIframe(blockId);
+    await page.waitForTimeout(500);
+
+    // Verify the link is still there
+    const blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('<a ');
+    expect(blockHtml).toContain('https://plone.org');
   });
 
   test('can clear a link', async ({ page }) => {
@@ -1340,17 +1471,7 @@ test.describe('Inline Editing', () => {
     // Select the word "test" (characters 10-14)
     // "This is a test paragraph"
     //  0123456789...
-    await editor.evaluate((el) => {
-      const textNode = el.querySelector('p')?.firstChild;
-      if (textNode) {
-        const range = document.createRange();
-        range.setStart(textNode, 10);
-        range.setEnd(textNode, 14);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    });
+    await helper.selectTextRange(editor, 10, 14);
 
     // Wait for bold button to appear (not active yet)
     await expect(async () => {
@@ -1441,7 +1562,11 @@ test.describe('Inline Editing', () => {
     expect(clipboardText).toBe('Test clipboard text');
   });
 
-  test('prospective formatting: toggle bold off after typing bold text', async ({ page }) => {
+  test('prospective formatting: toggle bold off after typing bold text', async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1501,20 +1626,28 @@ test.describe('Inline Editing', () => {
     await editor.pressSequentially(' testing', { delay: 10 });
     await helper.waitForEditorText(editor, /Hello world testing/);
 
-    // Verify final text
-    const finalText = await editor.textContent();
-    expect(finalText).toBe('Hello world testing');
+    // Verify final text via clipboard (tests ZWS cleaning on copy)
+    await editor.press('Meta+a');
+    await editor.press('Meta+c');
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    console.log('[TEST] Clipboard text:', JSON.stringify(clipboardText));
+    expect(clipboardText).toBe('Hello world testing');
 
     // Verify structure: "Hello " (plain) + "world" (bold) + " testing" (plain)
     const html = await editor.innerHTML();
     console.log('[TEST] Final HTML:', html);
 
-    // "world" should be bold
+    // "world" should be bold (may contain trailing ZWS for cursor positioning)
     const boldSpan = editor.locator('span[style*="font-weight: bold"]');
-    await expect(boldSpan).toHaveText('world');
+    await expect(boldSpan).toHaveText(/world/);
 
     // " testing" should NOT be inside the bold span
-    expect(html).not.toMatch(/bold.*testing/i);
+    // Verify "testing" is outside the span by checking the span only contains "world" + optional ZWS
+    const boldSpanContent = await boldSpan.textContent();
+    const cleanBoldContent = boldSpanContent
+      ?.replace(/[\uFEFF\u200B]/g, '')
+      .trim();
+    expect(cleanBoldContent).toBe('world');
   });
 
   test('prospective formatting: clipboard strips ZWS from bold text', async ({
