@@ -549,6 +549,11 @@ const SyncedSlateToolbar = ({
                 Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
                 console.log('[TOOLBAR] Inserted empty inline element and positioned cursor inside');
               }
+
+              // DON'T call onChangeFormData here - handleChange will fire because we changed children
+              // handleChange will pick up activeFormatRequestIdRef.current and include it
+              // (Unlike selection-only changes where we must call explicitly)
+              console.log('[TOOLBAR] Prospective format applied, handleChange will send update');
             }
           } else {
             // Range selection - use toggleInlineFormat to wrap/unwrap selected text

@@ -3,6 +3,7 @@
  * Tests various DOM structures and verifies correct Slate path generation
  */
 
+import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { JSDOM } from 'jsdom';
 
 // Mock console methods to suppress debug output during tests
