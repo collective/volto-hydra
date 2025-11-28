@@ -302,7 +302,16 @@ test.describe('Block Drag and Drop', () => {
     // Complete the drag
     await helper.completeDrag(dragHandle2);
 
-    await page.waitForTimeout(100);
+    // Wait for block order to change (block should no longer be at bottom)
+    await expect
+      .poll(
+        async () => {
+          const order = await helper.getBlockOrder();
+          return order.indexOf(firstBlock);
+        },
+        { timeout: 5000, message: 'Block should have moved from bottom position' },
+      )
+      .toBeLessThan(2); // Should be at position 0 or 1, not 2 (bottom)
 
     // Verify second drag worked - block should have moved up
     const finalOrder = await helper.getBlockOrder();

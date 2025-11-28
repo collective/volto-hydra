@@ -744,10 +744,10 @@ const Iframe = (props) => {
     // Normal Redux form data change (from sidebar editing)
     // Skip if formData hasn't actually changed from what we already have synced
     // This prevents echoing back data we just sent to Redux from toolbar
-    if (JSON.stringify(formToUse?.blocks) === JSON.stringify(iframeSyncState.formData?.blocks)) {
+    if (JSON.stringify(formToUse) === JSON.stringify(iframeSyncState.formData)) {
       return;
     }
-    if (iframeOriginRef.current && formToUse && formToUse.blocks && Object.keys(formToUse.blocks).length > 0) {
+    if (iframeOriginRef.current && formToUse) {
       const message = { type: 'FORM_DATA', data: formToUse };
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         message,

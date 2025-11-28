@@ -1746,12 +1746,6 @@ export class Bridge {
               const isHoveringOverTopHalf =
                 mouseYRelativeToBlock < closestBlockRect.height / 2;
 
-              console.error('[HYDRA-DND] Mouse coords:', { clientX: e.clientX, clientY: e.clientY, scrollY: window.scrollY });
-              console.error('[HYDRA-DND] Closest block:', closestBlock.getAttribute('data-block-uid'));
-              console.error('[HYDRA-DND] Block rect:', { top: closestBlockRect.top, bottom: closestBlockRect.bottom, height: closestBlockRect.height });
-              console.error('[HYDRA-DND] Mouse Y relative to block:', mouseYRelativeToBlock, '| Half height:', closestBlockRect.height / 2);
-              console.error('[HYDRA-DND] Is top half?', isHoveringOverTopHalf, '| Insert at:', isHoveringOverTopHalf ? 'BEFORE (0)' : 'AFTER (1)');
-
               insertAt = isHoveringOverTopHalf ? 0 : 1;
               closestBlockUid = closestBlock.getAttribute('data-block-uid');
 
