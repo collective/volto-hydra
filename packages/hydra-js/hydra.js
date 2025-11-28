@@ -112,6 +112,7 @@ export class Bridge {
     this.blockObserver = null;
     this.handleObjectBrowserMessage = null;
     this.pendingTransforms = {}; // Track pending transform requests for timeout handling
+    this.eventBuffer = []; // Buffer for keypresses during blocking (replayed after transform)
     this.savedSelection = null; // Store selection for format operations
     this.textUpdateTimer = null; // Timer for batching text updates
     this.pendingTextUpdate = null; // Pending text update data
@@ -220,7 +221,6 @@ export class Bridge {
         const reciveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
-              console.log('[HYDRA] Received INITIAL_DATA');
               this.formData = JSON.parse(JSON.stringify(e.data.data));
               console.log('[HYDRA] formData has blocks:', Object.keys(this.formData?.blocks || {}));
 
@@ -230,14 +230,6 @@ export class Bridge {
 
               // Store Slate configuration for keyboard shortcuts and toolbar
               this.slateConfig = e.data.slateConfig || { hotkeys: {}, toolbarButtons: [] };
-              console.log('[HYDRA] Stored slateConfig:', this.slateConfig);
-              console.log('[HYDRA] buttonConfigs received:', this.slateConfig?.buttonConfigs);
-              // Log each button config to see if SVGs are present
-              if (this.slateConfig?.buttonConfigs) {
-                Object.entries(this.slateConfig.buttonConfigs).forEach(([name, config]) => {
-                  console.log(`[HYDRA] Button ${name}: svg length = ${config.svg?.length || 0}, has svg = ${!!config.svg}`);
-                });
-              }
 
               // Add nodeIds to all slate fields in all blocks
               this.addNodeIdsToAllSlateFields();
@@ -285,8 +277,6 @@ export class Bridge {
                 const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
                 const fieldType = blockTypeFields[editableField];
                 const showFormatBtns = fieldType === 'slate';
-
-                console.log('[HYDRA] Updating toolbar with formatBtns:', showFormatBtns, 'for blockType:', blockType, 'field:', editableField, 'type:', fieldType);
 
                 // Send BLOCK_SELECTED message to update toolbar visibility
                 const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
@@ -400,7 +390,6 @@ export class Bridge {
                 }
 
                 if (event.data.transformedSelection) {
-                  console.log('[HYDRA] Restoring cursor from transformed Slate selection:', event.data.transformedSelection);
                   // Store expected selection so selectionchange handler can suppress it
                   this.expectedSelectionFromAdmin = event.data.transformedSelection;
                   // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
@@ -408,11 +397,10 @@ export class Bridge {
                   this.savedClickPosition = null;
                   this.restoreSlateSelection(event.data.transformedSelection, this.formData);
                 } else if (this.savedSelection) {
-                  console.log('[HYDRA] No transformed selection provided, using saved selection from selectionchange');
                   this.expectedSelectionFromAdmin = this.savedSelection;
                   this.restoreSlateSelection(this.savedSelection, this.formData);
                 } else {
-                  console.log('[HYDRA] No saved selection available');
+                  //console.log('[HYDRA] No saved selection available');
                 }
                 // Clear the processing flag - DOM updates are complete
                 this.isProcessingExternalUpdate = false;
@@ -650,9 +638,23 @@ export class Bridge {
 
     if (processing) {
       console.log('[HYDRA] BLOCKING input for', blockId);
-      // Create keyboard blocker function
+      // Clear any existing buffer when starting new blocking
+      this.eventBuffer = [];
+
+      // Create keyboard blocker function that buffers keydown events for replay
       const blockKeyboard = (e) => {
-        console.log('[HYDRA] BLOCKED keyboard event:', e.type, 'key:', e.key, 'for block:', blockId);
+        // Buffer keydown events for replay after transform completes
+        if (e.type === 'keydown') {
+          this.eventBuffer.push({
+            key: e.key,
+            code: e.code,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+          });
+          console.log('[HYDRA] BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+        }
         e.preventDefault();
         e.stopPropagation();
         return false;
@@ -694,6 +696,36 @@ export class Bridge {
 
       // Clear pending transform
       delete this.pendingTransforms[blockId];
+
+      // Replay buffered events after cursor has been restored
+      if (this.eventBuffer.length > 0) {
+        const buffer = this.eventBuffer;
+        this.eventBuffer = [];
+        console.log('[HYDRA] Replaying', buffer.length, 'buffered events');
+
+        // Small delay to ensure DOM is ready after cursor restore
+        setTimeout(() => {
+          for (const evt of buffer) {
+            if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
+              // Printable character - insert directly at cursor using execCommand
+              document.execCommand('insertText', false, evt.key);
+            } else {
+              // Special key (backspace, delete, arrows, etc) - dispatch event
+              const event = new KeyboardEvent('keydown', {
+                key: evt.key,
+                code: evt.code,
+                ctrlKey: evt.ctrlKey,
+                metaKey: evt.metaKey,
+                shiftKey: evt.shiftKey,
+                altKey: evt.altKey,
+                bubbles: true,
+                cancelable: true,
+              });
+              editableField.dispatchEvent(event);
+            }
+          }
+        }, 0);
+      }
     }
   }
 
@@ -797,7 +829,6 @@ export class Bridge {
 
     // Handle empty element case (no text nodes) - cursor is at start of element
     if (!textNode && node.nodeType === Node.ELEMENT_NODE) {
-      console.log('[HYDRA] serializePoint: Empty element, using element path with text index 0');
       // Find the element's path by walking up from the element itself
       const elementPath = this.getElementPath(node);
       if (elementPath) {
@@ -809,14 +840,12 @@ export class Bridge {
     }
 
     // Walk up to find the path through the Slate structure
-    console.log('[HYDRA] serializePoint calling getNodePath with textNode:', textNode?.nodeName, 'textOffset:', textOffset);
     const path = this.getNodePath(textNode);
     if (!path) {
       console.warn('[HYDRA] serializePoint: getNodePath returned null for textNode:', textNode);
       return null;
     }
 
-    console.log('[HYDRA] serializePoint result: path:', JSON.stringify(path), 'offset:', textOffset);
     return { path, offset: textOffset };
   }
 
@@ -910,11 +939,9 @@ export class Bridge {
     const path = [];
     let current = node;
 
-    console.log('[HYDRA] getNodePath START - node type:', node.nodeType === Node.TEXT_NODE ? 'TEXT_NODE' : node.nodeName, 'content:', node.textContent?.substring(0, 30));
 
     // If starting with a text node, calculate its Slate index
     if (node.nodeType === Node.TEXT_NODE) {
-      console.log('[HYDRA]   Starting from text node, parent:', node.parentNode?.nodeName);
       const parent = node.parentNode;
 
       // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
@@ -926,26 +953,21 @@ export class Bridge {
         !parent.hasAttribute?.('data-editable-field')
       ) {
         const nodeId = parent.getAttribute('data-node-id');
-        console.log(`[HYDRA]   Parent is inline element with data-node-id: ${nodeId}`);
 
         // Parse the parent's path from its node ID
         const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
-        console.log(`[HYDRA]   Parsed parent path: [${parts.join(', ')}]`);
 
         // Text node index within the parent element
         const siblings = Array.from(parent.childNodes);
         const textIndex = siblings.indexOf(node);
-        console.log(`[HYDRA]   Text at DOM index ${textIndex} in inline parent`);
 
         // Build path: parent path + text index
         path.push(...parts, textIndex);
-        console.log('[HYDRA] getNodePath FINAL path:', JSON.stringify(path));
         return path;
       } else {
         // Parent is a block element or doesn't have data-node-id
         // Calculate Slate index among siblings considering node IDs
         const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
-        console.log(`[HYDRA]   Text node at Slate index ${slateIndex} among siblings`);
         path.push(slateIndex);
         current = parent;
       }
@@ -958,14 +980,12 @@ export class Bridge {
       const hasEditableField = current.hasAttribute?.('data-editable-field');
       const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
 
-      console.log(`[HYDRA]   [${depth}] ${current.nodeName} - nodeId: ${hasNodeId ? current.getAttribute('data-node-id') : 'NO'}, editable: ${hasEditableField}, slate: ${hasSlateEditor}`);
 
       // Process current node
       if (hasNodeId) {
         const nodeId = current.getAttribute('data-node-id');
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
         const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
-        console.log(`[HYDRA]     → Parsed data-node-id="${nodeId}" to path: [${parts.join(', ')}]`);
 
         // Prepend these path components
         for (let i = parts.length - 1; i >= 0; i--) {
@@ -975,7 +995,6 @@ export class Bridge {
 
       // Stop if we've reached the editable field container or slate editor
       if (hasEditableField || hasSlateEditor) {
-        console.log('[HYDRA] getNodePath END - reached container');
         break;
       }
 
@@ -995,7 +1014,6 @@ export class Bridge {
       return [0, 0]; // Default to first block, first text
     }
 
-    console.log('[HYDRA] getNodePath FINAL path:', JSON.stringify(path));
     return path;
   }
 
@@ -1245,13 +1263,14 @@ export class Bridge {
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
 
     // Flush any pending text updates from the previous block before switching
+    // Also clear event buffer - user is reorienting to a new block
     if (!isSelectingSameBlock) {
       console.log('[HYDRA] Switching blocks - flushing pending text updates');
       this.flushPendingTextUpdates();
+      this.eventBuffer = [];
     }
 
     this.isInlineEditing = true;
-    console.log('[HYDRA] Set isInlineEditing = true');
 
     // Helper function to handle each element - sets contenteditable and handles string fields
     const handleElement = (element) => {
@@ -1473,11 +1492,9 @@ export class Bridge {
           if (editableField) {
             const fieldName = editableField.getAttribute('data-editable-field');
             const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
-            console.log('[HYDRA] Editable field:', { found: true, fieldName, blockType, fieldType });
 
             if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
               editableField.focus();
-              console.log('[HYDRA] Called focus(), activeElement:', document.activeElement);
 
               if (this.lastClickEvent) {
                 // Save click position for FORM_DATA handler to use after renderer updates
@@ -1496,15 +1513,12 @@ export class Bridge {
                 if (!hasNonCollapsedSelection) {
                   // Position cursor at the click location using caretRangeFromPoint
                   const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
-                  console.log('[HYDRA] caretRangeFromPoint:', { x: this.lastClickEvent.clientX, y: this.lastClickEvent.clientY, hasRange: !!range });
                   if (range) {
                     const selection = window.getSelection();
                     selection.removeAllRanges();
                     selection.addRange(range);
-                    console.log('[HYDRA] Set selection at click point, rangeCount:', selection.rangeCount);
                   }
                 } else {
-                  console.log('[HYDRA] Preserving existing non-collapsed selection');
                 }
 
                 // Clear the stored click event
@@ -1611,12 +1625,10 @@ export class Bridge {
    * The drag handle is positioned on mousemove to avoid being destroyed by re-renders.
    */
   createDragHandle() {
-    console.log('[HYDRA] createDragHandle called for block:', this.selectedBlockUid);
 
     // Remove any existing drag handle
     const existingDragHandle = document.querySelector('.volto-hydra-drag-button');
     if (existingDragHandle) {
-      console.log('[HYDRA] Removing existing drag handle');
       existingDragHandle.remove();
     }
 
@@ -1638,7 +1650,6 @@ export class Bridge {
     });
 
     document.body.appendChild(dragButton);
-    console.log('[HYDRA] Drag handle appended to body');
 
     // Position the drag handle immediately (not on mousemove)
     const positionDragHandle = () => {
@@ -1662,7 +1673,6 @@ export class Bridge {
       dragButton.style.left = `${toolbarLeft}px`;
       dragButton.style.top = `${toolbarTop}px`;
       dragButton.style.display = 'block';
-      console.log('[HYDRA] Drag handle positioned at:', { left: toolbarLeft, top: toolbarTop });
     };
 
     // Position immediately
@@ -2338,7 +2348,6 @@ export class Bridge {
       subtree: true,
       characterData: true,
     });
-    console.log('[HYDRA] Mutation observer set up');
   }
 
   /**
@@ -2408,7 +2417,6 @@ export class Bridge {
           if (fieldTypes[fieldName] === 'slate' && block[fieldName]) {
             // Add nodeIds to the slate field's value
             block[fieldName] = this.addNodeIds(block[fieldName]);
-            console.log(`[HYDRA] Added nodeIds to ${blockType}.${fieldName}`);
           }
         });
       });
@@ -2558,10 +2566,6 @@ export class Bridge {
     }
 
     try {
-      console.log('[HYDRA] Restoring Slate selection:', slateSelection);
-      console.log('[HYDRA] Anchor:', JSON.stringify(slateSelection.anchor));
-      console.log('[HYDRA] Focus:', JSON.stringify(slateSelection.focus));
-
       // Find the selected block (assume it's the currently selected block)
       if (!this.selectedBlockUid) {
         return;
@@ -2572,7 +2576,6 @@ export class Bridge {
         return;
       }
 
-      console.log('[HYDRA] Block value for selection restoration:', JSON.stringify(block.value));
 
       // Get nodeId for anchor and focus by walking the Slate tree
       // Returns {nodeId, textChildIndex, parentChildren} for text nodes
@@ -2593,14 +2596,6 @@ export class Bridge {
         return;
       }
 
-      console.log('[HYDRA] Found DOM elements for selection restoration:', {
-        anchorNodeId: anchorResult.nodeId,
-        focusNodeId: focusResult.nodeId,
-        anchorElement: anchorElement.tagName,
-        focusElement: focusElement.tagName,
-        anchorTextChildIndex: anchorResult.textChildIndex,
-        focusTextChildIndex: focusResult.textChildIndex,
-      });
 
       // Find DOM children directly using Slate child index
       // This preserves the exact child index from Slate path (e.g., path [0,2] = 3rd child)
@@ -2613,7 +2608,6 @@ export class Bridge {
         const anchorChild = this.findChildBySlateIndex(anchorElement, anchorResult.textChildIndex);
         if (anchorChild) {
           anchorTextResult = this.findTextNodeInChild(anchorChild, slateSelection.anchor.offset);
-          console.log('[HYDRA] Found anchor via findChildBySlateIndex:', anchorResult.textChildIndex, '-> child:', anchorChild.nodeName, 'offset:', slateSelection.anchor.offset);
         } else {
           console.warn('[HYDRA] Could not find anchor child at Slate index:', anchorResult.textChildIndex);
         }
@@ -2627,7 +2621,6 @@ export class Bridge {
         const focusChild = this.findChildBySlateIndex(focusElement, focusResult.textChildIndex);
         if (focusChild) {
           focusTextResult = this.findTextNodeInChild(focusChild, slateSelection.focus.offset);
-          console.log('[HYDRA] Found focus via findChildBySlateIndex:', focusResult.textChildIndex, '-> child:', focusChild.nodeName, 'offset:', slateSelection.focus.offset);
         } else {
           console.warn('[HYDRA] Could not find focus child at Slate index:', focusResult.textChildIndex);
         }
@@ -2636,10 +2629,9 @@ export class Bridge {
         focusTextResult = this.findTextNodeInChild(focusElement, slateSelection.focus.offset);
       }
 
-      console.log('[HYDRA] Selection restoration text results:', { anchorTextResult, focusTextResult });
 
       if (!anchorTextResult || !focusTextResult) {
-        console.log('[HYDRA] Selection restoration failed - could not find text nodes');
+        console.warn('[HYDRA] Selection restoration failed - could not find text nodes');
         return;
       }
 

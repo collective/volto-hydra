@@ -69,19 +69,15 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Select all text
     await page.keyboard.press('Meta+A');
-    await page.waitForTimeout(200);
 
-    // Verify selection exists (text should be selected)
-    const selectedText = await page.evaluate(() => {
-      return window.getSelection()?.toString();
-    });
-    console.log('[TEST] Selected text:', selectedText);
+    // Verify selection exists in iframe (polls until text is selected)
+    await expect.poll(() => editable.evaluate(() => window.getSelection()?.toString())).toBe('Text to format');
 
     // Apply bold using keyboard shortcut (triggers SLATE_TRANSFORM_REQUEST)
     await page.keyboard.press('Meta+b');
 
-    // Wait for FORM_DATA response and re-render
-    await page.waitForTimeout(500);
+    // Wait for bold formatting to appear (polls until condition met)
+    await expect(editable.locator('span[style*="font-weight: bold"]')).toBeVisible();
 
     // Verify bold was applied (renderer converts {type: "strong"} to styled span)
     const html = await editable.innerHTML();
@@ -125,7 +121,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(content).not.toContain('mat'); // 'format' should have lost 'mat'
   });
 
-  test('should block input during slow transform to prevent content desync', async ({ page }) => {
+  test('should buffer input during slow transform and replay after completion', async ({ page }) => {
     // Configure mock parent to simulate a slow transform (500ms delay)
     await page.evaluate(() => {
       window.mockParent.setTransformDelay(500);
@@ -156,43 +152,29 @@ test.describe('Inline Editing with Mock Parent', () => {
     console.log('[TEST] Selection set:', selectionSet);
     expect(selectionSet.success).toBe(true);
     expect(selectionSet.text).toBe('Text to format');
-    await page.waitForTimeout(200);
-
-    // Capture text content before transform
-    const textBeforeFormat = await editable.textContent();
-    console.log('[TEST] Text before formatting:', textBeforeFormat);
 
     // Apply bold using keyboard shortcut to trigger transform
     await page.keyboard.press('Meta+b');
     await page.waitForTimeout(50); // Small delay for blocking to kick in
 
-    // Try to type during the slow transform - should be blocked by keyboard event handlers
-    await page.keyboard.type('BLOCKED');
-    await page.waitForTimeout(100);
+    // Type during the slow transform - should be buffered (not inserted yet)
+    await page.keyboard.type('BUFFERED');
 
-    // Verify the typed text was NOT inserted (blocked during pending transform)
+    // Verify the typed text was NOT inserted yet (buffered during pending transform)
     const textDuringBlock = await editable.textContent();
     console.log('[TEST] Text after typing attempt during transform:', textDuringBlock);
-    expect(textDuringBlock).not.toContain('BLOCKED');
+    expect(textDuringBlock).not.toContain('BUFFERED');
 
-    // Wait for transform to complete (500ms delay + processing time)
-    await page.waitForTimeout(500);
+    // Wait for transform to complete and buffered text to be replayed
+    // The buffered text should appear after cursor is restored
+    await expect(editable).toContainText('BUFFERED');
 
     // Verify bold was applied (renderer converts {type: "strong"} to styled span)
     const html = await editable.innerHTML();
     console.log('[TEST] HTML after formatting:', html);
     expect(html).toContain('font-weight: bold');
     expect(html).toContain('Text to format');
-
-    // Now verify typing works AFTER transform completes
-    await editable.click();
-    await page.keyboard.press('End');
-    await page.keyboard.type(' ALLOWED');
-    await page.waitForTimeout(200);
-
-    const textAfterUnblock = await editable.textContent();
-    console.log('[TEST] Text after typing when unblocked:', textAfterUnblock);
-    expect(textAfterUnblock).toContain('ALLOWED');
+    expect(html).toContain('BUFFERED');
 
     // Reset delay for other tests
     await page.evaluate(() => {
@@ -328,13 +310,15 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Select all text
     await page.keyboard.press('Meta+A');
-    await page.waitForTimeout(200);
+
+    // Verify selection exists in iframe (polls until text is selected)
+    await expect.poll(() => editable.evaluate(() => window.getSelection()?.toString())).toBe('Text to format');
 
     // Apply bold using keyboard shortcut
     await page.keyboard.press('Meta+b');
 
-    // Wait for FORM_DATA response and re-render
-    await page.waitForTimeout(500);
+    // Wait for bold formatting to appear (polls until condition met)
+    await expect(editable.locator('span[style*="font-weight: bold"]')).toBeVisible();
 
     // Get the rendered HTML
     const html = await editable.innerHTML();
