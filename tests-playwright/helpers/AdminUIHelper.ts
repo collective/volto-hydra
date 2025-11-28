@@ -1169,13 +1169,47 @@ export class AdminUIHelper {
       (el, { start, end }) => {
         const doc = el.ownerDocument;
         const win = doc.defaultView;
-        // The editor element itself contains the text node directly
-        const textNode = el.firstChild;
-        if (textNode && textNode.nodeType === 3) {
-          // nodeType 3 = TEXT_NODE
+
+        // Helper to find node and offset at a given character position
+        // Walks all text nodes, skipping ZWS characters
+        const findPositionInTextNodes = (
+          targetOffset: number,
+        ): { node: Node; offset: number } | null => {
+          const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+          let currentOffset = 0;
+          let node: Node | null;
+
+          while ((node = walker.nextNode())) {
+            // Get text content, filtering out ZWS
+            const text = node.textContent || '';
+            const cleanText = text.replace(/[\uFEFF\u200B]/g, '');
+            const nodeLength = cleanText.length;
+
+            if (currentOffset + nodeLength >= targetOffset) {
+              // Target is within this node
+              // Calculate offset within this node, accounting for ZWS
+              let charsSeen = 0;
+              let rawOffset = 0;
+              for (let i = 0; i < text.length && charsSeen < targetOffset - currentOffset; i++) {
+                if (text[i] !== '\uFEFF' && text[i] !== '\u200B') {
+                  charsSeen++;
+                }
+                rawOffset++;
+              }
+              return { node, offset: rawOffset };
+            }
+            currentOffset += nodeLength;
+          }
+          return null;
+        };
+
+        const startPos = findPositionInTextNodes(start);
+        const endPos = findPositionInTextNodes(end);
+
+        if (startPos && endPos) {
           const range = doc.createRange();
-          range.setStart(textNode, start);
-          range.setEnd(textNode, end);
+          range.setStart(startPos.node, startPos.offset);
+          range.setEnd(endPos.node, endPos.offset);
           const sel = win?.getSelection();
           sel?.removeAllRanges();
           sel?.addRange(range);
