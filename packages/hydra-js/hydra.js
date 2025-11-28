@@ -631,51 +631,56 @@ export class Bridge {
    */
   setBlockProcessing(blockId, processing = true, requestId = null) {
     console.log('[HYDRA] setBlockProcessing:', { blockId, processing, requestId });
-    const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-    const editableField = block?.querySelector('[data-editable-field="value"]');
-
-    if (!editableField) {
-      console.log('[HYDRA] setBlockProcessing: No editable field found for', blockId);
-      return;
-    }
 
     if (processing) {
       console.log('[HYDRA] BLOCKING input for', blockId);
       // Clear any existing buffer when starting new blocking
       this.eventBuffer = [];
+      this.blockedBlockId = blockId;
 
       // Create keyboard blocker function that buffers keydown events for replay
-      const blockKeyboard = (e) => {
-        // Buffer keydown events for replay after transform completes
-        if (e.type === 'keydown') {
-          this.eventBuffer.push({
-            key: e.key,
-            code: e.code,
-            ctrlKey: e.ctrlKey,
-            metaKey: e.metaKey,
-            shiftKey: e.shiftKey,
-            altKey: e.altKey,
-          });
-          console.log('[HYDRA] BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      };
+      // Attached to document so it survives DOM re-renders
+      if (!this._documentKeyboardBlocker) {
+        this._documentKeyboardBlocker = (e) => {
+          // Only block if we have an active blocked block
+          if (!this.blockedBlockId) return;
 
-      // Store the blocker so we can remove it later
-      editableField._keyboardBlocker = blockKeyboard;
+          // Check if event is targeting our blocked block (even after re-render)
+          const targetBlock = e.target.closest?.('[data-block-uid]');
+          if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
+            return; // Not our block, let it through
+          }
 
-      // Block all keyboard and input events
-      editableField.addEventListener('keydown', blockKeyboard, true);
-      editableField.addEventListener('keypress', blockKeyboard, true);
-      editableField.addEventListener('input', blockKeyboard, true);
-      editableField.addEventListener('beforeinput', blockKeyboard, true);
+          // Buffer keydown events for replay after transform completes
+          if (e.type === 'keydown') {
+            this.eventBuffer.push({
+              key: e.key,
+              code: e.code,
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey,
+              shiftKey: e.shiftKey,
+              altKey: e.altKey,
+            });
+            console.log('[HYDRA] BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        };
 
-      // Visual feedback only - keep focus and contenteditable to maintain cursor position
-      editableField.style.cursor = 'wait';
+        // Attach to document so it survives DOM re-renders
+        document.addEventListener('keydown', this._documentKeyboardBlocker, true);
+        document.addEventListener('keypress', this._documentKeyboardBlocker, true);
+        document.addEventListener('input', this._documentKeyboardBlocker, true);
+        document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
+      }
 
-      // TODO: Send message to parent to disable format buttons
+      // Visual feedback on current element
+      const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+      const editableField = block?.querySelector('[data-editable-field]');
+      if (editableField) {
+        editableField.style.cursor = 'wait';
+      }
 
       // Store requestId to match with FORM_DATA for unblocking
       this.pendingTransforms[blockId] = {
@@ -683,19 +688,16 @@ export class Bridge {
       };
     } else {
       console.log('[HYDRA] UNBLOCKING input for', blockId);
-      // Remove keyboard blocker
-      if (editableField._keyboardBlocker) {
-        editableField.removeEventListener('keydown', editableField._keyboardBlocker, true);
-        editableField.removeEventListener('keypress', editableField._keyboardBlocker, true);
-        editableField.removeEventListener('input', editableField._keyboardBlocker, true);
-        editableField.removeEventListener('beforeinput', editableField._keyboardBlocker, true);
-        delete editableField._keyboardBlocker;
+
+      // Clear blocked state
+      this.blockedBlockId = null;
+
+      // Restore visual feedback on current element (may be new after re-render)
+      const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+      const editableField = block?.querySelector('[data-editable-field]');
+      if (editableField) {
+        editableField.style.cursor = 'text';
       }
-
-      // Restore visual feedback
-      editableField.style.cursor = 'text';
-
-      // TODO: Send message to parent to re-enable format buttons
 
       // Clear pending transform
       delete this.pendingTransforms[blockId];
