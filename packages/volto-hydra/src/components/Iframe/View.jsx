@@ -398,11 +398,13 @@ const Iframe = (props) => {
         case 'INLINE_EDIT_DATA':
           inlineEditCounterRef.current += 1;
           // Update combined state atomically - formData, selection together
-          // Use spread to preserve other fields (toolbarRequestDone, completedFlushRequestId, transformAction)
+          // If flushRequestId is present, this was a flush response - also set completedFlushRequestId
+          // so the toolbar knows it can proceed with the format button click
           setIframeSyncState(prev => ({
             ...prev,
             formData: event.data.data,
             selection: event.data.selection || null,
+            ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
           }));
           // Also update Redux for persistence
           onChangeFormData(event.data.data);
@@ -628,7 +630,8 @@ const Iframe = (props) => {
           iframeOriginRef.current = event.origin;
 
           // Extract block field types from schema registry (maps blockType -> fieldName -> fieldType)
-          const blockFieldTypes = extractBlockFieldTypes(intl);
+          // Use different name to avoid shadowing outer blockFieldTypes (causes temporal dead zone)
+          const initialBlockFieldTypes = extractBlockFieldTypes(intl);
 
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
@@ -636,7 +639,7 @@ const Iframe = (props) => {
             {
               type: 'INITIAL_DATA',
               data: form,
-              blockFieldTypes,
+              blockFieldTypes: initialBlockFieldTypes,
               slateConfig: {
                 hotkeys: config.settings.slate?.hotkeys || {},
                 toolbarButtons,

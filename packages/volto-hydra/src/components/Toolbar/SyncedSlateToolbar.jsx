@@ -77,80 +77,8 @@ class SlateErrorBoundary extends Component {
  * This editor is also used by keyboard shortcuts - they access it via
  * window.voltoHydraToolbarEditor instead of duplicating format logic.
  *
- * ============================================================================
- * DATA FLOW ARCHITECTURE
- * ============================================================================
- *
- * There are two main flows for how content changes propagate:
- *
- * FLOW 1: FORMAT BUTTON CLICKED (Toolbar → Iframe)
- * ------------------------------------------------
- * This flow uses a flush/requestId mechanism to ensure the iframe has the
- * latest text before applying formatting:
- *
- * 1. User clicks format button (e.g., Bold) in toolbar
- * 2. onMouseDownCapture intercepts the click BEFORE Slate handles it
- * 3. We generate a unique requestId and send FLUSH_BUFFER to iframe
- *    - This tells iframe to immediately send any pending text changes
- *    - We also set contenteditable=false to "block" the iframe editor
- * 4. Iframe receives FLUSH_BUFFER, sends pending text, replies BUFFER_FLUSHED
- * 5. View.jsx receives BUFFER_FLUSHED, updates form data, sets completedFlushRequestId
- * 6. useEffect detects completedFlushRequestId matches our pending request
- * 7. NOW we trigger the actual button mousedown (via pendingButtonRef)
- * 8. Slate button applies the transform to the toolbar editor
- * 9. handleChange fires with new value
- * 10. We send updated value to Redux and iframe (via onChangeFormData)
- * 11. Iframe receives FORM_DATA with formatRequestId, unblocks editor
- * 12. Iframe re-renders with formatted content
- *
- * Why this complexity? Without flushing, the user might type "hello", click Bold,
- * but the iframe hasn't sent "hello" yet - so only partial text gets formatted.
- *
- * FLOW 2: SIDEBAR EDITING (Sidebar → Redux → Toolbar)
- * ---------------------------------------------------
- * When the user edits via the sidebar form (RichTextWidget), changes flow differently:
- *
- * 1. User interacts with sidebar editor (types, clicks format buttons)
- * 2. Sidebar editor's onChange updates Redux form state directly
- * 3. View.jsx's useEffect detects formDataFromRedux changed
- * 4. View.jsx validates selection against new value (may clear if invalid)
- *    - This is CRITICAL: if format removed bold, paths like [0,1,0] become invalid
- *    - Selection must be cleared before toolbar tries to render buttons
- * 5. View.jsx updates iframeSyncState.formData (and possibly clears selection)
- * 6. SyncedSlateToolbar receives new form/currentSelection props
- * 7. useEffect syncs editor.children with new fieldValue
- * 8. Toolbar re-renders with updated button states
- * 9. Iframe receives FORM_DATA and re-renders content
- *
- * Key difference: No flush needed because changes originate FROM the sidebar,
- * not from the iframe. But selection validation IS needed because the document
- * structure may change (e.g., removing bold unwraps <strong> nodes, changing paths).
- *
- * FLOW 3: HOTKEY FORMAT (Iframe → Admin → Iframe)
- * -----------------------------------------------
- * When the user presses a keyboard shortcut (e.g., Ctrl+B) in the iframe:
- *
- * 1. User presses Ctrl+B in iframe while editing text
- * 2. hydra.js hotkey handler detects the shortcut
- * 3. hydra.js checks isSlateField() - only slate fields support formatting
- * 4. hydra.js flushes pending text updates (synchronous, no round-trip)
- * 5. hydra.js generates requestId, blocks editor (contenteditable=false)
- * 6. hydra.js sends SLATE_FORMAT_REQUEST with requestId to admin
- * 7. View.jsx receives SLATE_FORMAT_REQUEST, calls applyFormat()
- * 8. applyFormat() stores requestId in formatRequestIdToSendRef
- * 9. applyFormat() applies format to toolbar editor (same as toolbar buttons)
- * 10. Toolbar editor's onChange fires, updates Redux
- * 11. useEffect in View.jsx sends FORM_DATA to iframe with formatRequestId
- * 12. Iframe receives FORM_DATA, matches requestId to pendingTransforms
- * 13. Iframe unblocks editor (contenteditable=true), re-renders content
- *
- * Key differences from toolbar button flow:
- * - No FLUSH_BUFFER round-trip needed (iframe already has latest text)
- * - Request originates from iframe, not admin
- * - Blocking happens immediately in iframe before sending request
- * - Same toolbar editor is used for the actual format transform
- *
- * ============================================================================
+ * For detailed data flow architecture (format buttons, sidebar editing, hotkeys,
+ * block selection), see: docs/slate-transforms-architecture.md
  */
 const SyncedSlateToolbar = ({
   selectedBlock,

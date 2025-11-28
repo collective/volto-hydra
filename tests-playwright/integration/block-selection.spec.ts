@@ -93,8 +93,8 @@ test.describe('Block Selection', () => {
     expect(hasToolbar).toBe(true);
 
     // Verify block appears selected with proper positioning
-    const isSelected = await helper.isBlockSelectedInIframe(blockId);
-    expect(isSelected).toBe(true);
+    const result = await helper.isBlockSelectedInIframe(blockId);
+    expect(result.ok).toBe(true);
   });
 
   test('switching block selection updates visual state', async ({ page }) => {
@@ -106,14 +106,14 @@ test.describe('Block Selection', () => {
     // Select first block - clickBlockInIframe waits for toolbar
     await helper.clickBlockInIframe('block-1-uuid');
 
-    expect(await helper.isBlockSelectedInIframe('block-1-uuid')).toBe(true);
-    expect(await helper.isBlockSelectedInIframe('block-2-uuid')).toBe(false);
+    expect((await helper.isBlockSelectedInIframe('block-1-uuid')).ok).toBe(true);
+    expect((await helper.isBlockSelectedInIframe('block-2-uuid')).ok).toBe(false);
 
     // Select second block - clickBlockInIframe waits for toolbar
     await helper.clickBlockInIframe('block-2-uuid');
 
-    expect(await helper.isBlockSelectedInIframe('block-1-uuid')).toBe(false);
-    expect(await helper.isBlockSelectedInIframe('block-2-uuid')).toBe(true);
+    expect((await helper.isBlockSelectedInIframe('block-1-uuid')).ok).toBe(false);
+    expect((await helper.isBlockSelectedInIframe('block-2-uuid')).ok).toBe(true);
   });
 
   test('block selection shows correct block type in sidebar', async ({ page }) => {

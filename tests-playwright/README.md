@@ -188,8 +188,9 @@ await helper.editBlockTextInIframe('block-uuid', 'New text');
 // Get block text
 const text = await helper.getBlockTextInIframe('block-uuid');
 
-// Check if selected
-const isSelected = await helper.isBlockSelectedInIframe('block-uuid');
+// Check if selected (returns { ok: boolean, reason?: string })
+const result = await helper.isBlockSelectedInIframe('block-uuid');
+if (!result.ok) console.log('Not selected:', result.reason);
 
 // Count blocks
 const count = await helper.getBlockCountInIframe();

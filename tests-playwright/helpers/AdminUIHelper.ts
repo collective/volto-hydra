@@ -358,8 +358,9 @@ export class AdminUIHelper {
         `and (3) View.jsx renders the toolbar overlay on BLOCK_SELECTED.`
       );
     }
-    if (!(await this.isBlockSelectedInIframe(blockId))) {
-      throw new Error("toolbar didn't appear in time");
+    const result = await this.isBlockSelectedInIframe(blockId);
+    if (!result.ok) {
+      throw new Error(`Block "${blockId}" selection check failed: ${result.reason}`);
     }
   }
 
@@ -655,6 +656,16 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the text content of an editor, stripping ZWS characters.
+   * ZWS characters (\u200B, \uFEFF) are inserted for cursor positioning
+   * but are invisible to users, so tests should verify what users see.
+   */
+  async getCleanTextContent(editor: Locator): Promise<string> {
+    const text = (await editor.textContent()) || '';
+    return text.replace(/[\u200B\uFEFF]/g, '');
+  }
+
+  /**
    * Wait for editor text to match a regex pattern.
    * Useful for waiting until text changes stabilize after typing or formatting.
    * Uses textContent() directly to preserve whitespace (toHaveText normalizes it).
@@ -705,7 +716,7 @@ export class AdminUIHelper {
    * 2. They are positioned correctly relative to the block (toolbar above, add button below)
    * 3. Elements are horizontally aligned with the block
    */
-  async isBlockSelectedInIframe(blockId: string): Promise<boolean> {
+  async isBlockSelectedInIframe(blockId: string): Promise<{ ok: boolean; reason?: string }> {
     try {
       // Verify all UI overlays are visible
       const toolbar = this.page.locator('.quanta-toolbar');
@@ -717,7 +728,10 @@ export class AdminUIHelper {
       const addButtonVisible = await addButton.isVisible();
 
       if (!toolbarVisible || !outlineVisible || !addButtonVisible) {
-        return false;
+        return {
+          ok: false,
+          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}, addButton=${addButtonVisible}`,
+        };
       }
 
       // Verify positioning is correct
@@ -734,10 +748,23 @@ export class AdminUIHelper {
       // Note: the toolbar is aligned with the block not the field!
       const aligned = true; // Skip strict alignment check for now
 
-      return toolbarPositioned && addButtonPositioned && aligned;
+      if (!toolbarPositioned) {
+        return {
+          ok: false,
+          reason: `Toolbar not positioned correctly: toolbarAboveBlock=${positions.toolbarAboveBlock} (expected -50 to 50)`,
+        };
+      }
+      if (!addButtonPositioned) {
+        return {
+          ok: false,
+          reason: `Add button not positioned correctly: addButtonBelowBlock=${positions.addButtonBelowBlock} (expected 0-16)`,
+        };
+      }
+
+      return { ok: true };
     } catch (error) {
       // If positioning verification fails, the block is not properly selected
-      return false;
+      return { ok: false, reason: `Positioning verification error: ${error}` };
     }
   }
 

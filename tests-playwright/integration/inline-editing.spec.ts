@@ -968,7 +968,7 @@ test.describe('Inline Editing', () => {
     // Check if new text inherits bold formatting
     const html = await editor.innerHTML();
     expect(html).toContain('style="font-weight: bold"');
-    const text = await editor.textContent();
+    const text = await helper.getCleanTextContent(editor);
     expect(text).toContain('Bold text more');
   });
 
