@@ -330,7 +330,6 @@ const SyncedSlateToolbar = ({
     // Update editor selection using Transforms (like Volto line 167)
     // Only sync if selection is valid for current document structure
     if (currentSelection && !isEqual(currentSelection, editor.selection)) {
-      console.log('[TOOLBAR] Setting editor selection via Transforms (selection changed)');
       try {
         Transforms.select(editor, currentSelection);
         // Save selection for Link plugin to use
@@ -340,10 +339,9 @@ const SyncedSlateToolbar = ({
         safeIncrementRenderKey();
       } catch (e) {
         // Selection is invalid for current document - likely stale, ignore it
-        console.log('[TOOLBAR] Selection transform failed (ignoring stale selection):', e.message);
+        console.warn('[TOOLBAR] Selection transform failed (ignoring stale selection):', e.message);
       }
     } else if (currentSelection) {
-      console.log('[TOOLBAR] Skipping selection sync - already matches editor.selection');
       // Still update savedSelection even if selection hasn't changed
       editor.savedSelection = currentSelection;
     }
@@ -353,11 +351,6 @@ const SyncedSlateToolbar = ({
     if (completedFlushRequestId && pendingFlushRef.current) {
       const { requestId, button } = pendingFlushRef.current;
       if (requestId === completedFlushRequestId) {
-        console.log('[TOOLBAR] Flush completed, triggering button mousedown now');
-        console.log('[TOOLBAR] Current editor.children:', JSON.stringify(editor.children));
-        console.log('[TOOLBAR] Current fieldValue:', JSON.stringify(fieldValue));
-        console.log('[TOOLBAR] Current editor.selection:', JSON.stringify(editor.selection));
-        console.log('[TOOLBAR] Current currentSelection prop:', JSON.stringify(currentSelection));
         pendingFlushRef.current = null;
         // Store requestId so handleChange can include it in FORM_DATA
         // This allows iframe to match FORM_DATA to the FLUSH_BUFFER that started blocking
@@ -367,7 +360,6 @@ const SyncedSlateToolbar = ({
         // Find the actual clickable element - Semantic UI Button renders as <a> tag
         // The onMouseDown handler is on the <a> tag, not the wrapper
         const clickableElement = button.querySelector('a.ui.button') || button.querySelector('button') || button;
-        console.log('[TOOLBAR] Dispatching mousedown on:', clickableElement.tagName, clickableElement.className);
         // Dispatch mousedown event since Slate buttons apply formatting on mousedown
         // We need bubbles: true for React's event delegation to work
         // Mark the event so AddLinkForm's handleClickOutside can ignore it
@@ -421,8 +413,6 @@ const SyncedSlateToolbar = ({
           const isCollapsed = editor.selection && Range.isCollapsed(editor.selection);
           const formatIsActive = isBlockActive(editor, format);
 
-          console.log('[TOOLBAR] Selection collapsed:', isCollapsed, 'Format active:', formatIsActive);
-
           if (isCollapsed) {
             // Prospective formatting - handle differently for collapsed selections
             if (formatIsActive) {
@@ -439,7 +429,6 @@ const SyncedSlateToolbar = ({
                 const afterPoint = Editor.after(editor, inlinePath);
                 if (afterPoint) {
                   Transforms.select(editor, afterPoint);
-                  console.log('[TOOLBAR] Moved cursor after inline element');
                   // Selection-only change won't trigger handleChange, so manually send FORM_DATA to unblock
                   if (requestId) {
                     onChangeFormData(form, editor.selection, requestId);
@@ -519,7 +508,6 @@ const SyncedSlateToolbar = ({
           console.warn('[TOOLBAR] Unknown transform type:', type);
       }
 
-      console.log('[TOOLBAR] Transform applied successfully');
     } catch (e) {
       console.error('[TOOLBAR] Error applying transform:', e);
     }

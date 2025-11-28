@@ -18,11 +18,6 @@ export const useSelectionPosition = () => {
   const isToolbarContext = editor.uid?.startsWith('toolbar-');
   const hydraData = editor.hydra || (isToolbarContext && typeof window !== 'undefined' ? window.voltoHydraData : null);
 
-  console.log('[useSelectionPosition] Called - isToolbarContext?', isToolbarContext,
-    'editor.hydra?', !!editor.hydra,
-    'using hydraData?', !!hydraData,
-    'editor.uid:', editor.uid);
-
   // If we have Hydra positioning data (Quanta toolbar), position over toolbar
   if (hydraData?.iframeRect && hydraData?.blockUIRect) {
     const { iframeRect, blockUIRect } = hydraData;
@@ -30,12 +25,6 @@ export const useSelectionPosition = () => {
     const calculatedTop = iframeRect.top + blockUIRect.top - 40;
     const calculatedLeft = iframeRect.left + blockUIRect.left;
 
-    console.log('[useSelectionPosition] Hydra mode detected, positioning over toolbar:', {
-      iframeTop: iframeRect.top,
-      blockTop: blockUIRect.top,
-      calculatedTop,
-      calculatedLeft,
-    });
 
     // Return a DOMRect-like object with all properties
     return {
@@ -51,7 +40,6 @@ export const useSelectionPosition = () => {
   }
 
   // Otherwise (sidebar), use original DOM-based positioning
-  console.log('[useSelectionPosition] No Hydra data, using DOM-based positioning');
 
   let rect = {};
 
@@ -60,13 +48,12 @@ export const useSelectionPosition = () => {
       const [textNode] = ReactEditor.toDOMPoint(editor, selection.anchor);
       const parentNode = textNode.parentNode;
       rect = parentNode.getBoundingClientRect();
-      console.log('[useSelectionPosition] DOM rect:', rect);
     } catch (e) {
-      console.log('[useSelectionPosition] Failed to get DOM rect:', e.message);
+      console.warn('[useSelectionPosition] Failed to get DOM rect:', e.message);
       // Fails when selection is outdated
     }
   } else {
-    console.log('[useSelectionPosition] No selection or editor not focused');
+    //console.log('[useSelectionPosition] No selection or editor not focused');
   }
 
   return rect;

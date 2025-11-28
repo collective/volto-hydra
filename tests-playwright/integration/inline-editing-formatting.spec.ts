@@ -44,26 +44,22 @@ test.describe('Inline Editing - Formatting', () => {
       message: 'Step 3: After creating selection'
     });
 
-    // STEP 4: Wait a moment to ensure selection is stable
-    await page.waitForTimeout(100);
-
-    // STEP 5: Verify selection still exists just before clicking button
+    // STEP 4: Verify selection still exists just before clicking button
     await helper.assertTextSelection(editor, 'Text to make bold', {
       shouldExist: true,
       shouldBeCollapsed: false,
-      message: 'Step 5: Before clicking bold button'
+      message: 'Step 4: Before clicking bold button'
     });
 
-    // STEP 5.5: Wait for toolbar to be fully ready and stable
+    // STEP 5: Wait for toolbar to be fully ready and stable
     await helper.waitForQuantaToolbar(blockId);
-    await page.waitForTimeout(100); // Let toolbar settle
 
     // STEP 6: Trigger the bold button using dispatchEvent
     console.log('[TEST] Step 6: Clicking bold button...');
     await helper.clickFormatButton('bold');
 
-    // STEP 7: Wait a moment for the formatting to apply
-    await page.waitForTimeout(500);
+    // STEP 7: Wait for bold formatting AND text content to be stable (polls until both conditions met)
+    await helper.waitForFormattedText(editor, /Text to make bold/, 'bold');
 
     // STEP 8: Check selection after button click
     await helper.assertTextSelection(editor, undefined, {
@@ -133,13 +129,13 @@ test.describe('Inline Editing - Formatting', () => {
       message: 'After selecting all, selection should exist and cover all text',
     });
 
-    // Apply bold
+    // Apply bold and wait for it to appear with text content
     await helper.clickFormatButton('bold');
-    await page.waitForTimeout(200);
+    await helper.waitForFormattedText(editor, /Bold and italic text/, 'bold');
 
-    // Apply italic (text should still be selected)
+    // Apply italic (text should still be selected) and wait for it to appear
     await helper.clickFormatButton('italic');
-    await page.waitForTimeout(200);
+    await helper.waitForFormattedText(editor, /Bold and italic text/, 'italic');
 
     // Verify both formats are applied
     // Note: hydra.js renders formatting as inline styles, not semantic tags
@@ -225,10 +221,10 @@ test.describe('Inline Editing - Formatting', () => {
     await editor.pressSequentially('Bold text', { delay: 10 });
     await helper.waitForEditorText(editor, /Bold text/);
 
-    // Select all and make it bold
+    // Select all and make it bold, wait for formatting AND content to be stable
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible();
+    await helper.waitForFormattedText(editor, /Bold text/, 'bold');
 
     // Move cursor to end
     await helper.moveCursorToEnd(editor);
@@ -429,9 +425,8 @@ test.describe('Inline Editing - Formatting', () => {
     // Press Cmd+B again to toggle bold OFF
     console.log('[TEST] Second Meta+b - toggling bold off');
     await editor.press('Meta+b');
-    await page.waitForTimeout(200);
 
-    // Wait for bold button to become inactive
+    // Wait for bold button to become inactive (polls until condition met)
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(false);
     }).toPass({ timeout: 5000 });

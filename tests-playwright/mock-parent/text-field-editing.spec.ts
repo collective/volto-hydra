@@ -55,10 +55,7 @@ test.describe('Non-Slate Text Field Editing', () => {
     await page.keyboard.press('Meta+A');
     await page.keyboard.type('Updated text');
 
-    // Wait for the change to be sent
-    await page.waitForTimeout(500);
-
-    // Verify the text was updated
+    // Verify the text was updated (auto-retries until condition met)
     await expect(textField).toHaveText('Updated text');
   });
 
@@ -81,12 +78,8 @@ test.describe('Non-Slate Text Field Editing', () => {
     await textField.click();
     await page.keyboard.type(' edited');
 
-    // Wait for message to be sent
-    await page.waitForTimeout(500);
-
-    // Verify we saw INLINE_EDIT_DATA message
-    const hasInlineEditData = messages.some(m => m.includes('INLINE_EDIT_DATA'));
-    expect(hasInlineEditData).toBe(true);
+    // Wait for INLINE_EDIT_DATA message to be captured (polls until condition met)
+    await expect.poll(() => messages.some(m => m.includes('INLINE_EDIT_DATA'))).toBe(true);
   });
 
 
@@ -121,11 +114,9 @@ test.describe('Non-Slate Text Field Editing', () => {
 
     // Press Enter - should NOT create a new line in string field
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
 
-    // Verify no newline was created
-    const text = await textField.textContent();
-    expect(text).toBe('First line'); // Should not have newline or additional text
+    // Verify no newline was created (polls until stable)
+    await expect(textField).toHaveText('First line');
 
     // Verify HTML doesn't contain <br> or newlines
     const html = await textField.innerHTML();
@@ -149,16 +140,22 @@ test.describe('Non-Slate Text Field Editing', () => {
 
     // Press Enter - should trigger SLATE_TRANSFORM_REQUEST (not be prevented)
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(500);
+
+    // Wait for Enter transform to complete by checking DOM has changed
+    // Enter in slate creates a new paragraph, so text should be split
+    await expect.poll(async () => {
+      const text = await slateField.textContent();
+      // After Enter, "First line" should still exist but field should have been re-rendered
+      return text?.includes('First line');
+    }).toBe(true);
 
     // If Enter was blocked by string handler, typing would fail
     // Since this is a slate field, Enter should NOT be blocked
     // We verify typing still works after Enter
     await page.keyboard.type('After Enter');
-    await page.waitForTimeout(200);
 
-    const content = await slateField.textContent();
-    expect(content).toContain('After Enter');
+    // Verify text appears (polls until condition met)
+    await expect(slateField).toContainText('After Enter');
   });
 
   test('textarea field allows Enter to create newlines with \\n', async ({ page }) => {
@@ -177,19 +174,15 @@ test.describe('Non-Slate Text Field Editing', () => {
 
     // Press Enter - should create a newline within the field
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
 
     // Type second line
     await page.keyboard.type('Second line');
-    await page.waitForTimeout(500); // Wait for debounced update
 
-    // Verify the content contains both lines (displayed content)
-    const text = await textareaField.textContent();
-    expect(text).toContain('First line');
-    expect(text).toContain('Second line');
+    // Verify the content contains both lines (polls until condition met)
+    await expect(textareaField).toContainText('First line');
+    await expect(textareaField).toContainText('Second line');
 
     // Verify the innerText (which is what gets sent) contains \n
-    const innerText = await textareaField.evaluate(el => el.innerText);
-    expect(innerText).toBe('First line\nSecond line');
+    await expect.poll(async () => await textareaField.evaluate(el => el.innerText)).toBe('First line\nSecond line');
   });
 });

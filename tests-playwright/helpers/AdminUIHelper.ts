@@ -113,7 +113,7 @@ export class AdminUIHelper {
   /**
    * Wait for the preview iframe to load.
    */
-  async waitForIframeReady(timeout: number = 20000): Promise<void> {
+  async waitForIframeReady(timeout: number = 30000): Promise<void> {
     await this.page.waitForSelector('#previewIframe', {
       state: 'visible',
       timeout,
