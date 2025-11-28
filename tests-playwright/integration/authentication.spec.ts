@@ -81,7 +81,7 @@ test.describe('Authentication and Access Control', () => {
 
     // Navigate to view page (not edit)
     await page.goto('http://localhost:3001/test-page');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState();
 
     // The left toolbar should be visible with Edit button
     // This confirms we're logged in and have edit permissions

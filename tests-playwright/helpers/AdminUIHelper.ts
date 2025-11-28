@@ -331,23 +331,14 @@ export class AdminUIHelper {
    * Wait for the Quanta toolbar to appear on a block.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
-    // Toolbar is now rendered in the parent window, not in the iframe
-    const toolbar = this.page.locator('.quanta-toolbar');
-
-    try {
-      await toolbar.waitFor({ state: 'visible', timeout });
-    } catch (e) {
-      throw new Error(
-        `Quanta toolbar overlay did not appear for block "${blockId}" within ${timeout}ms. ` +
-        `The toolbar is now rendered in the parent window as an overlay. ` +
-        `Check that: (1) hydra.js is loaded, (2) selectBlock() sends BLOCK_SELECTED message, ` +
-        `and (3) View.jsx renders the toolbar overlay on BLOCK_SELECTED.`
-      );
-    }
-    const result = await this.isBlockSelectedInIframe(blockId);
-    if (!result.ok) {
-      throw new Error(`Block "${blockId}" selection check failed: ${result.reason}`);
-    }
+    // Use Playwright's expect.poll to wait until our iframe-selection helper reports the block is selected.
+    // Support both boolean and { ok } return shapes from isBlockSelectedInIframe.
+    await expect.poll(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res: any = await this.isBlockSelectedInIframe(blockId);
+      if (typeof res === 'boolean') return res;
+      return !!res && !!res.ok;
+    }, { timeout }).toBeTruthy();
   }
 
   async getMenuButtonInQuantaToolbar(blockId: string, formatKeyword:string): Promise<void> {

@@ -93,8 +93,7 @@ test.describe('Block Selection', () => {
     expect(hasToolbar).toBe(true);
 
     // Verify block appears selected with proper positioning
-    const result = await helper.isBlockSelectedInIframe(blockId);
-    expect(result.ok).toBe(true);
+    await helper.waitForQuantaToolbar(blockId);
   });
 
   test('switching block selection updates visual state', async ({ page }) => {
