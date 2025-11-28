@@ -76,9 +76,41 @@ if (process.env.DEBUG) {
 }
 
 /**
- * No authentication required for test mock server
- * All requests are allowed
+ * Check if request has valid authentication
+ * @param {Object} req - Express request object
+ * @returns {boolean} True if authenticated
  */
+function isAuthenticated(req) {
+  const authHeader = req.headers.authorization;
+  return authHeader && authHeader.startsWith('Bearer ');
+}
+
+/**
+ * Filter actions based on authentication status
+ * Unauthenticated users don't get edit permission
+ * @param {Object} content - Content object with @components
+ * @param {boolean} authenticated - Whether user is authenticated
+ * @returns {Object} Content with filtered actions
+ */
+function filterActionsForAuth(content, authenticated) {
+  if (!content || !content['@components'] || !content['@components'].actions) {
+    return content;
+  }
+
+  // Clone content to avoid mutating original
+  const filtered = JSON.parse(JSON.stringify(content));
+
+  if (!authenticated) {
+    // Remove edit action for unauthenticated users
+    if (filtered['@components'].actions.object) {
+      filtered['@components'].actions.object = filtered[
+        '@components'
+      ].actions.object.filter((action) => action.id !== 'edit');
+    }
+  }
+
+  return filtered;
+}
 
 // Load initial content from fixtures
 function loadInitialContent() {
@@ -453,12 +485,16 @@ app.get('*', (req, res, next) => {
   const content = contentDB[cleanPath];
 
   if (content) {
+    // Filter actions based on authentication
+    const authenticated = isAuthenticated(req);
+    const filteredContent = filterActionsForAuth(content, authenticated);
+
     if (process.env.DEBUG) {
-      console.log(`[DEBUG] Serving API content for ${cleanPath}`);
+      console.log(`[DEBUG] Serving API content for ${cleanPath} (auth: ${authenticated})`);
       console.log(`[DEBUG] Query params:`, req.query);
-      console.log(`[DEBUG] Response preview:`, JSON.stringify(content).substring(0, 500));
+      console.log(`[DEBUG] Response preview:`, JSON.stringify(filteredContent).substring(0, 500));
     }
-    res.json(content);
+    res.json(filteredContent);
   } else {
     res.status(404).json({
       error: {

@@ -1892,42 +1892,47 @@ export class AdminUIHelper {
 
   /**
    * Logout from the Admin UI.
-   * Clicks the user menu and then the logout button.
-   * This is a complex operation that handles various UI patterns.
+   * Clicks the PersonalTools button in the toolbar, then clicks Logout.
    *
    * @throws Error if logout UI elements cannot be found
    */
   async logout(): Promise<void> {
-    // Look for user menu
-    const userMenu = this.page.locator('[aria-label="User menu"]').or(
-      this.page.locator('.user.menu')
-    ).first();
+    // Look for PersonalTools button in the left toolbar
+    // The button has class="user" and id="toolbar-personal"
+    const userMenu = this.page
+      .locator('#toolbar-personal')
+      .or(this.page.locator('#toolbar button.user'))
+      .or(this.page.locator('[aria-label="Personal tools"]'))
+      .first();
 
     const menuCount = await userMenu.count();
     if (menuCount === 0) {
       throw new Error(
-        'User menu not found. Check that user is logged in and the user menu element exists.'
+        'PersonalTools button not found. Check that user is logged in and on view page (not edit).',
       );
     }
 
-    // Verify menu is visible before clicking
+    // Verify button is visible before clicking
     try {
-      await userMenu.waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
+      await userMenu.waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
       throw new Error(
-        'User menu exists but is not visible. Check that the UI is fully loaded.'
+        'PersonalTools button exists but is not visible. Check that the toolbar is fully loaded.',
       );
     }
 
     await userMenu.click();
 
-    // Wait for dropdown to appear
-    const logoutButton = this.page.locator('text=Logout').or(
-      this.page.locator('text=Log out')
-    );
+    // Wait for dropdown to appear - the logout is a Link with id="toolbar-logout"
+    // It contains an SVG with class="logout"
+    const logoutButton = this.page
+      .locator('#toolbar-logout')
+      .or(this.page.locator('a .icon.logout').first())
+      .or(this.page.locator('[aria-label="Logout"]'))
+      .or(this.page.locator('text=Logout'));
 
     try {
-      await logoutButton.waitFor({ state: 'visible', timeout: 2000 });
+      await logoutButton.first().waitFor({ state: 'visible', timeout: 2000 });
     } catch (e) {
       throw new Error(
         'Logout button did not appear after clicking user menu. ' +
@@ -1935,7 +1940,7 @@ export class AdminUIHelper {
       );
     }
 
-    await logoutButton.click();
+    await logoutButton.first().click();
 
     // Wait for redirect to login page
     try {
