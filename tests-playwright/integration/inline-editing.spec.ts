@@ -1258,10 +1258,8 @@ test.describe('Inline Editing', () => {
     expect(html).toContain('<a href="https://example.com">link</a>');
   });
 
-  test('can paste plain text', async ({ page }) => {
-    // Test paste functionality - reuses the existing "can cut text" test
-    // Since that test already cuts and pastes back, we verify the paste works there
-    // This test is essentially a duplicate - keeping it for API coverage
+  test('can cut and paste plain text', async ({ page }) => {
+    // Test cut and paste functionality using clipboard helpers
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1275,47 +1273,21 @@ test.describe('Inline Editing', () => {
     await editor.pressSequentially('Text to paste', { delay: 10 });
     await helper.waitForEditorText(editor, /Text to paste/);
 
-    // Select all text
+    // Select all text and cut
     await helper.selectAllTextInEditor(editor);
+    const cutText = await helper.cutSelectedText(editor);
+    console.log('[TEST] Cut text:', JSON.stringify(cutText));
 
-    // Cut using keyboard shortcut - use page.keyboard like the working test
-    await page.keyboard.press('Meta+x');
-    await page.waitForTimeout(300);  // Give time for clipboard operation
-
-    // Check if cut worked
-    const textAfterCut = await editor.textContent();
-    console.log('[TEST] Text after cut:', JSON.stringify(textAfterCut));
-
-    // If cut didn't work, the text will still be there
-    if (textAfterCut === 'Text to paste') {
-      // Cut didn't work - try Control instead of Meta
-      console.log('[TEST] Meta+x did not cut, trying Control+x');
-      await helper.selectAllTextInEditor(editor);
-      await page.keyboard.press('Control+x');
-      await page.waitForTimeout(300);
-    }
-
-    // Wait for empty
+    // Wait for text to be cleared
     await helper.waitForEditorText(editor, /^$/);
 
-    // Paste using keyboard shortcut
-    await page.keyboard.press('Meta+v');
-    await page.waitForTimeout(300);
-
-    // Check if paste worked
-    let textAfterPaste = await editor.textContent();
-    console.log('[TEST] Text after Meta+v paste:', JSON.stringify(textAfterPaste));
-
-    if (!textAfterPaste || textAfterPaste === '') {
-      // Try Control+v
-      console.log('[TEST] Meta+v did not paste, trying Control+v');
-      await page.keyboard.press('Control+v');
-      await page.waitForTimeout(300);
-      textAfterPaste = await editor.textContent();
-      console.log('[TEST] Text after Control+v paste:', JSON.stringify(textAfterPaste));
-    }
+    // Paste the text back and wait for it to appear
+    await helper.pasteFromClipboard(editor);
+    await helper.waitForEditorText(editor, /Text to paste/);
 
     // Verify paste worked
+    const textAfterPaste = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Text after paste:', JSON.stringify(textAfterPaste));
     expect(textAfterPaste).toContain('Text to paste');
   });
 
@@ -1346,7 +1318,7 @@ test.describe('Inline Editing', () => {
     await helper.waitForEditorText(editor, /Hello world testing/);
 
     // Verify we have "Hello world testing" with "world" in bold
-    const initialText = await editor.textContent();
+    const initialText = await helper.getCleanTextContent(editor);
     expect(initialText).toBe('Hello world testing');
 
     // Select from "lo w" to "ld te" (crosses bold boundary)
@@ -1389,7 +1361,7 @@ test.describe('Inline Editing', () => {
     await page.waitForTimeout(500);
 
     // Verify result - should be "Helsting" (removed "lo world te")
-    const finalText = await editor.textContent();
+    const finalText = await helper.getCleanTextContent(editor);
     expect(finalText).toBe('Helsting');
   });
 

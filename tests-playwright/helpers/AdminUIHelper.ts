@@ -602,6 +602,45 @@ export class AdminUIHelper {
   }
 
   /**
+   * Cut selected text and return the cut content.
+   * Uses native keyboard cut (Meta+x) and reads from clipboard API.
+   * Automatically grants clipboard permissions if needed.
+   */
+  async cutSelectedText(editor: Locator): Promise<string> {
+    // Grant clipboard permissions
+    await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Trigger native cut with keyboard shortcut
+    await editor.press('Meta+x');
+
+    // Small delay for clipboard to be populated
+    await this.page.waitForTimeout(50);
+
+    // Read clipboard from parent page (clipboard is shared)
+    const clipboardText = await this.page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+
+    return clipboardText;
+  }
+
+  /**
+   * Paste text from clipboard into the editor.
+   * Uses native keyboard paste (Meta+v).
+   * Automatically grants clipboard permissions if needed.
+   */
+  async pasteFromClipboard(editor: Locator): Promise<void> {
+    // Grant clipboard permissions
+    await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // Trigger native paste with keyboard shortcut
+    await editor.press('Meta+v');
+
+    // Small delay for paste to complete
+    await this.page.waitForTimeout(50);
+  }
+
+  /**
    * Get selection state info from an editor element.
    * Useful for debugging selection/focus issues.
    */

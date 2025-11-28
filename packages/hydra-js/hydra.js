@@ -795,6 +795,19 @@ export class Bridge {
       }
     }
 
+    // Handle empty element case (no text nodes) - cursor is at start of element
+    if (!textNode && node.nodeType === Node.ELEMENT_NODE) {
+      console.log('[HYDRA] serializePoint: Empty element, using element path with text index 0');
+      // Find the element's path by walking up from the element itself
+      const elementPath = this.getElementPath(node);
+      if (elementPath) {
+        // For empty paragraph, selection should be at [0, 0] offset 0
+        // (paragraph path + text child index 0)
+        return { path: [...elementPath, 0], offset: 0 };
+      }
+      return null;
+    }
+
     // Walk up to find the path through the Slate structure
     console.log('[HYDRA] serializePoint calling getNodePath with textNode:', textNode?.nodeName, 'textOffset:', textOffset);
     const path = this.getNodePath(textNode);
@@ -862,6 +875,35 @@ export class Bridge {
     }
 
     return slateIndex;
+  }
+
+  /**
+   * Gets the Slate path for an element node (not text node) by checking data-node-id
+   * Used when selection is in an empty element with no text children
+   *
+   * @param {Element} element - DOM element to find path for
+   * @returns {Array|null} Slate path as array of indices, or null if not found
+   */
+  getElementPath(element) {
+    // Walk up to find the element with data-node-id
+    let current = element;
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+      if (current.hasAttribute('data-node-id')) {
+        const nodeId = current.getAttribute('data-node-id');
+        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        console.log('[HYDRA] getElementPath: Found node-id', nodeId, '-> path:', parts);
+        return parts;
+      }
+      if (current.hasAttribute('data-editable-field')) {
+        // Reached the container without finding a node-id
+        // For empty containers, return [0] (first paragraph)
+        console.log('[HYDRA] getElementPath: Reached container, returning [0]');
+        return [0];
+      }
+      current = current.parentElement;
+    }
+    console.warn('[HYDRA] getElementPath: Could not find path for element');
+    return null;
   }
 
   getNodePath(node) {
