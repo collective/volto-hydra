@@ -224,7 +224,13 @@
             data: mockFormData,
             blockFieldTypes: blockFieldTypes,  // Block type -> field name -> field type
             slateConfig: {
-              hotkeys: {},
+              hotkeys: {
+                // Keyboard shortcuts for formatting (Cmd+B, Cmd+I, etc.)
+                'mod+b': { type: 'inline', format: 'strong' },
+                'mod+i': { type: 'inline', format: 'em' },
+                'mod+u': { type: 'inline', format: 'u' },
+                'mod+s': { type: 'inline', format: 'del' },
+              },
               toolbarButtons: [], // Not used by current implementation
               buttonConfigs: {
                 // Simple mock button config for testing
@@ -261,9 +267,9 @@
           break;
         }
 
-        case 'SLATE_FORMAT_REQUEST': {
-          const { blockId, format, action, selection } = message;
-          console.log('[MOCK_PARENT] Processing SLATE_FORMAT_REQUEST:', { blockId, format, action, selection });
+        case 'SLATE_TRANSFORM_REQUEST': {
+          const { blockId, transformType, format, selection, requestId, fieldName, data } = message;
+          console.log('[MOCK_PARENT] Processing SLATE_TRANSFORM_REQUEST:', { blockId, transformType, format, selection, requestId });
 
           // Simulate slow transform with configurable delay
           const transformDelay = window.mockTransformDelay || 0;
@@ -273,36 +279,46 @@
               await new Promise(resolve => setTimeout(resolve, transformDelay));
             }
 
-          // Get current value
-          const currentValue = mockFormData.blocks[blockId].value;
+            // Update mockFormData from the message data (includes latest text)
+            if (data) {
+              mockFormData = data;
+            }
 
-          console.log('[MOCK_PARENT] Applying Slate transformation:', {
-            format,
-            action,
-            selection,
-            currentValue: JSON.stringify(currentValue)
-          });
+            // Get current value from the correct field
+            const block = mockFormData.blocks[blockId];
+            const currentValue = block[fieldName] || block.value;
 
-          // Apply the real Slate transformation
-          const updatedValue = applySlateTransform(currentValue, selection, format, action);
+            console.log('[MOCK_PARENT] Applying Slate transformation:', {
+              transformType,
+              format,
+              selection,
+              currentValue: JSON.stringify(currentValue)
+            });
 
-          console.log('[MOCK_PARENT] Transformation result:', JSON.stringify(updatedValue));
+            // Apply the Slate transformation (for format transforms)
+            let updatedValue = currentValue;
+            if (transformType === 'format' && format) {
+              updatedValue = applySlateTransform(currentValue, selection, format, transformType);
+            }
 
-          // Update the block in mockFormData
-          mockFormData.blocks[blockId] = {
-            ...mockFormData.blocks[blockId],
-            value: updatedValue,
-          };
+            console.log('[MOCK_PARENT] Transformation result:', JSON.stringify(updatedValue));
 
-          // Send FORM_DATA with complete updated form data AND transformed selection
-          const response = {
-            type: 'FORM_DATA',
-            data: mockFormData,
-            selection: selection,
-          };
-          console.log('[MOCK_PARENT] Sending FORM_DATA with selection:', response);
-          event.source.postMessage(response, event.origin);
-          logMessage('sent', 'FORM_DATA', { blockId, updatedValue, selection });
+            // Update the block in mockFormData
+            mockFormData.blocks[blockId] = {
+              ...mockFormData.blocks[blockId],
+              [fieldName || 'value']: updatedValue,
+            };
+
+            // Send FORM_DATA with formatRequestId so hydra.js knows to unblock
+            const response = {
+              type: 'FORM_DATA',
+              data: mockFormData,
+              formatRequestId: requestId,
+              savedSelection: selection,
+            };
+            console.log('[MOCK_PARENT] Sending FORM_DATA with formatRequestId:', response);
+            event.source.postMessage(response, event.origin);
+            logMessage('sent', 'FORM_DATA', { blockId, formatRequestId: requestId });
           };
 
           // Execute the async transform (with optional delay) - await to ensure delay happens

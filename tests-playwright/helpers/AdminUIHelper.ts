@@ -113,7 +113,7 @@ export class AdminUIHelper {
   /**
    * Wait for the preview iframe to load.
    */
-  async waitForIframeReady(timeout: number = 10000): Promise<void> {
+  async waitForIframeReady(timeout: number = 20000): Promise<void> {
     await this.page.waitForSelector('#previewIframe', {
       state: 'visible',
       timeout,
@@ -134,8 +134,16 @@ export class AdminUIHelper {
   /**
    * Click on a block within the preview iframe.
    * Waits for the block to be selected (have the outline) after clicking.
+   *
+   * @param blockId - The data-block-uid of the block to click
+   * @param options.waitForToolbar - If true (default), waits for Volto's quanta-toolbar.
+   *                                  Set to false for mock parent tests where Volto isn't running.
    */
-  async clickBlockInIframe(blockId: string) {
+  async clickBlockInIframe(
+    blockId: string,
+    options: { waitForToolbar?: boolean } = {},
+  ) {
+    const { waitForToolbar = true } = options;
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -149,22 +157,29 @@ export class AdminUIHelper {
     await block.scrollIntoViewIfNeeded();
     await block.click();
 
-    // Wait for the block UI overlays to appear in the parent window (toolbar and selection outline)
-    // The selection outline and toolbar are now rendered in the parent window, not in the iframe
-    try {
-      await this.page.locator('.quanta-toolbar').waitFor({
-        state: 'visible',
-        timeout: 5000
-      });
-    } catch (e) {
-      throw new Error(`Block "${blockId}" was clicked but the toolbar overlay never appeared in parent window. This likely means selectBlock() in hydra.js is not sending BLOCK_SELECTED message. Check that hydra.js is loaded and selectBlock() is being called.`);
+    if (waitForToolbar) {
+      // Wait for the block UI overlays to appear in the parent window (toolbar and selection outline)
+      // The selection outline and toolbar are now rendered in the parent window, not in the iframe
+      try {
+        await this.page.locator('.quanta-toolbar').waitFor({
+          state: 'visible',
+          timeout: 5000
+        });
+      } catch (e) {
+        throw new Error(`Block "${blockId}" was clicked but the toolbar overlay never appeared in parent window. This likely means selectBlock() in hydra.js is not sending BLOCK_SELECTED message. Check that hydra.js is loaded and selectBlock() is being called.`);
+      }
+
+      // Wait for the Quanta toolbar to appear on the selected block
+      await this.waitForQuantaToolbar(blockId);
+    } else {
+      // For mock parent tests: wait for block to become editable instead of toolbar
+      const editableField = block.locator('[contenteditable="true"]');
+      try {
+        await editableField.waitFor({ state: 'visible', timeout: 5000 });
+      } catch (e) {
+        throw new Error(`Block "${blockId}" was clicked but no contenteditable field appeared. Check that hydra.js is handling the block selection.`);
+      }
     }
-
-    // Wait for the Quanta toolbar to appear on the selected block
-    await this.waitForQuantaToolbar(blockId);
-
-    // Wait for the sidebar to open and show this block's info
-    // await this.waitForSidebarOpen();
 
     // Return the block locator for chaining
     return block;

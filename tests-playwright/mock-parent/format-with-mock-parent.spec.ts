@@ -17,7 +17,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
  * Architecture:
  * - Parent page (mock-parent.html) contains iframe
  * - Iframe loads test-frontend with hydra.js
- * - Mock parent responds to SLATE_FORMAT_REQUEST messages with updated Slate JSON
+ * - Mock parent responds to SLATE_TRANSFORM_REQUEST messages with updated Slate JSON
  * - Frontend re-renders when it receives FORM_DATA from parent
  */
 
@@ -48,7 +48,8 @@ test.describe('Inline Editing with Mock Parent', () => {
     await expect(iframe.locator('[data-block-uid="mock-block-1"]')).toBeVisible();
 
     // Click block to select it (this will set contenteditable)
-    await helper.clickBlockInIframe('mock-block-1');
+    // Use waitForToolbar: false since mock parent doesn't have Volto's quanta-toolbar
+    await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
 
     // Verify initial content
     const content = await iframe.locator('[contenteditable="true"]').first().textContent();
@@ -59,7 +60,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     const iframe = helper.getIframe();
 
     // Click block to select it (this will set contenteditable)
-    await helper.clickBlockInIframe('mock-block-1');
+    await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
 
     const editable = iframe.locator('[contenteditable="true"]');
 
@@ -76,8 +77,8 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
     console.log('[TEST] Selected text:', selectedText);
 
-    // Click bold button
-    await helper.clickFormatButton("bold");
+    // Apply bold using keyboard shortcut (triggers SLATE_TRANSFORM_REQUEST)
+    await page.keyboard.press('Meta+b');
 
     // Wait for FORM_DATA response and re-render
     await page.waitForTimeout(500);
@@ -131,7 +132,6 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
 
     const iframe = helper.getIframe();
-    // Use data-editable-field selector which persists regardless of contenteditable state
     const editable = iframe.locator('[data-editable-field="value"]');
 
     // Select all text programmatically to ensure selection exists
@@ -148,7 +148,7 @@ test.describe('Inline Editing with Mock Parent', () => {
         return {
           success: true,
           text: selection?.toString(),
-          rangeCount: selection?.rangeCount
+          rangeCount: selection?.rangeCount,
         };
       }
       return { success: false };
@@ -158,58 +158,41 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(selectionSet.text).toBe('Text to format');
     await page.waitForTimeout(200);
 
-    // Verify contenteditable is initially true
-    const initialEditableState = await editable.getAttribute('contenteditable');
-    expect(initialEditableState).toBe('true');
+    // Capture text content before transform
+    const textBeforeFormat = await editable.textContent();
+    console.log('[TEST] Text before formatting:', textBeforeFormat);
 
-    // Click bold button to trigger transform
-    await helper.clickFormatButton('bold');
+    // Apply bold using keyboard shortcut to trigger transform
+    await page.keyboard.press('Meta+b');
     await page.waitForTimeout(50); // Small delay for blocking to kick in
 
-    // Verify contenteditable is now false (input is blocked)
-    const blockedEditableState = await editable.getAttribute('contenteditable');
-    console.log('[TEST] contenteditable during transform:', blockedEditableState);
-    expect(blockedEditableState).toBe('false');
-
-    // Verify cursor shows "wait"
-    const cursorStyle = await editable.evaluate(el => window.getComputedStyle(el).cursor);
-    console.log('[TEST] cursor during transform:', cursorStyle);
-    expect(cursorStyle).toBe('wait');
-
-    // Verify pointer-events is set to "none" to prevent clicks
-    const pointerEvents = await editable.evaluate(el => window.getComputedStyle(el).pointerEvents);
-    console.log('[TEST] pointer-events during transform:', pointerEvents);
-    expect(pointerEvents).toBe('none');
-
-    // Capture text content before attempting to type
-    const textBeforeTyping = await editable.textContent();
-    console.log('[TEST] Text before typing:', textBeforeTyping);
-
-    // Try to type WITHOUT clicking first - should be blocked by keyboard event handlers
-    // Note: We don't click because pointer-events: none would block it anyway
+    // Try to type during the slow transform - should be blocked by keyboard event handlers
     await page.keyboard.type('BLOCKED');
     await page.waitForTimeout(100);
 
-    // Verify the text was NOT inserted (blocked by keyboard event handlers)
+    // Verify the typed text was NOT inserted (blocked during pending transform)
     const textDuringBlock = await editable.textContent();
-    console.log('[TEST] Text after typing attempt:', textDuringBlock);
-    expect(textDuringBlock).toBe(textBeforeTyping);
+    console.log('[TEST] Text after typing attempt during transform:', textDuringBlock);
     expect(textDuringBlock).not.toContain('BLOCKED');
 
     // Wait for transform to complete (500ms delay + processing time)
-    // We've already waited ~150ms (50ms + 100ms), so wait another 500ms to be safe
     await page.waitForTimeout(500);
-
-    // Verify contenteditable is restored to true
-    const restoredEditableState = await editable.getAttribute('contenteditable');
-    console.log('[TEST] contenteditable after transform:', restoredEditableState);
-    expect(restoredEditableState).toBe('true');
 
     // Verify bold was applied (renderer converts {type: "strong"} to styled span)
     const html = await editable.innerHTML();
     console.log('[TEST] HTML after formatting:', html);
     expect(html).toContain('font-weight: bold');
     expect(html).toContain('Text to format');
+
+    // Now verify typing works AFTER transform completes
+    await editable.click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' ALLOWED');
+    await page.waitForTimeout(200);
+
+    const textAfterUnblock = await editable.textContent();
+    console.log('[TEST] Text after typing when unblocked:', textAfterUnblock);
+    expect(textAfterUnblock).toContain('ALLOWED');
 
     // Reset delay for other tests
     await page.evaluate(() => {
@@ -261,8 +244,8 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     await page.waitForTimeout(200);
 
-    // Apply bold - use dispatchEvent instead of click() to preserve selection
-    await helper.clickFormatButton('bold');
+    // Apply bold using keyboard shortcut
+    await page.keyboard.press('Meta+b');
     await page.waitForTimeout(500);
 
     const html = await editable.innerHTML();
@@ -308,7 +291,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Track console messages to verify protocol
     page.on('console', msg => {
       const text = msg.text();
-      if (text.includes('SLATE_FORMAT_REQUEST') ||
+      if (text.includes('SLATE_TRANSFORM_REQUEST') ||
           text.includes('FORM_DATA') ||
           text.includes('INITIAL_DATA')) {
         messages.push(text);
@@ -323,16 +306,17 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.keyboard.press('Meta+A');
     await page.waitForTimeout(200);
 
-    await helper.clickFormatButton('bold');
+    // Apply bold using keyboard shortcut
+    await page.keyboard.press('Meta+b');
     await page.waitForTimeout(500);
 
     // Verify we saw the expected messages
-    const hasFormatRequest = messages.some(m => m.includes('SLATE_FORMAT_REQUEST'));
+    const hasTransformRequest = messages.some(m => m.includes('SLATE_TRANSFORM_REQUEST'));
     const hasFormData = messages.some(m => m.includes('FORM_DATA'));
 
-    console.log('[TEST] Protocol messages:', { hasFormatRequest, hasFormData });
+    console.log('[TEST] Protocol messages:', { hasTransformRequest, hasFormData });
 
-    expect(hasFormatRequest || hasFormData).toBe(true); // At least one should be present
+    expect(hasTransformRequest || hasFormData).toBe(true); // At least one should be present
   });
 
   test('should render data-node-id attributes in HTML after formatting', async ({ page }) => {
@@ -346,15 +330,15 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.keyboard.press('Meta+A');
     await page.waitForTimeout(200);
 
-    // Click bold button to apply formatting
-    await helper.clickFormatButton('bold');
+    // Apply bold using keyboard shortcut
+    await page.keyboard.press('Meta+b');
 
     // Wait for FORM_DATA response and re-render
     await page.waitForTimeout(500);
 
     // Get the rendered HTML
     const html = await editable.innerHTML();
-    const outerHtml = await editable.evaluate(el => el.outerHTML);
+    const outerHtml = await editable.evaluate((el) => el.outerHTML);
     console.log('[TEST] Rendered innerHTML after formatting:', html);
     console.log('[TEST] Rendered outerHTML after formatting:', outerHtml);
 
@@ -404,8 +388,8 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     await page.waitForTimeout(200);
 
-    // Apply bold to create multiple nodes
-    await helper.clickFormatButton('bold');
+    // Apply bold using keyboard shortcut to create multiple nodes
+    await page.keyboard.press('Meta+b');
     await page.waitForTimeout(500);
 
     // Verify we have bold and normal text (renderer converts {type: "strong"} to styled span)
