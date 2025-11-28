@@ -563,7 +563,7 @@ export class AdminUIHelper {
 
   /**
    * Copy selected text and return clipboard content.
-   * Uses native keyboard copy (Meta+c) and reads from clipboard API.
+   * Uses native keyboard copy (ControlOrMeta+c) and reads from clipboard API.
    * Automatically grants clipboard permissions if needed.
    */
   async copyAndGetClipboardText(editor: Locator): Promise<string> {
@@ -571,7 +571,7 @@ export class AdminUIHelper {
     await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Trigger native copy with keyboard shortcut
-    await editor.press('Meta+c');
+    await editor.press('ControlOrMeta+c');
 
     // Small delay for clipboard to be populated
     await this.page.waitForTimeout(50);
@@ -586,7 +586,7 @@ export class AdminUIHelper {
 
   /**
    * Cut selected text and return the cut content.
-   * Uses native keyboard cut (Meta+x) and reads from clipboard API.
+   * Uses native keyboard cut (ControlOrMeta+x) and reads from clipboard API.
    * Automatically grants clipboard permissions if needed.
    */
   async cutSelectedText(editor: Locator): Promise<string> {
@@ -594,7 +594,7 @@ export class AdminUIHelper {
     await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Trigger native cut with keyboard shortcut
-    await editor.press('Meta+x');
+    await editor.press('ControlOrMeta+x');
 
     // Small delay for clipboard to be populated
     await this.page.waitForTimeout(50);
@@ -609,7 +609,7 @@ export class AdminUIHelper {
 
   /**
    * Paste text from clipboard into the editor.
-   * Uses native keyboard paste (Meta+v).
+   * Uses native keyboard paste (ControlOrMeta+v).
    * Automatically grants clipboard permissions if needed.
    */
   async pasteFromClipboard(editor: Locator): Promise<void> {
@@ -617,7 +617,7 @@ export class AdminUIHelper {
     await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Trigger native paste with keyboard shortcut
-    await editor.press('Meta+v');
+    await editor.press('ControlOrMeta+v');
 
     // Small delay for paste to complete
     await this.page.waitForTimeout(50);

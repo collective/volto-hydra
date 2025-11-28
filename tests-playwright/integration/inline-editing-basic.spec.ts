@@ -296,7 +296,7 @@ test.describe('Inline Editing - Basic', () => {
     // Select all text in the sidebar editor and apply bold formatting
     const sidebarEditor = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
     await sidebarEditor.click();
-    await sidebarEditor.press('Meta+a'); // Select all
+    await sidebarEditor.press('ControlOrMeta+a'); // Select all
 
     // Verify text is selected
     const selectedText = await sidebarEditor.evaluate(() => window.getSelection()?.toString());
@@ -384,7 +384,7 @@ test.describe('Inline Editing - Basic', () => {
 
     const sidebarEditor = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
     await sidebarEditor.click();
-    await sidebarEditor.press('Meta+a'); // Select all in sidebar
+    await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
 
     // Wait for sidebar toolbar to appear and click bold
     const sidebarToolbar = await helper.waitForSidebarSlateToolbar();
@@ -398,7 +398,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Step 4: Now remove bold from sidebar - select all again and click bold to toggle off
     await sidebarEditor.click();
-    await sidebarEditor.press('Meta+a'); // Select all in sidebar
+    await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
 
     // Wait for sidebar toolbar again and click bold to remove formatting
     const sidebarToolbar2 = await helper.waitForSidebarSlateToolbar();

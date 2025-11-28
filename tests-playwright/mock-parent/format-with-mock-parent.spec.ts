@@ -68,13 +68,13 @@ test.describe('Inline Editing with Mock Parent', () => {
     await editable.click();
 
     // Select all text
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
 
     // Verify selection exists in iframe (polls until text is selected)
     await expect.poll(() => editable.evaluate(() => window.getSelection()?.toString())).toBe('Text to format');
 
     // Apply bold using keyboard shortcut (triggers SLATE_TRANSFORM_REQUEST)
-    await page.keyboard.press('Meta+b');
+    await page.keyboard.press('ControlOrMeta+b');
 
     // Wait for bold formatting to appear (polls until condition met)
     await expect(editable.locator('span[style*="font-weight: bold"]')).toBeVisible();
@@ -154,7 +154,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(selectionSet.text).toBe('Text to format');
 
     // Apply bold using keyboard shortcut to trigger transform
-    await page.keyboard.press('Meta+b');
+    await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(50); // Small delay for blocking to kick in
 
     // Type during the slow transform - should be buffered (not inserted yet)
@@ -170,11 +170,13 @@ test.describe('Inline Editing with Mock Parent', () => {
     await expect(editable).toContainText('BUFFERED');
 
     // Verify bold was applied (renderer converts {type: "strong"} to styled span)
+    // Since text was selected when typing, BUFFERED replaces "Text to format"
     const html = await editable.innerHTML();
     console.log('[TEST] HTML after formatting:', html);
     expect(html).toContain('font-weight: bold');
-    expect(html).toContain('Text to format');
     expect(html).toContain('BUFFERED');
+    // Original text is replaced by buffered typing (normal editor behavior)
+    expect(html).not.toContain('Text to format');
 
     // Reset delay for other tests
     await page.evaluate(() => {
@@ -227,7 +229,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.waitForTimeout(200);
 
     // Apply bold using keyboard shortcut
-    await page.keyboard.press('Meta+b');
+    await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(500);
 
     const html = await editable.innerHTML();
@@ -285,11 +287,11 @@ test.describe('Inline Editing with Mock Parent', () => {
     const editable = iframe.locator('[contenteditable="true"]');
 
     await editable.click();
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.waitForTimeout(200);
 
     // Apply bold using keyboard shortcut
-    await page.keyboard.press('Meta+b');
+    await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(500);
 
     // Verify we saw the expected messages
@@ -309,13 +311,13 @@ test.describe('Inline Editing with Mock Parent', () => {
     await editable.click();
 
     // Select all text
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
 
     // Verify selection exists in iframe (polls until text is selected)
     await expect.poll(() => editable.evaluate(() => window.getSelection()?.toString())).toBe('Text to format');
 
     // Apply bold using keyboard shortcut
-    await page.keyboard.press('Meta+b');
+    await page.keyboard.press('ControlOrMeta+b');
 
     // Wait for bold formatting to appear (polls until condition met)
     await expect(editable.locator('span[style*="font-weight: bold"]')).toBeVisible();
@@ -373,7 +375,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.waitForTimeout(200);
 
     // Apply bold using keyboard shortcut to create multiple nodes
-    await page.keyboard.press('Meta+b');
+    await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(500);
 
     // Verify we have bold and normal text (renderer converts {type: "strong"} to styled span)

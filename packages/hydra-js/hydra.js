@@ -113,6 +113,7 @@ export class Bridge {
     this.handleObjectBrowserMessage = null;
     this.pendingTransforms = {}; // Track pending transform requests for timeout handling
     this.eventBuffer = []; // Buffer for keypresses during blocking (replayed after transform)
+    this.pendingBufferReplay = null; // Marked for replay after DOM re-render
     this.savedSelection = null; // Store selection for format operations
     this.textUpdateTimer = null; // Timer for batching text updates
     this.pendingTextUpdate = null; // Pending text update data
@@ -402,6 +403,8 @@ export class Bridge {
                 } else {
                   //console.log('[HYDRA] No saved selection available');
                 }
+                // Replay any buffered keystrokes now that DOM is ready
+                this.replayBufferedEvents();
                 // Clear the processing flag - DOM updates are complete
                 this.isProcessingExternalUpdate = false;
               });
@@ -697,34 +700,72 @@ export class Bridge {
       // Clear pending transform
       delete this.pendingTransforms[blockId];
 
-      // Replay buffered events after cursor has been restored
+      // Mark buffer for replay - actual replay happens after DOM re-render
+      // and selection restore in the FORM_DATA handler
       if (this.eventBuffer.length > 0) {
-        const buffer = this.eventBuffer;
+        this.pendingBufferReplay = {
+          blockId,
+          buffer: [...this.eventBuffer],
+        };
         this.eventBuffer = [];
-        console.log('[HYDRA] Replaying', buffer.length, 'buffered events');
+        console.log('[HYDRA] Marked', this.pendingBufferReplay.buffer.length, 'events for replay after DOM ready');
+      }
+    }
+  }
 
-        // Small delay to ensure DOM is ready after cursor restore
-        setTimeout(() => {
-          for (const evt of buffer) {
-            if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
-              // Printable character - insert directly at cursor using execCommand
-              document.execCommand('insertText', false, evt.key);
-            } else {
-              // Special key (backspace, delete, arrows, etc) - dispatch event
-              const event = new KeyboardEvent('keydown', {
-                key: evt.key,
-                code: evt.code,
-                ctrlKey: evt.ctrlKey,
-                metaKey: evt.metaKey,
-                shiftKey: evt.shiftKey,
-                altKey: evt.altKey,
-                bubbles: true,
-                cancelable: true,
-              });
-              editableField.dispatchEvent(event);
-            }
-          }
-        }, 0);
+  /**
+   * Replays buffered keyboard events after DOM is ready.
+   * Called after selection is restored following a transform.
+   */
+  replayBufferedEvents() {
+    if (!this.pendingBufferReplay) {
+      return;
+    }
+
+    const { blockId, buffer } = this.pendingBufferReplay;
+    this.pendingBufferReplay = null;
+
+    console.log('[HYDRA] Replaying', buffer.length, 'buffered events');
+
+    // Re-query editable field in case DOM was re-rendered
+    const currentBlock = document.querySelector(`[data-block-uid="${blockId}"]`);
+    const currentEditable = currentBlock?.querySelector('[contenteditable="true"]');
+    if (!currentEditable) {
+      console.warn('[HYDRA] Cannot replay buffer - editable field not found');
+      return;
+    }
+
+    // Build up text string from consecutive printable characters
+    let textToInsert = '';
+    for (const evt of buffer) {
+      if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
+        textToInsert += evt.key;
+      }
+      // Note: special keys are ignored for now - they're complex to replay
+    }
+
+    if (textToInsert) {
+      // Insert text directly using Selection API
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+
+        // Delete any selected content first
+        if (!range.collapsed) {
+          range.deleteContents();
+        }
+
+        // Insert the text
+        const textNode = document.createTextNode(textToInsert);
+        range.insertNode(textNode);
+
+        // Move cursor after inserted text
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        console.log('[HYDRA] Inserted buffered text:', textToInsert);
       }
     }
   }
@@ -1265,7 +1306,6 @@ export class Bridge {
     // Flush any pending text updates from the previous block before switching
     // Also clear event buffer - user is reorienting to a new block
     if (!isSelectingSameBlock) {
-      console.log('[HYDRA] Switching blocks - flushing pending text updates');
       this.flushPendingTextUpdates();
       this.eventBuffer = [];
     }
@@ -1919,16 +1959,13 @@ export class Bridge {
               requestAnimationFrame(() => {
                 // Re-query the block element to ensure we get the updated DOM element
                 const currentBlockElement = document.querySelector(`[data-block-uid="${uid}"]`);
-                console.log('[HYDRA] SELECT_BLOCK focus handler:', { uid, found: !!currentBlockElement });
                 if (currentBlockElement) {
                   const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
-                  console.log('[HYDRA] Editable field:', { found: !!editableField, isConnected: editableField?.isConnected });
                   if (editableField) {
                     // Only focus the field, don't manipulate the selection
                     // The selection may have been carefully set by a format operation
                     // or other operation, so we should preserve it
                     editableField.focus();
-                    console.log('[HYDRA] Called focus(), activeElement:', document.activeElement);
 
                     // Don't manipulate selection here - just focus is enough
                     // If there's no selection, the browser will place cursor at the beginning
@@ -2102,7 +2139,6 @@ export class Bridge {
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
       editableField.addEventListener('keydown', (e) => {
-        console.log('[HYDRA] Keydown event in editable field:', e.key, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
 
         // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
         // to prevent native formatting from conflicting with Slate-based formatting
@@ -2129,11 +2165,10 @@ export class Bridge {
             const keyMatch = e.key.toLowerCase() === key;
 
             if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
-              console.log('[HYDRA] Formatting shortcut detected:', shortcut, 'format:', config.format);
 
               // Only apply format hotkeys to slate fields - text/textarea fields don't support formatting
               if (!this.isSlateField(blockUid, this.focusedFieldName)) {
-                console.log('[HYDRA] Skipping format hotkey - field is not slate');
+                console.warn('[HYDRA] Skipping format hotkey - field is not slate');
                 // Still prevent default to avoid native contenteditable formatting
                 e.preventDefault();
                 return;
@@ -2323,23 +2358,18 @@ export class Bridge {
     // We need a mechanism to distinguish user-initiated text changes from
     // programmatic updates caused by FORM_DATA messages.
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
-      console.log('[HYDRA] Mutation observer detected', mutations.length, 'mutations, isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
-        console.log('[HYDRA] Mutation type:', mutation.type, 'target:', mutation.target);
         if (mutation.type === 'characterData' && this.isInlineEditing) {
           // Find the editable field element (works for both Slate and non-Slate fields)
           const parentEl = mutation.target?.parentElement;
           const targetElement = parentEl?.closest('[data-editable-field]');
 
-          console.log('[HYDRA] characterData mutation: parentEl:', parentEl?.tagName, 'targetElement:', targetElement?.tagName, 'textContent:', JSON.stringify(mutation.target?.textContent?.substring(0, 20)));
-
           if (targetElement) {
-            console.log('[HYDRA] Calling unified handleTextChange');
             // Pass parentEl so handleTextChange can find the actual node that changed
             // (e.g., SPAN for inline formatting) rather than the whole editable field (P)
             this.handleTextChange(targetElement, parentEl);
           } else {
-            console.log('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
+            console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
         }
       });
@@ -2998,14 +3028,14 @@ export class Bridge {
     const editableField = target.getAttribute('data-editable-field');
 
     if (!editableField) {
-      console.log('[HYDRA] handleTextChange: No data-editable-field found');
+      console.warn('[HYDRA] handleTextChange: No data-editable-field found');
       return;
     }
 
     // Don't process text changes during external updates (FORM_DATA from Admin)
     // The DOM mutation was caused by Admin re-rendering, not user typing
     if (this.isProcessingExternalUpdate) {
-      console.log('[HYDRA] handleTextChange: Ignoring - external update in progress');
+      console.warn('[HYDRA] handleTextChange: Ignoring - external update in progress');
       return;
     }
 
@@ -3014,7 +3044,6 @@ export class Bridge {
     const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
     const fieldType = blockFieldTypes[editableField];
 
-    console.log('[HYDRA] handleTextChange:', editableField, 'type:', fieldType, 'text:', target.innerText?.substring(0, 50));
 
     // Note: We intentionally do NOT strip ZWS from DOM during typing.
     // Like slate-react, we let the frontend re-render (triggered by FORM_DATA) naturally remove ZWS.
@@ -3033,7 +3062,6 @@ export class Bridge {
       }
 
       const nodeId = closestNode.getAttribute('data-node-id');
-      console.log('[HYDRA] handleTextChange: using nodeId:', nodeId, 'from element:', closestNode.tagName);
       // Strip ZWS characters before updating - they're only for cursor positioning in DOM
       const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
       const updatedJson = this.updateJsonNode(
@@ -3064,15 +3092,12 @@ export class Bridge {
 
     // Clear existing timer and set new one - batches rapid changes
     if (this.textUpdateTimer) {
-      console.log('[HYDRA] Clearing existing batch timer');
       clearTimeout(this.textUpdateTimer);
     }
 
     // Send update after 300ms of no typing (debounce)
-    console.log('[HYDRA] Setting batch timer (300ms)');
     this.textUpdateTimer = setTimeout(() => {
       if (this.pendingTextUpdate) {
-        console.log('[HYDRA] Batch timer fired, sending update');
         // Add current selection at send time (not creation time)
         this.pendingTextUpdate.selection = this.serializeSelection();
         this.sendMessageToParent(this.pendingTextUpdate);

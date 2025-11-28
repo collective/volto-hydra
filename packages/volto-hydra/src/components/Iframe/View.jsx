@@ -701,7 +701,6 @@ const Iframe = (props) => {
   // 1. Redux form data changes (from sidebar editing)
   // 2. toolbarRequestDone is set (toolbar completed a format, including selection-only changes)
   useEffect(() => {
-    console.log('[VIEW] FORM_DATA useEffect triggered, toolbarRequestDone:', iframeSyncState.toolbarRequestDone);
     // Use formDataFromRedux if available (for change detection), otherwise fall back to form prop
     const formToUse = formDataFromRedux || form;
 

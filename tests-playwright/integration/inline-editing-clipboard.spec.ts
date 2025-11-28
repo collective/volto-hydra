@@ -60,11 +60,11 @@ test.describe('Inline Editing - Clipboard', () => {
     await editor.pressSequentially('Hello ', { delay: 10 });
 
     // Apply bold formatting to "world"
-    // Use Meta+b (Cmd+B on macOS) for formatting
-    await editor.press('Meta+b');
+    // Use ControlOrMeta+b (Cmd+B on macOS) for formatting
+    await editor.press('ControlOrMeta+b');
     await page.waitForTimeout(100); // Wait for format operation to complete
     await editor.pressSequentially('world', { delay: 10 });
-    await editor.press('Meta+b'); // toggle bold off
+    await editor.press('ControlOrMeta+b'); // toggle bold off
     await page.waitForTimeout(100); // Wait for format operation to complete
 
     await editor.pressSequentially(' testing', { delay: 10 });
@@ -110,8 +110,8 @@ test.describe('Inline Editing - Clipboard', () => {
     // Select and copy from parent document
     const testDiv = page.locator('#test-clipboard');
     await testDiv.click();
-    await page.keyboard.press('Meta+a');
-    await page.keyboard.press('Meta+c');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('ControlOrMeta+c');
 
     // Read clipboard
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());

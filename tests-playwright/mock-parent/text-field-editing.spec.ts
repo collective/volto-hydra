@@ -52,7 +52,7 @@ test.describe('Non-Slate Text Field Editing', () => {
     await textField.click();
 
     // Clear existing text and type new text
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('Updated text');
 
     // Verify the text was updated (auto-retries until condition met)
@@ -109,7 +109,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
     // Clear and type initial text
     await textField.click();
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('First line');
 
     // Press Enter - should NOT create a new line in string field
@@ -135,7 +135,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
     // Clear and type initial text
     await slateField.click();
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('First line');
 
     // Press Enter - should trigger SLATE_TRANSFORM_REQUEST (not be prevented)
@@ -169,7 +169,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
     // Clear and type initial text
     await textareaField.click();
-    await page.keyboard.press('Meta+A');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('First line');
 
     // Press Enter - should create a newline within the field

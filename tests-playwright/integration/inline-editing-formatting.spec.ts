@@ -263,7 +263,7 @@ test.describe('Inline Editing - Formatting', () => {
     }).toPass({ timeout: 5000 });
 
     // Press Cmd+B (Mac) to bold the selection
-    await editor.press('Meta+b');
+    await editor.press('ControlOrMeta+b');
 
     // Wait for bold button to become active
     await expect(async () => {
@@ -357,7 +357,7 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Hello/);
 
     // Press Cmd+B to enable bold mode for subsequent text
-    await editor.press('Meta+b');
+    await editor.press('ControlOrMeta+b');
 
     // Wait for bold button to become active (indicates bold mode is on)
     await expect(async () => {
@@ -401,8 +401,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Hello/);
 
     // Press Cmd+B to enable bold mode
-    console.log('[TEST] First Meta+b - enabling bold');
-    await editor.press('Meta+b');
+    console.log('[TEST] First ControlOrMeta+b - enabling bold');
+    await editor.press('ControlOrMeta+b');
 
     // Wait for bold button to become active
     await expect(async () => {
@@ -417,14 +417,14 @@ test.describe('Inline Editing - Formatting', () => {
 
     // Check selection state before toggling off
     const selectionInfo = await helper.getSelectionInfo(editor);
-    console.log('[TEST] Selection before second Meta+b:', JSON.stringify(selectionInfo));
+    console.log('[TEST] Selection before second ControlOrMeta+b:', JSON.stringify(selectionInfo));
     expect(selectionInfo.editorHasFocus).toBe(true);
     expect(selectionInfo.isCollapsed).toBe(true);
     expect(selectionInfo.anchorOffset).toBe(6); // ZWS + "world" = 6 chars
 
     // Press Cmd+B again to toggle bold OFF
-    console.log('[TEST] Second Meta+b - toggling bold off');
-    await editor.press('Meta+b');
+    console.log('[TEST] Second ControlOrMeta+b - toggling bold off');
+    await editor.press('ControlOrMeta+b');
 
     // Wait for bold button to become inactive (polls until condition met)
     await expect(async () => {
@@ -433,7 +433,7 @@ test.describe('Inline Editing - Formatting', () => {
 
     // Check cursor is outside the bold element after toggle
     const selectionAfterToggle = await helper.getSelectionInfo(editor);
-    console.log('[TEST] Selection after second Meta+b:', JSON.stringify(selectionAfterToggle));
+    console.log('[TEST] Selection after second ControlOrMeta+b:', JSON.stringify(selectionAfterToggle));
     expect(selectionAfterToggle.editorHasFocus).toBe(true);
     expect(selectionAfterToggle.isCollapsed).toBe(true);
     // Cursor should NOT be inside SPAN (bold element) - it should be in #text after the span
@@ -444,8 +444,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Hello world testing/);
 
     // Verify final text via clipboard (tests ZWS cleaning on copy)
-    await editor.press('Meta+a');
-    await editor.press('Meta+c');
+    await editor.press('ControlOrMeta+a');
+    await editor.press('ControlOrMeta+c');
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     console.log('[TEST] Clipboard text:', JSON.stringify(clipboardText));
     expect(clipboardText).toBe('Hello world testing');
@@ -488,7 +488,7 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Hello/);
 
     // Press Cmd+B to enable bold mode (prospective formatting inserts ZWS)
-    await editor.press('Meta+b');
+    await editor.press('ControlOrMeta+b');
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 5000 });
