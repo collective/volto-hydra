@@ -53,6 +53,9 @@ jobs:
           RAZZLE_API_PATH: http://localhost:8888
           RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
+      - name: Run unit tests (hydra-js)
+        run: |
+          pnpm --filter hydra-js test
       - name: Install Playwright browsers
         run: |
           pnpm exec playwright install --with-deps chromium

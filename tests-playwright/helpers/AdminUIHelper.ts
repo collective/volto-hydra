@@ -307,52 +307,23 @@ export class AdminUIHelper {
   }
 
   /**
-   * Get Quanta Toolbar buttons for a block (inside iframe).
-   * Returns object with button visibility states.
+   * Get all buttons in the Quanta toolbar (rendered in parent window).
+   * Returns a list of buttons with their title/aria-label.
    */
-  async getQuantaToolbarButtons(
-    blockId: string
-  ): Promise<{
-    addButton: boolean;
-    dragButton: boolean;
-    menuButton: boolean;
-    formatButtons?: {
-      bold: boolean;
-      italic: boolean;
-      strikethrough: boolean;
-      link: boolean;
-    };
-  }> {
-    const iframe = this.getIframe();
-    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+  async getQuantaToolbarButtons(): Promise<{ title: string; visible: boolean }[]> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    const buttons = toolbar.locator('button, [role="button"], a');
+    const count = await buttons.count();
 
-    const result = {
-      addButton: await blockLocator.locator('.volto-hydra-add-button').isVisible(),
-      dragButton: await blockLocator
-        .locator('.volto-hydra-quantaToolbar .volto-hydra-drag-button')
-        .isVisible(),
-      menuButton: await blockLocator
-        .locator('.volto-hydra-quantaToolbar .volto-hydra-menu-button')
-        .isVisible(),
-    };
-
-    // Check for format buttons (only present for Slate/text blocks)
-    const formatButtons = blockLocator.locator(
-      '.volto-hydra-quantaToolbar .volto-hydra-format-button'
-    );
-    const formatButtonCount = await formatButtons.count();
-
-    if (formatButtonCount > 0) {
-      // Format buttons exist, check each one
-      const allFormatButtons = await formatButtons.all();
-      result.formatButtons = {
-        bold: allFormatButtons.length > 0 && (await allFormatButtons[0].isVisible()),
-        italic: allFormatButtons.length > 1 && (await allFormatButtons[1].isVisible()),
-        strikethrough: allFormatButtons.length > 2 && (await allFormatButtons[2].isVisible()),
-        link: allFormatButtons.length > 3 && (await allFormatButtons[3].isVisible()),
-      };
+    const result: { title: string; visible: boolean }[] = [];
+    for (let i = 0; i < count; i++) {
+      const btn = buttons.nth(i);
+      const title = await btn.getAttribute('title') || await btn.getAttribute('aria-label') || '';
+      const visible = await btn.isVisible();
+      if (title) {
+        result.push({ title, visible });
+      }
     }
-
     return result;
   }
 
@@ -433,30 +404,36 @@ export class AdminUIHelper {
   }
 
   /**
-   * get the Quanta Toolbar dropdown menu.
+   * Get the Quanta Toolbar dropdown menu (rendered in parent window via portal).
    */
   async getQuantaToolbarMenu(blockId: string): Promise<Locator> {
-    const dropdown = this.page.locator(`.volto-hydra-dropdown-menu.visible`);
+    // The dropdown is rendered via portal to document.body in parent window
+    // It doesn't have a .visible class - it's conditionally rendered
+    const dropdown = this.page.locator('.volto-hydra-dropdown-menu');
     return dropdown;
   }
 
   /**
    * Get the dropdown menu options (Settings, Remove).
+   * The dropdown is rendered via portal to document.body in parent window.
    */
-  async getQuantaToolbarMenuOptions(blockId: string): Promise<string[]> {
-    const iframe = this.getIframe();
-    const dropdown = iframe.locator(
-      `[data-block-uid="${blockId}"] .volto-hydra-dropdown-menu`
-    );
+  async getQuantaToolbarMenuOptions(_blockId: string): Promise<string[]> {
+    // The dropdown is in the parent window, not in the iframe
+    const dropdown = this.page.locator('.volto-hydra-dropdown-menu');
     const items = dropdown.locator('.volto-hydra-dropdown-item');
 
     const options: string[] = [];
     const count = await items.count();
 
     for (let i = 0; i < count; i++) {
-      const text = await items.nth(i).locator('.volto-hydra-dropdown-text').textContent();
+      // Text is directly in the item, not in a nested element
+      const text = await items.nth(i).textContent();
       if (text) {
-        options.push(text.trim());
+        // Remove emoji prefix (e.g., "⚙️ Settings" -> "Settings")
+        const cleanText = text.replace(/^[^\w]*/, '').trim();
+        if (cleanText) {
+          options.push(cleanText);
+        }
       }
     }
 

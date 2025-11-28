@@ -33,35 +33,80 @@ describe('HydraBridge.getNodePath()', () => {
     global.Node = dom.window.Node;
 
     // Create a minimal HydraBridge instance for testing
+    // This mock matches the actual implementation in hydra.js
     bridge = {
+      getSlateIndexAmongSiblings: function (node, parent) {
+        const siblings = Array.from(parent.childNodes);
+        const nodeIndex = siblings.indexOf(node);
+
+        // Look at all siblings before this node to determine Slate index
+        let slateIndex = 0;
+        for (let i = 0; i < nodeIndex; i++) {
+          const sibling = siblings[i];
+          if (
+            sibling.nodeType === Node.ELEMENT_NODE &&
+            sibling.hasAttribute('data-node-id')
+          ) {
+            // Element with data-node-id: parse its index from the ID
+            const nodeId = sibling.getAttribute('data-node-id');
+            const parts = nodeId.split(/[.-]/); // Split on . or -
+            const lastIndex = parseInt(parts[parts.length - 1], 10);
+            slateIndex = lastIndex + 1; // Next index after this element
+          } else if (sibling.nodeType === Node.TEXT_NODE) {
+            // Text node: takes the next index
+            slateIndex++;
+          }
+        }
+
+        return slateIndex;
+      },
+
       getNodePath: function (node) {
         const path = [];
         let current = node;
-        let isTextNodeChild = false;
 
-        // If starting with a text node, start from its parent element
+        // If starting with a text node, calculate its Slate index
         if (node.nodeType === Node.TEXT_NODE) {
-          isTextNodeChild = true;
-          current = node.parentNode;
+          const parent = node.parentNode;
+
+          // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
+          if (
+            parent.hasAttribute?.('data-node-id') &&
+            parent.nodeName !== 'P' &&
+            parent.nodeName !== 'DIV' &&
+            !parent.hasAttribute?.('data-editable-field')
+          ) {
+            const nodeId = parent.getAttribute('data-node-id');
+            // Parse the parent's path from its node ID
+            const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+            // Text node index within the parent element
+            const siblings = Array.from(parent.childNodes);
+            const textIndex = siblings.indexOf(node);
+            // Build path: parent path + text index
+            path.push(...parts, textIndex);
+            return path;
+          } else {
+            // Parent is a block element or doesn't have data-node-id
+            const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
+            path.push(slateIndex);
+            current = parent;
+          }
         }
 
         // Walk up the DOM tree building the path
         while (current) {
           const hasNodeId = current.hasAttribute?.('data-node-id');
-          const hasEditableField = current.hasAttribute?.(
-            'data-editable-field',
-          );
+          const hasEditableField = current.hasAttribute?.('data-editable-field');
           const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
 
           // Process current node
           if (hasNodeId) {
-            // This is a Slate node, find its index among ALL siblings (including text nodes)
-            const parent = current.parentNode;
-            // Use childNodes (not children) to include text nodes in the count
-            const siblings = Array.from(parent.childNodes);
-            const index = siblings.indexOf(current);
-            if (index !== -1) {
-              path.unshift(index);
+            const nodeId = current.getAttribute('data-node-id');
+            // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
+            const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+            // Prepend these path components
+            for (let i = parts.length - 1; i >= 0; i--) {
+              path.unshift(parts[i]);
             }
           }
 
@@ -76,12 +121,6 @@ describe('HydraBridge.getNodePath()', () => {
         // If we didn't find the editable field or slate editor, path is invalid
         if (!current) {
           return null;
-        }
-
-        // If we started from a text node, append 0 to represent the text leaf
-        // In Slate, text is always in leaf nodes, so text node paths always end with a leaf index
-        if (isTextNodeChild) {
-          path.push(0);
         }
 
         // Ensure path has at least block index
@@ -115,8 +154,9 @@ describe('HydraBridge.getNodePath()', () => {
       const brElement = document.querySelector('br');
       const path = bridge.getNodePath(brElement);
 
-      // BR element doesn't have data-node-id, so path should be null or handle gracefully
-      expect(path).toBeNull();
+      // BR element is not a text node, so walks up to find parent with data-node-id
+      // Parent <p> has data-node-id="0", so path is [0]
+      expect(path).toEqual([0]);
     });
   });
 
@@ -150,17 +190,18 @@ describe('HydraBridge.getNodePath()', () => {
     test('multiple formatted spans', () => {
       // DOM: <p data-editable-field="value" data-node-id="0">
       //        <span data-node-id="0-0">Hello</span>
-      //        <span data-node-id="0-1">world</span>
+      //        <span data-node-id="0-2">world</span>
       //      </p>
+      // Note: span indices from data-node-id determine Slate indices
       document.body.innerHTML =
-        '<p data-editable-field="value" data-node-id="0"><span data-node-id="0-0">Hello</span> <span data-node-id="0-1">world</span></p>';
+        '<p data-editable-field="value" data-node-id="0"><span data-node-id="0-0">Hello</span> <span data-node-id="0-2">world</span></p>';
 
       const firstSpanText = document.querySelectorAll('span')[0].firstChild;
       const secondSpanText = document.querySelectorAll('span')[1].firstChild;
       const spaceBetween = document.querySelector('p').childNodes[1]; // Text node with space
 
       expect(bridge.getNodePath(firstSpanText)).toEqual([0, 0, 0]);
-      expect(bridge.getNodePath(spaceBetween)).toEqual([0, 1, 0]); // Space text node
+      expect(bridge.getNodePath(spaceBetween)).toEqual([0, 1]); // Space text node at index 1 (after 0-0)
       expect(bridge.getNodePath(secondSpanText)).toEqual([0, 2, 0]);
     });
   });
@@ -196,7 +237,8 @@ describe('HydraBridge.getNodePath()', () => {
 
       expect(bridge.getNodePath(firstText)).toEqual([0, 0]);
       expect(bridge.getNodePath(boldText)).toEqual([0, 1, 0]);
-      expect(bridge.getNodePath(lastText)).toEqual([0, 2, 0]);
+      // lastText is at Slate index 2 (after span with node-id 0-1, so 1+1=2)
+      expect(bridge.getNodePath(lastText)).toEqual([0, 2]);
     });
 
     test('multiple formats in sequence', () => {
@@ -292,7 +334,7 @@ describe('HydraBridge.getNodePath()', () => {
       // DOM: <p data-editable-field="value" data-node-id="0">
       //        text1<span data-node-id="0-1">span</span>text2
       //      </p>
-      // Siblings: [text1, span, text2] -> indices [0, 1, 2]
+      // Siblings: [text1, span, text2] -> Slate indices based on data-node-id
       document.body.innerHTML =
         '<p data-editable-field="value" data-node-id="0">text1<span data-node-id="0-1">span</span>text2</p>';
 
@@ -303,16 +345,17 @@ describe('HydraBridge.getNodePath()', () => {
 
       expect(bridge.getNodePath(text1)).toEqual([0, 0]);
       expect(bridge.getNodePath(span.firstChild)).toEqual([0, 1, 0]);
-      expect(bridge.getNodePath(text2)).toEqual([0, 2, 0]);
+      // text2 is after span with node-id 0-1, so Slate index = 1+1 = 2
+      expect(bridge.getNodePath(text2)).toEqual([0, 2]);
     });
 
     test('handles whitespace text nodes', () => {
       // DOM with whitespace between elements
       // <p data-editable-field="value" data-node-id="0">
       //   <span data-node-id="0-0">a</span>
-      //   <span data-node-id="0-1">b</span>
+      //   <span data-node-id="0-2">b</span>
       // </p>
-      // Note: Whitespace text nodes between spans should be counted
+      // Note: Whitespace text nodes between spans get Slate index based on preceding node-id
       const p = document.createElement('p');
       p.setAttribute('data-editable-field', 'value');
       p.setAttribute('data-node-id', '0');
@@ -324,7 +367,7 @@ describe('HydraBridge.getNodePath()', () => {
       const whitespace = document.createTextNode('\n  ');
 
       const span2 = document.createElement('span');
-      span2.setAttribute('data-node-id', '0-1');
+      span2.setAttribute('data-node-id', '0-2');
       span2.textContent = 'b';
 
       p.appendChild(span1);
@@ -333,11 +376,53 @@ describe('HydraBridge.getNodePath()', () => {
       document.body.appendChild(p);
 
       // span1's text is at [0, 0, 0]
-      // whitespace is at [0, 1, 0]
-      // span2's text is at [0, 2, 0]
+      // whitespace is at Slate index 1 (after 0-0, so 0+1=1)
+      // span2's text is at [0, 2, 0] (from node-id 0-2)
       expect(bridge.getNodePath(span1.firstChild)).toEqual([0, 0, 0]);
-      expect(bridge.getNodePath(whitespace)).toEqual([0, 1, 0]);
+      expect(bridge.getNodePath(whitespace)).toEqual([0, 1]);
       expect(bridge.getNodePath(span2.firstChild)).toEqual([0, 2, 0]);
+    });
+  });
+
+  describe('Double wrapper scenarios', () => {
+    test('double wrapper with same node-id renders correctly', () => {
+      // DOM: When a renderer wraps text twice (e.g., bold+italic using same node-id)
+      // <p data-editable-field="value" data-node-id="0">
+      //   <strong data-node-id="0-0">
+      //     <em data-node-id="0-0">text</em>
+      //   </strong>
+      // </p>
+      document.body.innerHTML =
+        '<p data-editable-field="value" data-node-id="0">' +
+        '<strong data-node-id="0-0"><em data-node-id="0-0">styled text</em></strong>' +
+        '</p>';
+
+      const textNode = document.querySelector('em').firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Both wrappers have same node-id "0-0", so path should be [0, 0, 0]
+      // The implementation parses node-id from the immediate parent (em)
+      expect(path).toEqual([0, 0, 0]);
+    });
+
+    test('double wrapper with text before and after', () => {
+      // <p data-editable-field="value" data-node-id="0">
+      //   before <strong data-node-id="0-1"><em data-node-id="0-1">bold</em></strong> after
+      // </p>
+      document.body.innerHTML =
+        '<p data-editable-field="value" data-node-id="0">' +
+        'before <strong data-node-id="0-1"><em data-node-id="0-1">bold</em></strong> after' +
+        '</p>';
+
+      const p = document.querySelector('p');
+      const beforeText = p.firstChild;
+      const boldText = document.querySelector('em').firstChild;
+      const afterText = p.lastChild;
+
+      expect(bridge.getNodePath(beforeText)).toEqual([0, 0]);
+      expect(bridge.getNodePath(boldText)).toEqual([0, 1, 0]);
+      // afterText is after element with node-id 0-1, so Slate index = 1+1 = 2
+      expect(bridge.getNodePath(afterText)).toEqual([0, 2]);
     });
   });
 });
