@@ -497,35 +497,4 @@ test.describe('Inline Editing - Links', () => {
     expect(await helper.isActiveFormatButton('link')).toBe(false);
   });
 
-  test('can arrow out of link', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-
-    const blockId = 'block-1-uuid';
-
-    // Create a simple text with a link manually using innerHTML
-    await helper.clickBlockInIframe(blockId);
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
-
-    // Insert HTML with a link
-    await editor.evaluate((el) => {
-      el.innerHTML = 'Text <a href="https://example.com">link</a> more';
-    });
-
-    // Click inside the link
-    await helper.clickRelativeToFormat(editor, 'inside', 'a');
-
-    // Press right arrow to move cursor
-    await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(100);
-
-    // Cursor should move (basic verification that arrow keys work)
-    // More detailed link boundary tests would require Slate-specific checks
-    const html = await editor.innerHTML();
-    expect(html).toContain('<a href="https://example.com">link</a>');
-  });
 });

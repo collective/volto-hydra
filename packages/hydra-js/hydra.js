@@ -1452,6 +1452,10 @@ export class Bridge {
     handleElementAndChildren(blockElement);
     this.observeBlockTextChanges(blockElement);
 
+    // Observe block size changes (e.g., image loading, content changes)
+    // This updates the selection outline when block dimensions change
+    this.observeBlockResize(blockElement, blockUid, show.formatBtns);
+
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
       this.selectionChangeListener = () => {
@@ -1579,11 +1583,22 @@ export class Bridge {
           // Now send BLOCK_SELECTED with selection - both arrive atomically
           // This prevents race conditions where toolbar gets new block but old selection
           if (this._pendingBlockSelected) {
+            // Recalculate rect from current DOM - FORM_DATA may have triggered a re-render
+            // that changed block dimensions (e.g., image loading) since we stored the rect
+            const currentRect = currentBlockElement.getBoundingClientRect();
             const serializedSelection = this.serializeSelection();
             window.parent.postMessage(
               {
                 type: 'BLOCK_SELECTED',
-                ...this._pendingBlockSelected,
+                blockUid: this._pendingBlockSelected.blockUid,
+                rect: {
+                  top: currentRect.top,
+                  left: currentRect.left,
+                  width: currentRect.width,
+                  height: currentRect.height,
+                },
+                showFormatButtons: this._pendingBlockSelected.showFormatButtons,
+                focusedFieldName: this._pendingBlockSelected.focusedFieldName,
                 selection: serializedSelection,
               },
               this.adminOrigin,
@@ -1658,6 +1673,75 @@ export class Bridge {
       window.removeEventListener('message', this.handleObjectBrowserMessage);
       this.handleObjectBrowserMessage = null;
     }
+    // Clean up block resize observer
+    if (this.blockResizeObserver) {
+      this.blockResizeObserver.disconnect();
+      this.blockResizeObserver = null;
+    }
+  }
+
+  /**
+   * Observes the selected block for size changes (e.g., image loading, content changes).
+   * When the block's size changes, sends an updated BLOCK_SELECTED message to update the selection outline.
+   *
+   * @param {Element} blockElement - The block element to observe.
+   * @param {string} blockUid - The block's UID.
+   * @param {boolean} showFormatButtons - Whether to show format buttons.
+   */
+  observeBlockResize(blockElement, blockUid, showFormatButtons) {
+    // Clean up any existing observer
+    if (this.blockResizeObserver) {
+      this.blockResizeObserver.disconnect();
+    }
+
+    // Store initial dimensions to detect actual changes
+    let lastRect = blockElement.getBoundingClientRect();
+
+    this.blockResizeObserver = new ResizeObserver((entries) => {
+      // Only process if this is still the selected block
+      if (this.selectedBlockUid !== blockUid) {
+        return;
+      }
+
+      for (const entry of entries) {
+        const newRect = entry.target.getBoundingClientRect();
+
+        // Only send update if dimensions actually changed significantly (> 1px)
+        const widthChanged = Math.abs(newRect.width - lastRect.width) > 1;
+        const heightChanged = Math.abs(newRect.height - lastRect.height) > 1;
+        const topChanged = Math.abs(newRect.top - lastRect.top) > 1;
+        const leftChanged = Math.abs(newRect.left - lastRect.left) > 1;
+
+        if (widthChanged || heightChanged || topChanged || leftChanged) {
+          console.log('[HYDRA] Block size changed, updating selection outline:', {
+            blockUid,
+            oldSize: { width: lastRect.width, height: lastRect.height },
+            newSize: { width: newRect.width, height: newRect.height },
+          });
+
+          lastRect = newRect;
+
+          // Send updated BLOCK_SELECTED with new rect
+          window.parent.postMessage(
+            {
+              type: 'BLOCK_SELECTED',
+              blockUid,
+              rect: {
+                top: newRect.top,
+                left: newRect.left,
+                width: newRect.width,
+                height: newRect.height,
+              },
+              showFormatButtons,
+              focusedFieldName: this.focusedFieldName,
+            },
+            this.adminOrigin,
+          );
+        }
+      }
+    });
+
+    this.blockResizeObserver.observe(blockElement);
   }
 
   /**

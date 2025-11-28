@@ -167,16 +167,22 @@ test.describe('Non-Slate Text Field Editing', () => {
     const textareaBlock = await helper.clickBlockInIframe('mock-textarea-block', { waitForToolbar: false });
     const textareaField = textareaBlock.locator('[data-editable-field="content"]');
 
-    // Clear and type initial text
+    // Clear and type initial text (use pressSequentially with delay for CI stability)
     await textareaField.click();
     await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.type('First line');
+    await textareaField.pressSequentially('First line', { delay: 20 });
+
+    // Wait for first line to appear before pressing Enter
+    await expect(textareaField).toContainText('First line');
 
     // Press Enter - should create a newline within the field
     await page.keyboard.press('Enter');
 
-    // Type second line
-    await page.keyboard.type('Second line');
+    // Small wait for DOM to settle after Enter (helps with CI timing)
+    await page.waitForTimeout(50);
+
+    // Type second line (use pressSequentially with delay for CI stability)
+    await textareaField.pressSequentially('Second line', { delay: 20 });
 
     // Verify the content contains both lines (polls until condition met)
     await expect(textareaField).toContainText('First line');
