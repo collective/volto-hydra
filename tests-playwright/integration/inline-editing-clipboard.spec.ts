@@ -113,10 +113,11 @@ test.describe('Inline Editing - Clipboard', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+c');
 
-    // Read clipboard
-    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    console.log('[TEST] Parent clipboard text:', JSON.stringify(clipboardText));
-
-    expect(clipboardText).toBe('Test clipboard text');
+    // Wait for clipboard to contain the expected text (copy may not complete immediately in CI)
+    await expect
+      .poll(async () => page.evaluate(() => navigator.clipboard.readText()), {
+        timeout: 5000,
+      })
+      .toBe('Test clipboard text');
   });
 });

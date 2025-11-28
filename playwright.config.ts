@@ -51,6 +51,8 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        // Explicit viewport for consistent behavior between local and CI
+        viewport: { width: 1280, height: 720 },
         // Grant clipboard permissions for paste tests
         permissions: ['clipboard-read', 'clipboard-write'],
       },

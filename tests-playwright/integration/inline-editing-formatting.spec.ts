@@ -446,9 +446,12 @@ test.describe('Inline Editing - Formatting', () => {
     // Verify final text via clipboard (tests ZWS cleaning on copy)
     await editor.press('ControlOrMeta+a');
     await editor.press('ControlOrMeta+c');
-    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    console.log('[TEST] Clipboard text:', JSON.stringify(clipboardText));
-    expect(clipboardText).toBe('Hello world testing');
+    // Wait for clipboard to contain the expected text (copy may not complete immediately in CI)
+    await expect
+      .poll(async () => page.evaluate(() => navigator.clipboard.readText()), {
+        timeout: 5000,
+      })
+      .toBe('Hello world testing');
 
     // Verify structure: "Hello " (plain) + "world" (bold) + " testing" (plain)
     const html = await editor.innerHTML();
