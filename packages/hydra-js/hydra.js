@@ -1526,45 +1526,56 @@ export class Bridge {
             this.needsFieldDetection = false;
           }
 
+          // Check if field was already editable before we do anything
+          const editableField = currentBlockElement.querySelector('[data-editable-field]');
+          const wasAlreadyEditable = editableField?.getAttribute('contenteditable') === 'true';
+
           // Set contenteditable on editable fields immediately (not waiting for FORM_DATA)
           this.restoreContentEditableOnFields(currentBlockElement, 'selectBlock');
 
           // Focus and position cursor for editable fields (text or slate type)
-          const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
-          if (editableField) {
-            const fieldName = editableField.getAttribute('data-editable-field');
+          const contentEditableField = currentBlockElement.querySelector('[contenteditable="true"]');
+          if (contentEditableField) {
+            const fieldName = contentEditableField.getAttribute('data-editable-field');
             const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
 
             if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
-              editableField.focus();
-
-              if (this.lastClickEvent) {
-                // Save click position for FORM_DATA handler to use after renderer updates
-                this.savedClickPosition = {
-                  clientX: this.lastClickEvent.clientX,
-                  clientY: this.lastClickEvent.clientY,
-                };
-
-                // Only restore click position if there's no existing non-collapsed selection
-                // (e.g., from Meta+A or programmatic selection)
-                const currentSelection = window.getSelection();
-                const hasNonCollapsedSelection = currentSelection &&
-                  currentSelection.rangeCount > 0 &&
-                  !currentSelection.getRangeAt(0).collapsed;
-
-                if (!hasNonCollapsedSelection) {
-                  // Position cursor at the click location using caretRangeFromPoint
-                  const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
-                  if (range) {
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                  }
-                } else {
-                }
-
-                // Clear the stored click event
+              // If field was already editable, browser already handled focus and cursor
+              // positioning on click - don't redo it (causes race with typing)
+              if (wasAlreadyEditable) {
+                console.log('[HYDRA] Field already editable, trusting browser click positioning');
                 this.lastClickEvent = null;
+              } else {
+                // Field just became editable - need to focus and position cursor
+                contentEditableField.focus();
+
+                if (this.lastClickEvent) {
+                  // Save click position for FORM_DATA handler to use after renderer updates
+                  this.savedClickPosition = {
+                    clientX: this.lastClickEvent.clientX,
+                    clientY: this.lastClickEvent.clientY,
+                  };
+
+                  // Only restore click position if there's no existing non-collapsed selection
+                  // (e.g., from Meta+A or programmatic selection)
+                  const currentSelection = window.getSelection();
+                  const hasNonCollapsedSelection = currentSelection &&
+                    currentSelection.rangeCount > 0 &&
+                    !currentSelection.getRangeAt(0).collapsed;
+
+                  if (!hasNonCollapsedSelection) {
+                    // Position cursor at the click location using caretRangeFromPoint
+                    const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
+                    if (range) {
+                      const selection = window.getSelection();
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                    }
+                  }
+
+                  // Clear the stored click event
+                  this.lastClickEvent = null;
+                }
               }
             } else {
               // No lastClickEvent, just log that we skipped cursor positioning
