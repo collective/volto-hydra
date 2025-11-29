@@ -1,5 +1,4 @@
 import { jsx } from 'slate-hyperscript';
-import addNodeIds from './addNodeIds';
 
 const deserialize = (el, markAttributes = {}) => {
   if (el.nodeType === Node.TEXT_NODE && !!el.textContent.trim()) {
@@ -55,14 +54,14 @@ const deserialize = (el, markAttributes = {}) => {
   }
 };
 /**
- * Converts html string (recieved from hydrajs) to slate compatible json data by first deserializing the html string to slate json data and adding node ids to the json data
+ * Converts html string (received from hydrajs) to slate compatible json data by deserializing the html string to slate json data
+ * Note: nodeIds are managed by hydra.js, not by the Admin UI
  * @param {String} html html string
  * @returns {JSON} slate compatible json data
  */
 export default function toggleMark(html) {
   const document = new DOMParser().parseFromString(html, 'text/html');
-  const d = deserialize(document.body);
-  return addNodeIds(d, { current: 1 });
+  return deserialize(document.body);
 }
 
 // Helper function to check if an element is block-level

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ContentEditable Keyboard Test</title>
+    <style>
+        .container {
+            border: 2px solid #333;
+            padding: 20px;
+            margin: 20px;
+            min-height: 100px;
+        }
+        .editable {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            min-height: 50px;
+        }
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>ContentEditable Keyboard Event Test</h1>
+
+    <div class="container">
+        <h2>Test 1: Listener on contenteditable="true" div</h2>
+        <div id="test1" class="editable" contenteditable="true">
+            Type here and press Enter
+        </div>
+        <div id="log1" class="log"></div>
+    </div>
+
+    <div class="container">
+        <h2>Test 2: Listener on parent div, child is contenteditable</h2>
+        <div id="test2-parent" class="editable">
+            <div contenteditable="true">Type here and press Enter</div>
+        </div>
+        <div id="log2" class="log"></div>
+    </div>
+
+    <div class="container">
+        <h2>Test 3: Listener on contenteditable with nested span</h2>
+        <div id="test3" class="editable" contenteditable="true">
+            <span>Type here and press Enter</span>
+        </div>
+        <div id="log3" class="log"></div>
+    </div>
+
+    <script>
+        function log(testNum, message) {
+            const logEl = document.getElementById(`log${testNum}`);
+            const entry = document.createElement('div');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.insertBefore(entry, logEl.firstChild);
+        }
+
+        // Test 1: Direct listener on contenteditable
+        const test1 = document.getElementById('test1');
+        test1.addEventListener('keydown', (e) => {
+            log(1, `keydown: key="${e.key}" code="${e.code}" target="${e.target.tagName}"`);
+            if (e.key === 'Enter') {
+                log(1, 'ENTER KEY DETECTED!');
+            }
+        });
+        test1.addEventListener('keyup', (e) => {
+            log(1, `keyup: key="${e.key}"`);
+        });
+        test1.addEventListener('keypress', (e) => {
+            log(1, `keypress: key="${e.key}"`);
+        });
+
+        // Test 2: Listener on parent
+        const test2Parent = document.getElementById('test2-parent');
+        test2Parent.addEventListener('keydown', (e) => {
+            log(2, `keydown: key="${e.key}" code="${e.code}" target="${e.target.tagName}"`);
+            if (e.key === 'Enter') {
+                log(2, 'ENTER KEY DETECTED!');
+            }
+        });
+
+        // Test 3: Listener on contenteditable with nested span
+        const test3 = document.getElementById('test3');
+        test3.addEventListener('keydown', (e) => {
+            log(3, `keydown: key="${e.key}" code="${e.code}" target="${e.target.tagName}"`);
+            if (e.key === 'Enter') {
+                log(3, 'ENTER KEY DETECTED!');
+                e.preventDefault(); // Prevent default Enter behavior
+                log(3, 'preventDefault() called');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -4,21 +4,40 @@ A Visual Headless CMS using Plone/Nick as a server, an Administration interface 
 Hydra provides true visual editor with drag and drop blocks and editable text but with any frontend stack you choose. 
 No assumptions. No learning curve.
 
-A unique open source Headless CMS
-- Quick to enable Visual editing of frontend blocks regardless of framework
-- Switch between multiple frontends while visual editing. Perfect for omni-channel.
+Why Headless CMS
+- You want a very custom website using frontend technologies you likely already know such as Next/Nuxt/Astro, 
+    - inc. the ability to easily integrate 3rd party components not specifically designed for a CMS.
+- You don't want to learn how to customise the CMS to get your custom site
+- You don't want to have to redeploy your CMS every time you make a frontend change.
+- You want your frontend and CMS to be able to be upgraded independently.
+- You may have many frontends for the same content (omni-channel)
+
+When not to use Headless
+- You want a no-code solution "non custom" website. Site builders like wix or squarespace are better for this. 
+- Or pick an open source CMS with an off the shelf theme or sitebuilder plugin.
+
+Why Visual Headless CMS
+- Your editors don't want to think about how it's going to look when they are editing. 
+- Editors want direct DnD editing.
+- Editors who want more control over page layout offered by blocks based editing.
+
+Why Hydra
+- A unique CMS by being Visual and true Headless and Open source
+- Quick to enable Visual editing of frontend blocks regardless of framework by just using tags. No required React or Vue in your frontend.
+- Switch between multiple frontends mid visual edit. Perfect for omni-channel.
 - Enterpise features such as versioning, i18n, workflow and automated content rules.
 - Unique hierarchical database letting you mix and match collections and trees for storage
 - Easier to implement design systems that enforce governance of content and design.
 - Customisable Administration Interface
 - Choice of python or javascript for your server
 - Scalable and Secure with a mature battle hardened backend used by both CIA and FBI.
+- Open source means you have the flexibility to host where and how you want and optimise costs and security how you want.
 
 Note: It is a [Work in Progress: Hydra Project](https://github.com/orgs/collective/projects/3/views/4).
 It shouldn't be used in production. It was kicked off as a GSoC project.
 
 
-## Online demo
+## Does it work? Try the online demo
 
 You can try out the editing experience now by logging into https://hydra.pretagov.com. 
 - Go to user preferences in the bottom left
@@ -485,10 +504,36 @@ If the widget is slate, then Editor can also :-
 - paste rich text from the clipboard (TODO)
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
-For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text but in addition you 
+For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text but in addition you
 will also need insert ```data-node-id``` on each formatting element in your rendered slate text. This let's hydra.js
-map your custom html to the internal data structure so formatting works as expected. (note these nodeids are only in 
+map your custom html to the internal data structure so formatting works as expected. (note these nodeids are only in
 data returned by ```onEditChange```)
+
+#### Renderer Node-ID Rules
+
+When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:
+
+1. **Element nodes** (p, strong, em, etc.) must have `data-node-id` attribute matching the Slate node's `nodeId`
+2. **Wrapper elements** - If you add extra wrapper elements around a Slate node (for styling or framework reasons),
+   ALL wrapper elements must have the **same** `data-node-id` as the inner element representing the Slate node
+
+**Why this matters:** hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor
+position after formatting changes, it walks your DOM counting Slate children. Text nodes count as children, and
+elements with unique node-ids count as children. Elements with duplicate node-ids (wrappers) are skipped.
+
+**Example - Valid wrapper pattern:**
+```html
+<!-- Slate: { type: "strong", nodeId: "0.1", children: [{ text: "bold" }] } -->
+<strong data-node-id="0.1"><b data-node-id="0.1">bold</b></strong>
+```
+Both `<strong>` and `<b>` have the same node-id, so they count as one Slate child.
+
+**Example - Invalid (missing node-id on wrapper):**
+```html
+<!-- DON'T do this - span wrapper has no node-id -->
+<span class="my-style"><strong data-node-id="0.1">bold</strong></span>
+```
+This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 
 Additionally your frontend can
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
