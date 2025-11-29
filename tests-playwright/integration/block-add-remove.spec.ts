@@ -264,6 +264,36 @@ test.describe('Removing Blocks', () => {
     expect(await helper.blockExists(blockIdToRemove)).toBe(false);
   });
 
+  test('selection moves to previous block after deletion', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blocks = await helper.getBlockOrder();
+    const [firstBlock, secondBlock] = blocks;
+
+    // Select the second block
+    await helper.clickBlockInIframe(secondBlock);
+    await helper.waitForQuantaToolbar(secondBlock);
+
+    // Verify second block is selected (toolbar positioned on it)
+    const toolbarCheck = await helper.isBlockSelectedInIframe(secondBlock);
+    expect(toolbarCheck.ok).toBe(true);
+
+    // Delete the second block via toolbar menu
+    await helper.openQuantaToolbarMenu(secondBlock);
+    await helper.clickQuantaToolbarMenuOption(secondBlock, 'Remove');
+
+    // Wait for block to disappear
+    await helper.waitForBlockToDisappear(secondBlock);
+
+    // Toolbar should now be on the first block (previous block)
+    await helper.waitForQuantaToolbar(firstBlock);
+    const newToolbarCheck = await helper.isBlockSelectedInIframe(firstBlock);
+    expect(newToolbarCheck.ok).toBe(true);
+  });
+
   test('removing block updates blocks_layout', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
