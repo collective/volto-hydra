@@ -56,7 +56,7 @@ import {
 import { compose } from 'redux';
 import config from '@plone/volto/registry';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
-import Iframe from '../../../../components/Iframe/View';
+import Iframe from '../../../../../components/Iframe/View';
 import './styles.css';
 /**
  * Form container class.

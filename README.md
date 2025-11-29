@@ -513,10 +513,36 @@ If the widget is slate, then Editor can also :-
 - paste rich text from the clipboard (TODO)
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
-For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text but in addition you 
+For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text but in addition you
 will also need insert ```data-node-id``` on each formatting element in your rendered slate text. This let's hydra.js
-map your custom html to the internal data structure so formatting works as expected. (note these nodeids are only in 
+map your custom html to the internal data structure so formatting works as expected. (note these nodeids are only in
 data returned by ```onEditChange```)
+
+#### Renderer Node-ID Rules
+
+When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:
+
+1. **Element nodes** (p, strong, em, etc.) must have `data-node-id` attribute matching the Slate node's `nodeId`
+2. **Wrapper elements** - If you add extra wrapper elements around a Slate node (for styling or framework reasons),
+   ALL wrapper elements must have the **same** `data-node-id` as the inner element representing the Slate node
+
+**Why this matters:** hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor
+position after formatting changes, it walks your DOM counting Slate children. Text nodes count as children, and
+elements with unique node-ids count as children. Elements with duplicate node-ids (wrappers) are skipped.
+
+**Example - Valid wrapper pattern:**
+```html
+<!-- Slate: { type: "strong", nodeId: "0.1", children: [{ text: "bold" }] } -->
+<strong data-node-id="0.1"><b data-node-id="0.1">bold</b></strong>
+```
+Both `<strong>` and `<b>` have the same node-id, so they count as one Slate child.
+
+**Example - Invalid (missing node-id on wrapper):**
+```html
+<!-- DON'T do this - span wrapper has no node-id -->
+<span class="my-style"><strong data-node-id="0.1">bold</strong></span>
+```
+This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 
 Additionally your frontend can
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)

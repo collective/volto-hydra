@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Parent Window - Hydra Format Testing</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+    #iframe-container {
+      border: 2px solid #ccc;
+      margin-top: 20px;
+    }
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    #log {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .log-entry {
+      margin: 2px 0;
+    }
+    .log-sent {
+      color: blue;
+    }
+    .log-received {
+      color: green;
+    }
+    /* Block UI overlays - minimal versions for testing */
+    .quanta-toolbar {
+      position: fixed;
+      background: #007eb1;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: none;
+      z-index: 1000;
+    }
+    .volto-hydra-block-outline {
+      position: fixed;
+      border: 2px solid #007eb1;
+      pointer-events: none;
+      display: none;
+      z-index: 999;
+    }
+    .volto-hydra-add-button {
+      position: fixed;
+      background: #007eb1;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: none;
+      z-index: 1000;
+      text-align: center;
+      line-height: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mock Parent Window - Testing Hydra Format Protocol</h1>
+  <p>This page mocks the Admin UI parent window to test iframe formatting without Volto.</p>
+
+  <!-- Block UI overlays -->
+  <div class="quanta-toolbar" id="quanta-toolbar">Toolbar</div>
+  <div class="volto-hydra-block-outline" id="block-outline"></div>
+  <div class="volto-hydra-add-button" id="add-button">+</div>
+
+  <div id="iframe-container">
+    <iframe id="previewIframe" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
+  </div>
+
+  <div id="log">
+    <div class="log-entry"><span style="font-weight: bold">Message Log:</strong></div>
+  </div>
+
+  <script>
+    console.log('[MOCK_PARENT] Loaded');
+
+    // Helper to add nodeIds to Slate JSON (matching hydra.js logic)
+    function addNodeIds(nodes, startId = 1) {
+      let currentId = startId;
+
+      function processNode(node) {
+        // Check if it's an element node (has type or children properties)
+        if (node.type || (node.children && !node.text)) {
+          // Add nodeId to element nodes
+          node.nodeId = currentId++;
+
+          if (node.children) {
+            node.children = node.children.map(child => processNode(child));
+          }
+        }
+        return node;
+      }
+
+      return nodes.map(node => processNode(node));
+    }
+
+    // Simple Slate transformation without needing full Slate library
+    // This manually creates the expected structure for testing
+    function applySlateTransform(value, selection, format, action) {
+      const result = JSON.parse(JSON.stringify(value)); // Deep clone
+
+      if (!selection || !result[0] || !result[0].children) {
+        return result;
+      }
+
+      const paragraph = result[0];
+      const anchor = selection.anchor;
+      const focus = selection.focus;
+
+      // Get selection bounds
+      const start = Math.min(anchor.offset, focus.offset);
+      const end = Math.max(anchor.offset, focus.offset);
+
+      // Get the text from first child (assuming simple structure for now)
+      const textNode = paragraph.children[0];
+      if (!textNode || !textNode.text) {
+        return result;
+      }
+
+      const originalText = textNode.text;
+
+      // Split into three parts: before, selected, after
+      const before = originalText.substring(0, start);
+      const selected = originalText.substring(start, end);
+      const after = originalText.substring(end);
+
+      // Build new children array
+      const newChildren = [];
+
+      if (before) {
+        newChildren.push({ text: before });
+      }
+
+      // Wrap selected text in format element
+      if (selected) {
+        newChildren.push({
+          type: format,
+          children: [{ text: selected }]
+        });
+      }
+
+      if (after) {
+        newChildren.push({ text: after });
+      }
+
+      paragraph.children = newChildren;
+
+      // Add nodeIds to the result
+      return addNodeIds(result);
+    }
+
+    // Mock form data with both a slate block and a simple text block
+    // This will be sent to iframe to override API content
+    let mockFormData = {
+      '@id': 'http://localhost:8888/test-page',
+      '@type': 'Document',
+      title: 'Mock Test Page',
+      blocks: {
+        'mock-block-1': {
+          '@type': 'slate',
+          value: addNodeIds([
+            {
+              type: 'p',
+              children: [
+                {
+                  text: 'Text to format',
+                },
+              ],
+            },
+          ]),
+        },
+        'mock-text-block': {
+          '@type': 'text',
+          text: 'Simple text field',
+        },
+        'mock-multi-field-block': {
+          '@type': 'multifield',
+          title: 'Block Title',
+          description: addNodeIds([
+            {
+              type: 'p',
+              children: [
+                {
+                  text: 'Block description with slate',
+                },
+              ],
+            },
+          ]),
+        },
+        'mock-textarea-block': {
+          '@type': 'textarea',
+          content: 'First line of textarea',
+        },
+      },
+      blocks_layout: {
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block'],
+      },
+    };
+
+    // Hardcoded responses are no longer needed - we use real Slate transformations
+
+    // Message log
+    const logEl = document.getElementById('log');
+    function logMessage(direction, type, data) {
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${direction}`;
+      entry.textContent = `[${direction.toUpperCase()}] ${type}: ${JSON.stringify(data)}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Listen for messages from iframe (async to support delayed transforms)
+    window.addEventListener('message', async (event) => {
+      // Only handle messages from our iframe
+      if (event.source !== document.getElementById('previewIframe').contentWindow) {
+        return;
+      }
+
+      const message = event.data;
+      console.log('[MOCK_PARENT] Received message:', message);
+      logMessage('received', message.type, message);
+
+      // Handle different message types
+      switch (message.type) {
+        case 'GET_INITIAL_DATA': {
+          // Respond with INITIAL_DATA (not FORM_DATA!)
+          // hydra.js converts INITIAL_DATA to FORM_DATA internally
+
+          // Build block field types metadata based on block types
+          // Map blockType -> fieldName -> fieldType (not blockId!)
+          const blockFieldTypes = {
+            'slate': { value: 'slate' },
+            'text': { text: 'string' },  // Simple string field
+            'multifield': { title: 'string', description: 'slate' },  // title is string, description is slate
+            'textarea': { content: 'textarea' }  // Multiline text field
+          };
+
+          const response = {
+            type: 'INITIAL_DATA',
+            data: mockFormData,
+            blockFieldTypes: blockFieldTypes,  // Block type -> field name -> field type
+            slateConfig: {
+              hotkeys: {
+                // Keyboard shortcuts for formatting (Cmd+B, Cmd+I, etc.)
+                'mod+b': { type: 'inline', format: 'strong' },
+                'mod+i': { type: 'inline', format: 'em' },
+                'mod+u': { type: 'inline', format: 'u' },
+                'mod+s': { type: 'inline', format: 'del' },
+              },
+              toolbarButtons: [], // Not used by current implementation
+              buttonConfigs: {
+                // Simple mock button config for testing
+                'bold': {
+                  format: 'strong',
+                  svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>',
+                  title: 'Bold',
+                  testId: 'bold-button',
+                },
+              },
+            },
+          };
+          console.log('[MOCK_PARENT] Sending INITIAL_DATA with blockFieldTypes:', response);
+          event.source.postMessage(response, event.origin);
+          logMessage('sent', 'INITIAL_DATA', response.data);
+
+          // Auto-select the first block after a short delay to allow hydra.js to initialize
+          setTimeout(() => {
+            const firstBlockId = mockFormData.blocks_layout.items[0];
+            if (firstBlockId) {
+              console.log('[MOCK_PARENT] Auto-selecting first block:', firstBlockId);
+
+              event.source.postMessage(
+                {
+                  type: 'SELECT_BLOCK',
+                  uid: firstBlockId,  // hydra.js expects 'uid' not 'blockId'
+                  data: mockFormData,  // hydra.js also expects the form data
+                },
+                event.origin,
+              );
+              logMessage('sent', 'SELECT_BLOCK', { uid: firstBlockId, data: mockFormData });
+            }
+          }, 100);
+          break;
+        }
+
+        case 'SLATE_TRANSFORM_REQUEST': {
+          const { blockId, transformType, format, selection, requestId, fieldName, data } = message;
+          console.log('[MOCK_PARENT] Processing SLATE_TRANSFORM_REQUEST:', { blockId, transformType, format, selection, requestId });
+
+          // Simulate slow transform with configurable delay
+          const transformDelay = window.mockTransformDelay || 0;
+          const processTransform = async () => {
+            if (transformDelay > 0) {
+              console.log(`[MOCK_PARENT] Simulating slow transform with ${transformDelay}ms delay`);
+              await new Promise(resolve => setTimeout(resolve, transformDelay));
+            }
+
+            // Update mockFormData from the message data (includes latest text)
+            if (data) {
+              mockFormData = data;
+            }
+
+            // Get current value from the correct field
+            const block = mockFormData.blocks[blockId];
+            const currentValue = block[fieldName] || block.value;
+
+            console.log('[MOCK_PARENT] Applying Slate transformation:', {
+              transformType,
+              format,
+              selection,
+              currentValue: JSON.stringify(currentValue)
+            });
+
+            // Apply the Slate transformation (for format transforms)
+            let updatedValue = currentValue;
+            if (transformType === 'format' && format) {
+              updatedValue = applySlateTransform(currentValue, selection, format, transformType);
+            }
+
+            console.log('[MOCK_PARENT] Transformation result:', JSON.stringify(updatedValue));
+
+            // Update the block in mockFormData
+            mockFormData.blocks[blockId] = {
+              ...mockFormData.blocks[blockId],
+              [fieldName || 'value']: updatedValue,
+            };
+
+            // Send FORM_DATA with formatRequestId so hydra.js knows to unblock
+            const response = {
+              type: 'FORM_DATA',
+              data: mockFormData,
+              formatRequestId: requestId,
+              savedSelection: selection,
+            };
+            console.log('[MOCK_PARENT] Sending FORM_DATA with formatRequestId:', response);
+            event.source.postMessage(response, event.origin);
+            logMessage('sent', 'FORM_DATA', { blockId, formatRequestId: requestId });
+          };
+
+          // Execute the async transform (with optional delay) - await to ensure delay happens
+          await processTransform();
+          break;
+        }
+
+        case 'SELECT_BLOCK':
+        case 'FORM_DATA': {
+          // Just log these for now
+          console.log('[MOCK_PARENT] Received but not handling:', message.type);
+          break;
+        }
+
+        case 'INLINE_EDIT_DATA': {
+          // Handle text changes from non-Slate blocks
+          console.log('[MOCK_PARENT] Received INLINE_EDIT_DATA:', message);
+          // Update mockFormData with the changes
+          mockFormData = message.data;
+          // DO NOT send FORM_DATA back - this would trigger re-render and interrupt typing
+          // Just update our local state and log it
+          logMessage('RECEIVED', 'INLINE_EDIT_DATA', message);
+          break;
+        }
+
+        case 'BLOCK_SELECTED': {
+          // Position the block UI overlays based on rect from iframe
+          const { rect, blockUid } = message;
+          if (rect) {
+            const iframe = document.getElementById('previewIframe');
+            const iframeRect = iframe.getBoundingClientRect();
+
+            // Position overlays relative to iframe position
+            const toolbar = document.getElementById('quanta-toolbar');
+            const outline = document.getElementById('block-outline');
+            const addButton = document.getElementById('add-button');
+
+            // Toolbar above block
+            toolbar.style.left = `${iframeRect.left + rect.left}px`;
+            toolbar.style.top = `${iframeRect.top + rect.top - 30}px`;
+            toolbar.style.display = 'block';
+
+            // Outline around block
+            outline.style.left = `${iframeRect.left + rect.left}px`;
+            outline.style.top = `${iframeRect.top + rect.top}px`;
+            outline.style.width = `${rect.width}px`;
+            outline.style.height = `${rect.height}px`;
+            outline.style.display = 'block';
+
+            // Add button below block
+            addButton.style.left = `${iframeRect.left + rect.left + rect.width / 2 - 12}px`;
+            addButton.style.top = `${iframeRect.top + rect.top + rect.height + 8}px`;
+            addButton.style.display = 'block';
+
+            console.log('[MOCK_PARENT] Positioned overlays for block:', blockUid, 'rect:', rect);
+          }
+          break;
+        }
+
+        default: {
+          console.log('[MOCK_PARENT] Unknown message type:', message.type);
+        }
+      }
+    });
+
+    console.log('[MOCK_PARENT] Message listener registered');
+
+    // Make mock parent available to tests
+    window.mockParent = {
+      getFormData: () => mockFormData,
+      getBlock: (blockId) => mockFormData.blocks[blockId],
+      setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
+    };
+  </script>
+</body>
+</html>

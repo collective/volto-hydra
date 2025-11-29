@@ -7,10 +7,15 @@
     ".": "./hydra.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest"
   },
   "type": "module",
   "keywords": [],
   "author": "",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "jest": "^30.0.0",
+    "jest-environment-node": "^30.0.0",
+    "jsdom": "^22.0.0"
+  }
 }

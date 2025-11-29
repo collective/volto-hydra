@@ -14,11 +14,19 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "start": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start",
+    "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start",
     "start:prod": "pnpm --filter @plone/volto start:prod",
     "build": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build",
     "build:deps": "pnpm --filter @plone/registry --filter @plone/components build",
     "i18n": "pnpm --filter volto-hydra i18n",
     "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js pnpm --filter @plone/volto test",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:mock": "playwright test --config=playwright-mock.config.ts",
+    "test:mock:headed": "playwright test --config=playwright-mock.config.ts --headed",
+    "test:mock:ui": "playwright test --config=playwright-mock.config.ts --ui",
     "lint": "eslint --max-warnings=0 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "lint:fix": "eslint --fix 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "prettier": "prettier --check 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
@@ -46,7 +54,12 @@
     "@plone/volto": "volto-18.0.0-alpha.41"
   },
   "devDependencies": {
-    "mrs-developer": "^2.2.0"
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "mrs-developer": "^2.2.0",
+    "typescript": "^5.3.0"
   },
   "packageManager": "pnpm@9.1.1",
   "files": [

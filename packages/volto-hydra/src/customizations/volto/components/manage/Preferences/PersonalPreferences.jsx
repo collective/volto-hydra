@@ -18,9 +18,9 @@ import languages from '@plone/volto/constants/Languages.cjs';
 import { changeLanguage } from '@plone/volto/actions';
 import { toGettextLang } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
-import getSavedURLs from '../../../../utils/getSavedURLs';
-import isValidUrl from '../../../../utils/isValidUrl';
-import { setFrontendPreviewUrl } from '../../../../actions';
+import getSavedURLs from '../../../../../utils/getSavedURLs';
+import isValidUrl from '../../../../../utils/isValidUrl';
+import { setFrontendPreviewUrl } from '../../../../../actions';
 
 const messages = defineMessages({
   personalPreferences: {
