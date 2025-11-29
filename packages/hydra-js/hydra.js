@@ -1287,6 +1287,16 @@ export class Bridge {
     if (this.dragHandlePositioner) {
       this.dragHandlePositioner();
     }
+
+    // Re-attach ResizeObserver to the new DOM element
+    // React re-renders may have replaced the block element, so our old observer
+    // would be watching a detached element. This ensures we catch future size
+    // changes (e.g., image loading after a re-render).
+    const showFormatButtons = fieldType === 'slate';
+    this.observeBlockResize(blockElement, this.selectedBlockUid, showFormatButtons);
+
+    // Also re-attach the text change observer for the same reason
+    this.observeBlockTextChanges(blockElement);
   }
 
   /**
@@ -1540,42 +1550,41 @@ export class Bridge {
             const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
 
             if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
-              // If field was already editable, browser already handled focus and cursor
-              // positioning on click - don't redo it (causes race with typing)
+              // Always ensure focus (no-op if already focused)
+              contentEditableField.focus();
+
+              // If field was already editable, browser already handled cursor positioning
+              // on click - don't redo it (causes race with typing)
               if (wasAlreadyEditable) {
                 console.log('[HYDRA] Field already editable, trusting browser click positioning');
                 this.lastClickEvent = null;
-              } else {
-                // Field just became editable - need to focus and position cursor
-                contentEditableField.focus();
+              } else if (this.lastClickEvent) {
+                // Field just became editable - need to position cursor
+                // Save click position for FORM_DATA handler to use after renderer updates
+                this.savedClickPosition = {
+                  clientX: this.lastClickEvent.clientX,
+                  clientY: this.lastClickEvent.clientY,
+                };
 
-                if (this.lastClickEvent) {
-                  // Save click position for FORM_DATA handler to use after renderer updates
-                  this.savedClickPosition = {
-                    clientX: this.lastClickEvent.clientX,
-                    clientY: this.lastClickEvent.clientY,
-                  };
+                // Only restore click position if there's no existing non-collapsed selection
+                // (e.g., from Meta+A or programmatic selection)
+                const currentSelection = window.getSelection();
+                const hasNonCollapsedSelection = currentSelection &&
+                  currentSelection.rangeCount > 0 &&
+                  !currentSelection.getRangeAt(0).collapsed;
 
-                  // Only restore click position if there's no existing non-collapsed selection
-                  // (e.g., from Meta+A or programmatic selection)
-                  const currentSelection = window.getSelection();
-                  const hasNonCollapsedSelection = currentSelection &&
-                    currentSelection.rangeCount > 0 &&
-                    !currentSelection.getRangeAt(0).collapsed;
-
-                  if (!hasNonCollapsedSelection) {
-                    // Position cursor at the click location using caretRangeFromPoint
-                    const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
-                    if (range) {
-                      const selection = window.getSelection();
-                      selection.removeAllRanges();
-                      selection.addRange(range);
-                    }
+                if (!hasNonCollapsedSelection) {
+                  // Position cursor at the click location using caretRangeFromPoint
+                  const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
+                  if (range) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
                   }
-
-                  // Clear the stored click event
-                  this.lastClickEvent = null;
                 }
+
+                // Clear the stored click event
+                this.lastClickEvent = null;
               }
             } else {
               // No lastClickEvent, just log that we skipped cursor positioning
@@ -1698,6 +1707,7 @@ export class Bridge {
    * @param {boolean} showFormatButtons - Whether to show format buttons.
    */
   observeBlockResize(blockElement, blockUid, showFormatButtons) {
+    console.log('[HYDRA] observeBlockResize called for block:', blockUid);
     // Clean up any existing observer
     if (this.blockResizeObserver) {
       this.blockResizeObserver.disconnect();
@@ -1705,10 +1715,13 @@ export class Bridge {
 
     // Store initial dimensions to detect actual changes
     let lastRect = blockElement.getBoundingClientRect();
+    console.log('[HYDRA] observeBlockResize initial rect:', { width: lastRect.width, height: lastRect.height });
 
     this.blockResizeObserver = new ResizeObserver((entries) => {
+      console.log('[HYDRA] ResizeObserver callback fired for:', blockUid);
       // Only process if this is still the selected block
       if (this.selectedBlockUid !== blockUid) {
+        console.log('[HYDRA] ResizeObserver: block no longer selected, ignoring');
         return;
       }
 
@@ -1750,7 +1763,9 @@ export class Bridge {
       }
     });
 
-    this.blockResizeObserver.observe(blockElement);
+    // Observe border-box to catch padding/border changes too (not just content)
+    // This ensures the selection outline updates for any visual size change
+    this.blockResizeObserver.observe(blockElement, { box: 'border-box' });
   }
 
   /**

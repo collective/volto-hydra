@@ -41,11 +41,44 @@
     .log-received {
       color: green;
     }
+    /* Block UI overlays - minimal versions for testing */
+    .quanta-toolbar {
+      position: fixed;
+      background: #007eb1;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: none;
+      z-index: 1000;
+    }
+    .volto-hydra-block-outline {
+      position: fixed;
+      border: 2px solid #007eb1;
+      pointer-events: none;
+      display: none;
+      z-index: 999;
+    }
+    .volto-hydra-add-button {
+      position: fixed;
+      background: #007eb1;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: none;
+      z-index: 1000;
+      text-align: center;
+      line-height: 24px;
+    }
   </style>
 </head>
 <body>
   <h1>Mock Parent Window - Testing Hydra Format Protocol</h1>
   <p>This page mocks the Admin UI parent window to test iframe formatting without Volto.</p>
+
+  <!-- Block UI overlays -->
+  <div class="quanta-toolbar" id="quanta-toolbar">Toolbar</div>
+  <div class="volto-hydra-block-outline" id="block-outline"></div>
+  <div class="volto-hydra-add-button" id="add-button">+</div>
 
   <div id="iframe-container">
     <iframe id="previewIframe" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
@@ -341,6 +374,40 @@
           // DO NOT send FORM_DATA back - this would trigger re-render and interrupt typing
           // Just update our local state and log it
           logMessage('RECEIVED', 'INLINE_EDIT_DATA', message);
+          break;
+        }
+
+        case 'BLOCK_SELECTED': {
+          // Position the block UI overlays based on rect from iframe
+          const { rect, blockUid } = message;
+          if (rect) {
+            const iframe = document.getElementById('previewIframe');
+            const iframeRect = iframe.getBoundingClientRect();
+
+            // Position overlays relative to iframe position
+            const toolbar = document.getElementById('quanta-toolbar');
+            const outline = document.getElementById('block-outline');
+            const addButton = document.getElementById('add-button');
+
+            // Toolbar above block
+            toolbar.style.left = `${iframeRect.left + rect.left}px`;
+            toolbar.style.top = `${iframeRect.top + rect.top - 30}px`;
+            toolbar.style.display = 'block';
+
+            // Outline around block
+            outline.style.left = `${iframeRect.left + rect.left}px`;
+            outline.style.top = `${iframeRect.top + rect.top}px`;
+            outline.style.width = `${rect.width}px`;
+            outline.style.height = `${rect.height}px`;
+            outline.style.display = 'block';
+
+            // Add button below block
+            addButton.style.left = `${iframeRect.left + rect.left + rect.width / 2 - 12}px`;
+            addButton.style.top = `${iframeRect.top + rect.top + rect.height + 8}px`;
+            addButton.style.display = 'block';
+
+            console.log('[MOCK_PARENT] Positioned overlays for block:', blockUid, 'rect:', rect);
+          }
           break;
         }
 
