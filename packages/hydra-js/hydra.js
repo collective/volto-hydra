@@ -111,7 +111,7 @@ export class Bridge {
     this.handleMouseUp = null;
     this.blockObserver = null;
     this.handleObjectBrowserMessage = null;
-    this.pendingTransforms = {}; // Track pending transform requests for timeout handling
+    this.pendingTransform = null; // Track the single pending transform request (only one at a time due to blocking)
     this.eventBuffer = []; // Buffer for keypresses during blocking (replayed after transform)
     this.pendingBufferReplay = null; // Marked for replay after DOM re-render
     this.savedSelection = null; // Store selection for format operations
@@ -419,17 +419,12 @@ export class Bridge {
             // Unblock input if this FORM_DATA has a matching formatRequestId
             // This ensures we only unblock for the specific format operation that caused blocking
             const formatRequestId = event.data.formatRequestId;
-            console.log('[HYDRA] FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransforms:', JSON.stringify(this.pendingTransforms));
-            if (formatRequestId) {
-              Object.keys(this.pendingTransforms).forEach((blockId) => {
-                const pending = this.pendingTransforms[blockId];
-                if (pending?.requestId === formatRequestId) {
-                  console.log('[HYDRA] Unblocking input for', blockId, '- formatRequestId matches pending requestId');
-                  this.setBlockProcessing(blockId, false);
-                } else {
-                  console.log('[HYDRA] formatRequestId', formatRequestId, 'does not match pending requestId:', pending?.requestId, 'for block:', blockId);
-                }
-              });
+            console.log('[HYDRA] FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
+            if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
+              console.log('[HYDRA] Unblocking input for', this.pendingTransform.blockId, '- formatRequestId matches');
+              this.setBlockProcessing(this.pendingTransform.blockId, false);
+            } else if (formatRequestId) {
+              console.log('[HYDRA] formatRequestId', formatRequestId, 'does not match pending requestId:', this.pendingTransform?.requestId);
             } else {
               console.log('[HYDRA] No formatRequestId in FORM_DATA, not unblocking');
             }
@@ -483,8 +478,8 @@ export class Bridge {
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
           const blockId = event.data.blockId;
 
-          // Clear the processing state and timeout for this block
-          if (blockId && this.pendingTransforms[blockId]) {
+          // Clear the processing state if it matches this block
+          if (blockId && this.pendingTransform?.blockId === blockId) {
             console.log('[HYDRA] Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
@@ -682,8 +677,9 @@ export class Bridge {
         editableField.style.cursor = 'wait';
       }
 
-      // Store requestId to match with FORM_DATA for unblocking
-      this.pendingTransforms[blockId] = {
+      // Store pending transform to match with FORM_DATA for unblocking
+      this.pendingTransform = {
+        blockId: blockId,
         requestId: requestId,
       };
     } else {
@@ -700,7 +696,7 @@ export class Bridge {
       }
 
       // Clear pending transform
-      delete this.pendingTransforms[blockId];
+      this.pendingTransform = null;
 
       // Mark buffer for replay - actual replay happens after DOM re-render
       // and selection restore in the FORM_DATA handler
@@ -792,7 +788,7 @@ export class Bridge {
     }
 
     console.error('[HYDRA] Transform timeout for block:', blockId);
-    delete this.pendingTransforms[blockId];
+    this.pendingTransform = null;
   }
 
   ////////////////////////////////////////////////////////////////////////////////

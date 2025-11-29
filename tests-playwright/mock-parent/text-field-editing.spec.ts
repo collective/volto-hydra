@@ -128,6 +128,11 @@ test.describe('Non-Slate Text Field Editing', () => {
     // Slate fields are multiline and have their own Enter handling
     // Our string field Enter prevention should NOT affect slate fields
     // This test verifies that pressing Enter in a slate field triggers a transform request
+    //
+    // IMPORTANT: We deliberately add a transform delay to test keyboard buffering.
+    // When Enter is pressed, a transform request is sent and the keyboard is blocked.
+    // Any keystrokes typed during the transform should be buffered and replayed
+    // into the new paragraph after the transform completes.
 
     // Select the slate block
     const slateBlock = await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
@@ -138,23 +143,19 @@ test.describe('Non-Slate Text Field Editing', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('First line');
 
+    // Set a transform delay to simulate slow server response
+    // This ensures keystrokes typed after Enter go into the buffer
+    await page.evaluate(() => {
+      (window as any).mockTransformDelay = 200;
+    });
+
     // Press Enter - should trigger SLATE_TRANSFORM_REQUEST (not be prevented)
     await page.keyboard.press('Enter');
 
-    // Wait for Enter transform to complete by checking DOM has changed
-    // Enter in slate creates a new paragraph, so text should be split
-    await expect.poll(async () => {
-      const text = await slateField.textContent();
-      // After Enter, "First line" should still exist but field should have been re-rendered
-      return text?.includes('First line');
-    }).toBe(true);
-
-    // If Enter was blocked by string handler, typing would fail
-    // Since this is a slate field, Enter should NOT be blocked
-    // We verify typing still works after Enter
+    // Type immediately while transform is in progress - these should be buffered
     await page.keyboard.type('After Enter');
 
-    // Verify text appears (polls until condition met)
+    // Wait for transform to complete and buffered text to appear
     await expect(slateField).toContainText('After Enter');
   });
 
