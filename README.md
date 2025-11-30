@@ -273,72 +273,77 @@ To do this you will include the hydra iframe bridge which creates a two way link
 - You can pass in a function to map plone url paths to frontend paths if there is not a one to one mapping
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
 
-For our slider example, we need to configure this new block.
+For our slider example, we need to configure this new block via `voltoConfig`:
 
 
 ```js
-const customBlocks = {
-  slider: {
-    id: 'slider', // The name (id) of the block
-    title: 'Slider', // The display name of the block
-    icon: 'data:...', // The icon used in the block chooser
-    group: 'common', // The group (blocks can be grouped, displayed in the chooser)
-    restricted: false,
-    mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
-    blockSchema: {
-      properties: {
-        slider_timing: {
-          title: "time",
-          widget: 'float',
-        }
-        slides: {
-          title: "Slides",
-          type: 'blocks',
-          allowedBlocks: ['slide', 'image'],
-          defaultBlock: 'slide',
-          maxLength=10,
-          blocksConfig={
-            slide: {
-              id: 'slide', // The name (id) of the block
-              title: 'Slide', // The display name of the block
-              blockSchema: {
-                fieldsets: [
-                  {
-                    id: 'default',
-                    title: "Settings",
-                    fields: ['url', 'title', 'image', 'description'],
+import { initBridge } from './hydra.js';
+
+const bridge = initBridge("https://hydra.pretagov.com", {
+  allowedBlocks: ['slate', 'image', 'video', 'slider'],
+  voltoConfig: {
+    blocks: {
+      blocksConfig: {
+        slider: {
+          id: 'slider', // The name (id) of the block
+          title: 'Slider', // The display name of the block
+          icon: 'data:...', // The icon used in the block chooser
+          group: 'common', // The group (blocks can be grouped, displayed in the chooser)
+          restricted: false,
+          mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
+          blockSchema: {
+            properties: {
+              slider_timing: {
+                title: "time",
+                widget: 'float',
+              },
+              slides: {
+                title: "Slides",
+                type: 'blocks',
+                allowedBlocks: ['slide', 'image'],
+                defaultBlock: 'slide',
+                maxLength: 10,
+                blocksConfig: {
+                  slide: {
+                    id: 'slide', // The name (id) of the block
+                    title: 'Slide', // The display name of the block
+                    blockSchema: {
+                      fieldsets: [
+                        {
+                          id: 'default',
+                          title: "Settings",
+                          fields: ['url', 'title', 'image', 'description'],
+                        },
+                      ],
+                      properties: {
+                        url: {
+                          title: "Link",
+                          widget: 'url',
+                        },
+                        title: {
+                          title: "Title",
+                        },
+                        image: {
+                          title: "Image",
+                          widget: "image"
+                        },
+                        description: {
+                          title: "Description",
+                          widget: "slate"
+                        },
+                      },
+                      required: [],
+                    },
                   },
-                ],
-                properties: {
-                  url: {
-                    title: "Link",
-                    widget: 'url',
-                  },
-                  title: {
-                    title: "Title",
-                  },
-                  image: {
-                    title: "Image",
-                    widget: "image"
-                  },
-                  description: {
-                    title: "Description",
-                    widget: "slate"
-                  },
-                },
-                required: [],
-              },            
+                }
+              }
             },
           }
-        }
+        },
       },
-    }
-  },  
-};
-
-
-import { initBridge } from './hydra.js';
-const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video', 'slider'], customBlocks: customBlocks});
+    },
+  },
+});
 ```
 
 Alternatively you can create a plugin for the CMS to add these schemas.

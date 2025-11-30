@@ -204,15 +204,6 @@ export class Bridge {
         this._setTokenCookie(access_token);
       }
 
-      if (options) {
-        if (options.allowedBlocks) {
-          window.parent.postMessage(
-            { type: 'ALLOWED_BLOCKS', allowedBlocks: options.allowedBlocks },
-            this.adminOrigin,
-          );
-        }
-      }
-
       if (isEditMode) {
         this.enableBlockClickListener();
         this.injectCSS();
@@ -252,8 +243,18 @@ export class Bridge {
         window.removeEventListener('message', reciveInitialData);
         window.addEventListener('message', reciveInitialData);
 
-        if (options.voltoConfig) {
-          this._updateVoltoConfig(options.voltoConfig);
+        // Send combined initialization message with both config and allowed blocks
+        // This ensures voltoConfig is processed first, then allowedBlocks can set
+        // the `restricted` property on all blocks (including newly added custom blocks)
+        if (options && (options.allowedBlocks || options.voltoConfig)) {
+          window.parent.postMessage(
+            {
+              type: 'FRONTEND_INIT',
+              allowedBlocks: options.allowedBlocks,
+              voltoConfig: options.voltoConfig,
+            },
+            this.adminOrigin,
+          );
         }
       }
 
@@ -502,6 +503,11 @@ export class Bridge {
             console.log('[HYDRA] Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
+        } else if (event.data.type === 'UPDATE_BLOCK_FIELD_TYPES') {
+          // Merge updated block field types from admin (e.g., after FRONTEND_INIT adds custom blocks)
+          const newTypes = event.data.blockFieldTypes || {};
+          this.blockFieldTypes = { ...this.blockFieldTypes, ...newTypes };
+          console.log('[HYDRA] Updated blockFieldTypes:', this.blockFieldTypes);
         }
       }
     };
@@ -1324,7 +1330,8 @@ export class Bridge {
    * @param {HTMLElement} blockElement - The block element to select.
    */
   selectBlock(blockElement) {
-    console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'));
+    const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
+    console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
     if (!blockElement) return;
 
     const blockUid = blockElement.getAttribute('data-block-uid');
@@ -1487,6 +1494,8 @@ export class Bridge {
     if (!this.selectionChangeListener) {
       this.selectionChangeListener = () => {
         const selection = window.getSelection();
+        const offset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : -1;
+        console.log('[HYDRA] selectionchange fired, cursor offset:', offset);
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
           this.savedSelection = this.serializeSelection();
@@ -1563,14 +1572,25 @@ export class Bridge {
           this.restoreContentEditableOnFields(currentBlockElement, 'selectBlock');
 
           // Focus and position cursor for editable fields (text or slate type)
-          const contentEditableField = currentBlockElement.querySelector('[contenteditable="true"]');
+          // Use focusedFieldName to find the specific field that was clicked, not just the first one
+          const contentEditableField = this.focusedFieldName
+            ? currentBlockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`)
+            : currentBlockElement.querySelector('[contenteditable="true"]');
           if (contentEditableField) {
             const fieldName = contentEditableField.getAttribute('data-editable-field');
             const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
 
             if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
-              // Always ensure focus (no-op if already focused)
-              contentEditableField.focus();
+              // Only call focus if not already focused
+              // Calling focus() on already-focused element can disrupt cursor position
+              const isAlreadyFocused = document.activeElement === contentEditableField;
+              console.log('[HYDRA] selectBlock focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName, contentEditableField: contentEditableField.tagName });
+              if (!isAlreadyFocused) {
+                console.log('[HYDRA] selectBlock calling focus() on field');
+                contentEditableField.focus();
+              } else {
+                console.log('[HYDRA] selectBlock skipping focus() - already focused');
+              }
 
               // If field was already editable, browser already handled cursor positioning
               // on click - don't redo it (causes race with typing)
@@ -2038,9 +2058,10 @@ export class Bridge {
           // Re-calculate block position and send BLOCK_SELECTED message
           const rect = blockElement.getBoundingClientRect();
 
-          // Determine if format buttons should be shown
+          // Determine if format buttons should be shown based on field type
           const blockData = this.formData?.blocks?.[blockUid];
-          const isSlateBlock = blockData?.['@type'] === 'slate';
+          const blockType = blockData?.['@type'];
+          const fieldType = this.blockFieldTypes?.[blockType]?.[this.focusedFieldName];
 
           window.parent.postMessage(
             {
@@ -2052,7 +2073,7 @@ export class Bridge {
                 width: rect.width,
                 height: rect.height,
               },
-              showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+              showFormatButtons: fieldType === 'slate',
             },
             this.adminOrigin,
           );
@@ -2079,8 +2100,13 @@ export class Bridge {
           // This ensures blocks selected via Order tab work the same as clicking
           this.selectBlock(blockElement);
 
-          // Focus the contenteditable element for Slate text blocks
-          if (this.formData.blocks[uid]?.['@type'] === 'slate') {
+          // Focus the contenteditable element for blocks with editable fields
+          // This includes slate, string, and textarea field types
+          const blockType = this.formData.blocks[uid]?.['@type'];
+          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+          const hasEditableFields = Object.keys(blockTypeFields).length > 0 || blockType === 'slate';
+
+          if (hasEditableFields) {
             // Use double requestAnimationFrame to wait for ALL DOM updates including Quanta toolbar
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
@@ -2168,7 +2194,8 @@ export class Bridge {
           if (blockElement) {
             const rect = blockElement.getBoundingClientRect();
             const blockData = this.formData?.blocks?.[this.selectedBlockUid];
-            const isSlateBlock = blockData?.['@type'] === 'slate';
+            const blockType = blockData?.['@type'];
+            const fieldType = this.blockFieldTypes?.[blockType]?.[this.focusedFieldName];
 
             window.parent.postMessage(
               {
@@ -2180,7 +2207,7 @@ export class Bridge {
                   width: rect.width,
                   height: rect.height,
                 },
-                showFormatButtons: isSlateBlock && this.focusedFieldName === 'value',
+                showFormatButtons: fieldType === 'slate',
               },
               this.adminOrigin,
             );
@@ -2723,67 +2750,88 @@ export class Bridge {
     }
 
     try {
-      // Find the selected block (assume it's the currently selected block)
-      if (!this.selectedBlockUid) {
+      // Find the selected block and determine field type
+      if (!this.selectedBlockUid || !this.focusedFieldName) {
         return;
       }
 
       const block = formData.blocks[this.selectedBlockUid];
-      if (!block || block['@type'] !== 'slate' || !block.value) {
+      if (!block) {
         return;
       }
 
+      const blockType = block['@type'];
+      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+      const fieldType = blockTypeFields[this.focusedFieldName];
+      const fieldValue = block[this.focusedFieldName];
 
-      // Get nodeId for anchor and focus by walking the Slate tree
-      // Returns {nodeId, textChildIndex, parentChildren} for text nodes
-      const anchorResult = this.getNodeIdFromPath(block.value, slateSelection.anchor.path);
-      const focusResult = this.getNodeIdFromPath(block.value, slateSelection.focus.path);
-
-      if (!anchorResult || !focusResult) {
+      // Find the block element for locating editable fields
+      const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+      if (!blockElement) {
         return;
       }
 
-      // Find DOM elements
-      const anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
-      const focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
-
-      if (!anchorElement || !focusElement) {
-        console.warn('[HYDRA] Could not find DOM elements for nodeIds:', { anchorResult, focusResult });
-        console.warn('[HYDRA] Anchor element:', anchorElement, 'Focus element:', focusElement);
-        return;
-      }
-
-
-      // Find DOM children directly using Slate child index
-      // This preserves the exact child index from Slate path (e.g., path [0,2] = 3rd child)
-      // instead of using ambiguous absolute character offsets
+      let anchorElement, focusElement;
       let anchorTextResult = null;
       let focusTextResult = null;
 
-      if (anchorResult.textChildIndex !== null) {
-        // Use direct child lookup - find DOM child at Slate index
-        const anchorChild = this.findChildBySlateIndex(anchorElement, anchorResult.textChildIndex);
-        if (anchorChild) {
-          anchorTextResult = this.findTextNodeInChild(anchorChild, slateSelection.anchor.offset);
-        } else {
-          console.warn('[HYDRA] Could not find anchor child at Slate index:', anchorResult.textChildIndex);
-        }
-      } else {
-        // No textChildIndex - use element directly with offset 0
-        anchorTextResult = this.findTextNodeInChild(anchorElement, slateSelection.anchor.offset);
-      }
+      // Check if this is a slate field with complex structure (has nodeIds)
+      const isSlateWithNodeIds = fieldType === 'slate' && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
 
-      if (focusResult.textChildIndex !== null) {
-        // Use direct child lookup - find DOM child at Slate index
-        const focusChild = this.findChildBySlateIndex(focusElement, focusResult.textChildIndex);
-        if (focusChild) {
-          focusTextResult = this.findTextNodeInChild(focusChild, slateSelection.focus.offset);
+      if (isSlateWithNodeIds) {
+        // Slate field with nodeIds - use existing path-based lookup
+        const anchorResult = this.getNodeIdFromPath(fieldValue, slateSelection.anchor.path);
+        const focusResult = this.getNodeIdFromPath(fieldValue, slateSelection.focus.path);
+
+        if (!anchorResult || !focusResult) {
+          return;
+        }
+
+        // Find DOM elements by nodeId
+        anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
+        focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
+
+        if (!anchorElement || !focusElement) {
+          console.warn('[HYDRA] Could not find DOM elements for nodeIds:', { anchorResult, focusResult });
+          return;
+        }
+
+        // Find DOM children using Slate child index
+        if (anchorResult.textChildIndex !== null) {
+          const anchorChild = this.findChildBySlateIndex(anchorElement, anchorResult.textChildIndex);
+          if (anchorChild) {
+            anchorTextResult = this.findTextNodeInChild(anchorChild, slateSelection.anchor.offset);
+          } else {
+            console.warn('[HYDRA] Could not find anchor child at Slate index:', anchorResult.textChildIndex);
+          }
         } else {
-          console.warn('[HYDRA] Could not find focus child at Slate index:', focusResult.textChildIndex);
+          anchorTextResult = this.findTextNodeInChild(anchorElement, slateSelection.anchor.offset);
+        }
+
+        if (focusResult.textChildIndex !== null) {
+          const focusChild = this.findChildBySlateIndex(focusElement, focusResult.textChildIndex);
+          if (focusChild) {
+            focusTextResult = this.findTextNodeInChild(focusChild, slateSelection.focus.offset);
+          } else {
+            console.warn('[HYDRA] Could not find focus child at Slate index:', focusResult.textChildIndex);
+          }
+        } else {
+          focusTextResult = this.findTextNodeInChild(focusElement, slateSelection.focus.offset);
         }
       } else {
-        // No textChildIndex - use element directly with offset 0
-        focusTextResult = this.findTextNodeInChild(focusElement, slateSelection.focus.offset);
+        // String/textarea field or slate without nodeIds - degenerate case
+        // Selection path is [0] with just an offset
+        // Find the editable field directly by data-editable-field attribute
+        const editableField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+        if (!editableField) {
+          console.warn('[HYDRA] Could not find editable field:', this.focusedFieldName);
+          return;
+        }
+
+        // Both anchor and focus use the same element for simple text fields
+        anchorElement = focusElement = editableField;
+        anchorTextResult = this.findTextNodeInChild(editableField, slateSelection.anchor.offset);
+        focusTextResult = this.findTextNodeInChild(editableField, slateSelection.focus.offset);
       }
 
 

@@ -197,7 +197,73 @@ function deepMerge(entry, newConfig) {
   }
   return output;
 }
+/**
+ * Parse an SVG string into Volto's Icon component format.
+ * Volto's Icon expects: { attributes: { xmlns, viewBox }, content }
+ *
+ * @param {string} svgString - SVG string like '<svg xmlns="..." viewBox="..."><path d="..."/></svg>'
+ * @returns {Object|null} - Icon object or null if parsing fails
+ */
+function parseSvgToIconFormat(svgString) {
+  if (typeof svgString !== 'string' || !svgString.trim().startsWith('<svg')) {
+    return null;
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svg = doc.querySelector('svg');
+
+    if (!svg) {
+      return null;
+    }
+
+    // Extract attributes
+    const xmlns = svg.getAttribute('xmlns') || 'http://www.w3.org/2000/svg';
+    const viewBox = svg.getAttribute('viewBox') || '0 0 24 24';
+
+    // Extract inner content (everything inside the svg tag)
+    const content = svg.innerHTML;
+
+    return {
+      attributes: { xmlns, viewBox },
+      content,
+    };
+  } catch (e) {
+    console.warn('[HYDRA] Failed to parse SVG icon:', e);
+    return null;
+  }
+}
+
+/**
+ * Process blocksConfig to convert string SVG icons to Volto's format.
+ * Modifies the config in place.
+ */
+function processBlockIcons(blocksConfig) {
+  if (!blocksConfig || typeof blocksConfig !== 'object') {
+    return;
+  }
+
+  Object.keys(blocksConfig).forEach((blockType) => {
+    const blockConfig = blocksConfig[blockType];
+    if (blockConfig && typeof blockConfig.icon === 'string') {
+      const parsedIcon = parseSvgToIconFormat(blockConfig.icon);
+      if (parsedIcon) {
+        blockConfig.icon = parsedIcon;
+      } else {
+        // Remove invalid string icons to prevent Icon component errors
+        delete blockConfig.icon;
+      }
+    }
+  });
+}
+
 function recurseUpdateVoltoConfig(newConfig) {
+  // Process icon strings in blocksConfig before merging
+  if (newConfig?.blocks?.blocksConfig) {
+    processBlockIcons(newConfig.blocks.blocksConfig);
+  }
+
   // Config object is not directly editable, update all the keys only.
   Object.entries(newConfig).forEach(([configKey, configValue]) => {
     config[configKey] = deepMerge(config[configKey], configValue);
@@ -401,9 +467,36 @@ const Iframe = (props) => {
 
           break;
 
+        case 'FRONTEND_INIT':
+          // Combined initialization from frontend - process in correct order:
+          // 1. First merge voltoConfig (adds custom block definitions)
+          // 2. Then set allowedBlocks (triggers updateAllowedBlocks with all blocks)
+          // 3. Re-extract and send updated blockFieldTypes to iframe
+          if (event.data.voltoConfig) {
+            recurseUpdateVoltoConfig(event.data.voltoConfig);
+
+            // Re-extract blockFieldTypes now that config has custom blocks
+            const updatedBlockFieldTypes = extractBlockFieldTypes(intl);
+
+            // Send updated types to iframe
+            event.source.postMessage(
+              {
+                type: 'UPDATE_BLOCK_FIELD_TYPES',
+                blockFieldTypes: updatedBlockFieldTypes,
+              },
+              event.origin,
+            );
+          }
+          if (event.data.allowedBlocks) {
+            setAllowedBlocksList(event.data.allowedBlocks);
+          }
+          break;
+
         case 'VOLTO_CONFIG':
-          const newConfig = event.data.voltoConfig || {};
-          recurseUpdateVoltoConfig(newConfig);
+          // Legacy handler for backwards compatibility
+          recurseUpdateVoltoConfig(event.data.voltoConfig || {});
+          // Re-trigger updateAllowedBlocks to set `restricted` on newly added blocks
+          setAllowedBlocksList(getAllowedBlocksList());
           break;
 
         case 'OPEN_SETTINGS':

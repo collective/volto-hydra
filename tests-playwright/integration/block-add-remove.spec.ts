@@ -51,7 +51,7 @@ test.describe('Adding Blocks', () => {
 
     // Get initial block count
     const initialCount = await helper.getBlockCount();
-    expect(initialCount).toBe(3); // test-page has 3 blocks
+    expect(initialCount).toBe(4); // test-page has 4 blocks (3 slate + 1 hero)
 
     // Select a block and click Add
     await helper.clickBlockInIframe('block-1-uuid');
@@ -302,26 +302,26 @@ test.describe('Removing Blocks', () => {
 
     // Get initial block order
     const initialBlocks = await helper.getBlockOrder();
-    expect(initialBlocks.length).toBe(3);
+    expect(initialBlocks.length).toBe(4); // test-page has 4 blocks (3 slate + 1 hero)
 
-    // Remove the middle block
+    // Remove the middle block (index 1)
     const blockToRemove = initialBlocks[1];
     await helper.clickBlockInIframe(blockToRemove);
     await helper.openQuantaToolbarMenu(blockToRemove);
     await helper.clickQuantaToolbarMenuOption(blockToRemove, 'Remove');
 
-    await helper.waitForBlockCountToBe(2);
+    await helper.waitForBlockCountToBe(initialBlocks.length - 1);
 
     // Get new block order
     const newBlocks = await helper.getBlockOrder();
 
     // Should have one less block
-    expect(newBlocks.length).toBe(2);
+    expect(newBlocks.length).toBe(initialBlocks.length - 1);
 
     // Removed block should not be in the list
     expect(newBlocks).not.toContain(blockToRemove);
 
-    // Other blocks should still be there
+    // First and third blocks should still be there
     expect(newBlocks).toContain(initialBlocks[0]);
     expect(newBlocks).toContain(initialBlocks[2]);
   });
@@ -333,19 +333,21 @@ test.describe('Removing Blocks', () => {
     await helper.navigateToEdit('/test-page');
 
     const initialBlocks = await helper.getBlockOrder();
-    const [first, middle, last] = initialBlocks;
+    // Remove the second block (index 1) - this is the "middle" regardless of total count
+    const blockToRemove = initialBlocks[1];
 
     // Remove middle block
-    await helper.clickBlockInIframe(middle);
-    await helper.openQuantaToolbarMenu(middle);
-    await helper.clickQuantaToolbarMenuOption(middle, 'Remove');
+    await helper.clickBlockInIframe(blockToRemove);
+    await helper.openQuantaToolbarMenu(blockToRemove);
+    await helper.clickQuantaToolbarMenuOption(blockToRemove, 'Remove');
 
-    await helper.waitForBlockCountToBe(2);
+    await helper.waitForBlockCountToBe(initialBlocks.length - 1);
 
     const newBlocks = await helper.getBlockOrder();
 
-    // Order should be preserved: first, last (middle removed)
-    expect(newBlocks).toEqual([first, last]);
+    // Order should be preserved: all blocks except the removed one, in original order
+    const expectedBlocks = initialBlocks.filter((b) => b !== blockToRemove);
+    expect(newBlocks).toEqual(expectedBlocks);
   });
 
   test('can remove multiple blocks sequentially', async ({ page }) => {
@@ -448,5 +450,63 @@ test.describe('Add and Remove Combined', () => {
     // Should be back to original count
     const finalCount = await helper.getBlockCount();
     expect(finalCount).toBe(initialCount);
+  });
+});
+
+test.describe('Allowed Blocks from Frontend', () => {
+  test('block chooser hides blocks not in allowedBlocks list', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a block to select it, then click the add button
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.clickAddBlockButton();
+
+    // Wait for the block chooser to appear
+    const chooserVisible = await helper.isBlockChooserVisible();
+    expect(chooserVisible).toBe(true);
+
+    // Frontend allows: ['slate', 'image', 'hero'] (configured in test-frontend/index.html)
+    // Video block should NOT be visible (not in allowed list)
+    expect(await helper.isBlockTypeVisible('video')).toBe(false);
+  });
+
+  test('custom block from frontend appears in block chooser', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a block to select it, then click the add button
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.clickAddBlockButton();
+
+    // Wait for the block chooser to appear
+    const chooserVisible = await helper.isBlockChooserVisible();
+    expect(chooserVisible).toBe(true);
+
+    // Custom 'hero' block should be visible (defined in test-frontend/index.html)
+    expect(await helper.isBlockTypeVisible('hero')).toBe(true);
+  });
+
+  test('can add custom block defined by frontend', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const initialCount = await helper.getBlockCount();
+
+    // Click a block to select it, then add a hero block
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('hero');
+
+    // Verify block was added
+    await helper.waitForBlockCountToBe(initialCount + 1);
+    const newCount = await helper.getBlockCount();
+    expect(newCount).toBe(initialCount + 1);
   });
 });
