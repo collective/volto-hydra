@@ -1909,6 +1909,19 @@ export class Bridge {
         draggedBlock.style.left = `${e.clientX}px`;
         draggedBlock.style.top = `${e.clientY}px`;
 
+        // Auto-scroll when dragging near viewport edges
+        const scrollThreshold = 50; // pixels from edge to trigger scroll
+        const scrollSpeed = 10; // pixels per frame
+        const viewportHeight = window.innerHeight;
+
+        if (e.clientY < scrollThreshold) {
+          // Near top edge - scroll up
+          window.scrollBy(0, -scrollSpeed);
+        } else if (e.clientY > viewportHeight - scrollThreshold) {
+          // Near bottom edge - scroll down
+          window.scrollBy(0, scrollSpeed);
+        }
+
         if (!throttleTimeout) {
           throttleTimeout = setTimeout(() => {
             const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
@@ -1917,6 +1930,17 @@ export class Bridge {
             // Find the closest ancestor with 'data-block-uid'
             while (closestBlock && !closestBlock.hasAttribute('data-block-uid')) {
               closestBlock = closestBlock.parentElement;
+            }
+
+            // Exclude the dragged block and its ghost from being drop targets
+            const draggedBlockUid = blockElement.getAttribute('data-block-uid');
+            if (
+              closestBlock &&
+              (closestBlock === draggedBlock ||
+                closestBlock === blockElement ||
+                closestBlock.getAttribute('data-block-uid') === draggedBlockUid)
+            ) {
+              closestBlock = null;
             }
 
             if (closestBlock) {
