@@ -273,6 +273,16 @@ const SyncedSlateToolbar = ({
     const fieldName = blockUI?.focusedFieldName || 'value';
     const fieldValue = block[fieldName];
 
+    // Only sync editor for slate fields - non-slate fields don't use the Slate editor
+    const blockType = block?.['@type'];
+    const blockTypeFields = blockFieldTypes?.[blockType] || {};
+    const fieldType = blockTypeFields[fieldName];
+    if (fieldType !== 'slate') {
+      // Clear internalValueRef so we don't use stale slate value when switching to a slate field
+      internalValueRef.current = null;
+      return;
+    }
+
     // Update editor.children if external value changed (like Volto line 158)
     // BUT don't overwrite local changes - only sync if Redux has caught up to what we sent
     // or if the value came from somewhere else (iframe text changes)
@@ -379,7 +389,7 @@ const SyncedSlateToolbar = ({
         delete button.dataset.bypassCapture;
       }
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId]);
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey]);
 
   // Handle transformAction from iframe (format, paste, delete)
   // These arrive atomically with form data, so editor already has the latest text
@@ -611,6 +621,14 @@ const SyncedSlateToolbar = ({
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
   const showFormatButtons = fieldType === 'slate';
+
+  // Debug: Check what blockFieldTypes the toolbar is receiving
+  if (blockType === 'hero') {
+    console.log('[TOOLBAR] Hero block - blockFieldTypes keys:', Object.keys(blockFieldTypes || {}));
+    console.log('[TOOLBAR] Hero block - blockFieldTypes[hero]:', blockFieldTypes?.['hero']);
+    console.log('[TOOLBAR] fieldName:', fieldName, 'fieldType:', fieldType, 'showFormatButtons:', showFormatButtons);
+    console.log('[TOOLBAR] fieldValue:', fieldValue, 'hasValidSlateValue:', fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0);
+  }
 
   // CRITICAL: Only show Slate if we actually have a valid field value array
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;

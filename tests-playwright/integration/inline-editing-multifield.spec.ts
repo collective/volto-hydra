@@ -243,4 +243,87 @@ test.describe('Inline Editing - Hero Block Fields', () => {
     // Verify text was inserted at cursor position
     await expect(headingField).toHaveText('Hello Beautiful World');
   });
+
+  test('format buttons appear when focusing slate field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click the hero block to select it
+    await helper.clickBlockInIframe(HERO_BLOCK_ID);
+
+    // Click the description field (slate type)
+    const descriptionField = iframe.locator(
+      `[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="description"]`
+    );
+    await descriptionField.click();
+
+    // Format buttons should be visible (Bold button in the quanta-toolbar)
+    const boldButton = helper.getQuantaToolbarFormatButton('Bold');
+    await expect(boldButton).toBeVisible();
+  });
+
+  test('format buttons disappear when focusing string field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click the hero block to select it
+    await helper.clickBlockInIframe(HERO_BLOCK_ID);
+
+    // First focus description (slate) to make format buttons appear
+    const descriptionField = iframe.locator(
+      `[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="description"]`
+    );
+    await descriptionField.click();
+
+    // Verify format buttons are visible
+    const boldButton = helper.getQuantaToolbarFormatButton('Bold');
+    await expect(boldButton).toBeVisible();
+
+    // Now focus heading (string type)
+    const headingField = iframe.locator(
+      `[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`
+    );
+    await headingField.click();
+
+    // Format buttons should NOT be visible
+    await expect(boldButton).not.toBeVisible();
+  });
+
+  test('hero block has border outline (multiple fields)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click the hero block to select it
+    await helper.clickBlockInIframe(HERO_BLOCK_ID);
+
+    // The outline should use border style (not bottom line)
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible();
+    await expect(outline).toHaveAttribute('data-outline-style', 'border');
+  });
+});
+
+test.describe('Inline Editing - Selection Outline Styles', () => {
+  const SLATE_BLOCK_ID = 'block-1-uuid';
+
+  test('slate block has bottom-line outline (single field)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click the slate block to select it
+    await helper.clickBlockInIframe(SLATE_BLOCK_ID);
+
+    // The outline should use bottom-line style (single field)
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible();
+    await expect(outline).toHaveAttribute('data-outline-style', 'bottom-line');
+  });
 });

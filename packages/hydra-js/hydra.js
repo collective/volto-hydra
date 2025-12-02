@@ -280,17 +280,11 @@ export class Bridge {
               if (previousFieldName !== editableField) {
                 console.log('[HYDRA] Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
 
-                // Determine if we should show format buttons based on field type
-                // blockFieldTypes maps blockType -> fieldName -> fieldType
-                const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
-                const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-                const fieldType = blockTypeFields[editableField];
-                const showFormatBtns = fieldType === 'slate';
-
                 // Send BLOCK_SELECTED message to update toolbar visibility
                 const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
                 if (blockElement) {
                   const rect = blockElement.getBoundingClientRect();
+                  const editableFields = this.getEditableFields(blockElement);
                   window.parent.postMessage(
                     {
                       type: 'BLOCK_SELECTED',
@@ -301,7 +295,7 @@ export class Bridge {
                         width: rect.width,
                         height: rect.height,
                       },
-                      showFormatButtons: showFormatBtns,
+                      editableFields,
                       focusedFieldName: editableField, // Send field name so toolbar knows which field to sync
                     },
                     this.adminOrigin,
@@ -587,16 +581,11 @@ export class Bridge {
       console.log('[HYDRA] Updating focusedFieldName from', this.focusedFieldName, 'to', fieldToFocus);
       this.focusedFieldName = fieldToFocus;
 
-      // Update toolbar with the correct field type
-      // Only show format buttons if the focused field is a slate field
-      const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
-      const focusedFieldType = fieldToFocus ? blockFieldTypes[fieldToFocus] : undefined;
-      const showFormatBtns = focusedFieldType === 'slate';
-
       // Send BLOCK_SELECTED message to update toolbar visibility
       const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
       if (blockElement) {
         const rect = blockElement.getBoundingClientRect();
+        const editableFields = this.getEditableFields(blockElement);
         window.parent.postMessage(
           {
             type: 'BLOCK_SELECTED',
@@ -607,7 +596,8 @@ export class Bridge {
               width: rect.width,
               height: rect.height,
             },
-            showFormatButtons: showFormatBtns,
+            editableFields, // Map of fieldName -> fieldType from DOM
+            focusedFieldName: fieldToFocus, // Send field name so toolbar knows which field to sync
           },
           this.adminOrigin,
         );
@@ -1356,8 +1346,8 @@ export class Bridge {
     // React re-renders may have replaced the block element, so our old observer
     // would be watching a detached element. This ensures we catch future size
     // changes (e.g., image loading after a re-render).
-    const showFormatButtons = fieldType === 'slate';
-    this.observeBlockResize(blockElement, this.selectedBlockUid, showFormatButtons);
+    const editableFields = this.getEditableFields(blockElement);
+    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields);
 
     // Also re-attach the text change observer for the same reason
     this.observeBlockTextChanges(blockElement);
@@ -1501,22 +1491,9 @@ export class Bridge {
       }
     }
 
-    // Determine if we should show format buttons based on the focused field type
-    // blockFieldTypes maps blockType -> fieldName -> fieldType
-    const blockType = this.formData?.blocks?.[blockUid]?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const focusedFieldType = this.focusedFieldName ? blockTypeFields[this.focusedFieldName] : undefined;
-    let show = { formatBtns: focusedFieldType === 'slate' };
-
-    console.log('[HYDRA] Block selected, sending UI messages:', {
-      blockUid,
-      focusedFieldName: this.focusedFieldName,
-      focusedFieldType,
-      showFormatBtns: show.formatBtns
-    });
-
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
     const rect = blockElement.getBoundingClientRect();
+    const editableFields = this.getEditableFields(blockElement);
     this._pendingBlockSelected = {
       blockUid,
       rect: {
@@ -1525,9 +1502,15 @@ export class Bridge {
         width: rect.width,
         height: rect.height,
       },
-      showFormatButtons: show.formatBtns,
+      editableFields, // Map of fieldName -> fieldType from DOM
       focusedFieldName: this.focusedFieldName,
     };
+
+    console.log('[HYDRA] Block selected, sending UI messages:', {
+      blockUid,
+      focusedFieldName: this.focusedFieldName,
+      editableFields,
+    });
 
     // Create drag handle for block reordering
     // This creates an invisible button in the iframe positioned under the parent's visual drag handle
@@ -1540,7 +1523,7 @@ export class Bridge {
 
     // Observe block size changes (e.g., image loading, content changes)
     // This updates the selection outline when block dimensions change
-    this.observeBlockResize(blockElement, blockUid, show.formatBtns);
+    this.observeBlockResize(blockElement, blockUid, editableFields);
 
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
@@ -1630,6 +1613,9 @@ export class Bridge {
             : currentBlockElement.querySelector('[contenteditable="true"]');
           if (contentEditableField) {
             const fieldName = contentEditableField.getAttribute('data-editable-field');
+            const blockData = this.formData?.blocks?.[this.selectedBlockUid];
+            const blockType = blockData?.['@type'];
+            const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
             const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
 
             if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
@@ -1706,7 +1692,7 @@ export class Bridge {
                   width: currentRect.width,
                   height: currentRect.height,
                 },
-                showFormatButtons: this._pendingBlockSelected.showFormatButtons,
+                editableFields: this._pendingBlockSelected.editableFields,
                 focusedFieldName: this._pendingBlockSelected.focusedFieldName,
                 selection: serializedSelection,
               },
@@ -1795,9 +1781,9 @@ export class Bridge {
    *
    * @param {Element} blockElement - The block element to observe.
    * @param {string} blockUid - The block's UID.
-   * @param {boolean} showFormatButtons - Whether to show format buttons.
+   * @param {Object} editableFields - Map of fieldName -> fieldType for editable fields in this block.
    */
-  observeBlockResize(blockElement, blockUid, showFormatButtons) {
+  observeBlockResize(blockElement, blockUid, editableFields) {
     console.log('[HYDRA] observeBlockResize called for block:', blockUid);
     // Clean up any existing observer
     if (this.blockResizeObserver) {
@@ -1845,7 +1831,7 @@ export class Bridge {
                 width: newRect.width,
                 height: newRect.height,
               },
-              showFormatButtons,
+              editableFields,
               focusedFieldName: this.focusedFieldName,
             },
             this.adminOrigin,
@@ -2133,11 +2119,7 @@ export class Bridge {
         if (blockElement) {
           // Re-calculate block position and send BLOCK_SELECTED message
           const rect = blockElement.getBoundingClientRect();
-
-          // Determine if format buttons should be shown based on field type
-          const blockData = this.formData?.blocks?.[blockUid];
-          const blockType = blockData?.['@type'];
-          const fieldType = this.blockFieldTypes?.[blockType]?.[this.focusedFieldName];
+          const editableFields = this.getEditableFields(blockElement);
 
           window.parent.postMessage(
             {
@@ -2149,7 +2131,8 @@ export class Bridge {
                 width: rect.width,
                 height: rect.height,
               },
-              showFormatButtons: fieldType === 'slate',
+              editableFields, // Map of fieldName -> fieldType from DOM
+              focusedFieldName: this.focusedFieldName, // Preserve field name for toolbar
             },
             this.adminOrigin,
           );
@@ -2269,9 +2252,7 @@ export class Bridge {
 
           if (blockElement) {
             const rect = blockElement.getBoundingClientRect();
-            const blockData = this.formData?.blocks?.[this.selectedBlockUid];
-            const blockType = blockData?.['@type'];
-            const fieldType = this.blockFieldTypes?.[blockType]?.[this.focusedFieldName];
+            const editableFields = this.getEditableFields(blockElement);
 
             window.parent.postMessage(
               {
@@ -2283,11 +2264,11 @@ export class Bridge {
                   width: rect.width,
                   height: rect.height,
                 },
-                showFormatButtons: fieldType === 'slate',
+                editableFields, // Map of fieldName -> fieldType from DOM
+                focusedFieldName: this.focusedFieldName, // Preserve field name for toolbar
               },
               this.adminOrigin,
             );
-
           }
         }
       }, 150);
@@ -2624,6 +2605,35 @@ export class Bridge {
           (bottom > 0 && bottom < innerHeight)) &&
           ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
       : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+  }
+
+  /**
+   * Collects all editable fields from a block element.
+   * Returns an object mapping fieldName -> fieldType (e.g., { heading: 'string', description: 'slate' })
+   * @param {HTMLElement} blockElement - The block element to scan
+   * @returns {Object} Map of field names to their types
+   */
+  getEditableFields(blockElement) {
+    if (!blockElement) return {};
+
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const blockData = this.formData?.blocks?.[blockUid];
+    const blockType = blockData?.['@type'];
+    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+
+    const editableFields = {};
+    const fieldElements = blockElement.querySelectorAll('[data-editable-field]');
+
+    fieldElements.forEach((element) => {
+      const fieldName = element.getAttribute('data-editable-field');
+      if (fieldName) {
+        // Get the field type from blockFieldTypes, or infer from the element
+        const fieldType = blockTypeFields[fieldName] || 'string';
+        editableFields[fieldName] = fieldType;
+      }
+    });
+
+    return editableFields;
   }
 
   /**

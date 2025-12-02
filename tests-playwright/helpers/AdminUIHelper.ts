@@ -328,6 +328,22 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get a format button from the Quanta toolbar by name (e.g., "Bold", "Italic").
+   * Uses accessible name matching which works with title attribute.
+   */
+  getQuantaToolbarFormatButton(formatName: string): Locator {
+    return this.page.locator('.quanta-toolbar').getByRole('button', { name: new RegExp(formatName, 'i') });
+  }
+
+  /**
+   * Check if a format button is visible in the Quanta toolbar.
+   */
+  async isFormatButtonVisible(formatName: string): Promise<boolean> {
+    const button = this.getQuantaToolbarFormatButton(formatName);
+    return await button.isVisible();
+  }
+
+  /**
    * Wait for the Quanta toolbar to appear on a block.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {

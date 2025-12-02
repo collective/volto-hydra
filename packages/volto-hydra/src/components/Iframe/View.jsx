@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { Node } from 'slate';
@@ -99,6 +99,13 @@ const extractBlockFieldTypes = (intl) => {
         ? blockConfig.blockSchema({ ...config, formData: {}, intl })
         : blockConfig.blockSchema;
 
+      // Debug: Log hero block schema processing
+      if (blockType === 'hero') {
+        console.log('[EXTRACT] Processing hero block, blockConfig.blockSchema:', blockConfig.blockSchema);
+        console.log('[EXTRACT] Hero schema after resolution:', schema);
+        console.log('[EXTRACT] Hero schema.properties:', schema?.properties);
+      }
+
       if (!schema?.properties) {
         return;
       }
@@ -120,12 +127,26 @@ const extractBlockFieldTypes = (intl) => {
         if (fieldType) {
           blockFieldTypes[blockType][fieldName] = fieldType;
         }
+
+        // Debug: Log hero field processing
+        if (blockType === 'hero') {
+          console.log(`[EXTRACT] Hero field ${fieldName}: widget=${field.widget}, type=${field.type}, resolved fieldType=${fieldType}`);
+        }
       });
+
+      // Debug: Log what was added for hero
+      if (blockType === 'hero') {
+        console.log('[EXTRACT] Hero blockFieldTypes after processing:', blockFieldTypes['hero']);
+      }
     } catch (error) {
       console.warn(`[VIEW] Error extracting field types for block type "${blockType}":`, error);
       // Continue with other block types
     }
   });
+
+  // Debug: Final state check
+  console.log('[EXTRACT] Final blockFieldTypes keys:', Object.keys(blockFieldTypes));
+  console.log('[EXTRACT] Final blockFieldTypes.hero:', blockFieldTypes['hero']);
 
   return blockFieldTypes;
 };
@@ -411,8 +432,8 @@ const Iframe = (props) => {
 
   const intl = useIntl();
 
-  // Extract block field types once and memoize (maps blockType -> fieldName -> fieldType)
-  const blockFieldTypes = useMemo(() => extractBlockFieldTypes(intl), [intl]);
+  // Extract block field types - stored in state so it can be updated when frontend config is merged
+  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
@@ -494,8 +515,18 @@ const Iframe = (props) => {
             }
             recurseUpdateVoltoConfig(frontendConfig);
 
+            // Debug: check if hero block was merged
+            console.log('[VIEW] After merge, blocksConfig keys:', Object.keys(config.blocks?.blocksConfig || {}));
+            console.log('[VIEW] Hero block config:', config.blocks?.blocksConfig?.hero);
+            console.log('[VIEW] Hero blockSchema:', config.blocks?.blocksConfig?.hero?.blockSchema);
+            console.log('[VIEW] Hero blockSchema properties:', config.blocks?.blocksConfig?.hero?.blockSchema?.properties);
+
             // Re-extract blockFieldTypes now that config has custom blocks
             const updatedBlockFieldTypes = extractBlockFieldTypes(intl);
+            console.log('[VIEW] Extracted blockFieldTypes:', updatedBlockFieldTypes);
+
+            // Store updated types in state so toolbar can use them
+            setBlockFieldTypes(updatedBlockFieldTypes);
 
             // Send updated types to iframe
             event.source.postMessage(
@@ -758,6 +789,7 @@ const Iframe = (props) => {
             blockUid: event.data.blockUid,
             rect: event.data.rect,
             focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+            editableFields: event.data.editableFields || {}, // Map of fieldName -> fieldType from iframe
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
           setIframeSyncState(prev => ({
@@ -1034,21 +1066,27 @@ const Iframe = (props) => {
       />
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
-      {blockUI && referenceElement && (
+      {blockUI && referenceElement && (() => {
+        // Determine outline style based on number of editable fields
+        // Single field blocks get bottom line, multi-field blocks get full border
+        const editableFieldCount = Object.keys(blockUI.editableFields || {}).length;
+        const showBottomLine = editableFieldCount === 1;
+        return (
         <>
-          {/* Selection Outline - blue border or bottom line depending on block type */}
+          {/* Selection Outline - blue border or bottom line depending on field count */}
           <div
             className="volto-hydra-block-outline"
+            data-outline-style={showBottomLine ? 'bottom-line' : 'border'}
             style={{
               position: 'fixed',
               left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
-              top: blockUI.showFormatButtons
+              top: showBottomLine
                 ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 1}px`
                 : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 2}px`,
               width: `${blockUI.rect.width}px`,
-              height: blockUI.showFormatButtons ? '3px' : `${blockUI.rect.height + 4}px`,
-              background: blockUI.showFormatButtons ? '#007eb1' : 'transparent',
-              border: blockUI.showFormatButtons ? 'none' : '2px solid #007eb1',
+              height: showBottomLine ? '3px' : `${blockUI.rect.height + 4}px`,
+              background: showBottomLine ? '#007eb1' : 'transparent',
+              border: showBottomLine ? 'none' : '2px solid #007eb1',
               pointerEvents: 'none',
               zIndex: 1,
             }}
@@ -1119,7 +1157,8 @@ const Iframe = (props) => {
             +
           </button>
         </>
-      )}
+        );
+      })()}
 
       {/* Dropdown menu */}
       {menuDropdownOpen && (
