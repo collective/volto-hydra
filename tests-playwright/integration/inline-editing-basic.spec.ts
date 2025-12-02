@@ -46,13 +46,13 @@ test.describe('Inline Editing - Basic', () => {
     expect(cursorAfterTyping.cursorOffset, `Cursor should be at end after typing. Got: ${JSON.stringify(cursorAfterTyping)}`).toBe(11);
 
     // Move cursor to start - NO re-render should happen
-    // Note: Home key doesn't work with hydra.js (works in plain iframes).
-    // Using Meta+ArrowLeft (Cmd+Left on Mac) as workaround.
-    await editor.press('Meta+ArrowLeft');
+    // Note: Home key and Meta+ArrowLeft don't work cross-platform with hydra.js.
+    // Using helper that sets selection via JavaScript.
+    await helper.moveCursorToStart(editor);
     const renderAfterHome = await iframe.locator('#render-counter').textContent();
     expect(renderAfterHome, `Render count should not change on cursor navigation`).toBe(initialRenderCount);
     const cursorAfterHome = await helper.getCursorInfo(editor);
-    expect(cursorAfterHome.cursorOffset, `Cursor should be at 0 after Cmd+Left. Got: ${JSON.stringify(cursorAfterHome)}`).toBe(0);
+    expect(cursorAfterHome.cursorOffset, `Cursor should be at 0 after moveCursorToStart. Got: ${JSON.stringify(cursorAfterHome)}`).toBe(0);
 
     // Move cursor right 6 positions (after "Hello ") - NO re-render should happen
     for (let i = 0; i < 6; i++) {

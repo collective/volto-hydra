@@ -1850,7 +1850,7 @@ export class AdminUIHelper {
 
     // Auto-scroll loop: move to edge and wait for scroll until target is in view
     const edgeThreshold = 30; // How close to edge to trigger scroll
-    const maxScrollAttempts = 20;
+    const maxScrollAttempts = 40; // Increased for CI with larger content
     let scrollAttempts = 0;
 
     while (scrollAttempts < maxScrollAttempts) {
