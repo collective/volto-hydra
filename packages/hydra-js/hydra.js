@@ -401,6 +401,34 @@ export class Bridge {
                     this.observeBlockTextChanges(blockElement);
                     // Re-attach event listeners (keydown, paste, etc.) to the new DOM element
                     this.makeBlockContentEditable(blockElement);
+
+                    // Re-attach ResizeObserver and send updated BLOCK_SELECTED
+                    // This is critical after drag-and-drop when block moves to new position
+                    const editableFields = this.getEditableFields(blockElement);
+                    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields);
+
+                    // Send updated rect to admin so toolbar follows the block
+                    const rect = blockElement.getBoundingClientRect();
+                    window.parent.postMessage(
+                      {
+                        type: 'BLOCK_SELECTED',
+                        blockUid: this.selectedBlockUid,
+                        rect: {
+                          top: rect.top,
+                          left: rect.left,
+                          width: rect.width,
+                          height: rect.height,
+                        },
+                        editableFields,
+                        focusedFieldName: this.focusedFieldName,
+                      },
+                      this.adminOrigin,
+                    );
+
+                    // Reposition drag button to follow the block
+                    if (this.dragHandlePositioner) {
+                      this.dragHandlePositioner();
+                    }
                   }
                 }
 

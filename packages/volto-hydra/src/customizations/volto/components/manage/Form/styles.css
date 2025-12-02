@@ -1,3 +1,27 @@
 .blocks-form {
     display: none;
 }
+
+/* Collapse slate block shortcut/markdown help sections by default */
+/* Target the wrapper divs containing ShortcutListing and MarkdownIntroduction */
+/* The structure is: div > header.header > h2 + Segment.secondary */
+
+/* Hide segments by default */
+.sidebar-container > div:has(> .header h2) > .ui.segment.secondary {
+    display: none;
+}
+
+/* Show on hover of the entire wrapper (header + segment) */
+.sidebar-container > div:has(> .header h2):hover > .ui.segment.secondary {
+    display: block;
+}
+
+/* Style the header to indicate it's expandable */
+.sidebar-container > div:has(> .header h2) > .header {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.sidebar-container > div:has(> .header h2):hover > .header {
+    opacity: 1;
+}

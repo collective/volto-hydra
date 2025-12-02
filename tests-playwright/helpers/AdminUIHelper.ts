@@ -1734,6 +1734,27 @@ export class AdminUIHelper {
   }
 
   /**
+   * Check if the drag shadow (visual clone of dragged block) is visible in the iframe.
+   * The drag shadow has class .dragging and is created when drag starts.
+   */
+  async isDragShadowVisible(): Promise<boolean> {
+    const iframe = this.getIframe();
+    const dragShadow = iframe.locator('.dragging');
+    return await dragShadow.isVisible();
+  }
+
+  /**
+   * Assert that the drag shadow is visible during drag.
+   */
+  async verifyDragShadowVisible(): Promise<void> {
+    const isVisible = await this.isDragShadowVisible();
+    console.log('[TEST] Drag shadow visible:', isVisible);
+    if (!isVisible) {
+      throw new Error('Drag shadow not visible - drag may not have started');
+    }
+  }
+
+  /**
    * Assert that the drop indicator is visible during drag.
    */
   async verifyDropIndicatorVisible(): Promise<void> {

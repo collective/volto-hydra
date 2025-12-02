@@ -290,6 +290,12 @@ test.describe('Block Drag and Drop', () => {
 
     // Try to drag immediately after first drag (without clicking to reset)
     await helper.startDrag(dragHandle2);
+
+    // Verify drag shadow (visual clone) is visible - confirms drag actually started
+    const isDragShadowVisible = await helper.isDragShadowVisible();
+    console.log('[TEST] Drag shadow visible during second drag:', isDragShadowVisible);
+    expect(isDragShadowVisible).toBe(true);
+
     await helper.moveDragToBlock(secondBlockElement, false); // false = insert before
 
     // If bug exists, the drop indicator won't show because drag didn't actually start
