@@ -1828,10 +1828,43 @@ export class AdminUIHelper {
       }
 
       // Calculate where we want to drop (75% or 25% of target block)
-      const targetY = insertAfter
+      const desiredTargetY = insertAfter
         ? targetRect.y + targetRect.height * 0.75
         : targetRect.y + targetRect.height * 0.25;
       const targetX = targetRect.x + targetRect.width / 2;
+
+      // Check if the DESIRED target point is within viewport
+      // This is more important than just checking if block is partially visible
+      const isDesiredPointInViewport =
+        desiredTargetY >= 0 && desiredTargetY <= viewportSize.height;
+
+      if (!isDesiredPointInViewport) {
+        // Desired drop point is off-screen, need more scrolling
+        scrollAttempts++;
+        // If target point is below viewport → scroll DOWN (bottom edge)
+        // If target point is above viewport → scroll UP (top edge)
+        const targetIsBelow = desiredTargetY >= viewportSize.height;
+        const edgeY = targetIsBelow
+          ? iframeRect.y + iframeRect.height - edgeThreshold // Below - bottom edge to scroll down
+          : iframeRect.y + edgeThreshold; // Above - top edge to scroll up
+        const edgeX = iframeRect.x + iframeRect.width / 2;
+        console.log(
+          `[TEST] Target point off-screen (attempt ${scrollAttempts}), scrolling:`,
+          { edgeX, edgeY, desiredTargetY, targetIsBelow },
+        );
+        await this.page.mouse.move(edgeX, edgeY, { steps: 3 });
+        await this.page.waitForTimeout(200);
+        continue;
+      }
+
+      // Target point is in viewport - use it directly
+      // Add small margin from block edges if needed
+      const visibleBlockTop = Math.max(targetRect.y, 0);
+      const visibleBlockBottom = Math.min(
+        targetRect.y + targetRect.height,
+        viewportSize.height,
+      );
+      let targetY = Math.max(visibleBlockTop + 10, Math.min(desiredTargetY, visibleBlockBottom - 10));
 
       // Check if target position is within viewport
       const isTargetInViewport = targetY >= 0 && targetY <= viewportSize.height;
@@ -1847,10 +1880,12 @@ export class AdminUIHelper {
       }
 
       // Target is off-screen - move to edge to trigger auto-scroll
+      // IMPORTANT: Stay within iframe bounds! The auto-scroll only triggers
+      // on mousemove events INSIDE the iframe
       scrollAttempts++;
       const edgeY = targetY > viewportSize.height
-        ? viewportSize.height - edgeThreshold // Target below - go to bottom edge
-        : edgeThreshold; // Target above - go to top edge
+        ? iframeRect.y + iframeRect.height - edgeThreshold // Target below - bottom edge OF IFRAME
+        : iframeRect.y + edgeThreshold; // Target above - top edge OF IFRAME
       const edgeX = iframeRect.x + iframeRect.width / 2;
 
       console.log(`[TEST] Target off-screen (attempt ${scrollAttempts}), moving to edge:`, { edgeX, edgeY });

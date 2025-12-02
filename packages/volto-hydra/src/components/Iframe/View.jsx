@@ -59,6 +59,13 @@ import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 
 /**
+ * NoPreview component for frontend-defined blocks.
+ * Prevents React errors when Volto tries to render a preview for blocks
+ * that have Slate values or other non-serializable content.
+ */
+const NoPreview = () => null;
+
+/**
  * Extract field types for all block types from schema registry
  * @param {Object} intl - The react-intl intl object for internationalization
  * @returns {Object} - Object mapping blockType -> fieldName -> fieldType
@@ -473,7 +480,19 @@ const Iframe = (props) => {
           // 2. Then set allowedBlocks (triggers updateAllowedBlocks with all blocks)
           // 3. Re-extract and send updated blockFieldTypes to iframe
           if (event.data.voltoConfig) {
-            recurseUpdateVoltoConfig(event.data.voltoConfig);
+            // Inject NoPreview view for frontend blocks that don't have one
+            // This prevents React errors when Volto tries to render previews
+            // for blocks with Slate values or other non-serializable content
+            const frontendConfig = event.data.voltoConfig;
+            if (frontendConfig?.blocks?.blocksConfig) {
+              Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
+                const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
+                if (blockConfig && !blockConfig.view) {
+                  blockConfig.view = NoPreview;
+                }
+              });
+            }
+            recurseUpdateVoltoConfig(frontendConfig);
 
             // Re-extract blockFieldTypes now that config has custom blocks
             const updatedBlockFieldTypes = extractBlockFieldTypes(intl);

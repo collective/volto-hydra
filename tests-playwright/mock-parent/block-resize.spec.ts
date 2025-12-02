@@ -71,6 +71,7 @@ test.describe('Block Resize Detection', () => {
     expect(initialCheck.ok).toBe(true);
 
     // Trigger a FORM_DATA message to cause a re-render
+    // TODO: replace this with a page resize which is more realisitic
     const iframe = helper.getIframe();
     await page.evaluate(() => {
       const iframeWindow = (document.getElementById('previewIframe') as HTMLIFrameElement).contentWindow;
