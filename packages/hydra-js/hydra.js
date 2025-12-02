@@ -627,6 +627,20 @@ export class Bridge {
       event.stopPropagation();
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
+        // Skip synthetic clicks (keyboard activation like space on button) on contenteditable elements
+        // event.detail === 0 indicates keyboard-triggered click
+        const target = event.target;
+        if (target.isContentEditable && event.detail === 0) {
+          event.preventDefault(); // Prevent button activation
+          return; // Don't re-select block - preserves cursor for text input
+        }
+
+        // Prevent link navigation in edit mode (for blocks wrapped in links)
+        const linkElement = event.target.closest('a');
+        if (linkElement) {
+          event.preventDefault();
+        }
+
         // Store the click event for cursor positioning
         this.lastClickEvent = event;
         this.selectBlock(blockElement);
@@ -635,6 +649,31 @@ export class Bridge {
 
     document.removeEventListener('click', this.blockClickHandler);
     document.addEventListener('click', this.blockClickHandler);
+
+    // Add global keydown handler for space on interactive elements
+    // Certain elements (buttons, inputs, summary) have space key behavior that conflicts
+    // with text editing when contenteditable. This handler is at document level so it
+    // survives DOM re-renders.
+    if (!this._interactiveSpaceHandler) {
+      this._interactiveSpaceHandler = (e) => {
+        if (e.key !== ' ' || !e.target.isContentEditable) return;
+
+        const tag = e.target.tagName;
+        const type = e.target.type?.toLowerCase();
+
+        // Elements where space has special activation behavior
+        const needsSpaceOverride =
+          tag === 'BUTTON' ||
+          tag === 'SUMMARY' ||
+          (tag === 'INPUT' && (type === 'submit' || type === 'button' || type === 'reset'));
+
+        if (needsSpaceOverride) {
+          e.preventDefault();
+          document.execCommand('insertText', false, ' ');
+        }
+      };
+      document.addEventListener('keydown', this._interactiveSpaceHandler, true);
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -2330,7 +2369,6 @@ export class Bridge {
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
       editableField.addEventListener('keydown', (e) => {
-
         // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
         // to prevent native formatting from conflicting with Slate-based formatting
         const nativeFormattingKeys = ['b', 'i', 'u', 's'];

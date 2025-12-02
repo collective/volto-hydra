@@ -298,7 +298,15 @@ function renderHeroBlock(block) {
 function renderImageBlock(block) {
     const url = block.url || '';
     const alt = block.alt || '';
-    return `<img src="${url}" alt="${alt}" />`;
+    const href = block.href;
+
+    const img = `<img src="${url}" alt="${alt}" />`;
+
+    // If href is set, wrap in link - tests that click behavior is prevented in edit mode
+    if (href) {
+        return `<a href="${href}" class="image-link">${img}</a>`;
+    }
+    return img;
 }
 
 /**

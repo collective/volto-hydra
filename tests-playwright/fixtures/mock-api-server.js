@@ -169,6 +169,30 @@ function loadInitialContent() {
 loadInitialContent();
 
 /**
+ * Get content for a path, reloading from disk to pick up changes during development.
+ * Falls back to cached contentDB if no file exists.
+ */
+function getContent(urlPath) {
+  // Check if there's a JSON file for this path in the api directory
+  const apiDir = path.join(__dirname, 'api');
+  if (fs.existsSync(apiDir)) {
+    const files = fs.readdirSync(apiDir);
+    for (const file of files) {
+      if (file.endsWith('.json') && !file.startsWith('schema-')) {
+        const filePath = path.join(apiDir, file);
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const contentPath = new URL(content['@id']).pathname;
+        if (contentPath === urlPath) {
+          return content;
+        }
+      }
+    }
+  }
+  // Fall back to cached contentDB
+  return contentDB[urlPath];
+}
+
+/**
  * POST /@login-renew
  * Renew/validate existing JWT token
  */
@@ -482,7 +506,8 @@ app.get('*', (req, res, next) => {
 
   const path = req.path;
   const cleanPath = path.replace('/++api++', '');
-  const content = contentDB[cleanPath];
+  // Reload content from disk to pick up changes during development
+  const content = getContent(cleanPath);
 
   if (content) {
     // Filter actions based on authentication
@@ -514,7 +539,8 @@ app.patch('*', (req, res) => {
   const path = req.path;
   const cleanPath = path.replace('/++api++', '');
 
-  const content = contentDB[cleanPath];
+  // Reload content from disk to pick up changes during development
+  const content = getContent(cleanPath);
 
   if (content) {
     // Return merged content but don't persist - ensures test isolation

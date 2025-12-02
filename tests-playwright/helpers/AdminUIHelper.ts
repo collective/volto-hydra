@@ -1887,7 +1887,17 @@ export class AdminUIHelper {
       // auto-scroll will trigger and move the block, causing incorrect drop position.
       const scrollZoneTop = iframeRect.y + edgeThreshold + 5; // Add 5px buffer
       const scrollZoneBottom = iframeRect.y + iframeRect.height - edgeThreshold - 5;
+
+      // Also ensure we're actually over the target block, not above/below it.
+      // elementFromPoint in hydra.js needs to find the block at the mouse position.
+      // For insertBefore, use top quarter of block (but not above the block).
+      // For insertAfter, use bottom quarter of block (but not below the block).
+      const blockTargetMin = targetRect.y + 10; // At least 10px into the block
+      const blockTargetMax = targetRect.y + targetRect.height - 10;
+
+      // Apply scroll zone clamping, but also ensure we're within the block bounds
       targetY = Math.max(scrollZoneTop, Math.min(targetY, scrollZoneBottom));
+      targetY = Math.max(blockTargetMin, Math.min(targetY, blockTargetMax));
 
       // Check if target position is within viewport
       const isTargetInViewport = targetY >= 0 && targetY <= viewportSize.height;
