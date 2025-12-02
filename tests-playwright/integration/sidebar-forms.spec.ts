@@ -138,6 +138,36 @@ test.describe('Sidebar Forms - Slate Block Behavior', () => {
     expect(hasOverrideTocField).toBe(true);
   });
 
+  test('Slate block shortcut and markdown help is collapsed by default', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click on Slate block
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // The "Editor shortcuts" header should be visible with collapse indicator
+    const editorShortcutsHeader = page.locator(
+      '#sidebar-properties .header h2:text-is("Editor shortcuts ▸")',
+    );
+    await expect(editorShortcutsHeader).toBeVisible();
+
+    // The "Markdown shortcuts" header should be visible with collapse indicator
+    const markdownShortcutsHeader = page.locator(
+      '#sidebar-properties .header h2:text-is("Markdown shortcuts ▸")',
+    );
+    await expect(markdownShortcutsHeader).toBeVisible();
+
+    // The segment content should NOT be in the DOM when collapsed
+    const helpSegments = page.locator(
+      '#sidebar-properties .ui.segment.secondary.attached',
+    );
+    await expect(helpSegments).toHaveCount(0);
+  });
+
   test('Slate blocks do NOT show Image-specific fields on Block tab', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
