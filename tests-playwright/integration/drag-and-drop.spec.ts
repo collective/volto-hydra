@@ -289,24 +289,8 @@ test.describe('Block Drag and Drop', () => {
     const secondBlockElement = iframe.locator(`[data-block-uid="${secondBlock}"]`);
 
     // Try to drag immediately after first drag (without clicking to reset)
-    await helper.startDrag(dragHandle2);
-
-    // Verify drag shadow (visual clone) is visible - confirms drag actually started
-    const isDragShadowVisible = await helper.isDragShadowVisible();
-    console.log('[TEST] Drag shadow visible during second drag:', isDragShadowVisible);
-    expect(isDragShadowVisible).toBe(true);
-
-    await helper.moveDragToBlock(secondBlockElement, false); // false = insert before
-
-    // If bug exists, the drop indicator won't show because drag didn't actually start
-    const isVisible = await helper.isDropIndicatorVisible();
-    console.log('[TEST] Drop indicator visible during second drag (without clicking):', isVisible);
-
-    // This should be true, but if bug exists it will be false
-    expect(isVisible).toBe(true);
-
-    // Complete the drag
-    await helper.completeDrag(dragHandle2);
+    // Use dragBlockWithMouse which handles scrolling (page may be scrolled after first drag)
+    await helper.dragBlockWithMouse(dragHandle2, secondBlockElement, false); // false = insert before
 
     // Wait for block order to change (block should no longer be at bottom)
     await expect

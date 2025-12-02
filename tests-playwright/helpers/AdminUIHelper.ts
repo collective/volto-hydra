@@ -1838,6 +1838,11 @@ export class AdminUIHelper {
     // Get toolbar drag icon position (where user SEES the draggable element)
     const toolbar = this.page.locator('.quanta-toolbar');
     const toolbarDragIcon = toolbar.locator('.drag-handle');
+
+    // Scroll toolbar into view if needed (block might be at bottom of page)
+    await toolbarDragIcon.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(100);
+
     const toolbarIconRect = await toolbarDragIcon.boundingBox();
 
     if (!toolbarIconRect) {
@@ -1857,6 +1862,9 @@ export class AdminUIHelper {
     await this.page.mouse.move(startX, startY);
     await this.page.mouse.down();
     await this.page.waitForTimeout(50);
+
+    // Verify drag shadow appears - confirms drag actually started
+    await this.verifyDragShadowVisible();
 
     // Get iframe and viewport info
     const iframeElement = this.page.locator('#previewIframe');
