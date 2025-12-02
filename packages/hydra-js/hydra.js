@@ -1334,6 +1334,19 @@ export class Bridge {
     console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
     if (!blockElement) return;
 
+    // Scroll block into view if needed, with space for toolbar above and add button below
+    const toolbarMargin = 50; // Toolbar is ~40px tall
+    const addButtonMargin = 50; // Add button is ~30px tall
+    const scrollRect = blockElement.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    if (scrollRect.top < toolbarMargin || scrollRect.bottom > viewportHeight - addButtonMargin) {
+      // Block or its UI elements are outside viewport - scroll to center it
+      const blockCenter = scrollRect.top + scrollRect.height / 2;
+      const viewportCenter = viewportHeight / 2;
+      window.scrollBy({ top: blockCenter - viewportCenter, behavior: 'instant' });
+    }
+
     const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
 

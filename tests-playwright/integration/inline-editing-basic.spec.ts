@@ -616,7 +616,8 @@ test.describe('Inline Editing - Basic', () => {
     await helper.waitForEditorText(editor, /This is a test/);
 
     // Select the word "test" (last 4 characters)
-    await page.keyboard.press('End');
+    // Use helper instead of page.keyboard.press('End') to avoid scrolling the window
+    await helper.moveCursorToEnd(editor);
     for (let i = 0; i < 4; i++) {
       await page.keyboard.press('Shift+ArrowLeft');
     }

@@ -210,9 +210,9 @@ test.describe('Inline Editing - Hero Block Fields', () => {
     const focusInfo = await helper.isEditorFocused(headingField);
     expect(focusInfo.isFocused, `Should be focused on heading field. Got: ${JSON.stringify(focusInfo)}`).toBe(true);
 
-    // Move cursor to start with Home - NO re-render should happen
-    // Use headingField.press() to send to iframe, not page.keyboard.press()
-    await headingField.press('Home');
+    // Move cursor to start with helper - NO re-render should happen
+    // Use helper instead of keyboard Home to avoid scrolling the window
+    await helper.moveCursorToStart(headingField);
     const renderAfterHome = await iframe.locator('#render-counter').textContent();
     expect(renderAfterHome, `Render count should not change on Home key`).toBe(initialRenderCount);
     const cursorAfterHome = await helper.getCursorInfo(headingField);

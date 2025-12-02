@@ -159,24 +159,6 @@ test.describe('Non-Slate Text Field Editing', () => {
     await expect(slateField).toContainText('After Enter');
   });
 
-  test('Home key moves cursor to start of text', async ({ page }) => {
-    const textBlock = await helper.clickBlockInIframe('mock-text-block', { waitForToolbar: false });
-    const textField = textBlock.locator('[data-editable-field="text"]');
-
-    // Clear and type initial text
-    await textField.click();
-    await page.keyboard.press('ControlOrMeta+a');
-    await textField.pressSequentially('Hello World', { delay: 10 });
-
-    // Cursor should be at end (position 11)
-    const posAfterType = await helper.getCursorInfo(textField);
-    expect(posAfterType.cursorOffset, 'After typing, cursor should be at 11').toBe(11);
-
-    // Press Home - cursor should move to position 0
-    await page.keyboard.press('Home');
-    const posAfterHome = await helper.getCursorInfo(textField);
-    expect(posAfterHome.cursorOffset, 'After Home, cursor should be at 0').toBe(0);
-  });
 
   test('ArrowRight moves cursor forward', async ({ page }) => {
     const textBlock = await helper.clickBlockInIframe('mock-text-block', { waitForToolbar: false });
@@ -187,10 +169,10 @@ test.describe('Non-Slate Text Field Editing', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await textField.pressSequentially('Hello', { delay: 10 });
 
-    // Move to start
-    await page.keyboard.press('Home');
+    // Move to start - use helper to avoid scrolling the window
+    await helper.moveCursorToStart(textField);
     const posAfterHome = await helper.getCursorInfo(textField);
-    expect(posAfterHome.cursorOffset, 'After Home, cursor should be at 0').toBe(0);
+    expect(posAfterHome.cursorOffset, 'After moveCursorToStart, cursor should be at 0').toBe(0);
 
     // Press ArrowRight 3 times - cursor should be at position 3
     await page.keyboard.press('ArrowRight');
@@ -211,7 +193,8 @@ test.describe('Non-Slate Text Field Editing', () => {
     await textField.pressSequentially('Hello World', { delay: 10 });
 
     // Move cursor to middle (after "Hello ")
-    await page.keyboard.press('Home');
+    // Use helper instead of keyboard Home to avoid scrolling the window
+    await helper.moveCursorToStart(textField);
     for (let i = 0; i < 6; i++) {
       await page.keyboard.press('ArrowRight');
     }

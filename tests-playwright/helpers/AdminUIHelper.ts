@@ -975,6 +975,7 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the end of the text in a contenteditable element.
+   * Uses JavaScript to avoid triggering window scroll (unlike keyboard End key).
    */
   async moveCursorToEnd(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
@@ -982,6 +983,21 @@ export class AdminUIHelper {
       const selection = el.ownerDocument.defaultView.getSelection();
       range.selectNodeContents(el);
       range.collapse(false); // Collapse to end
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+  }
+
+  /**
+   * Move cursor to the start of the text in a contenteditable element.
+   * Uses JavaScript to avoid triggering window scroll (unlike keyboard Home key).
+   */
+  async moveCursorToStart(editor: any): Promise<void> {
+    await editor.evaluate((el: any) => {
+      const range = el.ownerDocument.createRange();
+      const selection = el.ownerDocument.defaultView.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(true); // Collapse to start
       selection.removeAllRanges();
       selection.addRange(range);
     });
@@ -1865,6 +1881,13 @@ export class AdminUIHelper {
         viewportSize.height,
       );
       let targetY = Math.max(visibleBlockTop + 10, Math.min(desiredTargetY, visibleBlockBottom - 10));
+
+      // IMPORTANT: Clamp targetY to avoid the auto-scroll zones near iframe edges.
+      // If we position the mouse in the scroll zone during the wait periods,
+      // auto-scroll will trigger and move the block, causing incorrect drop position.
+      const scrollZoneTop = iframeRect.y + edgeThreshold + 5; // Add 5px buffer
+      const scrollZoneBottom = iframeRect.y + iframeRect.height - edgeThreshold - 5;
+      targetY = Math.max(scrollZoneTop, Math.min(targetY, scrollZoneBottom));
 
       // Check if target position is within viewport
       const isTargetInViewport = targetY >= 0 && targetY <= viewportSize.height;
