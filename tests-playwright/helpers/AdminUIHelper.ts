@@ -1884,8 +1884,12 @@ export class AdminUIHelper {
           `[TEST] Target point off-screen (attempt ${scrollAttempts}), scrolling:`,
           { edgeX, edgeY, desiredTargetY, targetIsBelow },
         );
-        await this.page.mouse.move(edgeX, edgeY, { steps: 3 });
-        await this.page.waitForTimeout(200);
+        // Do multiple small moves in the scroll zone to trigger more scroll events
+        // hydra.js scrolls 10px per mousemove, so more moves = faster scrolling
+        for (let i = 0; i < 5; i++) {
+          await this.page.mouse.move(edgeX, edgeY + (i % 2 === 0 ? 0 : 2), { steps: 2 });
+          await this.page.waitForTimeout(50);
+        }
         continue;
       }
 
@@ -1938,9 +1942,12 @@ export class AdminUIHelper {
       const edgeX = iframeRect.x + iframeRect.width / 2;
 
       console.log(`[TEST] Target off-screen (attempt ${scrollAttempts}), moving to edge:`, { edgeX, edgeY });
-      await this.page.mouse.move(edgeX, edgeY, { steps: 3 });
-      // Wait for auto-scroll to happen (hydra.js scrolls on each mousemove near edge)
-      await this.page.waitForTimeout(200);
+      // Do multiple small moves in the scroll zone to trigger more scroll events
+      // hydra.js scrolls 10px per mousemove, so more moves = faster scrolling
+      for (let i = 0; i < 5; i++) {
+        await this.page.mouse.move(edgeX, edgeY + (i % 2 === 0 ? 0 : 2), { steps: 2 });
+        await this.page.waitForTimeout(50);
+      }
     }
 
     if (scrollAttempts >= maxScrollAttempts) {

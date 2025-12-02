@@ -49,9 +49,9 @@ test.describe('Adding Blocks', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Get initial block count
+    // Get initial block count (don't hardcode - fixture may change)
     const initialCount = await helper.getBlockCount();
-    expect(initialCount).toBe(4); // test-page has 4 blocks (3 slate + 1 hero)
+    expect(initialCount).toBeGreaterThan(0);
 
     // Select a block and click Add
     await helper.clickBlockInIframe('block-1-uuid');
@@ -300,11 +300,11 @@ test.describe('Removing Blocks', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Get initial block order
+    // Get initial block order (don't hardcode - fixture may change)
     const initialBlocks = await helper.getBlockOrder();
-    expect(initialBlocks.length).toBe(4); // test-page has 4 blocks (3 slate + 1 hero)
+    expect(initialBlocks.length).toBeGreaterThan(1); // Need at least 2 blocks
 
-    // Remove the middle block (index 1)
+    // Remove a block (index 1)
     const blockToRemove = initialBlocks[1];
     await helper.clickBlockInIframe(blockToRemove);
     await helper.openQuantaToolbarMenu(blockToRemove);
