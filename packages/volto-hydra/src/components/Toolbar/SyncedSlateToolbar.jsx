@@ -679,8 +679,10 @@ const SyncedSlateToolbar = ({
           alignItems: 'center',
           justifyContent: 'center',
           pointerEvents: 'none',
-          color: '#999',
+          color: '#666',
           fontSize: '14px',
+          background: '#e8e8e8',
+          borderRadius: '2px',
         }}
       >
         ⠿

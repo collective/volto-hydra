@@ -2019,10 +2019,9 @@ export class Bridge {
             dropIndicator.className = 'volto-hydra-drop-indicator';
             dropIndicator.style.cssText = `
               position: absolute;
-              left: 0;
-              right: 0;
-              height: 4px;
-              background: #007bff;
+              height: 3px;
+              border-top: 3px dashed #007bff;
+              background: transparent;
               pointer-events: none;
               z-index: 9998;
               display: none;
@@ -2071,6 +2070,8 @@ export class Bridge {
           }
 
           dropIndicator.style.top = `${indicatorY}px`;
+          dropIndicator.style.left = `${closestBlockRect.left}px`;
+          dropIndicator.style.width = `${closestBlockRect.width}px`;
           dropIndicator.style.display = 'block';
         }
       };
