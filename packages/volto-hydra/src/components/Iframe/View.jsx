@@ -792,6 +792,18 @@ const Iframe = (props) => {
             if (isNewBlock) {
               onSelectBlock(event.data.blockUid);
             }
+
+            // Skip update if nothing changed - prevents unnecessary toolbar redraws
+            if (prevBlockUI &&
+                prevBlockUI.blockUid === event.data.blockUid &&
+                prevBlockUI.focusedFieldName === event.data.focusedFieldName &&
+                prevBlockUI.rect?.top === event.data.rect?.top &&
+                prevBlockUI.rect?.left === event.data.rect?.left &&
+                prevBlockUI.rect?.width === event.data.rect?.width &&
+                prevBlockUI.rect?.height === event.data.rect?.height) {
+              return prevBlockUI; // Return same reference to skip re-render
+            }
+
             return {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
@@ -800,10 +812,14 @@ const Iframe = (props) => {
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
-          setIframeSyncState(prev => ({
-            ...prev,
-            selection: event.data.selection || null,
-          }));
+          // Only update if selection actually changed
+          setIframeSyncState(prev => {
+            const newSelection = event.data.selection || null;
+            if (JSON.stringify(prev.selection) === JSON.stringify(newSelection)) {
+              return prev; // Skip re-render if selection unchanged
+            }
+            return { ...prev, selection: newSelection };
+          });
           break;
 
         case 'HIDE_BLOCK_UI':

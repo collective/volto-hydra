@@ -402,32 +402,38 @@ export class Bridge {
                     // Re-attach event listeners (keydown, paste, etc.) to the new DOM element
                     this.makeBlockContentEditable(blockElement);
 
-                    // Re-attach ResizeObserver and send updated BLOCK_SELECTED
+                    // Re-attach ResizeObserver
                     // This is critical after drag-and-drop when block moves to new position
+                    // For sidebar edits (no transformedSelection): pass skipInitialUpdate to prevent toolbar blink
                     const editableFields = this.getEditableFields(blockElement);
-                    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields);
+                    const isSidebarEdit = !event.data.transformedSelection;
+                    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, isSidebarEdit);
 
-                    // Send updated rect to admin so toolbar follows the block
-                    const rect = blockElement.getBoundingClientRect();
-                    window.parent.postMessage(
-                      {
-                        type: 'BLOCK_SELECTED',
-                        blockUid: this.selectedBlockUid,
-                        rect: {
-                          top: rect.top,
-                          left: rect.left,
-                          width: rect.width,
-                          height: rect.height,
+                    // Only send BLOCK_SELECTED for toolbar format operations (has transformedSelection)
+                    // Skip for sidebar edits - rect doesn't change and sending causes toolbar redraws
+                    if (event.data.transformedSelection) {
+                      // Send updated rect to admin so toolbar follows the block
+                      const rect = blockElement.getBoundingClientRect();
+                      window.parent.postMessage(
+                        {
+                          type: 'BLOCK_SELECTED',
+                          blockUid: this.selectedBlockUid,
+                          rect: {
+                            top: rect.top,
+                            left: rect.left,
+                            width: rect.width,
+                            height: rect.height,
+                          },
+                          editableFields,
+                          focusedFieldName: this.focusedFieldName,
                         },
-                        editableFields,
-                        focusedFieldName: this.focusedFieldName,
-                      },
-                      this.adminOrigin,
-                    );
+                        this.adminOrigin,
+                      );
 
-                    // Reposition drag button to follow the block
-                    if (this.dragHandlePositioner) {
-                      this.dragHandlePositioner();
+                      // Reposition drag button to follow the block
+                      if (this.dragHandlePositioner) {
+                        this.dragHandlePositioner();
+                      }
                     }
                   }
                 }
@@ -1348,35 +1354,39 @@ export class Bridge {
     }
 
     // Send updated block position to Admin UI for toolbar/overlay positioning
-    const rect = blockElement.getBoundingClientRect();
+    // Skip for sidebar edits (skipFocus=true) - block position hasn't really changed
+    if (!skipFocus) {
+      const rect = blockElement.getBoundingClientRect();
 
-    window.parent.postMessage(
-      {
-        type: 'BLOCK_SELECTED',
-        blockUid: this.selectedBlockUid,
-        rect: {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
+      window.parent.postMessage(
+        {
+          type: 'BLOCK_SELECTED',
+          blockUid: this.selectedBlockUid,
+          rect: {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          },
+          focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
         },
-        focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
-      },
-      this.adminOrigin,
-    );
+        this.adminOrigin,
+      );
 
-    // Reposition drag button after blocks have moved (e.g., after drag-and-drop)
-    // The drag button needs to follow the selected block's new position
-    if (this.dragHandlePositioner) {
-      this.dragHandlePositioner();
+      // Reposition drag button after blocks have moved (e.g., after drag-and-drop)
+      // The drag button needs to follow the selected block's new position
+      if (this.dragHandlePositioner) {
+        this.dragHandlePositioner();
+      }
     }
 
     // Re-attach ResizeObserver to the new DOM element
     // React re-renders may have replaced the block element, so our old observer
     // would be watching a detached element. This ensures we catch future size
     // changes (e.g., image loading after a re-render).
+    // For sidebar edits: pass skipInitialUpdate to prevent spurious BLOCK_SELECTED from immediate observer fire
     const editableFields = this.getEditableFields(blockElement);
-    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields);
+    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, skipFocus);
 
     // Also re-attach the text change observer for the same reason
     this.observeBlockTextChanges(blockElement);
@@ -1812,16 +1822,41 @@ export class Bridge {
    * @param {string} blockUid - The block's UID.
    * @param {Object} editableFields - Map of fieldName -> fieldType for editable fields in this block.
    */
-  observeBlockResize(blockElement, blockUid, editableFields) {
-    console.log('[HYDRA] observeBlockResize called for block:', blockUid);
+  observeBlockResize(blockElement, blockUid, editableFields, skipInitialUpdate = false) {
+    console.log('[HYDRA] observeBlockResize called for block:', blockUid, 'skipInitialUpdate:', skipInitialUpdate);
+
+    // Skip if already observing the same block (by UID, not element reference)
+    // ResizeObserver fires immediately when attached - recreating it causes spurious updates
+    // After re-render, element reference changes but we're still on same block
+    if (this._lastBlockRectUid === blockUid && this.blockResizeObserver && this._observedBlockElement) {
+      // Check if the old element is still in the DOM
+      // If detached, we need to re-attach to the new element
+      if (document.body.contains(this._observedBlockElement)) {
+        console.log('[HYDRA] observeBlockResize: already observing this block, skipping');
+        return;
+      }
+      console.log('[HYDRA] observeBlockResize: old element detached, re-attaching to new element');
+    }
+
     // Clean up any existing observer
     if (this.blockResizeObserver) {
       this.blockResizeObserver.disconnect();
     }
 
     // Store initial dimensions to detect actual changes
-    let lastRect = blockElement.getBoundingClientRect();
-    console.log('[HYDRA] observeBlockResize initial rect:', { width: lastRect.width, height: lastRect.height });
+    // Use instance variable so it persists across observer recreations
+    // Only reset if this is a different block
+    const currentRect = blockElement.getBoundingClientRect();
+    if (!this._lastBlockRect || this._lastBlockRectUid !== blockUid) {
+      this._lastBlockRect = currentRect;
+      this._lastBlockRectUid = blockUid;
+    } else if (skipInitialUpdate) {
+      // For sidebar edits: update lastRect to current rect to prevent immediate fire from triggering update
+      // The block position may have shifted slightly due to re-render, but we don't want to send BLOCK_SELECTED
+      this._lastBlockRect = currentRect;
+    }
+    this._observedBlockElement = blockElement;
+    console.log('[HYDRA] observeBlockResize initial rect:', { width: currentRect.width, height: currentRect.height });
 
     this.blockResizeObserver = new ResizeObserver((entries) => {
       console.log('[HYDRA] ResizeObserver callback fired for:', blockUid);
@@ -1831,8 +1866,16 @@ export class Bridge {
         return;
       }
 
+      // Skip during sidebar edit processing - the re-render causes false positives
+      // as elements are temporarily detached/reattached
+      if (this.isProcessingExternalUpdate) {
+        console.log('[HYDRA] ResizeObserver: external update in progress, skipping');
+        return;
+      }
+
       for (const entry of entries) {
         const newRect = entry.target.getBoundingClientRect();
+        const lastRect = this._lastBlockRect;
 
         // Only send update if dimensions actually changed significantly (> 1px)
         const widthChanged = Math.abs(newRect.width - lastRect.width) > 1;
@@ -1847,7 +1890,7 @@ export class Bridge {
             newSize: { width: newRect.width, height: newRect.height },
           });
 
-          lastRect = newRect;
+          this._lastBlockRect = newRect;
 
           // Send updated BLOCK_SELECTED with new rect
           window.parent.postMessage(
