@@ -1952,6 +1952,8 @@ export class Bridge {
       // Create a visual copy of the block being dragged
       const draggedBlock = blockElement.cloneNode(true);
       draggedBlock.classList.add('dragging');
+      // Remove data-block-uid from shadow so it doesn't interfere with selectors
+      draggedBlock.removeAttribute('data-block-uid');
       document.body.appendChild(draggedBlock);
 
       // Position the copy under the cursor
@@ -1992,11 +1994,13 @@ export class Bridge {
           throttleTimeout = setTimeout(() => {
             const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
             let closestBlock = elementBelow;
+            console.log('[HYDRA] elementFromPoint at', e.clientX, e.clientY, ':', elementBelow?.tagName, elementBelow?.getAttribute?.('data-block-uid'));
 
             // Find the closest ancestor with 'data-block-uid'
             while (closestBlock && !closestBlock.hasAttribute('data-block-uid')) {
               closestBlock = closestBlock.parentElement;
             }
+            console.log('[HYDRA] closestBlock:', closestBlock?.getAttribute?.('data-block-uid'));
 
             // Exclude the dragged block and its ghost from being drop targets
             const draggedBlockUid = blockElement.getAttribute('data-block-uid');
@@ -2023,6 +2027,7 @@ export class Bridge {
                   background: #007bff;
                   pointer-events: none;
                   z-index: 9998;
+                  display: none;
                 `;
                 document.body.appendChild(dropIndicator);
               }
@@ -2083,6 +2088,15 @@ export class Bridge {
 
         draggedBlock.remove();
 
+        // Always clean up drop indicator on mouseup
+        const dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
+        if (dropIndicator) {
+          console.log('[HYDRA] Hiding drop indicator on mouseup');
+          dropIndicator.style.display = 'none';
+        } else {
+          console.log('[HYDRA] No drop indicator to hide on mouseup');
+        }
+
         if (closestBlockUid) {
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
           const blocks_layout = this.formData.blocks_layout.items;
@@ -2103,12 +2117,6 @@ export class Bridge {
 
             // Insert at new position
             blocks_layout.splice(insertIndex, 0, draggedBlockId);
-
-            // Clean up drop indicator
-            const dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
-            if (dropIndicator) {
-              dropIndicator.style.display = 'none';
-            }
 
             // Send updated blocks_layout to parent
             window.parent.postMessage(
