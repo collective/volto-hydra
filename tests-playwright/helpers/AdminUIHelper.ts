@@ -360,6 +360,15 @@ export class AdminUIHelper {
 
     // Scroll block into view with room for toolbar
     await this.scrollBlockIntoViewWithToolbarRoom(blockId);
+
+    // After scrolling, the viewport position changed, so poll again to ensure
+    // the toolbar has re-adjusted its position correctly
+    await expect.poll(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res: any = await this.isBlockSelectedInIframe(blockId);
+      if (typeof res === 'boolean') return res;
+      return !!res && !!res.ok;
+    }, { timeout: 5000 }).toBeTruthy();
   }
 
   async getMenuButtonInQuantaToolbar(blockId: string, formatKeyword:string): Promise<void> {
