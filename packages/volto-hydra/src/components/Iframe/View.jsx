@@ -785,19 +785,25 @@ const Iframe = (props) => {
         case 'BLOCK_SELECTED':
           // Update block UI state and selection atomically
           // Selection is included in BLOCK_SELECTED to prevent race conditions
-          setBlockUI({
-            blockUid: event.data.blockUid,
-            rect: event.data.rect,
-            focusedFieldName: event.data.focusedFieldName, // Track which field is focused
-            editableFields: event.data.editableFields || {}, // Map of fieldName -> fieldType from iframe
+          setBlockUI((prevBlockUI) => {
+            const isNewBlock = !prevBlockUI || prevBlockUI.blockUid !== event.data.blockUid;
+            // Only call onSelectBlock for NEW block selections, not rect updates
+            // This prevents focus being stolen from sidebar when typing triggers rect updates
+            if (isNewBlock) {
+              onSelectBlock(event.data.blockUid);
+            }
+            return {
+              blockUid: event.data.blockUid,
+              rect: event.data.rect,
+              focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+              editableFields: event.data.editableFields || {}, // Map of fieldName -> fieldType from iframe
+            };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
           setIframeSyncState(prev => ({
             ...prev,
             selection: event.data.selection || null,
           }));
-          // Call onSelectBlock to open sidebar and update selectedBlock in parent
-          onSelectBlock(event.data.blockUid);
           break;
 
         case 'HIDE_BLOCK_UI':

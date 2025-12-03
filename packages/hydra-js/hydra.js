@@ -432,6 +432,8 @@ export class Bridge {
                   }
                 }
 
+                // Only restore selection for toolbar format operations (has transformedSelection)
+                // NOT for sidebar edits - those should not steal focus from sidebar
                 if (event.data.transformedSelection) {
                   // Store expected selection so selectionchange handler can suppress it
                   this.expectedSelectionFromAdmin = event.data.transformedSelection;
@@ -439,12 +441,8 @@ export class Bridge {
                   // the selection we're about to restore from transformedSelection
                   this.savedClickPosition = null;
                   this.restoreSlateSelection(event.data.transformedSelection, this.formData);
-                } else if (this.savedSelection) {
-                  this.expectedSelectionFromAdmin = this.savedSelection;
-                  this.restoreSlateSelection(this.savedSelection, this.formData);
-                } else {
-                  //console.log('[HYDRA] No saved selection available');
                 }
+                // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
                 // Replay any buffered keystrokes now that DOM is ready
                 this.replayBufferedEvents();
                 // Clear the processing flag - DOM updates are complete
@@ -473,12 +471,14 @@ export class Bridge {
 
             // Update block UI overlay positions after form data changes
             // Blocks might have resized after form updates
+            // Skip focus if this is from sidebar editing (no transformedSelection)
+            const skipFocus = !event.data.transformedSelection;
             if (this.selectedBlockUid) {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
                   if (blockElement) {
-                    this.updateBlockUIAfterFormData(blockElement);
+                    this.updateBlockUIAfterFormData(blockElement, skipFocus);
                   }
                 });
               });
@@ -1301,7 +1301,7 @@ export class Bridge {
    *
    * @param {HTMLElement} blockElement - The currently selected block element.
    */
-  updateBlockUIAfterFormData(blockElement) {
+  updateBlockUIAfterFormData(blockElement, skipFocus = false) {
     // Restore contenteditable on fields after renderer updates
     // The renderer may have replaced DOM elements, removing contenteditable attributes
     this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
@@ -1316,7 +1316,8 @@ export class Bridge {
 
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
-    if (this.focusedFieldName) {
+    // Skip focus if editing from sidebar - don't steal focus from sidebar fields
+    if (this.focusedFieldName && !skipFocus) {
       const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
 
       if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
