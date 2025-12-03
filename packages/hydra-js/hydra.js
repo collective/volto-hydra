@@ -1954,9 +1954,9 @@ export class Bridge {
       draggedBlock.classList.add('dragging');
       // Remove data-block-uid from shadow so it doesn't interfere with selectors
       draggedBlock.removeAttribute('data-block-uid');
-      document.body.appendChild(draggedBlock);
 
-      // Position the copy under the cursor
+      // IMPORTANT: Set styles BEFORE appending to avoid brief layout flash
+      // where element is in document flow before position:fixed takes effect
       Object.assign(draggedBlock.style, {
         position: 'fixed',
         width: `${rect.width}px`,
@@ -1968,8 +1968,9 @@ export class Bridge {
         zIndex: '10000',
       });
 
+      document.body.appendChild(draggedBlock);
+
       let closestBlockUid = null;
-      let throttleTimeout;
       let insertAt = null; // 0 for top, 1 for bottom
 
       // Handle mouse movement
@@ -1990,93 +1991,87 @@ export class Bridge {
           window.scrollBy(0, scrollSpeed);
         }
 
-        if (!throttleTimeout) {
-          throttleTimeout = setTimeout(() => {
-            const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
-            let closestBlock = elementBelow;
-            console.log('[HYDRA] elementFromPoint at', e.clientX, e.clientY, ':', elementBelow?.tagName, elementBelow?.getAttribute?.('data-block-uid'));
+        // Find element under cursor (no throttle - these operations are fast)
+        const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+        let closestBlock = elementBelow;
 
-            // Find the closest ancestor with 'data-block-uid'
-            while (closestBlock && !closestBlock.hasAttribute('data-block-uid')) {
-              closestBlock = closestBlock.parentElement;
+        // Find the closest ancestor with 'data-block-uid'
+        while (closestBlock && !closestBlock.hasAttribute('data-block-uid')) {
+          closestBlock = closestBlock.parentElement;
+        }
+
+        // Exclude the dragged block and its ghost from being drop targets
+        const draggedBlockUid = blockElement.getAttribute('data-block-uid');
+        if (
+          closestBlock &&
+          (closestBlock === draggedBlock ||
+            closestBlock === blockElement ||
+            closestBlock.getAttribute('data-block-uid') === draggedBlockUid)
+        ) {
+          closestBlock = null;
+        }
+
+        if (closestBlock) {
+          // Get or create drop indicator
+          let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
+          if (!dropIndicator) {
+            dropIndicator = document.createElement('div');
+            dropIndicator.className = 'volto-hydra-drop-indicator';
+            dropIndicator.style.cssText = `
+              position: absolute;
+              left: 0;
+              right: 0;
+              height: 4px;
+              background: #007bff;
+              pointer-events: none;
+              z-index: 9998;
+              display: none;
+            `;
+            document.body.appendChild(dropIndicator);
+          }
+
+          // Determine if hovering over top or bottom half
+          const closestBlockRect = closestBlock.getBoundingClientRect();
+          const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
+          const isHoveringOverTopHalf =
+            mouseYRelativeToBlock < closestBlockRect.height / 2;
+
+          insertAt = isHoveringOverTopHalf ? 0 : 1;
+          closestBlockUid = closestBlock.getAttribute('data-block-uid');
+
+          // Position drop indicator between blocks
+          // Center it in the gap between adjacent blocks
+          const indicatorHeight = 4;
+          let indicatorY;
+
+          if (insertAt === 0) {
+            // Inserting before this block - find the previous block
+            const prevBlock = closestBlock.previousElementSibling;
+            if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
+              // Position exactly halfway between previous block bottom and current block top
+              const prevBlockRect = prevBlock.getBoundingClientRect();
+              const gap = closestBlockRect.top - prevBlockRect.bottom;
+              indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+            } else {
+              // No previous block - position at top of first block
+              indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
             }
-            console.log('[HYDRA] closestBlock:', closestBlock?.getAttribute?.('data-block-uid'));
-
-            // Exclude the dragged block and its ghost from being drop targets
-            const draggedBlockUid = blockElement.getAttribute('data-block-uid');
-            if (
-              closestBlock &&
-              (closestBlock === draggedBlock ||
-                closestBlock === blockElement ||
-                closestBlock.getAttribute('data-block-uid') === draggedBlockUid)
-            ) {
-              closestBlock = null;
+          } else {
+            // Inserting after this block - find the next block
+            const nextBlock = closestBlock.nextElementSibling;
+            if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
+              // Position exactly halfway between current block bottom and next block top
+              const nextBlockRect = nextBlock.getBoundingClientRect();
+              const gap = nextBlockRect.top - closestBlockRect.bottom;
+              indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+            } else {
+              // No next block - position at bottom of last block
+              indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
             }
+          }
 
-            if (closestBlock) {
-              // Get or create drop indicator
-              let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
-              if (!dropIndicator) {
-                dropIndicator = document.createElement('div');
-                dropIndicator.className = 'volto-hydra-drop-indicator';
-                dropIndicator.style.cssText = `
-                  position: absolute;
-                  left: 0;
-                  right: 0;
-                  height: 4px;
-                  background: #007bff;
-                  pointer-events: none;
-                  z-index: 9998;
-                  display: none;
-                `;
-                document.body.appendChild(dropIndicator);
-              }
-
-              // Determine if hovering over top or bottom half
-              const closestBlockRect = closestBlock.getBoundingClientRect();
-              const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
-              const isHoveringOverTopHalf =
-                mouseYRelativeToBlock < closestBlockRect.height / 2;
-
-              insertAt = isHoveringOverTopHalf ? 0 : 1;
-              closestBlockUid = closestBlock.getAttribute('data-block-uid');
-
-              // Position drop indicator between blocks
-              // Center it in the gap between adjacent blocks
-              const indicatorHeight = 4;
-              let indicatorY;
-
-              if (insertAt === 0) {
-                // Inserting before this block - find the previous block
-                const prevBlock = closestBlock.previousElementSibling;
-                if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
-                  // Position exactly halfway between previous block bottom and current block top
-                  const prevBlockRect = prevBlock.getBoundingClientRect();
-                  const gap = closestBlockRect.top - prevBlockRect.bottom;
-                  indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-                } else {
-                  // No previous block - position at top of first block
-                  indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
-                }
-              } else {
-                // Inserting after this block - find the next block
-                const nextBlock = closestBlock.nextElementSibling;
-                if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
-                  // Position exactly halfway between current block bottom and next block top
-                  const nextBlockRect = nextBlock.getBoundingClientRect();
-                  const gap = nextBlockRect.top - closestBlockRect.bottom;
-                  indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-                } else {
-                  // No next block - position at bottom of last block
-                  indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
-                }
-              }
-
-              dropIndicator.style.top = `${indicatorY}px`;
-              dropIndicator.style.display = 'block';
-            }
-            throttleTimeout = null;
-          }, 100);
+          dropIndicator.style.top = `${indicatorY}px`;
+          dropIndicator.style.display = 'block';
         }
       };
 

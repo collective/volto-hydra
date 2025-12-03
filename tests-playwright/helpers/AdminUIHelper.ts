@@ -1780,29 +1780,44 @@ export class AdminUIHelper {
   async verifyDropIndicatorNearTarget(
     targetBlock: Locator,
     insertAfter: boolean,
+    cursorPageCoords?: { x: number; y: number },
   ): Promise<void> {
     const iframe = this.getIframe();
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+
+    // Get iframe offset for coordinate translation
+    const iframeEl = this.page.locator('#previewIframe');
+    const iframeBox = await iframeEl.boundingBox();
 
     // Use iframe's internal getBoundingClientRect for consistent coordinates
     // (Playwright's boundingBox doesn't account for iframe scroll correctly)
     const dropRectInIframeCoords = await dropIndicator.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      return { y: r.y };
+      return { x: r.x, y: r.y, width: r.width, height: r.height, display: getComputedStyle(el).display };
     });
     const targetRectInIframeCoords = await targetBlock.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      return { y: r.y, height: r.height };
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
     });
 
     const targetTop = targetRectInIframeCoords.y;
     const targetBottom = targetRectInIframeCoords.y + targetRectInIframeCoords.height;
     const dropY = dropRectInIframeCoords.y;
 
+    // Calculate cursor position in iframe coords (if provided)
+    let cursorIframeCoords: { x: number; y: number } | null = null;
+    if (cursorPageCoords && iframeBox) {
+      cursorIframeCoords = {
+        x: cursorPageCoords.x - iframeBox.x,
+        y: cursorPageCoords.y - iframeBox.y,
+      };
+    }
+
     // Drop indicator should be at the correct edge of the target block
     // For insertAfter: indicator at BOTTOM edge (within tolerance below block)
     // For insertBefore: indicator at TOP edge (within tolerance above block)
     const tolerance = 30; // Should be close to the edge
+    const expectedEdge = insertAfter ? targetBottom : targetTop;
     let isNearTarget: boolean;
 
     if (insertAfter) {
@@ -1814,14 +1829,22 @@ export class AdminUIHelper {
     }
 
     console.log(
-      `[TEST] Drop indicator position check (iframe coords): dropY=${dropY}, targetTop=${targetTop}, ` +
-        `targetBottom=${targetBottom}, insertAfter=${insertAfter}, isNearTarget=${isNearTarget}`,
+      `[TEST] Drop indicator check (all iframe coords):\n` +
+        `  Cursor: ${cursorIframeCoords ? `(${cursorIframeCoords.x.toFixed(0)}, ${cursorIframeCoords.y.toFixed(0)})` : 'unknown'}\n` +
+        `  Drop indicator: y=${dropY.toFixed(0)} (display: ${dropRectInIframeCoords.display})\n` +
+        `  Target block: top=${targetTop.toFixed(0)}, bottom=${targetBottom.toFixed(0)}\n` +
+        `  Expected edge: ${insertAfter ? 'bottom' : 'top'} @ ${expectedEdge.toFixed(0)} ±${tolerance}\n` +
+        `  Result: ${isNearTarget ? 'PASS' : 'FAIL'} (dropY ${dropY.toFixed(0)} ${isNearTarget ? 'is' : 'is NOT'} within ${expectedEdge - tolerance}-${expectedEdge + tolerance})`,
     );
 
     if (!isNearTarget) {
       throw new Error(
-        `Drop indicator not near target block. ` +
-          `Expected near y=${targetTop}-${targetBottom}, got ${dropY}`,
+        `Drop indicator not near target block.\n` +
+          `  Cursor (iframe): ${cursorIframeCoords ? `(${cursorIframeCoords.x.toFixed(0)}, ${cursorIframeCoords.y.toFixed(0)})` : 'unknown'}\n` +
+          `  Drop indicator y: ${dropY.toFixed(0)}\n` +
+          `  Target: top=${targetTop.toFixed(0)}, bottom=${targetBottom.toFixed(0)}\n` +
+          `  Expected: ${insertAfter ? 'bottom' : 'top'} edge @ ${expectedEdge.toFixed(0)} ±${tolerance}\n` +
+          `  Allowed range: ${expectedEdge - tolerance} to ${expectedEdge + tolerance}`,
       );
     }
   }
@@ -1985,6 +2008,9 @@ export class AdminUIHelper {
     await this.page.mouse.move(startPosPage.x, startPosPage.y);
     await this.page.mouse.down();
 
+    // Verify drag shadow appears immediately after mousedown
+    await this.verifyDragShadowVisible();
+
     // 3. Move towards target, using auto-scroll when target is off-screen
     const targetBlockUid = await targetBlock.getAttribute('data-block-uid');
     if (!targetBlockUid) {
@@ -2035,12 +2061,12 @@ export class AdminUIHelper {
       }
 
       // Target is in safe zone - move directly to it
-      console.log('[TEST] Target in safe zone, moving to drop position');
+      console.log('[TEST] Target in safe zone, moving to drop position:', dropPosPage);
       await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
 
       // Wait for drop indicator to be in position (no more auto-scroll should happen)
       await expect(async () => {
-        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter);
+        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
       }).toPass({ timeout: 5000 });
       break;
     }
