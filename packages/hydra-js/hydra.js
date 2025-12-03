@@ -449,10 +449,10 @@ export class Bridge {
                   this.restoreSlateSelection(event.data.transformedSelection, this.formData);
                 }
                 // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
+                // Clear the processing flag BEFORE replay so handleTextChange can process buffered text
+                this.isProcessingExternalUpdate = false;
                 // Replay any buffered keystrokes now that DOM is ready
                 this.replayBufferedEvents();
-                // Clear the processing flag - DOM updates are complete
-                this.isProcessingExternalUpdate = false;
               });
             });
 
@@ -852,6 +852,13 @@ export class Bridge {
         selection.addRange(range);
 
         console.log('[HYDRA] Inserted buffered text:', textToInsert);
+
+        // Manually trigger text change handler since insertNode creates a childList mutation
+        // but our MutationObserver only watches for characterData mutations
+        const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
+        if (editableField && this.isInlineEditing) {
+          this.handleTextChange(editableField, textNode.parentElement);
+        }
       }
     }
   }

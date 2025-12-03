@@ -347,7 +347,7 @@
               type: 'FORM_DATA',
               data: mockFormData,
               formatRequestId: requestId,
-              savedSelection: selection,
+              transformedSelection: selection,  // Must match what hydra.js checks for
             };
             console.log('[MOCK_PARENT] Sending FORM_DATA with formatRequestId:', response);
             event.source.postMessage(response, event.origin);
