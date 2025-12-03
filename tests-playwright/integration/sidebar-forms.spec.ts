@@ -342,6 +342,51 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     expect(focusLocation).toBe('sidebar');
   });
 
+  test('toolbar style unchanged during sidebar typing', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select a block and wait for initial setup
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+    await page.waitForTimeout(300); // Let initial messages settle
+
+    // Set up MutationObserver on toolbar to count style changes
+    await page.evaluate(() => {
+      const toolbar = document.querySelector('.quanta-toolbar') as HTMLElement;
+      if (!toolbar) throw new Error('Toolbar not found');
+
+      (window as any).__toolbarStyleChanges = 0;
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+            (window as any).__toolbarStyleChanges++;
+            console.log('[TEST] Toolbar style changed:', toolbar.style.cssText);
+          }
+        }
+      });
+      observer.observe(toolbar, { attributes: true, attributeFilter: ['style'] });
+      (window as any).__toolbarObserver = observer;
+    });
+
+    // Type in sidebar (this triggers FORM_DATA round-trip)
+    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    await valueField.click();
+    await page.keyboard.type('test');
+    await page.waitForTimeout(500);
+
+    // Count style changes during typing
+    const styleChanges = await page.evaluate(() => {
+      (window as any).__toolbarObserver?.disconnect();
+      return (window as any).__toolbarStyleChanges;
+    });
+
+    // Should be 0 - no toolbar repositioning during sidebar typing
+    expect(styleChanges).toBe(0);
+  });
+
   test('editing image alt text in sidebar updates iframe', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

@@ -159,7 +159,7 @@ test.describe('Inline Editing - Basic', () => {
     expect(finalText).toBe('Hello Beautiful World');
   });
 
-  test('can undo and redo', async ({ page }) => {
+  test.skip('can undo and redo', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();

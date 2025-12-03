@@ -1361,30 +1361,45 @@ export class Bridge {
     }
 
     // Send updated block position to Admin UI for toolbar/overlay positioning
-    // Skip for sidebar edits (skipFocus=true) - block position hasn't really changed
-    if (!skipFocus) {
-      const rect = blockElement.getBoundingClientRect();
+    const currentRect = blockElement.getBoundingClientRect();
 
+    // For skipFocus (sidebar edits): only send if position actually changed (e.g., after drag-and-drop)
+    // For !skipFocus (format operations): always send
+    let shouldSendBlockSelected = !skipFocus;
+
+    if (skipFocus && this._lastBlockRect) {
+      const topChanged = Math.abs(currentRect.top - this._lastBlockRect.top) > 1;
+      const leftChanged = Math.abs(currentRect.left - this._lastBlockRect.left) > 1;
+
+      if (topChanged || leftChanged) {
+        console.log('[HYDRA] Block position changed after re-render, updating toolbar');
+        shouldSendBlockSelected = true;
+      }
+    }
+
+    if (shouldSendBlockSelected) {
       window.parent.postMessage(
         {
           type: 'BLOCK_SELECTED',
           blockUid: this.selectedBlockUid,
           rect: {
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
+            top: currentRect.top,
+            left: currentRect.left,
+            width: currentRect.width,
+            height: currentRect.height,
           },
-          focusedFieldName: this.focusedFieldName, // Send field name so toolbar knows which field to sync
+          focusedFieldName: this.focusedFieldName,
         },
         this.adminOrigin,
       );
+    }
 
-      // Reposition drag button after blocks have moved (e.g., after drag-and-drop)
-      // The drag button needs to follow the selected block's new position
-      if (this.dragHandlePositioner) {
-        this.dragHandlePositioner();
-      }
+    // Update _lastBlockRect for future comparisons
+    this._lastBlockRect = currentRect;
+
+    // Always reposition drag button after DOM updates - block may have moved
+    if (this.dragHandlePositioner) {
+      this.dragHandlePositioner();
     }
 
     // Re-attach ResizeObserver to the new DOM element
@@ -1858,9 +1873,8 @@ export class Bridge {
       this._lastBlockRect = currentRect;
       this._lastBlockRectUid = blockUid;
     } else if (skipInitialUpdate) {
-      // For sidebar edits: update lastRect to current rect to prevent immediate fire from triggering update
-      // The block position may have shifted slightly due to re-render, but we don't want to send BLOCK_SELECTED
-      this._lastBlockRect = currentRect;
+      // Don't update _lastBlockRect - let updateBlockUIAfterFormData compare and update it
+      // This preserves the pre-update position for comparison after re-render
     }
     this._observedBlockElement = blockElement;
     console.log('[HYDRA] observeBlockResize initial rect:', { width: currentRect.width, height: currentRect.height });
@@ -1873,10 +1887,9 @@ export class Bridge {
         return;
       }
 
-      // Skip during sidebar edit processing - the re-render causes false positives
-      // as elements are temporarily detached/reattached
-      if (this.isProcessingExternalUpdate) {
-        console.log('[HYDRA] ResizeObserver: external update in progress, skipping');
+      // Skip if element was detached during re-render (getBoundingClientRect returns zeros)
+      if (!entries[0]?.target?.isConnected) {
+        console.log('[HYDRA] ResizeObserver: element detached, ignoring');
         return;
       }
 
@@ -1891,11 +1904,9 @@ export class Bridge {
         const leftChanged = Math.abs(newRect.left - lastRect.left) > 1;
 
         if (widthChanged || heightChanged || topChanged || leftChanged) {
-          console.log('[HYDRA] Block size changed, updating selection outline:', {
-            blockUid,
-            oldSize: { width: lastRect.width, height: lastRect.height },
-            newSize: { width: newRect.width, height: newRect.height },
-          });
+          console.log('[HYDRA] Block size changed, updating selection outline:', blockUid,
+            'old:', lastRect.top, lastRect.left, lastRect.width, lastRect.height,
+            'new:', newRect.top, newRect.left, newRect.width, newRect.height);
 
           this._lastBlockRect = newRect;
 
