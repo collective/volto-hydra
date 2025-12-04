@@ -17,11 +17,19 @@
  * - No nested contenteditable conflicts
  */
 
+// Global render counter for testing re-render behavior
+window.hydraRenderCount = window.hydraRenderCount || 0;
+
 /**
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with blocks and blocks_layout
  */
 function renderContent(content) {
+    // Increment render counter
+    window.hydraRenderCount++;
+    const counterEl = document.getElementById('render-counter');
+    if (counterEl) counterEl.textContent = window.hydraRenderCount;
+
     const container = document.getElementById('content');
     container.innerHTML = '';
 
@@ -65,6 +73,9 @@ function renderBlock(blockId, block) {
             break;
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
+            break;
+        case 'hero':
+            wrapper.innerHTML = renderHeroBlock(block);
             break;
         default:
             wrapper.innerHTML = `<p>Unknown block type: ${block['@type']}</p>`;
@@ -237,6 +248,49 @@ function renderMultiFieldBlock(block) {
 }
 
 /**
+ * Render a hero block with multiple editable text fields.
+ * Tests all field types: string (heading, buttonText), textarea (subheading), slate (description)
+ * @param {Object} block - Hero block data
+ * @returns {string} HTML string
+ */
+function renderHeroBlock(block) {
+    const heading = block.heading || '';
+    const subheading = block.subheading || '';
+    const buttonText = block.buttonText || '';
+    const description = block.description || [{ type: 'p', children: [{ text: '' }] }];
+
+    // Render subheading as textarea (preserve newlines)
+    const subheadingHtml = subheading.replace(/\n/g, '<br>');
+
+    // Render description as slate field
+    let descriptionHtml = '';
+    description.forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        switch (node.type) {
+            case 'h1':
+                descriptionHtml += `<h1 data-editable-field="description"${nodeIdAttr}>${text}</h1>`;
+                break;
+            case 'h2':
+                descriptionHtml += `<h2 data-editable-field="description"${nodeIdAttr}>${text}</h2>`;
+                break;
+            case 'p':
+            default:
+                descriptionHtml += `<p data-editable-field="description"${nodeIdAttr}>${text}</p>`;
+        }
+    });
+
+    return `
+        <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
+            <h1 data-editable-field="heading">${heading}</h1>
+            <p data-editable-field="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
+            <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
+            <button data-editable-field="buttonText" style="padding: 10px 20px; cursor: pointer;">${buttonText}</button>
+        </div>
+    `;
+}
+
+/**
  * Render an image block.
  * @param {Object} block - Image block data
  * @returns {string} HTML string
@@ -244,7 +298,15 @@ function renderMultiFieldBlock(block) {
 function renderImageBlock(block) {
     const url = block.url || '';
     const alt = block.alt || '';
-    return `<img src="${url}" alt="${alt}" />`;
+    const href = block.href;
+
+    const img = `<img src="${url}" alt="${alt}" />`;
+
+    // If href is set, wrap in link - tests that click behavior is prevented in edit mode
+    if (href) {
+        return `<a href="${href}" class="image-link">${img}</a>`;
+    }
+    return img;
 }
 
 /**

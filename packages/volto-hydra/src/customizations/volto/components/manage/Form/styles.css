@@ -1,3 +1,63 @@
 .blocks-form {
     display: none;
 }
+
+/* Stack labels above inputs in sidebar forms */
+#sidebar-properties .ui.grid,
+#sidebar-metadata .ui.grid {
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+}
+
+#sidebar-properties .ui.grid > .row,
+#sidebar-metadata .ui.grid > .row {
+    flex-direction: column !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+#sidebar-properties .ui.grid > .row > .column,
+#sidebar-metadata .ui.grid > .row > .column {
+    width: 100% !important;
+    padding: 0 !important;
+    display: block !important;
+}
+
+/* Label styling */
+#sidebar-properties label,
+#sidebar-metadata label {
+    font-size: 12px !important;
+    color: #878f97 !important;
+    font-weight: 400 !important;
+    margin-bottom: 2px !important;
+    display: block !important;
+}
+
+/* Field spacing */
+#sidebar-properties .field,
+#sidebar-metadata .field {
+    margin-bottom: 16px !important;
+}
+
+/* Help text */
+#sidebar-properties p.help,
+#sidebar-metadata p.help {
+    margin: 2px 0 0 0 !important;
+    font-size: 11px !important;
+}
+
+/* Remove extra row padding */
+#sidebar-properties .ui.grid > .row.stretched,
+#sidebar-metadata .ui.grid > .row.stretched {
+    padding: 0 !important;
+}
+
+/* Stack label above input in wrapper */
+#sidebar-properties .inline.field .wrapper,
+#sidebar-metadata .inline.field .wrapper {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    min-height: auto !important;
+}

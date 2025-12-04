@@ -74,6 +74,25 @@ The health endpoint (`core/packages/volto/razzle.config.js`) returns:
 - `tests-playwright/integration/inline-editing.spec.ts` - Tests inline editing functionality
 - `tests-playwright/integration/drag-and-drop.spec.ts` - Tests block reordering via drag and drop
 
+## Manual Development Server
+
+To manually start the servers for development/testing:
+
+```bash
+# Terminal 1: Start mock API server (port 8888)
+pnpm start:mock-api
+
+# Terminal 2: Start Volto Hydra (port 3001 SSR, port 3002 webpack)
+pnpm start:test
+```
+
+Then access: http://localhost:3001/test-page/edit
+
+**Port summary:**
+- **8888**: Mock API + test frontend
+- **3001**: Volto SSR server (navigate here)
+- **3002**: Webpack dev server (health check here)
+
 ## Development Workflow
 
 ### After Making Changes to Code

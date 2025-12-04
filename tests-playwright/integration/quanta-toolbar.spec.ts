@@ -133,9 +133,9 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Verify block exists
-    let blockCount = await helper.getBlockCountInIframe();
-    expect(blockCount).toBe(3);
+    // Verify block exists - use dynamic count, don't hardcode
+    const initialBlockCount = await helper.getBlockCountInIframe();
+    expect(initialBlockCount).toBeGreaterThanOrEqual(3);
 
     // Select block and open menu
     await helper.clickBlockInIframe(blockId);
@@ -144,12 +144,12 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     // Click Remove
     await helper.clickQuantaToolbarMenuOption(blockId, 'Remove');
 
-    // Wait for block to be removed
-    await helper.waitForBlockCountToBe(2);
+    // Wait for block to be removed (one less than initial)
+    await helper.waitForBlockCountToBe(initialBlockCount - 1);
 
-    // Verify block count decreased
-    blockCount = await helper.getBlockCountInIframe();
-    expect(blockCount).toBe(2);
+    // Verify block count decreased by 1
+    const finalBlockCount = await helper.getBlockCountInIframe();
+    expect(finalBlockCount).toBe(initialBlockCount - 1);
   });
 });
 

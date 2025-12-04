@@ -294,7 +294,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Text with bold/);
 
     // Select the word "bold" (last 4 characters)
-    await page.keyboard.press('End');
+    // Use helper instead of page.keyboard.press('End') to avoid scrolling the window
+    await helper.moveCursorToEnd(editor);
     for (let i = 0; i < 4; i++) {
       await page.keyboard.press('Shift+ArrowLeft');
     }

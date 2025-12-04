@@ -212,4 +212,34 @@ test.describe('Block Selection', () => {
     const blockText = await iframe.locator(`[data-block-uid="${blockId}"]`).textContent();
     expect(blockText).toContain('TYPED');
   });
+
+  test('can select block that is wrapped in a link', async ({ page }) => {
+    // When an entire block is wrapped in a link (e.g., image block with href),
+    // clicking it should select the block instead of navigating away
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const LINKED_IMAGE_BLOCK_ID = 'block-5-linked-image';
+
+    // Store original URL to verify we haven't navigated away
+    const originalUrl = page.url();
+
+    // Click the linked image block
+    await helper.clickBlockInIframe(LINKED_IMAGE_BLOCK_ID);
+
+    // Block should be selected (toolbar visible)
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(LINKED_IMAGE_BLOCK_ID);
+    expect(hasToolbar).toBe(true);
+
+    // Page should NOT have navigated away - URL should still contain /edit
+    expect(page.url()).toContain('/edit');
+    expect(page.url()).toBe(originalUrl);
+
+    // Verify the link element is present inside the block (confirms test setup)
+    const linkElement = iframe.locator(`[data-block-uid="${LINKED_IMAGE_BLOCK_ID}"] a.image-link`);
+    await expect(linkElement).toBeVisible();
+  });
 });

@@ -41,8 +41,8 @@ export default defineConfig({
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
 
-    /* Video on failure */
-    video: 'retain-on-failure',
+    /* Video recording - disabled by default to save CPU. Enable with VIDEO=1 */
+    video: process.env.VIDEO ? 'retain-on-failure' : 'off',
   },
 
   /* Configure projects for major browsers */

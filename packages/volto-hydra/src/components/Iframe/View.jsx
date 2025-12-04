@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
-import { compose } from 'redux';
 import Cookies from 'js-cookie';
 import { Node } from 'slate';
 import {
@@ -60,6 +59,13 @@ import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 
 /**
+ * NoPreview component for frontend-defined blocks.
+ * Prevents React errors when Volto tries to render a preview for blocks
+ * that have Slate values or other non-serializable content.
+ */
+const NoPreview = () => null;
+
+/**
  * Extract field types for all block types from schema registry
  * @param {Object} intl - The react-intl intl object for internationalization
  * @returns {Object} - Object mapping blockType -> fieldName -> fieldType
@@ -93,6 +99,13 @@ const extractBlockFieldTypes = (intl) => {
         ? blockConfig.blockSchema({ ...config, formData: {}, intl })
         : blockConfig.blockSchema;
 
+      // Debug: Log hero block schema processing
+      if (blockType === 'hero') {
+        console.log('[EXTRACT] Processing hero block, blockConfig.blockSchema:', blockConfig.blockSchema);
+        console.log('[EXTRACT] Hero schema after resolution:', schema);
+        console.log('[EXTRACT] Hero schema.properties:', schema?.properties);
+      }
+
       if (!schema?.properties) {
         return;
       }
@@ -114,12 +127,26 @@ const extractBlockFieldTypes = (intl) => {
         if (fieldType) {
           blockFieldTypes[blockType][fieldName] = fieldType;
         }
+
+        // Debug: Log hero field processing
+        if (blockType === 'hero') {
+          console.log(`[EXTRACT] Hero field ${fieldName}: widget=${field.widget}, type=${field.type}, resolved fieldType=${fieldType}`);
+        }
       });
+
+      // Debug: Log what was added for hero
+      if (blockType === 'hero') {
+        console.log('[EXTRACT] Hero blockFieldTypes after processing:', blockFieldTypes['hero']);
+      }
     } catch (error) {
       console.warn(`[VIEW] Error extracting field types for block type "${blockType}":`, error);
       // Continue with other block types
     }
   });
+
+  // Debug: Final state check
+  console.log('[EXTRACT] Final blockFieldTypes keys:', Object.keys(blockFieldTypes));
+  console.log('[EXTRACT] Final blockFieldTypes.hero:', blockFieldTypes['hero']);
 
   return blockFieldTypes;
 };
@@ -172,6 +199,104 @@ const getUrlWithAdminParams = (url, token) => {
         )
     : null;
 };
+function _isObject(item) {
+  return (
+    ![undefined, null].includes(item) &&
+    typeof item === 'object' &&
+    !Array.isArray(item)
+  );
+}
+function deepMerge(entry, newConfig) {
+  let output = Object.assign({}, entry);
+  if (_isObject(entry) && _isObject(newConfig)) {
+    Object.keys(newConfig).forEach((key) => {
+      if (_isObject(newConfig[key])) {
+        if (!(key in entry)) {
+          Object.assign(output, {
+            [key]: newConfig[key],
+          });
+        } else {
+          output[key] = deepMerge(entry[key], newConfig[key]);
+        }
+      } else {
+        Object.assign(output, { [key]: newConfig[key] });
+      }
+    });
+  }
+  return output;
+}
+/**
+ * Parse an SVG string into Volto's Icon component format.
+ * Volto's Icon expects: { attributes: { xmlns, viewBox }, content }
+ *
+ * @param {string} svgString - SVG string like '<svg xmlns="..." viewBox="..."><path d="..."/></svg>'
+ * @returns {Object|null} - Icon object or null if parsing fails
+ */
+function parseSvgToIconFormat(svgString) {
+  if (typeof svgString !== 'string' || !svgString.trim().startsWith('<svg')) {
+    return null;
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svg = doc.querySelector('svg');
+
+    if (!svg) {
+      return null;
+    }
+
+    // Extract attributes
+    const xmlns = svg.getAttribute('xmlns') || 'http://www.w3.org/2000/svg';
+    const viewBox = svg.getAttribute('viewBox') || '0 0 24 24';
+
+    // Extract inner content (everything inside the svg tag)
+    const content = svg.innerHTML;
+
+    return {
+      attributes: { xmlns, viewBox },
+      content,
+    };
+  } catch (e) {
+    console.warn('[HYDRA] Failed to parse SVG icon:', e);
+    return null;
+  }
+}
+
+/**
+ * Process blocksConfig to convert string SVG icons to Volto's format.
+ * Modifies the config in place.
+ */
+function processBlockIcons(blocksConfig) {
+  if (!blocksConfig || typeof blocksConfig !== 'object') {
+    return;
+  }
+
+  Object.keys(blocksConfig).forEach((blockType) => {
+    const blockConfig = blocksConfig[blockType];
+    if (blockConfig && typeof blockConfig.icon === 'string') {
+      const parsedIcon = parseSvgToIconFormat(blockConfig.icon);
+      if (parsedIcon) {
+        blockConfig.icon = parsedIcon;
+      } else {
+        // Remove invalid string icons to prevent Icon component errors
+        delete blockConfig.icon;
+      }
+    }
+  });
+}
+
+function recurseUpdateVoltoConfig(newConfig) {
+  // Process icon strings in blocksConfig before merging
+  if (newConfig?.blocks?.blocksConfig) {
+    processBlockIcons(newConfig.blocks.blocksConfig);
+  }
+
+  // Config object is not directly editable, update all the keys only.
+  Object.entries(newConfig).forEach(([configKey, configValue]) => {
+    config[configKey] = deepMerge(config[configKey], configValue);
+  });
+}
 
 const Iframe = (props) => {
   const {
@@ -307,8 +432,8 @@ const Iframe = (props) => {
 
   const intl = useIntl();
 
-  // Extract block field types once and memoize (maps blockType -> fieldName -> fieldType)
-  const blockFieldTypes = useMemo(() => extractBlockFieldTypes(intl), [intl]);
+  // Extract block field types - stored in state so it can be updated when frontend config is merged
+  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
@@ -368,6 +493,60 @@ const Iframe = (props) => {
         case 'PATH_CHANGE': // PATH change from the iframe
           history.push(event.data.path);
 
+          break;
+
+        case 'FRONTEND_INIT':
+          // Combined initialization from frontend - process in correct order:
+          // 1. First merge voltoConfig (adds custom block definitions)
+          // 2. Then set allowedBlocks (triggers updateAllowedBlocks with all blocks)
+          // 3. Re-extract and send updated blockFieldTypes to iframe
+          if (event.data.voltoConfig) {
+            // Inject NoPreview view for frontend blocks that don't have one
+            // This prevents React errors when Volto tries to render previews
+            // for blocks with Slate values or other non-serializable content
+            const frontendConfig = event.data.voltoConfig;
+            if (frontendConfig?.blocks?.blocksConfig) {
+              Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
+                const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
+                if (blockConfig && !blockConfig.view) {
+                  blockConfig.view = NoPreview;
+                }
+              });
+            }
+            recurseUpdateVoltoConfig(frontendConfig);
+
+            // Debug: check if hero block was merged
+            console.log('[VIEW] After merge, blocksConfig keys:', Object.keys(config.blocks?.blocksConfig || {}));
+            console.log('[VIEW] Hero block config:', config.blocks?.blocksConfig?.hero);
+            console.log('[VIEW] Hero blockSchema:', config.blocks?.blocksConfig?.hero?.blockSchema);
+            console.log('[VIEW] Hero blockSchema properties:', config.blocks?.blocksConfig?.hero?.blockSchema?.properties);
+
+            // Re-extract blockFieldTypes now that config has custom blocks
+            const updatedBlockFieldTypes = extractBlockFieldTypes(intl);
+            console.log('[VIEW] Extracted blockFieldTypes:', updatedBlockFieldTypes);
+
+            // Store updated types in state so toolbar can use them
+            setBlockFieldTypes(updatedBlockFieldTypes);
+
+            // Send updated types to iframe
+            event.source.postMessage(
+              {
+                type: 'UPDATE_BLOCK_FIELD_TYPES',
+                blockFieldTypes: updatedBlockFieldTypes,
+              },
+              event.origin,
+            );
+          }
+          if (event.data.allowedBlocks) {
+            setAllowedBlocksList(event.data.allowedBlocks);
+          }
+          break;
+
+        case 'VOLTO_CONFIG':
+          // Legacy handler for backwards compatibility
+          recurseUpdateVoltoConfig(event.data.voltoConfig || {});
+          // Re-trigger updateAllowedBlocks to set `restricted` on newly added blocks
+          setAllowedBlocksList(getAllowedBlocksList());
           break;
 
         case 'OPEN_SETTINGS':
@@ -606,18 +785,41 @@ const Iframe = (props) => {
         case 'BLOCK_SELECTED':
           // Update block UI state and selection atomically
           // Selection is included in BLOCK_SELECTED to prevent race conditions
-          setBlockUI({
-            blockUid: event.data.blockUid,
-            rect: event.data.rect,
-            focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+          setBlockUI((prevBlockUI) => {
+            const isNewBlock = !prevBlockUI || prevBlockUI.blockUid !== event.data.blockUid;
+            // Only call onSelectBlock for NEW block selections, not rect updates
+            // This prevents focus being stolen from sidebar when typing triggers rect updates
+            if (isNewBlock) {
+              onSelectBlock(event.data.blockUid);
+            }
+
+            // Skip update if nothing changed - prevents unnecessary toolbar redraws
+            if (prevBlockUI &&
+                prevBlockUI.blockUid === event.data.blockUid &&
+                prevBlockUI.focusedFieldName === event.data.focusedFieldName &&
+                prevBlockUI.rect?.top === event.data.rect?.top &&
+                prevBlockUI.rect?.left === event.data.rect?.left &&
+                prevBlockUI.rect?.width === event.data.rect?.width &&
+                prevBlockUI.rect?.height === event.data.rect?.height) {
+              return prevBlockUI; // Return same reference to skip re-render
+            }
+
+            return {
+              blockUid: event.data.blockUid,
+              rect: event.data.rect,
+              focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+              editableFields: event.data.editableFields || {}, // Map of fieldName -> fieldType from iframe
+            };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
-          setIframeSyncState(prev => ({
-            ...prev,
-            selection: event.data.selection || null,
-          }));
-          // Call onSelectBlock to open sidebar and update selectedBlock in parent
-          onSelectBlock(event.data.blockUid);
+          // Only update if selection actually changed
+          setIframeSyncState(prev => {
+            const newSelection = event.data.selection || null;
+            if (JSON.stringify(prev.selection) === JSON.stringify(newSelection)) {
+              return prev; // Skip re-render if selection unchanged
+            }
+            return { ...prev, selection: newSelection };
+          });
           break;
 
         case 'HIDE_BLOCK_UI':
@@ -886,21 +1088,27 @@ const Iframe = (props) => {
       />
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
-      {blockUI && referenceElement && (
+      {blockUI && referenceElement && (() => {
+        // Determine outline style based on number of editable fields
+        // Single field blocks get bottom line, multi-field blocks get full border
+        const editableFieldCount = Object.keys(blockUI.editableFields || {}).length;
+        const showBottomLine = editableFieldCount === 1;
+        return (
         <>
-          {/* Selection Outline - blue border or bottom line depending on block type */}
+          {/* Selection Outline - blue border or bottom line depending on field count */}
           <div
             className="volto-hydra-block-outline"
+            data-outline-style={showBottomLine ? 'bottom-line' : 'border'}
             style={{
               position: 'fixed',
               left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
-              top: blockUI.showFormatButtons
+              top: showBottomLine
                 ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 1}px`
                 : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 2}px`,
               width: `${blockUI.rect.width}px`,
-              height: blockUI.showFormatButtons ? '3px' : `${blockUI.rect.height + 4}px`,
-              background: blockUI.showFormatButtons ? '#007eb1' : 'transparent',
-              border: blockUI.showFormatButtons ? 'none' : '2px solid #007eb1',
+              height: showBottomLine ? '3px' : `${blockUI.rect.height + 4}px`,
+              background: showBottomLine ? '#007eb1' : 'transparent',
+              border: showBottomLine ? 'none' : '2px solid #007eb1',
               pointerEvents: 'none',
               zIndex: 1,
             }}
@@ -953,17 +1161,19 @@ const Iframe = (props) => {
               zIndex: 10,
               width: '30px',
               height: '30px',
-              background: 'transparent',
-              color: '#b8b8b8',
+              background: 'rgba(200, 200, 200, 0.5)',
+              color: '#666',
               border: 'none',
+              borderRadius: '50%',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '28px',
+              fontSize: '22px',
               lineHeight: '1',
-              fontWeight: '300',
-              padding: 0,
+              fontWeight: '400',
+              padding: '0 0 2px 0',
+              textAlign: 'center',
             }}
             onClick={() => setAddNewBlockOpened(true)}
             title="Add block"
@@ -971,7 +1181,8 @@ const Iframe = (props) => {
             +
           </button>
         </>
-      )}
+        );
+      })()}
 
       {/* Dropdown menu */}
       {menuDropdownOpen && (

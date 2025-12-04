@@ -56,6 +56,7 @@
 <script setup>
 
 import { initBridge } from '../packages/hydra.js';
+import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
 const adminUrl = runtimeConfig.public.adminUrl;
@@ -71,14 +72,43 @@ onMounted(() => {
         const isEdit = url.searchParams.get("_edit");
 
         if (isEdit) {
+            const newBlocks = {
+                hello_from_the_other_side: {
+                    id: 'hello_from_the_other_side',
+                    title: 'Hello from the other side',
+                    group: 'common',
+                    icon: "test",
+                    blockSchema: {
+                        required: ['title'],
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['title'],
+                                required: ['title'],
+                            },
+                        ],
+                        properties: {
+                            title: {
+                                title: "My field title",
+                            },
+                        },
+                    },
+                },
+            };
             const bridge = initBridge(adminUrl, {
-                allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'],
+                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...Object.keys(newBlocks)],
+                voltoConfig: {
+                    blocks: {
+                        blocksConfig: newBlocks,
+                    }
+                }
             });
             bridge.onEditChange((page) => {
                 if (page) {
                     data.value.page = page;
                 }
-                });
+            });
         }
     }
 });
@@ -121,8 +151,8 @@ function getSections(page) {
     var section = {blocks:[], style:null};
     var sections = [section];
     // find all with the same styles and group them
-    for (let i in page.blocks_layout.items) {
-        var block_id = page.blocks_layout.items[i];
+    for (let i in page.blocks_layout?.items) {
+        var block_id = page.blocks_layout?.items[i];
         var block = page.blocks[block_id];
         var style = block?.styles?.backgroundColor == 'grey'? {'bg-slate-300':true} : {};
         if (section.style != null && JSON.stringify(section.style) !== JSON.stringify(style)) {
