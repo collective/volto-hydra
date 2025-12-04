@@ -51,6 +51,8 @@ import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty } from '../../utils/blockPath';
+import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
+import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
 /**
  * NoPreview component for frontend-defined blocks.
@@ -1401,6 +1403,25 @@ const Iframe = (props) => {
           onClose={() => setMenuDropdownOpen(false)}
         />
       )}
+
+      {/* Hierarchical sidebar widgets */}
+      <ParentBlocksWidget
+        selectedBlock={selectedBlock}
+        formData={properties}
+        blockPathMap={iframeSyncState.blockPathMap}
+        onSelectBlock={onSelectBlock}
+      />
+      <ChildBlocksWidget
+        selectedBlock={selectedBlock}
+        formData={properties}
+        blockPathMap={iframeSyncState.blockPathMap}
+        onSelectBlock={onSelectBlock}
+        onAddBlock={(parentBlockId, fieldName) => {
+          // TODO: Implement add block to container field
+          console.log('[VIEW] Add block requested:', { parentBlockId, fieldName });
+          setAddNewBlockOpened(true);
+        }}
+      />
     </div>
   );
 };

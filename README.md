@@ -515,16 +515,16 @@ For our slider example
    - but you can override this by setting a ```onHandleBlockSelection``` callback.
 
 
-Placeholders are special blocks rendered when a container is empty or if a new sub-block is added.
-- The  default placeholder has the @type of 'Placeholder'
-- Render the Placeholder as taking up the space a typical sub-block might take up.
+Empty blocks are special blocks rendered when a container is empty or if a new sub-block is added.
+- The default empty block has the @type of 'empty' (matching Volto's convention)
+- Render the empty block as taking up the space a typical sub-block might take up.
   - this is important so containers are always able to be selected even when empty.
-- Hydra will automatically place an add button in the center of a Placeholder block.
-- After the user clicks "add" and selects a block, the Placeholder is replaced by new block.
-- if you'd like to customise the look of the placeholder you can use ```data-block-add="hidden"``` to prevent hide the default button
+- Hydra will automatically place an add button on the empty block.
+- After the user clicks "add" and selects a block, the empty block is replaced by the new block.
+- if you'd like to customise the look of the empty block you can use ```data-block-add="hidden"``` to hide the default button
   and instead add ```data-block-add="button"``` to another element you want to act as the add button.
-  - or you can nominate another type be your placeholder, such as a SlateBlock (which has the builtin capability to replace itself)
-- if only one block type is allowed in a container then this is created instead of a Placeholder block.
+  - or you can nominate another type be your empty block, such as a SlateBlock (which has the builtin capability to replace itself)
+- if only one block type is allowed in a container then this is created instead of an empty block.
 
 
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))

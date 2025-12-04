@@ -1,3 +1,7 @@
+# Architecture Documentation
+
+Read `docs/slate-transforms-architecture.md` for understanding how Slate transforms work between hydra.js and View.jsx (Enter key, formatting, paste, delete handling).
+
 # Running Playwright Tests
 
 ## Prerequisites
