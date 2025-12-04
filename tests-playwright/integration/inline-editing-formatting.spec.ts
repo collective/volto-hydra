@@ -6,7 +6,6 @@
  * - ctrl-b and other native formatting shortcuts are ignored
  * - if we aren't focused on a field then the format buttons should be disabled
  * - click bold button without selection and then type - should be bolded
- * - format button still works when sidebar is closed
  * - heading shortcuts (## for h2, ### for h3)
  * - bullet list shortcuts (- or * for ul, 1. for ol)
  * - multiple formats on same text (bold + italic, etc)
@@ -509,5 +508,40 @@ test.describe('Inline Editing - Formatting', () => {
     // Clipboard should have "Hello world" without any ZWS characters
     expect(clipboardText).toBe('Hello world');
     expect(clipboardText).not.toMatch(/[\uFEFF\u200B]/);
+  });
+
+  test('format button still works when sidebar is closed', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Test with sidebar closed', { delay: 10 });
+    await helper.waitForEditorText(editor, /Test with sidebar closed/);
+
+    // Close the sidebar by clicking the trigger button (the edge button that collapses it)
+    const sidebarTrigger = page.locator('.sidebar-container .trigger');
+    await sidebarTrigger.click();
+
+    // Wait for sidebar to collapse (gets 'collapsed' class)
+    const sidebarContainer = page.locator('.sidebar-container');
+    await expect(sidebarContainer).toHaveClass(/collapsed/, { timeout: 5000 });
+
+    // Now select text and apply bold formatting (should still work without sidebar)
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton('bold');
+
+    // Wait for bold formatting to appear
+    await helper.waitForFormattedText(editor, /Test with sidebar closed/, 'bold');
+
+    // Verify bold was applied
+    const blockHtml = await editor.innerHTML();
+    expect(blockHtml).toContain('style="font-weight: bold"');
+    expect(blockHtml).toContain('Test with sidebar closed');
   });
 });
