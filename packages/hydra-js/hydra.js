@@ -1555,6 +1555,8 @@ export class Bridge {
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
+    // Read data-block-add attribute for add button direction (right, bottom, hidden)
+    const addDirection = blockElement.getAttribute('data-block-add') || 'bottom';
     this._pendingBlockSelected = {
       blockUid,
       rect: {
@@ -1565,6 +1567,7 @@ export class Bridge {
       },
       editableFields, // Map of fieldName -> fieldType from DOM
       focusedFieldName: this.focusedFieldName,
+      addDirection, // Direction for add button positioning
     };
 
     console.log('[HYDRA] Block selected, sending UI messages:', {
@@ -1755,11 +1758,12 @@ export class Bridge {
                 },
                 editableFields: this._pendingBlockSelected.editableFields,
                 focusedFieldName: this._pendingBlockSelected.focusedFieldName,
+                addDirection: this._pendingBlockSelected.addDirection,
                 selection: serializedSelection,
               },
               this.adminOrigin,
             );
-            console.log('[HYDRA] Sent BLOCK_SELECTED with selection:', { blockUid: this._pendingBlockSelected.blockUid, selection: serializedSelection });
+            console.log('[HYDRA] Sent BLOCK_SELECTED with selection:', { blockUid: this._pendingBlockSelected.blockUid, addDirection: this._pendingBlockSelected.addDirection, selection: serializedSelection });
             this._pendingBlockSelected = null;
           }
         }

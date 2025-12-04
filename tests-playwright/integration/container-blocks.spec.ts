@@ -207,6 +207,40 @@ test.describe('Adding Blocks to Containers', () => {
   });
 });
 
+test.describe('Add Button Direction', () => {
+  test('add button appears to right for blocks with data-block-add="right"', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // col-1 has data-block-add="right" attribute
+    await helper.clickBlockInIframe('col-1');
+
+    // Verify add button is positioned to the right of the block
+    const positioning = await helper.verifyBlockUIPositioning('col-1');
+    expect(positioning.addButtonDirection).toBe('right');
+  });
+
+  test('add button appears below for blocks with data-block-add="bottom"', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // text-1a has data-block-add="bottom" attribute
+    await helper.clickBlockInIframe('text-1a');
+
+    // Verify add button is positioned below the block
+    const positioning = await helper.verifyBlockUIPositioning('text-1a');
+    expect(positioning.addButtonDirection).toBe('bottom');
+  });
+});
+
 test.describe('Deleting Blocks from Containers', () => {
   test('deleting nested block removes from container, not page', async ({
     page,

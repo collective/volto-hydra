@@ -929,6 +929,7 @@ const Iframe = (props) => {
             if (prevBlockUI &&
                 prevBlockUI.blockUid === event.data.blockUid &&
                 prevBlockUI.focusedFieldName === event.data.focusedFieldName &&
+                prevBlockUI.addDirection === event.data.addDirection &&
                 prevBlockUI.rect?.top === event.data.rect?.top &&
                 prevBlockUI.rect?.left === event.data.rect?.left &&
                 prevBlockUI.rect?.width === event.data.rect?.width &&
@@ -941,6 +942,7 @@ const Iframe = (props) => {
               rect: event.data.rect,
               focusedFieldName: event.data.focusedFieldName, // Track which field is focused
               editableFields: event.data.editableFields || {}, // Map of fieldName -> fieldType from iframe
+              addDirection: event.data.addDirection || 'bottom', // Direction for add button positioning
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
@@ -1307,35 +1309,43 @@ const Iframe = (props) => {
             }}
           />
 
-          {/* Add Button - below block, right-aligned */}
-          <button
-            className="volto-hydra-add-button"
-            style={{
-              position: 'fixed',
-              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left + blockUI.rect.width - 30}px`,
-              top: `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height + 8}px`,
-              zIndex: 10,
-              width: '30px',
-              height: '30px',
-              background: 'rgba(200, 200, 200, 0.5)',
-              color: '#666',
-              border: 'none',
-              borderRadius: '50%',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '22px',
-              lineHeight: '1',
-              fontWeight: '400',
-              padding: '0 0 2px 0',
-              textAlign: 'center',
-            }}
-            onClick={() => setAddNewBlockOpened(true)}
-            title="Add block"
-          >
-            +
-          </button>
+          {/* Add Button - positioned based on data-block-add direction */}
+          {blockUI.addDirection !== 'hidden' && (
+            <button
+              className="volto-hydra-add-button"
+              style={{
+                position: 'fixed',
+                // For 'right': to the right of block, bottom-aligned
+                // For 'bottom' (default): below block, right-aligned
+                left: blockUI.addDirection === 'right'
+                  ? `${referenceElement.getBoundingClientRect().left + blockUI.rect.left + blockUI.rect.width + 8}px`
+                  : `${referenceElement.getBoundingClientRect().left + blockUI.rect.left + blockUI.rect.width - 30}px`,
+                top: blockUI.addDirection === 'right'
+                  ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 30}px`
+                  : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height + 8}px`,
+                zIndex: 10,
+                width: '30px',
+                height: '30px',
+                background: 'rgba(200, 200, 200, 0.5)',
+                color: '#666',
+                border: 'none',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                lineHeight: '1',
+                fontWeight: '400',
+                padding: '0 0 2px 0',
+                textAlign: 'center',
+              }}
+              onClick={() => setAddNewBlockOpened(true)}
+              title="Add block"
+            >
+              +
+            </button>
+          )}
         </>
         );
       })()}

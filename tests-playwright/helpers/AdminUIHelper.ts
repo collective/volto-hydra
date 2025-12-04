@@ -770,46 +770,41 @@ export class AdminUIHelper {
    */
   async isBlockSelectedInIframe(blockId: string): Promise<{ ok: boolean; reason?: string }> {
     try {
-      // Verify all UI overlays are visible
+      // Verify essential UI overlays are visible (toolbar and outline)
+      // Note: add button visibility/positioning is checked separately by verifyBlockUIPositioning
       const toolbar = this.page.locator('.quanta-toolbar');
       const outline = this.page.locator('.volto-hydra-block-outline');
-      const addButton = this.page.locator('.volto-hydra-add-button');
 
       const toolbarVisible = await toolbar.isVisible();
       const outlineVisible = await outline.isVisible();
-      const addButtonVisible = await addButton.isVisible();
 
-      if (!toolbarVisible || !outlineVisible || !addButtonVisible) {
+      if (!toolbarVisible || !outlineVisible) {
         return {
           ok: false,
-          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}, addButton=${addButtonVisible}`,
+          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}`,
         };
       }
 
-      // Verify positioning is correct
-      const positions = await this.verifyBlockUIPositioning(blockId);
+      // Verify toolbar positioning is correct
+      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      const toolbarBox = await this.getToolbarBoundingBox();
+
+      if (!blockBox || !toolbarBox) {
+        return {
+          ok: false,
+          reason: `Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}`,
+        };
+      }
 
       // Toolbar positioning: Can overlap the block top (negative is OK)
       // Generous tolerance for CI browser differences (within -100px to +100px)
-      const toolbarPositioned = positions.toolbarAboveBlock > -100 && positions.toolbarAboveBlock < 100;
-
-      // Add button should be ~8px below block (allow generous tolerance for CI browser differences)
-      const addButtonPositioned = positions.addButtonBelowBlock >= -20 && positions.addButtonBelowBlock < 50;
-
-      // Horizontal alignment check: tolerate small misalignments since toolbar is positioned
-      // Note: the toolbar is aligned with the block not the field!
-      const aligned = true; // Skip strict alignment check for now
+      const toolbarAboveBlock = blockBox.y - (toolbarBox.y + toolbarBox.height);
+      const toolbarPositioned = toolbarAboveBlock > -100 && toolbarAboveBlock < 100;
 
       if (!toolbarPositioned) {
         return {
           ok: false,
-          reason: `Toolbar not positioned correctly: toolbarAboveBlock=${positions.toolbarAboveBlock} (expected -100 to 100)`,
-        };
-      }
-      if (!addButtonPositioned) {
-        return {
-          ok: false,
-          reason: `Add button not positioned correctly: addButtonBelowBlock=${positions.addButtonBelowBlock} (expected -20 to 50)`,
+          reason: `Toolbar not positioned correctly: toolbarAboveBlock=${toolbarAboveBlock} (expected -100 to 100)`,
         };
       }
 
@@ -895,6 +890,8 @@ export class AdminUIHelper {
   async verifyBlockUIPositioning(blockId: string): Promise<{
     toolbarAboveBlock: number;
     addButtonBelowBlock: number;
+    addButtonRightOfBlock: number;
+    addButtonDirection: 'bottom' | 'right' | 'unknown';
     horizontalAlignment: boolean;
   }> {
     const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
@@ -905,11 +902,30 @@ export class AdminUIHelper {
       throw new Error(`Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}, addButton=${!!addButtonBox}`);
     }
 
+    // Distance from bottom of block to top of add button (positive = button is below)
+    const addButtonBelowBlock = addButtonBox.y - (blockBox.y + blockBox.height);
+    // Distance from right edge of block to left edge of add button (positive = button is to right)
+    const addButtonRightOfBlock = addButtonBox.x - (blockBox.x + blockBox.width);
+
+    // Determine direction based on position
+    // "bottom" = button's top is near block's bottom (within 20px below)
+    // "right" = button's left is near block's right (within 20px to the right)
+    let addButtonDirection: 'bottom' | 'right' | 'unknown' = 'unknown';
+    if (addButtonBelowBlock >= 0 && addButtonBelowBlock < 20) {
+      addButtonDirection = 'bottom';
+    } else if (addButtonRightOfBlock >= 0 && addButtonRightOfBlock < 20) {
+      addButtonDirection = 'right';
+    }
+
     return {
       // Distance from bottom of toolbar to top of block
       toolbarAboveBlock: blockBox.y - (toolbarBox.y + toolbarBox.height),
       // Distance from bottom of block to top of add button
-      addButtonBelowBlock: addButtonBox.y - (blockBox.y + blockBox.height),
+      addButtonBelowBlock,
+      // Distance from right edge of block to left edge of add button
+      addButtonRightOfBlock,
+      // Detected direction of add button relative to block
+      addButtonDirection,
       // Check if toolbar and block are horizontally aligned (within 2px tolerance)
       horizontalAlignment: Math.abs(toolbarBox.x - blockBox.x) < 2
     };
