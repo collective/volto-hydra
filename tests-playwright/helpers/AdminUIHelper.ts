@@ -215,33 +215,33 @@ export class AdminUIHelper {
 
   /**
    * Open a specific sidebar tab (Page, Block, Order, etc.)
-   * Matches Cypress pattern: .sidebar-container .tabs-wrapper .menu .item
+   *
+   * Note: The Hydra sidebar uses a unified hierarchical view without tabs.
+   * This method is kept for backwards compatibility and scrolls to the
+   * appropriate section:
+   * - "Block": Scrolls to block settings (#sidebar-properties)
+   * - "Page"/"Document": Scrolls to top for page metadata (#sidebar-metadata)
+   * - "Order": Scrolls to child blocks widget at bottom (#sidebar-children)
    */
   async openSidebarTab(tabName: string): Promise<void> {
-    const tab = this.page.locator('.sidebar-container .tabs-wrapper .menu .item', {
-      hasText: tabName
-    });
+    // Map tab names to their portal target IDs
+    const tabToSelector: Record<string, string> = {
+      Block: '#sidebar-properties',
+      Page: '#sidebar-metadata',
+      Document: '#sidebar-metadata',
+      Order: '#sidebar-order',
+    };
 
-    // Check if tab exists
-    const tabCount = await tab.count();
-    if (tabCount === 0) {
-      throw new Error(
-        `Sidebar tab "${tabName}" not found. ` +
-        `Check that the sidebar is open and the tab name is correct. ` +
-        `Available tabs are typically: Page, Block, Order.`
-      );
+    const selector = tabToSelector[tabName];
+    if (selector) {
+      const section = this.page.locator(selector);
+      // Wait for the section to exist
+      await section.waitFor({ state: 'attached', timeout: 5000 });
+      // Scroll to the section
+      await section.scrollIntoViewIfNeeded();
+      // Brief wait for scroll to complete
+      await this.page.waitForTimeout(100);
     }
-
-    // Verify tab is visible
-    try {
-      await tab.waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-      throw new Error(`Sidebar tab "${tabName}" exists but is not visible. Check sidebar state.`);
-    }
-
-    await tab.click();
-    // Wait for tab content to load
-    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -355,6 +355,9 @@ export class AdminUIHelper {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
+      if (res && !res.ok && res.reason) {
+        console.log(`[TEST] isBlockSelectedInIframe failed: ${res.reason}`);
+      }
       return !!res && !!res.ok;
     }, { timeout }).toBeTruthy();
 
@@ -785,26 +788,28 @@ export class AdminUIHelper {
         };
       }
 
-      // Verify toolbar positioning is correct
+      // Verify the outline covers THIS specific block
       const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
-      const toolbarBox = await this.getToolbarBoundingBox();
+      const outlineBox = await this.getBlockOutlineBoundingBox();
 
-      if (!blockBox || !toolbarBox) {
+      if (!blockBox || !outlineBox) {
         return {
           ok: false,
-          reason: `Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}`,
+          reason: `Missing bounding boxes: block=${!!blockBox}, outline=${!!outlineBox}`,
         };
       }
 
-      // Toolbar positioning: Can overlap the block top (negative is OK)
-      // Generous tolerance for CI browser differences (within -100px to +100px)
-      const toolbarAboveBlock = blockBox.y - (toolbarBox.y + toolbarBox.height);
-      const toolbarPositioned = toolbarAboveBlock > -100 && toolbarAboveBlock < 100;
+      // Check if outline is horizontally aligned with block
+      // Note: outline is a bottom border, so we only check X alignment
+      // The outline's Y will be at the block's bottom, not center
+      const blockCenterX = blockBox.x + blockBox.width / 2;
+      const outlineCenterX = outlineBox.x + outlineBox.width / 2;
+      const centerXDiff = Math.abs(blockCenterX - outlineCenterX);
 
-      if (!toolbarPositioned) {
+      if (centerXDiff > 50) {
         return {
           ok: false,
-          reason: `Toolbar not positioned correctly: toolbarAboveBlock=${toolbarAboveBlock} (expected -100 to 100)`,
+          reason: `Outline not horizontally aligned with block. Block X: ${blockCenterX.toFixed(0)}, Outline X: ${outlineCenterX.toFixed(0)}, diff: ${centerXDiff.toFixed(0)}`,
         };
       }
 
@@ -1519,6 +1524,7 @@ export class AdminUIHelper {
   /**
    * Check if a block type is visible in the block chooser.
    * Block types: 'slate', 'image', 'video', 'listing', etc.
+   * Note: Only searches within the block chooser popup, not the entire page.
    */
   async isBlockTypeVisible(blockType: string): Promise<boolean> {
     // Different block types have different display names
@@ -1527,14 +1533,19 @@ export class AdminUIHelper {
       image: ['Image', 'image'],
       video: ['Video', 'video'],
       listing: ['Listing', 'listing'],
+      columns: ['Columns', 'columns'],
+      hero: ['Hero', 'hero'],
     };
 
     const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
 
-    // Try to find the block type button
+    // Scope search to block chooser only (not sidebar or other parts of page)
+    const blockChooser = this.page.locator('.blocks-chooser');
+
+    // Try to find the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = this.page.locator(`button:has-text("${name}")`).or(
-        this.page.locator(`[data-block-type="${name.toLowerCase()}"]`)
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
+        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
       ).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {

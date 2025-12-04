@@ -239,9 +239,19 @@
 
       // Handle different message types
       switch (message.type) {
-        case 'GET_INITIAL_DATA': {
-          // Respond with INITIAL_DATA (not FORM_DATA!)
-          // hydra.js converts INITIAL_DATA to FORM_DATA internally
+        case 'INIT': {
+          // New INIT message format from hydra.js
+          // Respond with FORM_DATA including blockPathMap
+          console.log('[MOCK_PARENT] Received INIT message:', message);
+
+          // Build blockPathMap for the mock blocks (simple page-level blocks)
+          const blockPathMap = {};
+          mockFormData.blocks_layout.items.forEach(blockId => {
+            blockPathMap[blockId] = {
+              path: ['blocks', blockId],
+              parentId: null
+            };
+          });
 
           // Build block field types metadata based on block types
           // Map blockType -> fieldName -> fieldType (not blockId!)
@@ -255,18 +265,17 @@
           const response = {
             type: 'INITIAL_DATA',
             data: mockFormData,
-            blockFieldTypes: blockFieldTypes,  // Block type -> field name -> field type
+            blockPathMap: blockPathMap,
+            blockFieldTypes: blockFieldTypes,
             slateConfig: {
               hotkeys: {
-                // Keyboard shortcuts for formatting (Cmd+B, Cmd+I, etc.)
                 'mod+b': { type: 'inline', format: 'strong' },
                 'mod+i': { type: 'inline', format: 'em' },
                 'mod+u': { type: 'inline', format: 'u' },
                 'mod+s': { type: 'inline', format: 'del' },
               },
-              toolbarButtons: [], // Not used by current implementation
+              toolbarButtons: [],
               buttonConfigs: {
-                // Simple mock button config for testing
                 'bold': {
                   format: 'strong',
                   svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>',
@@ -276,7 +285,7 @@
               },
             },
           };
-          console.log('[MOCK_PARENT] Sending INITIAL_DATA with blockFieldTypes:', response);
+          console.log('[MOCK_PARENT] Sending INITIAL_DATA with blockPathMap:', response);
           event.source.postMessage(response, event.origin);
           logMessage('sent', 'INITIAL_DATA', response.data);
 
@@ -289,12 +298,79 @@
               event.source.postMessage(
                 {
                   type: 'SELECT_BLOCK',
-                  uid: firstBlockId,  // hydra.js expects 'uid' not 'blockId'
-                  data: mockFormData,  // hydra.js also expects the form data
+                  uid: firstBlockId,
+                  data: mockFormData,
+                  blockPathMap: blockPathMap,
                 },
                 event.origin,
               );
-              logMessage('sent', 'SELECT_BLOCK', { uid: firstBlockId, data: mockFormData });
+              logMessage('sent', 'SELECT_BLOCK', { uid: firstBlockId });
+            }
+          }, 100);
+          break;
+        }
+
+        case 'GET_INITIAL_DATA': {
+          // Legacy handler for backwards compatibility
+          console.log('[MOCK_PARENT] Received legacy GET_INITIAL_DATA');
+
+          // Build blockPathMap
+          const blockPathMap = {};
+          mockFormData.blocks_layout.items.forEach(blockId => {
+            blockPathMap[blockId] = {
+              path: ['blocks', blockId],
+              parentId: null
+            };
+          });
+
+          // Build block field types metadata
+          const blockFieldTypes = {
+            'slate': { value: 'slate' },
+            'text': { text: 'string' },
+            'multifield': { title: 'string', description: 'slate' },
+            'textarea': { content: 'textarea' }
+          };
+
+          const response = {
+            type: 'INITIAL_DATA',
+            data: mockFormData,
+            blockPathMap: blockPathMap,
+            blockFieldTypes: blockFieldTypes,
+            slateConfig: {
+              hotkeys: {
+                'mod+b': { type: 'inline', format: 'strong' },
+                'mod+i': { type: 'inline', format: 'em' },
+                'mod+u': { type: 'inline', format: 'u' },
+                'mod+s': { type: 'inline', format: 'del' },
+              },
+              toolbarButtons: [],
+              buttonConfigs: {
+                'bold': {
+                  format: 'strong',
+                  svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>',
+                  title: 'Bold',
+                  testId: 'bold-button',
+                },
+              },
+            },
+          };
+          console.log('[MOCK_PARENT] Sending INITIAL_DATA:', response);
+          event.source.postMessage(response, event.origin);
+          logMessage('sent', 'INITIAL_DATA', response.data);
+
+          setTimeout(() => {
+            const firstBlockId = mockFormData.blocks_layout.items[0];
+            if (firstBlockId) {
+              event.source.postMessage(
+                {
+                  type: 'SELECT_BLOCK',
+                  uid: firstBlockId,
+                  data: mockFormData,
+                  blockPathMap: blockPathMap,
+                },
+                event.origin,
+              );
+              logMessage('sent', 'SELECT_BLOCK', { uid: firstBlockId });
             }
           }, 100);
           break;
