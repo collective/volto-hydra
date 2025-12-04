@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { v4 as uuid } from 'uuid';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { Node } from 'slate';
@@ -57,6 +58,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer } from '../../utils/blockPath';
 
 /**
  * NoPreview component for frontend-defined blocks.
@@ -64,6 +66,75 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
  * that have Slate values or other non-serializable content.
  */
 const NoPreview = () => null;
+
+/**
+ * Validate frontend configuration passed to initBridge.
+ * Collects all validation errors and throws a single error with all issues.
+ *
+ * @param {Object} options - Options from FRONTEND_INIT message
+ * @param {string[]} options.allowedBlocks - Page-level allowed block types
+ * @param {Object} options.voltoConfig - Frontend's custom config
+ * @param {Object} mergedBlocksConfig - Full merged blocks configuration
+ * @throws {Error} If any validation errors are found
+ */
+const validateFrontendConfig = (options, mergedBlocksConfig) => {
+  const errors = [];
+  const { allowedBlocks, voltoConfig } = options;
+  const frontendBlocksConfig = voltoConfig?.blocks?.blocksConfig;
+
+  if (!allowedBlocks || !mergedBlocksConfig || !frontendBlocksConfig) return;
+
+  // Validation 1: Check for container-only blocks in page-level allowedBlocks
+  const customBlockTypes = new Set(Object.keys(frontendBlocksConfig));
+  const containerChildBlocks = new Set();
+
+  Object.values(mergedBlocksConfig).forEach((blockConfig) => {
+    const schema = typeof blockConfig?.blockSchema === 'function'
+      ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+      : blockConfig?.blockSchema;
+
+    if (schema?.properties) {
+      Object.values(schema.properties).forEach((fieldDef) => {
+        if (fieldDef.type === 'blocks' && fieldDef.allowedBlocks) {
+          fieldDef.allowedBlocks.forEach((childType) => {
+            if (customBlockTypes.has(childType)) {
+              containerChildBlocks.add(childType);
+            }
+          });
+        }
+      });
+    }
+  });
+
+  const containerOnlyBlocks = allowedBlocks.filter((blockType) => {
+    if (!containerChildBlocks.has(blockType)) return false;
+    const blockConfig = mergedBlocksConfig[blockType];
+    if (!blockConfig) return false;
+    const schema = typeof blockConfig.blockSchema === 'function'
+      ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+      : blockConfig.blockSchema;
+    const hasEditableFields = schema?.fieldsets?.some(
+      (fs) => fs.fields?.some((f) => schema.properties?.[f]?.type !== 'blocks')
+    );
+    return !hasEditableFields;
+  });
+
+  if (containerOnlyBlocks.length > 0) {
+    errors.push(
+      `allowedBlocks contains container-only block types: [${containerOnlyBlocks.join(', ')}]. ` +
+      `These blocks are only valid inside container blocks. Remove them from the page-level allowedBlocks array.`
+    );
+  }
+
+  // Future validations can be added here:
+  // - Validation 2: Check for missing block renderers
+  // - Validation 3: Check for invalid schema definitions
+  // - etc.
+
+  if (errors.length > 0) {
+    throw new Error(`[HYDRA] initBridge config error:\n- ${errors.join('\n- ')}`);
+  }
+};
 
 /**
  * Extract field types for all block types from schema registry
@@ -318,6 +389,7 @@ const Iframe = (props) => {
 
   const dispatch = useDispatch();
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
@@ -379,6 +451,7 @@ const Iframe = (props) => {
   //   this is for toolbar→iframe flow (format completion, including selection-only changes)
   const [iframeSyncState, setIframeSyncState] = useState(() => ({
     formData: properties,
+    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig), // Maps blockId -> { path, parentId }
     selection: null,
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
@@ -405,15 +478,21 @@ const Iframe = (props) => {
   // Without this, sidebar edits don't propagate to the toolbar, causing selection/content mismatch
   useEffect(() => {
     if (formDataFromRedux && formDataFromRedux !== iframeSyncState.formData) {
+      // Rebuild blockPathMap when formData changes (use live config for custom blocks)
+      const newBlockPathMap = buildBlockPathMap(formDataFromRedux, config.blocks.blocksConfig);
       setIframeSyncState(prev => {
         // Redux form syncs (from sidebar editing) don't include a new selection -
         // only the form data changes. The existing selection from the iframe may
         // become stale if the document structure changed (e.g., bold removed).
         // Validate and clear the selection if it's no longer valid.
         let newSelection = prev.selection;
-        if (selectedBlock && prev.selection && formDataFromRedux.blocks?.[selectedBlock]) {
-          const block = formDataFromRedux.blocks[selectedBlock];
-          const slateValue = block.value; // Most common slate field name
+        if (selectedBlock && prev.selection) {
+          // Use path lookup for nested block support
+          const blockPath = newBlockPathMap[selectedBlock]?.path;
+          const block = blockPath
+            ? getBlockByPath(formDataFromRedux, blockPath)
+            : formDataFromRedux.blocks?.[selectedBlock];
+          const slateValue = block?.value; // Most common slate field name
           if (slateValue && !isSelectionValidForValue(prev.selection, slateValue)) {
             console.log('[VIEW] Selection invalid for new form data, clearing');
             newSelection = null;
@@ -422,11 +501,12 @@ const Iframe = (props) => {
         return {
           ...prev,
           formData: formDataFromRedux,
+          blockPathMap: newBlockPathMap,
           selection: newSelection,
         };
       });
     }
-  }, [formDataFromRedux, selectedBlock]);
+  }, [formDataFromRedux, selectedBlock, blocksConfig]);
 
   const history = useHistory();
 
@@ -442,22 +522,35 @@ const Iframe = (props) => {
         value: [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }],
       };
     }
-    const [newId, newFormData] = insertBlock(
-      properties,
-      id,
-      value,
-      current,
-      config.experimental.addBlockButton.enabled ? 1 : 0,
-    );
 
-    const blocksFieldname = getBlocksFieldname(newFormData);
-    const blockData = newFormData[blocksFieldname][newId];
-    newFormData[blocksFieldname][newId] = applyBlockDefaults({
+    const newId = uuid();
+
+    // Apply block defaults to the new block
+    let blockData = { '@type': value['@type'], ...value };
+    blockData = applyBlockDefaults({
       data: blockData,
       intl,
       metadata,
       properties,
     });
+
+    // Check if inserting inside a container (null means page-level)
+    const containerConfig = getContainerFieldConfig(
+      id,
+      iframeSyncState.blockPathMap,
+      properties,
+      blocksConfig,
+    );
+
+    // Unified insertion - works for both page and container
+    const newFormData = insertBlockInContainer(
+      properties,
+      iframeSyncState.blockPathMap,
+      id,
+      newId,
+      blockData,
+      containerConfig,
+    );
 
     onChangeFormData(newFormData);
     return newId;
@@ -468,17 +561,41 @@ const Iframe = (props) => {
     onChangeFormData(newFormData);
   };
 
+  const onDeleteBlock = (id, selectPrev) => {
+    // Check if deleting from a container (null means page-level)
+    const containerConfig = getContainerFieldConfig(
+      id,
+      iframeSyncState.blockPathMap,
+      properties,
+      blocksConfig,
+    );
+
+    // Get previous block for selection (within same container or page)
+    const previous = previousBlockId(properties, id);
+
+    // Unified deletion - works for both page and container
+    const newFormData = deleteBlockFromContainer(
+      properties,
+      iframeSyncState.blockPathMap,
+      id,
+      containerConfig,
+    );
+
+    onChangeFormData(newFormData);
+    onSelectBlock(selectPrev ? previous : null);
+    setAddNewBlockOpened(false);
+    dispatch(setSidebarTab(1));
+  };
+
+  // Process pending delete from iframe DELETE_BLOCK message (same pattern as addNewBlockOpened)
   useEffect(() => {
-    const onDeleteBlock = (id, selectPrev) => {
-      const previous = previousBlockId(properties, id);
-      const newFormData = deleteBlock(properties, id);
+    if (pendingDelete) {
+      onDeleteBlock(pendingDelete.uid, pendingDelete.selectPrev);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete]);
 
-      onChangeFormData(newFormData);
-      onSelectBlock(selectPrev ? previous : null);
-      setAddNewBlockOpened(false);
-      dispatch(setSidebarTab(1));
-    };
-
+  useEffect(() => {
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
@@ -528,6 +645,13 @@ const Iframe = (props) => {
             // Store updated types in state so toolbar can use them
             setBlockFieldTypes(updatedBlockFieldTypes);
 
+            // Rebuild blockPathMap now that custom blocks are registered
+            // This is needed because initial buildBlockPathMap ran before FRONTEND_INIT
+            setIframeSyncState(prev => ({
+              ...prev,
+              blockPathMap: buildBlockPathMap(prev.formData, config.blocks.blocksConfig),
+            }));
+
             // Send updated types to iframe
             event.source.postMessage(
               {
@@ -538,6 +662,7 @@ const Iframe = (props) => {
             );
           }
           if (event.data.allowedBlocks) {
+            validateFrontendConfig(event.data, config.blocks.blocksConfig);
             setAllowedBlocksList(event.data.allowedBlocks);
           }
           break;
@@ -562,7 +687,7 @@ const Iframe = (props) => {
           break;
 
         case 'DELETE_BLOCK':
-          onDeleteBlock(event.data.uid, true);
+          setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
         case 'ALLOWED_BLOCKS':
@@ -576,12 +701,13 @@ const Iframe = (props) => {
 
         case 'INLINE_EDIT_DATA':
           inlineEditCounterRef.current += 1;
-          // Update combined state atomically - formData, selection together
+          // Update combined state atomically - formData, blockPathMap, selection together
           // If flushRequestId is present, this was a flush response - also set completedFlushRequestId
           // so the toolbar knows it can proceed with the format button click
           setIframeSyncState(prev => ({
             ...prev,
             formData: event.data.data,
+            blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig),
             selection: event.data.selection || null,
             ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
           }));
@@ -647,14 +773,19 @@ const Iframe = (props) => {
               const formToUseForEnter = event.data.data;
 
               // Update iframeSyncState to keep it in sync
+              const enterBlockPathMap = buildBlockPathMap(formToUseForEnter, config.blocks.blocksConfig);
               setIframeSyncState(prev => ({
                 ...prev,
                 formData: formToUseForEnter,
+                blockPathMap: enterBlockPathMap,
                 selection: enterSelection || null,
               }));
 
-              // Get the current block data and check if the field is a slate field
-              const currentBlock = formToUseForEnter.blocks[enterBlockId];
+              // Get the current block data using path lookup (supports nested blocks)
+              const enterBlockPath = enterBlockPathMap[enterBlockId]?.path;
+              const currentBlock = enterBlockPath
+                ? getBlockByPath(formToUseForEnter, enterBlockPath)
+                : formToUseForEnter.blocks[enterBlockId];
               if (!currentBlock) {
                 break;
               }
@@ -741,6 +872,7 @@ const Iframe = (props) => {
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
+              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig),
               selection: event.data.selection || null,
               transformAction: transformAction,
             }));
@@ -1034,6 +1166,29 @@ const Iframe = (props) => {
     }
   }, [menuDropdownOpen]);
 
+  // Compute effective allowedBlocks for BlockChooser
+  // If selected block is inside a container, use container's allowedBlocks
+  const effectiveAllowedBlocks = useMemo(() => {
+    if (!selectedBlock || !iframeSyncState.blockPathMap) {
+      return allowedBlocks;
+    }
+
+    const containerConfig = getContainerFieldConfig(
+      selectedBlock,
+      iframeSyncState.blockPathMap,
+      iframeSyncState.formData,
+      blocksConfig,
+    );
+
+    // If inside a container with specific allowedBlocks, use those
+    if (containerConfig?.allowedBlocks) {
+      return containerConfig.allowedBlocks;
+    }
+
+    // Otherwise use page-level allowedBlocks
+    return allowedBlocks;
+  }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData, blocksConfig, allowedBlocks]);
+
   return (
     <div id="iframeContainer">
       <OpenObjectBrowser
@@ -1068,7 +1223,7 @@ const Iframe = (props) => {
                   : null
               }
               currentBlock={selectedBlock}
-              allowedBlocks={allowedBlocks}
+              allowedBlocks={effectiveAllowedBlocks}
               blocksConfig={blocksConfig}
               properties={properties}
               showRestricted={showRestricted}
@@ -1118,6 +1273,7 @@ const Iframe = (props) => {
           <SyncedSlateToolbar
             selectedBlock={selectedBlock}
             form={iframeSyncState.formData}
+            blockPathMap={iframeSyncState.blockPathMap}
             currentSelection={iframeSyncState.selection}
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
@@ -1188,9 +1344,7 @@ const Iframe = (props) => {
       {menuDropdownOpen && (
         <DropdownMenu
           selectedBlock={selectedBlock}
-          properties={properties}
-          onChangeFormData={onChangeFormData}
-          onSelectBlock={onSelectBlock}
+          onDeleteBlock={onDeleteBlock}
           menuButtonRect={menuButtonRect}
           onClose={() => setMenuDropdownOpen(false)}
         />

@@ -77,6 +77,16 @@ function renderBlock(blockId, block) {
         case 'hero':
             wrapper.innerHTML = renderHeroBlock(block);
             break;
+        case 'columns':
+            wrapper.innerHTML = renderColumnsBlock(block);
+            break;
+        case 'column':
+            wrapper.innerHTML = renderColumnBlock(block);
+            break;
+        case 'title':
+            // Title block is just rendered by page title, empty here
+            wrapper.innerHTML = '';
+            break;
         default:
             wrapper.innerHTML = `<p>Unknown block type: ${block['@type']}</p>`;
     }
@@ -307,6 +317,80 @@ function renderImageBlock(block) {
         return `<a href="${href}" class="image-link">${img}</a>`;
     }
     return img;
+}
+
+/**
+ * Render a columns container block.
+ * Columns go right (data-block-add="right" on each column).
+ * @param {Object} block - Columns block data with columns/columns_layout
+ * @returns {string} HTML string
+ */
+function renderColumnsBlock(block) {
+    const columns = block.columns || {};
+    const columnsLayout = block.columns_layout || { items: [] };
+    const items = columnsLayout.items || [];
+
+    let html = '<div class="columns-row" style="display: flex; gap: 20px;">';
+
+    items.forEach(columnId => {
+        const column = columns[columnId];
+        if (!column) return;
+
+        // Render column as a nested block with data-block-uid and data-block-add="right"
+        html += `<div data-block-uid="${columnId}" data-block-type="column" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
+        html += renderColumnContent(column);
+        html += '</div>';
+    });
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Render a column block content (the content blocks inside a column).
+ * Content blocks go down (data-block-add="bottom").
+ * @param {Object} column - Column block data with blocks/blocks_layout
+ * @returns {string} HTML string
+ */
+function renderColumnContent(column) {
+    const blocks = column.blocks || {};
+    const blocksLayout = column.blocks_layout || { items: [] };
+    const items = blocksLayout.items || [];
+
+    let html = '';
+
+    items.forEach(blockId => {
+        const block = blocks[blockId];
+        if (!block) return;
+
+        // Render nested content block with data-block-uid and data-block-add="bottom"
+        html += `<div data-block-uid="${blockId}" data-block-type="${block['@type']}" data-block-add="bottom">`;
+
+        // Render inner content based on block type
+        switch (block['@type']) {
+            case 'slate':
+                html += renderSlateBlock(block);
+                break;
+            case 'image':
+                html += renderImageBlock(block);
+                break;
+            default:
+                html += `<p>Unknown block type: ${block['@type']}</p>`;
+        }
+
+        html += '</div>';
+    });
+
+    return html || '<p style="color: #999;">Empty column</p>';
+}
+
+/**
+ * Render a column block (standalone, if needed).
+ * @param {Object} block - Column block data
+ * @returns {string} HTML string
+ */
+function renderColumnBlock(block) {
+    return renderColumnContent(block);
 }
 
 /**

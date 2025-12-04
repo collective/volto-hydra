@@ -118,13 +118,65 @@
                                         required: [],
                                     },
                                 },
+                                // Container block: columns contains column children
+                                columns: {
+                                    id: 'columns',
+                                    title: 'Columns',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="18" rx="1"/><rect x="14" y="3" width="8" height="18" rx="1"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['columns'],
+                                            },
+                                        ],
+                                        properties: {
+                                            columns: {
+                                                title: 'Columns',
+                                                type: 'blocks',
+                                                allowedBlocks: ['column'],
+                                                defaultBlock: 'column',
+                                                maxLength: 4,
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Nested container: column contains content blocks
+                                column: {
+                                    id: 'column',
+                                    title: 'Column',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['blocks'],
+                                            },
+                                        ],
+                                        properties: {
+                                            blocks: {
+                                                title: 'Content',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slate', 'image'],
+                                                defaultBlock: 'slate',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
                             },
                         },
                     };
 
                     // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
+                    // Note: 'column' is NOT in page-level allowedBlocks - it's only allowed inside 'columns'
                     window.bridge = initBridge(adminOrigin, {
-                        allowedBlocks: ['slate', 'image', 'hero'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns'],
                         voltoConfig: voltoConfig,
                     });
 
