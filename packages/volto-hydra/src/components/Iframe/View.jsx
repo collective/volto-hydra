@@ -10,7 +10,6 @@ import {
   getBlocksLayoutFieldname,
   insertBlock,
   moveBlock,
-  mutateBlock,
   previousBlockId,
 } from '@plone/volto/helpers';
 
@@ -58,7 +57,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty } from '../../utils/blockPath';
 
 /**
  * NoPreview component for frontend-defined blocks.
@@ -556,7 +555,23 @@ const Iframe = (props) => {
   };
 
   const onMutateBlock = (id, value) => {
-    const newFormData = mutateBlock(properties, id, value);
+    // Check if mutating inside a container (null means page-level)
+    const containerConfig = getContainerFieldConfig(
+      id,
+      iframeSyncState.blockPathMap,
+      properties,
+      blocksConfig,
+    );
+
+    // Use container-aware mutation for nested blocks
+    const newFormData = mutateBlockInContainer(
+      properties,
+      iframeSyncState.blockPathMap,
+      id,
+      value,
+      containerConfig,
+    );
+
     onChangeFormData(newFormData);
   };
 
@@ -573,11 +588,19 @@ const Iframe = (props) => {
     const previous = previousBlockId(properties, id);
 
     // Unified deletion - works for both page and container
-    const newFormData = deleteBlockFromContainer(
+    let newFormData = deleteBlockFromContainer(
       properties,
       iframeSyncState.blockPathMap,
       id,
       containerConfig,
+    );
+
+    // Ensure container has at least one block (empty block if now empty)
+    newFormData = ensureEmptyBlockIfEmpty(
+      newFormData,
+      containerConfig,
+      iframeSyncState.blockPathMap,
+      uuid,
     );
 
     onChangeFormData(newFormData);
@@ -922,6 +945,16 @@ const Iframe = (props) => {
             // This prevents focus being stolen from sidebar when typing triggers rect updates
             if (isNewBlock) {
               onSelectBlock(event.data.blockUid);
+
+              // Check if selected block is an empty block - if so, open block chooser
+              // BlockChooser will dynamically decide to mutate vs insert based on selected block type
+              const selectedBlockData = getBlockByPath(
+                properties,
+                iframeSyncState.blockPathMap?.[event.data.blockUid]?.path,
+              ) || properties?.blocks?.[event.data.blockUid];
+              if (selectedBlockData?.['@type'] === 'empty') {
+                setAddNewBlockOpened(true);
+              }
             }
 
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
@@ -1212,16 +1245,23 @@ const Iframe = (props) => {
                   : null
               }
               onInsertBlock={
-                onInsertBlock
-                  ? (id, value) => {
-                      setAddNewBlockOpened(false);
+                // Check if selected block is empty - if so, use onMutateBlock to replace
+                (() => {
+                  const selectedBlockData = getBlockByPath(
+                    properties,
+                    iframeSyncState.blockPathMap?.[selectedBlock]?.path,
+                  ) || properties?.blocks?.[selectedBlock];
+                  const isEmptyBlock = selectedBlockData?.['@type'] === 'empty';
 
-                      const newId = onInsertBlock(id, value);
-                      onSelectBlock(newId);
-                      setAddNewBlockOpened(false);
-                      dispatch(setSidebarTab(1));
-                    }
-                  : null
+                  if (!onInsertBlock || isEmptyBlock) return null;
+
+                  return (id, value) => {
+                    setAddNewBlockOpened(false);
+                    const newId = onInsertBlock(id, value);
+                    onSelectBlock(newId);
+                    dispatch(setSidebarTab(1));
+                  };
+                })()
               }
               currentBlock={selectedBlock}
               allowedBlocks={effectiveAllowedBlocks}
@@ -1309,19 +1349,36 @@ const Iframe = (props) => {
           />
 
           {/* Add Button - positioned based on data-block-add direction */}
-          {blockUI.addDirection !== 'hidden' && (
+          {blockUI.addDirection !== 'hidden' && (() => {
+            const iframeRect = referenceElement.getBoundingClientRect();
+            const isRightDirection = blockUI.addDirection === 'right';
+
+            // Calculate ideal position
+            let addLeft = isRightDirection
+              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8  // Right of block
+              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - 30; // Bottom-right of block
+
+            // Constrain to stay within iframe bounds
+            const iframeRight = iframeRect.left + iframeRect.width;
+            const buttonWidth = 30;
+            if (addLeft + buttonWidth > iframeRight) {
+              // Move button to left side of block if it would go offscreen
+              addLeft = iframeRect.left + blockUI.rect.left - buttonWidth - 8;
+            }
+
+            // For 'right': top-right of block
+            // For 'bottom' (default): below block
+            const addTop = isRightDirection
+              ? iframeRect.top + blockUI.rect.top  // Top-right
+              : iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+
+            return (
             <button
               className="volto-hydra-add-button"
               style={{
                 position: 'fixed',
-                // For 'right': to the right of block, bottom-aligned
-                // For 'bottom' (default): below block, right-aligned
-                left: blockUI.addDirection === 'right'
-                  ? `${referenceElement.getBoundingClientRect().left + blockUI.rect.left + blockUI.rect.width + 8}px`
-                  : `${referenceElement.getBoundingClientRect().left + blockUI.rect.left + blockUI.rect.width - 30}px`,
-                top: blockUI.addDirection === 'right'
-                  ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 30}px`
-                  : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height + 8}px`,
+                left: `${addLeft}px`,
+                top: `${addTop}px`,
                 zIndex: 10,
                 width: '30px',
                 height: '30px',
@@ -1344,7 +1401,8 @@ const Iframe = (props) => {
             >
               +
             </button>
-          )}
+            );
+          })()}
         </>
         );
       })()}

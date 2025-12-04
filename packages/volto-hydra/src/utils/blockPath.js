@@ -378,3 +378,122 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
   // Use path-aware update to handle nested containers
   return setBlockByPath(formData, parentPath, updatedParentBlock);
 }
+
+/**
+ * Mutate a block in a container (replace its data).
+ * Treats the page itself as a container when containerConfig is null.
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {string} blockId - Block ID to mutate
+ * @param {Object} newBlockData - New block data
+ * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or null for page-level
+ * @returns {Object} New formData with block mutated
+ */
+export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlockData, containerConfig) {
+  // Page-level mutation
+  if (!containerConfig) {
+    return {
+      ...formData,
+      blocks: {
+        ...formData.blocks,
+        [blockId]: newBlockData,
+      },
+    };
+  }
+
+  // Container-level mutation
+  const { parentId, fieldName } = containerConfig;
+
+  const parentPath = blockPathMap[parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] Could not find parent block ${parentId} for container mutation`);
+  }
+
+  const updatedParentBlock = {
+    ...parentBlock,
+    [fieldName]: {
+      ...parentBlock[fieldName],
+      [blockId]: newBlockData,
+    },
+  };
+
+  return setBlockByPath(formData, parentPath, updatedParentBlock);
+}
+
+/**
+ * Determine the block type to use for an empty container.
+ * Uses defaultBlock if specified, or the single allowed type, otherwise 'empty'.
+ *
+ * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlock
+ * @returns {string} Block type to create
+ */
+function getEmptyBlockType(containerConfig) {
+  if (containerConfig?.defaultBlock) {
+    return containerConfig.defaultBlock;
+  }
+  if (containerConfig?.allowedBlocks?.length === 1) {
+    return containerConfig.allowedBlocks[0];
+  }
+  return 'empty';
+}
+
+/**
+ * Ensure a container has at least one block (empty block if container is empty).
+ * Call this after deleting a block to ensure empty containers get an empty block.
+ *
+ * @param {Object} formData - The form data
+ * @param {Object|null} containerConfig - Container config (null for page-level)
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @returns {Object} formData with empty block added if container was empty, or original formData
+ */
+export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap, uuidGenerator) {
+  if (!containerConfig) {
+    // Page-level: check blocks_layout.items
+    const items = formData.blocks_layout?.items || [];
+    if (items.length === 0) {
+      const newBlockId = uuidGenerator();
+      const blockType = getEmptyBlockType(null);
+      return {
+        ...formData,
+        blocks: {
+          ...formData.blocks,
+          [newBlockId]: { '@type': blockType },
+        },
+        blocks_layout: { items: [newBlockId] },
+      };
+    }
+    return formData;
+  }
+
+  // Container-level: check container's blocks_layout
+  const { parentId, fieldName } = containerConfig;
+  const layoutFieldName = `${fieldName}_layout`;
+
+  const parentPath = blockPathMap[parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+
+  if (!parentBlock) {
+    return formData;
+  }
+
+  const items = parentBlock[layoutFieldName]?.items || [];
+  if (items.length === 0) {
+    const newBlockId = uuidGenerator();
+    const blockType = getEmptyBlockType(containerConfig);
+    const updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: {
+        ...parentBlock[fieldName],
+        [newBlockId]: { '@type': blockType },
+      },
+      [layoutFieldName]: { items: [newBlockId] },
+    };
+    return setBlockByPath(formData, parentPath, updatedParentBlock);
+  }
+
+  return formData;
+}

@@ -4117,6 +4117,23 @@ export class Bridge {
           background: rgba(0, 0, 0, 0.1);
           margin: 0 1em;
         }
+        /* Empty block visual indicator - always visible */
+        [data-block-type="empty"] {
+          border: 2px dashed #b8c6c8 !important;
+          border-radius: 4px;
+          background: rgba(200, 200, 200, 0.1);
+          min-height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        [data-block-type="empty"]::after {
+          content: '+';
+          font-size: 24px;
+          color: #b8c6c8;
+          pointer-events: none;
+        }
       `;
     document.head.appendChild(style);
   }

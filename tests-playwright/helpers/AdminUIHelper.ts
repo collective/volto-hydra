@@ -407,7 +407,7 @@ export class AdminUIHelper {
     await this.waitForQuantaToolbar(blockId);
 
     const menuButton = await this.getMenuButtonInQuantaToolbar(blockId, 'options');
-    menuButton.click();
+    await menuButton.click();
 
     // Wait for dropdown to appear
     const dropdown = this.page.locator(

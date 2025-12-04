@@ -338,3 +338,217 @@ test.describe('Deleting Blocks from Containers', () => {
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
 });
+
+test.describe('Empty Block Behavior', () => {
+  // Note: We use gridBlock for empty block tests because it doesn't have a defaultBlock.
+  // The column block has defaultBlock: 'slate', so it creates slate blocks instead of empty.
+
+  test('container with defaultBlock creates that type when emptied', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // The column block has defaultBlock: 'slate', so when we delete all blocks,
+    // it should create a slate block, not an empty block.
+
+    // First delete text-1b from col-1
+    await helper.clickBlockInIframe('text-1b');
+    await helper.openQuantaToolbarMenu('text-1b');
+    await helper.clickQuantaToolbarMenuOption('text-1b', 'Remove');
+    await helper.waitForBlockToDisappear('text-1b');
+
+    // Now delete text-1a (the last block in col-1)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.openQuantaToolbarMenu('text-1a');
+    await helper.clickQuantaToolbarMenuOption('text-1a', 'Remove');
+    await helper.waitForBlockToDisappear('text-1a');
+
+    // col-1 should now have 1 block (the default slate block, not empty)
+    const col1Blocks = await iframe
+      .locator('[data-block-uid="col-1"] > [data-block-uid]')
+      .count();
+    expect(col1Blocks).toBe(1);
+
+    // The block should be of type 'slate' (the defaultBlock), not 'empty'
+    const blockType = await iframe
+      .locator('[data-block-uid="col-1"] > [data-block-uid]')
+      .first()
+      .getAttribute('data-block-type');
+    expect(blockType).toBe('slate');
+  });
+
+  test('container with single allowedBlock creates that type when emptied', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // The columns block has allowedBlocks: ['column'] with no defaultBlock,
+    // so when we delete all columns, it should create a 'column' block
+    // (the single allowed type) instead of 'empty'.
+
+    // First delete col-2 from columns-1
+    await helper.clickBlockInIframe('col-2');
+    await helper.openQuantaToolbarMenu('col-2');
+    await helper.clickQuantaToolbarMenuOption('col-2', 'Remove');
+    await helper.waitForBlockToDisappear('col-2');
+
+    // Now delete col-1 (the last column in columns-1)
+    await helper.clickBlockInIframe('col-1');
+    await helper.openQuantaToolbarMenu('col-1');
+    await helper.clickQuantaToolbarMenuOption('col-1', 'Remove');
+    await helper.waitForBlockToDisappear('col-1');
+
+    // columns-1 should now have 1 block (a column block, not empty)
+    const columnBlocks = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(columnBlocks).toBe(1);
+
+    // The block should be of type 'column' (the single allowed type), not 'empty'
+    const blockType = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .first()
+      .getAttribute('data-block-type');
+    expect(blockType).toBe('column');
+  });
+
+  test('deleting last block from container creates empty block', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // First delete grid-cell-2 from grid-1
+    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.openQuantaToolbarMenu('grid-cell-2');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-2');
+
+    // Now delete grid-cell-1 (the last block in grid-1)
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.openQuantaToolbarMenu('grid-cell-1');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-1');
+
+    // grid-1 should now have 1 empty block
+    const gridBlocks = await iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .count();
+    expect(gridBlocks).toBe(1);
+
+    // The block should be of type 'empty'
+    const emptyBlock = iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .first();
+    const blockType = await emptyBlock.getAttribute('data-block-type');
+    expect(blockType).toBe('empty');
+
+    // Empty block should have visible dashed border styling (injected by hydra.js)
+    const borderStyle = await emptyBlock.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return style.borderStyle;
+    });
+    expect(borderStyle).toBe('dashed');
+
+    // Empty block should have the "+" indicator (::after pseudo-element)
+    const pseudoContent = await emptyBlock.evaluate((el) => {
+      const style = window.getComputedStyle(el, '::after');
+      return style.content;
+    });
+    // CSS content property wraps the value in quotes, so we check for '"+"'
+    expect(pseudoContent).toBe('"+"');
+  });
+
+  test('clicking empty block opens block chooser', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Delete both blocks from grid-1 to create empty block
+    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.openQuantaToolbarMenu('grid-cell-2');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-2');
+
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.openQuantaToolbarMenu('grid-cell-1');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-1');
+
+    // Get the empty block's ID
+    const emptyBlockId = await iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .first()
+      .getAttribute('data-block-uid');
+
+    // Click the empty block
+    await helper.clickBlockInIframe(emptyBlockId!);
+
+    // Block chooser should open automatically
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+  });
+
+  test('selecting block type replaces empty block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Delete both blocks from grid-1 to create empty block
+    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.openQuantaToolbarMenu('grid-cell-2');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-2');
+
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.openQuantaToolbarMenu('grid-cell-1');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-1');
+
+    // Get the empty block's ID
+    const emptyBlockId = await iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .first()
+      .getAttribute('data-block-uid');
+
+    // Click the empty block to open chooser
+    await helper.clickBlockInIframe(emptyBlockId!);
+
+    // Wait for block chooser
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Select slate block type - use text content since title attribute may vary
+    await blockChooser.getByRole('button', { name: 'Text' }).click();
+
+    // Wait for re-render
+    await page.waitForTimeout(500);
+
+    // The block should now be slate type, not empty
+    const blockType = await iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .first()
+      .getAttribute('data-block-type');
+    expect(blockType).toBe('slate');
+  });
+});

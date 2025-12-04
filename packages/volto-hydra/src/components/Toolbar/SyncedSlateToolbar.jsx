@@ -652,9 +652,17 @@ const SyncedSlateToolbar = ({
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
-  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0 };
+  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800 };
   const toolbarTop = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
-  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Aligned with block container left edge
+
+  // Determine if block is on right side of iframe - if so, align toolbar to right edge
+  // This prevents toolbar from extending beyond iframe and being overlapped by sidebar
+  const iframeMidpoint = toolbarIframeRect.left + toolbarIframeRect.width / 2;
+  const blockCenter = toolbarIframeRect.left + blockUI.rect.left + blockUI.rect.width / 2;
+  const alignRight = blockCenter > iframeMidpoint;
+
+  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Left edge of block
+  const toolbarRight = window.innerWidth - (toolbarIframeRect.left + blockUI.rect.left + blockUI.rect.width); // Distance from block's right edge to window right
 
 
   return (
@@ -664,7 +672,9 @@ const SyncedSlateToolbar = ({
         style={{
           position: 'fixed',
           top: `${toolbarTop}px`,
-          left: `${toolbarLeft}px`,
+          ...(alignRight
+            ? { right: `${toolbarRight}px` }
+            : { left: `${toolbarLeft}px` }),
           zIndex: 10,
           display: 'flex',
           gap: '2px',

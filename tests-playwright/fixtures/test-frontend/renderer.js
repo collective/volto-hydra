@@ -86,6 +86,9 @@ function renderBlock(blockId, block) {
         case 'gridBlock':
             wrapper.innerHTML = renderGridBlock(block);
             break;
+        case 'empty':
+            wrapper.innerHTML = renderEmptyBlock(block);
+            break;
         case 'title':
             // Title block is just rendered by page title, empty here
             wrapper.innerHTML = '';
@@ -425,6 +428,9 @@ function renderGridBlock(block) {
             case 'image':
                 html += renderImageBlock(childBlock);
                 break;
+            case 'empty':
+                html += renderEmptyBlock(childBlock);
+                break;
             default:
                 html += `<p>Unknown block type: ${childBlock['@type']}</p>`;
         }
@@ -434,6 +440,16 @@ function renderGridBlock(block) {
 
     html += '</div>';
     return html;
+}
+
+/**
+ * Render an Empty block.
+ * Empty blocks are inserted into empty containers and can be clicked to add a real block.
+ * @param {Object} block - Empty block data
+ * @returns {string} HTML string
+ */
+function renderEmptyBlock(block) {
+    return `<div class="empty-block" style="min-height: 60px;"></div>`;
 }
 
 /**
