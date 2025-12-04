@@ -1556,7 +1556,21 @@ export class Bridge {
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
     // Read data-block-add attribute for add button direction (right, bottom, hidden)
-    const addDirection = blockElement.getAttribute('data-block-add') || 'bottom';
+    // If not specified, infer from nesting depth: even depths (0, 2, ...) → bottom, odd depths (1, 3, ...) → right
+    let addDirection = blockElement.getAttribute('data-block-add');
+    if (!addDirection) {
+      // Count ancestor blocks to determine nesting depth
+      let depth = 0;
+      let parent = blockElement.parentElement;
+      while (parent) {
+        if (parent.hasAttribute('data-block-uid')) {
+          depth++;
+        }
+        parent = parent.parentElement;
+      }
+      // Page-level blocks (depth 0) → bottom, nested (depth 1) → right, etc.
+      addDirection = depth % 2 === 0 ? 'bottom' : 'right';
+    }
     this._pendingBlockSelected = {
       blockUid,
       rect: {

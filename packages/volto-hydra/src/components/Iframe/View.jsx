@@ -541,7 +541,6 @@ const Iframe = (props) => {
       properties,
       blocksConfig,
     );
-
     // Unified insertion - works for both page and container
     const newFormData = insertBlockInContainer(
       properties,

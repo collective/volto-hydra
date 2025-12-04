@@ -83,6 +83,9 @@ function renderBlock(blockId, block) {
         case 'column':
             wrapper.innerHTML = renderColumnBlock(block);
             break;
+        case 'gridBlock':
+            wrapper.innerHTML = renderGridBlock(block);
+            break;
         case 'title':
             // Title block is just rendered by page title, empty here
             wrapper.innerHTML = '';
@@ -391,6 +394,46 @@ function renderColumnContent(column) {
  */
 function renderColumnBlock(block) {
     return renderColumnContent(block);
+}
+
+/**
+ * Render a grid block (Volto's built-in container).
+ * NO explicit data-block-add attributes - tests automatic direction inference.
+ * @param {Object} block - Grid block data with blocks/blocks_layout
+ * @returns {string} HTML string
+ */
+function renderGridBlock(block) {
+    const blocks = block.blocks || {};
+    const blocksLayout = block.blocks_layout || { items: [] };
+    const items = blocksLayout.items || [];
+
+    let html = '<div class="grid-row" style="display: flex; gap: 20px;">';
+
+    items.forEach(blockId => {
+        const childBlock = blocks[blockId];
+        if (!childBlock) return;
+
+        // Render grid cell WITHOUT data-block-add attribute
+        // This tests that hydra.js correctly infers direction from nesting depth
+        html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
+
+        // Render inner content based on block type
+        switch (childBlock['@type']) {
+            case 'slate':
+                html += renderSlateBlock(childBlock);
+                break;
+            case 'image':
+                html += renderImageBlock(childBlock);
+                break;
+            default:
+                html += `<p>Unknown block type: ${childBlock['@type']}</p>`;
+        }
+
+        html += '</div>';
+    });
+
+    html += '</div>';
+    return html;
 }
 
 /**

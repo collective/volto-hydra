@@ -192,6 +192,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const parentBlock = getBlockById(formData, blockPathMap, parentId);
 
   if (!parentBlock) {
+    console.log('[BLOCKPATH] getContainerFieldConfig: parentBlock not found for', parentId);
     return null;
   }
 
@@ -203,8 +204,18 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
 
   if (!schema?.properties) {
     // Check for implicit container (blocks/blocks_layout without schema)
-    if (parentBlock.blocks && parentBlock.blocks_layout?.items?.includes(blockId)) {
-      return { fieldName: 'blocks', allowedBlocks: null, defaultBlock: null, maxLength: null };
+    // For these containers (like gridBlock), allowedBlocks/maxLength are at the block config level
+    const hasBlocks = !!parentBlock.blocks;
+    const layoutItems = parentBlock.blocks_layout?.items;
+    const includesBlock = layoutItems?.includes(blockId);
+    if (hasBlocks && includesBlock) {
+      return {
+        fieldName: 'blocks',
+        parentId,
+        allowedBlocks: parentConfig?.allowedBlocks || null,
+        defaultBlock: parentConfig?.defaultBlock || null,
+        maxLength: parentConfig?.maxLength || null,
+      };
     }
     return null;
   }
@@ -225,6 +236,22 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
         };
       }
     }
+  }
+
+  // Fallback: Check for implicit container (blocks/blocks_layout) even when schema exists
+  // This handles blocks like gridBlock that have a schema but use implicit blocks/blocks_layout
+  // For these containers, allowedBlocks/maxLength are at the block config level
+  const hasBlocks = !!parentBlock.blocks;
+  const layoutItems = parentBlock.blocks_layout?.items;
+  const includesBlock = layoutItems?.includes(blockId);
+  if (hasBlocks && includesBlock) {
+    return {
+      fieldName: 'blocks',
+      parentId,
+      allowedBlocks: parentConfig?.allowedBlocks || null,
+      defaultBlock: parentConfig?.defaultBlock || null,
+      maxLength: parentConfig?.maxLength || null,
+    };
   }
 
   return null;

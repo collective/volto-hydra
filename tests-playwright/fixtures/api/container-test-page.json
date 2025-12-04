@@ -52,10 +52,26 @@
       "@type": "slate",
       "value": [{"type": "p", "children": [{"text": "Text after columns"}]}],
       "plaintext": "Text after columns"
+    },
+    "grid-1": {
+      "@type": "gridBlock",
+      "blocks": {
+        "grid-cell-1": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Grid Cell 1"}]}],
+          "plaintext": "Grid Cell 1"
+        },
+        "grid-cell-2": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Grid Cell 2"}]}],
+          "plaintext": "Grid Cell 2"
+        }
+      },
+      "blocks_layout": {"items": ["grid-cell-1", "grid-cell-2"]}
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "columns-1", "text-after"]
+    "items": ["title-block", "columns-1", "text-after", "grid-1"]
   },
   "allow_discussion": false,
   "is_folderish": false,

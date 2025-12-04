@@ -205,6 +205,45 @@ test.describe('Adding Blocks to Containers', () => {
       .count();
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
+
+  test('adding block inside implicit container (gridBlock) works', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Count initial blocks in grid-1 (should be 2: grid-cell-1, grid-cell-2)
+    const initialGridBlocks = await iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .count();
+    expect(initialGridBlocks).toBe(2);
+
+    // Count initial page-level blocks
+    const initialPageBlocks = await iframe
+      .locator('#content > [data-block-uid]')
+      .count();
+
+    // Select grid-cell-1 and add a new block after it
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('slate');
+
+    // grid-1 should now have 3 blocks
+    const finalGridBlocks = await iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .count();
+    expect(finalGridBlocks).toBe(3);
+
+    // Page-level blocks should be unchanged
+    const finalPageBlocks = await iframe
+      .locator('#content > [data-block-uid]')
+      .count();
+    expect(finalPageBlocks).toBe(initialPageBlocks);
+  });
 });
 
 test.describe('Add Button Direction', () => {
@@ -238,6 +277,23 @@ test.describe('Add Button Direction', () => {
     // Verify add button is positioned below the block
     const positioning = await helper.verifyBlockUIPositioning('text-1a');
     expect(positioning.addButtonDirection).toBe('bottom');
+  });
+
+  test('add button direction is inferred from nesting depth when no attribute', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // grid-cell-1 has NO data-block-add attribute
+    // It's nested at depth 1 (inside grid-1), so direction should be inferred as 'right'
+    await helper.clickBlockInIframe('grid-cell-1');
+
+    // Verify add button is positioned to the right (inferred from depth 1)
+    const positioning = await helper.verifyBlockUIPositioning('grid-cell-1');
+    expect(positioning.addButtonDirection).toBe('right');
   });
 });
 
