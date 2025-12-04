@@ -157,6 +157,49 @@ export class Bridge {
     return fallback;
   }
 
+  /**
+   * Check if an editable field belongs directly to a block, not a nested block.
+   * Container blocks (like columns) contain nested blocks with their own editable fields.
+   * This method helps avoid accidentally interacting with nested blocks' fields.
+   *
+   * @param {HTMLElement} field - The editable field element
+   * @param {HTMLElement} blockElement - The block element to check ownership against
+   * @returns {boolean} True if the field belongs directly to blockElement
+   */
+  fieldBelongsToBlock(field, blockElement) {
+    const fieldBlockElement = field.closest('[data-block-uid]');
+    return fieldBlockElement === blockElement;
+  }
+
+  /**
+   * Get editable fields that belong directly to a block, excluding nested blocks' fields.
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {HTMLElement[]} Array of editable field elements that belong to this block
+   */
+  getOwnEditableFields(blockElement) {
+    const allFields = blockElement.querySelectorAll('[data-editable-field]');
+    return Array.from(allFields).filter(
+      (field) => this.fieldBelongsToBlock(field, blockElement),
+    );
+  }
+
+  /**
+   * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {HTMLElement|null} The first editable field or null if none
+   */
+  getOwnFirstEditableField(blockElement) {
+    const allFields = blockElement.querySelectorAll('[data-editable-field]');
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        return field;
+      }
+    }
+    return null;
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Bridge Class Initialization and Navigation Event Handling
   ////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +286,7 @@ export class Bridge {
         this.injectCSS();
         this.listenForSelectBlockMessage();
         this.setupScrollHandler();
+        this.setupResizeHandler();
 
         // Send single INIT message with config - admin merges config before responding
         // This ensures blockPathMap is built with complete schema knowledge
@@ -321,6 +365,7 @@ export class Bridge {
                   window.parent.postMessage(
                     {
                       type: 'BLOCK_SELECTED',
+                      src: 'fieldFocusListener',
                       blockUid,
                       rect: {
                         top: rect.top,
@@ -406,8 +451,9 @@ export class Bridge {
             this.addNodeIdsToAllSlateFields();
 
             // Log the block data to see if bold formatting is present
-            if (this.selectedBlockUid && this.formData.blocks[this.selectedBlockUid]) {
-              console.log('[HYDRA] Block data being passed to callback:', JSON.stringify(this.formData.blocks[this.selectedBlockUid].value));
+            const selectedBlockData = this.getBlockData(this.selectedBlockUid);
+            if (this.selectedBlockUid && selectedBlockData) {
+              console.log('[HYDRA] Block data being passed to callback:', JSON.stringify(selectedBlockData.value));
             }
 
             // Suppress outbound messages during external update processing
@@ -452,6 +498,7 @@ export class Bridge {
                       window.parent.postMessage(
                         {
                           type: 'BLOCK_SELECTED',
+                          src: 'formDataHandler',
                           blockUid: this.selectedBlockUid,
                           rect: {
                             top: rect.top,
@@ -591,10 +638,11 @@ export class Bridge {
 
     // Set contenteditable on text and slate fields only
     // Get blockType to look up field types (supports nested blocks via blockPathMap)
+    // Only set on THIS block's own fields, not nested blocks' fields
     const blockData = this.getBlockData(blockUid);
     const blockType = blockData?.['@type'];
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const editableFields = blockElement.querySelectorAll('[data-editable-field]');
+    const editableFields = this.getOwnEditableFields(blockElement);
     editableFields.forEach((field) => {
       const fieldName = field.getAttribute('data-editable-field');
       const fieldType = blockTypeFields[fieldName];
@@ -621,19 +669,19 @@ export class Bridge {
     let fieldToFocus = null;
 
     if (this.lastClickEvent) {
-      // Find the clicked editable field
+      // Find the clicked editable field - only accept if it belongs to THIS block
       const clickedElement = this.lastClickEvent.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
       console.log('[HYDRA] Click event path - found clickedField:', !!clickedField);
-      if (clickedField) {
+      if (clickedField && this.fieldBelongsToBlock(clickedField, blockElement)) {
         fieldToFocus = clickedField.getAttribute('data-editable-field');
         console.log('[HYDRA] Got field from click:', fieldToFocus);
       }
     }
 
-    // If no clicked field found, use the first editable field
+    // If no clicked field found, use the first editable field that belongs to THIS block
     if (!fieldToFocus) {
-      const firstEditableField = blockElement.querySelector('[data-editable-field]');
+      const firstEditableField = this.getOwnFirstEditableField(blockElement);
       console.log('[HYDRA] querySelector path - found:', !!firstEditableField);
       if (firstEditableField) {
         fieldToFocus = firstEditableField.getAttribute('data-editable-field');
@@ -654,6 +702,7 @@ export class Bridge {
         window.parent.postMessage(
           {
             type: 'BLOCK_SELECTED',
+            src: 'detectFieldChange',
             blockUid,
             rect: {
               top: rect.top,
@@ -1191,10 +1240,11 @@ export class Bridge {
    */
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
     // Get blockType to look up field types (supports nested blocks via blockPathMap)
+    // Only restore on THIS block's own fields, not nested blocks' fields
     const blockData = this.getBlockData(this.selectedBlockUid);
     const blockType = blockData?.['@type'];
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const editableFields = blockElement.querySelectorAll('[data-editable-field]');
+    const editableFields = this.getOwnEditableFields(blockElement);
     console.log(`[HYDRA] restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
     editableFields.forEach((field) => {
       const fieldName = field.getAttribute('data-editable-field');
@@ -1415,6 +1465,7 @@ export class Bridge {
       window.parent.postMessage(
         {
           type: 'BLOCK_SELECTED',
+          src: 'updateBlockUIAfterFormData',
           blockUid: this.selectedBlockUid,
           rect: {
             top: currentRect.top,
@@ -1538,9 +1589,16 @@ export class Bridge {
           fieldType => fieldType === 'slate'
         );
         if (hasSlateField) {
-          this.formData.blocks[blockUid] = this.addNodeIds(
-            this.formData.blocks[blockUid],
-          );
+          // Use getBlockData to handle nested blocks
+          const block = this.getBlockData(blockUid);
+          if (block) {
+            // Add nodeIds to each slate field, following the same pattern as addNodeIdsToAllSlateFields
+            Object.keys(blockFieldTypes).forEach((fieldName) => {
+              if (blockFieldTypes[fieldName] === 'slate' && block[fieldName]) {
+                block[fieldName] = this.addNodeIds(block[fieldName]);
+              }
+            });
+          }
           // NodeIds are now added to this.formData for internal use
           // No need to send anywhere - they're already in memory for DOM manipulation
         }
@@ -1575,14 +1633,14 @@ export class Bridge {
       }
     }
 
-    // If no clicked field, use the first editable field in this block
+    // If no clicked field, use the first editable field that belongs to THIS block
     if (!this.focusedFieldName) {
-      const firstEditableField = blockElement.querySelector('[data-editable-field]');
+      const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-editable-field');
         console.log('[HYDRA] Set focusedFieldName to first editable field:', this.focusedFieldName);
       } else {
-        // No editable fields in this block (e.g., image blocks)
+        // No editable fields in this block (e.g., image blocks or container blocks)
         console.log('[HYDRA] No editable fields found, focusedFieldName remains null');
       }
     }
@@ -1721,9 +1779,20 @@ export class Bridge {
 
           // Focus and position cursor for editable fields (text or slate type)
           // Use focusedFieldName to find the specific field that was clicked, not just the first one
-          const contentEditableField = this.focusedFieldName
+          let contentEditableField = this.focusedFieldName
             ? currentBlockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`)
             : currentBlockElement.querySelector('[contenteditable="true"]');
+
+          // Verify the field belongs to THIS block, not a nested block
+          // Container blocks (like columns) contain nested blocks with their own editable fields
+          // If we find a field that belongs to a nested block, don't focus it
+          if (contentEditableField) {
+            const fieldBlockElement = contentEditableField.closest('[data-block-uid]');
+            if (fieldBlockElement !== currentBlockElement) {
+              console.log('[HYDRA] selectBlock: editable field belongs to nested block, skipping focus');
+              contentEditableField = null;
+            }
+          }
           if (contentEditableField) {
             const fieldName = contentEditableField.getAttribute('data-editable-field');
             const blockData = this.getBlockData(this.selectedBlockUid);
@@ -1798,6 +1867,7 @@ export class Bridge {
             window.parent.postMessage(
               {
                 type: 'BLOCK_SELECTED',
+                src: 'selectionChangeListener',
                 blockUid: this._pendingBlockSelected.blockUid,
                 rect: {
                   top: currentRect.top,
@@ -1967,6 +2037,7 @@ export class Bridge {
           window.parent.postMessage(
             {
               type: 'BLOCK_SELECTED',
+              src: 'resizeObserver',
               blockUid,
               rect: {
                 top: newRect.top,
@@ -2258,35 +2329,6 @@ export class Bridge {
         return;
       }
 
-      // Handle REQUEST_BLOCK_RESELECT - parent wants updated block position after scroll/resize
-      if (event.data.type === 'REQUEST_BLOCK_RESELECT') {
-        const { blockUid } = event.data;
-        const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
-
-        if (blockElement) {
-          // Re-calculate block position and send BLOCK_SELECTED message
-          const rect = blockElement.getBoundingClientRect();
-          const editableFields = this.getEditableFields(blockElement);
-
-          window.parent.postMessage(
-            {
-              type: 'BLOCK_SELECTED',
-              blockUid,
-              rect: {
-                top: rect.top,
-                left: rect.left,
-                width: rect.width,
-                height: rect.height,
-              },
-              editableFields, // Map of fieldName -> fieldType from DOM
-              focusedFieldName: this.focusedFieldName, // Preserve field name for toolbar
-            },
-            this.adminOrigin,
-          );
-        }
-        return;
-      }
-
       // Handle SELECT_BLOCK - select a new block from Admin UI
       if (event.data.type === 'SELECT_BLOCK') {
         const { uid } = event.data;
@@ -2308,7 +2350,9 @@ export class Bridge {
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          const blockType = this.formData.blocks[uid]?.['@type'];
+          // Use getBlockData to handle nested blocks (not just top-level)
+          const blockData = this.getBlockData(uid);
+          const blockType = blockData?.['@type'];
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           const hasEditableFields = Object.keys(blockTypeFields).length > 0 || blockType === 'slate';
 
@@ -2319,8 +2363,10 @@ export class Bridge {
                 // Re-query the block element to ensure we get the updated DOM element
                 const currentBlockElement = document.querySelector(`[data-block-uid="${uid}"]`);
                 if (currentBlockElement) {
-                  const editableField = currentBlockElement.querySelector('[contenteditable="true"]');
-                  if (editableField) {
+                  // Find the first contenteditable field that belongs to THIS block
+                  // (not a nested block's field) to avoid ping-pong selection issues
+                  const editableField = this.getOwnFirstEditableField(currentBlockElement);
+                  if (editableField && editableField.getAttribute('contenteditable') === 'true') {
                     // Only focus the field, don't manipulate the selection
                     // The selection may have been carefully set by a format operation
                     // or other operation, so we should preserve it
@@ -2404,6 +2450,7 @@ export class Bridge {
             window.parent.postMessage(
               {
                 type: 'BLOCK_SELECTED',
+                src: 'scrollHandler',
                 blockUid: this.selectedBlockUid,
                 rect: {
                   top: rect.top,
@@ -2422,6 +2469,44 @@ export class Bridge {
     };
 
     window.addEventListener('scroll', handleScroll);
+  }
+
+  /**
+   * Sets up window resize handler to update block UI overlay positions
+   */
+  setupResizeHandler() {
+    const handleResize = () => {
+      // After resize, re-send BLOCK_SELECTED with updated positions
+      if (this.selectedBlockUid) {
+        const blockElement = document.querySelector(
+          `[data-block-uid="${this.selectedBlockUid}"]`,
+        );
+
+        if (blockElement) {
+          const rect = blockElement.getBoundingClientRect();
+          const editableFields = this.getEditableFields(blockElement);
+
+          window.parent.postMessage(
+            {
+              type: 'BLOCK_SELECTED',
+              src: 'resizeHandler',
+              blockUid: this.selectedBlockUid,
+              rect: {
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+              },
+              editableFields,
+              focusedFieldName: this.focusedFieldName,
+            },
+            this.adminOrigin,
+          );
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -2445,8 +2530,9 @@ export class Bridge {
       blockUid = blockElement?.getAttribute('data-block-uid');
     } else {
       // Called with a block element - query for child editable field
+      // Use getOwnFirstEditableField to avoid getting nested blocks' fields
       blockUid = elementOrBlock.getAttribute('data-block-uid');
-      editableField = elementOrBlock.querySelector('[data-editable-field]');
+      editableField = this.getOwnFirstEditableField(elementOrBlock);
     }
 
     if (editableField) {
@@ -2769,7 +2855,8 @@ export class Bridge {
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
 
     const editableFields = {};
-    const fieldElements = blockElement.querySelectorAll('[data-editable-field]');
+    // Use getOwnEditableFields to only get THIS block's fields, not nested blocks' fields
+    const fieldElements = this.getOwnEditableFields(blockElement);
 
     fieldElements.forEach((element) => {
       const fieldName = element.getAttribute('data-editable-field');
@@ -2824,13 +2911,12 @@ export class Bridge {
   addNodeIdsToAllSlateFields() {
     if (!this.formData) return;
 
-    // Get all block IDs from blockPathMap (includes nested blocks)
-    const allBlockIds = Object.keys(this.blockPathMap || {});
-
-    // If no blockPathMap, fall back to top-level blocks
-    if (allBlockIds.length === 0 && this.formData.blocks) {
-      allBlockIds.push(...Object.keys(this.formData.blocks));
+    if (!this.blockPathMap) {
+      throw new Error('[HYDRA] blockPathMap is required but was not provided by admin');
     }
+
+    // Get all block IDs from blockPathMap (includes nested blocks)
+    const allBlockIds = Object.keys(this.blockPathMap);
 
     allBlockIds.forEach((blockId) => {
       // getBlockData returns a reference to the actual block in formData
@@ -2998,7 +3084,8 @@ export class Bridge {
         return;
       }
 
-      const block = formData.blocks[this.selectedBlockUid];
+      // Use getBlockData to handle nested blocks (formData.blocks[uid] only works for top-level)
+      const block = this.getBlockData(this.selectedBlockUid);
       if (!block) {
         return;
       }
@@ -3492,13 +3579,20 @@ export class Bridge {
       const currBlock = document.querySelector(
         `[data-block-uid="${blockUid}"]`,
       );
-      this.formData.blocks[blockUid] = {
-        ...updatedJson,
-        plaintext: this.stripZeroWidthSpaces(currBlock.innerText),
-      };
+      // Use getBlockData to handle nested blocks - it returns a reference to the actual block
+      const block = this.getBlockData(blockUid);
+      if (block) {
+        // Update the block in place (getBlockData returns a reference)
+        Object.assign(block, updatedJson);
+        block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
+      }
     } else {
       // Non-Slate field - update field directly with text content
-      this.formData.blocks[blockUid][editableField] = this.stripZeroWidthSpaces(target.innerText);
+      // Use getBlockData to handle nested blocks
+      const block = this.getBlockData(blockUid);
+      if (block) {
+        block[editableField] = this.stripZeroWidthSpaces(target.innerText);
+      }
     }
 
     // Store the pending update - create a deep copy and strip nodeIds

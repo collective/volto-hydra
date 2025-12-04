@@ -417,6 +417,7 @@ const Iframe = (props) => {
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
     if (iframeOriginRef.current && selectedBlock) {
+      console.log('[VIEW] useEffect sending SELECT_BLOCK:', selectedBlock);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         {
           type: 'SELECT_BLOCK',
@@ -427,15 +428,6 @@ const Iframe = (props) => {
       );
     }
   }, [selectedBlock]);
-
-  // Listen for sidebar block selection events (e.g., clicking "‹ Page" header)
-  useEffect(() => {
-    const handleSelectBlock = (event) => {
-      onSelectBlock(event.detail?.blockId ?? null);
-    };
-    document.addEventListener('hydra:select-block', handleSelectBlock);
-    return () => document.removeEventListener('hydra:select-block', handleSelectBlock);
-  }, [onSelectBlock]);
 
   // Clear blockUI when no block is selected
   useEffect(() => {
@@ -907,27 +899,34 @@ const Iframe = (props) => {
           }));
           break;
 
-        case 'BLOCK_SELECTED':
+        case 'BLOCK_SELECTED': {
           // Update block UI state and selection atomically
           // Selection is included in BLOCK_SELECTED to prevent race conditions
-          setBlockUI((prevBlockUI) => {
-            const isNewBlock = !prevBlockUI || prevBlockUI.blockUid !== event.data.blockUid;
-            // Only call onSelectBlock for NEW block selections, not rect updates
-            // This prevents focus being stolen from sidebar when typing triggers rect updates
-            if (isNewBlock) {
-              onSelectBlock(event.data.blockUid);
 
-              // Check if selected block is an empty block - if so, open block chooser
-              // BlockChooser will dynamically decide to mutate vs insert based on selected block type
-              const selectedBlockData = getBlockByPath(
-                properties,
-                iframeSyncState.blockPathMap?.[event.data.blockUid]?.path,
-              ) || properties?.blocks?.[event.data.blockUid];
-              if (selectedBlockData?.['@type'] === 'empty') {
-                setAddNewBlockOpened(true);
-              }
+          // Determine if this is a new block BEFORE setBlockUI to avoid nested state updates
+          // Calling onSelectBlock (which dispatches Redux action) inside setBlockUI callback
+          // causes React's "Cannot update during an existing state transition" warning
+          const isNewBlock = !blockUI || blockUI.blockUid !== event.data.blockUid;
+          console.log('[VIEW] BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
+
+          // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
+          if (isNewBlock) {
+            console.log('[VIEW] BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
+            onSelectBlock(event.data.blockUid);
+
+            // Check if selected block is an empty block - if so, open block chooser
+            // BlockChooser will dynamically decide to mutate vs insert based on selected block type
+            const selectedBlockData = getBlockByPath(
+              properties,
+              iframeSyncState.blockPathMap?.[event.data.blockUid]?.path,
+            ) || properties?.blocks?.[event.data.blockUid];
+            if (selectedBlockData?.['@type'] === 'empty') {
+              setAddNewBlockOpened(true);
             }
+          }
 
+          // Now update blockUI state
+          setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
             if (prevBlockUI &&
                 prevBlockUI.blockUid === event.data.blockUid &&
@@ -958,6 +957,7 @@ const Iframe = (props) => {
             return { ...prev, selection: newSelection };
           });
           break;
+        }
 
         case 'HIDE_BLOCK_UI':
           // Hide all block UI overlays
@@ -1156,31 +1156,6 @@ const Iframe = (props) => {
       }
     };
   }, []);
-
-  // Handle window resize to update block UI overlay positions
-  useEffect(() => {
-    const handleResize = () => {
-      // On window resize, request updated positions from iframe
-      if (blockUI && iframeOriginRef.current) {
-        const iframe = document.getElementById('previewIframe');
-        if (iframe?.contentWindow) {
-          iframe.contentWindow.postMessage(
-            {
-              type: 'REQUEST_BLOCK_RESELECT',
-              blockUid: blockUI.blockUid,
-            },
-            iframeOriginRef.current,
-          );
-        }
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [blockUI]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1417,6 +1392,14 @@ const Iframe = (props) => {
           onDeleteBlock={onDeleteBlock}
           menuButtonRect={menuButtonRect}
           onClose={() => setMenuDropdownOpen(false)}
+          onOpenSettings={() => {
+            // Expand sidebar if collapsed by clicking the trigger button
+            const sidebarContainer = document.querySelector('.sidebar-container');
+            if (sidebarContainer?.classList.contains('collapsed')) {
+              const triggerButton = sidebarContainer.querySelector('.trigger');
+              triggerButton?.click();
+            }
+          }}
         />
       )}
 
