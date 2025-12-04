@@ -428,6 +428,22 @@ const Iframe = (props) => {
     }
   }, [selectedBlock]);
 
+  // Listen for sidebar block selection events (e.g., clicking "‹ Page" header)
+  useEffect(() => {
+    const handleSelectBlock = (event) => {
+      onSelectBlock(event.detail?.blockId ?? null);
+    };
+    document.addEventListener('hydra:select-block', handleSelectBlock);
+    return () => document.removeEventListener('hydra:select-block', handleSelectBlock);
+  }, [onSelectBlock]);
+
+  // Clear blockUI when no block is selected
+  useEffect(() => {
+    if (!selectedBlock) {
+      setBlockUI(null);
+    }
+  }, [selectedBlock]);
+
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux

@@ -383,6 +383,223 @@ test.describe('Deleting Blocks from Containers', () => {
   });
 });
 
+test.describe('Hierarchical Sidebar', () => {
+  test('sticky headers remain visible when scrolling sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select the image block which has lots of fields that require scrolling
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Get the sidebar content wrapper
+    const sidebarContent = page.locator('.sidebar-content-wrapper');
+
+    // Get all sticky headers
+    const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
+    const headerCount = await stickyHeaders.count();
+
+    // Should have at least 2 headers (Page + current block)
+    expect(headerCount).toBeGreaterThanOrEqual(2);
+
+    // Scroll to bottom of sidebar
+    await sidebarContent.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await page.waitForTimeout(100);
+
+    // Get the scroll container bounds
+    const containerBounds = await sidebarContent.boundingBox();
+    expect(containerBounds).toBeTruthy();
+
+    // Verify all sticky headers are within the visible scroll viewport
+    // Each header should be positioned within the container's visible area
+    for (let i = 0; i < headerCount; i++) {
+      const header = stickyHeaders.nth(i);
+      const headerBounds = await header.boundingBox();
+      expect(headerBounds).toBeTruthy();
+
+      // Header should be within the container's visible area (not scrolled out)
+      // boundingBox uses y for top position
+      const isWithinContainer =
+        headerBounds!.y >= containerBounds!.y &&
+        headerBounds!.y < containerBounds!.y + containerBounds!.height;
+
+      expect(
+        isWithinContainer,
+        `Header ${i} should be visible within scroll container. ` +
+          `Header y: ${headerBounds!.y}, Container y: ${containerBounds!.y}, ` +
+          `Container height: ${containerBounds!.height}`,
+      ).toBe(true);
+    }
+
+    // Verify headers are stacked (each header's y position should be >= previous)
+    let previousY = containerBounds!.y;
+    for (let i = 0; i < headerCount; i++) {
+      const header = stickyHeaders.nth(i);
+      const headerBounds = await header.boundingBox();
+
+      expect(
+        headerBounds!.y >= previousY,
+        `Header ${i} should be below or at previous header position`,
+      ).toBe(true);
+
+      previousY = headerBounds!.y + headerBounds!.height;
+    }
+  });
+
+  test('child blocks widget not shown for non-container blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a leaf block (text-1a is a slate block with no children)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForSidebarOpen();
+
+    // Wait for sidebar to fully render
+    await page.waitForTimeout(300);
+
+    // The child blocks widget should NOT be visible for non-container blocks
+    const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
+
+    // Child blocks widget should NOT be visible for slate blocks (no container fields)
+    await expect(childBlocksWidget).not.toBeVisible();
+  });
+
+  test('child blocks widget shown for container blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a container block (col-1 is a column with child blocks)
+    await helper.clickBlockInIframe('col-1');
+    await helper.waitForSidebarOpen();
+
+    // Wait for sidebar to fully render
+    await page.waitForTimeout(300);
+
+    // The child blocks widget should be visible for container blocks
+    const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
+    await expect(childBlocksWidget).toBeVisible();
+
+    // Should show the child blocks (text-1a, text-1b)
+    const childItems = page.locator('#sidebar-order .child-block-item');
+    const itemCount = await childItems.count();
+    expect(itemCount).toBe(2);
+  });
+
+  test('clicking parent headers navigates up hierarchy closing children', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a deeply nested block (text-1a inside col-1 inside columns-1)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    // Should see: Page, Columns, Column, Text (4 headers)
+    let headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBeGreaterThanOrEqual(4);
+
+    // Step 1: Click "Column" header to go up one level
+    const columnHeader = page.locator(
+      '.sidebar-section-header.sticky-header .parent-nav[title="Select Column"]',
+    );
+    await expect(columnHeader).toBeVisible();
+    await columnHeader.click();
+    await page.waitForTimeout(300);
+
+    // Column is now current, Text header is gone
+    let currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"]',
+    );
+    await expect(currentHeader).toContainText(/column/i);
+    headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(3); // Page, Columns, Column
+
+    // Step 2: Click "Columns" header to go up another level
+    const columnsHeader = page.locator(
+      '.sidebar-section-header.sticky-header .parent-nav[title="Select Columns"]',
+    );
+    await expect(columnsHeader).toBeVisible();
+    await columnsHeader.click();
+    await page.waitForTimeout(300);
+
+    // Columns is now current, Column header is gone
+    currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"]',
+    );
+    await expect(currentHeader).toContainText(/columns/i);
+    headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(2); // Page, Columns
+
+    // Step 3: Click "Page" header to deselect all blocks
+    const pageHeader = page.locator(
+      '.sidebar-section-header.sticky-header.page-header .parent-nav',
+    );
+    await expect(pageHeader).toBeVisible();
+    await pageHeader.click();
+    await page.waitForTimeout(300);
+
+    // Page is current, no block headers shown
+    headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(1); // Only Page
+  });
+
+  test('clicking Page header hides selection outline, add button, and toolbar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a block
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    // Verify selection UI is visible
+    const selectionOutline = page.locator('.volto-hydra-block-outline');
+    const addButton = page.locator('.volto-hydra-add-button');
+    const toolbar = page.locator('.quanta-toolbar');
+
+    await expect(selectionOutline).toBeVisible();
+    await expect(addButton).toBeVisible();
+    // Toolbar may or may not be visible depending on block type
+
+    // Click Page header to deselect
+    const pageHeader = page.locator(
+      '.sidebar-section-header.sticky-header.page-header .parent-nav',
+    );
+    await pageHeader.click();
+    await page.waitForTimeout(300);
+
+    // Verify all selection UI is hidden
+    await expect(selectionOutline).not.toBeVisible();
+    await expect(addButton).not.toBeVisible();
+    await expect(toolbar).not.toBeVisible();
+  });
+});
+
 test.describe('Empty Block Behavior', () => {
   // Note: We use gridBlock for empty block tests because it doesn't have a defaultBlock.
   // The column block has defaultBlock: 'slate', so it creates slate blocks instead of empty.

@@ -204,8 +204,9 @@ export class AdminUIHelper {
    * Wait for the sidebar to open.
    */
   async waitForSidebarOpen(timeout: number = 5000): Promise<void> {
+    // Wait for sidebar to be open - check for the content wrapper which is always visible
     await this.page.waitForSelector(
-      '#sidebar-properties',
+      '.sidebar-content-wrapper',
       {
         state: 'visible',
         timeout,

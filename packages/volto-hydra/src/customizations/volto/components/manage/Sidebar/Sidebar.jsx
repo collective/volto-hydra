@@ -4,7 +4,7 @@
  * Based on PLIP 6569: https://github.com/plone/volto/issues/6569
  */
 
-import React, { useState, Fragment, useCallback } from 'react';
+import React, { useState, Fragment, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from 'semantic-ui-react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -17,6 +17,25 @@ import { Icon } from '@plone/volto/components';
 import expandSVG from '@plone/volto/icons/left-key.svg';
 import collapseSVG from '@plone/volto/icons/right-key.svg';
 import './Sidebar.css';
+
+/**
+ * Calculate and apply sticky header offsets for VS Code-style stacking.
+ * Each sticky header's `top` value is set to the cumulative height of
+ * all preceding sticky headers.
+ */
+const updateStickyOffsets = (containerRef) => {
+  if (!containerRef.current) return;
+
+  const stickyHeaders = containerRef.current.querySelectorAll(
+    '.sidebar-section-header.sticky-header',
+  );
+
+  let cumulativeTop = 0;
+  stickyHeaders.forEach((header) => {
+    header.style.top = `${cumulativeTop}px`;
+    cumulativeTop += header.offsetHeight;
+  });
+};
 
 const messages = defineMessages({
   page: {
@@ -38,7 +57,6 @@ const messages = defineMessages({
 });
 
 const Sidebar = (props) => {
-  const dispatch = useDispatch();
   const intl = useIntl();
   const { cookies, content } = props;
   const [expanded, setExpanded] = useState(
@@ -46,9 +64,30 @@ const Sidebar = (props) => {
   );
   const [size] = useState(0);
   const [showFull, setshowFull] = useState(true);
+  const sidebarContentRef = useRef(null);
 
   const toolbarExpanded = useSelector((state) => state.toolbar.expanded);
   const type = useSelector((state) => state.schema?.schema?.title);
+
+  // Update sticky header offsets when DOM changes
+  useEffect(() => {
+    // Initial calculation
+    updateStickyOffsets(sidebarContentRef);
+
+    // Set up MutationObserver to recalculate when headers change
+    if (sidebarContentRef.current) {
+      const observer = new MutationObserver(() => {
+        updateStickyOffsets(sidebarContentRef);
+      });
+
+      observer.observe(sidebarContentRef.current, {
+        childList: true,
+        subtree: true,
+      });
+
+      return () => observer.disconnect();
+    }
+  }, []);
 
   const onToggleExpanded = () => {
     cookies.set('sidebar_expanded', !expanded, getCookieOptions());
@@ -120,29 +159,37 @@ const Sidebar = (props) => {
         </Button>
 
         {/* Unified hierarchical sidebar content */}
-        <div className="sidebar-content-wrapper">
-          {/* Page settings section - portal target for page metadata */}
-          <div className="sidebar-section page-section">
-            <div className="sidebar-section-header sticky-header">
-              <span className="section-title">
-                {type || intl.formatMessage(messages.page)}
-              </span>
-            </div>
-            <div className="sidebar-section-content" id="sidebar-metadata">
-              {/* Page metadata fields rendered here via portal */}
-            </div>
+        <div className="sidebar-content-wrapper" ref={sidebarContentRef}>
+          {/* Page header - sticky at top */}
+          {/* When a block is selected, ParentBlocksWidget portals a clickable button into section-title */}
+          <div
+            className="sidebar-section-header sticky-header page-header"
+            data-page-type={type || intl.formatMessage(messages.page)}
+          >
+            <button
+              className="parent-nav"
+              onClick={() => document.dispatchEvent(new CustomEvent('hydra:select-block', { detail: { blockId: null } }))}
+              title="Select Page"
+            >
+              <span className="nav-prefix">‹</span>
+              <span>{type || intl.formatMessage(messages.page)}</span>
+            </button>
           </div>
 
-          {/* Parent blocks section - rendered dynamically based on selection */}
-          <div id="sidebar-parents">
-            {/* Parent block settings rendered here */}
+          {/* Page metadata - portal target */}
+          <div className="sidebar-section-content" id="sidebar-metadata">
+            {/* Page metadata fields rendered here via portal */}
           </div>
 
-          {/* Current block section - portal target for block settings */}
-          <div className="sidebar-section block-section" id="sidebar-properties-wrapper">
-            <div className="sidebar-section-content" id="sidebar-properties">
-              {/* Current block settings rendered here via portal */}
-            </div>
+          {/* Parent blocks section - rendered dynamically via portal */}
+          {/* display:contents makes this layout-transparent so sticky headers work */}
+          <div id="sidebar-parents" style={{ display: 'contents' }}>
+            {/* Parent block headers rendered here via portal */}
+          </div>
+
+          {/* Current block settings - portal target */}
+          <div className="sidebar-section-content" id="sidebar-properties">
+            {/* Current block settings rendered here via portal */}
           </div>
 
           {/* Child blocks widget - portal target for nested blocks list */}

@@ -128,8 +128,8 @@ const ParentBlocksWidget = ({
   if (!isClient) return null;
   if (!selectedBlock) return null;
 
-  const target = document.getElementById('sidebar-parents');
-  if (!target) return null;
+  const parentsTarget = document.getElementById('sidebar-parents');
+  if (!parentsTarget) return null;
 
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
@@ -138,38 +138,38 @@ const ParentBlocksWidget = ({
   const currentBlockData = getBlockData(selectedBlock, formData, blockPathMap);
   const currentBlockType = currentBlockData?.['@type'];
 
-  return createPortal(
+  return (
     <>
-      {/* Parent blocks - each with navigation header */}
-      {parentIds.map((parentId) => {
-        const parentData = getBlockData(parentId, formData, blockPathMap);
-        const parentType = parentData?.['@type'];
 
-        return (
-          <div key={parentId} className="sidebar-section parent-block-section">
-            <ParentBlockHeader
-              blockId={parentId}
-              blockType={parentType}
-              isCurrentBlock={false}
-              onSelectBlock={onSelectBlock}
-            />
-            {/* Parent block settings would go here if we had them */}
-            {/* For now, just show the header for navigation */}
-          </div>
-        );
-      })}
+      {/* Parent blocks - headers only, no wrappers for sticky to work */}
+      {createPortal(
+        <>
+          {parentIds.map((parentId) => {
+            const parentData = getBlockData(parentId, formData, blockPathMap);
+            const parentType = parentData?.['@type'];
 
-      {/* Current block header */}
-      <div className="sidebar-section current-block-section">
-        <ParentBlockHeader
-          blockId={selectedBlock}
-          blockType={currentBlockType}
-          isCurrentBlock={true}
-          onSelectBlock={onSelectBlock}
-        />
-      </div>
-    </>,
-    target,
+            return (
+              <ParentBlockHeader
+                key={parentId}
+                blockId={parentId}
+                blockType={parentType}
+                isCurrentBlock={false}
+                onSelectBlock={onSelectBlock}
+              />
+            );
+          })}
+
+          {/* Current block header - direct child for sticky stacking */}
+          <ParentBlockHeader
+            blockId={selectedBlock}
+            blockType={currentBlockType}
+            isCurrentBlock={true}
+            onSelectBlock={onSelectBlock}
+          />
+        </>,
+        parentsTarget,
+      )}
+    </>
   );
 };
 
