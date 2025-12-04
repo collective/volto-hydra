@@ -244,6 +244,50 @@ test.describe('Adding Blocks to Containers', () => {
       .count();
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
+
+  test('pressing Enter in nested block adds new block to container, not page', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    const initialCol1Blocks = await iframe
+      .locator('[data-block-uid="col-1"] > [data-block-uid]')
+      .count();
+    expect(initialCol1Blocks).toBe(2);
+
+    // Count initial page-level blocks
+    const initialPageBlocks = await iframe
+      .locator('#content > [data-block-uid]')
+      .count();
+
+    // Click on text-1a to edit it and get the editor
+    const editor = await helper.enterEditMode('text-1a');
+
+    // Move cursor to end and press Enter to split/add new block
+    await helper.moveCursorToEnd(editor);
+    await page.keyboard.press('Enter');
+
+    // Wait for the new block to appear
+    await page.waitForTimeout(500);
+
+    // col-1 should now have 3 blocks (text-1a was split, creating a new block)
+    const finalCol1Blocks = await iframe
+      .locator('[data-block-uid="col-1"] > [data-block-uid]')
+      .count();
+    expect(finalCol1Blocks).toBe(3);
+
+    // Page-level blocks should be unchanged - the new block should be in the container
+    const finalPageBlocks = await iframe
+      .locator('#content > [data-block-uid]')
+      .count();
+    expect(finalPageBlocks).toBe(initialPageBlocks);
+  });
 });
 
 test.describe('Add Button Direction', () => {

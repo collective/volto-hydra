@@ -5,11 +5,6 @@ import Cookies from 'js-cookie';
 import { Node } from 'slate';
 import {
   applyBlockDefaults,
-  deleteBlock,
-  getBlocksFieldname,
-  getBlocksLayoutFieldname,
-  insertBlock,
-  moveBlock,
   previousBlockId,
 } from '@plone/volto/helpers';
 
@@ -38,8 +33,6 @@ function isSelectionValidForValue(selection, slateValue) {
 import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
-import { buttons as slateButtons } from '@plone/volto-slate/editor/config';
-import isValidUrl from '../../utils/isValidUrl';
 import { BlockChooser } from '@plone/volto/components';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
@@ -420,7 +413,7 @@ const Iframe = (props) => {
   });
 
   useEffect(() => {
-    // Only send SELECT_BLOCK if iframe is ready (has sent GET_INITIAL_DATA)
+    // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
     if (iframeOriginRef.current && selectedBlock) {
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         {
@@ -634,60 +627,6 @@ const Iframe = (props) => {
 
           break;
 
-        case 'FRONTEND_INIT':
-          // Combined initialization from frontend - process in correct order:
-          // 1. First merge voltoConfig (adds custom block definitions)
-          // 2. Then set allowedBlocks (triggers updateAllowedBlocks with all blocks)
-          // 3. Re-extract and send updated blockFieldTypes to iframe
-          if (event.data.voltoConfig) {
-            // Inject NoPreview view for frontend blocks that don't have one
-            // This prevents React errors when Volto tries to render previews
-            // for blocks with Slate values or other non-serializable content
-            const frontendConfig = event.data.voltoConfig;
-            if (frontendConfig?.blocks?.blocksConfig) {
-              Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
-                const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
-                if (blockConfig && !blockConfig.view) {
-                  blockConfig.view = NoPreview;
-                }
-              });
-            }
-            recurseUpdateVoltoConfig(frontendConfig);
-
-            // Debug: check if hero block was merged
-            console.log('[VIEW] After merge, blocksConfig keys:', Object.keys(config.blocks?.blocksConfig || {}));
-            console.log('[VIEW] Hero block config:', config.blocks?.blocksConfig?.hero);
-            console.log('[VIEW] Hero blockSchema:', config.blocks?.blocksConfig?.hero?.blockSchema);
-            console.log('[VIEW] Hero blockSchema properties:', config.blocks?.blocksConfig?.hero?.blockSchema?.properties);
-
-            // Re-extract blockFieldTypes now that config has custom blocks
-            const updatedBlockFieldTypes = extractBlockFieldTypes(intl);
-            console.log('[VIEW] Extracted blockFieldTypes:', updatedBlockFieldTypes);
-
-            // Store updated types in state so toolbar can use them
-            setBlockFieldTypes(updatedBlockFieldTypes);
-
-            // Rebuild blockPathMap now that custom blocks are registered
-            // This is needed because initial buildBlockPathMap ran before FRONTEND_INIT
-            setIframeSyncState(prev => ({
-              ...prev,
-              blockPathMap: buildBlockPathMap(prev.formData, config.blocks.blocksConfig),
-            }));
-
-            // Send updated types to iframe
-            event.source.postMessage(
-              {
-                type: 'UPDATE_BLOCK_FIELD_TYPES',
-                blockFieldTypes: updatedBlockFieldTypes,
-              },
-              event.origin,
-            );
-          }
-          if (event.data.allowedBlocks) {
-            validateFrontendConfig(event.data, config.blocks.blocksConfig);
-            setAllowedBlocksList(event.data.allowedBlocks);
-          }
-          break;
 
         case 'VOLTO_CONFIG':
           // Legacy handler for backwards compatibility
@@ -830,27 +769,40 @@ const Iframe = (props) => {
                 enterSelection,
               );
 
-              // Create new form data with updated blocks
-              const newFormData = { ...formToUseForEnter };
-              const blocksFieldname = getBlocksFieldname(newFormData);
+              // Check if this block is inside a container
+              const containerConfig = getContainerFieldConfig(
+                enterBlockId,
+                enterBlockPathMap,
+                formToUseForEnter,
+                config.blocks.blocksConfig,
+              );
 
               // Update current block with content before cursor
-              newFormData[blocksFieldname][enterBlockId] = {
+              const updatedCurrentBlock = {
                 ...currentBlock,
                 [enterFieldName]: topValue,
               };
+              let newFormData = mutateBlockInContainer(
+                formToUseForEnter,
+                enterBlockPathMap,
+                enterBlockId,
+                updatedCurrentBlock,
+                containerConfig,
+              );
 
               // Create new block with content after cursor
-              const [newBlockId, updatedFormData] = insertBlock(
+              const newBlockId = uuid();
+              const newBlockData = {
+                '@type': blockType,
+                [enterFieldName]: bottomValue,
+              };
+              const updatedFormData = insertBlockInContainer(
                 newFormData,
+                enterBlockPathMap,
                 enterBlockId,
-                {
-                  '@type': blockType,
-                  [enterFieldName]: bottomValue,
-                },
-                {},
-                1,
-                config.blocks.blocksConfig,
+                newBlockId,
+                newBlockData,
+                containerConfig,
               );
 
               // Update Redux state
@@ -859,8 +811,9 @@ const Iframe = (props) => {
 
               // Send FORM_DATA message to trigger iframe re-render with new block
               if (iframeOriginRef.current) {
+                const updatedBlockPathMap = buildBlockPathMap(updatedFormData, config.blocks.blocksConfig);
                 event.source.postMessage(
-                  { type: 'FORM_DATA', data: updatedFormData, formatRequestId: enterRequestId },
+                  { type: 'FORM_DATA', data: updatedFormData, blockPathMap: updatedBlockPathMap, formatRequestId: enterRequestId },
                   event.origin,
                 );
               }
@@ -993,21 +946,51 @@ const Iframe = (props) => {
           setBlockUI(null);
           break;
 
-        case 'GET_INITIAL_DATA':
-          // Store the iframe's actual origin when it first contacts us
+        case 'INIT':
+          // Combined initialization: merge config first, then send data
+          // This ensures blockPathMap is built with complete schema knowledge
           iframeOriginRef.current = event.origin;
 
-          // Extract block field types from schema registry (maps blockType -> fieldName -> fieldType)
-          // Use different name to avoid shadowing outer blockFieldTypes (causes temporal dead zone)
+          // 1. Merge voltoConfig (adds custom block definitions)
+          if (event.data.voltoConfig) {
+            const frontendConfig = event.data.voltoConfig;
+            // Inject NoPreview view for frontend blocks that don't have one
+            if (frontendConfig?.blocks?.blocksConfig) {
+              Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
+                const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
+                if (blockConfig && !blockConfig.view) {
+                  blockConfig.view = NoPreview;
+                }
+              });
+            }
+            recurseUpdateVoltoConfig(frontendConfig);
+          }
+
+          // 2. Set allowedBlocks
+          if (event.data.allowedBlocks) {
+            validateFrontendConfig(event.data, config.blocks.blocksConfig);
+            setAllowedBlocksList(event.data.allowedBlocks);
+          }
+
+          // 3. Extract block field types (now includes custom blocks)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl);
+          setBlockFieldTypes(initialBlockFieldTypes);
 
+          // 4. Build blockPathMap (now has complete schema knowledge)
+          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig);
+          setIframeSyncState(prev => ({
+            ...prev,
+            blockPathMap: initialBlockPathMap,
+          }));
+
+          // 5. Send everything to iframe
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
-
           event.source.postMessage(
             {
               type: 'INITIAL_DATA',
               data: form,
               blockFieldTypes: initialBlockFieldTypes,
+              blockPathMap: initialBlockPathMap,
               slateConfig: {
                 hotkeys: config.settings.slate?.hotkeys || {},
                 toolbarButtons,
@@ -1015,8 +998,6 @@ const Iframe = (props) => {
             },
             event.origin,
           );
-          // Don't send SELECT_BLOCK here - let the useEffect handle it after content is rendered
-          // The useEffect at line ~375 will send SELECT_BLOCK once iframe is ready and content is rendered
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -1087,6 +1068,7 @@ const Iframe = (props) => {
       const message = {
         type: 'FORM_DATA',
         data: iframeSyncState.formData,
+        blockPathMap: iframeSyncState.blockPathMap,
         formatRequestId: iframeSyncState.toolbarRequestDone,
       };
       if (iframeSyncState.selection) {
@@ -1115,7 +1097,10 @@ const Iframe = (props) => {
       return;
     }
     if (iframeOriginRef.current && formToUse) {
-      const message = { type: 'FORM_DATA', data: formToUse };
+      const updatedBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig);
+      console.log('[VIEW] Sending FORM_DATA with blockPathMap keys:', Object.keys(updatedBlockPathMap));
+      console.log('[VIEW] blockPathMap for text-1a:', updatedBlockPathMap['text-1a']);
+      const message = { type: 'FORM_DATA', data: formToUse, blockPathMap: updatedBlockPathMap };
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
