@@ -123,11 +123,16 @@ function loadInitialContent() {
     'description': '',
     'items': [],
     'items_total': 0,
+    'is_folderish': true,
     '@components': {
       'actions': {
         '@id': 'http://localhost:8888/@actions',
         'document_actions': [],
-        'object': [],
+        'object': [
+          { 'id': 'view', 'title': 'View' },
+          { 'id': 'edit', 'title': 'Edit' },
+          { 'id': 'folderContents', 'title': 'Contents' }
+        ],
         'object_buttons': [],
         'portal_tabs': [],
         'site_actions': [],
@@ -487,6 +492,74 @@ app.get('*/@search', (req, res) => {
       'next': null,
       'prev': null,
     },
+  });
+});
+
+/**
+ * GET /:path/@contents or /@contents
+ * Get folder contents for content browsing
+ * Returns items at the parent folder level (siblings of current content)
+ */
+app.get('*/@contents', (req, res) => {
+  const contentPath = req.path.replace('/@contents', '') || '/';
+
+  // For Documents, we return siblings (contents of parent folder)
+  // For the site root, we return all root-level items
+  let items;
+
+  if (contentPath === '' || contentPath === '/') {
+    // Root level - return all root-level items
+    items = Object.entries(contentDB)
+      .filter(([path]) => {
+        if (path === '/') return false;
+        const pathParts = path.split('/').filter(p => p);
+        return pathParts.length === 1;
+      })
+      .map(([_path, content]) => ({
+        '@id': content['@id'],
+        '@type': content['@type'],
+        'id': content.id,
+        'title': content.title,
+        'description': content.description || '',
+        'review_state': content.review_state || 'published',
+        'UID': content.UID,
+        'is_folderish': content.is_folderish || false,
+      }));
+  } else {
+    // Get parent folder's contents (siblings of this content)
+    const pathParts = contentPath.split('/').filter(p => p);
+    const parentPath = pathParts.length > 1
+      ? '/' + pathParts.slice(0, -1).join('/')
+      : '/';
+
+    items = Object.entries(contentDB)
+      .filter(([itemPath]) => {
+        if (itemPath === '/') return false;
+        const itemParts = itemPath.split('/').filter(p => p);
+        // Same depth as current content and same parent
+        if (parentPath === '/') {
+          return itemParts.length === 1;
+        } else {
+          return itemPath.startsWith(parentPath + '/') &&
+                 itemParts.length === pathParts.length;
+        }
+      })
+      .map(([_path, content]) => ({
+        '@id': content['@id'],
+        '@type': content['@type'],
+        'id': content.id,
+        'title': content.title,
+        'description': content.description || '',
+        'review_state': content.review_state || 'published',
+        'UID': content.UID,
+        'is_folderish': content.is_folderish || false,
+      }));
+  }
+
+  res.json({
+    '@id': `http://localhost:8888${contentPath}/@contents`,
+    'items': items,
+    'items_total': items.length,
   });
 });
 

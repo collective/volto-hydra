@@ -86,7 +86,7 @@
     "actions": {
       "@id": "http://localhost:8888/container-test-page/@actions",
       "document_actions": [],
-      "object": [{"id": "edit", "title": "Edit"}],
+      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
       "object_buttons": [],
       "portal_tabs": [],
       "site_actions": [],
