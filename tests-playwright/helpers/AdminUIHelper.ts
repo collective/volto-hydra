@@ -800,18 +800,45 @@ export class AdminUIHelper {
         };
       }
 
-      // Check if outline is horizontally aligned with block
-      // Note: outline is a bottom border, so we only check X alignment
-      // The outline's Y will be at the block's bottom, not center
-      const blockCenterX = blockBox.x + blockBox.width / 2;
-      const outlineCenterX = outlineBox.x + outlineBox.width / 2;
-      const centerXDiff = Math.abs(blockCenterX - outlineCenterX);
+      // Check if outline covers this specific block
+      // Outline is either a full box around the block, or a bottom line
+      const tolerance = 20;
 
-      if (centerXDiff > 50) {
+      // Check horizontal alignment (X and width should match)
+      const xDiff = Math.abs(blockBox.x - outlineBox.x);
+      const widthDiff = Math.abs(blockBox.width - outlineBox.width);
+
+      if (xDiff > tolerance || widthDiff > tolerance) {
         return {
           ok: false,
-          reason: `Outline not horizontally aligned with block. Block X: ${blockCenterX.toFixed(0)}, Outline X: ${outlineCenterX.toFixed(0)}, diff: ${centerXDiff.toFixed(0)}`,
+          reason: `Outline not horizontally aligned. Block: x=${blockBox.x.toFixed(0)} w=${blockBox.width.toFixed(0)}, Outline: x=${outlineBox.x.toFixed(0)} w=${outlineBox.width.toFixed(0)}`,
         };
+      }
+
+      // Check vertical alignment
+      // If outline is a full box: top should match block top, height should match
+      // If outline is a bottom line: top should be at block bottom
+      const isFullBox = outlineBox.height > 10;
+      if (isFullBox) {
+        // Full box - should surround the block
+        const topDiff = Math.abs(blockBox.y - outlineBox.y);
+        const heightDiff = Math.abs(blockBox.height - outlineBox.height);
+        if (topDiff > tolerance || heightDiff > tolerance) {
+          return {
+            ok: false,
+            reason: `Outline box not around block. Block: y=${blockBox.y.toFixed(0)} h=${blockBox.height.toFixed(0)}, Outline: y=${outlineBox.y.toFixed(0)} h=${outlineBox.height.toFixed(0)}`,
+          };
+        }
+      } else {
+        // Bottom line - should be at block's bottom edge
+        const blockBottom = blockBox.y + blockBox.height;
+        const bottomDiff = Math.abs(blockBottom - outlineBox.y);
+        if (bottomDiff > tolerance) {
+          return {
+            ok: false,
+            reason: `Outline line not at block bottom. Block bottom: ${blockBottom.toFixed(0)}, Outline Y: ${outlineBox.y.toFixed(0)}, diff: ${bottomDiff.toFixed(0)}`,
+          };
+        }
       }
 
       return { ok: true };

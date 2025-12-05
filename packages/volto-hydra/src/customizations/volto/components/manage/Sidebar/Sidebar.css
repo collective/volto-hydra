@@ -80,6 +80,25 @@
   padding: 0;
 }
 
+/* Sidebar close button in page header */
+.hydra-sidebar .sidebar-close-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #666;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.hydra-sidebar .sidebar-close-button:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
 /* Page section specific styles */
 .hydra-sidebar .page-section .sidebar-section-content {
   padding: 0;
@@ -206,4 +225,9 @@
 
 .hydra-sidebar #sidebar-metadata .ui.styled.accordion .content {
   padding: 16px;
+}
+
+/* Hide the duplicate block header from InlineForm - we have our own in ParentBlocksWidget */
+.hydra-sidebar #sidebar-properties .header.pulled {
+  display: none;
 }

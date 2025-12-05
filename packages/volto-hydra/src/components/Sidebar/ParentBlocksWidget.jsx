@@ -1,14 +1,13 @@
 /**
  * ParentBlocksWidget - Renders parent block settings in the sidebar.
- * Shows the chain of parent containers from root to the immediate parent.
+ * Shows the chain of parent containers from root to the current block.
+ *
+ * The ‹ arrow always navigates UP one level (selects parent, closes current).
  *
  * Example hierarchy for text-1a inside col-1 inside columns-1:
- *   < Columns     [...]   ← Click to select columns-1
- *     [columns settings]
- *   < Column      [...]   ← Click to select col-1
- *     [column settings]
- *   Slate         [...]   ← Current block (highlighted)
- *     [slate settings rendered via sidebar-properties portal]
+ *   ‹ Columns     [...]   ← Click ‹ to deselect (go to page)
+ *   ‹ Column      [...]   ← Click ‹ to select columns-1
+ *   ‹ Text        [...]   ← Click ‹ to select col-1 (current block, highlighted)
  */
 
 import React from 'react';
@@ -74,10 +73,11 @@ const getBlockData = (blockId, formData, blockPathMap) => {
 
 /**
  * Single parent block section header
+ * Arrow (‹) always navigates UP to parentId (closes this block, selects parent)
  */
 const ParentBlockHeader = ({
-  blockId,
   blockType,
+  parentId,
   isCurrentBlock,
   onSelectBlock,
 }) => {
@@ -88,18 +88,17 @@ const ParentBlockHeader = ({
       className="sidebar-section-header sticky-header"
       data-is-current={isCurrentBlock}
     >
-      {isCurrentBlock ? (
-        <span className="section-title">{title}</span>
-      ) : (
-        <button
-          className="parent-nav"
-          onClick={() => onSelectBlock(blockId)}
-          title={`Select ${title}`}
-        >
-          <span className="nav-prefix">‹</span>
-          <span>{title}</span>
-        </button>
-      )}
+      <button
+        className="parent-nav"
+        onClick={() => {
+          console.log('[PARENT_NAV] Arrow clicked, navigating to parent:', parentId, 'from block type:', blockType);
+          onSelectBlock(parentId);
+        }}
+        title={parentId ? `Go to parent` : 'Deselect block'}
+      >
+        <span className="nav-prefix">‹</span>
+        <span>{title}</span>
+      </button>
       <div className="block-actions-menu">
         <button className="menu-trigger" title="Block actions">
           •••
@@ -144,25 +143,27 @@ const ParentBlocksWidget = ({
       {/* Parent blocks - headers only, no wrappers for sticky to work */}
       {createPortal(
         <>
-          {parentIds.map((parentId) => {
+          {parentIds.map((parentId, index) => {
             const parentData = getBlockData(parentId, formData, blockPathMap);
             const parentType = parentData?.['@type'];
+            // Parent of this parent (or null if root)
+            const grandparentId = index > 0 ? parentIds[index - 1] : null;
 
             return (
               <ParentBlockHeader
                 key={parentId}
-                blockId={parentId}
                 blockType={parentType}
+                parentId={grandparentId}
                 isCurrentBlock={false}
                 onSelectBlock={onSelectBlock}
               />
             );
           })}
 
-          {/* Current block header - direct child for sticky stacking */}
+          {/* Current block header - arrow navigates to immediate parent */}
           <ParentBlockHeader
-            blockId={selectedBlock}
             blockType={currentBlockType}
+            parentId={parentIds.length > 0 ? parentIds[parentIds.length - 1] : null}
             isCurrentBlock={true}
             onSelectBlock={onSelectBlock}
           />

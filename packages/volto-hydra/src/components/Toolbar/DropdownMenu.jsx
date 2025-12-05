@@ -12,6 +12,7 @@ const DropdownMenu = ({
   onDeleteBlock,
   menuButtonRect,
   onClose,
+  onOpenSettings,
 }) => {
   if (!menuButtonRect) {
     return null;
@@ -19,7 +20,10 @@ const DropdownMenu = ({
 
   const handleSettings = () => {
     onClose();
-    // TODO: Open settings sidebar
+    // Open/expand the sidebar if collapsed
+    if (onOpenSettings) {
+      onOpenSettings();
+    }
   };
 
   const handleRemove = () => {

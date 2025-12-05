@@ -16,6 +16,7 @@ import { BodyClass, getCookieOptions } from '@plone/volto/helpers';
 import { Icon } from '@plone/volto/components';
 import expandSVG from '@plone/volto/icons/left-key.svg';
 import collapseSVG from '@plone/volto/icons/right-key.svg';
+import clearSVG from '@plone/volto/icons/clear.svg';
 import './Sidebar.css';
 
 /**
@@ -53,6 +54,10 @@ const messages = defineMessages({
   blocks: {
     id: 'Blocks',
     defaultMessage: 'Blocks',
+  },
+  closeSidebar: {
+    id: 'Close sidebar',
+    defaultMessage: 'Close sidebar',
   },
 });
 
@@ -160,19 +165,21 @@ const Sidebar = (props) => {
 
         {/* Unified hierarchical sidebar content */}
         <div className="sidebar-content-wrapper" ref={sidebarContentRef}>
-          {/* Page header - sticky at top */}
-          {/* When a block is selected, ParentBlocksWidget portals a clickable button into section-title */}
+          {/* Page header - sticky at top, static text (deselect via block arrows) */}
           <div
             className="sidebar-section-header sticky-header page-header"
             data-page-type={type || intl.formatMessage(messages.page)}
           >
+            <span className="section-title">
+              {type || intl.formatMessage(messages.page)}
+            </span>
             <button
-              className="parent-nav"
-              onClick={() => document.dispatchEvent(new CustomEvent('hydra:select-block', { detail: { blockId: null } }))}
-              title="Select Page"
+              className="sidebar-close-button"
+              onClick={onToggleExpanded}
+              aria-label={intl.formatMessage(messages.closeSidebar)}
+              title={intl.formatMessage(messages.closeSidebar)}
             >
-              <span className="nav-prefix">‹</span>
-              <span>{type || intl.formatMessage(messages.page)}</span>
+              <Icon name={clearSVG} size="24px" />
             </button>
           </div>
 

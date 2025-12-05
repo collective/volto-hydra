@@ -494,7 +494,7 @@ test.describe('Hierarchical Sidebar', () => {
     expect(itemCount).toBe(2);
   });
 
-  test('clicking parent headers navigates up hierarchy closing children', async ({
+  test('clicking arrow on headers navigates up to parent', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -513,16 +513,16 @@ test.describe('Hierarchical Sidebar', () => {
       .count();
     expect(headerCount).toBeGreaterThanOrEqual(4);
 
-    // Step 1: Click "Column" header to go up one level
-    const columnHeader = page.locator(
-      '.sidebar-section-header.sticky-header .parent-nav[title="Select Column"]',
+    // Step 1: Click current "Text" header arrow to go up to Column
+    let currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await expect(columnHeader).toBeVisible();
-    await columnHeader.click();
+    await expect(currentHeader).toContainText(/text/i);
+    await currentHeader.click();
     await page.waitForTimeout(300);
 
     // Column is now current, Text header is gone
-    let currentHeader = page.locator(
+    currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"]',
     );
     await expect(currentHeader).toContainText(/column/i);
@@ -531,12 +531,11 @@ test.describe('Hierarchical Sidebar', () => {
       .count();
     expect(headerCount).toBe(3); // Page, Columns, Column
 
-    // Step 2: Click "Columns" header to go up another level
-    const columnsHeader = page.locator(
-      '.sidebar-section-header.sticky-header .parent-nav[title="Select Columns"]',
+    // Step 2: Click current "Column" header arrow to go up to Columns
+    const columnHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await expect(columnsHeader).toBeVisible();
-    await columnsHeader.click();
+    await columnHeader.click();
     await page.waitForTimeout(300);
 
     // Columns is now current, Column header is gone
@@ -549,22 +548,21 @@ test.describe('Hierarchical Sidebar', () => {
       .count();
     expect(headerCount).toBe(2); // Page, Columns
 
-    // Step 3: Click "Page" header to deselect all blocks
-    const pageHeader = page.locator(
-      '.sidebar-section-header.sticky-header.page-header .parent-nav',
+    // Step 3: Click current "Columns" header arrow to deselect
+    const columnsHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await expect(pageHeader).toBeVisible();
-    await pageHeader.click();
+    await columnsHeader.click();
     await page.waitForTimeout(300);
 
-    // Page is current, no block headers shown
+    // No block selected, only Page header shown
     headerCount = await page
       .locator('.sidebar-section-header.sticky-header')
       .count();
     expect(headerCount).toBe(1); // Only Page
   });
 
-  test('clicking Page header hides selection outline, add button, and toolbar', async ({
+  test('clicking block arrow to deselect hides selection outline and add button', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -572,31 +570,94 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    // Select a block
-    await helper.clickBlockInIframe('text-1a');
+    // Select a top-level block (columns-1)
+    await helper.clickBlockInIframe('columns-1');
     await helper.waitForSidebarOpen();
     await page.waitForTimeout(300);
 
     // Verify selection UI is visible
     const selectionOutline = page.locator('.volto-hydra-block-outline');
     const addButton = page.locator('.volto-hydra-add-button');
-    const toolbar = page.locator('.quanta-toolbar');
 
     await expect(selectionOutline).toBeVisible();
     await expect(addButton).toBeVisible();
-    // Toolbar may or may not be visible depending on block type
 
-    // Click Page header to deselect
-    const pageHeader = page.locator(
-      '.sidebar-section-header.sticky-header.page-header .parent-nav',
+    // Click current block's arrow to deselect (Columns has no parent)
+    const currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await pageHeader.click();
+    await currentHeader.click();
     await page.waitForTimeout(300);
 
     // Verify all selection UI is hidden
     await expect(selectionOutline).not.toBeVisible();
     await expect(addButton).not.toBeVisible();
-    await expect(toolbar).not.toBeVisible();
+  });
+
+  test('clicking close button in Page header collapses sidebar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.waitForSidebarOpen();
+
+    // Verify sidebar is visible and expanded
+    const sidebarContainer = page.locator('.sidebar-container');
+    await expect(sidebarContainer).toBeVisible();
+    await expect(sidebarContainer).not.toHaveClass(/collapsed/);
+
+    // Click the close button in Page header
+    const closeButton = page.locator('.sidebar-close-button');
+    await expect(closeButton).toBeVisible();
+    await closeButton.click();
+
+    // Wait for sidebar to collapse
+    await page.waitForTimeout(300);
+
+    // Verify sidebar is collapsed
+    await expect(sidebarContainer).toHaveClass(/collapsed/);
+  });
+
+  test('toolbar position updates after sidebar toggle', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.waitForSidebarOpen();
+
+    // Select a block to show toolbar
+    await helper.clickBlockInIframe('text-after');
+    await page.waitForTimeout(300);
+
+    // Verify block is properly selected with correct positioning
+    const initialResult = await helper.isBlockSelectedInIframe('text-after');
+    expect(initialResult.ok, `Initial selection failed: ${initialResult.reason}`).toBe(true);
+
+    // Close sidebar
+    const closeButton = page.locator('.sidebar-close-button');
+    await closeButton.click();
+    await page.waitForTimeout(500); // Wait for resize
+
+    // Verify positioning is still correct after sidebar close
+    const afterCloseResult = await helper.isBlockSelectedInIframe('text-after');
+    expect(
+      afterCloseResult.ok,
+      `After sidebar close: ${afterCloseResult.reason}`,
+    ).toBe(true);
+
+    // Re-open sidebar
+    const triggerButton = page.locator('.sidebar-container .trigger');
+    await triggerButton.click();
+    await page.waitForTimeout(500); // Wait for resize
+
+    // Verify positioning is still correct after sidebar reopen
+    const afterReopenResult = await helper.isBlockSelectedInIframe('text-after');
+    expect(
+      afterReopenResult.ok,
+      `After sidebar reopen: ${afterReopenResult.reason}`,
+    ).toBe(true);
   });
 });
 
