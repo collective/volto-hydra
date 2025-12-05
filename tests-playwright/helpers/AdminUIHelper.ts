@@ -204,8 +204,9 @@ export class AdminUIHelper {
    * Wait for the sidebar to open.
    */
   async waitForSidebarOpen(timeout: number = 5000): Promise<void> {
+    // Wait for sidebar to be open - check for the content wrapper which is always visible
     await this.page.waitForSelector(
-      '#sidebar-properties',
+      '.sidebar-content-wrapper',
       {
         state: 'visible',
         timeout,
@@ -215,33 +216,33 @@ export class AdminUIHelper {
 
   /**
    * Open a specific sidebar tab (Page, Block, Order, etc.)
-   * Matches Cypress pattern: .sidebar-container .tabs-wrapper .menu .item
+   *
+   * Note: The Hydra sidebar uses a unified hierarchical view without tabs.
+   * This method is kept for backwards compatibility and scrolls to the
+   * appropriate section:
+   * - "Block": Scrolls to block settings (#sidebar-properties)
+   * - "Page"/"Document": Scrolls to top for page metadata (#sidebar-metadata)
+   * - "Order": Scrolls to child blocks widget at bottom (#sidebar-children)
    */
   async openSidebarTab(tabName: string): Promise<void> {
-    const tab = this.page.locator('.sidebar-container .tabs-wrapper .menu .item', {
-      hasText: tabName
-    });
+    // Map tab names to their portal target IDs
+    const tabToSelector: Record<string, string> = {
+      Block: '#sidebar-properties',
+      Page: '#sidebar-metadata',
+      Document: '#sidebar-metadata',
+      Order: '#sidebar-order',
+    };
 
-    // Check if tab exists
-    const tabCount = await tab.count();
-    if (tabCount === 0) {
-      throw new Error(
-        `Sidebar tab "${tabName}" not found. ` +
-        `Check that the sidebar is open and the tab name is correct. ` +
-        `Available tabs are typically: Page, Block, Order.`
-      );
+    const selector = tabToSelector[tabName];
+    if (selector) {
+      const section = this.page.locator(selector);
+      // Wait for the section to exist
+      await section.waitFor({ state: 'attached', timeout: 5000 });
+      // Scroll to the section
+      await section.scrollIntoViewIfNeeded();
+      // Brief wait for scroll to complete
+      await this.page.waitForTimeout(100);
     }
-
-    // Verify tab is visible
-    try {
-      await tab.waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-      throw new Error(`Sidebar tab "${tabName}" exists but is not visible. Check sidebar state.`);
-    }
-
-    await tab.click();
-    // Wait for tab content to load
-    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -355,6 +356,9 @@ export class AdminUIHelper {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
+      if (res && !res.ok && res.reason) {
+        console.log(`[TEST] isBlockSelectedInIframe failed: ${res.reason}`);
+      }
       return !!res && !!res.ok;
     }, { timeout }).toBeTruthy();
 
@@ -407,7 +411,7 @@ export class AdminUIHelper {
     await this.waitForQuantaToolbar(blockId);
 
     const menuButton = await this.getMenuButtonInQuantaToolbar(blockId, 'options');
-    menuButton.click();
+    await menuButton.click();
 
     // Wait for dropdown to appear
     const dropdown = this.page.locator(
@@ -770,47 +774,71 @@ export class AdminUIHelper {
    */
   async isBlockSelectedInIframe(blockId: string): Promise<{ ok: boolean; reason?: string }> {
     try {
-      // Verify all UI overlays are visible
+      // Verify essential UI overlays are visible (toolbar and outline)
+      // Note: add button visibility/positioning is checked separately by verifyBlockUIPositioning
       const toolbar = this.page.locator('.quanta-toolbar');
       const outline = this.page.locator('.volto-hydra-block-outline');
-      const addButton = this.page.locator('.volto-hydra-add-button');
 
       const toolbarVisible = await toolbar.isVisible();
       const outlineVisible = await outline.isVisible();
-      const addButtonVisible = await addButton.isVisible();
 
-      if (!toolbarVisible || !outlineVisible || !addButtonVisible) {
+      if (!toolbarVisible || !outlineVisible) {
         return {
           ok: false,
-          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}, addButton=${addButtonVisible}`,
+          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}`,
         };
       }
 
-      // Verify positioning is correct
-      const positions = await this.verifyBlockUIPositioning(blockId);
+      // Verify the outline covers THIS specific block
+      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      const outlineBox = await this.getBlockOutlineBoundingBox();
 
-      // Toolbar positioning: Can overlap the block top (negative is OK)
-      // Generous tolerance for CI browser differences (within -100px to +100px)
-      const toolbarPositioned = positions.toolbarAboveBlock > -100 && positions.toolbarAboveBlock < 100;
-
-      // Add button should be ~8px below block (allow generous tolerance for CI browser differences)
-      const addButtonPositioned = positions.addButtonBelowBlock >= -20 && positions.addButtonBelowBlock < 50;
-
-      // Horizontal alignment check: tolerate small misalignments since toolbar is positioned
-      // Note: the toolbar is aligned with the block not the field!
-      const aligned = true; // Skip strict alignment check for now
-
-      if (!toolbarPositioned) {
+      if (!blockBox || !outlineBox) {
         return {
           ok: false,
-          reason: `Toolbar not positioned correctly: toolbarAboveBlock=${positions.toolbarAboveBlock} (expected -100 to 100)`,
+          reason: `Missing bounding boxes: block=${!!blockBox}, outline=${!!outlineBox}`,
         };
       }
-      if (!addButtonPositioned) {
+
+      // Check if outline covers this specific block
+      // Outline is either a full box around the block, or a bottom line
+      const tolerance = 20;
+
+      // Check horizontal alignment (X and width should match)
+      const xDiff = Math.abs(blockBox.x - outlineBox.x);
+      const widthDiff = Math.abs(blockBox.width - outlineBox.width);
+
+      if (xDiff > tolerance || widthDiff > tolerance) {
         return {
           ok: false,
-          reason: `Add button not positioned correctly: addButtonBelowBlock=${positions.addButtonBelowBlock} (expected -20 to 50)`,
+          reason: `Outline not horizontally aligned. Block: x=${blockBox.x.toFixed(0)} w=${blockBox.width.toFixed(0)}, Outline: x=${outlineBox.x.toFixed(0)} w=${outlineBox.width.toFixed(0)}`,
         };
+      }
+
+      // Check vertical alignment
+      // If outline is a full box: top should match block top, height should match
+      // If outline is a bottom line: top should be at block bottom
+      const isFullBox = outlineBox.height > 10;
+      if (isFullBox) {
+        // Full box - should surround the block
+        const topDiff = Math.abs(blockBox.y - outlineBox.y);
+        const heightDiff = Math.abs(blockBox.height - outlineBox.height);
+        if (topDiff > tolerance || heightDiff > tolerance) {
+          return {
+            ok: false,
+            reason: `Outline box not around block. Block: y=${blockBox.y.toFixed(0)} h=${blockBox.height.toFixed(0)}, Outline: y=${outlineBox.y.toFixed(0)} h=${outlineBox.height.toFixed(0)}`,
+          };
+        }
+      } else {
+        // Bottom line - should be at block's bottom edge
+        const blockBottom = blockBox.y + blockBox.height;
+        const bottomDiff = Math.abs(blockBottom - outlineBox.y);
+        if (bottomDiff > tolerance) {
+          return {
+            ok: false,
+            reason: `Outline line not at block bottom. Block bottom: ${blockBottom.toFixed(0)}, Outline Y: ${outlineBox.y.toFixed(0)}, diff: ${bottomDiff.toFixed(0)}`,
+          };
+        }
       }
 
       return { ok: true };
@@ -895,6 +923,8 @@ export class AdminUIHelper {
   async verifyBlockUIPositioning(blockId: string): Promise<{
     toolbarAboveBlock: number;
     addButtonBelowBlock: number;
+    addButtonRightOfBlock: number;
+    addButtonDirection: 'bottom' | 'right' | 'unknown';
     horizontalAlignment: boolean;
   }> {
     const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
@@ -905,11 +935,30 @@ export class AdminUIHelper {
       throw new Error(`Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}, addButton=${!!addButtonBox}`);
     }
 
+    // Distance from bottom of block to top of add button (positive = button is below)
+    const addButtonBelowBlock = addButtonBox.y - (blockBox.y + blockBox.height);
+    // Distance from right edge of block to left edge of add button (positive = button is to right)
+    const addButtonRightOfBlock = addButtonBox.x - (blockBox.x + blockBox.width);
+
+    // Determine direction based on position
+    // "bottom" = button's top is near block's bottom (within 20px below)
+    // "right" = button's left is near block's right (within 20px to the right)
+    let addButtonDirection: 'bottom' | 'right' | 'unknown' = 'unknown';
+    if (addButtonBelowBlock >= 0 && addButtonBelowBlock < 20) {
+      addButtonDirection = 'bottom';
+    } else if (addButtonRightOfBlock >= 0 && addButtonRightOfBlock < 20) {
+      addButtonDirection = 'right';
+    }
+
     return {
       // Distance from bottom of toolbar to top of block
       toolbarAboveBlock: blockBox.y - (toolbarBox.y + toolbarBox.height),
       // Distance from bottom of block to top of add button
-      addButtonBelowBlock: addButtonBox.y - (blockBox.y + blockBox.height),
+      addButtonBelowBlock,
+      // Distance from right edge of block to left edge of add button
+      addButtonRightOfBlock,
+      // Detected direction of add button relative to block
+      addButtonDirection,
       // Check if toolbar and block are horizontally aligned (within 2px tolerance)
       horizontalAlignment: Math.abs(toolbarBox.x - blockBox.x) < 2
     };
@@ -1503,6 +1552,7 @@ export class AdminUIHelper {
   /**
    * Check if a block type is visible in the block chooser.
    * Block types: 'slate', 'image', 'video', 'listing', etc.
+   * Note: Only searches within the block chooser popup, not the entire page.
    */
   async isBlockTypeVisible(blockType: string): Promise<boolean> {
     // Different block types have different display names
@@ -1511,14 +1561,19 @@ export class AdminUIHelper {
       image: ['Image', 'image'],
       video: ['Video', 'video'],
       listing: ['Listing', 'listing'],
+      columns: ['Columns', 'columns'],
+      hero: ['Hero', 'hero'],
     };
 
     const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
 
-    // Try to find the block type button
+    // Scope search to block chooser only (not sidebar or other parts of page)
+    const blockChooser = this.page.locator('.blocks-chooser');
+
+    // Try to find the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = this.page.locator(`button:has-text("${name}")`).or(
-        this.page.locator(`[data-block-type="${name.toLowerCase()}"]`)
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
+        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
       ).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {

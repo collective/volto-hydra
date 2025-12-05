@@ -1,8 +1,5 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { useDispatch } from 'react-redux';
-import { deleteBlock, previousBlockId } from '@plone/volto/helpers';
-import { setSidebarTab } from '@plone/volto/actions';
 
 /**
  * Dropdown Menu for Block Actions
@@ -12,31 +9,27 @@ import { setSidebarTab } from '@plone/volto/actions';
  */
 const DropdownMenu = ({
   selectedBlock,
-  properties,
-  onChangeFormData,
-  onSelectBlock,
+  onDeleteBlock,
   menuButtonRect,
   onClose,
+  onOpenSettings,
 }) => {
-  const dispatch = useDispatch();
-
   if (!menuButtonRect) {
     return null;
   }
 
   const handleSettings = () => {
     onClose();
-    // TODO: Open settings sidebar
+    // Open/expand the sidebar if collapsed
+    if (onOpenSettings) {
+      onOpenSettings();
+    }
   };
 
   const handleRemove = () => {
     onClose();
     if (selectedBlock) {
-      const previous = previousBlockId(properties, selectedBlock);
-      const newFormData = deleteBlock(properties, selectedBlock);
-      onChangeFormData(newFormData);
-      onSelectBlock(previous);
-      dispatch(setSidebarTab(1));
+      onDeleteBlock(selectedBlock, true);
     }
   };
 

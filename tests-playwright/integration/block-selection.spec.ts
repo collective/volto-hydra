@@ -144,7 +144,7 @@ test.describe('Block Selection', () => {
     expect(stillHasAltField).toBe(false);
   });
 
-  test('clicking block in Order tab selects it in iframe', async ({ page }) => {
+  test('clicking block in ChildBlocksWidget selects it in iframe', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -154,27 +154,25 @@ test.describe('Block Selection', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForSidebarOpen();
 
-    // Open Order tab
-    await helper.openSidebarTab('Order');
+    // Click the parent arrow "‹ Text" to deselect - this navigates up to page level
+    const parentArrow = page.locator('.sidebar-section-header .parent-nav');
+    await expect(parentArrow).toBeVisible({ timeout: 5000 });
+    await parentArrow.click();
+    await page.waitForTimeout(500);
 
-    // Wait for Order tab content to be visible (uses @dnd-kit, not react-beautiful-dnd)
-    const orderTab = page.locator('#sidebar-order');
-    await expect(orderTab).toBeVisible({ timeout: 2000 });
+    // Wait for ChildBlocksWidget to show page-level blocks
+    const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
+    await expect(childBlocksWidget).toBeVisible({ timeout: 2000 });
 
-    // Find the second block in the order list (using .tree-item-wrapper)
-    // Note: test-page has 3 blocks total (block-1-uuid, block-2-uuid, block-3-uuid)
-    const blockItems = page.locator('.tree-item-wrapper');
+    // Find block items in the widget
+    const blockItems = childBlocksWidget.locator('.child-block-item');
     await expect(blockItems.first()).toBeVisible();
 
-    // Click the second block's tree-item div (block-2-uuid which is an image block)
-    const secondBlockInList = blockItems.nth(1).locator('.tree-item');
+    // Click the second block (block-2-uuid which is an image block)
+    const secondBlockInList = blockItems.nth(1);
     await expect(secondBlockInList).toBeVisible();
     await secondBlockInList.click();
     await page.waitForTimeout(500);
-
-    // Verify the second block is now selected
-    // Check that Block tab shows the image block fields
-    await helper.openSidebarTab('Block');
 
     // The sidebar should now show image block fields (url, alt)
     const hasUrlField = await helper.hasSidebarField('url');
@@ -211,6 +209,131 @@ test.describe('Block Selection', () => {
     // Verify the text was inserted into the block
     const blockText = await iframe.locator(`[data-block-uid="${blockId}"]`).textContent();
     expect(blockText).toContain('TYPED');
+  });
+
+  test('selecting new block scrolls sidebar to show settings', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click first block to open sidebar
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+
+    // Get the sidebar scroll container
+    const sidebarContent = page.locator('#sidebar-properties .sidebar-content');
+    await expect(sidebarContent).toBeVisible();
+
+    // Get the block settings section for the selected block
+    const blockSettingsHeader = page.locator('.sidebar-section-header').filter({ hasText: /Text|Slate/i });
+    await expect(blockSettingsHeader).toBeVisible({ timeout: 5000 });
+
+    // Verify the block settings section is visible in the viewport (scrolled into view)
+    // The header should be in the visible area of the sidebar
+    const headerBox = await blockSettingsHeader.boundingBox();
+    const sidebarBox = await sidebarContent.boundingBox();
+
+    expect(headerBox).toBeTruthy();
+    expect(sidebarBox).toBeTruthy();
+
+    // The header should be within the visible sidebar area
+    const headerIsVisible = headerBox!.y >= sidebarBox!.y &&
+                           headerBox!.y + headerBox!.height <= sidebarBox!.y + sidebarBox!.height;
+    expect(headerIsVisible).toBe(true);
+  });
+
+  test('reselecting same block does not scroll sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click first block to open sidebar
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+
+    // Get the sidebar scroll container
+    const sidebarContent = page.locator('#sidebar-properties .sidebar-content');
+    await expect(sidebarContent).toBeVisible();
+
+    // Scroll the sidebar to a specific position (simulating user scroll)
+    await sidebarContent.evaluate((el) => {
+      el.scrollTop = 50; // Scroll down 50px
+    });
+    await page.waitForTimeout(100);
+
+    // Get the scroll position
+    const scrollBefore = await sidebarContent.evaluate((el) => el.scrollTop);
+    expect(scrollBefore).toBe(50);
+
+    // Re-click the same block
+    await helper.clickBlockInIframe('block-1-uuid');
+    await page.waitForTimeout(300);
+
+    // Verify scroll position is maintained (not reset)
+    const scrollAfter = await sidebarContent.evaluate((el) => el.scrollTop);
+    expect(scrollAfter).toBe(scrollBefore);
+  });
+
+  test('sidebar block header menu has same items as toolbar menu except settings', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a block to open sidebar
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+
+    // Open the toolbar menu in iframe
+    const iframe = helper.getIframe();
+    const toolbarMenuButton = iframe.locator('.block-toolbar .menu-button, .block-toolbar [aria-label="More options"], .block-toolbar button:has(.icon)').first();
+    await expect(toolbarMenuButton).toBeVisible({ timeout: 5000 });
+    await toolbarMenuButton.click();
+    await page.waitForTimeout(200);
+
+    // Get toolbar menu items
+    const toolbarMenuItems = iframe.locator('.block-toolbar-menu .menu-item, .toolbar-menu-popup button, [role="menu"] button, .popup-menu button');
+    const toolbarItemTexts: string[] = [];
+    const toolbarCount = await toolbarMenuItems.count();
+    for (let i = 0; i < toolbarCount; i++) {
+      const text = await toolbarMenuItems.nth(i).textContent();
+      if (text) toolbarItemTexts.push(text.trim().toLowerCase());
+    }
+
+    // Close toolbar menu by clicking elsewhere
+    await iframe.locator('body').click({ position: { x: 10, y: 10 } });
+    await page.waitForTimeout(200);
+
+    // Open the sidebar block header menu
+    const sidebarMenuButton = page.locator(
+      '.sidebar-section-header .block-actions-menu button, .sidebar-section-header [aria-label="More options"], .sidebar-section-header .menu-trigger',
+    );
+    await expect(sidebarMenuButton).toBeVisible({ timeout: 5000 });
+    await sidebarMenuButton.click();
+    await page.waitForTimeout(200);
+
+    // Get sidebar menu items
+    const sidebarMenuItems = page.locator(
+      '.block-actions-menu .menu-item, [role="menu"] button, .popup-menu button',
+    );
+    const sidebarItemTexts: string[] = [];
+    const sidebarCount = await sidebarMenuItems.count();
+    for (let i = 0; i < sidebarCount; i++) {
+      const text = await sidebarMenuItems.nth(i).textContent();
+      if (text) sidebarItemTexts.push(text.trim().toLowerCase());
+    }
+
+    // Filter out "settings" from toolbar items for comparison
+    const toolbarItemsWithoutSettings = toolbarItemTexts.filter(
+      (item) => !item.includes('setting'),
+    );
+
+    // Sidebar should have same items as toolbar (minus settings)
+    expect(sidebarItemTexts.sort()).toEqual(toolbarItemsWithoutSettings.sort());
   });
 
   test('can select block that is wrapped in a link', async ({ page }) => {

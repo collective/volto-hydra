@@ -258,6 +258,18 @@ app.post('/@login', (req, res) => {
 });
 
 /**
+ * POST /@logout
+ * Logout and invalidate the session (mock - always succeeds)
+ */
+app.post('/@logout', (req, res) => {
+  if (process.env.DEBUG) {
+    console.log('Logout requested');
+  }
+  // Return 204 No Content on successful logout (Plone behavior)
+  res.status(204).send();
+});
+
+/**
  * GET /health
  * Health check endpoint for server readiness
  */

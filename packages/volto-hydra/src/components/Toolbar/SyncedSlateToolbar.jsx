@@ -5,6 +5,7 @@ import { isEqual } from 'lodash';
 import config from '@plone/volto/registry';
 import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
 import slateTransforms from '../../utils/slateTransforms';
+import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { useDispatch, useSelector } from 'react-redux';
 import { setPluginOptions } from '@plone/volto-slate/actions';
 
@@ -83,6 +84,7 @@ class SlateErrorBoundary extends Component {
 const SyncedSlateToolbar = ({
   selectedBlock,
   form,
+  blockPathMap,
   currentSelection,
   onChangeFormData,
   completedFlushRequestId,
@@ -93,6 +95,16 @@ const SyncedSlateToolbar = ({
   iframeElement,
   onOpenMenu,
 }) => {
+
+  // Helper to get block data using path lookup (supports nested blocks)
+  const getBlock = useCallback((blockId) => {
+    return getBlockById(form, blockPathMap, blockId);
+  }, [form, blockPathMap]);
+
+  // Helper to update block data using path lookup (supports nested blocks)
+  const updateBlockInForm = useCallback((blockId, newBlockData) => {
+    return updateBlockById(form, blockPathMap, blockId, newBlockData);
+  }, [form, blockPathMap]);
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   const [editor] = useState(() => {
@@ -267,9 +279,9 @@ const SyncedSlateToolbar = ({
 
   // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
   useEffect(() => {
-    if (!selectedBlock || !form.blocks[selectedBlock]) return;
+    const block = getBlock(selectedBlock);
+    if (!selectedBlock || !block) return;
 
-    const block = form.blocks[selectedBlock];
     const fieldName = blockUI?.focusedFieldName || 'value';
     const fieldValue = block[fieldName];
 
@@ -389,7 +401,7 @@ const SyncedSlateToolbar = ({
         delete button.dataset.bypassCapture;
       }
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey]);
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey, getBlock]);
 
   // Handle transformAction from iframe (format, paste, delete)
   // These arrive atomically with form data, so editor already has the latest text
@@ -550,7 +562,7 @@ const SyncedSlateToolbar = ({
       internalValueRef.current = newValue;
 
       // Only call onChange if value actually changed (like Volto line 108)
-      const block = form.blocks[selectedBlock];
+      const block = getBlock(selectedBlock);
       const fieldName = blockUI?.focusedFieldName || 'value';
       const currentFieldValue = block?.[fieldName];
 
@@ -558,17 +570,12 @@ const SyncedSlateToolbar = ({
         return;
       }
 
-      // Build updated form data with the correct field
-      const updatedForm = {
-        ...form,
-        blocks: {
-          ...form.blocks,
-          [selectedBlock]: {
-            ...form.blocks[selectedBlock],
-            [fieldName]: newValue,
-          },
-        },
+      // Build updated form data with the correct field (supports nested blocks)
+      const updatedBlock = {
+        ...block,
+        [fieldName]: newValue,
       };
+      const updatedForm = updateBlockInForm(selectedBlock, updatedBlock);
 
       // Track what we're sending so useEffect doesn't overwrite with stale data
       lastSentValueRef.current = newValue;
@@ -582,7 +589,7 @@ const SyncedSlateToolbar = ({
       // DON'T increment renderKey here - it would remount <Slate> and reset editor.children
       // Buttons will re-render naturally when React processes the state updates
     },
-    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor],
+    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor, getBlock, updateBlockInForm],
   );
 
   // Create Redux store for persistent helpers (like LinkEditor)
@@ -607,8 +614,8 @@ const SyncedSlateToolbar = ({
     throw new Error(`[SyncedSlateToolbar] form.blocks is ${form.blocks} - form object doesn't have blocks property. Form keys: ${Object.keys(form).join(', ')}`);
   }
 
-  // Check if we have block data for this specific block
-  const block = form.blocks[selectedBlock];
+  // Check if we have block data for this specific block (supports nested blocks via path lookup)
+  const block = getBlock(selectedBlock);
   if (!block) {
     return null; // No block data yet - this is OK during initial render
   }
@@ -645,9 +652,17 @@ const SyncedSlateToolbar = ({
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
-  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0 };
+  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800 };
   const toolbarTop = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
-  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Aligned with block container left edge
+
+  // Determine if block is on right side of iframe - if so, align toolbar to right edge
+  // This prevents toolbar from extending beyond iframe and being overlapped by sidebar
+  const iframeMidpoint = toolbarIframeRect.left + toolbarIframeRect.width / 2;
+  const blockCenter = toolbarIframeRect.left + blockUI.rect.left + blockUI.rect.width / 2;
+  const alignRight = blockCenter > iframeMidpoint;
+
+  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Left edge of block
+  const toolbarRight = window.innerWidth - (toolbarIframeRect.left + blockUI.rect.left + blockUI.rect.width); // Distance from block's right edge to window right
 
 
   return (
@@ -657,7 +672,9 @@ const SyncedSlateToolbar = ({
         style={{
           position: 'fixed',
           top: `${toolbarTop}px`,
-          left: `${toolbarLeft}px`,
+          ...(alignRight
+            ? { right: `${toolbarRight}px` }
+            : { left: `${toolbarLeft}px` }),
           zIndex: 10,
           display: 'flex',
           gap: '2px',

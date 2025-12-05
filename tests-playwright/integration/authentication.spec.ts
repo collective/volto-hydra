@@ -2,6 +2,46 @@ import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Authentication and Access Control', () => {
+  test('Login form accepts admin/admin and redirects to dashboard', async ({ page }) => {
+    // Go to login page
+    await page.goto('http://localhost:3001/login');
+
+    // Wait for the login form to be visible
+    const usernameField = page.getByLabel('Login Name');
+    const passwordField = page.getByLabel('Password');
+    const loginButton = page.getByRole('button', { name: 'Log in' });
+
+    await expect(usernameField).toBeVisible({ timeout: 10000 });
+    await expect(passwordField).toBeVisible();
+    await expect(loginButton).toBeVisible();
+
+    // Enter credentials
+    await usernameField.fill('admin');
+    await passwordField.fill('admin');
+
+    // Set up response waiter BEFORE clicking
+    const loginResponsePromise = page.waitForResponse(
+      (response) => response.url().includes('@login') && response.status() === 200,
+      { timeout: 10000 },
+    );
+
+    // Click login
+    await loginButton.click();
+
+    // Wait for login API response
+    await loginResponsePromise;
+
+    // Wait for redirect after successful login (should leave /login)
+    await page.waitForURL(/^(?!.*\/login).*$/, { timeout: 15000 });
+
+    // Verify we're logged in - Personal tools button should be in the DOM
+    const personalTools = page.getByRole('button', { name: 'Personal tools' });
+    await expect(personalTools).toBeAttached({ timeout: 10000 });
+
+    // Verify we're not on the login page
+    expect(page.url()).not.toContain('/login');
+  });
+
   test('Edit page requires authentication', async ({ page }) => {
     // Try to access edit page without logging in
     await page.goto('http://localhost:3001/test-page/edit');

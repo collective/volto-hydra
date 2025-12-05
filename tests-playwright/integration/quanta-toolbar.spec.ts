@@ -151,6 +151,36 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     const finalBlockCount = await helper.getBlockCountInIframe();
     expect(finalBlockCount).toBe(initialBlockCount - 1);
   });
+
+  test('Clicking Settings option expands collapsed sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForSidebarOpen();
+
+    const blockId = 'block-1-uuid';
+
+    // First collapse the sidebar using the close button
+    const closeButton = page.locator('.sidebar-close-button');
+    await closeButton.click();
+    await page.waitForTimeout(300);
+
+    // Verify sidebar is collapsed
+    const sidebarContainer = page.locator('.sidebar-container');
+    await expect(sidebarContainer).toHaveClass(/collapsed/);
+
+    // Click block and open menu
+    await helper.clickBlockInIframe(blockId);
+    await helper.openQuantaToolbarMenu(blockId);
+
+    // Click Settings
+    await helper.clickQuantaToolbarMenuOption(blockId, 'Settings');
+    await page.waitForTimeout(300);
+
+    // Sidebar should be expanded
+    await expect(sidebarContainer).not.toHaveClass(/collapsed/);
+  });
 });
 
 test.describe('Quanta Toolbar - Different Block Types', () => {
