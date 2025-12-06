@@ -471,6 +471,51 @@ test.describe('Hierarchical Sidebar', () => {
     await expect(childBlocksWidget).not.toBeVisible();
   });
 
+  test('selecting nested block auto-scrolls sidebar to show its settings', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a deeply nested block (text-1a is 3 levels deep: page > columns > column > text)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForSidebarOpen();
+
+    // Wait for scroll animation to complete
+    await page.waitForTimeout(500);
+
+    // Get the sidebar scroll container and current block settings
+    const sidebarScroller = page.locator('.sidebar-content-wrapper');
+    const blockSettings = page.locator('#sidebar-properties');
+
+    await expect(sidebarScroller).toBeVisible();
+    await expect(blockSettings).toBeVisible();
+
+    // Get bounding boxes
+    const settingsBox = await blockSettings.boundingBox();
+    const scrollerBox = await sidebarScroller.boundingBox();
+
+    expect(settingsBox).toBeTruthy();
+    expect(scrollerBox).toBeTruthy();
+
+    // The current block settings should be visible (scrolled into view)
+    // At minimum, the top of the settings should be visible in the viewport
+    const settingsTop = settingsBox!.y;
+    const scrollerTop = scrollerBox!.y;
+    const scrollerBottom = scrollerBox!.y + scrollerBox!.height;
+
+    // Settings top should be within the visible scroll area
+    const isSettingsTopVisible =
+      settingsTop >= scrollerTop && settingsTop < scrollerBottom;
+    expect(
+      isSettingsTopVisible,
+      `Current block settings should be scrolled into view. ` +
+        `Settings top: ${settingsTop}, Scroller range: ${scrollerTop}-${scrollerBottom}`,
+    ).toBe(true);
+  });
+
   test('child blocks widget shown for container blocks', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -618,6 +663,105 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Verify sidebar is collapsed
     await expect(sidebarContainer).toHaveClass(/collapsed/);
+  });
+
+  test('each block in hierarchy shows editable settings', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify initial titles are rendered in iframe
+    await expect(
+      iframe.locator('[data-block-uid="columns-1"] .columns-title'),
+    ).toHaveText('My Columns Section');
+    await expect(
+      iframe.locator('[data-block-uid="col-1"] .column-title'),
+    ).toHaveText('Left Column');
+
+    // Select the deepest nested block (text-1a inside col-1 inside columns-1)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    // Should see parent block headers in sidebar-parents
+    const sidebarParents = page.locator('#sidebar-parents');
+    await expect(sidebarParents).toBeVisible();
+
+    // Find all title input fields in the parent blocks sidebar
+    // Each parent block (Columns, Column) should have a title field
+    const parentTitleInputs = sidebarParents.locator(
+      'input[name="title"], .field-wrapper-title input',
+    );
+
+    // Should have at least 2 title fields (Columns and Column)
+    const titleCount = await parentTitleInputs.count();
+    expect(titleCount).toBeGreaterThanOrEqual(2);
+
+    // ===== Edit Level 1: Columns block (grandparent) =====
+    // The first title field should be for the Columns block
+    const columnsTitle = parentTitleInputs.first();
+    await expect(columnsTitle).toBeVisible();
+    await expect(columnsTitle).toHaveValue('My Columns Section');
+
+    // Clear and fill with new value
+    await columnsTitle.clear();
+    await columnsTitle.fill('Edited Columns Title');
+    await columnsTitle.press('Tab'); // Trigger blur to save
+
+    // Verify the iframe updated with the new Columns title
+    await expect(
+      iframe.locator('[data-block-uid="columns-1"] .columns-title'),
+      'Columns title should update in iframe after sidebar edit',
+    ).toHaveText('Edited Columns Title');
+
+    // ===== Edit Level 2: Column block (parent) =====
+    // Re-query inputs after the re-render from first edit
+    const columnTitleInputs = sidebarParents.locator(
+      'input[name="title"], .field-wrapper-title input',
+    );
+    const columnTitle = columnTitleInputs.nth(1);
+    await expect(columnTitle).toBeVisible();
+    await expect(columnTitle).toHaveValue('Left Column');
+
+    // Clear and fill with new value
+    await columnTitle.clear();
+    await columnTitle.fill('Edited Column Title');
+    await columnTitle.press('Tab'); // Trigger blur to save
+
+    // Verify the iframe updated with the new Column title
+    await expect(
+      iframe.locator('[data-block-uid="col-1"] .column-title'),
+      'Column title should update in iframe after sidebar edit',
+    ).toHaveText('Edited Column Title');
+
+    // ===== Verify Level 3: Current block (Slate/Text) has settings =====
+    // The current block's settings should render in #sidebar-properties inside the current block section
+    const sidebarProperties = page.locator('#sidebar-properties');
+    await expect(
+      sidebarProperties,
+      'Current block settings should be visible in #sidebar-properties',
+    ).toBeVisible();
+
+    // Slate block should have a "Body" field in its settings
+    const slateBodyField = sidebarProperties.locator(
+      '.field-wrapper-value, [class*="field"][class*="value"]',
+    );
+    await expect(
+      slateBodyField.first(),
+      'Slate block should show Body/value field in sidebar',
+    ).toBeVisible();
+
+    // ===== Verify all edits persisted =====
+    // Both titles should still show the edited values
+    await expect(
+      iframe.locator('[data-block-uid="columns-1"] .columns-title'),
+    ).toHaveText('Edited Columns Title');
+    await expect(
+      iframe.locator('[data-block-uid="col-1"] .column-title'),
+    ).toHaveText('Edited Column Title');
   });
 
   test('toolbar position updates after sidebar toggle', async ({ page }) => {

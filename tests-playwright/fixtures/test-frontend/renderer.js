@@ -335,8 +335,15 @@ function renderColumnsBlock(block) {
     const columns = block.columns || {};
     const columnsLayout = block.columns_layout || { items: [] };
     const items = columnsLayout.items || [];
+    const title = block.title || '';
 
-    let html = '<div class="columns-row" style="display: flex; gap: 20px;">';
+    // Render editable title for columns block
+    let html = '';
+    if (title) {
+        html += `<h3 data-editable-field="title" class="columns-title" style="margin-bottom: 10px;">${title}</h3>`;
+    }
+
+    html += '<div class="columns-row" style="display: flex; gap: 20px;">';
 
     items.forEach(columnId => {
         const column = columns[columnId];
@@ -362,8 +369,14 @@ function renderColumnContent(column) {
     const blocks = column.blocks || {};
     const blocksLayout = column.blocks_layout || { items: [] };
     const items = blocksLayout.items || [];
+    const title = column.title || '';
 
     let html = '';
+
+    // Render editable title for column block
+    if (title) {
+        html += `<h4 data-editable-field="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
+    }
 
     items.forEach(blockId => {
         const block = blocks[blockId];

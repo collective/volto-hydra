@@ -17,9 +17,11 @@
     },
     "columns-1": {
       "@type": "columns",
+      "title": "My Columns Section",
       "columns": {
         "col-1": {
           "@type": "column",
+          "title": "Left Column",
           "blocks": {
             "text-1a": {
               "@type": "slate",
@@ -36,6 +38,7 @@
         },
         "col-2": {
           "@type": "column",
+          "title": "Right Column",
           "blocks": {
             "text-2a": {
               "@type": "slate",

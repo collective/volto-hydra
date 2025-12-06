@@ -109,10 +109,10 @@
   min-height: 100px;
 }
 
-/* Child blocks widget styles */
+/* Child blocks widget styles - appears as part of the current block section */
 .hydra-sidebar .child-blocks-section {
-  border-top: 2px solid #e0e0e0;
-  margin-top: auto;
+  /* No margin-top: auto - flows naturally after current block section */
+  /* No top border - integrated with parent block section */
 }
 
 .hydra-sidebar .child-blocks-widget {

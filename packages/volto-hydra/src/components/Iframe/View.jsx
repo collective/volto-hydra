@@ -1409,6 +1409,31 @@ const Iframe = (props) => {
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}
+        onChangeBlock={(blockId, newBlockData) => {
+          // Rebuild blockPathMap from current properties to ensure it's up to date
+          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig);
+
+          // Find container config for nested blocks
+          const pathInfo = currentBlockPathMap[blockId];
+          const containerConfig = pathInfo?.parentId
+            ? getContainerFieldConfig(
+                blockId,
+                currentBlockPathMap,
+                properties,
+                blocksConfig,
+              )
+            : null;
+
+          const newFormData = mutateBlockInContainer(
+            properties,
+            currentBlockPathMap,
+            blockId,
+            newBlockData,
+            containerConfig,
+          );
+
+          onChangeFormData(newFormData);
+        }}
       />
       <ChildBlocksWidget
         selectedBlock={selectedBlock}

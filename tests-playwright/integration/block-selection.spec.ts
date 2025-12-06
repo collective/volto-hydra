@@ -221,26 +221,33 @@ test.describe('Block Selection', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForSidebarOpen();
 
-    // Get the sidebar scroll container
-    const sidebarContent = page.locator('#sidebar-properties .sidebar-content');
-    await expect(sidebarContent).toBeVisible();
+    // Get the sidebar scroll container (.sidebar-content-wrapper in Sidebar.jsx)
+    const sidebarScroller = page.locator('.sidebar-content-wrapper');
+    await expect(sidebarScroller).toBeVisible();
 
-    // Get the block settings section for the selected block
-    const blockSettingsHeader = page.locator('.sidebar-section-header').filter({ hasText: /Text|Slate/i });
-    await expect(blockSettingsHeader).toBeVisible({ timeout: 5000 });
+    // Get the current block settings section (#sidebar-properties)
+    const blockSettings = page.locator('#sidebar-properties');
+    await expect(blockSettings).toBeVisible({ timeout: 5000 });
 
-    // Verify the block settings section is visible in the viewport (scrolled into view)
-    // The header should be in the visible area of the sidebar
-    const headerBox = await blockSettingsHeader.boundingBox();
-    const sidebarBox = await sidebarContent.boundingBox();
+    // Wait for scroll animation to complete
+    await page.waitForTimeout(500);
 
-    expect(headerBox).toBeTruthy();
-    expect(sidebarBox).toBeTruthy();
+    // Verify the block settings are visible within the scroll viewport
+    const settingsBox = await blockSettings.boundingBox();
+    const scrollerBox = await sidebarScroller.boundingBox();
 
-    // The header should be within the visible sidebar area
-    const headerIsVisible = headerBox!.y >= sidebarBox!.y &&
-                           headerBox!.y + headerBox!.height <= sidebarBox!.y + sidebarBox!.height;
-    expect(headerIsVisible).toBe(true);
+    expect(settingsBox).toBeTruthy();
+    expect(scrollerBox).toBeTruthy();
+
+    // The settings should be at least partially visible in the sidebar viewport
+    const settingsTop = settingsBox!.y;
+    const settingsBottom = settingsBox!.y + settingsBox!.height;
+    const scrollerTop = scrollerBox!.y;
+    const scrollerBottom = scrollerBox!.y + scrollerBox!.height;
+
+    // Check that settings are within visible area (at least partially)
+    const isVisible = settingsTop < scrollerBottom && settingsBottom > scrollerTop;
+    expect(isVisible, 'Current block settings should be visible in sidebar scroll area').toBe(true);
   });
 
   test('reselecting same block does not scroll sidebar', async ({ page }) => {
@@ -253,18 +260,21 @@ test.describe('Block Selection', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForSidebarOpen();
 
-    // Get the sidebar scroll container
-    const sidebarContent = page.locator('#sidebar-properties .sidebar-content');
-    await expect(sidebarContent).toBeVisible();
+    // Get the sidebar scroll container (.sidebar-content-wrapper in Sidebar.jsx)
+    const sidebarScroller = page.locator('.sidebar-content-wrapper');
+    await expect(sidebarScroller).toBeVisible();
+
+    // Wait for any initial scroll to complete
+    await page.waitForTimeout(500);
 
     // Scroll the sidebar to a specific position (simulating user scroll)
-    await sidebarContent.evaluate((el) => {
+    await sidebarScroller.evaluate((el) => {
       el.scrollTop = 50; // Scroll down 50px
     });
     await page.waitForTimeout(100);
 
     // Get the scroll position
-    const scrollBefore = await sidebarContent.evaluate((el) => el.scrollTop);
+    const scrollBefore = await sidebarScroller.evaluate((el) => el.scrollTop);
     expect(scrollBefore).toBe(50);
 
     // Re-click the same block
@@ -272,7 +282,7 @@ test.describe('Block Selection', () => {
     await page.waitForTimeout(300);
 
     // Verify scroll position is maintained (not reset)
-    const scrollAfter = await sidebarContent.evaluate((el) => el.scrollTop);
+    const scrollAfter = await sidebarScroller.evaluate((el) => el.scrollTop);
     expect(scrollAfter).toBe(scrollBefore);
   });
 

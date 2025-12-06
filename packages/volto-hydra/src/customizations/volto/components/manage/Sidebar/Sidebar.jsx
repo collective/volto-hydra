@@ -188,15 +188,11 @@ const Sidebar = (props) => {
             {/* Page metadata fields rendered here via portal */}
           </div>
 
-          {/* Parent blocks section - rendered dynamically via portal */}
+          {/* Parent blocks section + current block - rendered dynamically via portal */}
           {/* display:contents makes this layout-transparent so sticky headers work */}
+          {/* Note: #sidebar-properties is provided by ParentBlocksWidget inside the current block section */}
           <div id="sidebar-parents" style={{ display: 'contents' }}>
-            {/* Parent block headers rendered here via portal */}
-          </div>
-
-          {/* Current block settings - portal target */}
-          <div className="sidebar-section-content" id="sidebar-properties">
-            {/* Current block settings rendered here via portal */}
+            {/* Parent block headers + current block header + #sidebar-properties rendered here via portal */}
           </div>
 
           {/* Child blocks widget - portal target for nested blocks list */}
