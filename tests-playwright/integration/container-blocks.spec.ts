@@ -1253,6 +1253,23 @@ test.describe('Single Allowed Block Auto-Insert', () => {
       .last();
     const childBlocks = await newColumn.locator('> [data-block-uid]').count();
     expect(childBlocks).toBeGreaterThan(0);
+
+    // The slate block should have EMPTY text, not "Empty block" fallback
+    // This verifies that applyBlockDefaults was called and slate got proper initial value
+    const slateBlock = newColumn.locator('> [data-block-uid]').first();
+    const slateText = await slateBlock.textContent();
+    expect(slateText?.trim()).toBe('');
+
+    // The new column should be selected (toolbar visible)
+    const newColumnId = await newColumn.getAttribute('data-block-uid');
+    expect(newColumnId).toBeTruthy();
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(newColumnId!);
+    expect(hasToolbar).toBe(true);
+
+    // The add button should be to the RIGHT of the new column (columns go horizontally)
+    const positioning = await helper.verifyBlockUIPositioning(newColumnId!);
+    console.log('[TEST] positioning:', JSON.stringify(positioning));
+    expect(positioning.addButtonDirection).toBe('right');
   });
 
   test('iframe add button auto-inserts when container has single allowedBlock', async ({

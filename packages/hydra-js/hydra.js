@@ -561,7 +561,25 @@ export class Bridge {
             // Blocks might have resized after form updates
             // Skip focus if this is from sidebar editing (no transformedSelection)
             const skipFocus = !event.data.transformedSelection;
-            if (this.selectedBlockUid) {
+
+            // Check if Admin wants to select a different block (e.g., after adding a new block)
+            // This handles the timing issue where SELECT_BLOCK arrives before the block exists
+            const adminSelectedBlockUid = event.data.selectedBlockUid;
+            const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
+
+            if (needsBlockSwitch) {
+              // Admin selected a different block - select it after re-render
+              // This will trigger selectBlock() which sends BLOCK_SELECTED back to Admin
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  const newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
+                  if (newBlockElement) {
+                    console.log('[HYDRA] Selecting block from FORM_DATA selectedBlockUid:', adminSelectedBlockUid);
+                    this.selectBlock(newBlockElement);
+                  }
+                });
+              });
+            } else if (this.selectedBlockUid) {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);

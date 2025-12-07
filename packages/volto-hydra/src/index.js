@@ -46,16 +46,36 @@ const applyConfig = (config) => {
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.type.blocks = HiddenBlocksWidget;
 
-  // Add the slate block in the sidebar
+  // Add the slate block in the sidebar with proper initialization
+  // blockSchema is used by applyBlockDefaults to set initial values for new blocks
+  // This is separate from schema (used for sidebar settings form)
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
+    blockSchema: {
+      title: 'Text',
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
+      properties: {
+        value: {
+          title: 'Body',
+          widget: 'hydra_slate',
+          // Default value for new slate blocks - used by applyBlockDefaults
+          default: config.settings.slate.defaultValue(),
+        },
+      },
+      required: [],
+    },
     schemaEnhancer: ({ formData, schema, intl }) => {
+      // Preserve existing default if present (from blockSchema)
+      const existingDefault = schema.properties?.value?.default;
       schema.properties.value = {
         title: 'Body',
         widget: 'hydra_slate',
+        ...(existingDefault !== undefined && { default: existingDefault }),
       };
       // Add to the beginning of the fields array to make it more visible
-      schema.fieldsets[0].fields.unshift('value');
+      if (!schema.fieldsets[0].fields.includes('value')) {
+        schema.fieldsets[0].fields.unshift('value');
+      }
       return schema;
     },
     sidebarTab: 1,

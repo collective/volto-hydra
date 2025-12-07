@@ -1020,33 +1020,96 @@ export class AdminUIHelper {
    * Verify the positioning relationships between block UI elements and the block.
    * Returns measurements for toolbar, add button, and alignment.
    */
-  async verifyBlockUIPositioning(blockId: string): Promise<{
+  async verifyBlockUIPositioning(
+    blockId: string,
+    options: { timeout?: number } = {},
+  ): Promise<{
     toolbarAboveBlock: number;
     addButtonBelowBlock: number;
     addButtonRightOfBlock: number;
     addButtonDirection: 'bottom' | 'right' | 'unknown';
     horizontalAlignment: boolean;
   }> {
+    const timeout = options.timeout ?? 5000;
+    const startTime = Date.now();
+
+    // Poll until the add button is positioned for this block (top or bottom aligned)
+    // This handles the race condition where React has rendered but browser hasn't painted
+    while (Date.now() - startTime < timeout) {
+      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      const toolbarBox = await this.getToolbarBoundingBox();
+      const addButtonBox = await this.getAddButtonBoundingBox();
+
+      if (blockBox && toolbarBox && addButtonBox) {
+        // Check if add button is positioned for THIS block (either top-aligned or bottom-aligned)
+        const addButtonTopAligned = Math.abs(addButtonBox.y - blockBox.y) < 30;
+        const addButtonBottomAligned =
+          Math.abs(addButtonBox.y - (blockBox.y + blockBox.height)) < 30;
+
+        if (addButtonTopAligned || addButtonBottomAligned) {
+          // Add button is positioned for this block, return the measurements
+          return this.measureBlockUIPositioningInternal(
+            blockBox,
+            toolbarBox,
+            addButtonBox,
+          );
+        }
+      }
+
+      // Wait a bit before polling again
+      await this.page.waitForTimeout(50);
+    }
+
+    // Timeout - return measurements anyway (test will likely fail with useful info)
     const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
     const toolbarBox = await this.getToolbarBoundingBox();
     const addButtonBox = await this.getAddButtonBoundingBox();
 
     if (!blockBox || !toolbarBox || !addButtonBox) {
-      throw new Error(`Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}, addButton=${!!addButtonBox}`);
+      throw new Error(
+        `Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}, addButton=${!!addButtonBox}`,
+      );
     }
 
+    return this.measureBlockUIPositioningInternal(
+      blockBox,
+      toolbarBox,
+      addButtonBox,
+    );
+  }
+
+  /**
+   * Internal helper to calculate positioning measurements from bounding boxes.
+   */
+  private measureBlockUIPositioningInternal(
+    blockBox: { x: number; y: number; width: number; height: number },
+    toolbarBox: { x: number; y: number; width: number; height: number },
+    addButtonBox: { x: number; y: number; width: number; height: number },
+  ): {
+    toolbarAboveBlock: number;
+    addButtonBelowBlock: number;
+    addButtonRightOfBlock: number;
+    addButtonDirection: 'bottom' | 'right' | 'unknown';
+    horizontalAlignment: boolean;
+  } {
     // Distance from bottom of block to top of add button (positive = button is below)
     const addButtonBelowBlock = addButtonBox.y - (blockBox.y + blockBox.height);
     // Distance from right edge of block to left edge of add button (positive = button is to right)
     const addButtonRightOfBlock = addButtonBox.x - (blockBox.x + blockBox.width);
 
     // Determine direction based on position
-    // "bottom" = button's top is near block's bottom (within 20px below)
-    // "right" = button's left is near block's right (within 20px to the right)
+    // "bottom" = button's top is near/below block's bottom (within 20px)
+    // "right" = button's top is near block's top (top-aligned, within 20px)
+    //           This includes when button is constrained to be inside the block
     let addButtonDirection: 'bottom' | 'right' | 'unknown' = 'unknown';
-    if (addButtonBelowBlock >= 0 && addButtonBelowBlock < 20) {
+    const addButtonTopAligned = Math.abs(addButtonBox.y - blockBox.y) < 20;
+    const addButtonBottomAligned =
+      addButtonBelowBlock >= -5 && addButtonBelowBlock < 20;
+
+    if (addButtonBottomAligned && !addButtonTopAligned) {
       addButtonDirection = 'bottom';
-    } else if (addButtonRightOfBlock >= 0 && addButtonRightOfBlock < 20) {
+    } else if (addButtonTopAligned) {
+      // Top-aligned means 'right' direction (even if constrained to be inside block)
       addButtonDirection = 'right';
     }
 
@@ -1060,7 +1123,7 @@ export class AdminUIHelper {
       // Detected direction of add button relative to block
       addButtonDirection,
       // Check if toolbar and block are horizontally aligned (within 2px tolerance)
-      horizontalAlignment: Math.abs(toolbarBox.x - blockBox.x) < 2
+      horizontalAlignment: Math.abs(toolbarBox.x - blockBox.x) < 2,
     };
   }
 

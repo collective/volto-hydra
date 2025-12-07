@@ -3,6 +3,8 @@
  * Supports container blocks where blocks can be nested inside other blocks.
  */
 
+import { applyBlockDefaults } from '@plone/volto/helpers';
+
 /**
  * Build a map of blockId -> path for all blocks in formData.
  * Traverses nested containers using schema to find `type: 'blocks'` fields.
@@ -559,15 +561,20 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  * @param {Object} blockData - The block data (with at least '@type')
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @param {Object} options - Options for block initialization
+ * @param {Object} options.intl - Intl object for i18n
+ * @param {Object} options.metadata - Metadata from form
+ * @param {Object} options.properties - Form properties
  * @returns {Object} Block data with container fields initialized (if applicable)
  */
-export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator) {
+export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}) {
+  const { intl, metadata, properties } = options;
   const blockType = blockData['@type'];
   const blockConfig = blocksConfig?.[blockType];
 
   // Get schema to find container fields
   const schema = typeof blockConfig?.blockSchema === 'function'
-    ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+    ? blockConfig.blockSchema({ formData: {}, intl: intl || { formatMessage: (m) => m.defaultMessage } })
     : blockConfig?.blockSchema;
 
   if (!schema?.properties) {
@@ -609,12 +616,22 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator)
     };
   }
 
-  // Create child block and recursively initialize it
+  // Create child block and apply defaults (like Volto's BlocksForm does)
   const childBlockId = uuidGenerator();
   let childBlockData = { '@type': childBlockType };
 
+  // Apply block defaults to get proper initial values (e.g., slate's value field)
+  if (intl) {
+    childBlockData = applyBlockDefaults({
+      data: childBlockData,
+      intl,
+      metadata,
+      properties,
+    }, blocksConfig);
+  }
+
   // Recursively initialize the child if it's also a container
-  childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator);
+  childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, options);
 
   // Add child to container
   const layoutFieldName = `${containerFieldName}_layout`;

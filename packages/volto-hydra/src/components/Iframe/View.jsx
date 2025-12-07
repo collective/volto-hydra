@@ -458,6 +458,7 @@ const Iframe = (props) => {
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
+    pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
   }));
   const urlFromEnv = getURlsFromEnv();
   const u =
@@ -540,7 +541,12 @@ const Iframe = (props) => {
     const mergedBlocksConfig = config.blocks.blocksConfig;
 
     // Initialize container blocks with default children (recursive)
-    blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid);
+    // Pass intl/metadata/properties so nested blocks get proper defaults (e.g., slate's value)
+    blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, {
+      intl,
+      metadata,
+      properties,
+    });
 
     // Check if inserting inside a container (null means page-level)
     const containerConfig = getContainerFieldConfig(
@@ -1130,17 +1136,32 @@ const Iframe = (props) => {
       const updatedBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig);
       console.log('[VIEW] Sending FORM_DATA with blockPathMap keys:', Object.keys(updatedBlockPathMap));
       console.log('[VIEW] blockPathMap for text-1a:', updatedBlockPathMap['text-1a']);
-      const message = { type: 'FORM_DATA', data: formToUse, blockPathMap: updatedBlockPathMap };
+      // Include pendingSelectBlockUid so iframe can select the block after re-rendering
+      // This is needed when a new block is added - the block doesn't exist in DOM yet
+      const message = {
+        type: 'FORM_DATA',
+        data: formToUse,
+        blockPathMap: updatedBlockPathMap,
+        selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
+      };
+      console.log('[VIEW] FORM_DATA selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
       );
+      // Clear pendingSelectBlockUid after sending
+      if (iframeSyncState.pendingSelectBlockUid) {
+        setIframeSyncState(prev => ({
+          ...prev,
+          pendingSelectBlockUid: null,
+        }));
+      }
     }
-  // NOTE: Only depend on formDataFromRedux and toolbarRequestDone.
+  // NOTE: Only depend on formDataFromRedux, toolbarRequestDone, and pendingSelectBlockUid.
   // Do NOT depend on iframeSyncState.formData/selection - those change during
   // normal toolbar sync and would cause echo back to iframe.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formDataFromRedux, iframeSyncState.toolbarRequestDone]);
+  }, [formDataFromRedux, iframeSyncState.toolbarRequestDone, iframeSyncState.pendingSelectBlockUid]);
 
   const sidebarFocusEventListenerRef = useRef(null);
 
@@ -1260,7 +1281,11 @@ const Iframe = (props) => {
       // Use merged config from registry (includes frontend's custom blocks after INIT)
       const mergedBlocksConfig = config.blocks.blocksConfig;
       let newBlockData = { '@type': blockType };
-      newBlockData = initializeContainerBlock(newBlockData, mergedBlocksConfig, uuid);
+      newBlockData = initializeContainerBlock(newBlockData, mergedBlocksConfig, uuid, {
+        intl,
+        metadata,
+        properties,
+      });
 
       // Get existing blocks to find last block for insertion position
       const parentPath = iframeSyncState.blockPathMap?.[parentBlockId]?.path;
@@ -1281,12 +1306,19 @@ const Iframe = (props) => {
       );
       if (newFormData) {
         onChangeFormData(newFormData);
+        // Store block to select after FORM_DATA is sent to iframe
+        // Don't call onSelectBlock directly - iframe doesn't have the block yet
+        setIframeSyncState(prev => ({
+          ...prev,
+          pendingSelectBlockUid: newBlockId,
+        }));
+        dispatch(setSidebarTab(1));
       }
     } else {
       // Multiple options - show the block chooser
       setAddNewBlockOpened(true);
     }
-  }, [sidebarAllowedBlocks, properties, onChangeFormData, iframeSyncState.blockPathMap]);
+  }, [sidebarAllowedBlocks, properties, onChangeFormData, iframeSyncState.blockPathMap, intl, metadata, dispatch]);
 
   // Handle iframe add - inserts AFTER the block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -1294,12 +1326,15 @@ const Iframe = (props) => {
     if (siblingAllowed?.length === 1) {
       // Only one allowed block type - auto-insert without showing chooser
       const blockType = siblingAllowed[0];
-      onInsertBlock(selectedBlock, { '@type': blockType });
+      const newId = onInsertBlock(selectedBlock, { '@type': blockType });
+      // Select the newly added block
+      onSelectBlock(newId);
+      dispatch(setSidebarTab(1));
     } else {
       // Multiple options - show the block chooser
       setAddNewBlockOpened(true);
     }
-  }, [iframeAllowedBlocks, selectedBlock, onInsertBlock]);
+  }, [iframeAllowedBlocks, selectedBlock, onInsertBlock, onSelectBlock, dispatch]);
 
   return (
     <div id="iframeContainer">
@@ -1432,16 +1467,16 @@ const Iframe = (props) => {
             const isRightDirection = blockUI.addDirection === 'right';
 
             // Calculate ideal position
+            const buttonWidth = 30;
             let addLeft = isRightDirection
               ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8  // Right of block
-              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - 30; // Bottom-right of block
+              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth; // Bottom-right of block
 
-            // Constrain to stay within iframe bounds
+            // Constrain to stay within iframe bounds - stay at top-right but move inward
             const iframeRight = iframeRect.left + iframeRect.width;
-            const buttonWidth = 30;
             if (addLeft + buttonWidth > iframeRight) {
-              // Move button to left side of block if it would go offscreen
-              addLeft = iframeRect.left + blockUI.rect.left - buttonWidth - 8;
+              // Move button inward to stay on screen, but keep it at top-right of block
+              addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
             }
 
             // For 'right': top-right of block
