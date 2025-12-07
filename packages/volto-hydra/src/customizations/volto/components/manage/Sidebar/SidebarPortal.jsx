@@ -1,26 +1,37 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
-import { SidebarPortalTargetContext } from '@plone/volto-hydra/components/Sidebar/SidebarPortalTargetContext';
+import { SidebarPortalTargetContext } from '../../../../../components/Sidebar/SidebarPortalTargetContext';
 
 // Re-export for convenience
 export { SidebarPortalTargetContext };
 
 /**
  * Portal that wraps Sidebar components
+ *
+ * Hydra takes full control of sidebar rendering via ParentBlocksWidget.
+ * This portal ONLY renders when SidebarPortalTargetContext is set.
+ * Volto's normal block rendering (without context) is suppressed to prevent duplicates.
+ *
  * @param {React.ReactNode} children Sidebar content
  * @param {bool} selected Sidebar needs to know when the related block is selected
- * @param {string} tab Element id where to insert sidebar content, default: sidebar-properties
+ * @param {string} tab Element id where to insert sidebar content (ignored - context required)
  * @returns {string} Rendered sidebar
  */
-const SidebarPortal = ({ children, selected, tab = 'sidebar-properties' }) => {
+const SidebarPortal = ({ children, selected }) => {
   const [isClient, setIsClient] = React.useState(null);
   const overrideTarget = React.useContext(SidebarPortalTargetContext);
 
   React.useEffect(() => setIsClient(true), []);
 
-  // Use override target if provided via context, otherwise use the tab prop
-  const targetId = overrideTarget || tab;
+  // Hydra takes full control: ONLY render when context is set
+  // This suppresses Volto's normal sidebar rendering (which has no context)
+  // ParentBlocksWidget handles all sidebar rendering with explicit context
+  if (!overrideTarget) {
+    return null;
+  }
+
+  const targetId = overrideTarget;
   const targetElement = isClient ? document.getElementById(targetId) : null;
 
   return (

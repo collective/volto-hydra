@@ -4,6 +4,7 @@ import {
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
 import HydraSlateWidget from './widgets/HydraSlateWidget';
+import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 
 const applyConfig = (config) => {
   // Patch setTimeout to catch focus errors from AddLinkForm
@@ -41,6 +42,9 @@ const applyConfig = (config) => {
 
   // Register the HydraSlateWidget that exposes editor instances
   config.widgets.widget.hydra_slate = HydraSlateWidget;
+
+  // Hide container block fields - ChildBlocksWidget handles their UI
+  config.widgets.type.blocks = HiddenBlocksWidget;
 
   // Add the slate block in the sidebar
   config.blocks.blocksConfig.slate = {

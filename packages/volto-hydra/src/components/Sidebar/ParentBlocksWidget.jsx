@@ -23,6 +23,7 @@ import { useLocation } from 'react-router-dom';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
+import DropdownMenu from '../Toolbar/DropdownMenu';
 
 /**
  * Get the display title for a block type
@@ -146,11 +147,16 @@ const ParentBlockSection = ({
   index,
   isCurrentBlock,
   onSelectBlock,
+  onDeleteBlock,
   onChangeBlock,
   formData,
   pathname,
   intl,
 }) => {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [menuButtonRect, setMenuButtonRect] = React.useState(null);
+  const menuButtonRef = React.useRef(null);
+
   const title = getBlockTypeTitle(blockType);
   // Use sidebar-properties for current block (backwards compat), parent-sidebar-{id} for parents
   const targetId = isCurrentBlock ? 'sidebar-properties' : `parent-sidebar-${blockId}`;
@@ -160,6 +166,28 @@ const ParentBlockSection = ({
 
   // Get schema for fallback rendering (when no Edit component)
   const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl) : null;
+
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleClickOutside = (e) => {
+      if (menuButtonRef.current && !menuButtonRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [menuOpen]);
+
+  const handleMenuClick = (e) => {
+    e.stopPropagation();
+    if (menuButtonRef.current) {
+      setMenuButtonRect(menuButtonRef.current.getBoundingClientRect());
+    }
+    setMenuOpen(!menuOpen);
+  };
 
   return (
     <div className="sidebar-section parent-block-section">
@@ -178,19 +206,39 @@ const ParentBlockSection = ({
           <span>{title}</span>
         </button>
         <div className="block-actions-menu">
-          <button className="menu-trigger" title="Block actions">
+          <button
+            ref={menuButtonRef}
+            className="menu-trigger"
+            title="Block actions"
+            onClick={handleMenuClick}
+          >
             •••
           </button>
+          {menuOpen && (
+            <DropdownMenu
+              selectedBlock={blockId}
+              onDeleteBlock={onDeleteBlock}
+              menuButtonRect={menuButtonRect}
+              onClose={() => setMenuOpen(false)}
+              // No onOpenSettings - we're already in sidebar/settings
+            />
+          )}
         </div>
       </div>
 
-      {/* Portal target for Edit component's SidebarPortal content */}
-      <div
-        id={targetId}
-        className="sidebar-section-content parent-block-settings"
-      />
+      {/* Portal target for parent blocks only - they render their own sidebar content
+          Current block's #sidebar-properties is a static element in Sidebar.jsx */}
+      {!isCurrentBlock && (
+        <div
+          id={targetId}
+          className="sidebar-section-content parent-block-settings"
+        />
+      )}
 
-      {/* Render Edit component with context override - its SidebarPortal will render to targetId */}
+      {/* Render Edit component for sidebar content
+          We take full control - SidebarPortal only renders when context is set
+          Parent blocks: render to their own target div
+          Current block: render to sidebar-properties */}
       {BlockEdit && (
         <SidebarPortalTargetContext.Provider value={targetId}>
           {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
@@ -222,8 +270,8 @@ const ParentBlockSection = ({
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
-      {!BlockEdit && schema && (
-        <div className="sidebar-section-content parent-block-settings fallback-form">
+      {!BlockEdit && schema && (() => {
+        const formContent = (
           <BlockDataForm
             schema={schema}
             onChangeField={(fieldId, value) => {
@@ -240,8 +288,15 @@ const ParentBlockSection = ({
             block={blockId}
             applySchemaEnhancers={true}
           />
-        </div>
-      )}
+        );
+        // For current block, portal to #sidebar-properties in Sidebar.jsx
+        // For parent blocks, render inline (portal target div already exists above)
+        if (isCurrentBlock) {
+          const sidebarProperties = document.getElementById('sidebar-properties');
+          return sidebarProperties ? createPortal(formContent, sidebarProperties) : null;
+        }
+        return formContent;
+      })()}
     </div>
   );
 };
@@ -255,6 +310,7 @@ const ParentBlocksWidget = ({
   formData,
   blockPathMap,
   onSelectBlock,
+  onDeleteBlock,
   onChangeBlock,
 }) => {
   const [isClient, setIsClient] = React.useState(false);
@@ -275,13 +331,46 @@ const ParentBlocksWidget = ({
     if (prevSelectedBlockRef.current === selectedBlock) return;
     prevSelectedBlockRef.current = selectedBlock;
 
-    // Use setTimeout to ensure portal has rendered
-    setTimeout(() => {
+    // Poll until sidebar content has rendered, then scroll
+    // This handles async content like Slate editors that render after initial mount
+    let attempts = 0;
+    const maxAttempts = 20; // 2 seconds max (20 * 100ms)
+
+    const tryScroll = () => {
+      attempts++;
       const sidebarProperties = document.getElementById('sidebar-properties');
-      if (sidebarProperties) {
-        sidebarProperties.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const scrollContainer = document.querySelector('.sidebar-content-wrapper');
+
+      if (!sidebarProperties || !scrollContainer) {
+        if (attempts < maxAttempts) setTimeout(tryScroll, 100);
+        return;
       }
-    }, 100);
+
+      // Wait until there's actual content inside (not just an empty container)
+      // The form or editor content should have rendered
+      const hasContent = sidebarProperties.querySelector('form, [role="textbox"]');
+      if (!hasContent && attempts < maxAttempts) {
+        setTimeout(tryScroll, 100);
+        return;
+      }
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const propertiesRect = sidebarProperties.getBoundingClientRect();
+
+      // Check if bottom of settings is below visible area
+      const propertiesBottom = propertiesRect.bottom;
+      const containerBottom = containerRect.bottom;
+
+      if (propertiesBottom > containerBottom) {
+        // Scroll the container to show the bottom of settings
+        // Add 30px padding to ensure settings are comfortably visible
+        const scrollAmount = propertiesBottom - containerBottom + 30;
+        scrollContainer.scrollTop += scrollAmount;
+      }
+    };
+
+    // Start polling after a small delay for initial React render
+    setTimeout(tryScroll, 100);
   }, [isClient, selectedBlock]);
 
   if (!isClient) {
@@ -324,6 +413,7 @@ const ParentBlocksWidget = ({
                 index={index}
                 isCurrentBlock={false}
                 onSelectBlock={onSelectBlock}
+                onDeleteBlock={onDeleteBlock}
                 onChangeBlock={onChangeBlock}
                 formData={formData}
                 pathname={pathname}
@@ -342,6 +432,7 @@ const ParentBlocksWidget = ({
             index={parentIds.length}
             isCurrentBlock={true}
             onSelectBlock={onSelectBlock}
+            onDeleteBlock={onDeleteBlock}
             onChangeBlock={onChangeBlock}
             formData={formData}
             pathname={pathname}
@@ -359,6 +450,7 @@ ParentBlocksWidget.propTypes = {
   formData: PropTypes.object,
   blockPathMap: PropTypes.object,
   onSelectBlock: PropTypes.func,
+  onDeleteBlock: PropTypes.func,
   onChangeBlock: PropTypes.func,
 };
 

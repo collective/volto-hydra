@@ -522,9 +522,6 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
 
-    // Wait for scroll animation to complete
-    await page.waitForTimeout(500);
-
     // Get the sidebar scroll container and current block settings
     const sidebarScroller = page.locator('.sidebar-content-wrapper');
     const blockSettings = page.locator('#sidebar-properties');
@@ -532,27 +529,25 @@ test.describe('Hierarchical Sidebar', () => {
     await expect(sidebarScroller).toBeVisible();
     await expect(blockSettings).toBeVisible();
 
-    // Get bounding boxes
-    const settingsBox = await blockSettings.boundingBox();
-    const scrollerBox = await sidebarScroller.boundingBox();
+    // Wait for scroll to complete by polling until settings bottom is visible
+    await expect(async () => {
+      const settingsBox = await blockSettings.boundingBox();
+      const scrollerBox = await sidebarScroller.boundingBox();
 
-    expect(settingsBox).toBeTruthy();
-    expect(scrollerBox).toBeTruthy();
+      expect(settingsBox).toBeTruthy();
+      expect(scrollerBox).toBeTruthy();
 
-    // The current block settings should be visible (scrolled into view)
-    // At minimum, the top of the settings should be visible in the viewport
-    const settingsTop = settingsBox!.y;
-    const scrollerTop = scrollerBox!.y;
-    const scrollerBottom = scrollerBox!.y + scrollerBox!.height;
+      // The current block settings should be fully visible (scrolled into view)
+      // Allow 5px tolerance for sub-pixel rendering differences
+      const settingsBottom = settingsBox!.y + settingsBox!.height;
+      const scrollerBottom = scrollerBox!.y + scrollerBox!.height;
+      const tolerance = 5;
 
-    // Settings top should be within the visible scroll area
-    const isSettingsTopVisible =
-      settingsTop >= scrollerTop && settingsTop < scrollerBottom;
-    expect(
-      isSettingsTopVisible,
-      `Current block settings should be scrolled into view. ` +
-        `Settings top: ${settingsTop}, Scroller range: ${scrollerTop}-${scrollerBottom}`,
-    ).toBe(true);
+      expect(
+        settingsBottom <= scrollerBottom + tolerance,
+        `Settings bottom (${settingsBottom}) should be within ${tolerance}px of scroller bottom (${scrollerBottom})`,
+      ).toBe(true);
+    }).toPass({ timeout: 5000 });
   });
 
   test('child blocks widget shown for container blocks', async ({ page }) => {

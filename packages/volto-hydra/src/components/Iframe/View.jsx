@@ -1509,6 +1509,7 @@ const Iframe = (props) => {
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}
+        onDeleteBlock={onDeleteBlock}
         onChangeBlock={(blockId, newBlockData) => {
           // Rebuild blockPathMap from current properties to ensure it's up to date
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig);

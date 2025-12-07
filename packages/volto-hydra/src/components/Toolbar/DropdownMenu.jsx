@@ -50,29 +50,34 @@ const DropdownMenu = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="volto-hydra-dropdown-item"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '10px',
-          cursor: 'pointer',
-          fontSize: '15px',
-          fontWeight: '500',
-        }}
-        onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-        onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-        onClick={handleSettings}
-      >
-        ⚙️ Settings
-      </div>
-      <div
-        style={{
-          height: '1px',
-          background: 'rgba(0, 0, 0, 0.1)',
-          margin: '0 10px',
-        }}
-      />
+      {/* Settings option - only shown when onOpenSettings is provided (toolbar usage) */}
+      {onOpenSettings && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={handleSettings}
+          >
+            ⚙️ Settings
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
       <div
         className="volto-hydra-dropdown-item"
         style={{
