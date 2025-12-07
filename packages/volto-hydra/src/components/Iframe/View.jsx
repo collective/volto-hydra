@@ -176,7 +176,10 @@ const extractBlockFieldTypes = (intl) => {
       }
 
       // Map each field to its type for this block type
-      blockFieldTypes[blockType] = {};
+      // Preserve any hardcoded values (like slate.value) by merging, not overwriting
+      if (!blockFieldTypes[blockType]) {
+        blockFieldTypes[blockType] = {};
+      }
       Object.keys(schema.properties).forEach((fieldName) => {
         const field = schema.properties[fieldName];
         // Determine field type based on widget
