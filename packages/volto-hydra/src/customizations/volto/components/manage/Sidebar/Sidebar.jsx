@@ -76,13 +76,15 @@ const Sidebar = (props) => {
 
   // Update sticky header offsets when DOM changes
   useEffect(() => {
-    // Initial calculation
-    updateStickyOffsets(sidebarContentRef);
+    // Initial calculation (deferred to ensure layout is complete)
+    requestAnimationFrame(() => updateStickyOffsets(sidebarContentRef));
 
     // Set up MutationObserver to recalculate when headers change
     if (sidebarContentRef.current) {
       const observer = new MutationObserver(() => {
-        updateStickyOffsets(sidebarContentRef);
+        // Use requestAnimationFrame to ensure DOM layout is complete
+        // before measuring header heights and setting top offsets
+        requestAnimationFrame(() => updateStickyOffsets(sidebarContentRef));
       });
 
       observer.observe(sidebarContentRef.current, {

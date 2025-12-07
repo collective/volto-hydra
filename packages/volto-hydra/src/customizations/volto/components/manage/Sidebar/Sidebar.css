@@ -18,6 +18,12 @@
   border-bottom: none;
 }
 
+/* Parent block sections need display: contents so their sticky headers
+   can stick relative to the scroll container, not the section div */
+.hydra-sidebar .parent-block-section {
+  display: contents;
+}
+
 .hydra-sidebar .sidebar-section-header {
   display: flex;
   justify-content: space-between;

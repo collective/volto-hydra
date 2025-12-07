@@ -424,69 +424,94 @@ test.describe('Deleting Blocks from Containers', () => {
 
 test.describe('Hierarchical Sidebar', () => {
   test('sticky headers remain visible when scrolling sidebar', async ({ page }) => {
+    // Set a very small viewport height to ensure sidebar content overflows
+    await page.setViewportSize({ width: 1280, height: 400 });
+
     const helper = new AdminUIHelper(page);
 
     await helper.login();
-    await helper.navigateToEdit('/test-page');
+    await helper.navigateToEdit('/container-test-page');
 
-    // Select the image block which has lots of fields that require scrolling
-    await helper.clickBlockInIframe('block-2-uuid');
+    // Select a deeply nested block (text inside column inside columns)
+    // This should show 4 headers: Page, Columns, Column, Text
+    await helper.clickBlockInIframe('text-2a');
     await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
 
     // Get the sidebar content wrapper
     const sidebarContent = page.locator('.sidebar-content-wrapper');
 
-    // Get all sticky headers
+    // Get all sticky headers - should be 4 for deeply nested block
     const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
-    const headerCount = await stickyHeaders.count();
+    await expect(stickyHeaders).toHaveCount(4);
 
-    // Should have at least 2 headers (Page + current block)
-    expect(headerCount).toBeGreaterThanOrEqual(2);
+    // Verify the header hierarchy: Page, Columns, Column, Text
+    await expect(stickyHeaders.nth(0)).toContainText('Page');
+    await expect(stickyHeaders.nth(1)).toContainText('Columns');
+    await expect(stickyHeaders.nth(2)).toContainText('Column');
+    await expect(stickyHeaders.nth(3)).toContainText('Text');
 
-    // Scroll to bottom of sidebar
-    await sidebarContent.evaluate((el) => {
-      el.scrollTop = el.scrollHeight;
-    });
-    await page.waitForTimeout(100);
-
-    // Get the scroll container bounds
+    // Get container bounds before scrolling
     const containerBounds = await sidebarContent.boundingBox();
     expect(containerBounds).toBeTruthy();
 
-    // Verify all sticky headers are within the visible scroll viewport
-    // Each header should be positioned within the container's visible area
-    for (let i = 0; i < headerCount; i++) {
-      const header = stickyHeaders.nth(i);
-      const headerBounds = await header.boundingBox();
-      expect(headerBounds).toBeTruthy();
+    // Scroll to bottom of sidebar
+    const scrollInfo = await sidebarContent.evaluate((el) => {
+      const before = el.scrollTop;
+      el.scrollTop = el.scrollHeight;
+      return {
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        scrollTopBefore: before,
+        scrollTopAfter: el.scrollTop,
+      };
+    });
+    await page.waitForTimeout(200);
 
-      // Header should be within the container's visible area (not scrolled out)
-      // boundingBox uses y for top position
-      const isWithinContainer =
-        headerBounds!.y >= containerBounds!.y &&
-        headerBounds!.y < containerBounds!.y + containerBounds!.height;
+    // Verify scrolling actually happened (content is taller than viewport)
+    expect(
+      scrollInfo.scrollTopAfter,
+      `Sidebar should have scrolled (scrollHeight=${scrollInfo.scrollHeight}, clientHeight=${scrollInfo.clientHeight})`,
+    ).toBeGreaterThan(0);
+
+    // After scrolling to bottom, sticky headers should be at the TOP of the container
+    // If sticky isn't working, they would have scrolled out of view (y would be negative)
+    const bounds = await Promise.all([
+      stickyHeaders.nth(0).boundingBox(),
+      stickyHeaders.nth(1).boundingBox(),
+      stickyHeaders.nth(2).boundingBox(),
+      stickyHeaders.nth(3).boundingBox(),
+    ]);
+
+    // Page header should be at the top of the container (sticky at top: 0)
+    expect(
+      bounds[0]!.y,
+      `Page header should be at top of container after scrolling (got y=${bounds[0]!.y}, container top=${containerBounds!.y})`,
+    ).toBeGreaterThanOrEqual(containerBounds!.y - 5); // Allow small margin
+
+    expect(
+      bounds[0]!.y,
+      `Page header should be stuck at top, not scrolled down`,
+    ).toBeLessThan(containerBounds!.y + 100);
+
+    // All headers should be stacked within the visible container area
+    for (let i = 0; i < 4; i++) {
+      expect(
+        bounds[i]!.y,
+        `Header ${i} should be within visible container (y=${bounds[i]!.y})`,
+      ).toBeGreaterThanOrEqual(containerBounds!.y - 5);
 
       expect(
-        isWithinContainer,
-        `Header ${i} should be visible within scroll container. ` +
-          `Header y: ${headerBounds!.y}, Container y: ${containerBounds!.y}, ` +
-          `Container height: ${containerBounds!.height}`,
-      ).toBe(true);
+        bounds[i]!.y,
+        `Header ${i} should be in upper portion of container when sticky`,
+      ).toBeLessThan(containerBounds!.y + containerBounds!.height / 2);
     }
 
-    // Verify headers are stacked (each header's y position should be >= previous)
-    let previousY = containerBounds!.y;
-    for (let i = 0; i < headerCount; i++) {
-      const header = stickyHeaders.nth(i);
-      const headerBounds = await header.boundingBox();
-
+    // Verify headers are stacked vertically (each below the previous)
+    for (let i = 1; i < bounds.length; i++) {
       expect(
-        headerBounds!.y >= previousY,
-        `Header ${i} should be below or at previous header position`,
-      ).toBe(true);
-
-      previousY = headerBounds!.y + headerBounds!.height;
+        bounds[i]!.y,
+        `Header ${i} should be below header ${i - 1}`,
+      ).toBeGreaterThan(bounds[i - 1]!.y);
     }
   });
 
