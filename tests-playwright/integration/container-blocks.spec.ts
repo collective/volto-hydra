@@ -1066,11 +1066,17 @@ test.describe('Empty Block Behavior', () => {
     await page.waitForTimeout(500);
 
     // The block should now be slate type, not empty
-    const blockType = await iframe
+    const slateBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
+      .first();
+    const blockType = await slateBlock.getAttribute('data-block-type');
     expect(blockType).toBe('slate');
+
+    // The slate block should have proper empty content, not "Empty block" fallback
+    // This verifies that onMutateBlock properly initializes the slate value
+    const slateText = await slateBlock.textContent();
+    expect(slateText?.trim()).toBe('');
+    expect(slateText).not.toContain('Empty block');
   });
 
   test('adding new container block creates initial block inside', async ({

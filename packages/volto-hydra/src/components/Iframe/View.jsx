@@ -577,6 +577,30 @@ const Iframe = (props) => {
     // Use merged config from registry (includes frontend's custom blocks after INIT)
     const mergedBlocksConfig = config.blocks.blocksConfig;
 
+    // Initialize block data the same way as onInsertBlock
+    // This is important when replacing empty blocks with real blocks
+    let blockData = { '@type': value['@type'], ...value };
+
+    // Add initial slate value for slate blocks
+    if (blockData['@type'] === 'slate' && !blockData.value) {
+      blockData.value = [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }];
+    }
+
+    // Apply block defaults
+    blockData = applyBlockDefaults({
+      data: blockData,
+      intl,
+      metadata,
+      properties,
+    });
+
+    // Initialize container blocks with default children (recursive)
+    blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, {
+      intl,
+      metadata,
+      properties,
+    });
+
     // Check if mutating inside a container (null means page-level)
     const containerConfig = getContainerFieldConfig(
       id,
@@ -590,7 +614,7 @@ const Iframe = (props) => {
       properties,
       iframeSyncState.blockPathMap,
       id,
-      value,
+      blockData,
       containerConfig,
     );
 
