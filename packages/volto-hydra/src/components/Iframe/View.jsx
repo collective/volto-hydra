@@ -386,6 +386,7 @@ const Iframe = (props) => {
 
   const dispatch = useDispatch();
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
+  const [addAfterBlockId, setAddAfterBlockId] = useState(null); // which block to add after
   const [pendingDelete, setPendingDelete] = useState(null);
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
@@ -1260,28 +1261,51 @@ const Iframe = (props) => {
     return allowedBlocks;
   }, [parentContainerConfig, allowedBlocks]);
 
-  // Compute effective allowedBlocks for BlockChooser
-  // This depends on whether we're adding INTO or AFTER
-  // For now, use sidebar behavior when container is selected, iframe behavior otherwise
+  // Compute allowedBlocks for BlockChooser based on addAfterBlockId
+  // We always add AFTER a block, so we need the parent container's allowedBlocks
   const effectiveAllowedBlocks = useMemo(() => {
-    // If selected block is a container, show its child allowed blocks
-    if (sidebarAllowedBlocks) {
-      return sidebarAllowedBlocks;
+    const afterBlockId = addAfterBlockId || selectedBlock;
+    const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
+    if (parentId) {
+      // Adding inside a container - get that container's allowedBlocks
+      const parentBlockData = getBlockByPath(
+        properties,
+        iframeSyncState.blockPathMap?.[parentId]?.path,
+      );
+      const parentType = parentBlockData?.['@type'];
+      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
+      // Find the container field that contains this block
+      for (const [fieldName, fieldDef] of Object.entries(parentSchema?.properties || {})) {
+        if (fieldDef.type === 'blocks') {
+          const layoutField = `${fieldName}_layout`;
+          if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
+            return fieldDef.allowedBlocks || null;
+          }
+        }
+      }
     }
-    // Otherwise show sibling allowed blocks
-    return iframeAllowedBlocks;
-  }, [sidebarAllowedBlocks, iframeAllowedBlocks]);
+    // Page-level - use page's allowedBlocks prop
+    return allowedBlocks;
+  }, [addAfterBlockId, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks]);
 
-  // Handle sidebar add - inserts INTO the container
+  // Handle sidebar add - adds after the last child of the container
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
+    // Find the last child of the container
+    const parentPath = iframeSyncState.blockPathMap?.[parentBlockId]?.path;
+    const parentBlock = getBlockByPath(properties, parentPath);
+    const layoutField = `${fieldName}_layout`;
+    const existingItems = parentBlock?.[layoutField]?.items || [];
+    const lastBlockId = existingItems[existingItems.length - 1] || null;
+
+    // Set which block we're adding after (for allowedBlocks computation)
+    setAddAfterBlockId(lastBlockId);
+
     const containerAllowed = sidebarAllowedBlocks;
     if (containerAllowed?.length === 1) {
       // Only one allowed block type - auto-insert without showing chooser
       const blockType = containerAllowed[0];
       const newBlockId = uuid();
 
-      // Initialize block data with recursive container initialization
-      // Use merged config from registry (includes frontend's custom blocks after INIT)
       const mergedBlocksConfig = config.blocks.blocksConfig;
       let newBlockData = { '@type': blockType };
       newBlockData = initializeContainerBlock(newBlockData, mergedBlocksConfig, uuid, {
@@ -1290,28 +1314,18 @@ const Iframe = (props) => {
         properties,
       });
 
-      // Get existing blocks to find last block for insertion position
-      const parentPath = iframeSyncState.blockPathMap?.[parentBlockId]?.path;
-      const parentBlock = getBlockByPath(properties, parentPath);
-      const layoutField = `${fieldName}_layout`;
-      const existingItems = parentBlock?.[layoutField]?.items || [];
-      const lastBlockId = existingItems[existingItems.length - 1] || null;
-
-      // Use insertBlockInContainer to add as child
       const containerConfig = { parentId: parentBlockId, fieldName };
       const newFormData = insertBlockInContainer(
         properties,
         iframeSyncState.blockPathMap,
-        lastBlockId, // afterBlockId - insert after last block
+        lastBlockId,
         newBlockId,
         newBlockData,
         containerConfig,
       );
       if (newFormData) {
         onChangeFormData(newFormData);
-        // Store block to select after FORM_DATA is sent to iframe
-        // Don't call onSelectBlock directly - iframe doesn't have the block yet
-        setIframeSyncState(prev => ({
+        setIframeSyncState((prev) => ({
           ...prev,
           pendingSelectBlockUid: newBlockId,
         }));
@@ -1323,21 +1337,28 @@ const Iframe = (props) => {
     }
   }, [sidebarAllowedBlocks, properties, onChangeFormData, iframeSyncState.blockPathMap, intl, metadata, dispatch]);
 
-  // Handle iframe add - inserts AFTER the block (as sibling)
+  // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
+    // Set which block we're adding after (for allowedBlocks computation)
+    setAddAfterBlockId(selectedBlock);
+
     const siblingAllowed = iframeAllowedBlocks;
     if (siblingAllowed?.length === 1) {
       // Only one allowed block type - auto-insert without showing chooser
       const blockType = siblingAllowed[0];
       const newId = onInsertBlock(selectedBlock, { '@type': blockType });
-      // Select the newly added block
-      onSelectBlock(newId);
+      // Store block to select after FORM_DATA is sent to iframe
+      // Don't call onSelectBlock directly - iframe doesn't have the block yet
+      setIframeSyncState((prev) => ({
+        ...prev,
+        pendingSelectBlockUid: newId,
+      }));
       dispatch(setSidebarTab(1));
     } else {
       // Multiple options - show the block chooser
       setAddNewBlockOpened(true);
     }
-  }, [iframeAllowedBlocks, selectedBlock, onInsertBlock, onSelectBlock, dispatch]);
+  }, [iframeAllowedBlocks, selectedBlock, onInsertBlock, dispatch]);
 
   return (
     <div id="iframeContainer">
@@ -1373,8 +1394,15 @@ const Iframe = (props) => {
 
                   return (id, value) => {
                     setAddNewBlockOpened(false);
-                    const newId = onInsertBlock(id, value);
-                    onSelectBlock(newId);
+                    // Use addAfterBlockId when set (sidebar add), otherwise use id from BlockChooser
+                    const insertAfterId = addAfterBlockId || id;
+                    const newId = onInsertBlock(insertAfterId, value);
+                    // Store block to select after FORM_DATA is sent to iframe
+                    // Don't call onSelectBlock directly - iframe doesn't have the block yet
+                    setIframeSyncState((prev) => ({
+                      ...prev,
+                      pendingSelectBlockUid: newId,
+                    }));
                     dispatch(setSidebarTab(1));
                   };
                 })()

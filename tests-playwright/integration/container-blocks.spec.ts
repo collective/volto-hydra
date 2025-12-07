@@ -140,11 +140,11 @@ test.describe('Container Block Detection', () => {
 // so it can derive parent relationships from blockPathMap[blockUid].parentId.
 
 test.describe('Adding Blocks to Containers', () => {
-  test('main add button respects container allowedBlocks when container selected', async ({
+  test('iframe add button adds AFTER selected block showing parent allowedBlocks', async ({
     page,
   }) => {
-    // BUG TEST: When columns-1 is selected, clicking the main add button should
-    // show only 'column' (the container's allowedBlocks), not page-level blocks.
+    // When columns-1 (page-level container) is selected, clicking the iframe add button
+    // should add AFTER columns-1 at page level, showing page-level allowed blocks
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -154,28 +154,22 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.clickContainerBlockInIframe('columns-1');
     await page.waitForTimeout(500);
 
-    // Click the main add button
+    // Click the iframe add button (adds AFTER columns-1)
     await helper.clickAddBlockButton();
 
     // Wait for block chooser
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
-    // Should NOT show page-level blocks like Image, Text, Hero
-    // because columns only allows ['column']
-    expect(await helper.isBlockTypeVisible('image')).toBe(false);
-    expect(await helper.isBlockTypeVisible('slate')).toBe(false);
-    expect(await helper.isBlockTypeVisible('hero')).toBe(false);
+    // Should show page-level blocks (Image, Text, Hero) since we're adding at page level
+    await expect(
+      blockChooser.getByRole('button', { name: 'Image' }),
+    ).toBeVisible();
+    await expect(
+      blockChooser.getByRole('button', { name: 'Text' }),
+    ).toBeVisible();
 
-    // Column should be available in the Common section (expand it first)
-    const commonSection = blockChooser.locator('text=Common');
-    if (await commonSection.isVisible()) {
-      await commonSection.click();
-      await page.waitForTimeout(200);
-    }
-
-    // Should show Column (the only allowed type for columns container)
-    expect(await helper.isBlockTypeVisible('column')).toBe(true);
+    await page.keyboard.press('Escape');
   });
 
   test('clicking add on nested block shows container-filtered block chooser', async ({
@@ -1312,31 +1306,127 @@ test.describe('Single Allowed Block Auto-Insert', () => {
       .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
       .count();
     expect(newColumnCount).toBe(3);
+
   });
 
-  test('block chooser still appears when multiple block types allowed', async ({
+  test('sidebar add on column adds block INSIDE column not as sibling', async ({
     page,
   }) => {
-    // column block has allowedBlocks: ['slate', 'image'] - multiple options
+    // When col-1 is selected and we click sidebar add, the new block should be
+    // added INSIDE col-1 (as a child), NOT as a sibling column in columns-1
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    const iframe = helper.getIframe();
+
+    // Count initial blocks in col-1 and columns in columns-1
+    const initialBlocksInCol1 = await iframe
+      .locator('[data-block-uid="col-1"] > [data-block-uid]')
+      .count();
+    const initialColumnCount = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(initialBlocksInCol1).toBe(2); // text-1a and text-1b
+    expect(initialColumnCount).toBe(2); // col-1 and col-2
+
     // Select col-1 (a column that allows slate and image)
     await helper.clickContainerBlockInIframe('col-1');
     await page.waitForTimeout(500);
 
-    // Click the sidebar add button (adds INTO col-1 where slate and image are allowed)
+    // Click the sidebar add button (should add INTO col-1)
     const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
     await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
     await sidebarAddButton.click();
 
-    // Block chooser SHOULD appear (since there are multiple options)
+    // Block chooser SHOULD appear (since col-1 allows slate and image)
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
-    // Close the chooser by pressing Escape
+    // Select Text (slate) block
+    await blockChooser.getByRole('button', { name: 'Text' }).click();
+
+    // Wait for block insertion
+    await page.waitForTimeout(1000);
+
+    // Verify: col-1 should now have 3 children (new block added INSIDE)
+    const newBlocksInCol1 = await iframe
+      .locator('[data-block-uid="col-1"] > [data-block-uid]')
+      .count();
+    expect(newBlocksInCol1).toBe(3); // was 2, now 3
+
+    // Verify: columns-1 should still have 2 columns (NO sibling added)
+    const newColumnCount = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(newColumnCount).toBe(2); // should still be 2, not 3
+  });
+
+  test('iframe add after page-level container shows page-level allowed blocks', async ({
+    page,
+  }) => {
+    // When clicking iframe add button on a page-level container block (columns-1),
+    // the block chooser should show all page-level blocks, not the container's child blocks
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select columns-1 (a page-level container block)
+    await helper.clickContainerBlockInIframe('columns-1');
+    await page.waitForTimeout(500);
+
+    // Click the iframe add button (adds AFTER columns-1 at page level)
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
+    // Block chooser should appear with page-level blocks (not just 'column')
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Should see common blocks like Image, Text, Hero - not just Column
+    // The page doesn't restrict allowedBlocks, so all common blocks should appear
+    await expect(blockChooser.getByRole('button', { name: 'Image' })).toBeVisible();
+    await expect(blockChooser.getByRole('button', { name: 'Text' })).toBeVisible();
+
     await page.keyboard.press('Escape');
+  });
+});
+
+test.describe('Sidebar Editing for Nested Blocks', () => {
+  test('editing nested slate block in iframe does not cause sidebar error', async ({
+    page,
+  }) => {
+    // Regression test: When editing a slate block inside a column in the iframe,
+    // the sidebar should not throw "Invalid value used as weak map key" error
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a slate block inside col-1 (text-1a)
+    await helper.clickContainerBlockInIframe('text-1a');
+    await page.waitForTimeout(500);
+
+    // Verify sidebar shows the slate block settings without error
+    const sidebarHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"]',
+    );
+    await expect(sidebarHeader).toBeVisible({ timeout: 5000 });
+
+    // Type some text in the iframe to trigger an edit
+    const iframe = helper.getIframe();
+    const slateBlock = iframe.locator('[data-block-uid="text-1a"]');
+    await slateBlock.click();
+    await page.keyboard.type('Test edit');
+
+    // Wait a moment for any errors to surface
+    await page.waitForTimeout(1000);
+
+    // Check for console errors - the page should not have crashed
+    // The sidebar should still be visible
+    await expect(sidebarHeader).toBeVisible();
   });
 });

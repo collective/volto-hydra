@@ -2299,6 +2299,18 @@ export class Bridge {
 
         if (closestBlockUid) {
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
+
+          // For now, only support drag-and-drop for page-level blocks
+          // TODO: Add container-aware DnD that handles nested blocks
+          const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
+          const targetPathInfo = this.blockPathMap?.[closestBlockUid];
+
+          if (draggedPathInfo?.parentId || targetPathInfo?.parentId) {
+            // One or both blocks are nested - skip for now
+            console.log('[HYDRA] DnD: Skipping - nested blocks not yet supported');
+            return;
+          }
+
           const blocks_layout = this.formData.blocks_layout.items;
           const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
           const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
@@ -3464,11 +3476,23 @@ export class Bridge {
    */
   getFormDataWithoutNodeIds() {
     const formDataCopy = JSON.parse(JSON.stringify(this.formData));
-    if (formDataCopy.blocks) {
-      Object.keys(formDataCopy.blocks).forEach((blockId) => {
-        this.resetJsonNodeIds(formDataCopy.blocks[blockId]);
-      });
-    }
+
+    // Recursively strip nodeIds from all blocks (including nested)
+    const stripNodeIds = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      // If this looks like a block (has @type), strip its nodeIds
+      if (obj['@type']) {
+        this.resetJsonNodeIds(obj);
+      }
+      // Recurse into all properties to find nested blocks
+      for (const value of Object.values(obj)) {
+        if (value && typeof value === 'object') {
+          stripNodeIds(value);
+        }
+      }
+    };
+
+    stripNodeIds(formDataCopy);
     return formDataCopy;
   }
 
@@ -3564,7 +3588,9 @@ export class Bridge {
     }
 
     // Determine field type from block schema metadata
-    const blockType = this.formData?.blocks[blockUid]?.['@type'];
+    // Use getBlockData to support nested blocks inside containers
+    const blockData = this.getBlockData(blockUid);
+    const blockType = blockData?.['@type'];
     const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
     const fieldType = blockFieldTypes[editableField];
 
@@ -3588,8 +3614,9 @@ export class Bridge {
       const nodeId = closestNode.getAttribute('data-node-id');
       // Strip ZWS characters before updating - they're only for cursor positioning in DOM
       const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
+      // Use blockData from getBlockData (already retrieved above) to support nested blocks
       const updatedJson = this.updateJsonNode(
-        this.formData?.blocks[blockUid],
+        blockData,
         nodeId,
         textContent,
       );
