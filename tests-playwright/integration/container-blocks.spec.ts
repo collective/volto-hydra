@@ -140,6 +140,44 @@ test.describe('Container Block Detection', () => {
 // so it can derive parent relationships from blockPathMap[blockUid].parentId.
 
 test.describe('Adding Blocks to Containers', () => {
+  test('main add button respects container allowedBlocks when container selected', async ({
+    page,
+  }) => {
+    // BUG TEST: When columns-1 is selected, clicking the main add button should
+    // show only 'column' (the container's allowedBlocks), not page-level blocks.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click on columns-1 to select it
+    await helper.clickContainerBlockInIframe('columns-1');
+    await page.waitForTimeout(500);
+
+    // Click the main add button
+    await helper.clickAddBlockButton();
+
+    // Wait for block chooser
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Should NOT show page-level blocks like Image, Text, Hero
+    // because columns only allows ['column']
+    expect(await helper.isBlockTypeVisible('image')).toBe(false);
+    expect(await helper.isBlockTypeVisible('slate')).toBe(false);
+    expect(await helper.isBlockTypeVisible('hero')).toBe(false);
+
+    // Column should be available in the Common section (expand it first)
+    const commonSection = blockChooser.locator('text=Common');
+    if (await commonSection.isVisible()) {
+      await commonSection.click();
+      await page.waitForTimeout(200);
+    }
+
+    // Should show Column (the only allowed type for columns container)
+    expect(await helper.isBlockTypeVisible('column')).toBe(true);
+  });
+
   test('clicking add on nested block shows container-filtered block chooser', async ({
     page,
   }) => {
@@ -300,6 +338,7 @@ test.describe('Add Button Direction', () => {
     await helper.navigateToEdit('/container-test-page');
 
     // col-1 has data-block-add="right" attribute
+    // clickBlockInIframe will automatically navigate up if a child is selected
     await helper.clickBlockInIframe('col-1');
 
     // Verify add button is positioned to the right of the block
@@ -863,13 +902,15 @@ test.describe('Empty Block Behavior', () => {
     // (the single allowed type) instead of 'empty'.
 
     // First delete col-2 from columns-1
-    await helper.clickBlockInIframe('col-2');
+    // Use clickContainerBlockInIframe to click on the column title,
+    // not inside where nested blocks would be selected instead
+    await helper.clickContainerBlockInIframe('col-2');
     await helper.openQuantaToolbarMenu('col-2');
     await helper.clickQuantaToolbarMenuOption('col-2', 'Remove');
     await helper.waitForBlockToDisappear('col-2');
 
     // Now delete col-1 (the last column in columns-1)
-    await helper.clickBlockInIframe('col-1');
+    await helper.clickContainerBlockInIframe('col-1');
     await helper.openQuantaToolbarMenu('col-1');
     await helper.clickQuantaToolbarMenuOption('col-1', 'Remove');
     await helper.waitForBlockToDisappear('col-1');
@@ -1016,5 +1057,249 @@ test.describe('Empty Block Behavior', () => {
       .first()
       .getAttribute('data-block-type');
     expect(blockType).toBe('slate');
+  });
+
+  test('adding new container block creates initial block inside', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on columns-1 to select it (the container that holds columns)
+    // We need to select the columns block to add a new column inside it
+    await helper.clickContainerBlockInIframe('columns-1');
+    await page.waitForTimeout(500);
+
+    // Click the SIDEBAR add button (adds INTO the container)
+    // Since columns only allows 'column' blocks, this should auto-insert
+    const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
+    await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
+    await sidebarAddButton.click();
+
+    // Block chooser should NOT appear (single allowedBlock = auto-insert)
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
+
+    // Wait for re-render
+    await page.waitForTimeout(1000);
+
+    // The new column should be created. Since column has defaultBlock: 'slate',
+    // it should have a slate block inside, not be empty.
+    // There should now be 3 columns
+    const columnBlocks = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(columnBlocks).toBe(3);
+
+    // Get the new column (the third one)
+    const newColumn = iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .nth(2);
+
+    // The new column should have at least one block inside
+    const childBlocks = await newColumn.locator('> [data-block-uid]').count();
+    expect(childBlocks).toBeGreaterThan(0);
+
+    // The block inside should be of type 'slate' (the defaultBlock)
+    const childBlockType = await newColumn
+      .locator('> [data-block-uid]')
+      .first()
+      .getAttribute('data-block-type');
+    expect(childBlockType).toBe('slate');
+  });
+
+  test('adding columns block recursively initializes column with default block', async ({
+    page,
+  }) => {
+    // This tests the recursive initialization:
+    // 1. Add columns block at page level
+    // 2. Columns block should automatically get a column (only allowed type)
+    // 3. That column should automatically get a slate block (column's defaultBlock)
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a page-level block (text-after) to get add button at page level
+    await helper.clickBlockInIframe('text-after');
+
+    // Click the add button
+    await helper.clickAddBlockButton();
+
+    // Wait for block chooser
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Expand the Common section to find Columns (it's folded by default)
+    const commonSection = blockChooser.locator('text=Common');
+    await commonSection.click();
+
+    // Select Columns block type (this is a container that only allows 'column')
+    await blockChooser.getByRole('button', { name: 'Columns' }).click();
+
+    // Wait for re-render
+    await page.waitForTimeout(1000);
+
+    // Find the newly added columns block (should be after text-after)
+    // The page layout should now have: title-block, columns-1, text-after, NEW-COLUMNS, grid-1
+    const allColumnsBlocks = iframe.locator('[data-block-type="columns"]');
+    const columnsCount = await allColumnsBlocks.count();
+    expect(columnsCount).toBe(2); // Original columns-1 + new one
+
+    // Get the new columns block (the last one)
+    const newColumnsBlock = allColumnsBlocks.last();
+    const newColumnsId = await newColumnsBlock.getAttribute('data-block-uid');
+    expect(newColumnsId).not.toBe('columns-1');
+
+    // The new columns block should have at least one column inside
+    const columnChildren = newColumnsBlock.locator(
+      '> .columns-row > [data-block-uid]',
+    );
+    const columnCount = await columnChildren.count();
+    expect(columnCount).toBeGreaterThanOrEqual(1);
+
+    // Get the first column
+    const firstColumn = columnChildren.first();
+    const columnType = await firstColumn.getAttribute('data-block-type');
+    expect(columnType).toBe('column');
+
+    // The column should have at least one block inside (defaultBlock: 'slate')
+    const columnContent = firstColumn.locator('> [data-block-uid]');
+    const contentCount = await columnContent.count();
+    expect(contentCount).toBeGreaterThanOrEqual(1);
+
+    // The content block should be slate (column's defaultBlock)
+    const contentType = await columnContent
+      .first()
+      .getAttribute('data-block-type');
+    expect(contentType).toBe('slate');
+  });
+});
+
+test.describe('Single Allowed Block Auto-Insert', () => {
+  // When a container only allows one block type, clicking add should
+  // automatically insert that block type without showing the chooser
+
+  test('sidebar add button auto-inserts when container has single allowedBlock', async ({
+    page,
+  }) => {
+    // columns block has allowedBlocks: ['column'] - only one option
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial column count
+    const initialColumnCount = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(initialColumnCount).toBe(2);
+
+    // Select columns-1 (the container that only allows column blocks)
+    await helper.clickContainerBlockInIframe('columns-1');
+    await page.waitForTimeout(500);
+
+    // Click the sidebar add button (the + in the ChildBlocksWidget)
+    // This is the "Add block" button in the sidebar that adds INTO the container
+    // The button has aria-label="Add block" but text content is just "+"
+    const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
+    await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
+    await sidebarAddButton.click();
+
+    // Block chooser should NOT appear (since there's only one option)
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
+
+    // Wait for the block to be inserted
+    await page.waitForTimeout(1000);
+
+    // A new column should have been auto-inserted
+    const newColumnCount = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(newColumnCount).toBe(3);
+
+    // The new column should have a slate inside (recursive initialization)
+    const newColumn = iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .last();
+    const childBlocks = await newColumn.locator('> [data-block-uid]').count();
+    expect(childBlocks).toBeGreaterThan(0);
+  });
+
+  test('iframe add button auto-inserts when container has single allowedBlock', async ({
+    page,
+  }) => {
+    // When col-1 is selected, the iframe add button inserts AFTER col-1
+    // Parent container (columns-1) only allows 'column' blocks, so auto-insert
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial column count
+    const initialColumnCount = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(initialColumnCount).toBe(2);
+
+    // Select col-1 (inside columns-1, which only allows column blocks)
+    await helper.clickContainerBlockInIframe('col-1');
+    await page.waitForTimeout(500);
+
+    // Find and click the iframe add button (the + button next to the block)
+    // This inserts AFTER col-1 as a sibling (another column)
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
+    // Block chooser should NOT appear (since parent only allows column blocks)
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
+
+    // Wait for the block to be inserted
+    await page.waitForTimeout(1000);
+
+    // A new column should have been auto-inserted
+    const newColumnCount = await iframe
+      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
+      .count();
+    expect(newColumnCount).toBe(3);
+  });
+
+  test('block chooser still appears when multiple block types allowed', async ({
+    page,
+  }) => {
+    // column block has allowedBlocks: ['slate', 'image'] - multiple options
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select col-1 (a column that allows slate and image)
+    await helper.clickContainerBlockInIframe('col-1');
+    await page.waitForTimeout(500);
+
+    // Click the sidebar add button (adds INTO col-1 where slate and image are allowed)
+    const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
+    await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
+    await sidebarAddButton.click();
+
+    // Block chooser SHOULD appear (since there are multiple options)
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Close the chooser by pressing Escape
+    await page.keyboard.press('Escape');
   });
 });

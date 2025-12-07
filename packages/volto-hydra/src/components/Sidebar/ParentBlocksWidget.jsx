@@ -284,11 +284,17 @@ const ParentBlocksWidget = ({
     }, 100);
   }, [isClient, selectedBlock]);
 
-  if (!isClient) return null;
-  if (!selectedBlock) return null;
+  if (!isClient) {
+    return null;
+  }
+  if (!selectedBlock) {
+    return null;
+  }
 
   const parentsTarget = document.getElementById('sidebar-parents');
-  if (!parentsTarget) return null;
+  if (!parentsTarget) {
+    return null;
+  }
 
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);

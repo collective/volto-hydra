@@ -158,8 +158,16 @@ export class AdminUIHelper {
     await block.click();
 
     if (waitForToolbar) {
-      // Wait for toolbar to be positioned correctly and scroll it into view
-      await this.waitForQuantaToolbar(blockId);
+      // Try to wait for toolbar on the target block
+      // If a child was selected instead, navigate up via sidebar
+      const result = await this.isBlockSelectedInIframe(blockId);
+      if (!result.ok) {
+        // A child block was likely selected instead - navigate up via sidebar
+        await this.navigateToParentBlock(blockId);
+      } else {
+        // Target is selected, wait for toolbar to be positioned correctly
+        await this.waitForQuantaToolbar(blockId);
+      }
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
       const editableField = block.locator('[contenteditable="true"]');
@@ -175,9 +183,101 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if a block is selected in the iframe.
-   * A block is selected if it has the "selected" class.
+   * Navigate up through parent blocks in the sidebar until reaching the target block.
+   * Used when clicking on a container block selects a child instead.
    */
+  async navigateToParentBlock(targetBlockId: string, maxAttempts: number = 10): Promise<void> {
+    // Wait for sidebar to be open
+    await this.waitForSidebarOpen();
+
+    // Wait for parent navigation buttons to appear in sidebar
+    // The sidebar needs time to render the block's parent hierarchy
+    const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
+    try {
+      await parentButtonLocator.first().waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
+      throw new Error(
+        `Cannot navigate to block "${targetBlockId}": no parent navigation buttons appeared in sidebar after 5s`
+      );
+    }
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Check if target block is now selected
+      const result = await this.isBlockSelectedInIframe(targetBlockId);
+      if (result.ok) {
+        await this.waitForQuantaToolbar(targetBlockId);
+        return;
+      }
+
+      // Find and click the LAST "‹ BlockType" parent navigation button in sidebar
+      // (the one closest to the current block - clicking it navigates up one level)
+      // Buttons are ordered root-to-current, so last is the current block's header
+      const parentButton = parentButtonLocator.last();
+      const buttonExists = (await parentButton.count()) > 0;
+
+      if (!buttonExists) {
+        throw new Error(
+          `Cannot navigate to block "${targetBlockId}": parent navigation buttons disappeared from sidebar`
+        );
+      }
+
+      await parentButton.click();
+      await this.page.waitForTimeout(300); // Wait for selection to update
+    }
+
+    throw new Error(
+      `Failed to navigate to block "${targetBlockId}" after ${maxAttempts} attempts`
+    );
+  }
+
+  /**
+   * Click on a container block by clicking on its title area.
+   * This is necessary for container blocks (like columns) that have nested blocks,
+   * where clicking in the center would select a nested block instead.
+   *
+   * @param blockId - The data-block-uid of the container block
+   */
+  async clickContainerBlockInIframe(blockId: string) {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Verify block exists
+    const blockCount = await block.count();
+    if (blockCount === 0) {
+      throw new Error(
+        `Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`,
+      );
+    }
+
+    // Try to click on the block's title element (data-editable-field="title")
+    const titleElement = block.locator(
+      '> [data-editable-field="title"], > .column-title, > h3, > h4',
+    );
+    const hasTitleElement = (await titleElement.count()) > 0;
+
+    if (hasTitleElement) {
+      // Click on title to select the container
+      await titleElement.first().scrollIntoViewIfNeeded();
+      await titleElement.first().click();
+    } else {
+      // Fall back to clicking on the block's border area (top-left corner)
+      const blockBox = await block.boundingBox();
+      if (blockBox) {
+        // Click 5px from left edge and 5px from top - on the border area
+        await block.click({ position: { x: 5, y: 5 } });
+      } else {
+        throw new Error(
+          `Cannot get bounding box for block "${blockId}" to click on border`,
+        );
+      }
+    }
+
+    // Wait for toolbar to be positioned correctly
+    await this.waitForQuantaToolbar(blockId);
+
+    return block;
+  }
+
   /**
    * Wait for a block to be selected in the iframe.
    */
@@ -1602,10 +1702,16 @@ export class AdminUIHelper {
 
     const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
 
-    // Try to find and click the block type button
+    // Block chooser is rendered as a portal directly on document.body
+    // with class "blocks-chooser". Look specifically within this container
+    // to avoid matching sidebar buttons with similar text.
+    const blockChooser = this.page.locator('.blocks-chooser');
+
+    // Try to find and click the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = this.page.locator(`button:has-text("${name}")`).or(
-        this.page.locator(`[data-block-type="${name.toLowerCase()}"]`)
+      // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
+        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
       ).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {

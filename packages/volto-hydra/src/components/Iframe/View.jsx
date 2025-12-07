@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuid } from 'uuid';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
@@ -50,7 +50,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -536,12 +536,18 @@ const Iframe = (props) => {
       properties,
     });
 
+    // Use merged config from registry (includes frontend's custom blocks after INIT)
+    const mergedBlocksConfig = config.blocks.blocksConfig;
+
+    // Initialize container blocks with default children (recursive)
+    blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid);
+
     // Check if inserting inside a container (null means page-level)
     const containerConfig = getContainerFieldConfig(
       id,
       iframeSyncState.blockPathMap,
       properties,
-      blocksConfig,
+      mergedBlocksConfig,
     );
     // Unified insertion - works for both page and container
     const newFormData = insertBlockInContainer(
@@ -558,12 +564,15 @@ const Iframe = (props) => {
   };
 
   const onMutateBlock = (id, value) => {
+    // Use merged config from registry (includes frontend's custom blocks after INIT)
+    const mergedBlocksConfig = config.blocks.blocksConfig;
+
     // Check if mutating inside a container (null means page-level)
     const containerConfig = getContainerFieldConfig(
       id,
       iframeSyncState.blockPathMap,
       properties,
-      blocksConfig,
+      mergedBlocksConfig,
     );
 
     // Use container-aware mutation for nested blocks
@@ -579,12 +588,15 @@ const Iframe = (props) => {
   };
 
   const onDeleteBlock = (id, selectPrev) => {
+    // Use merged config from registry (includes frontend's custom blocks after INIT)
+    const mergedBlocksConfig = config.blocks.blocksConfig;
+
     // Check if deleting from a container (null means page-level)
     const containerConfig = getContainerFieldConfig(
       id,
       iframeSyncState.blockPathMap,
       properties,
-      blocksConfig,
+      mergedBlocksConfig,
     );
 
     // Get previous block for selection (within same container or page)
@@ -1178,28 +1190,116 @@ const Iframe = (props) => {
     }
   }, [menuDropdownOpen]);
 
-  // Compute effective allowedBlocks for BlockChooser
-  // If selected block is inside a container, use container's allowedBlocks
-  const effectiveAllowedBlocks = useMemo(() => {
+  // Get container configs for the selected block
+  // - ownContainerConfig: for adding children INTO the selected block (sidebar add)
+  // - parentContainerConfig: for adding siblings AFTER the selected block (iframe add)
+  // NOTE: We use config.blocks.blocksConfig directly (not blocksConfig prop) because
+  // the config is mutated when INIT is received with frontend's custom blocksConfig.
+  // The iframeSyncState.blockPathMap dependency ensures re-compute after INIT.
+  const { ownContainerConfig, parentContainerConfig } = useMemo(() => {
     if (!selectedBlock || !iframeSyncState.blockPathMap) {
-      return allowedBlocks;
+      return { ownContainerConfig: null, parentContainerConfig: null };
     }
 
-    const containerConfig = getContainerFieldConfig(
+    // Use merged config from registry (includes frontend's custom blocks after INIT)
+    const mergedBlocksConfig = config.blocks.blocksConfig;
+
+    const ownConfig = getBlockOwnContainerConfig(
       selectedBlock,
       iframeSyncState.blockPathMap,
       iframeSyncState.formData,
-      blocksConfig,
+      mergedBlocksConfig,
     );
 
-    // If inside a container with specific allowedBlocks, use those
-    if (containerConfig?.allowedBlocks) {
-      return containerConfig.allowedBlocks;
-    }
+    const parentConfig = getContainerFieldConfig(
+      selectedBlock,
+      iframeSyncState.blockPathMap,
+      iframeSyncState.formData,
+      mergedBlocksConfig,
+    );
 
-    // Otherwise use page-level allowedBlocks
+    return { ownContainerConfig: ownConfig, parentContainerConfig: parentConfig };
+  }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData]);
+
+  // Sidebar add: adds INTO the selected container
+  // Uses ownContainerConfig.allowedBlocks
+  const sidebarAllowedBlocks = useMemo(() => {
+    return ownContainerConfig?.allowedBlocks || null;
+  }, [ownContainerConfig]);
+
+  // Iframe add: adds AFTER the selected block (as sibling)
+  // Uses parentContainerConfig.allowedBlocks, or page-level allowedBlocks
+  const iframeAllowedBlocks = useMemo(() => {
+    if (parentContainerConfig?.allowedBlocks) {
+      return parentContainerConfig.allowedBlocks;
+    }
     return allowedBlocks;
-  }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData, blocksConfig, allowedBlocks]);
+  }, [parentContainerConfig, allowedBlocks]);
+
+  // Compute effective allowedBlocks for BlockChooser
+  // This depends on whether we're adding INTO or AFTER
+  // For now, use sidebar behavior when container is selected, iframe behavior otherwise
+  const effectiveAllowedBlocks = useMemo(() => {
+    // If selected block is a container, show its child allowed blocks
+    if (sidebarAllowedBlocks) {
+      return sidebarAllowedBlocks;
+    }
+    // Otherwise show sibling allowed blocks
+    return iframeAllowedBlocks;
+  }, [sidebarAllowedBlocks, iframeAllowedBlocks]);
+
+  // Handle sidebar add - inserts INTO the container
+  const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
+    const containerAllowed = sidebarAllowedBlocks;
+    if (containerAllowed?.length === 1) {
+      // Only one allowed block type - auto-insert without showing chooser
+      const blockType = containerAllowed[0];
+      const newBlockId = uuid();
+
+      // Initialize block data with recursive container initialization
+      // Use merged config from registry (includes frontend's custom blocks after INIT)
+      const mergedBlocksConfig = config.blocks.blocksConfig;
+      let newBlockData = { '@type': blockType };
+      newBlockData = initializeContainerBlock(newBlockData, mergedBlocksConfig, uuid);
+
+      // Get existing blocks to find last block for insertion position
+      const parentPath = iframeSyncState.blockPathMap?.[parentBlockId]?.path;
+      const parentBlock = getBlockByPath(properties, parentPath);
+      const layoutField = `${fieldName}_layout`;
+      const existingItems = parentBlock?.[layoutField]?.items || [];
+      const lastBlockId = existingItems[existingItems.length - 1] || null;
+
+      // Use insertBlockInContainer to add as child
+      const containerConfig = { parentId: parentBlockId, fieldName };
+      const newFormData = insertBlockInContainer(
+        properties,
+        iframeSyncState.blockPathMap,
+        lastBlockId, // afterBlockId - insert after last block
+        newBlockId,
+        newBlockData,
+        containerConfig,
+      );
+      if (newFormData) {
+        onChangeFormData(newFormData);
+      }
+    } else {
+      // Multiple options - show the block chooser
+      setAddNewBlockOpened(true);
+    }
+  }, [sidebarAllowedBlocks, properties, onChangeFormData, iframeSyncState.blockPathMap]);
+
+  // Handle iframe add - inserts AFTER the block (as sibling)
+  const handleIframeAdd = useCallback(() => {
+    const siblingAllowed = iframeAllowedBlocks;
+    if (siblingAllowed?.length === 1) {
+      // Only one allowed block type - auto-insert without showing chooser
+      const blockType = siblingAllowed[0];
+      onInsertBlock(selectedBlock, { '@type': blockType });
+    } else {
+      // Multiple options - show the block chooser
+      setAddNewBlockOpened(true);
+    }
+  }, [iframeAllowedBlocks, selectedBlock, onInsertBlock]);
 
   return (
     <div id="iframeContainer">
@@ -1374,7 +1474,7 @@ const Iframe = (props) => {
                 padding: '0 0 2px 0',
                 textAlign: 'center',
               }}
-              onClick={() => setAddNewBlockOpened(true)}
+              onClick={handleIframeAdd}
               title="Add block"
             >
               +
@@ -1441,9 +1541,7 @@ const Iframe = (props) => {
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}
         onAddBlock={(parentBlockId, fieldName) => {
-          // TODO: Implement add block to container field
-          console.log('[VIEW] Add block requested:', { parentBlockId, fieldName });
-          setAddNewBlockOpened(true);
+          handleSidebarAdd(parentBlockId, fieldName);
         }}
       />
     </div>

@@ -183,6 +183,87 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
   });
 });
 
+test.describe('Quanta Toolbar - Positioning', () => {
+  test('toolbar aligns correctly with blocks near right edge of iframe', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // text-2a is inside col-2 (right column), near the right edge of the iframe
+    // This tests the toolbar alignment issue where blocks near the edge have misaligned toolbars
+    const block = iframe.locator('[data-block-uid="text-2a"]');
+    await expect(block).toBeVisible();
+
+    // Click directly on the block (bypassing clickBlockInIframe which has timeout on alignment check)
+    await block.click();
+    await page.waitForTimeout(500);
+
+    // Get the block's bounding box (relative to iframe viewport, then adjusted to page)
+    const blockBox = await block.boundingBox();
+    expect(blockBox).toBeTruthy();
+
+    // Get the toolbar outline's bounding box (in page coordinates)
+    // Use the correct class name: .volto-hydra-block-outline
+    const toolbarOutline = page.locator('.volto-hydra-block-outline');
+    await expect(toolbarOutline).toBeVisible({ timeout: 5000 });
+    const outlineBox = await toolbarOutline.boundingBox();
+    expect(outlineBox).toBeTruthy();
+
+    // The outline should align horizontally with the block
+    // Allow 5px tolerance for minor differences
+    const tolerance = 5;
+    const xAligned = Math.abs(blockBox!.x - outlineBox!.x) <= tolerance;
+    const widthAligned = Math.abs(blockBox!.width - outlineBox!.width) <= tolerance;
+
+    // This test documents the bug - currently fails because outline is offset for right-side blocks
+    expect(
+      xAligned,
+      `Outline x (${outlineBox!.x}) should match block x (${blockBox!.x})`,
+    ).toBe(true);
+    expect(
+      widthAligned,
+      `Outline width (${outlineBox!.width}) should match block width (${blockBox!.width})`,
+    ).toBe(true);
+  });
+
+  test('toolbar menu opens correctly for blocks near right edge', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on text-2a (right side block inside col-2)
+    const block = iframe.locator('[data-block-uid="text-2a"]');
+    await block.click();
+    await page.waitForTimeout(500);
+
+    // The toolbar should be visible
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // Try to open the toolbar menu using the helper
+    // The menu button should be clickable and not intercepted by the sidebar
+    await helper.openQuantaToolbarMenu('text-2a');
+
+    // Menu should open and be visible (not hidden behind sidebar)
+    const menu = await helper.getQuantaToolbarMenu('text-2a');
+    await expect(menu).toBeVisible({ timeout: 3000 });
+
+    // Verify menu options are accessible
+    const options = await helper.getQuantaToolbarMenuOptions('text-2a');
+    expect(options.length).toBeGreaterThan(0);
+  });
+});
+
 test.describe('Quanta Toolbar - Different Block Types', () => {
   test('Slate blocks have format buttons, Image blocks do not', async ({ page }) => {
     const helper = new AdminUIHelper(page);
