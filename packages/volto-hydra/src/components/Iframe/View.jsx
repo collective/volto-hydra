@@ -1006,8 +1006,9 @@ const Iframe = (props) => {
         }
 
         case 'HIDE_BLOCK_UI':
-          // Hide all block UI overlays
+          // Hide all block UI overlays and deselect block
           setBlockUI(null);
+          onSelectBlock(null);
           break;
 
         case 'INIT':
@@ -1590,6 +1591,8 @@ const Iframe = (props) => {
               triggerButton?.click();
             }
           }}
+          parentId={iframeSyncState.blockPathMap?.[selectedBlock]?.parentId}
+          onSelectBlock={onSelectBlock}
         />
       )}
 

@@ -1401,6 +1401,119 @@ test.describe('Single Allowed Block Auto-Insert', () => {
   });
 });
 
+test.describe('Parent Block Navigation', () => {
+  test('pressing Escape selects parent block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a deeply nested block (text-1a inside col-1 inside columns-1)
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Verify text-1a is selected (4 headers: Page, Columns, Column, Text)
+    let headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(4);
+
+    // Press Escape to go up to parent (col-1)
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Should now have 3 headers (Page, Columns, Column)
+    headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(3);
+
+    // Current block should be Column
+    const currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"]',
+    );
+    await expect(currentHeader).toContainText(/column/i);
+
+    // Press Escape again to go to columns-1
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(2);
+    await expect(currentHeader).toContainText(/columns/i);
+
+    // Press Escape again to deselect (no block selected)
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(1); // Only Page header
+  });
+
+  test('toolbar menu has Select Container option for nested blocks', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a nested block (text-1a inside col-1)
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Open the toolbar menu
+    await helper.openQuantaToolbarMenu('text-1a');
+
+    // Should see "Select Container" option
+    const selectContainerOption = page.locator(
+      '.volto-hydra-dropdown-item:has-text("Select Container")',
+    );
+    await expect(selectContainerOption).toBeVisible();
+
+    // Click it to select the parent
+    await selectContainerOption.click();
+    await page.waitForTimeout(300);
+
+    // Should now have col-1 selected (3 headers: Page, Columns, Column)
+    const headerCount = await page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+    expect(headerCount).toBe(3);
+
+    const currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"]',
+    );
+    await expect(currentHeader).toContainText(/column/i);
+  });
+
+  test('toolbar menu hides Select Container for top-level blocks', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select a top-level block (columns-1 has no parent)
+    await helper.clickContainerBlockInIframe('columns-1');
+    await page.waitForTimeout(300);
+
+    // Open the toolbar menu
+    await helper.openQuantaToolbarMenu('columns-1');
+
+    // Should NOT see "Select Container" option (no parent to select)
+    const selectContainerOption = page.locator(
+      '.volto-hydra-dropdown-item:has-text("Select Container")',
+    );
+    await expect(selectContainerOption).not.toBeVisible();
+  });
+});
+
 test.describe('Sidebar Editing for Nested Blocks', () => {
   test('editing nested slate block in iframe does not cause sidebar error', async ({
     page,

@@ -796,6 +796,39 @@ export class Bridge {
       };
       document.addEventListener('keydown', this._interactiveSpaceHandler, true);
     }
+
+    // Add global keydown handler for Escape to select parent block
+    // This allows navigating up the block hierarchy with keyboard
+    if (!this._escapeKeyHandler) {
+      this._escapeKeyHandler = (e) => {
+        if (e.key !== 'Escape') return;
+        if (!this.selectedBlockUid) return;
+
+        // Don't interfere with escape in modals, dropdowns, etc.
+        const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
+        if (isInPopup) return;
+
+        e.preventDefault();
+
+        // Get parent from blockPathMap
+        const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+        const parentId = pathInfo?.parentId || null;
+        console.log('[HYDRA] Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
+
+        if (parentId) {
+          // Select the parent block
+          const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
+          if (parentElement) {
+            this.selectBlock(parentElement, 'escapeKey');
+          }
+        } else {
+          // No parent - deselect (send HIDE_BLOCK_UI)
+          this.selectedBlockUid = null;
+          this.sendMessageToParent({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+        }
+      };
+      document.addEventListener('keydown', this._escapeKeyHandler, true);
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////
