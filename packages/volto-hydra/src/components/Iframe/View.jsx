@@ -50,7 +50,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -457,7 +457,7 @@ const Iframe = (props) => {
   //   this is for toolbar→iframe flow (format completion, including selection-only changes)
   const [iframeSyncState, setIframeSyncState] = useState(() => ({
     formData: properties,
-    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig), // Maps blockId -> { path, parentId }
+    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig, getAllowedBlocksList()), // Maps blockId -> { path, parentId, allowedSiblingTypes }
     selection: null,
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
@@ -486,7 +486,7 @@ const Iframe = (props) => {
   useEffect(() => {
     if (formDataFromRedux && formDataFromRedux !== iframeSyncState.formData) {
       // Rebuild blockPathMap when formData changes (use live config for custom blocks)
-      const newBlockPathMap = buildBlockPathMap(formDataFromRedux, config.blocks.blocksConfig);
+      const newBlockPathMap = buildBlockPathMap(formDataFromRedux, config.blocks.blocksConfig, getAllowedBlocksList());
       setIframeSyncState(prev => {
         // Redux form syncs (from sidebar editing) don't include a new selection -
         // only the form data changes. The existing selection from the iframe may
@@ -684,13 +684,6 @@ const Iframe = (props) => {
           break;
 
 
-        case 'VOLTO_CONFIG':
-          // Legacy handler for backwards compatibility
-          recurseUpdateVoltoConfig(event.data.voltoConfig || {});
-          // Re-trigger updateAllowedBlocks to set `restricted` on newly added blocks
-          setAllowedBlocksList(getAllowedBlocksList());
-          break;
-
         case 'OPEN_SETTINGS':
           if (history.location.pathname.endsWith('/edit')) {
             onSelectBlock(event.data.uid);
@@ -705,15 +698,6 @@ const Iframe = (props) => {
 
         case 'DELETE_BLOCK':
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
-          break;
-
-        case 'ALLOWED_BLOCKS':
-          if (
-            JSON.stringify(getAllowedBlocksList()) !==
-            JSON.stringify(event.data.allowedBlocks)
-          ) {
-            setAllowedBlocksList(event.data.allowedBlocks);
-          }
           break;
 
         case 'INLINE_EDIT_DATA':
@@ -933,9 +917,33 @@ const Iframe = (props) => {
           break;
 
         case 'UPDATE_BLOCKS_LAYOUT':
-
           onChangeFormData(event.data.data);
           break;
+
+        case 'MOVE_BLOCK': {
+          // Handle drag-and-drop block moves (supports container and page-level)
+          const { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId } = event.data;
+
+          // Use moveBlockBetweenContainers utility to handle all cases:
+          // - Same container reordering
+          // - Different container moves
+          // - Page ↔ container moves
+          const newFormData = moveBlockBetweenContainers(
+            properties,
+            iframeSyncState.blockPathMap,
+            blockId,
+            targetBlockId,
+            insertAfter,
+            sourceParentId,
+            targetParentId,
+            blocksConfig,
+          );
+
+          if (newFormData) {
+            onChangeFormData(newFormData);
+          }
+          break;
+        }
 
         case 'SELECTION_CHANGE':
           // Store current selection from iframe for format operations
@@ -1042,7 +1050,8 @@ const Iframe = (props) => {
           setBlockFieldTypes(initialBlockFieldTypes);
 
           // 4. Build blockPathMap (now has complete schema knowledge)
-          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig);
+          // Pass allowedBlocks directly since setAllowedBlocksList is async
+          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, event.data.allowedBlocks || null);
           setIframeSyncState(prev => ({
             ...prev,
             blockPathMap: initialBlockPathMap,

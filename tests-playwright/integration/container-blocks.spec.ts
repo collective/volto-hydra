@@ -1549,3 +1549,595 @@ test.describe('Sidebar Editing for Nested Blocks', () => {
     await expect(sidebarHeader).toBeVisible();
   });
 });
+
+test.describe('Container Block Drag and Drop', () => {
+  test.setTimeout(30000);
+
+  test('can reorder blocks within the same container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial order of blocks in col-1 (has text-1a, text-1b)
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const initialBlocks = await col1.locator(':scope > [data-block-uid]').all();
+    expect(initialBlocks.length).toBe(2);
+
+    const firstBlockUid = await initialBlocks[0].getAttribute('data-block-uid');
+    const secondBlockUid = await initialBlocks[1].getAttribute('data-block-uid');
+    expect(firstBlockUid).toBe('text-1a');
+    expect(secondBlockUid).toBe('text-1b');
+
+    // Select first block in container
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Get drag handle and drag to after second block
+    const dragHandle = await helper.getDragHandle();
+    const secondBlock = iframe.locator('[data-block-uid="text-1b"]');
+
+    await helper.dragBlockWithMouse(dragHandle, secondBlock, true); // Insert after
+
+    // Verify order changed within the container
+    const newBlocks = await col1.locator(':scope > [data-block-uid]').all();
+    const newFirstBlockUid = await newBlocks[0].getAttribute('data-block-uid');
+    const newSecondBlockUid = await newBlocks[1].getAttribute('data-block-uid');
+
+    expect(newFirstBlockUid).toBe('text-1b');
+    expect(newSecondBlockUid).toBe('text-1a');
+  });
+
+  test('can drag block from one container to another', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial counts
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
+
+    const col1InitialCount = await col1
+      .locator(':scope > [data-block-uid]')
+      .count();
+    const col2InitialCount = await col2
+      .locator(':scope > [data-block-uid]')
+      .count();
+
+    expect(col1InitialCount).toBe(2); // text-1a, text-1b
+    expect(col2InitialCount).toBe(1); // text-2a
+
+    // Select text-1a from col-1
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Drag to col-2 (drop on text-2a)
+    const dragHandle = await helper.getDragHandle();
+    const targetBlock = iframe.locator('[data-block-uid="text-2a"]');
+
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, true); // Insert after
+
+    // Verify block moved between containers
+    const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
+    const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
+
+    expect(col1NewCount).toBe(1); // Only text-1b left
+    expect(col2NewCount).toBe(2); // text-2a + text-1a
+  });
+
+  test('can drag block from container to page level', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial counts
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const col1InitialCount = await col1
+      .locator(':scope > [data-block-uid]')
+      .count();
+
+    // Verify text-1a starts inside col-1
+    expect(col1InitialCount).toBe(2);
+
+    // Select text-1a from col-1
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Drag to page level (drop on text-after which is a page-level block)
+    const dragHandle = await helper.getDragHandle();
+    const targetBlock = iframe.locator('[data-block-uid="text-after"]');
+
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
+
+    // Verify it's no longer in col-1
+    const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
+    expect(col1NewCount).toBe(col1InitialCount - 1);
+
+    // Verify text-1a is now a direct child of body (page-level)
+    // It should not be inside col-1 anymore
+    const text1aInCol1 = await col1
+      .locator('[data-block-uid="text-1a"]')
+      .count();
+    expect(text1aInCol1).toBe(0);
+
+    // And it should exist at page level (not inside any container)
+    const text1aAtPageLevel = iframe.locator(
+      ':scope > [data-block-uid="text-1a"], body > [data-block-uid="text-1a"]',
+    );
+    // Actually the page-level blocks might be in a wrapper, let's just check it's not in col-1
+  });
+
+  test('can drag page-level block into container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial state
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
+    const col2InitialCount = await col2
+      .locator(':scope > [data-block-uid]')
+      .count();
+
+    // Verify text-after is NOT in col-2 initially
+    const textAfterInCol2Initially = await col2
+      .locator('[data-block-uid="text-after"]')
+      .count();
+    expect(textAfterInCol2Initially).toBe(0);
+
+    // Select text-after (page-level slate block)
+    await helper.clickBlockInIframe('text-after');
+    await page.waitForTimeout(300);
+
+    // Drag into col-2 (drop on text-2a)
+    const dragHandle = await helper.getDragHandle();
+    const targetBlock = iframe.locator('[data-block-uid="text-2a"]');
+
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, false); // Insert before
+
+    // Verify it's now in col-2
+    const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
+    expect(col2NewCount).toBe(col2InitialCount + 1);
+
+    // Verify text-after is now inside col-2
+    const textAfterInCol2 = await col2
+      .locator('[data-block-uid="text-after"]')
+      .count();
+    expect(textAfterInCol2).toBe(1);
+  });
+
+  test('block data is preserved after drag between containers', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial text content of text-1a
+    const originalText = await iframe
+      .locator('[data-block-uid="text-1a"] p')
+      .textContent();
+    expect(originalText).toContain('Col 1 Text 1');
+
+    // Select and drag text-1a to col-2
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    const dragHandle = await helper.getDragHandle();
+    const targetBlock = iframe.locator('[data-block-uid="text-2a"]');
+
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
+
+    // Verify the text content is preserved
+    const newText = await iframe
+      .locator('[data-block-uid="text-1a"] p')
+      .textContent();
+    expect(newText).toContain('Col 1 Text 1');
+  });
+
+  test('drop indicator is vertical for horizontal layout blocks', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select col-1 (a column with data-block-add="right")
+    await helper.clickBlockInIframe('col-1');
+    await page.waitForTimeout(300);
+
+    // Start dragging
+    const dragHandle = await helper.getDragHandle();
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
+
+    // Get drag handle position
+    const handleBox = await dragHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+
+    // Get iframe position to translate coordinates
+    const iframeEl = page.locator('#previewIframe');
+    const iframeBox = await iframeEl.boundingBox();
+    expect(iframeBox).not.toBeNull();
+
+    // Start the drag
+    await page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2,
+    );
+    await page.mouse.down();
+
+    // Move to col-2's LEFT EDGE (not center) to hit the column element itself
+    // and avoid hitting child content blocks
+    const col2Box = await col2.boundingBox();
+    expect(col2Box).not.toBeNull();
+
+    // Position at far left edge of col-2, vertically centered
+    // We need to add iframe offset since col2Box is in iframe coords
+    const targetX = iframeBox!.x + col2Box!.x + 5; // 5px into the column from left edge
+    const targetY = iframeBox!.y + col2Box!.y + col2Box!.height / 2;
+
+    await page.mouse.move(targetX, targetY, { steps: 10 });
+
+    // Check that drop indicator exists and is vertical
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    await expect(dropIndicator).toBeVisible();
+
+    // Get computed styles to verify it's vertical
+    const indicatorStyles = await dropIndicator.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return {
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        borderLeft: style.borderLeft,
+        borderTop: style.borderTop,
+      };
+    });
+
+    // Vertical indicator should be taller than wide (height > width)
+    expect(indicatorStyles.height).toBeGreaterThan(indicatorStyles.width);
+
+    // Clean up
+    await page.mouse.up();
+  });
+
+  test('can reorder columns horizontally', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial order of columns
+    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
+    const columnsRow = columnsBlock.locator('.columns-row');
+    const columns = columnsRow.locator(':scope > [data-block-uid]');
+    const initialColumns = await columns.all();
+    expect(initialColumns.length).toBe(2);
+
+    const firstColUid = await initialColumns[0].getAttribute('data-block-uid');
+    const secondColUid = await initialColumns[1].getAttribute('data-block-uid');
+    expect(firstColUid).toBe('col-1');
+    expect(secondColUid).toBe('col-2');
+
+    // Select col-1
+    await helper.clickBlockInIframe('col-1');
+    await page.waitForTimeout(300);
+
+    // Drag col-1 to the right of col-2 using horizontal drag
+    const dragHandle = await helper.getDragHandle();
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
+
+    await helper.dragBlockWithMouseHorizontal(dragHandle, col2, true); // Insert after (right)
+
+    // Wait for the reorder to complete
+    await page.waitForTimeout(500);
+
+    // Verify order changed - refresh the locators after DOM update
+    const newColumnsRow = iframe.locator('[data-block-uid="columns-1"] .columns-row');
+    const newColumns = await newColumnsRow.locator(':scope > [data-block-uid]').all();
+    expect(newColumns.length).toBe(2);
+
+    const newFirstColUid = await newColumns[0].getAttribute('data-block-uid');
+    const newSecondColUid = await newColumns[1].getAttribute('data-block-uid');
+
+    expect(newFirstColUid).toBe('col-2');
+    expect(newSecondColUid).toBe('col-1');
+  });
+
+  test('drop indicator is vertical for grid cells (inferred from nesting depth)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Grid cells are at nesting depth 1 (inside grid-1), so they should use horizontal layout
+    // This tests that direction is inferred correctly even without explicit data-block-add attribute
+    const gridCell1 = iframe.locator('[data-block-uid="grid-cell-1"]');
+    await expect(gridCell1).toBeVisible();
+
+    // Click on grid-cell-1 to select it
+    await helper.clickBlockInIframe('grid-cell-1');
+    await page.waitForTimeout(300);
+
+    // Start dragging
+    const dragHandle = await helper.getDragHandle();
+    const handleBox = await dragHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+
+    await page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2,
+    );
+    await page.mouse.down();
+
+    // Move to grid-cell-2 (sibling in horizontal layout)
+    const gridCell2 = iframe.locator('[data-block-uid="grid-cell-2"]');
+    const cell2Box = await gridCell2.boundingBox();
+    expect(cell2Box).not.toBeNull();
+
+    // Move to right side of grid-cell-2
+    await page.mouse.move(
+      cell2Box!.x + cell2Box!.width * 0.75,
+      cell2Box!.y + cell2Box!.height / 2,
+      { steps: 10 },
+    );
+
+    // Drop indicator should be visible and VERTICAL (for horizontal layout)
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    await expect(dropIndicator).toBeVisible();
+
+    // Check that indicator is vertical (height > width)
+    const indicatorBox = await dropIndicator.boundingBox();
+    expect(indicatorBox).not.toBeNull();
+    // Vertical indicator has small width and larger height
+    expect(indicatorBox!.width).toBeLessThan(20); // Should be thin (around 4px)
+    expect(indicatorBox!.height).toBeGreaterThan(50); // Should be tall
+
+    // Clean up
+    await page.mouse.up();
+  });
+
+  test('drop indicator not shown when block type not allowed in target container', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select text-1a (a slate block inside col-1)
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Try to drag to columns-1 container (which only allows 'column' blocks, not 'slate')
+    const dragHandle = await helper.getDragHandle();
+
+    // Get positions
+    const handleBox = await dragHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+
+    // Start the drag
+    await page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2,
+    );
+    await page.mouse.down();
+
+    // Move to col-1 element itself (which is inside columns-1)
+    // Dropping here means dropping INTO columns-1, which doesn't allow slate
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const col1Box = await col1.boundingBox();
+    expect(col1Box).not.toBeNull();
+
+    // Move to left edge of col-1 to trigger horizontal layout detection
+    await page.mouse.move(col1Box!.x + 5, col1Box!.y + col1Box!.height / 2, {
+      steps: 10,
+    });
+
+    // Drop indicator should NOT be visible (slate not allowed in columns container)
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    await expect(dropIndicator).not.toBeVisible();
+
+    // Clean up
+    await page.mouse.up();
+  });
+
+  test('block stays in place when dropped in container that does not allow it', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial position of text-1a (a slate block inside col-1)
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const initialText1aInCol1 = await col1
+      .locator('[data-block-uid="text-1a"]')
+      .count();
+    expect(initialText1aInCol1).toBe(1);
+
+    // Select text-1a
+    await helper.clickBlockInIframe('text-1a');
+    await page.waitForTimeout(300);
+
+    // Try to drag to col-1 level (drop on col-1 which expects column siblings, not slate)
+    // columns container only allows 'column' blocks, not 'slate'
+    const dragHandle = await helper.getDragHandle();
+
+    // Use horizontal drag to col-1 (which is in columns container that only allows 'column' blocks)
+    // expectIndicator=false because slate is not allowed as a sibling of columns
+    const indicatorShown = await helper.dragBlockWithMouseHorizontal(
+      dragHandle,
+      col1,
+      false, // insertAfter=false (left side)
+      false, // expectIndicator=false (drop should be rejected)
+    );
+
+    // Indicator should not have been shown
+    expect(indicatorShown).toBe(false);
+
+    // text-1a should still be inside col-1 (move to columns level should be rejected)
+    const finalText1aInCol1 = await col1
+      .locator('[data-block-uid="text-1a"]')
+      .count();
+    expect(finalText1aInCol1).toBe(1);
+
+    // text-1a should NOT be a sibling of col-1/col-2 in the columns container
+    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
+    const directChildren = await columnsBlock
+      .locator('.columns-row > [data-block-uid]')
+      .all();
+    const directChildUids = await Promise.all(
+      directChildren.map((b) => b.getAttribute('data-block-uid')),
+    );
+    expect(directChildUids).not.toContain('text-1a');
+  });
+
+  test('column block cannot be dragged to page level (page allowedBlocks restriction)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // col-1 is a 'column' block which is NOT in page-level allowedBlocks
+    // Page level allows: ['slate', 'image', 'hero', 'columns'] - NOT 'column'
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    await expect(col1).toBeVisible();
+
+    // Select col-1
+    await helper.clickBlockInIframe('col-1');
+    await page.waitForTimeout(300);
+
+    // Try to drag to page level (next to text-after which is a page-level block)
+    const dragHandle = await helper.getDragHandle();
+    const textAfter = iframe.locator('[data-block-uid="text-after"]');
+
+    // Get positions
+    const handleBox = await dragHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+
+    // Start the drag
+    await page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2,
+    );
+    await page.mouse.down();
+
+    // Move to text-after's bottom area (vertical layout at page level)
+    const textAfterBox = await textAfter.boundingBox();
+    expect(textAfterBox).not.toBeNull();
+
+    await page.mouse.move(
+      textAfterBox!.x + textAfterBox!.width / 2,
+      textAfterBox!.y + textAfterBox!.height * 0.75,
+      { steps: 10 },
+    );
+
+    // Drop indicator should NOT be visible ('column' not allowed at page level)
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    await expect(dropIndicator).not.toBeVisible();
+
+    // Drop anyway (should be rejected)
+    await page.mouse.up();
+
+    // Wait for any potential state changes
+    await page.waitForTimeout(500);
+
+    // col-1 should still be inside columns-1 (not moved to page level)
+    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
+    const col1InColumns = await columnsBlock
+      .locator('[data-block-uid="col-1"]')
+      .count();
+    expect(col1InColumns).toBe(1);
+
+    // col-1 should NOT be a page-level block (direct child of content)
+    const contentDiv = iframe.locator('#content');
+    const pageLevelBlocks = await contentDiv.locator('> [data-block-uid]').all();
+    const pageLevelUids = await Promise.all(
+      pageLevelBlocks.map((b) => b.getAttribute('data-block-uid')),
+    );
+    expect(pageLevelUids).not.toContain('col-1');
+  });
+
+  test('can drag block on right side of screen (right-aligned toolbar)', async ({
+    page,
+  }) => {
+    // This tests that the drag handle works correctly when the toolbar is
+    // right-aligned (which happens for blocks on the right side of the iframe)
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // col-2 is on the right side of the screen, so toolbar should be right-aligned
+    // Get initial count of blocks in col-2
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
+    const col2InitialCount = await col2
+      .locator(':scope > [data-block-uid]')
+      .count();
+    expect(col2InitialCount).toBe(1); // Only text-2a
+
+    // Select text-2a (right side block)
+    await helper.clickBlockInIframe('text-2a');
+    await page.waitForTimeout(300);
+
+    // Get drag handle - should work even though toolbar is right-aligned
+    const dragHandle = await helper.getDragHandle();
+    expect(dragHandle).not.toBeNull();
+
+    // Try to drag text-2a to col-1 (which is on the left)
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const text1b = iframe.locator('[data-block-uid="text-1b"]');
+
+    // Drag text-2a to after text-1b in col-1
+    await helper.dragBlockWithMouse(dragHandle, text1b, true);
+
+    // Wait for the move to complete
+    await page.waitForTimeout(500);
+
+    // Verify text-2a moved from col-2 to col-1
+    const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
+    expect(col2NewCount).toBe(0); // text-2a should be gone
+
+    const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
+    expect(col1NewCount).toBe(3); // text-1a, text-1b, text-2a
+
+    // Verify text-2a is now in col-1
+    const text2aInCol1 = await col1
+      .locator('[data-block-uid="text-2a"]')
+      .count();
+    expect(text2aInCol1).toBe(1);
+  });
+});

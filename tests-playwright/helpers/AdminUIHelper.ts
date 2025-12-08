@@ -2315,6 +2315,88 @@ export class AdminUIHelper {
   }
 
   /**
+   * Drag a block horizontally to a target position (for blocks with data-block-add="right").
+   * Uses X-axis position to determine left/right insertion.
+   *
+   * @param dragHandle - The drag handle locator (from toolbar)
+   * @param targetBlock - The target block locator (where to drop)
+   * @param insertAfter - If true, insert to the right; if false, insert to the left
+   */
+  async dragBlockWithMouseHorizontal(
+    dragHandle: Locator,
+    targetBlock: Locator,
+    insertAfter: boolean = true,
+    expectIndicator: boolean = true
+  ): Promise<boolean> {
+    // 1. Get toolbar position
+    const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
+    console.log('[TEST] Horizontal drag start position (page):', startPosPage);
+
+    if (!this.isInPageViewport(startPosPage.y)) {
+      throw new Error(
+        `Toolbar drag icon is off-screen at Y=${startPosPage.y}. ` +
+        `The block must be scrolled into view before dragging.`
+      );
+    }
+
+    // 2. Mouse down at toolbar position
+    await this.page.mouse.move(startPosPage.x, startPosPage.y);
+    await this.page.mouse.down();
+
+    // Verify drag shadow appears
+    await this.verifyDragShadowVisible();
+
+    // 3. Get target block position and move horizontally
+    const targetBlockUid = await targetBlock.getAttribute('data-block-uid');
+    if (!targetBlockUid) {
+      throw new Error('Target block does not have data-block-uid attribute');
+    }
+
+    // Get iframe coords for the target
+    const iframe = this.getIframe();
+    const targetRect = await targetBlock.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+
+    // Calculate drop position - for horizontal, use X position
+    const dropX = insertAfter
+      ? targetRect.x + targetRect.width * 0.75  // Right side
+      : targetRect.x + targetRect.width * 0.25; // Left side
+    const dropY = targetRect.y + targetRect.height / 2;  // Center vertically
+
+    // Convert to page coords
+    const dropPosPage = await this.iframeCoordsToPageCoords({ x: dropX, y: dropY });
+
+    console.log('[TEST] Moving to horizontal drop position:', dropPosPage);
+    await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
+
+    // Check drop indicator visibility
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    let indicatorVisible = false;
+
+    if (expectIndicator) {
+      // Wait for drop indicator to appear
+      await expect(dropIndicator).toBeVisible({ timeout: 2000 });
+      indicatorVisible = true;
+    } else {
+      // Verify indicator is NOT visible (drop should be rejected)
+      await expect(dropIndicator).not.toBeVisible();
+      indicatorVisible = false;
+    }
+
+    // 4. Drop
+    await this.page.mouse.up();
+
+    // 5. Wait for cleanup
+    await expect(dropIndicator).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Horizontal drag complete, indicator was visible:', indicatorVisible);
+
+    return indicatorVisible;
+  }
+
+  /**
    * Wait for the block count to reach a specific value.
    * This is a condition-based wait that replaces arbitrary timeouts.
    *

@@ -11,12 +11,13 @@ import { applyBlockDefaults } from '@plone/volto/helpers';
  *
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
- * @returns {Object} Map of blockId -> { path: string[], parentId: string|null }
+ * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (from initBridge config)
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, allowedSiblingTypes: Array|null }
  *
  * Path format: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
  * This allows accessing: formData.blocks['columns-1'].columns['col-1'].blocks['text-1a']
  */
-export function buildBlockPathMap(formData, blocksConfig) {
+export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = null) {
   const pathMap = {};
 
   if (!formData?.blocks) {
@@ -29,19 +30,21 @@ export function buildBlockPathMap(formData, blocksConfig) {
    * @param {Array} layoutItems - Array of block uids in order
    * @param {Array} currentPath - Path to this blocks object (e.g., ['blocks'] or ['blocks', 'columns-1', 'columns'])
    * @param {string|null} parentId - Parent block's uid, or null for page-level
+   * @param {Array|null} allowedBlocks - Allowed block types in this container (from parent's schema)
    */
-  function traverse(blocksObj, layoutItems, currentPath, parentId) {
+  function traverse(blocksObj, layoutItems, currentPath, parentId, allowedBlocks = null) {
     if (!blocksObj || !layoutItems) return;
 
     layoutItems.forEach((blockId) => {
       const block = blocksObj[blockId];
       if (!block) return;
 
-      // Store path for this block
+      // Store path for this block, including allowedBlocks for DND validation
       const blockPath = [...currentPath, blockId];
       pathMap[blockId] = {
         path: blockPath,
         parentId: parentId,
+        allowedSiblingTypes: allowedBlocks, // What types are allowed as siblings in this container
       };
 
       // Check if this block type has container fields (type: 'blocks')
@@ -66,6 +69,7 @@ export function buildBlockPathMap(formData, blocksConfig) {
                 nestedLayout,
                 [...blockPath, fieldName],
                 blockId,
+                fieldDef.allowedBlocks || null, // Pass allowedBlocks from schema
               );
             }
           }
@@ -86,8 +90,9 @@ export function buildBlockPathMap(formData, blocksConfig) {
   }
 
   // Start traversal from page-level blocks
+  // Pass pageAllowedBlocks so page-level blocks get the correct allowedSiblingTypes
   const pageLayoutItems = formData.blocks_layout?.items || [];
-  traverse(formData.blocks, pageLayoutItems, ['blocks'], null);
+  traverse(formData.blocks, pageLayoutItems, ['blocks'], null, pageAllowedBlocks);
 
   return pathMap;
 }
@@ -642,4 +647,249 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     },
     [layoutFieldName]: { items: [childBlockId] },
   };
+}
+
+/**
+ * Move a block from one location to another (supports same-container reorder,
+ * cross-container moves, and page↔container moves).
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {string} blockId - Block being moved
+ * @param {string} targetBlockId - Block to insert relative to
+ * @param {boolean} insertAfter - True to insert after target, false for before
+ * @param {string|null} sourceParentId - Parent of source block (null for page-level)
+ * @param {string|null} targetParentId - Parent of target block (null for page-level)
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @returns {Object|null} New formData with block moved, or null if invalid move
+ */
+export function moveBlockBetweenContainers(
+  formData,
+  blockPathMap,
+  blockId,
+  targetBlockId,
+  insertAfter,
+  sourceParentId,
+  targetParentId,
+  blocksConfig,
+) {
+  // Get block data to move
+  const sourcePath = blockPathMap[blockId]?.path;
+  const blockData = getBlockByPath(formData, sourcePath);
+
+  if (!blockData) {
+    console.error('[MOVE_BLOCK] Could not find block data for:', blockId);
+    return null;
+  }
+
+  // Same container - just reorder
+  if (sourceParentId === targetParentId) {
+    return reorderBlockInContainer(
+      formData,
+      blockPathMap,
+      blockId,
+      targetBlockId,
+      insertAfter,
+      sourceParentId,
+      blocksConfig,
+    );
+  }
+
+  // Different containers - need to remove from source and add to target
+  // First, delete from source
+  // getContainerFieldConfig takes the block ID and finds its container
+  const sourceContainerConfig = sourceParentId
+    ? getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig)
+    : null;
+
+  let newFormData = deleteBlockFromContainer(
+    formData,
+    blockPathMap,
+    blockId,
+    sourceContainerConfig,
+  );
+
+  // Get target container config by looking up target block's container
+  const targetContainerConfig = targetParentId
+    ? getContainerFieldConfig(targetBlockId, blockPathMap, formData, blocksConfig)
+    : null;
+
+  // Validate that block type is allowed in target container
+  const blockType = blockData?.['@type'];
+  const targetAllowedBlocks = blockPathMap[targetBlockId]?.allowedSiblingTypes;
+  if (targetAllowedBlocks && blockType && !targetAllowedBlocks.includes(blockType)) {
+    console.warn('[MOVE_BLOCK] Block type not allowed in target container:', blockType, 'allowed:', targetAllowedBlocks);
+    return null; // Reject the move
+  }
+
+  // Find insertion index
+  const insertIndex = getInsertionIndex(
+    newFormData,
+    blockPathMap,
+    targetBlockId,
+    insertAfter,
+    targetContainerConfig,
+  );
+
+  // Insert into target container
+  if (targetContainerConfig) {
+    // Insert into a container
+    const { parentId, fieldName } = targetContainerConfig;
+    const layoutFieldName = `${fieldName}_layout`;
+    const parentPath = blockPathMap[parentId]?.path;
+    const parentBlock = getBlockByPath(newFormData, parentPath);
+
+    if (!parentBlock) {
+      console.error('[MOVE_BLOCK] Could not find target parent block:', parentId);
+      return null;
+    }
+
+    const items = [...(parentBlock[layoutFieldName]?.items || [])];
+    items.splice(insertIndex, 0, blockId);
+
+    const updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: {
+        ...parentBlock[fieldName],
+        [blockId]: blockData,
+      },
+      [layoutFieldName]: { items },
+    };
+
+    newFormData = setBlockByPath(newFormData, parentPath, updatedParentBlock);
+  } else {
+    // Insert at page level
+    const items = [...(newFormData.blocks_layout?.items || [])];
+    items.splice(insertIndex, 0, blockId);
+
+    newFormData = {
+      ...newFormData,
+      blocks: {
+        ...newFormData.blocks,
+        [blockId]: blockData,
+      },
+      blocks_layout: { items },
+    };
+  }
+
+  return newFormData;
+}
+
+/**
+ * Reorder a block within the same container.
+ */
+function reorderBlockInContainer(
+  formData,
+  blockPathMap,
+  blockId,
+  targetBlockId,
+  insertAfter,
+  parentId,
+  blocksConfig,
+) {
+  if (parentId) {
+    // Container-level reorder
+    // getContainerFieldConfig takes a block ID and finds its container
+    const containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig);
+    if (!containerConfig) {
+      console.error('[MOVE_BLOCK] Could not find container config for block:', blockId, 'parent:', parentId);
+      return null;
+    }
+
+    const { fieldName } = containerConfig;
+    const layoutFieldName = `${fieldName}_layout`;
+    const parentPath = blockPathMap[parentId]?.path;
+    const parentBlock = getBlockByPath(formData, parentPath);
+
+    if (!parentBlock) {
+      console.error('[MOVE_BLOCK] Could not find parent block:', parentId);
+      return null;
+    }
+
+    const items = [...(parentBlock[layoutFieldName]?.items || [])];
+    const currentIndex = items.indexOf(blockId);
+    const targetIndex = items.indexOf(targetBlockId);
+
+    if (currentIndex === -1 || targetIndex === -1) {
+      console.error('[MOVE_BLOCK] Block not found in layout:', { blockId, targetBlockId, items });
+      return null;
+    }
+
+    // Remove from current position
+    items.splice(currentIndex, 1);
+
+    // Calculate new position (adjust if moving down)
+    let newIndex = targetIndex;
+    if (currentIndex < targetIndex) {
+      newIndex--;
+    }
+    if (insertAfter) {
+      newIndex++;
+    }
+
+    // Insert at new position
+    items.splice(newIndex, 0, blockId);
+
+    const updatedParentBlock = {
+      ...parentBlock,
+      [layoutFieldName]: { items },
+    };
+
+    return setBlockByPath(formData, parentPath, updatedParentBlock);
+  } else {
+    // Page-level reorder
+    const items = [...(formData.blocks_layout?.items || [])];
+    const currentIndex = items.indexOf(blockId);
+    const targetIndex = items.indexOf(targetBlockId);
+
+    if (currentIndex === -1 || targetIndex === -1) {
+      console.error('[MOVE_BLOCK] Block not found in page layout:', { blockId, targetBlockId, items });
+      return null;
+    }
+
+    // Remove from current position
+    items.splice(currentIndex, 1);
+
+    // Calculate new position (adjust if moving down)
+    let newIndex = targetIndex;
+    if (currentIndex < targetIndex) {
+      newIndex--;
+    }
+    if (insertAfter) {
+      newIndex++;
+    }
+
+    // Insert at new position
+    items.splice(newIndex, 0, blockId);
+
+    return {
+      ...formData,
+      blocks_layout: { items },
+    };
+  }
+}
+
+/**
+ * Get the index to insert at in the target container.
+ */
+function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, containerConfig) {
+  let items;
+
+  if (containerConfig) {
+    const { parentId, fieldName } = containerConfig;
+    const layoutFieldName = `${fieldName}_layout`;
+    const parentPath = blockPathMap[parentId]?.path;
+    const parentBlock = getBlockByPath(formData, parentPath);
+    items = parentBlock?.[layoutFieldName]?.items || [];
+  } else {
+    items = formData.blocks_layout?.items || [];
+  }
+
+  const targetIndex = items.indexOf(targetBlockId);
+  if (targetIndex === -1) {
+    // Target not found, insert at end
+    return items.length;
+  }
+
+  return insertAfter ? targetIndex + 1 : targetIndex;
 }

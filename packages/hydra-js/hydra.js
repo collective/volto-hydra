@@ -121,6 +121,7 @@ export class Bridge {
     this.isProcessingExternalUpdate = false; // Flag to suppress messages during FORM_DATA processing
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
+    this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
     this.init(options); // Initialize the bridge
   }
 
@@ -198,6 +199,32 @@ export class Bridge {
       }
     }
     return null;
+  }
+
+  /**
+   * Get the add direction for a block element.
+   * Uses data-block-add attribute if set, otherwise infers from nesting depth.
+   * Even depths (0, 2, ...) → 'bottom' (vertical), odd depths (1, 3, ...) → 'right' (horizontal)
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {string} 'right', 'bottom', or 'hidden'
+   */
+  getAddDirection(blockElement) {
+    let addDirection = blockElement.getAttribute('data-block-add');
+    if (!addDirection) {
+      // Count ancestor blocks to determine nesting depth
+      let depth = 0;
+      let parent = blockElement.parentElement;
+      while (parent) {
+        if (parent.hasAttribute('data-block-uid')) {
+          depth++;
+        }
+        parent = parent.parentElement;
+      }
+      // Page-level blocks (depth 0) → bottom, nested (depth 1) → right, etc.
+      addDirection = depth % 2 === 0 ? 'bottom' : 'right';
+    }
+    return addDirection;
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -385,17 +412,6 @@ export class Bridge {
         }, true); // Use capture phase to catch focus events before they bubble
       }
     }
-  }
-
-  /**
-   * @typedef {import('@plone/registry').ConfigData} VoltoConfigData
-   * @param {VoltoConfigData} voltoConfig
-   */
-  _updateVoltoConfig(voltoConfig) {
-    window.parent.postMessage(
-      { type: 'VOLTO_CONFIG', voltoConfig: voltoConfig },
-      this.adminOrigin,
-    );
   }
 
   /**
@@ -1699,22 +1715,8 @@ export class Bridge {
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
-    // Read data-block-add attribute for add button direction (right, bottom, hidden)
-    // If not specified, infer from nesting depth: even depths (0, 2, ...) → bottom, odd depths (1, 3, ...) → right
-    let addDirection = blockElement.getAttribute('data-block-add');
-    if (!addDirection) {
-      // Count ancestor blocks to determine nesting depth
-      let depth = 0;
-      let parent = blockElement.parentElement;
-      while (parent) {
-        if (parent.hasAttribute('data-block-uid')) {
-          depth++;
-        }
-        parent = parent.parentElement;
-      }
-      // Page-level blocks (depth 0) → bottom, nested (depth 1) → right, etc.
-      addDirection = depth % 2 === 0 ? 'bottom' : 'right';
-    }
+    // Get add button direction (right, bottom, hidden) - uses attribute or infers from nesting depth
+    const addDirection = this.getAddDirection(blockElement);
     this._pendingBlockSelected = {
       blockUid,
       rect: {
@@ -2157,10 +2159,24 @@ export class Bridge {
       // Position drag button to match parent toolbar position
       // IMPORTANT: Use BLOCK CONTAINER rect (same as BLOCK_SELECTED message), NOT editable field rect
       const rect = blockElement.getBoundingClientRect();
-      const toolbarLeft = rect.left;  // Left edge of block container
       const toolbarTop = rect.top - 48; // 48px above block container (matches parent toolbar height)
 
-      dragButton.style.left = `${toolbarLeft}px`;
+      // Determine if block is on right side of viewport - if so, align toolbar to right edge
+      // This mirrors the logic in SyncedSlateToolbar.jsx
+      const viewportMidpoint = window.innerWidth / 2;
+      const blockCenter = rect.left + rect.width / 2;
+      const alignRight = blockCenter > viewportMidpoint;
+
+      if (alignRight) {
+        // Right-align: position from right edge of block
+        const toolbarRight = window.innerWidth - rect.right;
+        dragButton.style.left = 'auto';
+        dragButton.style.right = `${toolbarRight}px`;
+      } else {
+        // Left-align: position from left edge of block
+        dragButton.style.right = 'auto';
+        dragButton.style.left = `${rect.left}px`;
+      }
       dragButton.style.top = `${toolbarTop}px`;
       dragButton.style.display = 'block';
     };
@@ -2209,6 +2225,7 @@ export class Bridge {
 
       let closestBlockUid = null;
       let insertAt = null; // 0 for top, 1 for bottom
+      let dropIndicatorVisible = false; // Track if drop indicator is shown - drop only allowed when visible
 
       // Handle mouse movement
       const onMouseMove = (e) => {
@@ -2249,6 +2266,27 @@ export class Bridge {
         }
 
         if (closestBlock) {
+          closestBlockUid = closestBlock.getAttribute('data-block-uid');
+
+          // Check if the dragged block type is allowed in the target container
+          const draggedBlockId = blockElement.getAttribute('data-block-uid');
+          const draggedBlockData = this.getBlockData(draggedBlockId);
+          const draggedBlockType = draggedBlockData?.['@type'];
+          const targetPathInfo = this.blockPathMap?.[closestBlockUid];
+          const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
+
+          // If target has allowedSiblingTypes restriction and dragged type not in list, skip
+          if (allowedSiblingTypes && draggedBlockType && !allowedSiblingTypes.includes(draggedBlockType)) {
+            // Hide any existing indicator and skip
+            const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (existingIndicator) {
+              existingIndicator.style.display = 'none';
+            }
+            dropIndicatorVisible = false; // Mark indicator as hidden
+            closestBlockUid = null; // Clear so drop won't happen
+            return;
+          }
+
           // Get or create drop indicator
           let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
           if (!dropIndicator) {
@@ -2256,8 +2294,6 @@ export class Bridge {
             dropIndicator.className = 'volto-hydra-drop-indicator';
             dropIndicator.style.cssText = `
               position: absolute;
-              height: 3px;
-              border-top: 3px dashed #007bff;
               background: transparent;
               pointer-events: none;
               z-index: 9998;
@@ -2266,50 +2302,106 @@ export class Bridge {
             document.body.appendChild(dropIndicator);
           }
 
-          // Determine if hovering over top or bottom half
           const closestBlockRect = closestBlock.getBoundingClientRect();
-          const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
-          const isHoveringOverTopHalf =
-            mouseYRelativeToBlock < closestBlockRect.height / 2;
 
-          insertAt = isHoveringOverTopHalf ? 0 : 1;
-          closestBlockUid = closestBlock.getAttribute('data-block-uid');
+          // Check if this block uses horizontal layout
+          // Uses data-block-add attribute or infers from nesting depth
+          const addDirection = this.getAddDirection(closestBlock);
+          const isHorizontalLayout = addDirection === 'right';
 
-          // Position drop indicator between blocks
-          // Center it in the gap between adjacent blocks
-          const indicatorHeight = 4;
-          let indicatorY;
+          if (isHorizontalLayout) {
+            // HORIZONTAL LAYOUT: Use X-axis to determine left/right insertion
+            const mouseXRelativeToBlock = e.clientX - closestBlockRect.left;
+            const isHoveringOverLeftHalf = mouseXRelativeToBlock < closestBlockRect.width / 2;
 
-          if (insertAt === 0) {
-            // Inserting before this block - find the previous block
-            const prevBlock = closestBlock.previousElementSibling;
-            if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
-              // Position exactly halfway between previous block bottom and current block top
-              const prevBlockRect = prevBlock.getBoundingClientRect();
-              const gap = closestBlockRect.top - prevBlockRect.bottom;
-              indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+            insertAt = isHoveringOverLeftHalf ? 0 : 1; // 0 = insert before (left), 1 = insert after (right)
+
+            // Position VERTICAL drop indicator
+            const indicatorWidth = 4;
+            let indicatorX;
+
+            if (insertAt === 0) {
+              // Inserting before (left of) this block - find the previous block
+              const prevBlock = closestBlock.previousElementSibling;
+              if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
+                const prevBlockRect = prevBlock.getBoundingClientRect();
+                const gap = closestBlockRect.left - prevBlockRect.right;
+                indicatorX = prevBlockRect.right + window.scrollX + (gap / 2) - (indicatorWidth / 2);
+              } else {
+                indicatorX = closestBlockRect.left + window.scrollX - (indicatorWidth / 2);
+              }
             } else {
-              // No previous block - position at top of first block
-              indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
+              // Inserting after (right of) this block - find the next block
+              const nextBlock = closestBlock.nextElementSibling;
+              if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
+                const nextBlockRect = nextBlock.getBoundingClientRect();
+                const gap = nextBlockRect.left - closestBlockRect.right;
+                indicatorX = closestBlockRect.right + window.scrollX + (gap / 2) - (indicatorWidth / 2);
+              } else {
+                indicatorX = closestBlockRect.right + window.scrollX - (indicatorWidth / 2);
+              }
             }
+
+            // Style as vertical indicator
+            dropIndicator.style.left = `${indicatorX}px`;
+            dropIndicator.style.top = `${closestBlockRect.top + window.scrollY}px`;
+            dropIndicator.style.width = `${indicatorWidth}px`;
+            dropIndicator.style.height = `${closestBlockRect.height}px`;
+            dropIndicator.style.borderTop = 'none';
+            dropIndicator.style.borderLeft = '3px dashed #007bff';
+            dropIndicator.style.display = 'block';
+            dropIndicatorVisible = true; // Mark indicator as visible - drop is allowed
           } else {
-            // Inserting after this block - find the next block
-            const nextBlock = closestBlock.nextElementSibling;
-            if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
-              // Position exactly halfway between current block bottom and next block top
-              const nextBlockRect = nextBlock.getBoundingClientRect();
-              const gap = nextBlockRect.top - closestBlockRect.bottom;
-              indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-            } else {
-              // No next block - position at bottom of last block
-              indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
-            }
-          }
+            // VERTICAL LAYOUT: Use Y-axis to determine top/bottom insertion (default behavior)
+            const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
+            const isHoveringOverTopHalf = mouseYRelativeToBlock < closestBlockRect.height / 2;
 
-          dropIndicator.style.top = `${indicatorY}px`;
-          dropIndicator.style.left = `${closestBlockRect.left}px`;
-          dropIndicator.style.width = `${closestBlockRect.width}px`;
-          dropIndicator.style.display = 'block';
+            insertAt = isHoveringOverTopHalf ? 0 : 1; // 0 = insert before (top), 1 = insert after (bottom)
+
+            // Position HORIZONTAL drop indicator
+            const indicatorHeight = 4;
+            let indicatorY;
+
+            if (insertAt === 0) {
+              // Inserting before this block - find the previous block
+              const prevBlock = closestBlock.previousElementSibling;
+              if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
+                const prevBlockRect = prevBlock.getBoundingClientRect();
+                const gap = closestBlockRect.top - prevBlockRect.bottom;
+                indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+              } else {
+                indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
+              }
+            } else {
+              // Inserting after this block - find the next block
+              const nextBlock = closestBlock.nextElementSibling;
+              if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
+                const nextBlockRect = nextBlock.getBoundingClientRect();
+                const gap = nextBlockRect.top - closestBlockRect.bottom;
+                indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
+              } else {
+                indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
+              }
+            }
+
+            // Style as horizontal indicator
+            dropIndicator.style.top = `${indicatorY}px`;
+            dropIndicator.style.left = `${closestBlockRect.left}px`;
+            dropIndicator.style.width = `${closestBlockRect.width}px`;
+            dropIndicator.style.height = `${indicatorHeight}px`;
+            dropIndicator.style.borderLeft = 'none';
+            dropIndicator.style.borderTop = '3px dashed #007bff';
+            dropIndicator.style.display = 'block';
+            dropIndicatorVisible = true; // Mark indicator as visible - drop is allowed
+          }
+        } else {
+          // No valid drop target - hide indicator and mark as not droppable
+          const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
+          if (existingIndicator) {
+            existingIndicator.style.display = 'none';
+          }
+          dropIndicatorVisible = false;
+          closestBlockUid = null;
         }
       };
 
@@ -2330,45 +2422,29 @@ export class Bridge {
           console.log('[HYDRA] No drop indicator to hide on mouseup');
         }
 
-        if (closestBlockUid) {
+        // Only allow drop if indicator was visible - this ensures all validation passed
+        if (closestBlockUid && dropIndicatorVisible) {
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
-
-          // For now, only support drag-and-drop for page-level blocks
-          // TODO: Add container-aware DnD that handles nested blocks
           const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
-          if (draggedPathInfo?.parentId || targetPathInfo?.parentId) {
-            // One or both blocks are nested - skip for now
-            console.log('[HYDRA] DnD: Skipping - nested blocks not yet supported');
-            return;
-          }
-
-          const blocks_layout = this.formData.blocks_layout.items;
-          const draggedBlockIndex = blocks_layout.indexOf(draggedBlockId);
-          const targetBlockIndex = blocks_layout.indexOf(closestBlockUid);
-
-          if (draggedBlockIndex !== -1 && targetBlockIndex !== -1) {
-            // Remove dragged block from its current position
-            blocks_layout.splice(draggedBlockIndex, 1);
-
-            // Determine insertion point based on hover position
-            // If dragging down, adjust target index since we removed the dragged block
-            let adjustedTargetIndex = targetBlockIndex;
-            if (draggedBlockIndex < targetBlockIndex) {
-              adjustedTargetIndex--;
-            }
-            const insertIndex = insertAt === 1 ? adjustedTargetIndex + 1 : adjustedTargetIndex;
-
-            // Insert at new position
-            blocks_layout.splice(insertIndex, 0, draggedBlockId);
-
-            // Send updated blocks_layout to parent
-            window.parent.postMessage(
-              { type: 'UPDATE_BLOCKS_LAYOUT', data: this.formData },
-              this.adminOrigin,
-            );
-          }
+          // Send MOVE_BLOCK message with all info needed for the move
+          // Admin will handle the complex mutation (works for page-level and container blocks)
+          console.log('[HYDRA] DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+          window.parent.postMessage(
+            {
+              type: 'MOVE_BLOCK',
+              blockId: draggedBlockId,
+              targetBlockId: closestBlockUid,
+              insertAfter: insertAt === 1,
+              // Include path info for Admin to determine source/target containers
+              sourceParentId: draggedPathInfo?.parentId || null,
+              targetParentId: targetPathInfo?.parentId || null,
+            },
+            this.adminOrigin,
+          );
+        } else if (closestBlockUid && !dropIndicatorVisible) {
+          console.log('[HYDRA] DnD: Drop rejected - indicator was not visible (block type not allowed in target)');
         }
       };
 
