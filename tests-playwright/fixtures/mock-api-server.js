@@ -17,13 +17,18 @@ const PORT = process.env.PORT || 8888;
 // In-memory content database
 const contentDB = {};
 
-// Create a valid JWT format token (header.payload.signature)
-// Header: {"alg":"HS256","typ":"JWT"}
-// Payload: {"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400} (expires in 24 hours)
-const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
-const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400})).toString('base64').replace(/=/g, '');
-const signature = 'fake-signature';
-const AUTH_TOKEN = `${header}.${payload}.${signature}`;
+/**
+ * Generate a fresh JWT token with 24-hour expiration from now.
+ * Called on each login/renew to ensure token is always valid.
+ */
+function generateAuthToken(username = 'admin') {
+  const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
+  const payload = Buffer.from(JSON.stringify({
+    "sub": username,
+    "exp": Math.floor(Date.now()/1000) + 86400  // 24 hours from NOW
+  })).toString('base64').replace(/=/g, '');
+  return `${header}.${payload}.fake-signature`;
+}
 
 // Middleware
 app.use(cors());
@@ -199,16 +204,16 @@ function getContent(urlPath) {
 
 /**
  * POST /@login-renew
- * Renew/validate existing JWT token
+ * Renew/validate existing JWT token - generates fresh token each time
  */
 app.post('/@login-renew', (req, res) => {
   if (process.env.DEBUG) {
     console.log('Token renewal requested');
   }
 
-  // Return the same token and user info
+  // Generate fresh token with new expiration
   res.json({
-    token: AUTH_TOKEN,
+    token: generateAuthToken('admin'),
     user: {
       '@id': 'http://localhost:8888/@users/admin',
       id: 'admin',
@@ -221,7 +226,7 @@ app.post('/@login-renew', (req, res) => {
 
 /**
  * POST /@login
- * Authenticate and return JWT token with user info
+ * Authenticate and return JWT token with user info - generates fresh token each time
  */
 app.post('/@login', (req, res) => {
   const { login, password } = req.body;
@@ -231,11 +236,13 @@ app.post('/@login', (req, res) => {
   }
 
   if (login && password) {
+    // Generate fresh token with new expiration
+    const token = generateAuthToken(login);
     const response = {
-      token: AUTH_TOKEN,
+      token,
       user: {
-        '@id': 'http://localhost:8888/@users/admin',
-        id: 'admin',
+        '@id': `http://localhost:8888/@users/${login}`,
+        id: login,
         fullname: 'Admin User',
         email: 'admin@example.com',
         roles: ['Manager', 'Authenticated'],
@@ -243,7 +250,7 @@ app.post('/@login', (req, res) => {
     };
 
     if (process.env.DEBUG) {
-      console.log(`Login successful, returning token: ${AUTH_TOKEN.substring(0, 20)}...`);
+      console.log(`Login successful, returning token: ${token.substring(0, 20)}...`);
       console.log(`Response body:`, JSON.stringify(response));
     }
 
