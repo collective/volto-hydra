@@ -505,20 +505,39 @@ function getEmptyBlockType(containerConfig) {
  * @param {Object|null} containerConfig - Container config (null for page-level)
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} options - Options for block initialization
+ * @param {Object} options.intl - Intl object for i18n
+ * @param {Object} options.metadata - Metadata from form
+ * @param {Object} options.properties - Form properties
  * @returns {Object} formData with empty block added if container was empty, or original formData
  */
-export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap, uuidGenerator) {
+export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap, uuidGenerator, blocksConfig, options = {}) {
+  const { intl, metadata, properties } = options;
+
   if (!containerConfig) {
     // Page-level: check blocks_layout.items
     const items = formData.blocks_layout?.items || [];
     if (items.length === 0) {
       const newBlockId = uuidGenerator();
       const blockType = getEmptyBlockType(null);
+      let blockData = { '@type': blockType };
+
+      // Apply block defaults to get proper initial values
+      if (intl && blocksConfig) {
+        blockData = applyBlockDefaults({
+          data: blockData,
+          intl,
+          metadata,
+          properties,
+        }, blocksConfig);
+      }
+
       return {
         ...formData,
         blocks: {
           ...formData.blocks,
-          [newBlockId]: { '@type': blockType },
+          [newBlockId]: blockData,
         },
         blocks_layout: { items: [newBlockId] },
       };
@@ -541,11 +560,23 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
   if (items.length === 0) {
     const newBlockId = uuidGenerator();
     const blockType = getEmptyBlockType(containerConfig);
+    let blockData = { '@type': blockType };
+
+    // Apply block defaults to get proper initial values
+    if (intl && blocksConfig) {
+      blockData = applyBlockDefaults({
+        data: blockData,
+        intl,
+        metadata,
+        properties,
+      }, blocksConfig);
+    }
+
     const updatedParentBlock = {
       ...parentBlock,
       [fieldName]: {
         ...parentBlock[fieldName],
-        [newBlockId]: { '@type': blockType },
+        [newBlockId]: blockData,
       },
       [layoutFieldName]: { items: [newBlockId] },
     };

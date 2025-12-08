@@ -1788,9 +1788,9 @@ test.describe('Container Block Drag and Drop', () => {
     expect(col2Box).not.toBeNull();
 
     // Position at far left edge of col-2, vertically centered
-    // We need to add iframe offset since col2Box is in iframe coords
-    const targetX = iframeBox!.x + col2Box!.x + 5; // 5px into the column from left edge
-    const targetY = iframeBox!.y + col2Box!.y + col2Box!.height / 2;
+    // Playwright's iframe.locator().boundingBox() already returns parent-relative coordinates
+    const targetX = col2Box!.x + 5; // 5px into the column from left edge
+    const targetY = col2Box!.y + col2Box!.height / 2;
 
     await page.mouse.move(targetX, targetY, { steps: 10 });
 
@@ -1918,7 +1918,7 @@ test.describe('Container Block Drag and Drop', () => {
     await page.mouse.up();
   });
 
-  test('drop indicator not shown when block type not allowed in target container', async ({
+  test('drop indicator walks up to valid parent when block type not allowed in immediate target', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -1932,7 +1932,7 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.clickBlockInIframe('text-1a');
     await page.waitForTimeout(300);
 
-    // Try to drag to columns-1 container (which only allows 'column' blocks, not 'slate')
+    // Try to drag over col-1 (which is inside columns-1 that only allows 'column' blocks)
     const dragHandle = await helper.getDragHandle();
 
     // Get positions
@@ -1947,19 +1947,30 @@ test.describe('Container Block Drag and Drop', () => {
     await page.mouse.down();
 
     // Move to col-1 element itself (which is inside columns-1)
-    // Dropping here means dropping INTO columns-1, which doesn't allow slate
+    // Slate can't be dropped as sibling of col-1 (columns only allows 'column')
+    // But system walks up and finds page level allows slate
     const col1 = iframe.locator('[data-block-uid="col-1"]');
     const col1Box = await col1.boundingBox();
     expect(col1Box).not.toBeNull();
 
-    // Move to left edge of col-1 to trigger horizontal layout detection
+    // Move to left edge of col-1
     await page.mouse.move(col1Box!.x + 5, col1Box!.y + col1Box!.height / 2, {
       steps: 10,
     });
 
-    // Drop indicator should NOT be visible (slate not allowed in columns container)
+    // Drop indicator SHOULD be visible - walks up to page level where slate is allowed
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
-    await expect(dropIndicator).not.toBeVisible();
+    await expect(dropIndicator).toBeVisible();
+
+    // The indicator should be at the page level (below columns block)
+    const indicatorBox = await dropIndicator.boundingBox();
+    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
+    const columnsBox = await columnsBlock.boundingBox();
+    expect(indicatorBox).not.toBeNull();
+    expect(columnsBox).not.toBeNull();
+
+    // Indicator Y should be near/below the columns block bottom edge
+    expect(indicatorBox!.y).toBeGreaterThanOrEqual(columnsBox!.y + columnsBox!.height - 20);
 
     // Clean up
     await page.mouse.up();
@@ -2139,5 +2150,67 @@ test.describe('Container Block Drag and Drop', () => {
       .locator('[data-block-uid="text-2a"]')
       .count();
     expect(text2aInCol1).toBe(1);
+  });
+
+  test('dragging last block out of container creates empty block in source container', async ({
+    page,
+  }) => {
+    // When dragging the last block out of a container, an empty block should be
+    // created in the source container to maintain its structure
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // col-2 only has one block (text-2a)
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
+    const col2InitialCount = await col2
+      .locator(':scope > [data-block-uid]')
+      .count();
+    expect(col2InitialCount).toBe(1); // Only text-2a
+
+    // Select text-2a and drag it to col-1
+    await helper.clickBlockInIframe('text-2a');
+    await page.waitForTimeout(300);
+
+    const dragHandle = await helper.getDragHandle();
+    expect(dragHandle).not.toBeNull();
+
+    // Drag to col-1 - target the bottom half of text-1b (inside col-1, not below it)
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const text1b = col1.locator('[data-block-uid="text-1b"]');
+    const text1bBox = await text1b.boundingBox();
+    expect(text1bBox).not.toBeNull();
+
+    // Target bottom 75% of text-1b to insert AFTER it but stay INSIDE col-1
+    const targetY = text1bBox!.y + text1bBox!.height * 0.75;
+
+    // Use mouse.move instead of hover() to avoid iframe interception issues
+    const dragHandleBox = await dragHandle!.boundingBox();
+    expect(dragHandleBox).not.toBeNull();
+    await page.mouse.move(
+      dragHandleBox!.x + dragHandleBox!.width / 2,
+      dragHandleBox!.y + dragHandleBox!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(text1bBox!.x + text1bBox!.width / 2, targetY, { steps: 10 });
+    await page.waitForTimeout(100);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    // Verify text-2a moved to col-1
+    const text2aInCol1 = await col1.locator('[data-block-uid="text-2a"]').count();
+    expect(text2aInCol1).toBe(1);
+
+    // CRITICAL: col-2 should now have a new default block, not be completely empty
+    // Since column has defaultBlock: 'slate', it creates a properly initialized slate block
+    const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
+    expect(col2NewCount).toBe(1); // Should have a new default block
+
+    // Verify it's a slate block (column's defaultBlock is 'slate')
+    const newSlateBlock = col2.locator('[data-block-type="slate"]');
+    await expect(newSlateBlock).toBeVisible();
   });
 });

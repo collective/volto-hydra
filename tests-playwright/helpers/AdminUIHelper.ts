@@ -2390,21 +2390,25 @@ export class AdminUIHelper {
       throw new Error('Target block does not have data-block-uid attribute');
     }
 
-    // Get iframe coords for the target
+    // Get target rect - Playwright's boundingBox() already returns page-relative coordinates
     const iframe = this.getIframe();
-    const targetRect = await targetBlock.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    });
+    const iframeEl = this.page.locator('#previewIframe');
+    const iframeBox = await iframeEl.boundingBox();
+    console.log('[TEST] Iframe bounding box:', iframeBox);
+    const targetRect = await targetBlock.boundingBox();
+    if (!targetRect) {
+      throw new Error('Could not get target block bounding box');
+    }
+    console.log('[TEST] Target block rect:', targetRect);
 
     // Calculate drop position - for horizontal, use X position
+    // boundingBox() already returns page-relative coordinates, no conversion needed
     const dropX = insertAfter
-      ? targetRect.x + targetRect.width * 0.75  // Right side
+      ? targetRect.x + targetRect.width * 0.75 // Right side
       : targetRect.x + targetRect.width * 0.25; // Left side
-    const dropY = targetRect.y + targetRect.height / 2;  // Center vertically
+    const dropY = targetRect.y + targetRect.height / 2; // Center vertically
 
-    // Convert to page coords
-    const dropPosPage = await this.iframeCoordsToPageCoords({ x: dropX, y: dropY });
+    const dropPosPage = { x: dropX, y: dropY };
 
     console.log('[TEST] Moving to horizontal drop position:', dropPosPage);
     await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });

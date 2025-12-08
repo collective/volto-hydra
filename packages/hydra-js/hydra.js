@@ -2253,26 +2253,60 @@ export class Bridge {
         }
 
         if (closestBlock) {
-          closestBlockUid = closestBlock.getAttribute('data-block-uid');
-
           // Check if the dragged block type is allowed in the target container
+          // If not, walk up the parent chain to find a valid drop target
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
           const draggedBlockData = this.getBlockData(draggedBlockId);
           const draggedBlockType = draggedBlockData?.['@type'];
-          const targetPathInfo = this.blockPathMap?.[closestBlockUid];
-          const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
 
-          // If target has allowedSiblingTypes restriction and dragged type not in list, skip
-          if (allowedSiblingTypes && draggedBlockType && !allowedSiblingTypes.includes(draggedBlockType)) {
-            // Hide any existing indicator and skip
+          // Find a valid drop target by walking up the parent chain
+          let validDropTarget = closestBlock;
+          let validDropTargetUid = validDropTarget.getAttribute('data-block-uid');
+
+          while (validDropTarget) {
+            const targetPathInfo = this.blockPathMap?.[validDropTargetUid];
+            const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
+
+            // Check if drop is allowed here
+            if (!allowedSiblingTypes || !draggedBlockType || allowedSiblingTypes.includes(draggedBlockType)) {
+              // Drop is allowed at this level
+              break;
+            }
+
+            // Not allowed here, try parent block
+            const parentElement = validDropTarget.parentElement?.closest('[data-block-uid]');
+            if (!parentElement) {
+              // No more parents to check - drop not allowed anywhere
+              validDropTarget = null;
+              validDropTargetUid = null;
+              break;
+            }
+
+            validDropTarget = parentElement;
+            validDropTargetUid = validDropTarget.getAttribute('data-block-uid');
+
+            // Don't allow dropping on the block we're dragging
+            if (validDropTargetUid === draggedBlockId) {
+              validDropTarget = null;
+              validDropTargetUid = null;
+              break;
+            }
+          }
+
+          // If no valid drop target found, hide indicator and skip
+          if (!validDropTarget) {
             const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
-            dropIndicatorVisible = false; // Mark indicator as hidden
-            closestBlockUid = null; // Clear so drop won't happen
+            dropIndicatorVisible = false;
+            closestBlockUid = null;
             return;
           }
+
+          // Use the valid drop target (may be the original or a parent)
+          closestBlock = validDropTarget;
+          closestBlockUid = validDropTargetUid;
 
           // Get or create drop indicator
           let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');

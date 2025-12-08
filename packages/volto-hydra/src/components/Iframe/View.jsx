@@ -647,6 +647,8 @@ const Iframe = (props) => {
       containerConfig,
       iframeSyncState.blockPathMap,
       uuid,
+      blocksConfig,
+      { intl, metadata, properties },
     );
 
     onChangeFormData(newFormData);
@@ -921,11 +923,17 @@ const Iframe = (props) => {
           // Handle drag-and-drop block moves (supports container and page-level)
           const { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId } = event.data;
 
+          // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
+          // Only needed when moving to a different container
+          const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
+            ? getContainerFieldConfig(blockId, iframeSyncState.blockPathMap, properties, blocksConfig)
+            : null;
+
           // Use moveBlockBetweenContainers utility to handle all cases:
           // - Same container reordering
           // - Different container moves
           // - Page ↔ container moves
-          const newFormData = moveBlockBetweenContainers(
+          let newFormData = moveBlockBetweenContainers(
             properties,
             iframeSyncState.blockPathMap,
             blockId,
@@ -937,6 +945,17 @@ const Iframe = (props) => {
           );
 
           if (newFormData) {
+            // If we moved to a different container, ensure source container has at least one block
+            if (sourceParentId !== targetParentId && sourceContainerConfig) {
+              newFormData = ensureEmptyBlockIfEmpty(
+                newFormData,
+                sourceContainerConfig,
+                iframeSyncState.blockPathMap,
+                uuid,
+                blocksConfig,
+                { intl, metadata, properties },
+              );
+            }
             onChangeFormData(newFormData);
           }
           break;
