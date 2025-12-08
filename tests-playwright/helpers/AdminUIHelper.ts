@@ -447,7 +447,36 @@ export class AdminUIHelper {
   }
 
   /**
+   * Check if the toolbar is covered by the sidebar.
+   * Returns true if NOT covered (toolbar is fully visible and clickable).
+   */
+  async isToolbarNotCoveredBySidebar(): Promise<boolean> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    const sidebar = this.page.locator('.sidebar-container:not(.collapsed)');
+
+    // If sidebar doesn't exist or is collapsed, toolbar can't be covered
+    if (!(await sidebar.isVisible())) {
+      return true;
+    }
+
+    const toolbarBox = await toolbar.boundingBox();
+    const sidebarBox = await sidebar.boundingBox();
+
+    if (!toolbarBox || !sidebarBox) {
+      return true; // Can't determine, assume ok
+    }
+
+    // Check if toolbar's right edge extends into sidebar's left edge
+    const toolbarRight = toolbarBox.x + toolbarBox.width;
+    const sidebarLeft = sidebarBox.x;
+
+    // Toolbar is not covered if its right edge is left of sidebar's left edge
+    return toolbarRight <= sidebarLeft;
+  }
+
+  /**
    * Wait for the Quanta toolbar to appear on a block and scroll it into view.
+   * Also verifies the toolbar is not covered by the sidebar.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
     // Wait until toolbar is positioned correctly relative to the block
@@ -472,6 +501,15 @@ export class AdminUIHelper {
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
       return !!res && !!res.ok;
+    }, { timeout: 5000 }).toBeTruthy();
+
+    // Verify toolbar is not covered by sidebar
+    await expect.poll(async () => {
+      const notCovered = await this.isToolbarNotCoveredBySidebar();
+      if (!notCovered) {
+        console.log(`[TEST] Toolbar for block "${blockId}" is covered by sidebar`);
+      }
+      return notCovered;
     }, { timeout: 5000 }).toBeTruthy();
   }
 

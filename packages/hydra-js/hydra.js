@@ -2161,22 +2161,9 @@ export class Bridge {
       const rect = blockElement.getBoundingClientRect();
       const toolbarTop = rect.top - 48; // 48px above block container (matches parent toolbar height)
 
-      // Determine if block is on right side of viewport - if so, align toolbar to right edge
-      // This mirrors the logic in SyncedSlateToolbar.jsx
-      const viewportMidpoint = window.innerWidth / 2;
-      const blockCenter = rect.left + rect.width / 2;
-      const alignRight = blockCenter > viewportMidpoint;
-
-      if (alignRight) {
-        // Right-align: position from right edge of block
-        const toolbarRight = window.innerWidth - rect.right;
-        dragButton.style.left = 'auto';
-        dragButton.style.right = `${toolbarRight}px`;
-      } else {
-        // Left-align: position from left edge of block
-        dragButton.style.right = 'auto';
-        dragButton.style.left = `${rect.left}px`;
-      }
+      // Always left-align at block's left edge
+      dragButton.style.right = 'auto';
+      dragButton.style.left = `${rect.left}px`;
       dragButton.style.top = `${toolbarTop}px`;
       dragButton.style.display = 'block';
     };

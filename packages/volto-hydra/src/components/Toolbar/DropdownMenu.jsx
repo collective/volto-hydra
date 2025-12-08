@@ -1,11 +1,18 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import SlateButtonsWrapper from './SlateButtonsWrapper';
+import FormatDropdown from './FormatDropdown';
 
 /**
  * Dropdown Menu for Block Actions
  *
- * Renders a dropdown menu with Settings, Select Container, and Remove options.
+ * Renders a dropdown menu with:
+ * - Overflow buttons (formatting buttons that don't fit in toolbar)
+ * - Settings, Select Container, and Remove options
  * Uses React portal to avoid container clipping issues.
+ *
+ * Overflow buttons are wrapped in a Slate context using the passed editor
+ * so that useSlate() works for the button components.
  */
 const DropdownMenu = ({
   selectedBlock,
@@ -15,6 +22,13 @@ const DropdownMenu = ({
   onOpenSettings,
   parentId,
   onSelectBlock,
+  overflowButtons = [], // Array of { name, element } for buttons that overflow
+  showFormatDropdown = false, // Whether to show FormatDropdown in overflow
+  blockButtons = [], // Block buttons for FormatDropdown
+  editor, // Slate editor for overflow buttons context
+  onChange, // Change handler for overflow buttons to propagate changes
+  onMouseDownCapture, // Capture handler for flushing buffer before format
+  onClickCapture, // Capture handler to block click when mousedown was intercepted
 }) => {
   if (!menuButtonRect) {
     return null;
@@ -59,6 +73,37 @@ const DropdownMenu = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
+      {/* Overflow buttons - formatting buttons that don't fit in toolbar */}
+      {(overflowButtons.length > 0 || showFormatDropdown) && editor && (
+        <SlateButtonsWrapper
+          editor={editor}
+          initialValue={editor.children}
+          onChange={onChange}
+          onMouseDownCapture={onMouseDownCapture}
+          onClickCapture={onClickCapture}
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '2px',
+            padding: '8px',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          {/* FormatDropdown when it doesn't fit in toolbar */}
+          {showFormatDropdown && blockButtons.length > 0 && (
+            <FormatDropdown blockButtons={blockButtons} />
+          )}
+          {overflowButtons.map(({ name, element }) => (
+            <div
+              key={name}
+              data-toolbar-button={name}
+              style={{ display: 'inline-flex' }}
+            >
+              {element}
+            </div>
+          ))}
+        </SlateButtonsWrapper>
+      )}
       {/* Settings option - only shown when onOpenSettings is provided (toolbar usage) */}
       {onOpenSettings && (
         <>

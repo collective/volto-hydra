@@ -49,7 +49,6 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import DropdownMenu from '../Toolbar/DropdownMenu';
 import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
@@ -391,8 +390,6 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
-  const [menuDropdownOpen, setMenuDropdownOpen] = useState(false); // Track dropdown menu visibility
-  const [menuButtonRect, setMenuButtonRect] = useState(null); // Store menu button position for portal positioning
   const blockChooserRef = useRef();
 
   // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
@@ -1228,26 +1225,6 @@ const Iframe = (props) => {
     };
   }, []);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    if (menuDropdownOpen) {
-      const handleClickOutside = (event) => {
-        // Close dropdown if clicking anywhere outside
-        if (!event.target.closest('.volto-hydra-dropdown-menu')) {
-          setMenuDropdownOpen(false);
-        }
-      };
-
-      // Add slight delay to avoid immediate close from the button click that opened it
-      setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
-
-      return () => {
-        document.removeEventListener('click', handleClickOutside);
-      };
-    }
-  }, [menuDropdownOpen]);
 
   // Get container configs for the selected block
   // - ownContainerConfig: for adding children INTO the selected block (sidebar add)
@@ -1520,10 +1497,10 @@ const Iframe = (props) => {
             blockUI={blockUI}
             blockFieldTypes={blockFieldTypes}
             iframeElement={referenceElement}
-            onOpenMenu={(rect) => {
-              setMenuButtonRect(rect);
-              setMenuDropdownOpen(!menuDropdownOpen);
-            }}
+            onDeleteBlock={onDeleteBlock}
+            onSelectBlock={onSelectBlock}
+            parentId={iframeSyncState.blockPathMap?.[selectedBlock]?.parentId}
+            maxToolbarWidth={referenceElement?.getBoundingClientRect()?.width || 400}
           />
 
           {/* Add Button - positioned based on data-block-add direction */}
@@ -1584,26 +1561,6 @@ const Iframe = (props) => {
         </>
         );
       })()}
-
-      {/* Dropdown menu */}
-      {menuDropdownOpen && (
-        <DropdownMenu
-          selectedBlock={selectedBlock}
-          onDeleteBlock={onDeleteBlock}
-          menuButtonRect={menuButtonRect}
-          onClose={() => setMenuDropdownOpen(false)}
-          onOpenSettings={() => {
-            // Expand sidebar if collapsed by clicking the trigger button
-            const sidebarContainer = document.querySelector('.sidebar-container');
-            if (sidebarContainer?.classList.contains('collapsed')) {
-              const triggerButton = sidebarContainer.querySelector('.trigger');
-              triggerButton?.click();
-            }
-          }}
-          parentId={iframeSyncState.blockPathMap?.[selectedBlock]?.parentId}
-          onSelectBlock={onSelectBlock}
-        />
-      )}
 
       {/* Hierarchical sidebar widgets */}
       <ParentBlocksWidget
