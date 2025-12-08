@@ -2100,6 +2100,185 @@ test.describe('Container Block Drag and Drop', () => {
     expect(pageLevelUids).not.toContain('col-1');
   });
 
+  test('column block cannot be dragged into grid (implicit container allowedBlocks)', async ({
+    page,
+  }) => {
+    // gridBlock is an implicit container (uses blocks/blocks_layout without schema field)
+    // It should have allowedBlocks from its block config, which doesn't include 'column'
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // col-1 is a 'column' block
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    await expect(col1).toBeVisible();
+
+    // grid-1 is a gridBlock with children grid-cell-1 and grid-cell-2
+    const gridCell1 = iframe.locator('[data-block-uid="grid-cell-1"]');
+    await expect(gridCell1).toBeVisible();
+
+    // Select col-1
+    await helper.clickBlockInIframe('col-1');
+    await page.waitForTimeout(300);
+
+    // Try to drag col-1 into the grid (next to grid-cell-1)
+    const dragHandle = await helper.getDragHandle();
+
+    // Get positions
+    const handleBox = await dragHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+
+    // Start the drag
+    await page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2,
+    );
+    await page.mouse.down();
+
+    // Move to grid-cell-1's area
+    const gridCellBox = await gridCell1.boundingBox();
+    expect(gridCellBox).not.toBeNull();
+
+    await page.mouse.move(
+      gridCellBox!.x + gridCellBox!.width / 2,
+      gridCellBox!.y + gridCellBox!.height / 2,
+      { steps: 10 },
+    );
+
+    // Drop indicator should NOT be visible ('column' not allowed in gridBlock)
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    await expect(dropIndicator).not.toBeVisible();
+
+    // Drop anyway (should be rejected)
+    await page.mouse.up();
+
+    // Wait for any potential state changes
+    await page.waitForTimeout(500);
+
+    // col-1 should still be inside columns-1 (not moved to grid)
+    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
+    const col1InColumns = await columnsBlock
+      .locator('[data-block-uid="col-1"]')
+      .count();
+    expect(col1InColumns).toBe(1);
+
+    // col-1 should NOT be inside grid-1
+    const gridBlock = iframe.locator('[data-block-uid="grid-1"]');
+    const col1InGrid = await gridBlock.locator('[data-block-uid="col-1"]').count();
+    expect(col1InGrid).toBe(0);
+  });
+
+  test('add button is disabled when columns container is at maxLength', async ({
+    page,
+  }) => {
+    // columns block has maxLength: 4 for its columns field
+    // Currently has 2 columns (col-1, col-2), add 2 more to reach maxLength
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify columns-1 currently has 2 columns
+    const columns1 = iframe.locator('[data-block-uid="columns-1"]');
+    await expect(
+      columns1.locator(':scope > .columns-row > [data-block-uid]'),
+    ).toHaveCount(2);
+
+    // Select col-2 (clicking navigates to parent if child is selected)
+    await helper.clickBlockInIframe('col-2');
+
+    // The add button is in the Admin UI (not iframe), positioned next to selected block
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    // Wait for 3rd column to be created (columns has single allowedBlock: 'column')
+    await expect(
+      columns1.locator(':scope > .columns-row > [data-block-uid]'),
+    ).toHaveCount(3);
+
+    // Select the new (3rd) column and add 4th column
+    const allColumns = columns1.locator(':scope > .columns-row > [data-block-uid]');
+    await allColumns.nth(2).click();
+    await helper.waitForQuantaToolbar((await allColumns.nth(2).getAttribute('data-block-uid'))!);
+
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    // Wait for 4th column to be created
+    await expect(
+      columns1.locator(':scope > .columns-row > [data-block-uid]'),
+    ).toHaveCount(4);
+
+    // Select the new (4th) column
+    await allColumns.nth(3).click();
+    await helper.waitForQuantaToolbar((await allColumns.nth(3).getAttribute('data-block-uid'))!);
+
+    // Add button should NOT be visible when container is at maxLength
+    await expect(addButton).not.toBeVisible();
+  });
+
+  test('add button is disabled when grid container is at maxLength', async ({
+    page,
+  }) => {
+    // gridBlock has maxLength: 4
+    // Currently has 2 cells (grid-cell-1, grid-cell-2), add 2 more to reach maxLength
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify grid-1 currently has 2 cells
+    // Note: grid children are inside a grid-row wrapper, not direct children
+    const grid1 = iframe.locator('[data-block-uid="grid-1"]');
+    const gridCells = grid1.locator('[data-block-uid]');
+    await expect(gridCells).toHaveCount(2);
+
+    // Select grid-cell-2 and add a new cell after it
+    await helper.clickBlockInIframe('grid-cell-2');
+
+    // The add button is in the Admin UI (not iframe)
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    // Select slate block type from chooser
+    await helper.selectBlockType('slate');
+
+    // Wait for 3rd cell to be created
+    await expect(gridCells).toHaveCount(3);
+
+    // Select the new (3rd) cell and add 4th cell
+    await gridCells.nth(2).click();
+    await helper.waitForQuantaToolbar(
+      (await gridCells.nth(2).getAttribute('data-block-uid'))!,
+    );
+
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    await helper.selectBlockType('slate');
+
+    // Wait for 4th cell to be created
+    await expect(gridCells).toHaveCount(4);
+
+    // Select the new (4th) cell
+    await gridCells.nth(3).click();
+    await helper.waitForQuantaToolbar(
+      (await gridCells.nth(3).getAttribute('data-block-uid'))!,
+    );
+
+    // Add button should NOT be visible when container is at maxLength
+    await expect(addButton).not.toBeVisible();
+  });
+
   test('can drag block on right side of screen (right-aligned toolbar)', async ({
     page,
   }) => {
@@ -2139,8 +2318,15 @@ test.describe('Container Block Drag and Drop', () => {
     await page.waitForTimeout(500);
 
     // Verify text-2a moved from col-2 to col-1
+    // Note: col-2 will have 1 block (empty block created when last block was removed)
     const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
-    expect(col2NewCount).toBe(0); // text-2a should be gone
+    expect(col2NewCount).toBe(1); // empty block created when text-2a was removed
+
+    // Verify text-2a is no longer in col-2
+    const text2aInCol2 = await col2
+      .locator('[data-block-uid="text-2a"]')
+      .count();
+    expect(text2aInCol2).toBe(0);
 
     const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
     expect(col1NewCount).toBe(3); // text-1a, text-1b, text-2a

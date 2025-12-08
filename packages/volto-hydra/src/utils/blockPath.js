@@ -12,7 +12,7 @@ import { applyBlockDefaults } from '@plone/volto/helpers';
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (from initBridge config)
- * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, allowedSiblingTypes: Array|null }
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, allowedSiblingTypes: Array|null, maxSiblings: number|null }
  *
  * Path format: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
  * This allows accessing: formData.blocks['columns-1'].columns['col-1'].blocks['text-1a']
@@ -31,20 +31,22 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
    * @param {Array} currentPath - Path to this blocks object (e.g., ['blocks'] or ['blocks', 'columns-1', 'columns'])
    * @param {string|null} parentId - Parent block's uid, or null for page-level
    * @param {Array|null} allowedBlocks - Allowed block types in this container (from parent's schema)
+   * @param {number|null} maxLength - Maximum number of blocks allowed in this container
    */
-  function traverse(blocksObj, layoutItems, currentPath, parentId, allowedBlocks = null) {
+  function traverse(blocksObj, layoutItems, currentPath, parentId, allowedBlocks = null, maxLength = null) {
     if (!blocksObj || !layoutItems) return;
 
     layoutItems.forEach((blockId) => {
       const block = blocksObj[blockId];
       if (!block) return;
 
-      // Store path for this block, including allowedBlocks for DND validation
+      // Store path for this block, including allowedBlocks and maxLength for validation
       const blockPath = [...currentPath, blockId];
       pathMap[blockId] = {
         path: blockPath,
         parentId: parentId,
         allowedSiblingTypes: allowedBlocks, // What types are allowed as siblings in this container
+        maxSiblings: maxLength, // Maximum number of blocks allowed in this container
       };
 
       // Check if this block type has container fields (type: 'blocks')
@@ -70,6 +72,7 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
                 [...blockPath, fieldName],
                 blockId,
                 fieldDef.allowedBlocks || null, // Pass allowedBlocks from schema
+                fieldDef.maxLength || null, // Pass maxLength from schema
               );
             }
           }
@@ -79,11 +82,16 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
       // Also check for implicit container fields (blocks/blocks_layout without schema)
       // This handles Volto's built-in container blocks like Grid
       if (block.blocks && block.blocks_layout?.items && !pathMap[Object.keys(block.blocks)[0]]) {
+        // For implicit containers, allowedBlocks and maxLength come from block config level
+        const implicitAllowedBlocks = blockConfig?.allowedBlocks || null;
+        const implicitMaxLength = blockConfig?.maxLength || null;
         traverse(
           block.blocks,
           block.blocks_layout.items,
           [...blockPath, 'blocks'],
           blockId,
+          implicitAllowedBlocks,
+          implicitMaxLength,
         );
       }
     });
