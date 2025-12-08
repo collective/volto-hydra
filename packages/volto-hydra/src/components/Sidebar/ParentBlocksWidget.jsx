@@ -167,20 +167,6 @@ const ParentBlockSection = ({
   // Get schema for fallback rendering (when no Edit component)
   const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl) : null;
 
-  // Close menu when clicking outside
-  React.useEffect(() => {
-    if (!menuOpen) return;
-
-    const handleClickOutside = (e) => {
-      if (menuButtonRef.current && !menuButtonRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [menuOpen]);
-
   const handleMenuClick = (e) => {
     e.stopPropagation();
     if (menuButtonRef.current) {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import SlateButtonsWrapper from './SlateButtonsWrapper';
 import FormatDropdown from './FormatDropdown';
@@ -30,6 +30,20 @@ const DropdownMenu = ({
   onMouseDownCapture, // Capture handler for flushing buffer before format
   onClickCapture, // Capture handler to block click when mousedown was intercepted
 }) => {
+  const menuRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [onClose]);
+
   if (!menuButtonRect) {
     return null;
   }
@@ -58,6 +72,7 @@ const DropdownMenu = ({
 
   return createPortal(
     <div
+      ref={menuRef}
       className="volto-hydra-dropdown-menu"
       style={{
         position: 'fixed',
