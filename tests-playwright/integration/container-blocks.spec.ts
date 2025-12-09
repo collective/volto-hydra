@@ -133,6 +133,26 @@ test.describe('Container Block Detection', () => {
     expect((await helper.isBlockSelectedInIframe('text-2a')).ok).toBe(true);
     expect((await helper.isBlockSelectedInIframe('text-after')).ok).toBe(false);
   });
+
+  test('container block shows full border outline, not bottom line', async ({ page }) => {
+    // Container blocks should show a full border around them, not just a bottom line
+    // even if they only have a single editable text field (like a title)
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click on columns-1 (a container block with a title field)
+    await helper.clickContainerBlockInIframe('columns-1');
+
+    // Wait for selection to be applied
+    await page.waitForTimeout(300);
+
+    // Check the selection outline style - should be 'border', not 'bottom-line'
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible();
+    await expect(outline).toHaveAttribute('data-outline-style', 'border');
+  });
 });
 
 // Note: Container hierarchy (parentUid) is determined from blockPathMap on the admin side,

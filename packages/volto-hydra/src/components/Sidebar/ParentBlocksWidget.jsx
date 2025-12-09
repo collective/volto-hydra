@@ -275,13 +275,9 @@ const ParentBlockSection = ({
             applySchemaEnhancers={true}
           />
         );
-        // For current block, portal to #sidebar-properties in Sidebar.jsx
-        // For parent blocks, render inline (portal target div already exists above)
-        if (isCurrentBlock) {
-          const sidebarProperties = document.getElementById('sidebar-properties');
-          return sidebarProperties ? createPortal(formContent, sidebarProperties) : null;
-        }
-        return formContent;
+        // Portal to the target element (sidebar-properties for current, parent-sidebar-{id} for parents)
+        const targetElement = document.getElementById(targetId);
+        return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
     </div>
   );

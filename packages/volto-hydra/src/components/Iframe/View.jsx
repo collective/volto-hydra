@@ -46,7 +46,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -1483,10 +1483,18 @@ const Iframe = (props) => {
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
       {blockUI && blockUI.rect && referenceElement && (() => {
-        // Determine outline style based on number of editable fields
-        // Single field blocks get bottom line, multi-field blocks get full border
+        // Determine outline style based on block type and number of editable fields
+        // Container blocks always get full border (they contain child blocks)
+        // Single field non-container blocks get bottom line
+        // Multi-field non-container blocks get full border
         const editableFieldCount = Object.keys(blockUI.editableFields || {}).length;
-        const showBottomLine = editableFieldCount === 1;
+        const isContainer = getAllContainerFields(
+          selectedBlock,
+          iframeSyncState.blockPathMap,
+          properties,
+          config.blocks.blocksConfig,
+        ).length > 0;
+        const showBottomLine = editableFieldCount === 1 && !isContainer;
         return (
         <>
           {/* Selection Outline - blue border or bottom line depending on field count */}
