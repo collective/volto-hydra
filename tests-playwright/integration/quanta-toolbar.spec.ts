@@ -334,10 +334,29 @@ test.describe('Quanta Toolbar - Format Dropdown', () => {
     const dropdownMenu = page.locator('.format-dropdown-menu');
     await expect(dropdownMenu).toBeVisible();
 
-    // Should contain block-level format options (headings, lists, etc.)
+    // Should contain block-level format options (headings, lists, blockquote)
     const menuItems = dropdownMenu.locator('.format-dropdown-item');
     const itemCount = await menuItems.count();
-    expect(itemCount).toBeGreaterThan(0);
+    expect(itemCount).toBeGreaterThanOrEqual(4); // At least: h2, h3, bullets, blockquote
+
+    // Verify specific format options are present by their title attributes
+    const itemTitles = await menuItems.evaluateAll((items) =>
+      items.map((item) => item.getAttribute('title')),
+    );
+
+    // Should have headings
+    expect(itemTitles).toContain('Title');
+    expect(itemTitles).toContain('Subtitle');
+
+    // Should have lists
+    expect(itemTitles.some((t) => t?.toLowerCase().includes('list'))).toBe(
+      true,
+    );
+
+    // Should have blockquote
+    expect(itemTitles.some((t) => t?.toLowerCase().includes('quote'))).toBe(
+      true,
+    );
   });
 
   test('selecting format from dropdown changes text format', async ({

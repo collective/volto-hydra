@@ -4,10 +4,10 @@ import { Transforms, Node, Range, Editor, Point } from 'slate';
 import { isEqual } from 'lodash';
 import config from '@plone/volto/registry';
 import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
+import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
-import { useDispatch, useSelector } from 'react-redux';
-import { setPluginOptions } from '@plone/volto-slate/actions';
+import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
 
@@ -67,26 +67,27 @@ class SlateErrorBoundary extends Component {
  * Button factories in config.settings.slate.buttons are arrow functions that
  * return React elements: (props) => <MarkElementButton ... /> or <BlockButton ... />
  *
- * We call the factory (with empty props) to get the element, then check the
- * element's type name. This is safe because the button components themselves
- * don't use hooks at the module level - hooks are only called during rendering.
+ * We call the factory (with empty props) to get the element, then compare the
+ * element's type to the imported BlockButton component reference.
  *
  * BlockButtons are used for block-level formatting (headings, lists, blockquote).
  * They should go in the FormatDropdown. Other buttons (MarkElementButton for bold,
  * italic, etc.) stay in the toolbar.
  *
- * NOTE: We check by component name ('BlockButton') not by hardcoding format values.
- * This ensures new block-level buttons automatically work without code changes.
+ * NOTE: We compare element.type === BlockButton directly, which works in both
+ * development and production builds because it's a reference comparison, not
+ * a string name comparison that would be affected by minification.
  */
-function isBlockButton(Btn) {
-  if (!Btn) return false;
+function isBlockButton(Btn, BlockButtonRef) {
+  if (!Btn || !BlockButtonRef) return false;
   try {
     // Call the factory function to get the React element
     // The factory is like: (props) => <BlockButton format="h2" ... />
     // Calling it returns the element {type: BlockButton, props: {...}}
     const element = Btn({});
-    // Check the component name - works with bundled code
-    return element?.type?.name === 'BlockButton' || element?.type?.displayName === 'BlockButton';
+    // Compare element.type to the imported BlockButton component reference
+    // This is a reference comparison that works in production builds
+    return element?.type === BlockButtonRef;
   } catch (e) {
     // If the factory throws (shouldn't happen), treat as non-block button
     return false;
@@ -694,8 +695,8 @@ const SyncedSlateToolbar = ({
       const element = <Btn />;
 
       // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
-      // isBlockButton inspects the element type without rendering, so no useSlate error
-      if (isBlockButton(Btn)) {
+      // isBlockButton compares element.type to imported BlockButton reference
+      if (isBlockButton(Btn, BlockButton)) {
         blockBtns.push({ name, element });
       } else {
         inlineBtns.push({ name, element });
