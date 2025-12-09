@@ -730,6 +730,55 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
 }
 
 /**
+ * Reorder blocks within a container by providing the new order array.
+ * Used by the sidebar ChildBlocksWidget for drag-and-drop reordering.
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {string|null} parentBlockId - Parent block ID (null for page-level)
+ * @param {string} fieldName - Container field name (e.g., 'blocks', 'columns')
+ * @param {Array<string>} newOrder - New order of block IDs
+ * @returns {Object} New formData with blocks reordered
+ */
+export function reorderBlocksInContainer(
+  formData,
+  blockPathMap,
+  parentBlockId,
+  fieldName,
+  newOrder,
+) {
+  const layoutFieldName = `${fieldName}_layout`;
+
+  if (!parentBlockId) {
+    // Page-level reorder
+    return {
+      ...formData,
+      blocks_layout: { items: newOrder },
+    };
+  }
+
+  // Container-level reorder
+  const parentPath = blockPathMap[parentBlockId]?.path;
+  if (!parentPath) {
+    console.error('[REORDER] Could not find parent path for:', parentBlockId);
+    return formData;
+  }
+
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    console.error('[REORDER] Could not find parent block:', parentBlockId);
+    return formData;
+  }
+
+  const updatedParent = {
+    ...parentBlock,
+    [layoutFieldName]: { items: newOrder },
+  };
+
+  return setBlockByPath(formData, parentPath, updatedParent);
+}
+
+/**
  * Move a block from one location to another (supports same-container reorder,
  * cross-container moves, and page↔container moves).
  *

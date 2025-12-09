@@ -2289,11 +2289,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(addButton).not.toBeVisible();
   });
 
-  test('can drag block on right side of screen (right-aligned toolbar)', async ({
-    page,
-  }) => {
-    // This tests that the drag handle works correctly when the toolbar is
-    // right-aligned (which happens for blocks on the right side of the iframe)
+  test('can drag block on right side of screen', async ({ page }) => {
+    // Test that drag works for blocks on the right side of the screen
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -2301,8 +2298,7 @@ test.describe('Container Block Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
-    // col-2 is on the right side of the screen, so toolbar should be right-aligned
-    // Get initial count of blocks in col-2
+    // Get initial count of blocks in col-2 (right side of screen)
     const col2 = iframe.locator('[data-block-uid="col-2"]');
     const col2InitialCount = await col2
       .locator(':scope > [data-block-uid]')
@@ -2313,7 +2309,7 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.clickBlockInIframe('text-2a');
     await page.waitForTimeout(300);
 
-    // Get drag handle - should work even though toolbar is right-aligned
+    // Get drag handle
     const dragHandle = await helper.getDragHandle();
     expect(dragHandle).not.toBeNull();
 
@@ -2408,5 +2404,67 @@ test.describe('Container Block Drag and Drop', () => {
     // Verify it's a slate block (column's defaultBlock is 'slate')
     const newSlateBlock = col2.locator('[data-block-type="slate"]');
     await expect(newSlateBlock).toBeVisible();
+  });
+});
+
+test.describe('Sidebar Child Blocks Reordering', () => {
+  test('can reorder child blocks by dragging in sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select col-1 (a container with 2 child blocks: text-1a, text-1b)
+    await helper.clickBlockInIframe('col-1');
+    await helper.waitForSidebarOpen();
+
+    // Verify initial order in iframe: text-1a comes before text-1b
+    const col1 = iframe.locator('[data-block-uid="col-1"]');
+    const initialOrder = await col1
+      .locator(':scope > [data-block-uid]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+    expect(initialOrder).toEqual(['text-1a', 'text-1b']);
+
+    // Find the child blocks widget in sidebar (Order tab)
+    await helper.openSidebarTab('Order');
+    const childBlocksWidget = page.locator('.child-blocks-widget');
+    await expect(childBlocksWidget).toBeVisible();
+
+    // Find the drag handles for the two child blocks
+    const dragHandles = childBlocksWidget.locator('.child-block-item .drag-handle');
+    await expect(dragHandles).toHaveCount(2);
+
+    // Drag text-1a below text-1b to reorder
+    // Must drag from the drag handle for react-beautiful-dnd to work
+    const firstDragHandle = dragHandles.first();
+    const secondItem = childBlocksWidget.locator('.child-block-item').last();
+
+    const firstHandleBox = await firstDragHandle.boundingBox();
+    const secondBox = await secondItem.boundingBox();
+    expect(firstHandleBox).not.toBeNull();
+    expect(secondBox).not.toBeNull();
+
+    // Drag from first item's drag handle to below second item
+    await page.mouse.move(
+      firstHandleBox!.x + firstHandleBox!.width / 2,
+      firstHandleBox!.y + firstHandleBox!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      secondBox!.x + secondBox!.width / 2,
+      secondBox!.y + secondBox!.height + 10,
+      { steps: 10 },
+    );
+    await page.waitForTimeout(100);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    // Verify order changed in iframe: text-1b now comes before text-1a
+    const newOrder = await col1
+      .locator(':scope > [data-block-uid]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+    expect(newOrder).toEqual(['text-1b', 'text-1a']);
   });
 });

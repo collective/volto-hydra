@@ -17,6 +17,7 @@ import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
+import { DragDropList } from '@plone/volto/components';
 
 const messages = defineMessages({
   blocks: {
@@ -98,10 +99,27 @@ const ContainerFieldSection = ({
   maxLength,
   onSelectBlock,
   onAddBlock,
+  onMoveBlock,
   parentBlockId,
 }) => {
   const intl = useIntl();
   const canAdd = !maxLength || childBlocks.length < maxLength;
+
+  // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
+  const childList = childBlocks.map((child) => [child.id, child]);
+
+  const handleMoveItem = (result) => {
+    const { source, destination } = result;
+    if (!destination || source.index === destination.index) return;
+
+    // Get the block IDs in current order
+    const blockIds = childBlocks.map((child) => child.id);
+    const [movedId] = blockIds.splice(source.index, 1);
+    blockIds.splice(destination.index, 0, movedId);
+
+    // Call the move handler with the new order
+    onMoveBlock(parentBlockId, fieldName, blockIds);
+  };
 
   return (
     <div className="container-field-section">
@@ -120,28 +138,38 @@ const ContainerFieldSection = ({
         </div>
       </div>
       <div className="child-blocks-list">
-        {childBlocks.map((child) => (
-          <div
-            key={child.id}
-            className="child-block-item"
-            onClick={() => onSelectBlock(child.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                onSelectBlock(child.id);
-              }
-            }}
+        {childBlocks.length > 0 ? (
+          <DragDropList
+            childList={childList}
+            onMoveItem={handleMoveItem}
           >
-            <span className="drag-handle">⋮⋮</span>
-            <span className="block-type">{child.title}</span>
-            <span className="nav-arrow">›</span>
-          </div>
-        ))}
-        {childBlocks.length === 0 && (
-          <div className="empty-container-message">
-            No blocks yet
-          </div>
+            {({ child, draginfo }) => (
+              <div
+                ref={draginfo.innerRef}
+                {...draginfo.draggableProps}
+                className="child-block-item"
+                onClick={() => onSelectBlock(child.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onSelectBlock(child.id);
+                  }
+                }}
+              >
+                <span
+                  className="drag-handle"
+                  {...draginfo.dragHandleProps}
+                >
+                  ⋮⋮
+                </span>
+                <span className="block-type">{child.title}</span>
+                <span className="nav-arrow">›</span>
+              </div>
+            )}
+          </DragDropList>
+        ) : (
+          <div className="empty-container-message">No blocks yet</div>
         )}
       </div>
     </div>
@@ -158,6 +186,7 @@ const ChildBlocksWidget = ({
   blockPathMap,
   onSelectBlock,
   onAddBlock,
+  onMoveBlock,
 }) => {
   const intl = useIntl();
   const [isClient, setIsClient] = React.useState(false);
@@ -217,6 +246,7 @@ const ChildBlocksWidget = ({
           childBlocks={childBlocks}
           onSelectBlock={onSelectBlock}
           onAddBlock={onAddBlock}
+          onMoveBlock={onMoveBlock}
           parentBlockId={null}
         />
       </div>,
@@ -254,6 +284,7 @@ const ChildBlocksWidget = ({
             maxLength={field.maxLength}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
+            onMoveBlock={onMoveBlock}
             parentBlockId={selectedBlock}
           />
         );
@@ -269,6 +300,7 @@ ChildBlocksWidget.propTypes = {
   blockPathMap: PropTypes.object,
   onSelectBlock: PropTypes.func,
   onAddBlock: PropTypes.func,
+  onMoveBlock: PropTypes.func,
 };
 
 export default ChildBlocksWidget;

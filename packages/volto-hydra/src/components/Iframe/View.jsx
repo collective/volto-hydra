@@ -46,7 +46,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -1657,6 +1657,16 @@ const Iframe = (props) => {
         onSelectBlock={onSelectBlock}
         onAddBlock={(parentBlockId, fieldName) => {
           handleSidebarAdd(parentBlockId, fieldName);
+        }}
+        onMoveBlock={(parentBlockId, fieldName, newOrder) => {
+          const newFormData = reorderBlocksInContainer(
+            properties,
+            iframeSyncState.blockPathMap,
+            parentBlockId,
+            fieldName,
+            newOrder,
+          );
+          onChangeFormData(newFormData);
         }}
       />
     </div>
