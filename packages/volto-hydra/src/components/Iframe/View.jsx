@@ -1470,7 +1470,7 @@ const Iframe = (props) => {
       />
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
-      {blockUI && referenceElement && (() => {
+      {blockUI && blockUI.rect && referenceElement && (() => {
         // Determine outline style based on number of editable fields
         // Single field blocks get bottom line, multi-field blocks get full border
         const editableFieldCount = Object.keys(blockUI.editableFields || {}).length;

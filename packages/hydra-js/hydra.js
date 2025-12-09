@@ -844,9 +844,13 @@ export class Bridge {
             this.selectBlock(parentElement, 'escapeKey');
           }
         } else {
-          // No parent - deselect (send HIDE_BLOCK_UI)
+          // No parent - deselect by sending BLOCK_SELECTED with null
           this.selectedBlockUid = null;
-          this.sendMessageToParent({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+          this.sendMessageToParent({
+            type: 'BLOCK_SELECTED',
+            blockUid: null,
+            rect: null,
+          }, this.adminOrigin);
         }
       };
       document.addEventListener('keydown', this._escapeKeyHandler, true);
