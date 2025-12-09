@@ -158,11 +158,14 @@ export class AdminUIHelper {
     await block.click();
 
     if (waitForToolbar) {
-      // Try to wait for toolbar on the target block
-      // If a child was selected instead, navigate up via sidebar
+      // Wait for any block to be selected (toolbar visible)
+      const toolbar = this.page.locator('.quanta-toolbar');
+      await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+
+      // Check if the correct block is selected
       const result = await this.isBlockSelectedInIframe(blockId);
       if (!result.ok) {
-        // A child block was likely selected instead - navigate up via sidebar
+        // Wrong block selected - likely a child. Navigate up via sidebar.
         await this.navigateToParentBlock(blockId);
       } else {
         // Target is selected, wait for toolbar to be positioned correctly
@@ -684,18 +687,23 @@ export class AdminUIHelper {
 
   /**
    * Verify that the current selection matches the expected text.
+   * Uses Playwright polling to handle async selection restoration after formatting.
    */
   async verifySelectionMatches(editor: Locator, expectedText: string): Promise<void> {
-    const selectedText = await editor.evaluate((el) => {
-      const selection = window.getSelection();
-      return selection ? selection.toString() : '';
-    });
-
-    if (selectedText !== expectedText) {
-      throw new Error(
-        `Selection mismatch. Expected: "${expectedText}", Got: "${selectedText}"`
-      );
-    }
+    await expect
+      .poll(
+        async () => {
+          return await editor.evaluate(() => {
+            const selection = window.getSelection();
+            return selection ? selection.toString() : '';
+          });
+        },
+        {
+          message: `Expected selection to be "${expectedText}"`,
+          timeout: 2000,
+        }
+      )
+      .toBe(expectedText);
   }
 
   /**
