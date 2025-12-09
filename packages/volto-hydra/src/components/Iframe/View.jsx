@@ -976,7 +976,16 @@ const Iframe = (props) => {
           // Determine if this is a new block BEFORE setBlockUI to avoid nested state updates
           // Calling onSelectBlock (which dispatches Redux action) inside setBlockUI callback
           // causes React's "Cannot update during an existing state transition" warning
-          const isNewBlock = !blockUI || blockUI.blockUid !== event.data.blockUid;
+          //
+          // IMPORTANT: Position updates from scroll/resize handlers should NEVER trigger
+          // onSelectBlock - they're just updating the rect, not changing selection.
+          // This prevents the scroll-back bug where scrolling away from a block causes
+          // it to be "re-selected" and scrolled back into view.
+          const isPositionUpdateOnly = event.data.src === 'scrollHandler' ||
+                                        event.data.src === 'resizeHandler';
+          const isNewBlock = !isPositionUpdateOnly &&
+                             (!blockUI || blockUI.blockUid !== event.data.blockUid) &&
+                             selectedBlock !== event.data.blockUid;
           console.log('[VIEW] BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
 
           // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
@@ -1030,9 +1039,11 @@ const Iframe = (props) => {
         }
 
         case 'HIDE_BLOCK_UI':
-          // Hide all block UI overlays and deselect block
+          // Hide block UI overlays temporarily (during scroll/resize)
+          // Don't deselect the block - just hide the visual overlays
+          // The block will be re-shown when BLOCK_SELECTED is sent after scroll stops
           setBlockUI(null);
-          onSelectBlock(null);
+          // Don't call onSelectBlock(null) - keep the block selected in Redux
           break;
 
         case 'INIT':

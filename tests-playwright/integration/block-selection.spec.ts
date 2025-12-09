@@ -380,4 +380,53 @@ test.describe('Block Selection', () => {
     const linkElement = iframe.locator(`[data-block-uid="${LINKED_IMAGE_BLOCK_ID}"] a.image-link`);
     await expect(linkElement).toBeVisible();
   });
+
+  test('scrolling selected block off screen does not scroll back', async ({ page }) => {
+    // Bug: After selecting a block, if user scrolls the iframe so the block
+    // goes off screen, the page automatically scrolls back to the block.
+    // This is disruptive to user workflow.
+
+    // Use a small viewport so content is much taller than iframe - matches real user scenario
+    await page.setViewportSize({ width: 1280, height: 400 });
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select the title block (first block at very top)
+    await helper.clickBlockInIframe('title-block');
+    await helper.waitForQuantaToolbar('title-block');
+
+    // Get initial scroll position (should be 0 or near top)
+    const iframeBody = iframe.locator('body');
+    const scrollBefore = await iframeBody.evaluate(() => window.scrollY);
+
+    // Use End key to scroll to bottom (like user reported)
+    await page.keyboard.press('End');
+    await page.waitForTimeout(200);
+
+    // Check scroll position right after pressing End
+    const scrollAfterEnd = await iframeBody.evaluate(() => window.scrollY);
+    expect(scrollAfterEnd).toBeGreaterThan(scrollBefore);
+
+    // Wait to see if it jumps back (the bug was scroll-back after ~1s)
+    await page.waitForTimeout(1000);
+
+    // Check if scroll position was maintained
+    const scrollFinal = await iframeBody.evaluate(() => window.scrollY);
+
+    // The scroll should stay where End key put it, not jump back to the selected block
+    expect(scrollFinal).toBeGreaterThanOrEqual(scrollAfterEnd - 50);
+
+    // Now scroll back to the top - the toolbar should reappear on the selected block
+    await page.keyboard.press('Home');
+    await page.waitForTimeout(500);
+
+    // Verify the toolbar is visible again for the selected block
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe('title-block');
+    expect(hasToolbar).toBe(true);
+  });
 });
