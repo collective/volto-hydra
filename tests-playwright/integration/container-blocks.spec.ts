@@ -2467,4 +2467,34 @@ test.describe('Sidebar Child Blocks Reordering', () => {
       .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
     expect(newOrder).toEqual(['text-1b', 'text-1a']);
   });
+
+  test('implicit container (gridBlock) shows child blocks in Order tab', async ({
+    page,
+  }) => {
+    // gridBlock is an implicit container - it has blocks/blocks_layout directly
+    // without a schema field defining the container. The sidebar should still
+    // show its children in the Order tab.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select grid-1 (an implicit container with grid-cell-1 and grid-cell-2)
+    await helper.clickBlockInIframe('grid-1');
+    await helper.waitForSidebarOpen();
+
+    // The child blocks widget should show the grid's children
+    const childBlocksWidget = page.locator('.child-blocks-widget');
+    await expect(childBlocksWidget).toBeVisible();
+
+    // Should show the two grid cells
+    const childItems = childBlocksWidget.locator('.child-block-item');
+    await expect(childItems).toHaveCount(2);
+
+    // Verify the child blocks show their plaintext content
+    const childTexts = await childItems
+      .locator('.block-type')
+      .allTextContents();
+    expect(childTexts).toEqual(['Grid Cell 1', 'Grid Cell 2']);
+  });
 });

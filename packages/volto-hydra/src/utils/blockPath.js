@@ -364,6 +364,58 @@ export function getBlockOwnContainerConfig(blockId, blockPathMap, formData, bloc
 }
 
 /**
+ * Get ALL container fields for a block (supports multiple container fields).
+ * Returns both schema-defined container fields (type: 'blocks') and implicit containers.
+ *
+ * @param {string} blockId - The block ID to check
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {Object} formData - The form data
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, defaultBlock, maxLength }]
+ */
+export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig) {
+  const block = getBlockById(formData, blockPathMap, blockId);
+  if (!block) return [];
+
+  const blockType = block['@type'];
+  const blockConfig = blocksConfig?.[blockType];
+  const schema = typeof blockConfig?.blockSchema === 'function'
+    ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+    : blockConfig?.blockSchema;
+
+  const containerFields = [];
+
+  // Check for schema-defined container fields (type: 'blocks')
+  if (schema?.properties) {
+    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+      if (fieldDef.type === 'blocks') {
+        containerFields.push({
+          fieldName,
+          title: fieldDef.title || fieldName,
+          allowedBlocks: fieldDef.allowedBlocks || null,
+          defaultBlock: fieldDef.defaultBlock || null,
+          maxLength: fieldDef.maxLength || null,
+        });
+      }
+    }
+  }
+
+  // Check for implicit container (blocks/blocks_layout without schema definition)
+  // Only if no explicit container fields found
+  if (containerFields.length === 0 && block.blocks && block.blocks_layout?.items) {
+    containerFields.push({
+      fieldName: 'blocks',
+      title: 'Blocks',
+      allowedBlocks: blockConfig?.allowedBlocks || null,
+      defaultBlock: blockConfig?.defaultBlock || null,
+      maxLength: blockConfig?.maxLength || null,
+    });
+  }
+
+  return containerFields;
+}
+
+/**
  * Insert a block into a container after a specified block.
  * Treats the page itself as a container when containerConfig is null.
  *

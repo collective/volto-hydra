@@ -18,6 +18,7 @@ import { createPortal } from 'react-dom';
 import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
+import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
 
 const messages = defineMessages({
   blocks: {
@@ -29,28 +30,6 @@ const messages = defineMessages({
     defaultMessage: 'Add block',
   },
 });
-
-/**
- * Get all container fields (type: 'blocks') from a block's schema
- */
-const getContainerFields = (blockType) => {
-  const blockConfig = config.blocks?.blocksConfig?.[blockType];
-  const schema = blockConfig?.blockSchema;
-  if (!schema?.properties) return [];
-
-  const containerFields = [];
-  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    if (fieldDef.type === 'blocks') {
-      containerFields.push({
-        name: fieldName,
-        title: fieldDef.title || fieldName,
-        allowedBlocks: fieldDef.allowedBlocks,
-        maxLength: fieldDef.maxLength,
-      });
-    }
-  }
-  return containerFields;
-};
 
 /**
  * Get child blocks for a specific container field
@@ -66,7 +45,8 @@ const getChildBlocks = (blockData, fieldName, formData) => {
     const childBlock = blocksData[blockId];
     const blockType = childBlock?.['@type'] || 'unknown';
     const blockConfig = config.blocks?.blocksConfig?.[blockType];
-    const title = blockConfig?.title || blockType;
+    // Use plaintext if available, otherwise fall back to block type title
+    const title = childBlock?.plaintext || blockConfig?.title || blockType;
 
     return {
       id: blockId,
@@ -195,28 +175,6 @@ const ChildBlocksWidget = ({
     setIsClient(true);
   }, []);
 
-  // Get the selected block's data
-  const getBlockData = (blockId) => {
-    if (!blockId || !formData) return null;
-
-    // Check blockPathMap for nested blocks
-    const pathInfo = blockPathMap?.[blockId];
-    if (pathInfo?.path) {
-      let current = formData;
-      for (const key of pathInfo.path) {
-        if (current && typeof current === 'object') {
-          current = current[key];
-        } else {
-          return null;
-        }
-      }
-      return current;
-    }
-
-    // Fall back to top-level blocks
-    return formData.blocks?.[blockId];
-  };
-
   // If no block selected, show page-level blocks
   if (!selectedBlock) {
     const pageBlocks = formData?.blocks_layout?.items || [];
@@ -254,12 +212,14 @@ const ChildBlocksWidget = ({
     );
   }
 
-  // Get selected block data and find container fields
-  const blockData = getBlockData(selectedBlock);
-  if (!blockData) return null;
-
-  const blockType = blockData['@type'];
-  const containerFields = getContainerFields(blockType);
+  // Use shared helper to get all container fields (supports multiple and implicit)
+  const blocksConfig = config.blocks?.blocksConfig;
+  const containerFields = getAllContainerFields(
+    selectedBlock,
+    blockPathMap,
+    formData,
+    blocksConfig,
+  );
 
   // If no container fields, don't render anything
   if (containerFields.length === 0) return null;
@@ -270,14 +230,17 @@ const ChildBlocksWidget = ({
   const target = document.getElementById('sidebar-order');
   if (!target) return null;
 
+  // Get the block data for retrieving children
+  const blockData = getBlockById(formData, blockPathMap, selectedBlock);
+
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        const childBlocks = getChildBlocks(blockData, field.name, formData);
+        const childBlocks = getChildBlocks(blockData, field.fieldName, formData);
         return (
           <ContainerFieldSection
-            key={field.name}
-            fieldName={field.name}
+            key={field.fieldName}
+            fieldName={field.fieldName}
             fieldTitle={field.title}
             childBlocks={childBlocks}
             allowedBlocks={field.allowedBlocks}
