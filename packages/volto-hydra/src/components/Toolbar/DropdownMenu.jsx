@@ -106,7 +106,11 @@ const DropdownMenu = ({
         >
           {/* FormatDropdown when it doesn't fit in toolbar */}
           {showFormatDropdown && blockButtons.length > 0 && (
-            <FormatDropdown blockButtons={blockButtons} />
+            <FormatDropdown
+              blockButtons={blockButtons}
+              onMouseDownCapture={onMouseDownCapture}
+              onClickCapture={onClickCapture}
+            />
           )}
           {overflowButtons.map(({ name, element }) => (
             <div

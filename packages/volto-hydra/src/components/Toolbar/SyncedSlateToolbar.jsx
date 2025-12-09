@@ -634,6 +634,11 @@ const SyncedSlateToolbar = ({
         return;
       }
 
+      // Don't intercept format dropdown trigger - it just opens a menu, no formatting
+      if (e.target.closest('.format-dropdown-trigger')) {
+        return;
+      }
+
       const button =
         e.target.closest('button') || e.target.closest('[data-toolbar-button]');
       if (!button) return;
@@ -851,7 +856,11 @@ const SyncedSlateToolbar = ({
                 <>
                   {/* Format dropdown for block-level buttons - only show if room */}
                   {showFormatDropdown && (
-                    <FormatDropdown blockButtons={blockButtons} />
+                    <FormatDropdown
+                      blockButtons={blockButtons}
+                      onMouseDownCapture={handleButtonMouseDownCapture}
+                      onClickCapture={handleButtonClickCapture}
+                    />
                   )}
                   {/* Visible inline format buttons */}
                   {visibleButtons.map(({ name, element }, i) => (

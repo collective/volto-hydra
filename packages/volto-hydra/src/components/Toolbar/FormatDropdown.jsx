@@ -28,7 +28,7 @@ const getInnerProps = (element) => {
   }
 };
 
-const FormatDropdown = ({ blockButtons }) => {
+const FormatDropdown = ({ blockButtons, onMouseDownCapture, onClickCapture }) => {
   const editor = useSlate();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef(null);
@@ -112,11 +112,10 @@ const FormatDropdown = ({ blockButtons }) => {
             minWidth: '160px',
             padding: '4px 0',
           }}
-          onMouseDown={(e) => {
-            // Close dropdown after any button click
-            // The button's onMouseDown will handle the format toggle
-            setTimeout(() => setIsOpen(false), 0);
-          }}
+          // Attach the same capture handlers used by the main toolbar
+          // This ensures format buttons go through the same flush mechanism
+          onMouseDownCapture={onMouseDownCapture}
+          onClickCapture={onClickCapture}
         >
           {blockButtons.map(({ name, element }) => {
             const innerProps = getInnerProps(element);
@@ -127,10 +126,13 @@ const FormatDropdown = ({ blockButtons }) => {
             const allowedChildren = innerProps.allowedChildren;
 
             return (
-              <div
+              // Use actual button element so capture handler finds it
+              <button
                 key={name}
                 className="format-dropdown-item"
-                role="button"
+                data-toolbar-button={name}
+                data-format={format}
+                data-allowed-children={allowedChildren ? JSON.stringify(allowedChildren) : undefined}
                 title={typeof title === 'string' ? title : name}
                 style={{
                   display: 'flex',
@@ -139,6 +141,9 @@ const FormatDropdown = ({ blockButtons }) => {
                   padding: '8px 12px',
                   background: isActive ? '#e3f2fd' : 'transparent',
                   cursor: 'pointer',
+                  border: 'none',
+                  width: '100%',
+                  textAlign: 'left',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) e.currentTarget.style.background = '#f5f5f5';
@@ -147,18 +152,22 @@ const FormatDropdown = ({ blockButtons }) => {
                   e.currentTarget.style.background = isActive ? '#e3f2fd' : 'transparent';
                 }}
                 onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (format) {
-                    toggleBlock(editor, format, allowedChildren);
+                  // Don't prevent default - let capture handler intercept first
+                  // After flush completes, this will be re-triggered with bypassCapture
+                  if (e.currentTarget.dataset.bypassCapture === 'true') {
+                    e.preventDefault();
+                    if (format) {
+                      toggleBlock(editor, format, allowedChildren);
+                    }
+                    setIsOpen(false);
                   }
-                  setIsOpen(false);
                 }}
               >
                 {icon && <Icon name={icon} size="20px" />}
                 <span style={{ fontSize: '14px', color: '#333' }}>
                   {typeof title === 'string' ? title : name}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>,
