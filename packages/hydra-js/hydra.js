@@ -210,6 +210,12 @@ export class Bridge {
    * @returns {string} 'right', 'bottom', or 'hidden'
    */
   getAddDirection(blockElement) {
+    // Empty blocks should not have an add button - they are meant to be replaced
+    // via block chooser, not have blocks added after them
+    if (blockElement.getAttribute('data-block-type') === 'empty') {
+      return 'hidden';
+    }
+
     let addDirection = blockElement.getAttribute('data-block-add');
     if (!addDirection) {
       // Count ancestor blocks to determine nesting depth
@@ -1576,21 +1582,27 @@ export class Bridge {
     console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
     if (!blockElement) return;
 
-    // Scroll block into view if needed, with space for toolbar above and add button below
-    const toolbarMargin = 50; // Toolbar is ~40px tall
-    const addButtonMargin = 50; // Add button is ~30px tall
-    const scrollRect = blockElement.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-
-    if (scrollRect.top < toolbarMargin || scrollRect.bottom > viewportHeight - addButtonMargin) {
-      // Block or its UI elements are outside viewport - scroll to center it
-      const blockCenter = scrollRect.top + scrollRect.height / 2;
-      const viewportCenter = viewportHeight / 2;
-      window.scrollBy({ top: blockCenter - viewportCenter, behavior: 'instant' });
-    }
-
     const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
+
+    // Store for use in async callback (focus handler uses this to decide preventScroll)
+    this._isReselectingSameBlock = isSelectingSameBlock;
+
+    // Only scroll block into view when selecting a NEW block (not reselecting same block)
+    // This prevents unwanted scroll-back when user has scrolled the selected block off screen
+    if (!isSelectingSameBlock) {
+      const toolbarMargin = 50; // Toolbar is ~40px tall
+      const addButtonMargin = 50; // Add button is ~30px tall
+      const scrollRect = blockElement.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      if (scrollRect.top < toolbarMargin || scrollRect.bottom > viewportHeight - addButtonMargin) {
+        // Block or its UI elements are outside viewport - scroll to center it
+        const blockCenter = scrollRect.top + scrollRect.height / 2;
+        const viewportCenter = viewportHeight / 2;
+        window.scrollBy({ top: blockCenter - viewportCenter, behavior: 'instant' });
+      }
+    }
 
     // Flush any pending text updates from the previous block before switching
     // Also clear event buffer - user is reorienting to a new block
@@ -1860,7 +1872,9 @@ export class Bridge {
               console.log('[HYDRA] selectBlock focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName, contentEditableField: contentEditableField.tagName });
               if (!isAlreadyFocused) {
                 console.log('[HYDRA] selectBlock calling focus() on field');
-                contentEditableField.focus();
+                // Use preventScroll when reselecting same block to avoid scroll-back bug
+                // (user may have scrolled the block off screen intentionally)
+                contentEditableField.focus({ preventScroll: this._isReselectingSameBlock });
               } else {
                 console.log('[HYDRA] selectBlock skipping focus() - already focused');
               }

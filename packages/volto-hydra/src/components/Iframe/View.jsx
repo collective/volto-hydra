@@ -992,16 +992,17 @@ const Iframe = (props) => {
           if (isNewBlock) {
             console.log('[VIEW] BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);
+          }
 
-            // Check if selected block is an empty block - if so, open block chooser
-            // BlockChooser will dynamically decide to mutate vs insert based on selected block type
-            const selectedBlockData = getBlockByPath(
-              properties,
-              iframeSyncState.blockPathMap?.[event.data.blockUid]?.path,
-            ) || properties?.blocks?.[event.data.blockUid];
-            if (selectedBlockData?.['@type'] === 'empty') {
-              setAddNewBlockOpened(true);
-            }
+          // Check if selected block is an empty block - if so, open block chooser
+          // This should happen on every click of an empty block, not just "new" selections
+          // BlockChooser will dynamically decide to mutate vs insert based on selected block type
+          const selectedBlockData = getBlockByPath(
+            properties,
+            iframeSyncState.blockPathMap?.[event.data.blockUid]?.path,
+          ) || properties?.blocks?.[event.data.blockUid];
+          if (selectedBlockData?.['@type'] === 'empty') {
+            setAddNewBlockOpened(true);
           }
 
           // Now update blockUI state

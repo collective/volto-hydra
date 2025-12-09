@@ -992,6 +992,16 @@ test.describe('Empty Block Behavior', () => {
     });
     // CSS content property wraps the value in quotes, so we check for '"+"'
     expect(pseudoContent).toBe('"+"');
+
+    // Empty block should NOT have an add button next to it
+    // Empty blocks are meant to be replaced via block chooser, not have blocks added after them
+    const emptyBlockId = await emptyBlock.getAttribute('data-block-uid');
+    await helper.clickBlockInIframe(emptyBlockId!);
+    await page.waitForTimeout(300);
+
+    // Verify the add button is NOT visible in the admin UI
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).not.toBeVisible();
   });
 
   test('clicking empty block opens block chooser', async ({ page }) => {
