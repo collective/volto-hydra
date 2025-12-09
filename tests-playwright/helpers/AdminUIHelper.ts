@@ -2191,22 +2191,174 @@ export class AdminUIHelper {
   /**
    * Get the target drop position for a block in PAGE coordinates.
    * Returns Y at 25% for insertBefore, 75% for insertAfter.
+   *
+   * Note: We use evaluate() with getBoundingClientRect() to get coords relative
+   * to the iframe's VIEWPORT (not scrollable content), then add the iframe's
+   * position in the page. This ensures correct coords even after auto-scroll.
    */
   private async getDropPositionInPageCoords(
     targetBlock: Locator,
     insertAfter: boolean
   ): Promise<{ x: number; y: number }> {
-    const rect = await targetBlock.boundingBox();
-    if (!rect) {
-      throw new Error('Target block not found');
+    // Use evaluate to get getBoundingClientRect - this gives coords relative
+    // to the iframe's VIEWPORT, which is what we need for mouse positioning
+    const rect = await targetBlock.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+
+    // Get iframe position in page coordinates
+    const iframeEl = this.page.locator('#previewIframe');
+    const iframeRect = await iframeEl.boundingBox();
+    if (!iframeRect) {
+      throw new Error('Could not get iframe bounding box');
     }
 
-    return {
-      x: rect.x + rect.width / 2,
+    const result = {
+      x: iframeRect.x + rect.x + rect.width / 2,
       y: insertAfter
-        ? rect.y + rect.height * 0.75
-        : rect.y + rect.height * 0.25,
+        ? iframeRect.y + rect.y + rect.height * 0.75
+        : iframeRect.y + rect.y + rect.height * 0.25,
     };
+
+    console.log(`[TEST] getDropPositionInPageCoords: rect.y=${rect.y.toFixed(1)}, iframeRect.y=${iframeRect.y.toFixed(1)}, result.y=${result.y.toFixed(1)}`);
+
+    return result;
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 1: START DRAG
+  // ============================================================================
+
+  /**
+   * Start a drag operation from the toolbar drag handle.
+   * Returns the starting position for reference.
+   */
+  private async startDragFromToolbar(): Promise<{ x: number; y: number }> {
+    const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
+    console.log('[TEST] Drag start position (page):', startPosPage);
+
+    if (!this.isInPageViewport(startPosPage.y)) {
+      throw new Error(
+        `Toolbar drag icon is off-screen at Y=${startPosPage.y}. ` +
+        `The block must be scrolled into view before dragging. ` +
+        `Ensure clickBlockInIframe() scrolls the selected block into view.`
+      );
+    }
+
+    await this.page.mouse.move(startPosPage.x, startPosPage.y);
+    await this.page.mouse.down();
+    await this.verifyDragShadowVisible();
+
+    return startPosPage;
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 2: AUTO-SCROLL TO TARGET
+  // ============================================================================
+
+  /**
+   * Auto-scroll the iframe until the target block is visible in the viewport.
+   * Returns when the target is in the viewport and ready for drop.
+   */
+  private async autoScrollToTarget(
+    targetBlock: Locator,
+    insertAfter: boolean,
+    maxAttempts: number = 40
+  ): Promise<{ x: number; y: number }> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.verifyDragShadowVisible();
+
+      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      console.log(`[TEST] Attempt ${attempt}: target at page Y=${dropPosPage.y.toFixed(1)}`);
+
+      const viewportSize = this.page.viewportSize();
+      const isAboveViewport = dropPosPage.y < 0;
+      const isBelowViewport = viewportSize && dropPosPage.y > viewportSize.height;
+      const needsAutoScroll = isAboveViewport || isBelowViewport;
+
+      if (!needsAutoScroll) {
+        return dropPosPage;
+      }
+
+      // Target is off-screen - move to edge to trigger auto-scroll
+      const scrollUp = isAboveViewport;
+      console.log(`[TEST] Target ${scrollUp ? 'above' : 'below'} viewport (Y=${dropPosPage.y.toFixed(1)}), triggering auto-scroll`);
+      await this.moveToScrollEdge(scrollUp);
+
+      // Wait for auto-scroll to happen (target position must change)
+      await this.waitForAutoScrollProgress(targetBlock, insertAfter, dropPosPage.y);
+    }
+
+    // If we get here, we've exceeded max attempts
+    throw new Error(`Auto-scroll failed after ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Wait for auto-scroll to make progress (target position changes).
+   */
+  private async waitForAutoScrollProgress(
+    targetBlock: Locator,
+    insertAfter: boolean,
+    prevY: number
+  ): Promise<void> {
+    await expect(async () => {
+      await this.verifyDragShadowVisible();
+      if (!(await this.isDropIndicatorVisible())) {
+        throw new Error('Drop indicator not visible during auto-scroll');
+      }
+      const newPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      const scrollAmount = Math.abs(newPos.y - prevY);
+      if (scrollAmount < 5) {
+        throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
+      }
+      console.log(`[TEST] Auto-scroll happened, target moved by ${scrollAmount.toFixed(1)}px`);
+    }).toPass({ timeout: 2000 });
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 3: MOVE TO DROP POSITION
+  // ============================================================================
+
+  /**
+   * Move the mouse to the drop position and verify the drop indicator is correct.
+   *
+   * NOTE: We continuously update the mouse position until the drop indicator is correct.
+   * This handles the case where auto-scroll continues after we start moving to the target.
+   */
+  private async moveToDropPosition(
+    targetBlock: Locator,
+    insertAfter: boolean,
+    _initialDropPos: { x: number; y: number }
+  ): Promise<void> {
+    // Keep moving to the target and checking until indicator is correct
+    await expect(async () => {
+      // Get current position and move to it
+      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
+
+      // Wait a moment for the drop indicator to update
+      await this.page.waitForTimeout(50);
+
+      // Verify the indicator is in the right position
+      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+    }).toPass({ timeout: 5000 });
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 4: DROP AND CLEANUP
+  // ============================================================================
+
+  /**
+   * Complete the drag operation by releasing the mouse and waiting for cleanup.
+   */
+  private async completeDrop(): Promise<void> {
+    await this.page.mouse.up();
+
+    const iframe = this.getIframe();
+    await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Drag complete');
   }
 
   /**
@@ -2247,195 +2399,97 @@ export class AdminUIHelper {
    * to trigger hydra's auto-scroll, which scrolls the iframe content until
    * the target becomes visible.
    *
-   * @param dragHandle - Unused, kept for API compatibility
+   * @param _dragHandle - Unused, kept for API compatibility
    * @param targetBlock - The block to drop near
    * @param insertAfter - If true, insert after target. If false, insert before.
    */
   async dragBlockWithMouse(
-    dragHandle: Locator,
+    _dragHandle: Locator,
     targetBlock: Locator,
     insertAfter: boolean = true
   ): Promise<void> {
-    // COORDINATE SYSTEM: All drag logic in hydra.js uses IFRAME coordinates.
-    // page.mouse uses PAGE coordinates. We translate when needed.
-    //
-    // IMPORTANT: This helper does NOT scroll. The caller (e.g., clickBlockInIframe)
-    // is responsible for ensuring the block and toolbar are visible before dragging.
-    // If the toolbar is off-screen, this method will fail with an assertion error.
+    // Step 1: Start drag from toolbar
+    await this.startDragFromToolbar();
 
-    // 1. Get toolbar position and ASSERT it's in viewport (don't scroll - that's caller's job)
-    const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
-    console.log('[TEST] Drag start position (page):', startPosPage);
+    // Step 2: Auto-scroll until target is in viewport
+    const dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
 
-    if (!this.isInPageViewport(startPosPage.y)) {
-      throw new Error(
-        `Toolbar drag icon is off-screen at Y=${startPosPage.y}. ` +
-        `The block must be scrolled into view before dragging. ` +
-        `Ensure clickBlockInIframe() scrolls the selected block into view.`
-      );
-    }
+    // Step 3: Move to drop position and verify indicator
+    await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage);
 
-    // 2. Mouse down at toolbar position (page coords for page.mouse)
-    await this.page.mouse.move(startPosPage.x, startPosPage.y);
-    await this.page.mouse.down();
-
-    // Verify drag shadow appears immediately after mousedown
-    await this.verifyDragShadowVisible();
-
-    // 3. Move towards target, using auto-scroll when target is off-screen
-    const targetBlockUid = await targetBlock.getAttribute('data-block-uid');
-    if (!targetBlockUid) {
-      throw new Error('Target block does not have data-block-uid attribute');
-    }
-
-    // Loop until auto-scroll stops and drop indicator is in position
-    const maxScrollAttempts = 40;
-    const autoScrollThreshold = 50; // hydra auto-scrolls within 50px of edges
-
-    for (let attempt = 0; attempt < maxScrollAttempts; attempt++) {
-      // Assert shadow is visible while dragging
-      await this.verifyDragShadowVisible();
-
-      // Get current target position in iframe coords
-      const prevPosInIframeCoords = await this.getDropPositionInIframeCoords(targetBlockUid, insertAfter);
-      const dropPosPage = await this.iframeCoordsToPageCoords(prevPosInIframeCoords);
-
-      console.log(`[TEST] Attempt ${attempt}: target at iframe Y=${prevPosInIframeCoords.y.toFixed(1)}`);
-
-      // Determine if target is near edge (would trigger auto-scroll)
-      const viewportSize = this.page.viewportSize();
-      const nearTopEdge = prevPosInIframeCoords.y < autoScrollThreshold;
-      const nearBottomEdge = viewportSize && prevPosInIframeCoords.y > viewportSize.height - autoScrollThreshold;
-      const expectAutoScroll = nearTopEdge || nearBottomEdge;
-
-      if (expectAutoScroll) {
-        // Target is near edge - move to edge to trigger auto-scroll
-        const scrollUp = nearTopEdge;
-        console.log(`[TEST] Target near ${scrollUp ? 'top' : 'bottom'} edge, triggering auto-scroll`);
-        await this.moveToScrollEdge(scrollUp);
-
-        // Wait for auto-scroll to happen (target position must change)
-        await expect(async () => {
-          await this.verifyDragShadowVisible();
-          if (!(await this.isDropIndicatorVisible())) {
-            throw new Error('Drop indicator not visible during auto-scroll');
-          }
-          const newPos = await this.getDropPositionInIframeCoords(targetBlockUid, insertAfter);
-          const scrollAmount = Math.abs(newPos.y - prevPosInIframeCoords.y);
-          if (scrollAmount < 5) {
-            throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
-          }
-          console.log(`[TEST] Auto-scroll happened, target moved by ${scrollAmount.toFixed(1)}px`);
-        }).toPass({ timeout: 2000 });
-        // Loop again to check if more scrolling needed
-        continue;
-      }
-
-      // Target is in safe zone - move directly to it
-      console.log('[TEST] Target in safe zone, moving to drop position:', dropPosPage);
-      await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
-
-      // Wait for drop indicator to be in position (no more auto-scroll should happen)
-      await expect(async () => {
-        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
-      }).toPass({ timeout: 5000 });
-      break;
-    }
-
-    // 4. Drop
-    await this.page.mouse.up();
-
-    // 5. Wait for drop marker and shadow to disappear
-    const iframe = this.getIframe();
-    await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
-    await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
-    console.log('[TEST] Drag complete');
+    // Step 4: Complete the drop
+    await this.completeDrop();
   }
 
   /**
    * Drag a block horizontally to a target position (for blocks with data-block-add="right").
    * Uses X-axis position to determine left/right insertion.
    *
-   * @param dragHandle - The drag handle locator (from toolbar)
+   * @param _dragHandle - Unused, kept for API compatibility
    * @param targetBlock - The target block locator (where to drop)
    * @param insertAfter - If true, insert to the right; if false, insert to the left
+   * @param expectIndicator - Whether to expect drop indicator (true) or rejection (false)
    */
   async dragBlockWithMouseHorizontal(
-    dragHandle: Locator,
+    _dragHandle: Locator,
     targetBlock: Locator,
     insertAfter: boolean = true,
     expectIndicator: boolean = true
   ): Promise<boolean> {
-    // 1. Get toolbar position
-    const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
-    console.log('[TEST] Horizontal drag start position (page):', startPosPage);
+    // Step 1: Start drag from toolbar
+    await this.startDragFromToolbar();
 
-    if (!this.isInPageViewport(startPosPage.y)) {
-      throw new Error(
-        `Toolbar drag icon is off-screen at Y=${startPosPage.y}. ` +
-        `The block must be scrolled into view before dragging.`
-      );
-    }
+    // Step 2: Calculate horizontal drop position
+    const dropPosPage = await this.getHorizontalDropPosition(targetBlock, insertAfter);
 
-    // 2. Mouse down at toolbar position
-    await this.page.mouse.move(startPosPage.x, startPosPage.y);
-    await this.page.mouse.down();
+    // Step 3: Move to drop position
+    console.log('[TEST] Moving to horizontal drop position:', dropPosPage);
+    await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
 
-    // Verify drag shadow appears
-    await this.verifyDragShadowVisible();
+    // Step 4: Check drop indicator visibility
+    const indicatorVisible = await this.checkDropIndicator(expectIndicator);
 
-    // 3. Get target block position and move horizontally
-    const targetBlockUid = await targetBlock.getAttribute('data-block-uid');
-    if (!targetBlockUid) {
-      throw new Error('Target block does not have data-block-uid attribute');
-    }
+    // Step 5: Complete the drop
+    await this.completeDrop();
 
-    // Get target rect - Playwright's boundingBox() already returns page-relative coordinates
-    const iframe = this.getIframe();
-    const iframeEl = this.page.locator('#previewIframe');
-    const iframeBox = await iframeEl.boundingBox();
-    console.log('[TEST] Iframe bounding box:', iframeBox);
+    return indicatorVisible;
+  }
+
+  /**
+   * Get the horizontal drop position for a target block.
+   * Returns X at 25% for insertBefore (left), 75% for insertAfter (right).
+   */
+  private async getHorizontalDropPosition(
+    targetBlock: Locator,
+    insertAfter: boolean
+  ): Promise<{ x: number; y: number }> {
     const targetRect = await targetBlock.boundingBox();
     if (!targetRect) {
       throw new Error('Could not get target block bounding box');
     }
-    console.log('[TEST] Target block rect:', targetRect);
 
-    // Calculate drop position - for horizontal, use X position
-    // boundingBox() already returns page-relative coordinates, no conversion needed
     const dropX = insertAfter
       ? targetRect.x + targetRect.width * 0.75 // Right side
       : targetRect.x + targetRect.width * 0.25; // Left side
     const dropY = targetRect.y + targetRect.height / 2; // Center vertically
 
-    const dropPosPage = { x: dropX, y: dropY };
+    return { x: dropX, y: dropY };
+  }
 
-    console.log('[TEST] Moving to horizontal drop position:', dropPosPage);
-    await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
-
-    // Check drop indicator visibility
+  /**
+   * Check if the drop indicator is visible as expected.
+   */
+  private async checkDropIndicator(expectIndicator: boolean): Promise<boolean> {
+    const iframe = this.getIframe();
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
-    let indicatorVisible = false;
 
     if (expectIndicator) {
-      // Wait for drop indicator to appear
       await expect(dropIndicator).toBeVisible({ timeout: 2000 });
-      indicatorVisible = true;
+      return true;
     } else {
-      // Verify indicator is NOT visible (drop should be rejected)
       await expect(dropIndicator).not.toBeVisible();
-      indicatorVisible = false;
+      return false;
     }
-
-    // 4. Drop
-    await this.page.mouse.up();
-
-    // 5. Wait for cleanup
-    await expect(dropIndicator).not.toBeVisible({ timeout: 5000 });
-    await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
-    console.log('[TEST] Horizontal drag complete, indicator was visible:', indicatorVisible);
-
-    return indicatorVisible;
   }
 
   /**
