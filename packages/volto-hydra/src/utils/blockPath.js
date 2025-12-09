@@ -6,12 +6,49 @@
 import { applyBlockDefaults } from '@plone/volto/helpers';
 
 /**
+ * Compute page-level allowed block types from blocksConfig's `restricted` property.
+ * A block is allowed at page level if restricted is false or if restricted(context) returns false.
+ *
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} context - Context for restricted functions { properties, navRoot, contentType }
+ * @returns {Array} Array of block type IDs allowed at page level
+ */
+function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
+  if (!blocksConfig) return null;
+
+  const allowedTypes = [];
+  for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
+    // Skip blocks without proper config
+    if (!blockConfig || !blockConfig.id) continue;
+
+    const restricted = blockConfig.restricted;
+    if (restricted === undefined || restricted === false) {
+      // Not restricted - allowed at page level
+      allowedTypes.push(blockType);
+    } else if (typeof restricted === 'function') {
+      // Dynamic restriction - evaluate with context
+      try {
+        const isRestricted = restricted({ ...context, block: blockConfig });
+        if (!isRestricted) {
+          allowedTypes.push(blockType);
+        }
+      } catch (e) {
+        // If function throws, treat as restricted
+        console.warn(`[BLOCKPATH] Error evaluating restricted for ${blockType}:`, e);
+      }
+    }
+    // If restricted === true, block is not allowed at page level
+  }
+  return allowedTypes.length > 0 ? allowedTypes : null;
+}
+
+/**
  * Build a map of blockId -> path for all blocks in formData.
  * Traverses nested containers using schema to find `type: 'blocks'` fields.
  *
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
- * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (from initBridge config)
+ * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (overrides restricted-based computation)
  * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, allowedSiblingTypes: Array|null, maxSiblings: number|null }
  *
  * Path format: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
@@ -23,6 +60,10 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
   if (!formData?.blocks) {
     return pathMap;
   }
+
+  // Compute page-level allowed blocks from restricted if not explicitly provided
+  const effectivePageAllowedBlocks = pageAllowedBlocks ??
+    getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
   /**
    * Recursively traverse block structure.
@@ -98,9 +139,9 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
   }
 
   // Start traversal from page-level blocks
-  // Pass pageAllowedBlocks so page-level blocks get the correct allowedSiblingTypes
+  // Pass effectivePageAllowedBlocks so page-level blocks get the correct allowedSiblingTypes
   const pageLayoutItems = formData.blocks_layout?.items || [];
-  traverse(formData.blocks, pageLayoutItems, ['blocks'], null, pageAllowedBlocks);
+  traverse(formData.blocks, pageLayoutItems, ['blocks'], null, effectivePageAllowedBlocks);
 
   return pathMap;
 }

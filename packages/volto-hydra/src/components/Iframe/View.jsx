@@ -39,10 +39,7 @@ import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
 import { setSidebarTab } from '@plone/volto/actions';
-import {
-  getAllowedBlocksList,
-  setAllowedBlocksList,
-} from '../../utils/allowedBlockList';
+import { setAllowedBlocksList } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
 // Note: Editor, Transforms, toggleInlineFormat, toggleBlock were removed
@@ -454,7 +451,7 @@ const Iframe = (props) => {
   //   this is for toolbar→iframe flow (format completion, including selection-only changes)
   const [iframeSyncState, setIframeSyncState] = useState(() => ({
     formData: properties,
-    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig, getAllowedBlocksList()), // Maps blockId -> { path, parentId, allowedSiblingTypes }
+    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig), // Maps blockId -> { path, parentId, allowedSiblingTypes }
     selection: null,
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
@@ -483,7 +480,7 @@ const Iframe = (props) => {
   useEffect(() => {
     if (formDataFromRedux && formDataFromRedux !== iframeSyncState.formData) {
       // Rebuild blockPathMap when formData changes (use live config for custom blocks)
-      const newBlockPathMap = buildBlockPathMap(formDataFromRedux, config.blocks.blocksConfig, getAllowedBlocksList());
+      const newBlockPathMap = buildBlockPathMap(formDataFromRedux, config.blocks.blocksConfig);
       setIframeSyncState(prev => {
         // Redux form syncs (from sidebar editing) don't include a new selection -
         // only the form data changes. The existing selection from the iframe may
@@ -1067,9 +1064,24 @@ const Iframe = (props) => {
             recurseUpdateVoltoConfig(frontendConfig);
           }
 
-          // 2. Set allowedBlocks
+          // 2. Apply allowedBlocks by setting `restricted: true` on blocks not in the list
+          // This integrates with Volto's standard block restriction mechanism
           if (event.data.allowedBlocks) {
             validateFrontendConfig(event.data, config.blocks.blocksConfig);
+            const allowedSet = new Set(event.data.allowedBlocks);
+            Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
+              const blockConfig = config.blocks.blocksConfig[blockType];
+              if (blockConfig && !allowedSet.has(blockType)) {
+                // Block not in allowedBlocks - mark as restricted at page level
+                // Preserve existing restricted function if it exists (for dynamic restrictions)
+                const existingRestricted = blockConfig.restricted;
+                if (typeof existingRestricted !== 'function') {
+                  blockConfig.restricted = true;
+                }
+                // If it's already a function, leave it - function takes precedence
+              }
+            });
+            // Keep the list for backwards compatibility
             setAllowedBlocksList(event.data.allowedBlocks);
           }
 
@@ -1078,8 +1090,8 @@ const Iframe = (props) => {
           setBlockFieldTypes(initialBlockFieldTypes);
 
           // 4. Build blockPathMap (now has complete schema knowledge)
-          // Pass allowedBlocks directly since setAllowedBlocksList is async
-          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, event.data.allowedBlocks || null);
+          // No need to pass allowedBlocks - it's now derived from blocksConfig.restricted
+          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig);
           setIframeSyncState(prev => ({
             ...prev,
             blockPathMap: initialBlockPathMap,
