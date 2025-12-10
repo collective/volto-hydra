@@ -145,10 +145,8 @@ test.describe('Container Block Detection', () => {
     // Click on columns-1 (a container block with a title field)
     await helper.clickContainerBlockInIframe('columns-1');
 
-    // Wait for selection to be applied
-    await page.waitForTimeout(300);
-
     // Check the selection outline style - should be 'border', not 'bottom-line'
+    // The expect().toBeVisible() will poll until the outline appears
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
     await expect(outline).toHaveAttribute('data-outline-style', 'border');
@@ -171,8 +169,8 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.navigateToEdit('/container-test-page');
 
     // Click on columns-1 to select it
+    // clickContainerBlockInIframe already waits for toolbar
     await helper.clickContainerBlockInIframe('columns-1');
-    await page.waitForTimeout(500);
 
     // Click the iframe add button (adds AFTER columns-1)
     await helper.clickAddBlockButton();
@@ -325,14 +323,11 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.moveCursorToEnd(editor);
     await page.keyboard.press('Enter');
 
-    // Wait for the new block to appear
-    await page.waitForTimeout(500);
-
-    // col-1 should now have 3 blocks (text-1a was split, creating a new block)
-    const finalCol1Blocks = await iframe
-      .locator('[data-block-uid="col-1"] > [data-block-uid]')
-      .count();
-    expect(finalCol1Blocks).toBe(3);
+    // Wait for col-1 to have 3 blocks (text-1a was split, creating a new block)
+    const col1BlocksLocator = iframe.locator(
+      '[data-block-uid="col-1"] > [data-block-uid]',
+    );
+    await expect(col1BlocksLocator).toHaveCount(3);
 
     // Page-level blocks should be unchanged - the new block should be in the container
     const finalPageBlocks = await iframe
@@ -352,10 +347,12 @@ test.describe('Add Button Direction', () => {
     await helper.navigateToEdit('/container-test-page');
 
     // col-1 has data-block-add="right" attribute
-    // clickBlockInIframe will automatically navigate up if a child is selected
-    await helper.clickBlockInIframe('col-1');
+    // Use clickContainerBlockInIframe to avoid hitting nested content
+    // (already waits for toolbar)
+    await helper.clickContainerBlockInIframe('col-1');
 
     // Verify add button is positioned to the right of the block
+    // verifyBlockUIPositioning already polls for the expected state
     const positioning = await helper.verifyBlockUIPositioning('col-1');
     expect(positioning.addButtonDirection).toBe('right');
   });
@@ -479,7 +476,6 @@ test.describe('Hierarchical Sidebar', () => {
         scrollTopAfter: el.scrollTop,
       };
     });
-    await page.waitForTimeout(200);
 
     // Verify scrolling actually happened (content is taller than viewport)
     expect(
@@ -2556,11 +2552,8 @@ test.describe('data-block-selector Navigation', () => {
     await expect(nextButton).toBeVisible();
     await nextButton.click();
 
-    // Wait for hydra.js to process
-    await page.waitForTimeout(300);
-
     // Verify slide-2 is now selected (toolbar visible on slide-2)
-    expect(await helper.isQuantaToolbarVisibleInIframe('slide-2')).toBe(true);
+    await helper.waitForQuantaToolbar('slide-2');
   });
 
   test('clicking prev button (-1) selects previous sibling', async ({
@@ -2577,18 +2570,16 @@ test.describe('data-block-selector Navigation', () => {
     const slide2Dot = iframe.locator('[data-block-selector="slide-2"]');
     await expect(slide2Dot).toBeVisible();
     await slide2Dot.click();
-    await page.waitForTimeout(300);
 
     // Verify slide-2 is selected
-    expect(await helper.isQuantaToolbarVisibleInIframe('slide-2')).toBe(true);
+    await helper.waitForQuantaToolbar('slide-2');
 
     // Click the "prev" button (←) with data-block-selector="-1"
     const prevButton = iframe.locator('[data-block-selector="-1"]');
     await prevButton.click();
-    await page.waitForTimeout(300);
 
     // Verify slide-1 is now selected
-    expect(await helper.isQuantaToolbarVisibleInIframe('slide-1')).toBe(true);
+    await helper.waitForQuantaToolbar('slide-1');
   });
 
   test('clicking +1 at last sibling stays on current block', async ({
@@ -2617,10 +2608,10 @@ test.describe('data-block-selector Navigation', () => {
 
     // Click the "next" button - should do nothing since we're at the end
     await nextButton.click();
-    await page.waitForTimeout(300);
 
     // slide-3 should still be selected (no change)
-    expect(await helper.isQuantaToolbarVisibleInIframe('slide-3')).toBe(true);
+    // Use waitForQuantaToolbar to confirm it's still on slide-3
+    await helper.waitForQuantaToolbar('slide-3');
   });
 
   test('clicking dot indicator selects that specific slide', async ({
@@ -2635,7 +2626,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Click on slide-1 first
     await helper.clickBlockInIframe('slide-1');
-    expect(await helper.isQuantaToolbarVisibleInIframe('slide-1')).toBe(true);
+    await helper.waitForQuantaToolbar('slide-1');
 
     // Click the dot indicator for slide-2 (data-block-selector="slide-2")
     // Note: Only first half of slides have dot indicators (slide-1, slide-2)
@@ -2643,10 +2634,9 @@ test.describe('data-block-selector Navigation', () => {
     const slide2Dot = iframe.locator('[data-block-selector="slide-2"]');
     await expect(slide2Dot).toBeVisible();
     await slide2Dot.click();
-    await page.waitForTimeout(300);
 
     // Verify slide-2 is now selected
-    expect(await helper.isQuantaToolbarVisibleInIframe('slide-2')).toBe(true);
+    await helper.waitForQuantaToolbar('slide-2');
   });
 
   // Sidebar-based selection tests
