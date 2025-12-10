@@ -535,13 +535,8 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
 
-    // Wait for sidebar to fully render
-    await page.waitForTimeout(300);
-
     // The child blocks widget should NOT be visible for non-container blocks
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
-
-    // Child blocks widget should NOT be visible for slate blocks (no container fields)
     await expect(childBlocksWidget).not.toBeVisible();
   });
 
@@ -1244,7 +1239,6 @@ test.describe('Single Allowed Block Auto-Insert', () => {
 
     // Select columns-1 (the container that only allows column blocks)
     await helper.clickContainerBlockInIframe('columns-1');
-    await page.waitForTimeout(500);
 
     // Add a column via the sidebar (columns field only allows 'column' type, so auto-inserts)
     await helper.addBlockViaSidebar('Columns');
@@ -1253,14 +1247,11 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).not.toBeVisible();
 
-    // Wait for the block to be inserted
-    await page.waitForTimeout(1000);
-
-    // A new column should have been auto-inserted
-    const newColumnCount = await iframe
-      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
-      .count();
-    expect(newColumnCount).toBe(3);
+    // A new column should have been auto-inserted (wait for count to reach 3)
+    const columnsLocator = iframe.locator(
+      '[data-block-uid="columns-1"] > .columns-row > [data-block-uid]',
+    );
+    await expect(columnsLocator).toHaveCount(3);
 
     // The new column should have a slate inside (recursive initialization)
     const newColumn = iframe
@@ -1354,16 +1345,14 @@ test.describe('Single Allowed Block Auto-Insert', () => {
 
     // Select col-1 (a column that allows slate and image)
     await helper.clickContainerBlockInIframe('col-1');
-    await page.waitForTimeout(500);
 
     // Add a Text block via the sidebar (col-1 allows slate and image, so chooser appears)
-    await helper.addBlockViaSidebar('Blocks', 'Text');
+    // Note: the column's container field is titled "Content" in its blockSchema
+    await helper.addBlockViaSidebar('Content', 'Text');
 
     // Verify: col-1 should now have 3 children (new block added INSIDE)
-    const newBlocksInCol1 = await iframe
-      .locator('[data-block-uid="col-1"] > [data-block-uid]')
-      .count();
-    expect(newBlocksInCol1).toBe(3); // was 2, now 3
+    const col1Blocks = iframe.locator('[data-block-uid="col-1"] > [data-block-uid]');
+    await expect(col1Blocks).toHaveCount(3); // was 2, now 3
 
     // Verify: columns-1 should still have 2 columns (NO sibling added)
     const newColumnCount = await iframe

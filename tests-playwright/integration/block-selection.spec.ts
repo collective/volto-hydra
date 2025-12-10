@@ -158,25 +158,21 @@ test.describe('Block Selection', () => {
     const parentArrow = page.locator('.sidebar-section-header .parent-nav');
     await expect(parentArrow).toBeVisible({ timeout: 5000 });
     await parentArrow.click();
-    await page.waitForTimeout(500);
 
-    // Wait for ChildBlocksWidget to show page-level blocks
+    // Wait for ChildBlocksWidget to show page-level blocks with the Image item
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
-    await expect(childBlocksWidget).toBeVisible({ timeout: 2000 });
+    await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
 
-    // Find block items in the widget
-    const blockItems = childBlocksWidget.locator('.child-block-item');
-    await expect(blockItems.first()).toBeVisible();
+    // Click the Image block item (block-2-uuid)
+    // Using hasText ensures the list is fully rendered before clicking
+    const imageBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Image' });
+    await expect(imageBlockItem).toBeVisible({ timeout: 5000 });
+    await imageBlockItem.click();
 
-    // Click the second block (block-2-uuid which is an image block)
-    const secondBlockInList = blockItems.nth(1);
-    await expect(secondBlockInList).toBeVisible();
-    await secondBlockInList.click();
-    await page.waitForTimeout(500);
-
-    // The sidebar should now show image block fields (url, alt)
-    const hasUrlField = await helper.hasSidebarField('url');
-    expect(hasUrlField).toBe(true);
+    // The sidebar should now show image block fields (alt text, alignment, etc.)
+    // Wait for the alt text field to appear (indicates sidebar updated to image block)
+    const altTextField = page.locator('.sidebar-container').getByRole('textbox', { name: 'Alt text' });
+    await expect(altTextField).toBeVisible({ timeout: 5000 });
 
     // Verify Quanta toolbar appears on the selected block in iframe
     const hasQuantaToolbar = await helper.isQuantaToolbarVisibleInIframe('block-2-uuid');
