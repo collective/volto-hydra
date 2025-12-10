@@ -18,6 +18,19 @@
     "columns-1": {
       "@type": "columns",
       "title": "My Columns Section",
+      "top_images": {
+        "top-img-1": {
+          "@type": "image",
+          "url": "http://localhost:8888/test-image-1.jpg",
+          "alt": "Top Image 1"
+        },
+        "top-img-2": {
+          "@type": "image",
+          "url": "http://localhost:8888/test-image-2.jpg",
+          "alt": "Top Image 2"
+        }
+      },
+      "top_images_layout": {"items": ["top-img-1", "top-img-2"]},
       "columns": {
         "col-1": {
           "@type": "column",

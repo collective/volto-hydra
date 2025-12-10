@@ -510,7 +510,7 @@ For our slider example
 - ```data-block-add="<<direction>>"``` is useful if blocks are going to be added in a non standard direction. By default it will alternate between 
   ```bottom``` and ```right``` depending on the parent container.
 - You can use ```data-block-selector="<<block_uid>>>"``` on buttons or links anywhere to enable sidebar block selection. You can also use -1, +1 etc 
-  to select the previous or next block.
+  to select the previous or next block (if the selector is in the container), otherwise use ```data-block-selector="<<block_uid>>>:+1|-1"``` to specify next/prev from the given block.
 - When a block is selected in the sidebar hydra will send fake clicks on  ```data-block-selector``` elements to ensure a hidden block is visible
    - but you can override this by setting a ```onHandleBlockSelection``` callback.
 

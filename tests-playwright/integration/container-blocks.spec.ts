@@ -2518,3 +2518,322 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     expect(childTexts).toEqual(['Grid Cell 1', 'Grid Cell 2']);
   });
 });
+
+test.describe('data-block-selector Navigation', () => {
+  /**
+   * Test carousel with hidden slides.
+   * Only one slide is visible at a time (like a real carousel).
+   * data-block-selector buttons should:
+   * 1. Select the target block
+   * 2. Make the hidden block visible (frontend handles visibility)
+   */
+
+  test('clicking next button (+1) selects next sibling', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify carousel structure is loaded
+    const carousel = iframe.locator('[data-block-uid="carousel-1"]');
+    await expect(carousel).toBeVisible();
+
+    // Initially slide-1 is visible, slide-2 is hidden
+    const slide1 = iframe.locator('[data-block-uid="slide-1"]');
+    const slide2 = iframe.locator('[data-block-uid="slide-2"]');
+    await expect(slide1).toBeVisible();
+    await expect(slide2).toBeHidden();
+
+    // Click on slide-1 to select it first
+    await helper.clickBlockInIframe('slide-1');
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-1')).toBe(true);
+
+    // Click the "next" button (→) with data-block-selector="+1"
+    // This should select slide-2
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await expect(nextButton).toBeVisible();
+    await nextButton.click();
+
+    // Wait for hydra.js to process
+    await page.waitForTimeout(300);
+
+    // Verify slide-2 is now selected (toolbar visible on slide-2)
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-2')).toBe(true);
+  });
+
+  test('clicking prev button (-1) selects previous sibling', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // First navigate to slide-2 by clicking the dot indicator
+    const slide2Dot = iframe.locator('[data-block-selector="slide-2"]');
+    await expect(slide2Dot).toBeVisible();
+    await slide2Dot.click();
+    await page.waitForTimeout(300);
+
+    // Verify slide-2 is selected
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-2')).toBe(true);
+
+    // Click the "prev" button (←) with data-block-selector="-1"
+    const prevButton = iframe.locator('[data-block-selector="-1"]');
+    await prevButton.click();
+    await page.waitForTimeout(300);
+
+    // Verify slide-1 is now selected
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-1')).toBe(true);
+  });
+
+  test('clicking +1 at last sibling stays on current block', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Navigate to slide-3 (last slide) by clicking +1 twice from slide-1
+    // (slide-3 doesn't have a direct selector dot - we only show dots for first half)
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Click +1 to go to slide-2
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await nextButton.click();
+    await helper.waitForQuantaToolbar('slide-2');
+
+    // Click +1 again to go to slide-3
+    await nextButton.click();
+    await helper.waitForQuantaToolbar('slide-3');
+
+    // Click the "next" button - should do nothing since we're at the end
+    await nextButton.click();
+    await page.waitForTimeout(300);
+
+    // slide-3 should still be selected (no change)
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-3')).toBe(true);
+  });
+
+  test('clicking dot indicator selects that specific slide', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on slide-1 first
+    await helper.clickBlockInIframe('slide-1');
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-1')).toBe(true);
+
+    // Click the dot indicator for slide-2 (data-block-selector="slide-2")
+    // Note: Only first half of slides have dot indicators (slide-1, slide-2)
+    // slide-3 does not have a direct selector to test +1/-1 fallback
+    const slide2Dot = iframe.locator('[data-block-selector="slide-2"]');
+    await expect(slide2Dot).toBeVisible();
+    await slide2Dot.click();
+    await page.waitForTimeout(300);
+
+    // Verify slide-2 is now selected
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-2')).toBe(true);
+  });
+
+  // Sidebar-based selection tests
+  // These test selecting blocks via the ChildBlocksWidget in the sidebar
+
+  test('clicking hidden slide in sidebar ChildBlocksWidget selects it', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // First click on the carousel container to see its child blocks in sidebar
+    await helper.clickContainerBlockInIframe('carousel-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    // Wait for carousel's ChildBlocksWidget to show Slides section
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Verify slide-2 is hidden in iframe (carousel shows only one slide at a time)
+    await expect(iframe.locator('[data-block-uid="slide-2"]')).toBeHidden();
+
+    // Click on the second slide entry in the sidebar's ChildBlocksWidget
+    // The widget shows blocks as "⋮⋮ Slide ›" (using block type title)
+    const slideButtons = sidebar.locator('.child-block-item');
+    await expect(slideButtons.nth(1)).toBeVisible();
+    await slideButtons.nth(1).click();
+
+    // Wait for slide-2 to be selected (includes waiting for carousel transition)
+    await helper.waitForQuantaToolbar('slide-2');
+  });
+
+  test('sidebar selection works for all carousel slides', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const sidebar = page.locator('.sidebar-container');
+
+    // Click on carousel container first
+    await helper.clickContainerBlockInIframe('carousel-1');
+    // Wait for carousel's ChildBlocksWidget to show Slides section
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Get slide entries in the ChildBlocksWidget
+    const slideButtons = sidebar.locator('.child-block-item');
+
+    // Select slide-3 via sidebar (third entry, it's hidden initially)
+    await expect(slideButtons.nth(2)).toBeVisible();
+    await slideButtons.nth(2).click();
+
+    // Wait for slide-3 to be selected (includes waiting for carousel transition)
+    await helper.waitForQuantaToolbar('slide-3');
+
+    // Now go back to carousel and select slide-1
+    await helper.clickContainerBlockInIframe('carousel-1');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Select first slide entry
+    await slideButtons.first().click();
+
+    // Wait for slide-1 to be selected
+    await helper.waitForQuantaToolbar('slide-1');
+  });
+});
+
+// ============================================================================
+// Multi-Container Field Tests
+// Block UIDs are unique so admin derives container field from blockPathMap
+// Tests both accordion (header/content fields) and columns (top_images/columns fields)
+// ============================================================================
+test.describe('Multi-Container Field Operations', () => {
+  test('selecting block in top_images field shows Image sidebar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="top-img-1"]').waitFor();
+
+    // Click the first top image block
+    await helper.clickBlockInIframe('top-img-1');
+
+    // Wait for sidebar to show Image block settings (includes nav chevron "‹ Image")
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Image').first()).toBeVisible();
+
+    // Verify image-specific settings are present
+    await expect(sidebar.getByText('Alt text')).toBeVisible();
+  });
+
+  test('selecting block in columns field shows Column sidebar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="col-1"]').waitFor();
+
+    // Click the first column block
+    await helper.clickBlockInIframe('col-1');
+
+    // Wait for sidebar to show Column block settings (includes nav chevron "‹ Column")
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Column').first()).toBeVisible();
+  });
+
+  test('Escape from top_images block navigates to columns parent', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="top-img-1"]').waitFor();
+
+    // Click the first top image to select it
+    await helper.clickBlockInIframe('top-img-1');
+
+    // Wait for Image sidebar to appear
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Image').first()).toBeVisible();
+
+    // Press Escape to navigate to parent (columns)
+    await page.keyboard.press('Escape');
+
+    // Verify the columns block is now selected - Title field should be editable
+    await expect(sidebar.getByLabel('Title')).toBeVisible();
+  });
+
+  test('Escape from column block navigates to columns parent', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="col-1"]').waitFor();
+
+    // Click the first column to select it
+    await helper.clickBlockInIframe('col-1');
+
+    // Wait for Column sidebar to appear
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Column').first()).toBeVisible();
+
+    // Press Escape to navigate to parent (columns)
+    await page.keyboard.press('Escape');
+
+    // Verify the columns block is now selected - Title field should be editable
+    await expect(sidebar.getByLabel('Title')).toBeVisible();
+  });
+
+  test('clicking block in sidebar ChildBlocksWidget selects it in iframe', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="columns-1"]').waitFor();
+
+    // First select the columns block to see its child blocks in sidebar
+    await helper.clickBlockInIframe('columns-1');
+
+    // Wait for sidebar to show columns block with child blocks widget
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.getByLabel('Title')).toBeVisible();
+
+    // The sidebar shows child blocks as buttons like "⋮⋮ Image ›"
+    // Click on the first Image entry button (the full row with › arrow)
+    const imageButton = sidebar.getByRole('button', { name: /Image/ }).first();
+    await expect(imageButton).toBeVisible();
+    await imageButton.click();
+
+    // Verify the image block is now selected in the iframe
+    await expect(sidebar.getByText('Alt text')).toBeVisible();
+  });
+});

@@ -118,7 +118,8 @@
                                         required: [],
                                     },
                                 },
-                                // Container block: columns contains column children
+                                // Container block: columns contains column children AND top_images
+                                // Tests multi-container field routing
                                 columns: {
                                     id: 'columns',
                                     title: 'Columns',
@@ -129,13 +130,19 @@
                                             {
                                                 id: 'default',
                                                 title: 'Default',
-                                                fields: ['title', 'columns'],
+                                                fields: ['title', 'top_images', 'columns'],
                                             },
                                         ],
                                         properties: {
                                             title: {
                                                 title: 'Title',
                                                 type: 'string',
+                                            },
+                                            top_images: {
+                                                title: 'Top Images',
+                                                type: 'blocks',
+                                                allowedBlocks: ['image'],
+                                                defaultBlock: 'image',
                                             },
                                             columns: {
                                                 title: 'Columns',
@@ -177,14 +184,98 @@
                                         required: [],
                                     },
                                 },
+                                // Carousel container: for testing data-block-selector
+                                carousel: {
+                                    id: 'carousel',
+                                    title: 'Carousel',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['slides'],
+                                            },
+                                        ],
+                                        properties: {
+                                            slides: {
+                                                title: 'Slides',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slide'],
+                                                defaultBlock: 'slide',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Slide block: child of carousel
+                                slide: {
+                                    id: 'slide',
+                                    title: 'Slide',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['title', 'content'],
+                                            },
+                                        ],
+                                        properties: {
+                                            title: {
+                                                title: 'Title',
+                                                type: 'string',
+                                            },
+                                            content: {
+                                                title: 'Content',
+                                                type: 'string',
+                                                widget: 'textarea',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Accordion block: demonstrates data-block-field for multi-container targeting
+                                accordion: {
+                                    id: 'accordion',
+                                    title: 'Accordion',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['header', 'content'],
+                                            },
+                                        ],
+                                        properties: {
+                                            header: {
+                                                title: 'Header',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slate'],
+                                                defaultBlock: 'slate',
+                                            },
+                                            content: {
+                                                title: 'Content',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slate', 'image'],
+                                                defaultBlock: 'slate',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
                             },
                         },
                     };
 
                     // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
-                    // Note: 'column' is NOT in page-level allowedBlocks - it's only allowed inside 'columns'
+                    // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge(adminOrigin, {
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'carousel', 'accordion'],
                         voltoConfig: voltoConfig,
                     });
 

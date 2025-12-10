@@ -769,6 +769,16 @@ export class Bridge {
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
       event.stopPropagation();
+
+      // Handle data-block-selector clicks (carousel nav buttons, etc.)
+      // Don't preventDefault - let frontend handle visibility changes
+      const selectorElement = event.target.closest('[data-block-selector]');
+      if (selectorElement) {
+        const selector = selectorElement.getAttribute('data-block-selector');
+        this.handleBlockSelector(selector, selectorElement);
+        return;
+      }
+
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
         // Skip synthetic clicks (keyboard activation like space on button) on contenteditable elements
@@ -1962,6 +1972,90 @@ export class Bridge {
   }
 
   /**
+   * Handle data-block-selector click to navigate between sibling blocks.
+   * Used for carousel prev/next buttons, tab selectors, etc.
+   *
+   * @param {string} selector - The selector value: "+1", "-1", or a block UID
+   * @param {HTMLElement} triggerElement - The element that was clicked
+   */
+  handleBlockSelector(selector, triggerElement) {
+    console.log('[HYDRA] handleBlockSelector:', selector, 'trigger:', triggerElement.className);
+    let targetUid;
+
+    if (selector === '+1' || selector === '-1') {
+      // Find sibling relative to current block or the container
+      const containerBlock = triggerElement.closest('[data-block-uid]');
+      if (!containerBlock) {
+        console.log('[HYDRA] handleBlockSelector: no container found');
+        return;
+      }
+      const containerUid = containerBlock.getAttribute('data-block-uid');
+      console.log('[HYDRA] handleBlockSelector: container =', containerUid);
+
+      // Get all nested blocks whose immediate parent container is this one
+      // (i.e., blocks directly owned by this container, not deeply nested)
+      const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
+      console.log('[HYDRA] handleBlockSelector: allNestedBlocks =', allNestedBlocks.length);
+      const childBlocks = Array.from(allNestedBlocks).filter((el) => {
+        // Check that this block's parent container is our container
+        const parentContainer = el.parentElement?.closest('[data-block-uid]');
+        return parentContainer?.getAttribute('data-block-uid') === containerUid;
+      });
+      console.log('[HYDRA] handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
+
+      if (childBlocks.length === 0) {
+        console.log('[HYDRA] handleBlockSelector: no child blocks found');
+        return;
+      }
+
+      // Find current index - use currently selected block if it's in this container
+      let currentIndex = -1;
+      if (this.selectedBlockUid) {
+        currentIndex = childBlocks.findIndex(
+          el => el.getAttribute('data-block-uid') === this.selectedBlockUid
+        );
+      }
+
+      // If no block selected or selected block not in container, start from first/last
+      if (currentIndex === -1) {
+        currentIndex = selector === '+1' ? -1 : childBlocks.length;
+      }
+
+      const offset = parseInt(selector, 10);
+      const targetIndex = currentIndex + offset;
+
+      // Bounds check
+      if (targetIndex >= 0 && targetIndex < childBlocks.length) {
+        targetUid = childBlocks[targetIndex].getAttribute('data-block-uid');
+      }
+    } else {
+      // Direct UID reference
+      targetUid = selector;
+    }
+
+    console.log('[HYDRA] handleBlockSelector: targetUid =', targetUid);
+    if (targetUid) {
+      // Wait for the frontend's click handler to show/hide slides,
+      // then select the block once it's visible
+      const waitForBlockAndSelect = (retries = 10) => {
+        const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+        if (targetElement && targetElement.offsetParent !== null) {
+          // Block exists and is visible (offsetParent is null for hidden elements)
+          console.log('[HYDRA] handleBlockSelector: selecting', targetUid);
+          this.selectBlock(targetElement);
+        } else if (retries > 0) {
+          // Wait a bit for frontend to render/show the block
+          setTimeout(() => waitForBlockAndSelect(retries - 1), 50);
+        } else {
+          console.log('[HYDRA] handleBlockSelector: block not visible after retries', targetUid);
+        }
+      };
+      // Start after a short delay to let click event propagate to frontend
+      setTimeout(waitForBlockAndSelect, 0);
+    }
+  }
+
+  /**
    * Deselects a block and updates the frontend accordingly.
    *
    * @param {string} prevSelectedBlockUid - The UID of the previously selected block.
@@ -2515,10 +2609,39 @@ export class Bridge {
         // Don't post FORM_DATA - form data syncing is handled separately
 
         // console.log("select block", event.data?.method);
-        const blockElement = document.querySelector(
+        let blockElement = document.querySelector(
           `[data-block-uid="${uid}"]`,
         );
-        if (blockElement) {
+
+        // If block doesn't exist or is hidden, try to make it visible
+        // using data-block-selector navigation (e.g., carousel slides)
+        if (!blockElement || this.isElementHidden(blockElement)) {
+          const madeVisible = this.tryMakeBlockVisible(uid);
+          if (madeVisible) {
+            // Wait for the renderer to make the block visible (e.g., carousel animation)
+            // Poll for up to 500ms for the block to become visible
+            const waitForVisible = async () => {
+              for (let i = 0; i < 10; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+                blockElement = document.querySelector(
+                  `[data-block-uid="${uid}"]`,
+                );
+                if (blockElement && !this.isElementHidden(blockElement)) {
+                  return true;
+                }
+              }
+              return false;
+            };
+            waitForVisible().then((visible) => {
+              if (visible) {
+                this.selectBlock(blockElement);
+              }
+            });
+            return; // Exit early - selection will happen in the async callback
+          }
+        }
+
+        if (blockElement && !this.isElementHidden(blockElement)) {
           !this.elementIsVisibleInViewport(blockElement) &&
             blockElement.scrollIntoView();
 
@@ -3016,6 +3139,161 @@ export class Bridge {
           (bottom > 0 && bottom < innerHeight)) &&
           ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
       : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+  }
+
+  /**
+   * Checks if an element is hidden (display: none, visibility: hidden, or zero dimensions)
+   * @param {HTMLElement} el - The element to check
+   * @returns {boolean} True if the element is hidden
+   */
+  isElementHidden(el) {
+    if (!el) return true;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return true;
+    }
+    const rect = el.getBoundingClientRect();
+    return rect.width === 0 && rect.height === 0;
+  }
+
+  /**
+   * Tries to make a block visible by clicking data-block-selector elements.
+   * First looks for a direct selector (data-block-selector="{uid}"),
+   * then tries +1/-1 navigation to reach the target block.
+   * @param {string} targetUid - The UID of the block to make visible
+   * @returns {boolean} True if a selector was clicked (block may now be visible)
+   */
+  tryMakeBlockVisible(targetUid) {
+    console.log(`[HYDRA] tryMakeBlockVisible: ${targetUid}`);
+    // First, try direct selector: data-block-selector="{targetUid}"
+    const directSelector = document.querySelector(
+      `[data-block-selector="${targetUid}"]`,
+    );
+    if (directSelector) {
+      console.log(`[HYDRA] tryMakeBlockVisible: found direct selector for ${targetUid}`);
+      directSelector.click();
+      return true;
+    }
+
+    // No direct selector - try +1/-1 navigation
+    console.log(`[HYDRA] tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
+
+    // Find the target element first (may exist but be hidden)
+    const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+    if (!targetElement) {
+      console.log(`[HYDRA] tryMakeBlockVisible: target element not in DOM`);
+      return false;
+    }
+
+    // Find the container block (parent with data-block-uid)
+    const containerBlock = targetElement.parentElement?.closest('[data-block-uid]');
+    if (!containerBlock) {
+      console.log(`[HYDRA] tryMakeBlockVisible: no container block found`);
+      return false;
+    }
+    const containerUid = containerBlock.getAttribute('data-block-uid');
+
+    // Find siblings by looking at the direct parent (which may be a wrapper div like .slides-wrapper)
+    const directParent = targetElement.parentElement;
+    if (!directParent) {
+      console.log(`[HYDRA] tryMakeBlockVisible: no parent element`);
+      return false;
+    }
+
+    const siblings = Array.from(
+      directParent.querySelectorAll(':scope > [data-block-uid]'),
+    );
+    console.log(`[HYDRA] tryMakeBlockVisible: found ${siblings.length} siblings in container ${containerUid}`);
+
+    const targetIndex = siblings.findIndex(
+      (el) => el.getAttribute('data-block-uid') === targetUid,
+    );
+    if (targetIndex === -1) {
+      console.log(`[HYDRA] tryMakeBlockVisible: target not in siblings`);
+      return false;
+    }
+
+    // Find the currently visible sibling
+    const currentIndex = siblings.findIndex((el) => !this.isElementHidden(el));
+    const currentUid = currentIndex >= 0 ? siblings[currentIndex].getAttribute('data-block-uid') : null;
+    console.log(`[HYDRA] tryMakeBlockVisible: currentIndex=${currentIndex} (${currentUid}), targetIndex=${targetIndex}`);
+
+    if (currentIndex === -1) {
+      console.log(`[HYDRA] tryMakeBlockVisible: no visible sibling`);
+      return false;
+    }
+
+    const stepsNeeded = targetIndex - currentIndex;
+    if (stepsNeeded === 0) {
+      console.log(`[HYDRA] tryMakeBlockVisible: already at target`);
+      return false;
+    }
+
+    const direction = stepsNeeded > 0 ? '+1' : '-1';
+
+    // Look for +1/-1 selectors in two formats:
+    // 1. "{blockUid}:+1" - explicit format, can be anywhere on page
+    // 2. "+1" - simple format, must be inside the container block
+    let selector = null;
+
+    // Try explicit format first: data-block-selector="{currentUid}:+1"
+    // This means "clicking this will show the block after {currentUid}"
+    // We need to click through each step, so find selector for current visible block
+    const explicitSelector = document.querySelector(
+      `[data-block-selector="${currentUid}:${direction}"]`,
+    );
+    if (explicitSelector) {
+      console.log(`[HYDRA] tryMakeBlockVisible: found explicit selector ${currentUid}:${direction}`);
+      selector = explicitSelector;
+    } else {
+      // Try simple format: selector must be inside the container
+      const simpleSelector = containerBlock.querySelector(
+        `[data-block-selector="${direction}"]`,
+      );
+      if (simpleSelector) {
+        console.log(`[HYDRA] tryMakeBlockVisible: found simple selector ${direction} inside container`);
+        selector = simpleSelector;
+      }
+    }
+
+    if (!selector) {
+      console.log(`[HYDRA] tryMakeBlockVisible: no ${direction} selector found`);
+      return false;
+    }
+
+    // Figure out which block should become visible after one click
+    const nextIndex = currentIndex + (stepsNeeded > 0 ? 1 : -1);
+    const nextBlock = siblings[nextIndex];
+    const nextUid = nextBlock?.getAttribute('data-block-uid');
+    console.log(`[HYDRA] tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
+
+    // Click once
+    selector.click();
+
+    // Wait for the expected block to become visible, then recurse if needed
+    const waitAndContinue = async () => {
+      // Poll for up to 500ms for the next block to become visible
+      for (let i = 0; i < 10; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        if (nextBlock && !this.isElementHidden(nextBlock)) {
+          console.log(`[HYDRA] tryMakeBlockVisible: ${nextUid} is now visible`);
+          // Check if we've reached the target
+          if (nextUid === targetUid) {
+            console.log(`[HYDRA] tryMakeBlockVisible: reached target ${targetUid}`);
+            return true;
+          }
+          // Need more clicks - recurse
+          console.log(`[HYDRA] tryMakeBlockVisible: not at target yet, continuing navigation`);
+          return this.tryMakeBlockVisible(targetUid);
+        }
+      }
+      console.log(`[HYDRA] tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible`);
+      return false;
+    };
+
+    // Start the async wait (caller will handle the promise via the polling loop)
+    waitAndContinue();
+    return true;
   }
 
   /**

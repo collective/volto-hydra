@@ -390,13 +390,13 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if the Quanta Toolbar is visible for a block.
-   * The toolbar is rendered in the parent window (admin UI), not inside the iframe.
+   * Check if the Quanta Toolbar is visible for a specific block.
+   * The toolbar is rendered in the parent window (admin UI), positioned above the block in iframe.
+   * Uses isBlockSelectedInIframe which verifies both visibility AND correct positioning.
    */
   async isQuantaToolbarVisibleInIframe(blockId: string): Promise<boolean> {
-    // Toolbar is now rendered in parent window, not in iframe
-    const toolbar = this.page.locator('.quanta-toolbar');
-    return await toolbar.isVisible();
+    const result = await this.isBlockSelectedInIframe(blockId);
+    return result.ok;
   }
 
   /**
