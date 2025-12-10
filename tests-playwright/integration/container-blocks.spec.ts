@@ -1639,9 +1639,8 @@ test.describe('Container Block Drag and Drop', () => {
     // Verify text-1a starts inside col-1
     expect(col1InitialCount).toBe(2);
 
-    // Select text-1a from col-1
+    // Select text-1a from col-1 and wait for toolbar
     await helper.clickBlockInIframe('text-1a');
-    await page.waitForTimeout(300);
 
     // Drag to page level (drop on text-after which is a page-level block)
     const dragHandle = await helper.getDragHandle();
@@ -1649,16 +1648,11 @@ test.describe('Container Block Drag and Drop', () => {
 
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
 
-    // Verify it's no longer in col-1
-    const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
-    expect(col1NewCount).toBe(col1InitialCount - 1);
+    // Wait for block to be removed from col-1 (React re-render may be async)
+    await expect(col1.locator(':scope > [data-block-uid]')).toHaveCount(col1InitialCount - 1, { timeout: 5000 });
 
-    // Verify text-1a is now a direct child of body (page-level)
-    // It should not be inside col-1 anymore
-    const text1aInCol1 = await col1
-      .locator('[data-block-uid="text-1a"]')
-      .count();
-    expect(text1aInCol1).toBe(0);
+    // Verify text-1a is no longer inside col-1
+    await expect(col1.locator('[data-block-uid="text-1a"]')).toHaveCount(0, { timeout: 5000 });
 
     // And it should exist at page level (not inside any container)
     const text1aAtPageLevel = iframe.locator(

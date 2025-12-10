@@ -163,9 +163,10 @@ test.describe('Block Selection', () => {
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
 
-    // Click the Image block item (block-2-uuid)
+    // Click the first Image block item (block-2-uuid)
     // Using hasText ensures the list is fully rendered before clicking
-    const imageBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Image' });
+    // .first() needed because there are two Image blocks (regular and linked)
+    const imageBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Image' }).first();
     await expect(imageBlockItem).toBeVisible({ timeout: 5000 });
     await imageBlockItem.click();
 
@@ -174,9 +175,8 @@ test.describe('Block Selection', () => {
     const altTextField = page.locator('.sidebar-container').getByRole('textbox', { name: 'Alt text' });
     await expect(altTextField).toBeVisible({ timeout: 5000 });
 
-    // Verify Quanta toolbar appears on the selected block in iframe
-    const hasQuantaToolbar = await helper.isQuantaToolbarVisibleInIframe('block-2-uuid');
-    expect(hasQuantaToolbar).toBe(true);
+    // Wait for Quanta toolbar to appear and be positioned on the selected block
+    await helper.waitForQuantaToolbar('block-2-uuid');
   });
 
   test('clicking text block puts cursor focus at correct position', async ({ page }) => {

@@ -8,6 +8,14 @@ import {
   previousBlockId,
 } from '@plone/volto/helpers';
 
+// Debug logging - disabled by default, enable via window.HYDRA_DEBUG
+const debugEnabled =
+  typeof window !== 'undefined' && window.HYDRA_DEBUG;
+const log = (...args) => debugEnabled && console.log('[VIEW]', ...args);
+// eslint-disable-next-line no-unused-vars
+const logExtract = (...args) =>
+  debugEnabled && console.log('[EXTRACT]', ...args);
+
 /**
  * Validates if a selection is valid for the given slate value.
  * Returns true if all paths in the selection exist in the document.
@@ -162,9 +170,9 @@ const extractBlockFieldTypes = (intl) => {
 
       // Debug: Log hero block schema processing
       if (blockType === 'hero') {
-        console.log('[EXTRACT] Processing hero block, blockConfig.blockSchema:', blockConfig.blockSchema);
-        console.log('[EXTRACT] Hero schema after resolution:', schema);
-        console.log('[EXTRACT] Hero schema.properties:', schema?.properties);
+        logExtract('Processing hero block, blockConfig.blockSchema:', blockConfig.blockSchema);
+        logExtract('Hero schema after resolution:', schema);
+        logExtract('Hero schema.properties:', schema?.properties);
       }
 
       if (!schema?.properties) {
@@ -194,13 +202,13 @@ const extractBlockFieldTypes = (intl) => {
 
         // Debug: Log hero field processing
         if (blockType === 'hero') {
-          console.log(`[EXTRACT] Hero field ${fieldName}: widget=${field.widget}, type=${field.type}, resolved fieldType=${fieldType}`);
+          logExtract(`Hero field ${fieldName}: widget=${field.widget}, type=${field.type}, resolved fieldType=${fieldType}`);
         }
       });
 
       // Debug: Log what was added for hero
       if (blockType === 'hero') {
-        console.log('[EXTRACT] Hero blockFieldTypes after processing:', blockFieldTypes['hero']);
+        logExtract('Hero blockFieldTypes after processing:', blockFieldTypes['hero']);
       }
     } catch (error) {
       console.warn(`[VIEW] Error extracting field types for block type "${blockType}":`, error);
@@ -209,8 +217,8 @@ const extractBlockFieldTypes = (intl) => {
   });
 
   // Debug: Final state check
-  console.log('[EXTRACT] Final blockFieldTypes keys:', Object.keys(blockFieldTypes));
-  console.log('[EXTRACT] Final blockFieldTypes.hero:', blockFieldTypes['hero']);
+  logExtract('Final blockFieldTypes keys:', Object.keys(blockFieldTypes));
+  logExtract('Final blockFieldTypes.hero:', blockFieldTypes['hero']);
 
   return blockFieldTypes;
 };
@@ -415,7 +423,7 @@ const Iframe = (props) => {
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
     if (iframeOriginRef.current && selectedBlock) {
-      console.log('[VIEW] useEffect sending SELECT_BLOCK:', selectedBlock);
+      log('useEffect sending SELECT_BLOCK:', selectedBlock);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         {
           type: 'SELECT_BLOCK',
@@ -495,7 +503,7 @@ const Iframe = (props) => {
             : formDataFromRedux.blocks?.[selectedBlock];
           const slateValue = block?.value; // Most common slate field name
           if (slateValue && !isSelectionValidForValue(prev.selection, slateValue)) {
-            console.log('[VIEW] Selection invalid for new form data, clearing');
+            log('Selection invalid for new form data, clearing');
             newSelection = null;
           }
         }
@@ -714,7 +722,7 @@ const Iframe = (props) => {
 
         case 'BUFFER_FLUSHED':
           // Iframe had no pending text - update combined state with current form + requestId + selection
-          console.log('[VIEW] Received BUFFER_FLUSHED (no pending text), requestId:', event.data.requestId);
+          log('Received BUFFER_FLUSHED (no pending text), requestId:', event.data.requestId);
           setIframeSyncState(prev => ({
             ...prev,
             selection: event.data.selection || null,
@@ -983,11 +991,11 @@ const Iframe = (props) => {
           const isNewBlock = !isPositionUpdateOnly &&
                              (!blockUI || blockUI.blockUid !== event.data.blockUid) &&
                              selectedBlock !== event.data.blockUid;
-          console.log('[VIEW] BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
+          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
 
           // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
           if (isNewBlock) {
-            console.log('[VIEW] BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
+            log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);
           }
 
@@ -1017,12 +1025,13 @@ const Iframe = (props) => {
             }
 
             // Assert required fields - fail loudly if BLOCK_SELECTED is missing data
-            if (!event.data.addDirection) {
+            // Only check when selecting a block (blockUid not null) - deselection doesn't need these
+            if (event.data.blockUid && !event.data.addDirection) {
               console.error('[VIEW] BLOCK_SELECTED missing addDirection! src:', event.data.src, 'blockUid:', event.data.blockUid);
               throw new Error(`BLOCK_SELECTED missing addDirection (src: ${event.data.src})`);
             }
             // editableFields can be empty {} (block has no editable fields) but must be present
-            if (event.data.editableFields === undefined) {
+            if (event.data.blockUid && event.data.editableFields === undefined) {
               console.error('[VIEW] BLOCK_SELECTED missing editableFields! src:', event.data.src, 'blockUid:', event.data.blockUid);
               throw new Error(`BLOCK_SELECTED missing editableFields (src: ${event.data.src})`);
             }
@@ -1199,7 +1208,7 @@ const Iframe = (props) => {
       if (iframeSyncState.selection) {
         message.transformedSelection = iframeSyncState.selection;
       }
-      console.log('[VIEW] Sending FORM_DATA with formatRequestId:', message.formatRequestId);
+      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
@@ -1223,8 +1232,8 @@ const Iframe = (props) => {
     }
     if (iframeOriginRef.current && formToUse) {
       const updatedBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig);
-      console.log('[VIEW] Sending FORM_DATA with blockPathMap keys:', Object.keys(updatedBlockPathMap));
-      console.log('[VIEW] blockPathMap for text-1a:', updatedBlockPathMap['text-1a']);
+      log('Sending FORM_DATA with blockPathMap keys:', Object.keys(updatedBlockPathMap));
+      log('blockPathMap for text-1a:', updatedBlockPathMap['text-1a']);
       // Include pendingSelectBlockUid so iframe can select the block after re-rendering
       // This is needed when a new block is added - the block doesn't exist in DOM yet
       const message = {
@@ -1233,7 +1242,7 @@ const Iframe = (props) => {
         blockPathMap: updatedBlockPathMap,
         selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
       };
-      console.log('[VIEW] FORM_DATA selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
+      log('FORM_DATA selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
@@ -1532,14 +1541,14 @@ const Iframe = (props) => {
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}
             onChangeFormData={(formData, selection, formatRequestId) => {
-              console.log('[VIEW] onChangeFormData callback called, formatRequestId:', formatRequestId);
+              log('onChangeFormData callback called, formatRequestId:', formatRequestId);
               // Update iframeSyncState atomically with formData, selection, and toolbarRequestDone
               // The FORM_DATA useEffect will:
               // 1. Send to iframe when it sees toolbarRequestDone (with formatRequestId)
               // 2. THEN update Redux (to avoid race condition where Redux re-render
               //    happens before toolbarRequestDone is committed)
               setIframeSyncState(prev => {
-                console.log('[VIEW] setIframeSyncState called, prev toolbarRequestDone:', prev.toolbarRequestDone, 'new:', formatRequestId);
+                log('setIframeSyncState called, prev toolbarRequestDone:', prev.toolbarRequestDone, 'new:', formatRequestId);
                 return {
                   ...prev,
                   formData: formData,
@@ -1579,7 +1588,7 @@ const Iframe = (props) => {
             }
 
             const iframeRect = referenceElement.getBoundingClientRect();
-            console.log('[VIEW] Add button render, blockUI.addDirection:', blockUI.addDirection, 'blockUid:', blockUI.blockUid);
+            log('Add button render, blockUI.addDirection:', blockUI.addDirection, 'blockUid:', blockUI.blockUid);
             const isRightDirection = blockUI.addDirection === 'right';
 
             // Calculate ideal position

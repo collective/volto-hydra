@@ -64,7 +64,6 @@ export class AdminUIHelper {
       sameSite: 'Lax',
     }]);
 
-    console.log('[DEBUG] Auth cookie set directly for testing');
 
     // Navigate to homepage first (doesn't require SSR auth)
     await this.page.goto(`${this.adminUrl}/`, {
@@ -72,7 +71,6 @@ export class AdminUIHelper {
       waitUntil: 'networkidle',
     });
 
-    console.log('[DEBUG] Homepage loaded successfully');
   }
 
   /**
@@ -87,7 +85,6 @@ export class AdminUIHelper {
 
     const editPath = `${contentPath}/edit`;
 
-    console.log(`[DEBUG] Navigating to ${editPath} using client-side navigation`);
 
     // Use React Router to navigate client-side (avoids SSR)
     await this.page.evaluate((path) => {
@@ -101,7 +98,6 @@ export class AdminUIHelper {
       }
     }, editPath);
 
-    console.log(`[DEBUG] Client-side navigation to ${editPath} triggered, waiting for iframe`);
 
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${editPath}`, { timeout: 10000 });

@@ -77,6 +77,10 @@
 // getTokenFromCookie
 // onEditChange
 
+// Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
+let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
+const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
+
 /**
  * Bridge class creating a two-way link between the Hydra and the frontend.
  * @exports Bridge - Exported for testing purposes
@@ -88,9 +92,11 @@ export class Bridge {
    * @param {URL} adminOrigin - The origin of the adminUI.
    * @param {Object} options - Options for the bridge initialization:
    *   - allowedBlocks: Array of allowed block types (e.g., ['title', 'text', 'image', ...])
+   *   - debug: Enable verbose logging (default: false)
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
+    if (options.debug) debugEnabled = true;
     this.learnOriginFromFirstMessage = options._learnOriginFromFirstMessage || false;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
@@ -135,7 +141,7 @@ export class Bridge {
   getBlockData(blockUid) {
     // First try blockPathMap for nested block support
     const pathInfo = this.blockPathMap?.[blockUid];
-    console.log('[HYDRA] getBlockData:', blockUid, 'pathInfo:', pathInfo, 'blockPathMap keys:', Object.keys(this.blockPathMap || {}));
+    log('getBlockData:', blockUid, 'pathInfo:', pathInfo, 'blockPathMap keys:', Object.keys(this.blockPathMap || {}));
     if (pathInfo?.path && this.formData) {
       // Walk the path to get the nested block
       let current = this.formData;
@@ -148,13 +154,13 @@ export class Bridge {
         }
       }
       if (current) {
-        console.log('[HYDRA] getBlockData: found via path, @type:', current['@type']);
+        log('getBlockData: found via path, @type:', current['@type']);
         return current;
       }
     }
     // Fallback to top-level blocks lookup
     const fallback = this.formData?.blocks?.[blockUid];
-    console.log('[HYDRA] getBlockData: fallback lookup, @type:', fallback?.['@type']);
+    log('getBlockData: fallback lookup, @type:', fallback?.['@type']);
     return fallback;
   }
 
@@ -389,15 +395,15 @@ export class Bridge {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
               this.formData = JSON.parse(JSON.stringify(e.data.data));
-              console.log('[HYDRA] formData has blocks:', Object.keys(this.formData?.blocks || {}));
+              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
 
               // Store block field types metadata (blockId -> fieldName -> fieldType)
               this.blockFieldTypes = e.data.blockFieldTypes || {};
-              console.log('[HYDRA] Stored blockFieldTypes:', this.blockFieldTypes);
+              log('Stored blockFieldTypes:', this.blockFieldTypes);
 
               // Store blockPathMap for nested block lookup
               this.blockPathMap = e.data.blockPathMap || {};
-              console.log('[HYDRA] Stored blockPathMap keys:', Object.keys(this.blockPathMap));
+              log('Stored blockPathMap keys:', Object.keys(this.blockPathMap));
 
               // Store Slate configuration for keyboard shortcuts and toolbar
               this.slateConfig = e.data.slateConfig || { hotkeys: {}, toolbarButtons: [] };
@@ -435,13 +441,13 @@ export class Bridge {
             const blockUid = blockElement?.getAttribute('data-block-uid');
 
             if (blockUid === this.selectedBlockUid) {
-              console.log('[HYDRA] Field focused:', editableField);
+              log('Field focused:', editableField);
               const previousFieldName = this.focusedFieldName;
               this.focusedFieldName = editableField;
 
               // Only update toolbar if field actually changed
               if (previousFieldName !== editableField) {
-                console.log('[HYDRA] Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
+                log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
 
                 // Send BLOCK_SELECTED message to update toolbar visibility
                 const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
@@ -486,7 +492,7 @@ export class Bridge {
       if (this.learnOriginFromFirstMessage && !this.adminOrigin) {
         this.adminOrigin = event.origin;
         this.learnOriginFromFirstMessage = false;
-        console.log('[HYDRA] Learned admin origin from first postMessage:', this.adminOrigin);
+        log('Learned admin origin from first postMessage:', this.adminOrigin);
       }
 
       if (
@@ -497,7 +503,7 @@ export class Bridge {
           event.data.type === 'FORM_DATA' ||
           event.data.type === 'TOGGLE_MARK_DONE'
         ) {
-          console.log('[HYDRA] Received', event.data.type, 'message');
+          log('Received', event.data.type, 'message');
           if (event.data.data) {
             // Don't set isInlineEditing to false - user is still editing
             this.formData = JSON.parse(JSON.stringify(event.data.data));
@@ -511,7 +517,7 @@ export class Bridge {
             // Log the block data to see if bold formatting is present
             const selectedBlockData = this.getBlockData(this.selectedBlockUid);
             if (this.selectedBlockUid && selectedBlockData) {
-              console.log('[HYDRA] Block data being passed to callback:', JSON.stringify(selectedBlockData.value));
+              log('Block data being passed to callback:', JSON.stringify(selectedBlockData.value));
             }
 
             // Suppress outbound messages during external update processing
@@ -520,7 +526,7 @@ export class Bridge {
             this.isProcessingExternalUpdate = true;
 
             // Call the callback first to trigger the re-render
-            console.log('[HYDRA] Calling onEditChange callback to trigger re-render');
+            log('Calling onEditChange callback to trigger re-render');
             callback(this.formData);
 
             // Restore cursor position after re-render (use requestAnimationFrame to ensure DOM is updated)
@@ -589,14 +595,14 @@ export class Bridge {
             // Unblock input if this FORM_DATA has a matching formatRequestId
             // This ensures we only unblock for the specific format operation that caused blocking
             const formatRequestId = event.data.formatRequestId;
-            console.log('[HYDRA] FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
+            log('FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
             if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
-              console.log('[HYDRA] Unblocking input for', this.pendingTransform.blockId, '- formatRequestId matches');
+              log('Unblocking input for', this.pendingTransform.blockId, '- formatRequestId matches');
               this.setBlockProcessing(this.pendingTransform.blockId, false);
             } else if (formatRequestId) {
-              console.log('[HYDRA] formatRequestId', formatRequestId, 'does not match pending requestId:', this.pendingTransform?.requestId);
+              log('formatRequestId', formatRequestId, 'does not match pending requestId:', this.pendingTransform?.requestId);
             } else {
-              console.log('[HYDRA] No formatRequestId in FORM_DATA, not unblocking');
+              log('No formatRequestId in FORM_DATA, not unblocking');
             }
 
             // Update block UI overlay positions after form data changes
@@ -616,7 +622,7 @@ export class Bridge {
                 requestAnimationFrame(() => {
                   const newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
                   if (newBlockElement) {
-                    console.log('[HYDRA] Selecting block from FORM_DATA selectedBlockUid:', adminSelectedBlockUid);
+                    log('Selecting block from FORM_DATA selectedBlockUid:', adminSelectedBlockUid);
                     this.selectBlock(newBlockElement);
                   }
                 });
@@ -638,7 +644,7 @@ export class Bridge {
           // Parent is requesting a buffer flush before applying format
           // This ensures the parent's Slate editor has the latest text
           const requestId = event.data.requestId;
-          console.log('[HYDRA] Received FLUSH_BUFFER request, requestId:', requestId);
+          log('Received FLUSH_BUFFER request, requestId:', requestId);
 
           // Block input during format operation - will be unblocked when FORM_DATA arrives
           // This prevents any text changes from being sent while format is being applied
@@ -652,7 +658,7 @@ export class Bridge {
 
           if (hadPendingText) {
             // requestId was included in INLINE_EDIT_DATA, parent will handle coordination
-            console.log('[HYDRA] Flushed pending text with requestId, waiting for Redux sync');
+            log('Flushed pending text with requestId, waiting for Redux sync');
           } else {
             // No pending text - send BUFFER_FLUSHED immediately (safe to proceed)
             // Include current selection so toolbar has it when applying format
@@ -661,7 +667,7 @@ export class Bridge {
               requestId: requestId,
               selection: this.serializeSelection(),
             });
-            console.log('[HYDRA] No pending text, sent BUFFER_FLUSHED immediately');
+            log('No pending text, sent BUFFER_FLUSHED immediately');
           }
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
@@ -670,7 +676,7 @@ export class Bridge {
 
           // Clear the processing state if it matches this block
           if (blockId && this.pendingTransform?.blockId === blockId) {
-            console.log('[HYDRA] Clearing processing state due to SLATE_ERROR');
+            log('Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
         }
@@ -692,7 +698,7 @@ export class Bridge {
   detectFocusedFieldAndUpdateToolbar(blockUid) {
     const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
     if (!blockElement) {
-      console.log('[HYDRA] Block element not found for field detection:', blockUid);
+      log('Block element not found for field detection:', blockUid);
       return;
     }
 
@@ -717,7 +723,7 @@ export class Bridge {
             field._enterKeyHandler = (e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                console.log('[HYDRA] Prevented Enter key in string field');
+                log('Prevented Enter key in string field');
               }
             };
             field.addEventListener('keydown', field._enterKeyHandler);
@@ -732,26 +738,26 @@ export class Bridge {
       // Find the clicked editable field - only accept if it belongs to THIS block
       const clickedElement = this.lastClickEvent.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
-      console.log('[HYDRA] Click event path - found clickedField:', !!clickedField);
+      log('Click event path - found clickedField:', !!clickedField);
       if (clickedField && this.fieldBelongsToBlock(clickedField, blockElement)) {
         fieldToFocus = clickedField.getAttribute('data-editable-field');
-        console.log('[HYDRA] Got field from click:', fieldToFocus);
+        log('Got field from click:', fieldToFocus);
       }
     }
 
     // If no clicked field found, use the first editable field that belongs to THIS block
     if (!fieldToFocus) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
-      console.log('[HYDRA] querySelector path - found:', !!firstEditableField);
+      log('querySelector path - found:', !!firstEditableField);
       if (firstEditableField) {
         fieldToFocus = firstEditableField.getAttribute('data-editable-field');
-        console.log('[HYDRA] Got field from querySelector:', fieldToFocus);
+        log('Got field from querySelector:', fieldToFocus);
       }
     }
 
     // Update focusedFieldName and recreate toolbar if field changed
     if (fieldToFocus !== this.focusedFieldName) {
-      console.log('[HYDRA] Updating focusedFieldName from', this.focusedFieldName, 'to', fieldToFocus);
+      log('Updating focusedFieldName from', this.focusedFieldName, 'to', fieldToFocus);
       this.focusedFieldName = fieldToFocus;
 
       // Send BLOCK_SELECTED message to update toolbar visibility
@@ -848,7 +854,7 @@ export class Bridge {
         // Get parent from blockPathMap
         const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
         const parentId = pathInfo?.parentId || null;
-        console.log('[HYDRA] Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
+        log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
 
         if (parentId) {
           // Select the parent block
@@ -879,10 +885,10 @@ export class Bridge {
    * @param {boolean} processing - true to block input, false to unblock
    */
   setBlockProcessing(blockId, processing = true, requestId = null) {
-    console.log('[HYDRA] setBlockProcessing:', { blockId, processing, requestId });
+    log('setBlockProcessing:', { blockId, processing, requestId });
 
     if (processing) {
-      console.log('[HYDRA] BLOCKING input for', blockId);
+      log('BLOCKING input for', blockId);
       // Clear any existing buffer when starting new blocking
       this.eventBuffer = [];
       this.blockedBlockId = blockId;
@@ -910,7 +916,7 @@ export class Bridge {
               shiftKey: e.shiftKey,
               altKey: e.altKey,
             });
-            console.log('[HYDRA] BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+            log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
           }
           e.preventDefault();
           e.stopPropagation();
@@ -937,7 +943,7 @@ export class Bridge {
         requestId: requestId,
       };
     } else {
-      console.log('[HYDRA] UNBLOCKING input for', blockId);
+      log('UNBLOCKING input for', blockId);
 
       // Clear blocked state
       this.blockedBlockId = null;
@@ -960,7 +966,7 @@ export class Bridge {
           buffer: [...this.eventBuffer],
         };
         this.eventBuffer = [];
-        console.log('[HYDRA] Marked', this.pendingBufferReplay.buffer.length, 'events for replay after DOM ready');
+        log('Marked', this.pendingBufferReplay.buffer.length, 'events for replay after DOM ready');
       }
     }
   }
@@ -977,7 +983,7 @@ export class Bridge {
     const { blockId, buffer } = this.pendingBufferReplay;
     this.pendingBufferReplay = null;
 
-    console.log('[HYDRA] Replaying', buffer.length, 'buffered events');
+    log('Replaying', buffer.length, 'buffered events');
 
     // Re-query editable field in case DOM was re-rendered
     const currentBlock = document.querySelector(`[data-block-uid="${blockId}"]`);
@@ -1017,7 +1023,7 @@ export class Bridge {
         selection.removeAllRanges();
         selection.addRange(range);
 
-        console.log('[HYDRA] Inserted buffered text:', textToInsert);
+        log('Inserted buffered text:', textToInsert);
 
         // Manually trigger text change handler since insertNode creates a childList mutation
         // but our MutationObserver only watches for characterData mutations
@@ -1220,13 +1226,13 @@ export class Bridge {
       if (current.hasAttribute('data-node-id')) {
         const nodeId = current.getAttribute('data-node-id');
         const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
-        console.log('[HYDRA] getElementPath: Found node-id', nodeId, '-> path:', parts);
+        log('getElementPath: Found node-id', nodeId, '-> path:', parts);
         return parts;
       }
       if (current.hasAttribute('data-editable-field')) {
         // Reached the container without finding a node-id
         // For empty containers, return [0] (first paragraph)
-        console.log('[HYDRA] getElementPath: Reached container, returning [0]');
+        log('getElementPath: Reached container, returning [0]');
         return [0];
       }
       current = current.parentElement;
@@ -1331,7 +1337,7 @@ export class Bridge {
     const blockType = blockData?.['@type'];
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     const editableFields = this.getOwnEditableFields(blockElement);
-    console.log(`[HYDRA] restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
+    log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
     editableFields.forEach((field) => {
       const fieldName = field.getAttribute('data-editable-field');
       const fieldType = blockTypeFields[fieldName];
@@ -1339,9 +1345,9 @@ export class Bridge {
       // Only set contenteditable for string, textarea, and slate fields
       if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
         field.setAttribute('contenteditable', 'true');
-        console.log(`[HYDRA]   ${fieldName}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+        log(`  ${fieldName}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
       } else {
-        console.log(`[HYDRA]   ${fieldName}: skipped (type: ${fieldType})`);
+        log(`  ${fieldName}: skipped (type: ${fieldType})`);
       }
     });
   }
@@ -1365,7 +1371,7 @@ export class Bridge {
       if (el.textContent === '' && el.childNodes.length === 0) {
         // Insert zero-width no-break space for cursor positioning
         el.appendChild(document.createTextNode('\uFEFF'));
-        console.log('[HYDRA] Added ZWS to empty inline element:', el.tagName, el.getAttribute('data-node-id'));
+        log('Added ZWS to empty inline element:', el.tagName, el.getAttribute('data-node-id'));
       }
 
       // Also ensure there's a text node AFTER inline elements for cursor exit
@@ -1375,7 +1381,7 @@ export class Bridge {
         // No text node after inline element - add ZWS so cursor can exit
         const zws = document.createTextNode('\uFEFF');
         el.parentNode.insertBefore(zws, el.nextSibling);
-        console.log('[HYDRA] Added ZWS after inline element for cursor exit:', el.tagName, el.getAttribute('data-node-id'));
+        log('Added ZWS after inline element for cursor exit:', el.tagName, el.getAttribute('data-node-id'));
       }
     });
   }
@@ -1470,7 +1476,7 @@ export class Bridge {
     for (const textNode of nodesToUpdate) {
       const newText = textNode.textContent.replace(/[\uFEFF\u200B]/g, '');
       if (newText !== textNode.textContent) {
-        console.log('[HYDRA] stripZeroWidthSpacesFromDOM: Stripping ZWS from:', JSON.stringify(textNode.textContent), '→', JSON.stringify(newText));
+        log('stripZeroWidthSpacesFromDOM: Stripping ZWS from:', JSON.stringify(textNode.textContent), '→', JSON.stringify(newText));
         textNode.textContent = newText;
       }
     }
@@ -1542,7 +1548,7 @@ export class Bridge {
       const leftChanged = Math.abs(currentRect.left - this._lastBlockRect.left) > 1;
 
       if (topChanged || leftChanged) {
-        console.log('[HYDRA] Block position changed after re-render, updating toolbar');
+        log('Block position changed after re-render, updating toolbar');
         shouldSendBlockSelected = true;
       }
     }
@@ -1578,7 +1584,7 @@ export class Bridge {
    */
   selectBlock(blockElement) {
     const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
-    console.log('[HYDRA] selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
+    log('selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
     if (!blockElement) return;
 
     const blockUid = blockElement.getAttribute('data-block-uid');
@@ -1631,7 +1637,7 @@ export class Bridge {
           element._enterKeyHandler = (e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
-              console.log('[HYDRA] Prevented Enter key in string field');
+              log('Prevented Enter key in string field');
             }
           };
           element.addEventListener('keydown', element._enterKeyHandler);
@@ -1707,7 +1713,7 @@ export class Bridge {
       const clickedField = clickedElement.closest('[data-editable-field]');
       if (clickedField) {
         this.focusedFieldName = clickedField.getAttribute('data-editable-field');
-        console.log('[HYDRA] Detected focused field from click:', this.focusedFieldName);
+        log('Detected focused field from click:', this.focusedFieldName);
       }
     }
 
@@ -1716,10 +1722,10 @@ export class Bridge {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-editable-field');
-        console.log('[HYDRA] Set focusedFieldName to first editable field:', this.focusedFieldName);
+        log('Set focusedFieldName to first editable field:', this.focusedFieldName);
       } else {
         // No editable fields in this block (e.g., image blocks or container blocks)
-        console.log('[HYDRA] No editable fields found, focusedFieldName remains null');
+        log('No editable fields found, focusedFieldName remains null');
       }
     }
 
@@ -1741,7 +1747,7 @@ export class Bridge {
       addDirection, // Direction for add button positioning
     };
 
-    console.log('[HYDRA] Block selected, sending UI messages:', {
+    log('Block selected, sending UI messages:', {
       blockUid,
       focusedFieldName: this.focusedFieldName,
       editableFields,
@@ -1765,7 +1771,7 @@ export class Bridge {
       this.selectionChangeListener = () => {
         const selection = window.getSelection();
         const offset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : -1;
-        console.log('[HYDRA] selectionchange fired, cursor offset:', offset);
+        log('selectionchange fired, cursor offset:', offset);
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
           this.savedSelection = this.serializeSelection();
@@ -1787,11 +1793,11 @@ export class Bridge {
               JSON.stringify(expected.focus) === JSON.stringify(current.focus);
             if (matches) {
               // Same selection as Admin sent - this is the restore, suppress it
-              console.log('[HYDRA] Selection matches Admin restore - not sending back');
+              log('Selection matches Admin restore - not sending back');
               return;
             } else {
               // Different selection - user moved cursor/selected text, clear expected
-              console.log('[HYDRA] Selection differs from Admin restore - user action');
+              log('Selection differs from Admin restore - user action');
               this.expectedSelectionFromAdmin = null;
             }
           }
@@ -1825,7 +1831,7 @@ export class Bridge {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const currentBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-        console.log('[HYDRA] selectBlock focus handler:', { blockUid: this.selectedBlockUid, found: !!currentBlockElement });
+        log('selectBlock focus handler:', { blockUid: this.selectedBlockUid, found: !!currentBlockElement });
 
         if (currentBlockElement) {
           // Detect which field should be focused if needed, and update toolbar
@@ -1853,7 +1859,7 @@ export class Bridge {
           if (contentEditableField) {
             const fieldBlockElement = contentEditableField.closest('[data-block-uid]');
             if (fieldBlockElement !== currentBlockElement) {
-              console.log('[HYDRA] selectBlock: editable field belongs to nested block, skipping focus');
+              log('selectBlock: editable field belongs to nested block, skipping focus');
               contentEditableField = null;
             }
           }
@@ -1868,20 +1874,20 @@ export class Bridge {
               // Only call focus if not already focused
               // Calling focus() on already-focused element can disrupt cursor position
               const isAlreadyFocused = document.activeElement === contentEditableField;
-              console.log('[HYDRA] selectBlock focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName, contentEditableField: contentEditableField.tagName });
+              log('selectBlock focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName, contentEditableField: contentEditableField.tagName });
               if (!isAlreadyFocused) {
-                console.log('[HYDRA] selectBlock calling focus() on field');
+                log('selectBlock calling focus() on field');
                 // Use preventScroll when reselecting same block to avoid scroll-back bug
                 // (user may have scrolled the block off screen intentionally)
                 contentEditableField.focus({ preventScroll: this._isReselectingSameBlock });
               } else {
-                console.log('[HYDRA] selectBlock skipping focus() - already focused');
+                log('selectBlock skipping focus() - already focused');
               }
 
               // If field was already editable, browser already handled cursor positioning
               // on click - don't redo it (causes race with typing)
               if (wasAlreadyEditable) {
-                console.log('[HYDRA] Field already editable, trusting browser click positioning');
+                log('Field already editable, trusting browser click positioning');
                 this.lastClickEvent = null;
               } else if (this.lastClickEvent) {
                 // Field just became editable - need to position cursor
@@ -1913,12 +1919,12 @@ export class Bridge {
               }
             } else {
               // No lastClickEvent, just log that we skipped cursor positioning
-              console.log('[HYDRA] No lastClickEvent, skipping cursor positioning');
+              log('No lastClickEvent, skipping cursor positioning');
             }
           } else {
             // Not an editable field type, clear click event if any
             if (this.lastClickEvent) {
-              console.log('[HYDRA] Non-editable field type, clearing lastClickEvent');
+              log('Non-editable field type, clearing lastClickEvent');
               this.lastClickEvent = null;
             }
           }
@@ -1934,7 +1940,7 @@ export class Bridge {
               focusedFieldName: pendingFocusedFieldName,
               selection: serializedSelection,
             });
-            console.log('[HYDRA] Sent BLOCK_SELECTED with selection:', { blockUid: pendingBlockUid, selection: serializedSelection });
+            log('Sent BLOCK_SELECTED with selection:', { blockUid: pendingBlockUid, selection: serializedSelection });
           }
         }
       });
@@ -1949,32 +1955,32 @@ export class Bridge {
    * @param {HTMLElement} triggerElement - The element that was clicked
    */
   handleBlockSelector(selector, triggerElement) {
-    console.log('[HYDRA] handleBlockSelector:', selector, 'trigger:', triggerElement.className);
+    log('handleBlockSelector:', selector, 'trigger:', triggerElement.className);
     let targetUid;
 
     if (selector === '+1' || selector === '-1') {
       // Find sibling relative to current block or the container
       const containerBlock = triggerElement.closest('[data-block-uid]');
       if (!containerBlock) {
-        console.log('[HYDRA] handleBlockSelector: no container found');
+        log('handleBlockSelector: no container found');
         return;
       }
       const containerUid = containerBlock.getAttribute('data-block-uid');
-      console.log('[HYDRA] handleBlockSelector: container =', containerUid);
+      log('handleBlockSelector: container =', containerUid);
 
       // Get all nested blocks whose immediate parent container is this one
       // (i.e., blocks directly owned by this container, not deeply nested)
       const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
-      console.log('[HYDRA] handleBlockSelector: allNestedBlocks =', allNestedBlocks.length);
+      log('handleBlockSelector: allNestedBlocks =', allNestedBlocks.length);
       const childBlocks = Array.from(allNestedBlocks).filter((el) => {
         // Check that this block's parent container is our container
         const parentContainer = el.parentElement?.closest('[data-block-uid]');
         return parentContainer?.getAttribute('data-block-uid') === containerUid;
       });
-      console.log('[HYDRA] handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
+      log('handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
 
       if (childBlocks.length === 0) {
-        console.log('[HYDRA] handleBlockSelector: no child blocks found');
+        log('handleBlockSelector: no child blocks found');
         return;
       }
 
@@ -2003,7 +2009,7 @@ export class Bridge {
       targetUid = selector;
     }
 
-    console.log('[HYDRA] handleBlockSelector: targetUid =', targetUid);
+    log('handleBlockSelector: targetUid =', targetUid);
     if (targetUid) {
       // Wait for the frontend's click handler to show/hide slides,
       // then select the block once it's visible
@@ -2011,13 +2017,13 @@ export class Bridge {
         const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
         if (targetElement && targetElement.offsetParent !== null) {
           // Block exists and is visible (offsetParent is null for hidden elements)
-          console.log('[HYDRA] handleBlockSelector: selecting', targetUid);
+          log('handleBlockSelector: selecting', targetUid);
           this.selectBlock(targetElement);
         } else if (retries > 0) {
           // Wait a bit for frontend to render/show the block
           setTimeout(() => waitForBlockAndSelect(retries - 1), 50);
         } else {
-          console.log('[HYDRA] handleBlockSelector: block not visible after retries', targetUid);
+          log('handleBlockSelector: block not visible after retries', targetUid);
         }
       };
       // Start after a short delay to let click event propagate to frontend
@@ -2103,7 +2109,7 @@ export class Bridge {
    * @param {Object} editableFields - Map of fieldName -> fieldType for editable fields in this block.
    */
   observeBlockResize(blockElement, blockUid, editableFields, skipInitialUpdate = false) {
-    console.log('[HYDRA] observeBlockResize called for block:', blockUid, 'skipInitialUpdate:', skipInitialUpdate);
+    log('observeBlockResize called for block:', blockUid, 'skipInitialUpdate:', skipInitialUpdate);
 
     // Skip if already observing the same block (by UID, not element reference)
     // ResizeObserver fires immediately when attached - recreating it causes spurious updates
@@ -2112,10 +2118,10 @@ export class Bridge {
       // Check if the old element is still in the DOM
       // If detached, we need to re-attach to the new element
       if (document.body.contains(this._observedBlockElement)) {
-        console.log('[HYDRA] observeBlockResize: already observing this block, skipping');
+        log('observeBlockResize: already observing this block, skipping');
         return;
       }
-      console.log('[HYDRA] observeBlockResize: old element detached, re-attaching to new element');
+      log('observeBlockResize: old element detached, re-attaching to new element');
     }
 
     // Clean up any existing observer
@@ -2135,19 +2141,19 @@ export class Bridge {
       // This preserves the pre-update position for comparison after re-render
     }
     this._observedBlockElement = blockElement;
-    console.log('[HYDRA] observeBlockResize initial rect:', { width: currentRect.width, height: currentRect.height });
+    log('observeBlockResize initial rect:', { width: currentRect.width, height: currentRect.height });
 
     this.blockResizeObserver = new ResizeObserver((entries) => {
-      console.log('[HYDRA] ResizeObserver callback fired for:', blockUid);
+      log('ResizeObserver callback fired for:', blockUid);
       // Only process if this is still the selected block
       if (this.selectedBlockUid !== blockUid) {
-        console.log('[HYDRA] ResizeObserver: block no longer selected, ignoring');
+        log('ResizeObserver: block no longer selected, ignoring');
         return;
       }
 
       // Skip if element was detached during re-render (getBoundingClientRect returns zeros)
       if (!entries[0]?.target?.isConnected) {
-        console.log('[HYDRA] ResizeObserver: element detached, ignoring');
+        log('ResizeObserver: element detached, ignoring');
         return;
       }
 
@@ -2162,7 +2168,7 @@ export class Bridge {
         const leftChanged = Math.abs(newRect.left - lastRect.left) > 1;
 
         if (widthChanged || heightChanged || topChanged || leftChanged) {
-          console.log('[HYDRA] Block size changed, updating selection outline:', blockUid,
+          log('Block size changed, updating selection outline:', blockUid,
             'old:', lastRect.top, lastRect.left, lastRect.width, lastRect.height,
             'new:', newRect.top, newRect.left, newRect.width, newRect.height);
 
@@ -2504,10 +2510,10 @@ export class Bridge {
         // Always clean up drop indicator on mouseup
         const dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
         if (dropIndicator) {
-          console.log('[HYDRA] Hiding drop indicator on mouseup');
+          log('Hiding drop indicator on mouseup');
           dropIndicator.style.display = 'none';
         } else {
-          console.log('[HYDRA] No drop indicator to hide on mouseup');
+          log('No drop indicator to hide on mouseup');
         }
 
         // Only allow drop if indicator was visible - this ensures all validation passed
@@ -2518,7 +2524,7 @@ export class Bridge {
 
           // Send MOVE_BLOCK message with all info needed for the move
           // Admin will handle the complex mutation (works for page-level and container blocks)
-          console.log('[HYDRA] DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+          log('DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
           window.parent.postMessage(
             {
               type: 'MOVE_BLOCK',
@@ -2532,7 +2538,7 @@ export class Bridge {
             this.adminOrigin,
           );
         } else if (closestBlockUid && !dropIndicatorVisible) {
-          console.log('[HYDRA] DnD: Drop rejected - indicator was not visible (block type not allowed in target)');
+          log('DnD: Drop rejected - indicator was not visible (block type not allowed in target)');
         }
       };
 
@@ -2604,7 +2610,7 @@ export class Bridge {
         if (blockElement && !this.isElementHidden(blockElement)) {
           // Skip if this block was already selected - no need to re-select
           if (alreadySelected) {
-            console.log('[HYDRA] SELECT_BLOCK: block already selected, skipping:', uid);
+            log('SELECT_BLOCK: block already selected, skipping:', uid);
             return;
           }
 
@@ -2650,7 +2656,7 @@ export class Bridge {
         } else {
           // Block element not found - content may not be rendered yet
           // Retry after a short delay (happens on initial page load)
-          console.log('[HYDRA] Block element not found for SELECT_BLOCK, retrying in 100ms:', uid);
+          log('Block element not found for SELECT_BLOCK, retrying in 100ms:', uid);
           setTimeout(() => {
             // Re-trigger the same SELECT_BLOCK message
             window.postMessage(
@@ -2673,7 +2679,7 @@ export class Bridge {
           `[data-block-uid="${uid}"]`,
         );
         if (blockElement) {
-          console.log('[HYDRA] Block element found on retry, selecting:', uid);
+          log('Block element found on retry, selecting:', uid);
           this.selectBlock(blockElement);
         } else {
           console.warn('[HYDRA] Block element still not found after retry:', uid);
@@ -2806,7 +2812,7 @@ export class Bridge {
         // cleanHtmlForClipboard only cleans within [data-editable-field] elements
         const cleanHtml = this.cleanHtmlForClipboard(range.cloneContents());
 
-        console.log('[HYDRA] Copy event - cleaning clipboard');
+        log('Copy event - cleaning clipboard');
         e.preventDefault();
         e.clipboardData.setData('text/plain', cleanText);
         e.clipboardData.setData('text/html', cleanHtml);
@@ -2818,7 +2824,7 @@ export class Bridge {
         // to prevent native formatting from conflicting with Slate-based formatting
         const nativeFormattingKeys = ['b', 'i', 'u', 's'];
         if ((e.ctrlKey || e.metaKey) && nativeFormattingKeys.includes(e.key.toLowerCase())) {
-          console.log('[HYDRA] Suppressing native formatting for:', e.key);
+          log('Suppressing native formatting for:', e.key);
           e.preventDefault();
         }
 
@@ -2862,7 +2868,7 @@ export class Bridge {
 
         // Handle Undo (Ctrl+Z / Cmd+Z)
         if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-          console.log('[HYDRA] Undo detected');
+          log('Undo detected');
           e.preventDefault();
 
           // Small delay to ensure any pending updates are processed
@@ -2872,14 +2878,14 @@ export class Bridge {
               type: 'SLATE_UNDO_REQUEST',
               blockId: blockUid,
             });
-            console.log('[HYDRA] SLATE_UNDO_REQUEST message sent');
+            log('SLATE_UNDO_REQUEST message sent');
           }, 50);
           return;
         }
 
         // Handle Redo (Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y)
         if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
-          console.log('[HYDRA] Redo detected');
+          log('Redo detected');
           e.preventDefault();
 
           // Small delay to ensure any pending updates are processed
@@ -2889,7 +2895,7 @@ export class Bridge {
               type: 'SLATE_REDO_REQUEST',
               blockId: blockUid,
             });
-            console.log('[HYDRA] SLATE_REDO_REQUEST message sent');
+            log('SLATE_REDO_REQUEST message sent');
           }, 50);
           return;
         }
@@ -2901,7 +2907,7 @@ export class Bridge {
           // Strip ZWS characters before writing to clipboard
           const cleanText = this.stripZeroWidthSpaces(selectedText);
           if (cleanText !== selectedText) {
-            console.log('[HYDRA] Copy - stripping ZWS from clipboard');
+            log('Copy - stripping ZWS from clipboard');
             e.preventDefault();
             navigator.clipboard.writeText(cleanText).catch(err => {
               console.error('[HYDRA] Failed to write to clipboard:', err);
@@ -2913,7 +2919,7 @@ export class Bridge {
 
         // Handle Cut (Ctrl+X / Cmd+X)
         if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-          console.log('[HYDRA] Cut shortcut detected');
+          log('Cut shortcut detected');
           e.preventDefault();
 
           // Get selected text and copy to clipboard
@@ -2921,12 +2927,12 @@ export class Bridge {
           const selectedText = selection.toString();
           // Strip ZWS characters before writing to clipboard
           const cleanText = this.stripZeroWidthSpaces(selectedText);
-          console.log('[HYDRA] Cut text:', cleanText);
+          log('Cut text:', cleanText);
 
           if (cleanText) {
             // Write to clipboard
             navigator.clipboard.writeText(cleanText).then(() => {
-              console.log('[HYDRA] Text written to clipboard');
+              log('Text written to clipboard');
               // Cut is just delete with clipboard - send delete request
               this.sendTransformRequest(blockUid, 'delete', {});
             }).catch(err => {
@@ -2938,12 +2944,12 @@ export class Bridge {
 
         // Handle Paste (Ctrl+V / Cmd+V)
         if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-          console.log('[HYDRA] Paste shortcut detected');
+          log('Paste shortcut detected');
           e.preventDefault();
 
           // Read from clipboard then send transform request
           navigator.clipboard.readText().then(text => {
-            console.log('[HYDRA] Clipboard text:', text);
+            log('Clipboard text:', text);
 
             // Send paste request with current form data included
             this.sendTransformRequest(blockUid, 'paste', {
@@ -2957,9 +2963,9 @@ export class Bridge {
 
         // Handle Enter key to create new block
         if (e.key === 'Enter' && !e.shiftKey) {
-          console.log('[HYDRA] Enter key detected (no Shift)');
+          log('Enter key detected (no Shift)');
           const selection = window.getSelection();
-          console.log('[HYDRA] Selection rangeCount:', selection.rangeCount);
+          log('Selection rangeCount:', selection.rangeCount);
           if (!selection.rangeCount) return;
 
           const range = selection.getRangeAt(0);
@@ -2969,10 +2975,10 @@ export class Bridge {
           const parentElement =
             node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
           const hasNodeId = parentElement?.closest('[data-node-id]');
-          console.log('[HYDRA] Has data-node-id?', !!hasNodeId);
+          log('Has data-node-id?', !!hasNodeId);
 
           if (hasNodeId) {
-            console.log('[HYDRA] Preventing default Enter and sending transform request for block:', blockUid);
+            log('Preventing default Enter and sending transform request for block:', blockUid);
             e.preventDefault(); // Block the default Enter behavior
 
             // Send enter request with current form data included
@@ -3023,7 +3029,7 @@ export class Bridge {
    * @param {HTMLElement} blockElement - The block element to observe.
    */
   observeBlockTextChanges(blockElement) {
-    console.log('[HYDRA] observeBlockTextChanges called for block:', blockElement.getAttribute('data-block-uid'));
+    log('observeBlockTextChanges called for block:', blockElement.getAttribute('data-block-uid'));
     if (this.blockTextMutationObserver) {
       this.blockTextMutationObserver.disconnect();
     }
@@ -3094,31 +3100,31 @@ export class Bridge {
    * @returns {boolean} True if a selector was clicked (block may now be visible)
    */
   tryMakeBlockVisible(targetUid) {
-    console.log(`[HYDRA] tryMakeBlockVisible: ${targetUid}`);
+    log(`tryMakeBlockVisible: ${targetUid}`);
     // First, try direct selector: data-block-selector="{targetUid}"
     const directSelector = document.querySelector(
       `[data-block-selector="${targetUid}"]`,
     );
     if (directSelector) {
-      console.log(`[HYDRA] tryMakeBlockVisible: found direct selector for ${targetUid}`);
+      log(`tryMakeBlockVisible: found direct selector for ${targetUid}`);
       directSelector.click();
       return true;
     }
 
     // No direct selector - try +1/-1 navigation
-    console.log(`[HYDRA] tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
+    log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
 
     // Find the target element first (may exist but be hidden)
     const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
     if (!targetElement) {
-      console.log(`[HYDRA] tryMakeBlockVisible: target element not in DOM`);
+      log(`tryMakeBlockVisible: target element not in DOM`);
       return false;
     }
 
     // Find the container block (parent with data-block-uid)
     const containerBlock = targetElement.parentElement?.closest('[data-block-uid]');
     if (!containerBlock) {
-      console.log(`[HYDRA] tryMakeBlockVisible: no container block found`);
+      log(`tryMakeBlockVisible: no container block found`);
       return false;
     }
     const containerUid = containerBlock.getAttribute('data-block-uid');
@@ -3126,36 +3132,36 @@ export class Bridge {
     // Find siblings by looking at the direct parent (which may be a wrapper div like .slides-wrapper)
     const directParent = targetElement.parentElement;
     if (!directParent) {
-      console.log(`[HYDRA] tryMakeBlockVisible: no parent element`);
+      log(`tryMakeBlockVisible: no parent element`);
       return false;
     }
 
     const siblings = Array.from(
       directParent.querySelectorAll(':scope > [data-block-uid]'),
     );
-    console.log(`[HYDRA] tryMakeBlockVisible: found ${siblings.length} siblings in container ${containerUid}`);
+    log(`tryMakeBlockVisible: found ${siblings.length} siblings in container ${containerUid}`);
 
     const targetIndex = siblings.findIndex(
       (el) => el.getAttribute('data-block-uid') === targetUid,
     );
     if (targetIndex === -1) {
-      console.log(`[HYDRA] tryMakeBlockVisible: target not in siblings`);
+      log(`tryMakeBlockVisible: target not in siblings`);
       return false;
     }
 
     // Find the currently visible sibling
     const currentIndex = siblings.findIndex((el) => !this.isElementHidden(el));
     const currentUid = currentIndex >= 0 ? siblings[currentIndex].getAttribute('data-block-uid') : null;
-    console.log(`[HYDRA] tryMakeBlockVisible: currentIndex=${currentIndex} (${currentUid}), targetIndex=${targetIndex}`);
+    log(`tryMakeBlockVisible: currentIndex=${currentIndex} (${currentUid}), targetIndex=${targetIndex}`);
 
     if (currentIndex === -1) {
-      console.log(`[HYDRA] tryMakeBlockVisible: no visible sibling`);
+      log(`tryMakeBlockVisible: no visible sibling`);
       return false;
     }
 
     const stepsNeeded = targetIndex - currentIndex;
     if (stepsNeeded === 0) {
-      console.log(`[HYDRA] tryMakeBlockVisible: already at target`);
+      log(`tryMakeBlockVisible: already at target`);
       return false;
     }
 
@@ -3173,7 +3179,7 @@ export class Bridge {
       `[data-block-selector="${currentUid}:${direction}"]`,
     );
     if (explicitSelector) {
-      console.log(`[HYDRA] tryMakeBlockVisible: found explicit selector ${currentUid}:${direction}`);
+      log(`tryMakeBlockVisible: found explicit selector ${currentUid}:${direction}`);
       selector = explicitSelector;
     } else {
       // Try simple format: selector must be inside the container
@@ -3181,13 +3187,13 @@ export class Bridge {
         `[data-block-selector="${direction}"]`,
       );
       if (simpleSelector) {
-        console.log(`[HYDRA] tryMakeBlockVisible: found simple selector ${direction} inside container`);
+        log(`tryMakeBlockVisible: found simple selector ${direction} inside container`);
         selector = simpleSelector;
       }
     }
 
     if (!selector) {
-      console.log(`[HYDRA] tryMakeBlockVisible: no ${direction} selector found`);
+      log(`tryMakeBlockVisible: no ${direction} selector found`);
       return false;
     }
 
@@ -3195,7 +3201,7 @@ export class Bridge {
     const nextIndex = currentIndex + (stepsNeeded > 0 ? 1 : -1);
     const nextBlock = siblings[nextIndex];
     const nextUid = nextBlock?.getAttribute('data-block-uid');
-    console.log(`[HYDRA] tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
+    log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
 
     // Click once
     selector.click();
@@ -3206,18 +3212,18 @@ export class Bridge {
       for (let i = 0; i < 10; i++) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         if (nextBlock && !this.isElementHidden(nextBlock)) {
-          console.log(`[HYDRA] tryMakeBlockVisible: ${nextUid} is now visible`);
+          log(`tryMakeBlockVisible: ${nextUid} is now visible`);
           // Check if we've reached the target
           if (nextUid === targetUid) {
-            console.log(`[HYDRA] tryMakeBlockVisible: reached target ${targetUid}`);
+            log(`tryMakeBlockVisible: reached target ${targetUid}`);
             return true;
           }
           // Need more clicks - recurse
-          console.log(`[HYDRA] tryMakeBlockVisible: not at target yet, continuing navigation`);
+          log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
           return this.tryMakeBlockVisible(targetUid);
         }
       }
-      console.log(`[HYDRA] tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible`);
+      log(`tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible`);
       return false;
     };
 
@@ -3566,7 +3572,7 @@ export class Bridge {
       selection?.removeAllRanges();
       selection?.addRange(range);
 
-      console.log('[HYDRA] Selection set, verifying:', {
+      log('Selection set, verifying:', {
         anchorNode: selection?.anchorNode?.nodeName,
         anchorOffset: selection?.anchorOffset,
         anchorParent: selection?.anchorNode?.parentElement?.tagName,
@@ -3608,7 +3614,7 @@ export class Bridge {
         const zwsPattern = /^[\uFEFF\u200B]+$/;
         if (offset === 0 && zwsPattern.test(textNode.textContent)) {
           offset = textNode.textContent.length;
-          console.log('[HYDRA] findTextNodeAndOffset: ZWS node detected, positioning after ZWS, offset:', offset);
+          log('findTextNodeAndOffset: ZWS node detected, positioning after ZWS, offset:', offset);
         }
         return { node: textNode, offset };
       }
@@ -3691,7 +3697,7 @@ export class Bridge {
     const adjustOffsetForZWS = (textNode, requestedOffset) => {
       const zwsPattern = /^[\uFEFF\u200B]+$/;
       if (requestedOffset === 0 && zwsPattern.test(textNode.textContent)) {
-        console.log('[HYDRA] findTextNodeInChild: ZWS node detected, positioning after ZWS');
+        log('findTextNodeInChild: ZWS node detected, positioning after ZWS');
         return textNode.textContent.length;
       }
       return Math.min(requestedOffset, textNode.textContent.length);
@@ -3760,7 +3766,7 @@ export class Bridge {
     // Text nodes don't have nodeIds in the DOM - only element nodes do
     // Also return the child index so we can calculate absolute offset
     if (node.hasOwnProperty('text') && parentNode && parentNode.nodeId) {
-      console.log('[HYDRA] Path points to text node at index', lastIndex, 'using parent nodeId:', parentNode.nodeId);
+      log('Path points to text node at index', lastIndex, 'using parent nodeId:', parentNode.nodeId);
       return {
         nodeId: parentNode.nodeId,
         textChildIndex: lastIndex,
@@ -3912,7 +3918,7 @@ export class Bridge {
       ...transformFields,
     }, this.adminOrigin);
 
-    console.log(`[HYDRA] SLATE_TRANSFORM_REQUEST (${transformType}) sent with data, requestId:`, requestId);
+    log(`SLATE_TRANSFORM_REQUEST (${transformType}) sent with data, requestId:`, requestId);
     return requestId;
   }
 
@@ -3963,7 +3969,7 @@ export class Bridge {
         ? mutatedNodeParent
         : target.closest('[data-node-id]');
       if (!closestNode) {
-        console.log('[HYDRA] Slate field but no data-node-id found!');
+        log('Slate field but no data-node-id found!');
         return;
       }
 
@@ -4694,13 +4700,13 @@ let bridgeInstance = null;
 export function initBridge(adminOrigin, options = {}) {
   // 1. Explicit parameter (highest priority)
   if (adminOrigin) {
-    console.log('[HYDRA] Using explicit admin origin:', adminOrigin);
+    log('Using explicit admin origin:', adminOrigin);
   }
   // 2. Auto-detect from referrer (most secure)
   else if (document.referrer) {
     try {
       adminOrigin = new URL(document.referrer).origin;
-      console.log('[HYDRA] Auto-detected admin origin from referrer:', adminOrigin);
+      log('Auto-detected admin origin from referrer:', adminOrigin);
     } catch (e) {
       console.error('[HYDRA] Failed to parse referrer URL:', e);
     }
