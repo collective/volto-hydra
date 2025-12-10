@@ -233,6 +233,59 @@ export class Bridge {
     return addDirection;
   }
 
+  /**
+   * Centralized method to send BLOCK_SELECTED message to Admin UI.
+   * Ensures all required fields are always present.
+   *
+   * @param {string} src - Source identifier for debugging (e.g., 'selectBlock', 'resizeObserver')
+   * @param {HTMLElement|null} blockElement - The block element (null for deselection)
+   * @param {Object} options - Optional overrides
+   * @param {string} [options.focusedFieldName] - Override focused field name
+   * @param {Object} [options.selection] - Serialized selection to include
+   */
+  sendBlockSelected(src, blockElement, options = {}) {
+    if (!blockElement) {
+      // Deselection case - send null values
+      this.sendMessageToParent({
+        type: 'BLOCK_SELECTED',
+        src,
+        blockUid: null,
+        rect: null,
+      }, this.adminOrigin);
+      return;
+    }
+
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const rect = blockElement.getBoundingClientRect();
+    const editableFields = this.getEditableFields(blockElement);
+    const addDirection = this.getAddDirection(blockElement);
+    const focusedFieldName = options.focusedFieldName !== undefined
+      ? options.focusedFieldName
+      : this.focusedFieldName;
+
+    const message = {
+      type: 'BLOCK_SELECTED',
+      src,
+      blockUid,
+      rect: {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      },
+      editableFields,
+      focusedFieldName,
+      addDirection,
+    };
+
+    // Include selection if provided
+    if (options.selection !== undefined) {
+      message.selection = options.selection;
+    }
+
+    window.parent.postMessage(message, this.adminOrigin);
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Bridge Class Initialization and Navigation Event Handling
   ////////////////////////////////////////////////////////////////////////////////
@@ -393,24 +446,7 @@ export class Bridge {
                 // Send BLOCK_SELECTED message to update toolbar visibility
                 const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
                 if (blockElement) {
-                  const rect = blockElement.getBoundingClientRect();
-                  const editableFields = this.getEditableFields(blockElement);
-                  window.parent.postMessage(
-                    {
-                      type: 'BLOCK_SELECTED',
-                      src: 'fieldFocusListener',
-                      blockUid,
-                      rect: {
-                        top: rect.top,
-                        left: rect.left,
-                        width: rect.width,
-                        height: rect.height,
-                      },
-                      editableFields,
-                      focusedFieldName: editableField, // Send field name so toolbar knows which field to sync
-                    },
-                    this.adminOrigin,
-                  );
+                  this.sendBlockSelected('fieldFocusListener', blockElement, { focusedFieldName: editableField });
                 }
               }
             }
@@ -516,23 +552,7 @@ export class Bridge {
                     // Skip for sidebar edits - rect doesn't change and sending causes toolbar redraws
                     if (event.data.transformedSelection) {
                       // Send updated rect to admin so toolbar follows the block
-                      const rect = blockElement.getBoundingClientRect();
-                      window.parent.postMessage(
-                        {
-                          type: 'BLOCK_SELECTED',
-                          src: 'formDataHandler',
-                          blockUid: this.selectedBlockUid,
-                          rect: {
-                            top: rect.top,
-                            left: rect.left,
-                            width: rect.width,
-                            height: rect.height,
-                          },
-                          editableFields,
-                          focusedFieldName: this.focusedFieldName,
-                        },
-                        this.adminOrigin,
-                      );
+                      this.sendBlockSelected('formDataHandler', blockElement);
 
                       // Reposition drag button to follow the block
                       if (this.dragHandlePositioner) {
@@ -737,24 +757,7 @@ export class Bridge {
       // Send BLOCK_SELECTED message to update toolbar visibility
       const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
       if (blockElement) {
-        const rect = blockElement.getBoundingClientRect();
-        const editableFields = this.getEditableFields(blockElement);
-        window.parent.postMessage(
-          {
-            type: 'BLOCK_SELECTED',
-            src: 'detectFieldChange',
-            blockUid,
-            rect: {
-              top: rect.top,
-              left: rect.left,
-              width: rect.width,
-              height: rect.height,
-            },
-            editableFields, // Map of fieldName -> fieldType from DOM
-            focusedFieldName: fieldToFocus, // Send field name so toolbar knows which field to sync
-          },
-          this.adminOrigin,
-        );
+        this.sendBlockSelected('detectFieldChange', blockElement, { focusedFieldName: fieldToFocus });
       }
     }
   }
@@ -856,11 +859,7 @@ export class Bridge {
         } else {
           // No parent - deselect by sending BLOCK_SELECTED with null
           this.selectedBlockUid = null;
-          this.sendMessageToParent({
-            type: 'BLOCK_SELECTED',
-            blockUid: null,
-            rect: null,
-          }, this.adminOrigin);
+          this.sendBlockSelected('escapeKey', null);
         }
       };
       document.addEventListener('keydown', this._escapeKeyHandler, true);
@@ -1549,21 +1548,7 @@ export class Bridge {
     }
 
     if (shouldSendBlockSelected) {
-      window.parent.postMessage(
-        {
-          type: 'BLOCK_SELECTED',
-          src: 'updateBlockUIAfterFormData',
-          blockUid: this.selectedBlockUid,
-          rect: {
-            top: currentRect.top,
-            left: currentRect.left,
-            width: currentRect.width,
-            height: currentRect.height,
-          },
-          focusedFieldName: this.focusedFieldName,
-        },
-        this.adminOrigin,
-      );
+      this.sendBlockSelected('updateBlockUIAfterFormData', blockElement);
     }
 
     // Update _lastBlockRect for future comparisons
@@ -1941,30 +1926,15 @@ export class Bridge {
           // Now send BLOCK_SELECTED with selection - both arrive atomically
           // This prevents race conditions where toolbar gets new block but old selection
           if (this._pendingBlockSelected) {
-            // Recalculate rect from current DOM - FORM_DATA may have triggered a re-render
-            // that changed block dimensions (e.g., image loading) since we stored the rect
-            const currentRect = currentBlockElement.getBoundingClientRect();
             const serializedSelection = this.serializeSelection();
-            window.parent.postMessage(
-              {
-                type: 'BLOCK_SELECTED',
-                src: 'selectionChangeListener',
-                blockUid: this._pendingBlockSelected.blockUid,
-                rect: {
-                  top: currentRect.top,
-                  left: currentRect.left,
-                  width: currentRect.width,
-                  height: currentRect.height,
-                },
-                editableFields: this._pendingBlockSelected.editableFields,
-                focusedFieldName: this._pendingBlockSelected.focusedFieldName,
-                addDirection: this._pendingBlockSelected.addDirection,
-                selection: serializedSelection,
-              },
-              this.adminOrigin,
-            );
-            console.log('[HYDRA] Sent BLOCK_SELECTED with selection:', { blockUid: this._pendingBlockSelected.blockUid, addDirection: this._pendingBlockSelected.addDirection, selection: serializedSelection });
+            const pendingBlockUid = this._pendingBlockSelected.blockUid;
+            const pendingFocusedFieldName = this._pendingBlockSelected.focusedFieldName;
             this._pendingBlockSelected = null;
+            this.sendBlockSelected('selectionChangeListener', currentBlockElement, {
+              focusedFieldName: pendingFocusedFieldName,
+              selection: serializedSelection,
+            });
+            console.log('[HYDRA] Sent BLOCK_SELECTED with selection:', { blockUid: pendingBlockUid, selection: serializedSelection });
           }
         }
       });
@@ -2199,22 +2169,7 @@ export class Bridge {
           this._lastBlockRect = newRect;
 
           // Send updated BLOCK_SELECTED with new rect
-          window.parent.postMessage(
-            {
-              type: 'BLOCK_SELECTED',
-              src: 'resizeObserver',
-              blockUid,
-              rect: {
-                top: newRect.top,
-                left: newRect.left,
-                width: newRect.width,
-                height: newRect.height,
-              },
-              editableFields,
-              focusedFieldName: this.focusedFieldName,
-            },
-            this.adminOrigin,
-          );
+          this.sendBlockSelected('resizeObserver', blockElement);
         }
       }
     });
@@ -2604,6 +2559,11 @@ export class Bridge {
       // Handle SELECT_BLOCK - select a new block from Admin UI
       if (event.data.type === 'SELECT_BLOCK') {
         const { uid } = event.data;
+
+        // Check if already selected BEFORE updating selectedBlockUid
+        // This prevents ping-pong when Admin echoes back the selection from iframe click
+        const alreadySelected = this.selectedBlockUid === uid;
+
         this.selectedBlockUid = uid;
         // Don't update formData here - it's managed via FORM_DATA messages
         // Don't post FORM_DATA - form data syncing is handled separately
@@ -2642,6 +2602,12 @@ export class Bridge {
         }
 
         if (blockElement && !this.isElementHidden(blockElement)) {
+          // Skip if this block was already selected - no need to re-select
+          if (alreadySelected) {
+            console.log('[HYDRA] SELECT_BLOCK: block already selected, skipping:', uid);
+            return;
+          }
+
           !this.elementIsVisibleInViewport(blockElement) &&
             blockElement.scrollIntoView();
 
@@ -2745,25 +2711,7 @@ export class Bridge {
           );
 
           if (blockElement) {
-            const rect = blockElement.getBoundingClientRect();
-            const editableFields = this.getEditableFields(blockElement);
-
-            window.parent.postMessage(
-              {
-                type: 'BLOCK_SELECTED',
-                src: 'scrollHandler',
-                blockUid: this.selectedBlockUid,
-                rect: {
-                  top: rect.top,
-                  left: rect.left,
-                  width: rect.width,
-                  height: rect.height,
-                },
-                editableFields, // Map of fieldName -> fieldType from DOM
-                focusedFieldName: this.focusedFieldName, // Preserve field name for toolbar
-              },
-              this.adminOrigin,
-            );
+            this.sendBlockSelected('scrollHandler', blockElement);
           }
         }
       }, 150);
@@ -2784,25 +2732,7 @@ export class Bridge {
         );
 
         if (blockElement) {
-          const rect = blockElement.getBoundingClientRect();
-          const editableFields = this.getEditableFields(blockElement);
-
-          window.parent.postMessage(
-            {
-              type: 'BLOCK_SELECTED',
-              src: 'resizeHandler',
-              blockUid: this.selectedBlockUid,
-              rect: {
-                top: rect.top,
-                left: rect.left,
-                width: rect.width,
-                height: rect.height,
-              },
-              editableFields,
-              focusedFieldName: this.focusedFieldName,
-            },
-            this.adminOrigin,
-          );
+          this.sendBlockSelected('resizeHandler', blockElement);
         }
       }
     };
