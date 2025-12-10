@@ -8,9 +8,12 @@ export class AdminUIHelper {
     public readonly page: Page,
     public readonly adminUrl: string = 'http://localhost:3001'
   ) {
-    // Capture all browser console messages
+    // Capture browser console errors and warnings only (filter out verbose debug logs)
     this.page.on('console', (msg) => {
-      console.log(`[BROWSER] ${msg.text()}`);
+      const type = msg.type();
+      if (type === 'error' || type === 'warning') {
+        console.log(`[BROWSER ${type.toUpperCase()}] ${msg.text()}`);
+      }
     });
 
     // Capture page errors
