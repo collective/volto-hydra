@@ -1559,9 +1559,13 @@ const Iframe = (props) => {
             // Check if container is at maxLength
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
             if (pathInfo?.maxSiblings) {
-              // Count siblings in the same container
+              // Count siblings in the same container field
+              // Must match both parentId AND containerField (for multi-field containers like columns with top_images + columns)
               const siblingCount = Object.values(iframeSyncState.blockPathMap || {})
-                .filter((info) => info.parentId === pathInfo.parentId)
+                .filter((info) =>
+                  info.parentId === pathInfo.parentId &&
+                  info.containerField === pathInfo.containerField
+                )
                 .length;
               if (siblingCount >= pathInfo.maxSiblings) {
                 return null; // Don't show add button when at maxLength

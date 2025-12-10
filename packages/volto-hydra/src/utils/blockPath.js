@@ -49,7 +49,7 @@ function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (overrides restricted-based computation)
- * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, allowedSiblingTypes: Array|null, maxSiblings: number|null }
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, containerField: string|null, allowedSiblingTypes: Array|null, maxSiblings: number|null }
  *
  * Path format: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
  * This allows accessing: formData.blocks['columns-1'].columns['col-1'].blocks['text-1a']
@@ -73,8 +73,9 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
    * @param {string|null} parentId - Parent block's uid, or null for page-level
    * @param {Array|null} allowedBlocks - Allowed block types in this container (from parent's schema)
    * @param {number|null} maxLength - Maximum number of blocks allowed in this container
+   * @param {string|null} containerField - Name of the container field (e.g., 'columns', 'top_images', 'blocks')
    */
-  function traverse(blocksObj, layoutItems, currentPath, parentId, allowedBlocks = null, maxLength = null) {
+  function traverse(blocksObj, layoutItems, currentPath, parentId, allowedBlocks = null, maxLength = null, containerField = null) {
     if (!blocksObj || !layoutItems) return;
 
     layoutItems.forEach((blockId) => {
@@ -86,6 +87,7 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
       pathMap[blockId] = {
         path: blockPath,
         parentId: parentId,
+        containerField: containerField, // Which container field this block belongs to
         allowedSiblingTypes: allowedBlocks, // What types are allowed as siblings in this container
         maxSiblings: maxLength, // Maximum number of blocks allowed in this container
       };
@@ -114,6 +116,7 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
                 blockId,
                 fieldDef.allowedBlocks || null, // Pass allowedBlocks from schema
                 fieldDef.maxLength || null, // Pass maxLength from schema
+                fieldName, // Pass the container field name
               );
             }
           }
@@ -133,6 +136,7 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
           blockId,
           implicitAllowedBlocks,
           implicitMaxLength,
+          'blocks', // Implicit container field name
         );
       }
     });
@@ -141,7 +145,7 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
   // Start traversal from page-level blocks
   // Pass effectivePageAllowedBlocks so page-level blocks get the correct allowedSiblingTypes
   const pageLayoutItems = formData.blocks_layout?.items || [];
-  traverse(formData.blocks, pageLayoutItems, ['blocks'], null, effectivePageAllowedBlocks);
+  traverse(formData.blocks, pageLayoutItems, ['blocks'], null, effectivePageAllowedBlocks, null, 'blocks');
 
   return pathMap;
 }

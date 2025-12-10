@@ -2219,8 +2219,8 @@ test.describe('Container Block Drag and Drop', () => {
       columns1.locator(':scope > .columns-row > [data-block-uid]'),
     ).toHaveCount(2);
 
-    // Select col-2 (clicking navigates to parent if child is selected)
-    await helper.clickBlockInIframe('col-2');
+    // Select col-2 container (use clickContainerBlockInIframe to avoid hitting nested content)
+    await helper.clickContainerBlockInIframe('col-2');
 
     // The add button is in the Admin UI (not iframe), positioned next to selected block
     const addButton = page.locator('.volto-hydra-add-button');
