@@ -1565,7 +1565,6 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select first block in container
     await helper.clickBlockInIframe('text-1a');
-    await page.waitForTimeout(300);
 
     // Get drag handle and drag to after second block
     const dragHandle = await helper.getDragHandle();
@@ -1573,12 +1572,14 @@ test.describe('Container Block Drag and Drop', () => {
 
     await helper.dragBlockWithMouse(dragHandle, secondBlock, true); // Insert after
 
-    // Verify order changed within the container
-    const newBlocks = await col1.locator(':scope > [data-block-uid]').all();
-    const newFirstBlockUid = await newBlocks[0].getAttribute('data-block-uid');
-    const newSecondBlockUid = await newBlocks[1].getAttribute('data-block-uid');
+    // Wait for reorder to complete - first block should now be text-1b
+    await expect.poll(async () => {
+      const firstBlock = col1.locator(':scope > [data-block-uid]').first();
+      return await firstBlock.getAttribute('data-block-uid');
+    }, { timeout: 5000 }).toBe('text-1b');
 
-    expect(newFirstBlockUid).toBe('text-1b');
+    // Verify second block is now text-1a
+    const newSecondBlockUid = await col1.locator(':scope > [data-block-uid]').nth(1).getAttribute('data-block-uid');
     expect(newSecondBlockUid).toBe('text-1a');
   });
 
@@ -1606,7 +1607,6 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select text-1a from col-1
     await helper.clickBlockInIframe('text-1a');
-    await page.waitForTimeout(300);
 
     // Drag to col-2 (drop on text-2a)
     const dragHandle = await helper.getDragHandle();
@@ -1614,12 +1614,9 @@ test.describe('Container Block Drag and Drop', () => {
 
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true); // Insert after
 
-    // Verify block moved between containers
-    const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
-    const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
-
-    expect(col1NewCount).toBe(1); // Only text-1b left
-    expect(col2NewCount).toBe(2); // text-2a + text-1a
+    // Wait for block to move between containers (React re-render may be async)
+    await expect(col1.locator(':scope > [data-block-uid]')).toHaveCount(1, { timeout: 5000 }); // Only text-1b left
+    await expect(col2.locator(':scope > [data-block-uid]')).toHaveCount(2, { timeout: 5000 }); // text-2a + text-1a
   });
 
   test('can drag block from container to page level', async ({ page }) => {
@@ -1683,7 +1680,6 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select text-after (page-level slate block)
     await helper.clickBlockInIframe('text-after');
-    await page.waitForTimeout(300);
 
     // Drag into col-2 (drop on text-2a)
     const dragHandle = await helper.getDragHandle();
@@ -1691,15 +1687,11 @@ test.describe('Container Block Drag and Drop', () => {
 
     await helper.dragBlockWithMouse(dragHandle, targetBlock, false); // Insert before
 
-    // Verify it's now in col-2
-    const col2NewCount = await col2.locator(':scope > [data-block-uid]').count();
-    expect(col2NewCount).toBe(col2InitialCount + 1);
+    // Wait for block to be added to col-2 (React re-render may be async)
+    await expect(col2.locator(':scope > [data-block-uid]')).toHaveCount(col2InitialCount + 1, { timeout: 5000 });
 
     // Verify text-after is now inside col-2
-    const textAfterInCol2 = await col2
-      .locator('[data-block-uid="text-after"]')
-      .count();
-    expect(textAfterInCol2).toBe(1);
+    await expect(col2.locator('[data-block-uid="text-after"]')).toHaveCount(1, { timeout: 5000 });
   });
 
   test('block data is preserved after drag between containers', async ({
