@@ -2993,4 +2993,43 @@ export class AdminUIHelper {
     console.log(`[TEST] Found sidebar toolbar button: ${format}`);
     return buttonHandle as ElementHandle;
   }
+
+  /**
+   * Add a block via the sidebar ChildBlocksWidget.
+   * Clicks the add button for the specified container field, and if a block chooser
+   * appears (multiple allowed types), selects the specified block type.
+   *
+   * @param containerFieldTitle - The title of the container field section (e.g., 'Columns', 'Blocks')
+   * @param blockType - The block type to add (e.g., 'column', 'slate', 'image'). If the container
+   *                    only allows one type, this is ignored and the block is auto-inserted.
+   */
+  async addBlockViaSidebar(
+    containerFieldTitle: string,
+    blockType?: string,
+  ): Promise<void> {
+    // Find the container field section and its add button
+    const section = this.page.locator('.container-field-section', {
+      has: this.page.locator('.widget-title', { hasText: containerFieldTitle }),
+    });
+    const addButton = section.getByRole('button', { name: 'Add block' });
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
+    // Check if block chooser appeared (multiple allowed types)
+    const blockChooser = this.page.locator('.blocks-chooser');
+    const chooserVisible = await blockChooser
+      .waitFor({ state: 'visible', timeout: 1000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (chooserVisible && blockType) {
+      // Select the specified block type
+      const blockButton = blockChooser.getByRole('button', {
+        name: new RegExp(blockType, 'i'),
+      });
+      await blockButton.click();
+      // Wait for chooser to close
+      await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
+    }
+  }
 }

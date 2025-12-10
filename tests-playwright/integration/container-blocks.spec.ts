@@ -1118,28 +1118,21 @@ test.describe('Empty Block Behavior', () => {
     // Click on columns-1 to select it (the container that holds columns)
     // We need to select the columns block to add a new column inside it
     await helper.clickContainerBlockInIframe('columns-1');
-    await page.waitForTimeout(500);
 
-    // Click the SIDEBAR add button (adds INTO the container)
-    // Since columns only allows 'column' blocks, this should auto-insert
-    const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
-    await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
-    await sidebarAddButton.click();
+    // Add a column via the sidebar (columns field only allows 'column' type, so auto-inserts)
+    await helper.addBlockViaSidebar('Columns');
 
-    // Block chooser should NOT appear (single allowedBlock = auto-insert)
+    // Block chooser should NOT have appeared (single allowedBlock = auto-insert)
     const blockChooser = page.locator('.blocks-chooser');
-    await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
-
-    // Wait for re-render
-    await page.waitForTimeout(1000);
+    await expect(blockChooser).not.toBeVisible();
 
     // The new column should be created. Since column has defaultBlock: 'slate',
     // it should have a slate block inside, not be empty.
-    // There should now be 3 columns
-    const columnBlocks = await iframe
-      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
-      .count();
-    expect(columnBlocks).toBe(3);
+    // Wait for columns-1 to have 3 columns
+    const columnBlocksLocator = iframe.locator(
+      '[data-block-uid="columns-1"] > .columns-row > [data-block-uid]',
+    );
+    await expect(columnBlocksLocator).toHaveCount(3, { timeout: 5000 });
 
     // Get the new column (the third one)
     const newColumn = iframe
@@ -1253,16 +1246,12 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     await helper.clickContainerBlockInIframe('columns-1');
     await page.waitForTimeout(500);
 
-    // Click the sidebar add button (the + in the ChildBlocksWidget)
-    // This is the "Add block" button in the sidebar that adds INTO the container
-    // The button has aria-label="Add block" but text content is just "+"
-    const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
-    await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
-    await sidebarAddButton.click();
+    // Add a column via the sidebar (columns field only allows 'column' type, so auto-inserts)
+    await helper.addBlockViaSidebar('Columns');
 
-    // Block chooser should NOT appear (since there's only one option)
+    // Block chooser should NOT have appeared (since there's only one option)
     const blockChooser = page.locator('.blocks-chooser');
-    await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
+    await expect(blockChooser).not.toBeVisible();
 
     // Wait for the block to be inserted
     await page.waitForTimeout(1000);
@@ -1367,20 +1356,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     await helper.clickContainerBlockInIframe('col-1');
     await page.waitForTimeout(500);
 
-    // Click the sidebar add button (should add INTO col-1)
-    const sidebarAddButton = page.getByRole('button', { name: 'Add block' });
-    await expect(sidebarAddButton).toBeVisible({ timeout: 5000 });
-    await sidebarAddButton.click();
-
-    // Block chooser SHOULD appear (since col-1 allows slate and image)
-    const blockChooser = page.locator('.blocks-chooser');
-    await expect(blockChooser).toBeVisible({ timeout: 5000 });
-
-    // Select Text (slate) block
-    await blockChooser.getByRole('button', { name: 'Text' }).click();
-
-    // Wait for block insertion
-    await page.waitForTimeout(1000);
+    // Add a Text block via the sidebar (col-1 allows slate and image, so chooser appears)
+    await helper.addBlockViaSidebar('Blocks', 'Text');
 
     // Verify: col-1 should now have 3 children (new block added INSIDE)
     const newBlocksInCol1 = await iframe

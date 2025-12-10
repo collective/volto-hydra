@@ -46,7 +46,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, getBlockOwnContainerConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -1016,12 +1016,23 @@ const Iframe = (props) => {
               return prevBlockUI; // Return same reference to skip re-render
             }
 
+            // Assert required fields - fail loudly if BLOCK_SELECTED is missing data
+            if (!event.data.addDirection) {
+              console.error('[VIEW] BLOCK_SELECTED missing addDirection! src:', event.data.src, 'blockUid:', event.data.blockUid);
+              throw new Error(`BLOCK_SELECTED missing addDirection (src: ${event.data.src})`);
+            }
+            // editableFields can be empty {} (block has no editable fields) but must be present
+            if (event.data.editableFields === undefined) {
+              console.error('[VIEW] BLOCK_SELECTED missing editableFields! src:', event.data.src, 'blockUid:', event.data.blockUid);
+              throw new Error(`BLOCK_SELECTED missing editableFields (src: ${event.data.src})`);
+            }
+
             return {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
               focusedFieldName: event.data.focusedFieldName, // Track which field is focused
-              editableFields: event.data.editableFields || {}, // Map of fieldName -> fieldType from iframe
-              addDirection: event.data.addDirection || 'bottom', // Direction for add button positioning
+              editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
+              addDirection: event.data.addDirection, // Direction for add button positioning
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
@@ -1269,42 +1280,26 @@ const Iframe = (props) => {
   }, []);
 
 
-  // Get container configs for the selected block
-  // - ownContainerConfig: for adding children INTO the selected block (sidebar add)
-  // - parentContainerConfig: for adding siblings AFTER the selected block (iframe add)
+  // Get parentContainerConfig for the selected block
+  // - Used for adding siblings AFTER the selected block (iframe add)
   // NOTE: We use config.blocks.blocksConfig directly (not blocksConfig prop) because
   // the config is mutated when INIT is received with frontend's custom blocksConfig.
   // The iframeSyncState.blockPathMap dependency ensures re-compute after INIT.
-  const { ownContainerConfig, parentContainerConfig } = useMemo(() => {
+  const parentContainerConfig = useMemo(() => {
     if (!selectedBlock || !iframeSyncState.blockPathMap) {
-      return { ownContainerConfig: null, parentContainerConfig: null };
+      return null;
     }
 
     // Use merged config from registry (includes frontend's custom blocks after INIT)
     const mergedBlocksConfig = config.blocks.blocksConfig;
 
-    const ownConfig = getBlockOwnContainerConfig(
+    return getContainerFieldConfig(
       selectedBlock,
       iframeSyncState.blockPathMap,
       iframeSyncState.formData,
       mergedBlocksConfig,
     );
-
-    const parentConfig = getContainerFieldConfig(
-      selectedBlock,
-      iframeSyncState.blockPathMap,
-      iframeSyncState.formData,
-      mergedBlocksConfig,
-    );
-
-    return { ownContainerConfig: ownConfig, parentContainerConfig: parentConfig };
   }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData]);
-
-  // Sidebar add: adds INTO the selected container
-  // Uses ownContainerConfig.allowedBlocks
-  const sidebarAllowedBlocks = useMemo(() => {
-    return ownContainerConfig?.allowedBlocks || null;
-  }, [ownContainerConfig]);
 
   // Iframe add: adds AFTER the selected block (as sibling)
   // Uses parentContainerConfig.allowedBlocks, or page-level allowedBlocks
@@ -1354,7 +1349,18 @@ const Iframe = (props) => {
     // Set which block we're adding after (for allowedBlocks computation)
     setAddAfterBlockId(lastBlockId);
 
-    const containerAllowed = sidebarAllowedBlocks;
+    // Get allowedBlocks for the specific container field (not just the first one)
+    const mergedBlocksConfig = config.blocks.blocksConfig;
+    const parentType = parentBlock?.['@type'];
+    const parentSchema =
+      typeof mergedBlocksConfig?.[parentType]?.blockSchema === 'function'
+        ? mergedBlocksConfig[parentType].blockSchema({
+            formData: {},
+            intl: { formatMessage: (m) => m.defaultMessage },
+          })
+        : mergedBlocksConfig?.[parentType]?.blockSchema;
+    const fieldDef = parentSchema?.properties?.[fieldName];
+    const containerAllowed = fieldDef?.allowedBlocks || null;
     if (containerAllowed?.length === 1) {
       // Only one allowed block type - auto-insert without showing chooser
       const blockType = containerAllowed[0];
@@ -1389,7 +1395,7 @@ const Iframe = (props) => {
       // Multiple options - show the block chooser
       setAddNewBlockOpened(true);
     }
-  }, [sidebarAllowedBlocks, properties, onChangeFormData, iframeSyncState.blockPathMap, intl, metadata, dispatch]);
+  }, [properties, onChangeFormData, iframeSyncState.blockPathMap, intl, metadata, dispatch]);
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -1573,6 +1579,7 @@ const Iframe = (props) => {
             }
 
             const iframeRect = referenceElement.getBoundingClientRect();
+            console.log('[VIEW] Add button render, blockUI.addDirection:', blockUI.addDirection, 'blockUid:', blockUI.blockUid);
             const isRightDirection = blockUI.addDirection === 'right';
 
             // Calculate ideal position

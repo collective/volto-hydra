@@ -318,56 +318,6 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
 }
 
 /**
- * Get the container field configuration for a block that IS a container.
- * This returns the config for the first container field (type: 'blocks') in the block's schema.
- * Used when the selected block is a container and we want to add children inside it.
- *
- * @param {string} blockId - The block ID to check
- * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
- * @param {Object} formData - The form data
- * @param {Object} blocksConfig - Block configuration from registry
- * @returns {Object|null} Container field config { fieldName, allowedBlocks, defaultBlock, maxLength } or null if not a container
- */
-export function getBlockOwnContainerConfig(blockId, blockPathMap, formData, blocksConfig) {
-  const block = getBlockById(formData, blockPathMap, blockId);
-  if (!block) return null;
-
-  const blockType = block['@type'];
-  const blockConfig = blocksConfig?.[blockType];
-  const schema = typeof blockConfig?.blockSchema === 'function'
-    ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-    : blockConfig?.blockSchema;
-
-  if (schema?.properties) {
-    // Find the first container field (type: 'blocks')
-    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-      if (fieldDef.type === 'blocks') {
-        return {
-          fieldName,
-          containerId: blockId,
-          allowedBlocks: fieldDef.allowedBlocks || null,
-          defaultBlock: fieldDef.defaultBlock || null,
-          maxLength: fieldDef.maxLength || null,
-        };
-      }
-    }
-  }
-
-  // Check for implicit container (blocks/blocks_layout without schema definition)
-  if (block.blocks && block.blocks_layout?.items) {
-    return {
-      fieldName: 'blocks',
-      containerId: blockId,
-      allowedBlocks: blockConfig?.allowedBlocks || null,
-      defaultBlock: blockConfig?.defaultBlock || null,
-      maxLength: blockConfig?.maxLength || null,
-    };
-  }
-
-  return null;
-}
-
-/**
  * Get ALL container fields for a block (supports multiple container fields).
  * Returns both schema-defined container fields (type: 'blocks') and implicit containers.
  *
@@ -722,67 +672,62 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     return blockData;
   }
 
-  // Find container field (type: 'blocks')
-  let containerFieldName = null;
-  let containerFieldDef = null;
+  // Find ALL container fields (type: 'blocks') and initialize each one
+  let result = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    if (fieldDef.type === 'blocks') {
-      containerFieldName = fieldName;
-      containerFieldDef = fieldDef;
-      break;
+    if (fieldDef.type !== 'blocks') {
+      continue;
     }
-  }
 
-  // Not a container - return unchanged
-  if (!containerFieldName) {
-    return blockData;
-  }
+    // Determine the initial child block type for this container field
+    let childBlockType = null;
+    if (fieldDef.defaultBlock) {
+      childBlockType = fieldDef.defaultBlock;
+    } else if (fieldDef.allowedBlocks?.length === 1) {
+      childBlockType = fieldDef.allowedBlocks[0];
+    }
 
-  // Determine the initial child block type
-  let childBlockType = null;
-  if (containerFieldDef.defaultBlock) {
-    childBlockType = containerFieldDef.defaultBlock;
-  } else if (containerFieldDef.allowedBlocks?.length === 1) {
-    childBlockType = containerFieldDef.allowedBlocks[0];
-  }
+    const layoutFieldName = `${fieldName}_layout`;
 
-  // No determinable child type - return with empty container structure
-  if (!childBlockType) {
-    const layoutFieldName = `${containerFieldName}_layout`;
-    return {
-      ...blockData,
-      [containerFieldName]: {},
-      [layoutFieldName]: { items: [] },
+    // No determinable child type - initialize with empty container structure
+    if (!childBlockType) {
+      result = {
+        ...result,
+        [fieldName]: {},
+        [layoutFieldName]: { items: [] },
+      };
+      continue;
+    }
+
+    // Create child block and apply defaults (like Volto's BlocksForm does)
+    const childBlockId = uuidGenerator();
+    let childBlockData = { '@type': childBlockType };
+
+    // Apply block defaults to get proper initial values (e.g., slate's value field)
+    if (intl) {
+      childBlockData = applyBlockDefaults({
+        data: childBlockData,
+        intl,
+        metadata,
+        properties,
+      }, blocksConfig);
+    }
+
+    // Recursively initialize the child if it's also a container
+    childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, options);
+
+    // Add child to this container field
+    result = {
+      ...result,
+      [fieldName]: {
+        [childBlockId]: childBlockData,
+      },
+      [layoutFieldName]: { items: [childBlockId] },
     };
   }
 
-  // Create child block and apply defaults (like Volto's BlocksForm does)
-  const childBlockId = uuidGenerator();
-  let childBlockData = { '@type': childBlockType };
-
-  // Apply block defaults to get proper initial values (e.g., slate's value field)
-  if (intl) {
-    childBlockData = applyBlockDefaults({
-      data: childBlockData,
-      intl,
-      metadata,
-      properties,
-    }, blocksConfig);
-  }
-
-  // Recursively initialize the child if it's also a container
-  childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, options);
-
-  // Add child to container
-  const layoutFieldName = `${containerFieldName}_layout`;
-  return {
-    ...blockData,
-    [containerFieldName]: {
-      [childBlockId]: childBlockData,
-    },
-    [layoutFieldName]: { items: [childBlockId] },
-  };
+  return result;
 }
 
 /**
