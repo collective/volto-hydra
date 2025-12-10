@@ -1,0 +1,88 @@
+{
+  "@id": "http://localhost:8888/carousel-test-page",
+  "@type": "Document",
+  "UID": "carousel-test-page-uid",
+  "id": "carousel-test-page",
+  "title": "Carousel Test Page",
+  "description": "A test page with carousel block for data-block-selector testing",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "carousel-1": {
+      "@type": "carousel",
+      "slides": {
+        "slide-1": {
+          "@type": "slide",
+          "title": "Slide 1",
+          "content": "First slide content"
+        },
+        "slide-2": {
+          "@type": "slide",
+          "title": "Slide 2",
+          "content": "Second slide content"
+        },
+        "slide-3": {
+          "@type": "slide",
+          "title": "Slide 3",
+          "content": "Third slide content"
+        }
+      },
+      "slides_layout": {"items": ["slide-1", "slide-2", "slide-3"]}
+    },
+    "text-after": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Text after carousel"}]}],
+      "plaintext": "Text after carousel"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "carousel-1", "text-after"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-01T12:00:00+00:00",
+  "modified": "2025-01-01T12:00:00+00:00",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "@components": {
+    "actions": {
+      "@id": "http://localhost:8888/carousel-test-page/@actions",
+      "document_actions": [],
+      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
+      "object_buttons": [],
+      "portal_tabs": [],
+      "site_actions": [],
+      "user": []
+    },
+    "breadcrumbs": {
+      "@id": "http://localhost:8888/carousel-test-page/@breadcrumbs",
+      "items": [
+        {"@id": "http://localhost:8888", "title": "Home"},
+        {"@id": "http://localhost:8888/carousel-test-page", "title": "Carousel Test Page"}
+      ],
+      "root": "http://localhost:8888"
+    },
+    "navigation": {
+      "@id": "http://localhost:8888/carousel-test-page/@navigation",
+      "items": []
+    },
+    "workflow": {
+      "@id": "http://localhost:8888/carousel-test-page/@workflow"
+    }
+  },
+  "can_manage_portlets": true,
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_add": true
+}

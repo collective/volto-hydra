@@ -17,13 +17,18 @@ const PORT = process.env.PORT || 8888;
 // In-memory content database
 const contentDB = {};
 
-// Create a valid JWT format token (header.payload.signature)
-// Header: {"alg":"HS256","typ":"JWT"}
-// Payload: {"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400} (expires in 24 hours)
-const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
-const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400})).toString('base64').replace(/=/g, '');
-const signature = 'fake-signature';
-const AUTH_TOKEN = `${header}.${payload}.${signature}`;
+/**
+ * Generate a fresh JWT token with 24-hour expiration from now.
+ * Called on each login/renew to ensure token is always valid.
+ */
+function generateAuthToken(username = 'admin') {
+  const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
+  const payload = Buffer.from(JSON.stringify({
+    "sub": username,
+    "exp": Math.floor(Date.now()/1000) + 86400  // 24 hours from NOW
+  })).toString('base64').replace(/=/g, '');
+  return `${header}.${payload}.fake-signature`;
+}
 
 // Middleware
 app.use(cors());
@@ -123,11 +128,16 @@ function loadInitialContent() {
     'description': '',
     'items': [],
     'items_total': 0,
+    'is_folderish': true,
     '@components': {
       'actions': {
         '@id': 'http://localhost:8888/@actions',
         'document_actions': [],
-        'object': [],
+        'object': [
+          { 'id': 'view', 'title': 'View' },
+          { 'id': 'edit', 'title': 'Edit' },
+          { 'id': 'folderContents', 'title': 'Contents' }
+        ],
         'object_buttons': [],
         'portal_tabs': [],
         'site_actions': [],
@@ -194,16 +204,16 @@ function getContent(urlPath) {
 
 /**
  * POST /@login-renew
- * Renew/validate existing JWT token
+ * Renew/validate existing JWT token - generates fresh token each time
  */
 app.post('/@login-renew', (req, res) => {
   if (process.env.DEBUG) {
     console.log('Token renewal requested');
   }
 
-  // Return the same token and user info
+  // Generate fresh token with new expiration
   res.json({
-    token: AUTH_TOKEN,
+    token: generateAuthToken('admin'),
     user: {
       '@id': 'http://localhost:8888/@users/admin',
       id: 'admin',
@@ -216,7 +226,7 @@ app.post('/@login-renew', (req, res) => {
 
 /**
  * POST /@login
- * Authenticate and return JWT token with user info
+ * Authenticate and return JWT token with user info - generates fresh token each time
  */
 app.post('/@login', (req, res) => {
   const { login, password } = req.body;
@@ -226,11 +236,13 @@ app.post('/@login', (req, res) => {
   }
 
   if (login && password) {
+    // Generate fresh token with new expiration
+    const token = generateAuthToken(login);
     const response = {
-      token: AUTH_TOKEN,
+      token,
       user: {
-        '@id': 'http://localhost:8888/@users/admin',
-        id: 'admin',
+        '@id': `http://localhost:8888/@users/${login}`,
+        id: login,
         fullname: 'Admin User',
         email: 'admin@example.com',
         roles: ['Manager', 'Authenticated'],
@@ -238,7 +250,7 @@ app.post('/@login', (req, res) => {
     };
 
     if (process.env.DEBUG) {
-      console.log(`Login successful, returning token: ${AUTH_TOKEN.substring(0, 20)}...`);
+      console.log(`Login successful, returning token: ${token.substring(0, 20)}...`);
       console.log(`Response body:`, JSON.stringify(response));
     }
 
@@ -255,6 +267,18 @@ app.post('/@login', (req, res) => {
       },
     });
   }
+});
+
+/**
+ * POST /@logout
+ * Logout and invalidate the session (mock - always succeeds)
+ */
+app.post('/@logout', (req, res) => {
+  if (process.env.DEBUG) {
+    console.log('Logout requested');
+  }
+  // Return 204 No Content on successful logout (Plone behavior)
+  res.status(204).send();
 });
 
 /**
@@ -475,6 +499,74 @@ app.get('*/@search', (req, res) => {
       'next': null,
       'prev': null,
     },
+  });
+});
+
+/**
+ * GET /:path/@contents or /@contents
+ * Get folder contents for content browsing
+ * Returns items at the parent folder level (siblings of current content)
+ */
+app.get('*/@contents', (req, res) => {
+  const contentPath = req.path.replace('/@contents', '') || '/';
+
+  // For Documents, we return siblings (contents of parent folder)
+  // For the site root, we return all root-level items
+  let items;
+
+  if (contentPath === '' || contentPath === '/') {
+    // Root level - return all root-level items
+    items = Object.entries(contentDB)
+      .filter(([path]) => {
+        if (path === '/') return false;
+        const pathParts = path.split('/').filter(p => p);
+        return pathParts.length === 1;
+      })
+      .map(([_path, content]) => ({
+        '@id': content['@id'],
+        '@type': content['@type'],
+        'id': content.id,
+        'title': content.title,
+        'description': content.description || '',
+        'review_state': content.review_state || 'published',
+        'UID': content.UID,
+        'is_folderish': content.is_folderish || false,
+      }));
+  } else {
+    // Get parent folder's contents (siblings of this content)
+    const pathParts = contentPath.split('/').filter(p => p);
+    const parentPath = pathParts.length > 1
+      ? '/' + pathParts.slice(0, -1).join('/')
+      : '/';
+
+    items = Object.entries(contentDB)
+      .filter(([itemPath]) => {
+        if (itemPath === '/') return false;
+        const itemParts = itemPath.split('/').filter(p => p);
+        // Same depth as current content and same parent
+        if (parentPath === '/') {
+          return itemParts.length === 1;
+        } else {
+          return itemPath.startsWith(parentPath + '/') &&
+                 itemParts.length === pathParts.length;
+        }
+      })
+      .map(([_path, content]) => ({
+        '@id': content['@id'],
+        '@type': content['@type'],
+        'id': content.id,
+        'title': content.title,
+        'description': content.description || '',
+        'review_state': content.review_state || 'published',
+        'UID': content.UID,
+        'is_folderish': content.is_folderish || false,
+      }));
+  }
+
+  res.json({
+    '@id': `http://localhost:8888${contentPath}/@contents`,
+    'items': items,
+    'items_total': items.length,
   });
 });
 

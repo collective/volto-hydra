@@ -45,8 +45,16 @@
       "document_actions": [],
       "object": [
         {
+          "id": "view",
+          "title": "View"
+        },
+        {
           "id": "edit",
           "title": "Edit"
+        },
+        {
+          "id": "folderContents",
+          "title": "Contents"
         }
       ],
       "object_buttons": [],

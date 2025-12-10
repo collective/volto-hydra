@@ -8,9 +8,12 @@ export class AdminUIHelper {
     public readonly page: Page,
     public readonly adminUrl: string = 'http://localhost:3001'
   ) {
-    // Capture all browser console messages
+    // Capture browser console errors and warnings only (filter out verbose debug logs)
     this.page.on('console', (msg) => {
-      console.log(`[BROWSER] ${msg.text()}`);
+      const type = msg.type();
+      if (type === 'error' || type === 'warning') {
+        console.log(`[BROWSER ${type.toUpperCase()}] ${msg.text()}`);
+      }
     });
 
     // Capture page errors
@@ -64,7 +67,6 @@ export class AdminUIHelper {
       sameSite: 'Lax',
     }]);
 
-    console.log('[DEBUG] Auth cookie set directly for testing');
 
     // Navigate to homepage first (doesn't require SSR auth)
     await this.page.goto(`${this.adminUrl}/`, {
@@ -72,7 +74,6 @@ export class AdminUIHelper {
       waitUntil: 'networkidle',
     });
 
-    console.log('[DEBUG] Homepage loaded successfully');
   }
 
   /**
@@ -87,7 +88,6 @@ export class AdminUIHelper {
 
     const editPath = `${contentPath}/edit`;
 
-    console.log(`[DEBUG] Navigating to ${editPath} using client-side navigation`);
 
     // Use React Router to navigate client-side (avoids SSR)
     await this.page.evaluate((path) => {
@@ -101,7 +101,6 @@ export class AdminUIHelper {
       }
     }, editPath);
 
-    console.log(`[DEBUG] Client-side navigation to ${editPath} triggered, waiting for iframe`);
 
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${editPath}`, { timeout: 10000 });
@@ -158,8 +157,19 @@ export class AdminUIHelper {
     await block.click();
 
     if (waitForToolbar) {
-      // Wait for toolbar to be positioned correctly and scroll it into view
-      await this.waitForQuantaToolbar(blockId);
+      // Wait for any block to be selected (toolbar visible)
+      const toolbar = this.page.locator('.quanta-toolbar');
+      await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+
+      // Check if the correct block is selected
+      const result = await this.isBlockSelectedInIframe(blockId);
+      if (!result.ok) {
+        // Wrong block selected - likely a child. Navigate up via sidebar.
+        await this.navigateToParentBlock(blockId);
+      } else {
+        // Target is selected, wait for toolbar to be positioned correctly
+        await this.waitForQuantaToolbar(blockId);
+      }
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
       const editableField = block.locator('[contenteditable="true"]');
@@ -175,9 +185,101 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if a block is selected in the iframe.
-   * A block is selected if it has the "selected" class.
+   * Navigate up through parent blocks in the sidebar until reaching the target block.
+   * Used when clicking on a container block selects a child instead.
    */
+  async navigateToParentBlock(targetBlockId: string, maxAttempts: number = 10): Promise<void> {
+    // Wait for sidebar to be open
+    await this.waitForSidebarOpen();
+
+    // Wait for parent navigation buttons to appear in sidebar
+    // The sidebar needs time to render the block's parent hierarchy
+    const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
+    try {
+      await parentButtonLocator.first().waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
+      throw new Error(
+        `Cannot navigate to block "${targetBlockId}": no parent navigation buttons appeared in sidebar after 5s`
+      );
+    }
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Check if target block is now selected
+      const result = await this.isBlockSelectedInIframe(targetBlockId);
+      if (result.ok) {
+        await this.waitForQuantaToolbar(targetBlockId);
+        return;
+      }
+
+      // Find and click the LAST "‹ BlockType" parent navigation button in sidebar
+      // (the one closest to the current block - clicking it navigates up one level)
+      // Buttons are ordered root-to-current, so last is the current block's header
+      const parentButton = parentButtonLocator.last();
+      const buttonExists = (await parentButton.count()) > 0;
+
+      if (!buttonExists) {
+        throw new Error(
+          `Cannot navigate to block "${targetBlockId}": parent navigation buttons disappeared from sidebar`
+        );
+      }
+
+      await parentButton.click();
+      await this.page.waitForTimeout(300); // Wait for selection to update
+    }
+
+    throw new Error(
+      `Failed to navigate to block "${targetBlockId}" after ${maxAttempts} attempts`
+    );
+  }
+
+  /**
+   * Click on a container block by clicking on its title area.
+   * This is necessary for container blocks (like columns) that have nested blocks,
+   * where clicking in the center would select a nested block instead.
+   *
+   * @param blockId - The data-block-uid of the container block
+   */
+  async clickContainerBlockInIframe(blockId: string) {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Verify block exists
+    const blockCount = await block.count();
+    if (blockCount === 0) {
+      throw new Error(
+        `Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`,
+      );
+    }
+
+    // Try to click on the block's title element (data-editable-field="title")
+    const titleElement = block.locator(
+      '> [data-editable-field="title"], > .column-title, > h3, > h4',
+    );
+    const hasTitleElement = (await titleElement.count()) > 0;
+
+    if (hasTitleElement) {
+      // Click on title to select the container
+      await titleElement.first().scrollIntoViewIfNeeded();
+      await titleElement.first().click();
+    } else {
+      // Fall back to clicking on the block's border area (top-left corner)
+      const blockBox = await block.boundingBox();
+      if (blockBox) {
+        // Click 5px from left edge and 5px from top - on the border area
+        await block.click({ position: { x: 5, y: 5 } });
+      } else {
+        throw new Error(
+          `Cannot get bounding box for block "${blockId}" to click on border`,
+        );
+      }
+    }
+
+    // Wait for toolbar to be positioned correctly
+    await this.waitForQuantaToolbar(blockId);
+
+    return block;
+  }
+
   /**
    * Wait for a block to be selected in the iframe.
    */
@@ -204,8 +306,9 @@ export class AdminUIHelper {
    * Wait for the sidebar to open.
    */
   async waitForSidebarOpen(timeout: number = 5000): Promise<void> {
+    // Wait for sidebar to be open - check for the content wrapper which is always visible
     await this.page.waitForSelector(
-      '#sidebar-properties',
+      '.sidebar-content-wrapper',
       {
         state: 'visible',
         timeout,
@@ -215,33 +318,33 @@ export class AdminUIHelper {
 
   /**
    * Open a specific sidebar tab (Page, Block, Order, etc.)
-   * Matches Cypress pattern: .sidebar-container .tabs-wrapper .menu .item
+   *
+   * Note: The Hydra sidebar uses a unified hierarchical view without tabs.
+   * This method is kept for backwards compatibility and scrolls to the
+   * appropriate section:
+   * - "Block": Scrolls to block settings (#sidebar-properties)
+   * - "Page"/"Document": Scrolls to top for page metadata (#sidebar-metadata)
+   * - "Order": Scrolls to child blocks widget at bottom (#sidebar-children)
    */
   async openSidebarTab(tabName: string): Promise<void> {
-    const tab = this.page.locator('.sidebar-container .tabs-wrapper .menu .item', {
-      hasText: tabName
-    });
+    // Map tab names to their portal target IDs
+    const tabToSelector: Record<string, string> = {
+      Block: '#sidebar-properties',
+      Page: '#sidebar-metadata',
+      Document: '#sidebar-metadata',
+      Order: '#sidebar-order',
+    };
 
-    // Check if tab exists
-    const tabCount = await tab.count();
-    if (tabCount === 0) {
-      throw new Error(
-        `Sidebar tab "${tabName}" not found. ` +
-        `Check that the sidebar is open and the tab name is correct. ` +
-        `Available tabs are typically: Page, Block, Order.`
-      );
+    const selector = tabToSelector[tabName];
+    if (selector) {
+      const section = this.page.locator(selector);
+      // Wait for the section to exist
+      await section.waitFor({ state: 'attached', timeout: 5000 });
+      // Scroll to the section
+      await section.scrollIntoViewIfNeeded();
+      // Brief wait for scroll to complete
+      await this.page.waitForTimeout(100);
     }
-
-    // Verify tab is visible
-    try {
-      await tab.waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-      throw new Error(`Sidebar tab "${tabName}" exists but is not visible. Check sidebar state.`);
-    }
-
-    await tab.click();
-    // Wait for tab content to load
-    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -286,13 +389,13 @@ export class AdminUIHelper {
   }
 
   /**
-   * Check if the Quanta Toolbar is visible for a block.
-   * The toolbar is rendered in the parent window (admin UI), not inside the iframe.
+   * Check if the Quanta Toolbar is visible for a specific block.
+   * The toolbar is rendered in the parent window (admin UI), positioned above the block in iframe.
+   * Uses isBlockSelectedInIframe which verifies both visibility AND correct positioning.
    */
   async isQuantaToolbarVisibleInIframe(blockId: string): Promise<boolean> {
-    // Toolbar is now rendered in parent window, not in iframe
-    const toolbar = this.page.locator('.quanta-toolbar');
-    return await toolbar.isVisible();
+    const result = await this.isBlockSelectedInIframe(blockId);
+    return result.ok;
   }
 
   /**
@@ -346,7 +449,36 @@ export class AdminUIHelper {
   }
 
   /**
+   * Check if the toolbar is covered by the sidebar.
+   * Returns true if NOT covered (toolbar is fully visible and clickable).
+   */
+  async isToolbarNotCoveredBySidebar(): Promise<boolean> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    const sidebar = this.page.locator('.sidebar-container:not(.collapsed)');
+
+    // If sidebar doesn't exist or is collapsed, toolbar can't be covered
+    if (!(await sidebar.isVisible())) {
+      return true;
+    }
+
+    const toolbarBox = await toolbar.boundingBox();
+    const sidebarBox = await sidebar.boundingBox();
+
+    if (!toolbarBox || !sidebarBox) {
+      return true; // Can't determine, assume ok
+    }
+
+    // Check if toolbar's right edge extends into sidebar's left edge
+    const toolbarRight = toolbarBox.x + toolbarBox.width;
+    const sidebarLeft = sidebarBox.x;
+
+    // Toolbar is not covered if its right edge is left of sidebar's left edge
+    return toolbarRight <= sidebarLeft;
+  }
+
+  /**
    * Wait for the Quanta toolbar to appear on a block and scroll it into view.
+   * Also verifies the toolbar is not covered by the sidebar.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
     // Wait until toolbar is positioned correctly relative to the block
@@ -355,6 +487,9 @@ export class AdminUIHelper {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
+      if (res && !res.ok && res.reason) {
+        console.log(`[TEST] isBlockSelectedInIframe failed: ${res.reason}`);
+      }
       return !!res && !!res.ok;
     }, { timeout }).toBeTruthy();
 
@@ -368,6 +503,15 @@ export class AdminUIHelper {
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
       return !!res && !!res.ok;
+    }, { timeout: 5000 }).toBeTruthy();
+
+    // Verify toolbar is not covered by sidebar
+    await expect.poll(async () => {
+      const notCovered = await this.isToolbarNotCoveredBySidebar();
+      if (!notCovered) {
+        console.log(`[TEST] Toolbar for block "${blockId}" is covered by sidebar`);
+      }
+      return notCovered;
     }, { timeout: 5000 }).toBeTruthy();
   }
 
@@ -407,7 +551,7 @@ export class AdminUIHelper {
     await this.waitForQuantaToolbar(blockId);
 
     const menuButton = await this.getMenuButtonInQuantaToolbar(blockId, 'options');
-    menuButton.click();
+    await menuButton.click();
 
     // Wait for dropdown to appear
     const dropdown = this.page.locator(
@@ -542,18 +686,23 @@ export class AdminUIHelper {
 
   /**
    * Verify that the current selection matches the expected text.
+   * Uses Playwright polling to handle async selection restoration after formatting.
    */
   async verifySelectionMatches(editor: Locator, expectedText: string): Promise<void> {
-    const selectedText = await editor.evaluate((el) => {
-      const selection = window.getSelection();
-      return selection ? selection.toString() : '';
-    });
-
-    if (selectedText !== expectedText) {
-      throw new Error(
-        `Selection mismatch. Expected: "${expectedText}", Got: "${selectedText}"`
-      );
-    }
+    await expect
+      .poll(
+        async () => {
+          return await editor.evaluate(() => {
+            const selection = window.getSelection();
+            return selection ? selection.toString() : '';
+          });
+        },
+        {
+          message: `Expected selection to be "${expectedText}"`,
+          timeout: 2000,
+        }
+      )
+      .toBe(expectedText);
   }
 
   /**
@@ -770,47 +919,71 @@ export class AdminUIHelper {
    */
   async isBlockSelectedInIframe(blockId: string): Promise<{ ok: boolean; reason?: string }> {
     try {
-      // Verify all UI overlays are visible
+      // Verify essential UI overlays are visible (toolbar and outline)
+      // Note: add button visibility/positioning is checked separately by verifyBlockUIPositioning
       const toolbar = this.page.locator('.quanta-toolbar');
       const outline = this.page.locator('.volto-hydra-block-outline');
-      const addButton = this.page.locator('.volto-hydra-add-button');
 
       const toolbarVisible = await toolbar.isVisible();
       const outlineVisible = await outline.isVisible();
-      const addButtonVisible = await addButton.isVisible();
 
-      if (!toolbarVisible || !outlineVisible || !addButtonVisible) {
+      if (!toolbarVisible || !outlineVisible) {
         return {
           ok: false,
-          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}, addButton=${addButtonVisible}`,
+          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}`,
         };
       }
 
-      // Verify positioning is correct
-      const positions = await this.verifyBlockUIPositioning(blockId);
+      // Verify the outline covers THIS specific block
+      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      const outlineBox = await this.getBlockOutlineBoundingBox();
 
-      // Toolbar positioning: Can overlap the block top (negative is OK)
-      // Generous tolerance for CI browser differences (within -100px to +100px)
-      const toolbarPositioned = positions.toolbarAboveBlock > -100 && positions.toolbarAboveBlock < 100;
-
-      // Add button should be ~8px below block (allow generous tolerance for CI browser differences)
-      const addButtonPositioned = positions.addButtonBelowBlock >= -20 && positions.addButtonBelowBlock < 50;
-
-      // Horizontal alignment check: tolerate small misalignments since toolbar is positioned
-      // Note: the toolbar is aligned with the block not the field!
-      const aligned = true; // Skip strict alignment check for now
-
-      if (!toolbarPositioned) {
+      if (!blockBox || !outlineBox) {
         return {
           ok: false,
-          reason: `Toolbar not positioned correctly: toolbarAboveBlock=${positions.toolbarAboveBlock} (expected -100 to 100)`,
+          reason: `Missing bounding boxes: block=${!!blockBox}, outline=${!!outlineBox}`,
         };
       }
-      if (!addButtonPositioned) {
+
+      // Check if outline covers this specific block
+      // Outline is either a full box around the block, or a bottom line
+      const tolerance = 20;
+
+      // Check horizontal alignment (X and width should match)
+      const xDiff = Math.abs(blockBox.x - outlineBox.x);
+      const widthDiff = Math.abs(blockBox.width - outlineBox.width);
+
+      if (xDiff > tolerance || widthDiff > tolerance) {
         return {
           ok: false,
-          reason: `Add button not positioned correctly: addButtonBelowBlock=${positions.addButtonBelowBlock} (expected -20 to 50)`,
+          reason: `Outline not horizontally aligned. Block: x=${blockBox.x.toFixed(0)} w=${blockBox.width.toFixed(0)}, Outline: x=${outlineBox.x.toFixed(0)} w=${outlineBox.width.toFixed(0)}`,
         };
+      }
+
+      // Check vertical alignment
+      // If outline is a full box: top should match block top, height should match
+      // If outline is a bottom line: top should be at block bottom
+      const isFullBox = outlineBox.height > 10;
+      if (isFullBox) {
+        // Full box - should surround the block
+        const topDiff = Math.abs(blockBox.y - outlineBox.y);
+        const heightDiff = Math.abs(blockBox.height - outlineBox.height);
+        if (topDiff > tolerance || heightDiff > tolerance) {
+          return {
+            ok: false,
+            reason: `Outline box not around block. Block: y=${blockBox.y.toFixed(0)} h=${blockBox.height.toFixed(0)}, Outline: y=${outlineBox.y.toFixed(0)} h=${outlineBox.height.toFixed(0)}`,
+          };
+        }
+      } else {
+        // Bottom line - should be at block's bottom edge
+        const blockBottom = blockBox.y + blockBox.height;
+        const bottomDiff = Math.abs(blockBottom - outlineBox.y);
+        if (bottomDiff > tolerance) {
+          return {
+            ok: false,
+            reason: `Outline line not at block bottom. Block bottom: ${blockBottom.toFixed(0)}, Outline Y: ${outlineBox.y.toFixed(0)}, diff: ${bottomDiff.toFixed(0)}`,
+          };
+        }
       }
 
       return { ok: true };
@@ -892,26 +1065,110 @@ export class AdminUIHelper {
    * Verify the positioning relationships between block UI elements and the block.
    * Returns measurements for toolbar, add button, and alignment.
    */
-  async verifyBlockUIPositioning(blockId: string): Promise<{
+  async verifyBlockUIPositioning(
+    blockId: string,
+    options: { timeout?: number } = {},
+  ): Promise<{
     toolbarAboveBlock: number;
     addButtonBelowBlock: number;
+    addButtonRightOfBlock: number;
+    addButtonDirection: 'bottom' | 'right' | 'unknown';
     horizontalAlignment: boolean;
   }> {
+    const timeout = options.timeout ?? 5000;
+    const startTime = Date.now();
+
+    // Poll until the add button is positioned for this block (top or bottom aligned)
+    // This handles the race condition where React has rendered but browser hasn't painted
+    while (Date.now() - startTime < timeout) {
+      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      const toolbarBox = await this.getToolbarBoundingBox();
+      const addButtonBox = await this.getAddButtonBoundingBox();
+
+      if (blockBox && toolbarBox && addButtonBox) {
+        // Check if add button is positioned for THIS block (either top-aligned or bottom-aligned)
+        const addButtonTopAligned = Math.abs(addButtonBox.y - blockBox.y) < 30;
+        const addButtonBottomAligned =
+          Math.abs(addButtonBox.y - (blockBox.y + blockBox.height)) < 30;
+
+        if (addButtonTopAligned || addButtonBottomAligned) {
+          // Add button is positioned for this block, return the measurements
+          return this.measureBlockUIPositioningInternal(
+            blockBox,
+            toolbarBox,
+            addButtonBox,
+          );
+        }
+      }
+
+      // Wait a bit before polling again
+      await this.page.waitForTimeout(50);
+    }
+
+    // Timeout - return measurements anyway (test will likely fail with useful info)
     const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
     const toolbarBox = await this.getToolbarBoundingBox();
     const addButtonBox = await this.getAddButtonBoundingBox();
 
     if (!blockBox || !toolbarBox || !addButtonBox) {
-      throw new Error(`Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}, addButton=${!!addButtonBox}`);
+      throw new Error(
+        `Missing bounding boxes: block=${!!blockBox}, toolbar=${!!toolbarBox}, addButton=${!!addButtonBox}`,
+      );
+    }
+
+    return this.measureBlockUIPositioningInternal(
+      blockBox,
+      toolbarBox,
+      addButtonBox,
+    );
+  }
+
+  /**
+   * Internal helper to calculate positioning measurements from bounding boxes.
+   */
+  private measureBlockUIPositioningInternal(
+    blockBox: { x: number; y: number; width: number; height: number },
+    toolbarBox: { x: number; y: number; width: number; height: number },
+    addButtonBox: { x: number; y: number; width: number; height: number },
+  ): {
+    toolbarAboveBlock: number;
+    addButtonBelowBlock: number;
+    addButtonRightOfBlock: number;
+    addButtonDirection: 'bottom' | 'right' | 'unknown';
+    horizontalAlignment: boolean;
+  } {
+    // Distance from bottom of block to top of add button (positive = button is below)
+    const addButtonBelowBlock = addButtonBox.y - (blockBox.y + blockBox.height);
+    // Distance from right edge of block to left edge of add button (positive = button is to right)
+    const addButtonRightOfBlock = addButtonBox.x - (blockBox.x + blockBox.width);
+
+    // Determine direction based on position
+    // "bottom" = button's top is near/below block's bottom (within 20px)
+    // "right" = button's top is near block's top (top-aligned, within 20px)
+    //           This includes when button is constrained to be inside the block
+    let addButtonDirection: 'bottom' | 'right' | 'unknown' = 'unknown';
+    const addButtonTopAligned = Math.abs(addButtonBox.y - blockBox.y) < 20;
+    const addButtonBottomAligned =
+      addButtonBelowBlock >= -5 && addButtonBelowBlock < 20;
+
+    if (addButtonBottomAligned && !addButtonTopAligned) {
+      addButtonDirection = 'bottom';
+    } else if (addButtonTopAligned) {
+      // Top-aligned means 'right' direction (even if constrained to be inside block)
+      addButtonDirection = 'right';
     }
 
     return {
       // Distance from bottom of toolbar to top of block
       toolbarAboveBlock: blockBox.y - (toolbarBox.y + toolbarBox.height),
       // Distance from bottom of block to top of add button
-      addButtonBelowBlock: addButtonBox.y - (blockBox.y + blockBox.height),
+      addButtonBelowBlock,
+      // Distance from right edge of block to left edge of add button
+      addButtonRightOfBlock,
+      // Detected direction of add button relative to block
+      addButtonDirection,
       // Check if toolbar and block are horizontally aligned (within 2px tolerance)
-      horizontalAlignment: Math.abs(toolbarBox.x - blockBox.x) < 2
+      horizontalAlignment: Math.abs(toolbarBox.x - blockBox.x) < 2,
     };
   }
 
@@ -1503,6 +1760,7 @@ export class AdminUIHelper {
   /**
    * Check if a block type is visible in the block chooser.
    * Block types: 'slate', 'image', 'video', 'listing', etc.
+   * Note: Only searches within the block chooser popup, not the entire page.
    */
   async isBlockTypeVisible(blockType: string): Promise<boolean> {
     // Different block types have different display names
@@ -1511,14 +1769,19 @@ export class AdminUIHelper {
       image: ['Image', 'image'],
       video: ['Video', 'video'],
       listing: ['Listing', 'listing'],
+      columns: ['Columns', 'columns'],
+      hero: ['Hero', 'hero'],
     };
 
     const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
 
-    // Try to find the block type button
+    // Scope search to block chooser only (not sidebar or other parts of page)
+    const blockChooser = this.page.locator('.blocks-chooser');
+
+    // Try to find the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = this.page.locator(`button:has-text("${name}")`).or(
-        this.page.locator(`[data-block-type="${name.toLowerCase()}"]`)
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
+        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
       ).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -1547,10 +1810,16 @@ export class AdminUIHelper {
 
     const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
 
-    // Try to find and click the block type button
+    // Block chooser is rendered as a portal directly on document.body
+    // with class "blocks-chooser". Look specifically within this container
+    // to avoid matching sidebar buttons with similar text.
+    const blockChooser = this.page.locator('.blocks-chooser');
+
+    // Try to find and click the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = this.page.locator(`button:has-text("${name}")`).or(
-        this.page.locator(`[data-block-type="${name.toLowerCase()}"]`)
+      // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
+        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
       ).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -1929,22 +2198,174 @@ export class AdminUIHelper {
   /**
    * Get the target drop position for a block in PAGE coordinates.
    * Returns Y at 25% for insertBefore, 75% for insertAfter.
+   *
+   * Note: We use evaluate() with getBoundingClientRect() to get coords relative
+   * to the iframe's VIEWPORT (not scrollable content), then add the iframe's
+   * position in the page. This ensures correct coords even after auto-scroll.
    */
   private async getDropPositionInPageCoords(
     targetBlock: Locator,
     insertAfter: boolean
   ): Promise<{ x: number; y: number }> {
-    const rect = await targetBlock.boundingBox();
-    if (!rect) {
-      throw new Error('Target block not found');
+    // Use evaluate to get getBoundingClientRect - this gives coords relative
+    // to the iframe's VIEWPORT, which is what we need for mouse positioning
+    const rect = await targetBlock.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+
+    // Get iframe position in page coordinates
+    const iframeEl = this.page.locator('#previewIframe');
+    const iframeRect = await iframeEl.boundingBox();
+    if (!iframeRect) {
+      throw new Error('Could not get iframe bounding box');
     }
 
-    return {
-      x: rect.x + rect.width / 2,
+    const result = {
+      x: iframeRect.x + rect.x + rect.width / 2,
       y: insertAfter
-        ? rect.y + rect.height * 0.75
-        : rect.y + rect.height * 0.25,
+        ? iframeRect.y + rect.y + rect.height * 0.75
+        : iframeRect.y + rect.y + rect.height * 0.25,
     };
+
+    console.log(`[TEST] getDropPositionInPageCoords: rect.y=${rect.y.toFixed(1)}, iframeRect.y=${iframeRect.y.toFixed(1)}, result.y=${result.y.toFixed(1)}`);
+
+    return result;
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 1: START DRAG
+  // ============================================================================
+
+  /**
+   * Start a drag operation from the toolbar drag handle.
+   * Returns the starting position for reference.
+   */
+  private async startDragFromToolbar(): Promise<{ x: number; y: number }> {
+    const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
+    console.log('[TEST] Drag start position (page):', startPosPage);
+
+    if (!this.isInPageViewport(startPosPage.y)) {
+      throw new Error(
+        `Toolbar drag icon is off-screen at Y=${startPosPage.y}. ` +
+        `The block must be scrolled into view before dragging. ` +
+        `Ensure clickBlockInIframe() scrolls the selected block into view.`
+      );
+    }
+
+    await this.page.mouse.move(startPosPage.x, startPosPage.y);
+    await this.page.mouse.down();
+    await this.verifyDragShadowVisible();
+
+    return startPosPage;
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 2: AUTO-SCROLL TO TARGET
+  // ============================================================================
+
+  /**
+   * Auto-scroll the iframe until the target block is visible in the viewport.
+   * Returns when the target is in the viewport and ready for drop.
+   */
+  private async autoScrollToTarget(
+    targetBlock: Locator,
+    insertAfter: boolean,
+    maxAttempts: number = 40
+  ): Promise<{ x: number; y: number }> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.verifyDragShadowVisible();
+
+      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      console.log(`[TEST] Attempt ${attempt}: target at page Y=${dropPosPage.y.toFixed(1)}`);
+
+      const viewportSize = this.page.viewportSize();
+      const isAboveViewport = dropPosPage.y < 0;
+      const isBelowViewport = viewportSize && dropPosPage.y > viewportSize.height;
+      const needsAutoScroll = isAboveViewport || isBelowViewport;
+
+      if (!needsAutoScroll) {
+        return dropPosPage;
+      }
+
+      // Target is off-screen - move to edge to trigger auto-scroll
+      const scrollUp = isAboveViewport;
+      console.log(`[TEST] Target ${scrollUp ? 'above' : 'below'} viewport (Y=${dropPosPage.y.toFixed(1)}), triggering auto-scroll`);
+      await this.moveToScrollEdge(scrollUp);
+
+      // Wait for auto-scroll to happen (target position must change)
+      await this.waitForAutoScrollProgress(targetBlock, insertAfter, dropPosPage.y);
+    }
+
+    // If we get here, we've exceeded max attempts
+    throw new Error(`Auto-scroll failed after ${maxAttempts} attempts`);
+  }
+
+  /**
+   * Wait for auto-scroll to make progress (target position changes).
+   */
+  private async waitForAutoScrollProgress(
+    targetBlock: Locator,
+    insertAfter: boolean,
+    prevY: number
+  ): Promise<void> {
+    await expect(async () => {
+      await this.verifyDragShadowVisible();
+      if (!(await this.isDropIndicatorVisible())) {
+        throw new Error('Drop indicator not visible during auto-scroll');
+      }
+      const newPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      const scrollAmount = Math.abs(newPos.y - prevY);
+      if (scrollAmount < 5) {
+        throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
+      }
+      console.log(`[TEST] Auto-scroll happened, target moved by ${scrollAmount.toFixed(1)}px`);
+    }).toPass({ timeout: 2000 });
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 3: MOVE TO DROP POSITION
+  // ============================================================================
+
+  /**
+   * Move the mouse to the drop position and verify the drop indicator is correct.
+   *
+   * NOTE: We continuously update the mouse position until the drop indicator is correct.
+   * This handles the case where auto-scroll continues after we start moving to the target.
+   */
+  private async moveToDropPosition(
+    targetBlock: Locator,
+    insertAfter: boolean,
+    _initialDropPos: { x: number; y: number }
+  ): Promise<void> {
+    // Keep moving to the target and checking until indicator is correct
+    await expect(async () => {
+      // Get current position and move to it
+      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
+
+      // Wait a moment for the drop indicator to update
+      await this.page.waitForTimeout(50);
+
+      // Verify the indicator is in the right position
+      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+    }).toPass({ timeout: 5000 });
+  }
+
+  // ============================================================================
+  // DRAG AND DROP HELPER - STEP 4: DROP AND CLEANUP
+  // ============================================================================
+
+  /**
+   * Complete the drag operation by releasing the mouse and waiting for cleanup.
+   */
+  private async completeDrop(): Promise<void> {
+    await this.page.mouse.up();
+
+    const iframe = this.getIframe();
+    await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Drag complete');
   }
 
   /**
@@ -1985,109 +2406,97 @@ export class AdminUIHelper {
    * to trigger hydra's auto-scroll, which scrolls the iframe content until
    * the target becomes visible.
    *
-   * @param dragHandle - Unused, kept for API compatibility
+   * @param _dragHandle - Unused, kept for API compatibility
    * @param targetBlock - The block to drop near
    * @param insertAfter - If true, insert after target. If false, insert before.
    */
   async dragBlockWithMouse(
-    dragHandle: Locator,
+    _dragHandle: Locator,
     targetBlock: Locator,
     insertAfter: boolean = true
   ): Promise<void> {
-    // COORDINATE SYSTEM: All drag logic in hydra.js uses IFRAME coordinates.
-    // page.mouse uses PAGE coordinates. We translate when needed.
-    //
-    // IMPORTANT: This helper does NOT scroll. The caller (e.g., clickBlockInIframe)
-    // is responsible for ensuring the block and toolbar are visible before dragging.
-    // If the toolbar is off-screen, this method will fail with an assertion error.
+    // Step 1: Start drag from toolbar
+    await this.startDragFromToolbar();
 
-    // 1. Get toolbar position and ASSERT it's in viewport (don't scroll - that's caller's job)
-    const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
-    console.log('[TEST] Drag start position (page):', startPosPage);
+    // Step 2: Auto-scroll until target is in viewport
+    const dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
 
-    if (!this.isInPageViewport(startPosPage.y)) {
-      throw new Error(
-        `Toolbar drag icon is off-screen at Y=${startPosPage.y}. ` +
-        `The block must be scrolled into view before dragging. ` +
-        `Ensure clickBlockInIframe() scrolls the selected block into view.`
-      );
+    // Step 3: Move to drop position and verify indicator
+    await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage);
+
+    // Step 4: Complete the drop
+    await this.completeDrop();
+  }
+
+  /**
+   * Drag a block horizontally to a target position (for blocks with data-block-add="right").
+   * Uses X-axis position to determine left/right insertion.
+   *
+   * @param _dragHandle - Unused, kept for API compatibility
+   * @param targetBlock - The target block locator (where to drop)
+   * @param insertAfter - If true, insert to the right; if false, insert to the left
+   * @param expectIndicator - Whether to expect drop indicator (true) or rejection (false)
+   */
+  async dragBlockWithMouseHorizontal(
+    _dragHandle: Locator,
+    targetBlock: Locator,
+    insertAfter: boolean = true,
+    expectIndicator: boolean = true
+  ): Promise<boolean> {
+    // Step 1: Start drag from toolbar
+    await this.startDragFromToolbar();
+
+    // Step 2: Calculate horizontal drop position
+    const dropPosPage = await this.getHorizontalDropPosition(targetBlock, insertAfter);
+
+    // Step 3: Move to drop position
+    console.log('[TEST] Moving to horizontal drop position:', dropPosPage);
+    await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
+
+    // Step 4: Check drop indicator visibility
+    const indicatorVisible = await this.checkDropIndicator(expectIndicator);
+
+    // Step 5: Complete the drop
+    await this.completeDrop();
+
+    return indicatorVisible;
+  }
+
+  /**
+   * Get the horizontal drop position for a target block.
+   * Returns X at 25% for insertBefore (left), 75% for insertAfter (right).
+   */
+  private async getHorizontalDropPosition(
+    targetBlock: Locator,
+    insertAfter: boolean
+  ): Promise<{ x: number; y: number }> {
+    const targetRect = await targetBlock.boundingBox();
+    if (!targetRect) {
+      throw new Error('Could not get target block bounding box');
     }
 
-    // 2. Mouse down at toolbar position (page coords for page.mouse)
-    await this.page.mouse.move(startPosPage.x, startPosPage.y);
-    await this.page.mouse.down();
+    const dropX = insertAfter
+      ? targetRect.x + targetRect.width * 0.75 // Right side
+      : targetRect.x + targetRect.width * 0.25; // Left side
+    const dropY = targetRect.y + targetRect.height / 2; // Center vertically
 
-    // Verify drag shadow appears immediately after mousedown
-    await this.verifyDragShadowVisible();
+    return { x: dropX, y: dropY };
+  }
 
-    // 3. Move towards target, using auto-scroll when target is off-screen
-    const targetBlockUid = await targetBlock.getAttribute('data-block-uid');
-    if (!targetBlockUid) {
-      throw new Error('Target block does not have data-block-uid attribute');
-    }
-
-    // Loop until auto-scroll stops and drop indicator is in position
-    const maxScrollAttempts = 40;
-    const autoScrollThreshold = 50; // hydra auto-scrolls within 50px of edges
-
-    for (let attempt = 0; attempt < maxScrollAttempts; attempt++) {
-      // Assert shadow is visible while dragging
-      await this.verifyDragShadowVisible();
-
-      // Get current target position in iframe coords
-      const prevPosInIframeCoords = await this.getDropPositionInIframeCoords(targetBlockUid, insertAfter);
-      const dropPosPage = await this.iframeCoordsToPageCoords(prevPosInIframeCoords);
-
-      console.log(`[TEST] Attempt ${attempt}: target at iframe Y=${prevPosInIframeCoords.y.toFixed(1)}`);
-
-      // Determine if target is near edge (would trigger auto-scroll)
-      const viewportSize = this.page.viewportSize();
-      const nearTopEdge = prevPosInIframeCoords.y < autoScrollThreshold;
-      const nearBottomEdge = viewportSize && prevPosInIframeCoords.y > viewportSize.height - autoScrollThreshold;
-      const expectAutoScroll = nearTopEdge || nearBottomEdge;
-
-      if (expectAutoScroll) {
-        // Target is near edge - move to edge to trigger auto-scroll
-        const scrollUp = nearTopEdge;
-        console.log(`[TEST] Target near ${scrollUp ? 'top' : 'bottom'} edge, triggering auto-scroll`);
-        await this.moveToScrollEdge(scrollUp);
-
-        // Wait for auto-scroll to happen (target position must change)
-        await expect(async () => {
-          await this.verifyDragShadowVisible();
-          if (!(await this.isDropIndicatorVisible())) {
-            throw new Error('Drop indicator not visible during auto-scroll');
-          }
-          const newPos = await this.getDropPositionInIframeCoords(targetBlockUid, insertAfter);
-          const scrollAmount = Math.abs(newPos.y - prevPosInIframeCoords.y);
-          if (scrollAmount < 5) {
-            throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
-          }
-          console.log(`[TEST] Auto-scroll happened, target moved by ${scrollAmount.toFixed(1)}px`);
-        }).toPass({ timeout: 2000 });
-        // Loop again to check if more scrolling needed
-        continue;
-      }
-
-      // Target is in safe zone - move directly to it
-      console.log('[TEST] Target in safe zone, moving to drop position:', dropPosPage);
-      await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
-
-      // Wait for drop indicator to be in position (no more auto-scroll should happen)
-      await expect(async () => {
-        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
-      }).toPass({ timeout: 5000 });
-      break;
-    }
-
-    // 4. Drop
-    await this.page.mouse.up();
-
-    // 5. Wait for drop marker and shadow to disappear
+  /**
+   * Check if the drop indicator is visible as expected.
+   */
+  private async checkDropIndicator(expectIndicator: boolean): Promise<boolean> {
     const iframe = this.getIframe();
-    await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
-    await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
-    console.log('[TEST] Drag complete');
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+
+    if (expectIndicator) {
+      await expect(dropIndicator).toBeVisible({ timeout: 2000 });
+      return true;
+    } else {
+      await expect(dropIndicator).not.toBeVisible();
+      return false;
+    }
   }
 
   /**
@@ -2582,5 +2991,44 @@ export class AdminUIHelper {
 
     console.log(`[TEST] Found sidebar toolbar button: ${format}`);
     return buttonHandle as ElementHandle;
+  }
+
+  /**
+   * Add a block via the sidebar ChildBlocksWidget.
+   * Clicks the add button for the specified container field, and if a block chooser
+   * appears (multiple allowed types), selects the specified block type.
+   *
+   * @param containerFieldTitle - The title of the container field section (e.g., 'Columns', 'Blocks')
+   * @param blockType - The block type to add (e.g., 'column', 'slate', 'image'). If the container
+   *                    only allows one type, this is ignored and the block is auto-inserted.
+   */
+  async addBlockViaSidebar(
+    containerFieldTitle: string,
+    blockType?: string,
+  ): Promise<void> {
+    // Find the container field section and its add button
+    const section = this.page.locator('.container-field-section', {
+      has: this.page.locator('.widget-title', { hasText: containerFieldTitle }),
+    });
+    const addButton = section.getByRole('button', { name: 'Add block' });
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
+    // Check if block chooser appeared (multiple allowed types)
+    const blockChooser = this.page.locator('.blocks-chooser');
+    const chooserVisible = await blockChooser
+      .waitFor({ state: 'visible', timeout: 1000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (chooserVisible && blockType) {
+      // Select the specified block type
+      const blockButton = blockChooser.getByRole('button', {
+        name: new RegExp(blockType, 'i'),
+      });
+      await blockButton.click();
+      // Wait for chooser to close
+      await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
+    }
   }
 }

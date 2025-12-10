@@ -4,9 +4,12 @@ import { Transforms, Node, Range, Editor, Point } from 'slate';
 import { isEqual } from 'lodash';
 import config from '@plone/volto/registry';
 import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
+import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms from '../../utils/slateTransforms';
-import { useDispatch, useSelector } from 'react-redux';
-import { setPluginOptions } from '@plone/volto-slate/actions';
+import { getBlockById, updateBlockById } from '../../utils/blockPath';
+import { useDispatch } from 'react-redux';
+import FormatDropdown from './FormatDropdown';
+import DropdownMenu from './DropdownMenu';
 
 /**
  * Validates if a selection is valid for the given document structure.
@@ -59,6 +62,39 @@ class SlateErrorBoundary extends Component {
 }
 
 /**
+ * Checks if a button factory creates a BlockButton component.
+ *
+ * Button factories in config.settings.slate.buttons are arrow functions that
+ * return React elements: (props) => <MarkElementButton ... /> or <BlockButton ... />
+ *
+ * We call the factory (with empty props) to get the element, then compare the
+ * element's type to the imported BlockButton component reference.
+ *
+ * BlockButtons are used for block-level formatting (headings, lists, blockquote).
+ * They should go in the FormatDropdown. Other buttons (MarkElementButton for bold,
+ * italic, etc.) stay in the toolbar.
+ *
+ * NOTE: We compare element.type === BlockButton directly, which works in both
+ * development and production builds because it's a reference comparison, not
+ * a string name comparison that would be affected by minification.
+ */
+function isBlockButton(Btn, BlockButtonRef) {
+  if (!Btn || !BlockButtonRef) return false;
+  try {
+    // Call the factory function to get the React element
+    // The factory is like: (props) => <BlockButton format="h2" ... />
+    // Calling it returns the element {type: BlockButton, props: {...}}
+    const element = Btn({});
+    // Compare element.type to the imported BlockButton component reference
+    // This is a reference comparison that works in production builds
+    return element?.type === BlockButtonRef;
+  } catch (e) {
+    // If the factory throws (shouldn't happen), treat as non-block button
+    return false;
+  }
+}
+
+/**
  * Synced Slate Toolbar - Renders real Slate buttons with synchronized editor
  *
  * This component creates a real Slate editor that stays synchronized with:
@@ -74,15 +110,13 @@ class SlateErrorBoundary extends Component {
  * When a button modifies the editor, onChange fires and we send the updated
  * value back to Redux and the iframe.
  *
- * This editor is also used by keyboard shortcuts - they access it via
- * window.voltoHydraToolbarEditor instead of duplicating format logic.
- *
  * For detailed data flow architecture (format buttons, sidebar editing, hotkeys,
  * block selection), see: docs/slate-transforms-architecture.md
  */
 const SyncedSlateToolbar = ({
   selectedBlock,
   form,
+  blockPathMap,
   currentSelection,
   onChangeFormData,
   completedFlushRequestId,
@@ -91,8 +125,21 @@ const SyncedSlateToolbar = ({
   blockUI,
   blockFieldTypes,
   iframeElement,
-  onOpenMenu,
+  onDeleteBlock,
+  onSelectBlock,
+  parentId,
+  maxToolbarWidth,
 }) => {
+
+  // Helper to get block data using path lookup (supports nested blocks)
+  const getBlock = useCallback((blockId) => {
+    return getBlockById(form, blockPathMap, blockId);
+  }, [form, blockPathMap]);
+
+  // Helper to update block data using path lookup (supports nested blocks)
+  const updateBlockInForm = useCallback((blockId, newBlockData) => {
+    return updateBlockById(form, blockPathMap, blockId, newBlockData);
+  }, [form, blockPathMap]);
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   const [editor] = useState(() => {
@@ -158,17 +205,6 @@ const SyncedSlateToolbar = ({
     };
   }, [editor]);
 
-  // Expose editor globally for keyboard shortcuts
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.voltoHydraToolbarEditor = editor;
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.voltoHydraToolbarEditor = null;
-      }
-    };
-  }, [editor]);
 
   // Detect clicks in iframe to close popups like LinkEditor
   // Clicks in iframe don't bubble to parent document, so handleClickOutside never fires
@@ -198,6 +234,10 @@ const SyncedSlateToolbar = ({
 
   // Force re-renders when value changes (to update button active states)
   const [renderKey, setRenderKey] = useState(0);
+
+  // State for dropdown menu
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuButtonRect, setMenuButtonRect] = useState(null);
 
   // Helper to safely increment renderKey without unmounting popups
   // When LinkEditor is open, we skip the remount to prevent this.input.focus() errors
@@ -267,9 +307,9 @@ const SyncedSlateToolbar = ({
 
   // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
   useEffect(() => {
-    if (!selectedBlock || !form.blocks[selectedBlock]) return;
+    const block = getBlock(selectedBlock);
+    if (!selectedBlock || !block) return;
 
-    const block = form.blocks[selectedBlock];
     const fieldName = blockUI?.focusedFieldName || 'value';
     const fieldValue = block[fieldName];
 
@@ -389,7 +429,7 @@ const SyncedSlateToolbar = ({
         delete button.dataset.bypassCapture;
       }
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey]);
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey, getBlock]);
 
   // Handle transformAction from iframe (format, paste, delete)
   // These arrive atomically with form data, so editor already has the latest text
@@ -550,7 +590,7 @@ const SyncedSlateToolbar = ({
       internalValueRef.current = newValue;
 
       // Only call onChange if value actually changed (like Volto line 108)
-      const block = form.blocks[selectedBlock];
+      const block = getBlock(selectedBlock);
       const fieldName = blockUI?.focusedFieldName || 'value';
       const currentFieldValue = block?.[fieldName];
 
@@ -558,17 +598,12 @@ const SyncedSlateToolbar = ({
         return;
       }
 
-      // Build updated form data with the correct field
-      const updatedForm = {
-        ...form,
-        blocks: {
-          ...form.blocks,
-          [selectedBlock]: {
-            ...form.blocks[selectedBlock],
-            [fieldName]: newValue,
-          },
-        },
+      // Build updated form data with the correct field (supports nested blocks)
+      const updatedBlock = {
+        ...block,
+        [fieldName]: newValue,
       };
+      const updatedForm = updateBlockInForm(selectedBlock, updatedBlock);
 
       // Track what we're sending so useEffect doesn't overwrite with stale data
       lastSentValueRef.current = newValue;
@@ -582,17 +617,102 @@ const SyncedSlateToolbar = ({
       // DON'T increment renderKey here - it would remount <Slate> and reset editor.children
       // Buttons will re-render naturally when React processes the state updates
     },
-    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor],
+    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor, getBlock, updateBlockInForm],
   );
 
-  // Create Redux store for persistent helpers (like LinkEditor)
-  // This provides the state management that Slate plugins expect
   // Get button configuration
   const toolbarButtons = config.settings.slate?.toolbarButtons || [];
   const buttons = config.settings.slate?.buttons || {};
   const persistentHelpers = config.settings.slate?.persistentHelpers || [];
 
+  // Capture handlers for toolbar buttons - shared between main toolbar and overflow menu
+  // These intercept mousedown to flush the iframe buffer before applying formatting
+  const handleButtonMouseDownCapture = useCallback(
+    (e) => {
+      // Don't intercept clicks inside popups (like LinkEditor's Clear/Submit buttons)
+      if (e.target.closest('.add-link')) {
+        return;
+      }
 
+      // Don't intercept format dropdown trigger - it just opens a menu, no formatting
+      if (e.target.closest('.format-dropdown-trigger')) {
+        return;
+      }
+
+      const button =
+        e.target.closest('button') || e.target.closest('[data-toolbar-button]');
+      if (!button) return;
+
+      // Check if this is a re-triggered event after flush
+      if (button.dataset.bypassCapture === 'true') {
+        return;
+      }
+
+      // Prevent the immediate mousedown - we'll re-trigger after flush
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Generate unique request ID and store pending request
+      const requestId = `flush-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      pendingFlushRef.current = { requestId, button };
+
+      // Send FLUSH_BUFFER to iframe - response will come via completedFlushRequestId prop
+      const iframe = document.getElementById('previewIframe');
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
+      }
+    },
+    [],
+  );
+
+  const handleButtonClickCapture = useCallback(
+    (e) => {
+      const button =
+        e.target.closest('button') || e.target.closest('[data-toolbar-button]');
+      if (!button) return;
+
+      if (button.dataset.bypassCapture === 'true') {
+        return;
+      }
+
+      // If pendingFlushRef has a request, the mousedown was intercepted
+      // Block this click to prevent double-application
+      if (pendingFlushRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    [],
+  );
+
+  // Classify buttons into block buttons (FormatDropdown) and inline buttons (toolbar)
+  // Uses isBlockButton() which inspects element type without rendering
+  const { blockButtons, allInlineButtons } = useMemo(() => {
+    const blockBtns = [];
+    const inlineBtns = [];
+
+    toolbarButtons.forEach((name) => {
+      if (name === 'separator') return;
+      const Btn = buttons[name];
+      if (!Btn) return;
+
+      // Create element for later rendering
+      const element = <Btn />;
+
+      // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
+      // isBlockButton compares element.type to imported BlockButton reference
+      if (isBlockButton(Btn, BlockButton)) {
+        blockBtns.push({ name, element });
+      } else {
+        inlineBtns.push({ name, element });
+      }
+    });
+
+    return {
+      blockButtons: blockBtns,
+      allInlineButtons: inlineBtns,
+    };
+  }, [toolbarButtons, buttons]);
 
   if (!blockUI || !selectedBlock) {
     return null;
@@ -607,8 +727,8 @@ const SyncedSlateToolbar = ({
     throw new Error(`[SyncedSlateToolbar] form.blocks is ${form.blocks} - form object doesn't have blocks property. Form keys: ${Object.keys(form).join(', ')}`);
   }
 
-  // Check if we have block data for this specific block
-  const block = form.blocks[selectedBlock];
+  // Check if we have block data for this specific block (supports nested blocks via path lookup)
+  const block = getBlock(selectedBlock);
   if (!block) {
     return null; // No block data yet - this is OK during initial render
   }
@@ -645,9 +765,35 @@ const SyncedSlateToolbar = ({
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
-  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0 };
+  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800 };
   const toolbarTop = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
-  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Aligned with block container left edge
+  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Always align with block's left edge
+
+  // Calculate max width so toolbar doesn't extend past iframe right edge (sidebar boundary)
+  const iframeRight = toolbarIframeRect.left + toolbarIframeRect.width;
+  const availableWidth = Math.max(100, iframeRight - toolbarLeft); // Min 100px for basic controls
+  const constrainedMaxWidth = Math.min(maxToolbarWidth || 400, availableWidth);
+
+  // Calculate how many buttons fit based on constrained width
+  // Measured widths: drag handle ~30px, menu button ~30px, gaps ~10px
+  const BUTTON_WIDTH = 32;
+  const FORMAT_DROPDOWN_WIDTH = 50;
+  const FIXED_WIDTH = 70; // drag handle (30) + menu button (30) + gaps/padding (10)
+  const availableForButtons = constrainedMaxWidth - FIXED_WIDTH;
+
+  // Format dropdown counts as ~1.5 buttons worth of space
+  const hasFormatDropdown = blockButtons.length > 0;
+  const formatDropdownSlots = hasFormatDropdown ? Math.ceil(FORMAT_DROPDOWN_WIDTH / BUTTON_WIDTH) : 0;
+  const availableSlots = Math.max(0, Math.floor(availableForButtons / BUTTON_WIDTH));
+  const slotsForInlineButtons = Math.max(0, availableSlots - formatDropdownSlots);
+
+  // Show format dropdown only if there's room for it plus at least 1 inline button
+  const showFormatDropdown = hasFormatDropdown && availableSlots >= formatDropdownSlots + 1;
+
+  const visibleButtons = allInlineButtons.slice(0, slotsForInlineButtons);
+  const overflowButtons = allInlineButtons.slice(slotsForInlineButtons);
+
+
 
 
   return (
@@ -658,6 +804,7 @@ const SyncedSlateToolbar = ({
           position: 'fixed',
           top: `${toolbarTop}px`,
           left: `${toolbarLeft}px`,
+          maxWidth: `${constrainedMaxWidth}px`,
           zIndex: 10,
           display: 'flex',
           gap: '2px',
@@ -667,6 +814,7 @@ const SyncedSlateToolbar = ({
           padding: '2px',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
           pointerEvents: 'none', // Allow events to pass through to iframe drag button
+          overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
       {/* Drag handle - visual indicator only, pointer events pass through to iframe button */}
@@ -695,65 +843,8 @@ const SyncedSlateToolbar = ({
       {showFormatButtons && hasValidSlateValue && (
         <div
           style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}
-          onMouseDownCapture={(e) => {
-            // Slate buttons apply formatting on mousedown (not click) to prevent focus loss
-            // We must capture mousedown to intercept before format is applied
-            console.log('[TOOLBAR] onMouseDownCapture fired, target:', e.target.tagName, e.target.title || e.target.className);
-
-            // Don't intercept clicks inside popups (like LinkEditor's Clear/Submit buttons)
-            if (e.target.closest('.add-link')) {
-              console.log('[TOOLBAR] Click inside popup, not intercepting');
-              return;
-            }
-
-            // Find the actual button element - could be button, a (Semantic UI), or our wrapper span
-            const button = e.target.closest('button') || e.target.closest('[data-toolbar-button]');
-            if (!button) {
-              console.log('[TOOLBAR] No button found, target:', e.target.tagName);
-              return;
-            }
-
-            // Check if this is a re-triggered event after flush
-            if (button.dataset.bypassCapture === 'true') {
-              console.log('[TOOLBAR] Bypass capture - letting mousedown through');
-              return; // Let the mousedown proceed normally
-            }
-
-            console.log('[TOOLBAR] Button mousedown intercepted, flushing buffer first');
-
-            // Prevent the immediate mousedown - we'll re-trigger after flush
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Generate unique request ID and store pending request
-            const requestId = `flush-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            pendingFlushRef.current = { requestId, button };
-
-            // Send FLUSH_BUFFER to iframe - response will come via completedFlushRequestId prop
-            const iframe = document.getElementById('previewIframe');
-            if (iframe?.contentWindow) {
-              iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
-            }
-          }}
-          onClickCapture={(e) => {
-            // Also capture click to prevent it when mousedown was intercepted
-            // Click fires after mousedown, so if we intercepted mousedown, we should also block click
-            const button = e.target.closest('button') || e.target.closest('[data-toolbar-button]');
-            if (!button) return;
-
-            if (button.dataset.bypassCapture === 'true') {
-              console.log('[TOOLBAR] Bypass capture - letting click through');
-              return;
-            }
-
-            // If pendingFlushRef has a request, the mousedown was intercepted
-            // Block this click to prevent double-application
-            if (pendingFlushRef.current) {
-              console.log('[TOOLBAR] Click blocked - waiting for flush');
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
+          onMouseDownCapture={handleButtonMouseDownCapture}
+          onClickCapture={handleButtonClickCapture}
         >
             <SlateErrorBoundary>
               <Slate
@@ -762,34 +853,22 @@ const SyncedSlateToolbar = ({
                 initialValue={currentValue}
                 onChange={handleChange}
               >
-                {toolbarButtons.map((name, i) => {
-                if (name === 'separator') {
-                  return (
-                    <div
-                      key={i}
-                      className="toolbar-separator"
-                      style={{
-                        width: '1px',
-                        height: '20px',
-                        background: '#e0e0e0',
-                        margin: '0 2px',
-                      }}
+                <>
+                  {/* Format dropdown for block-level buttons - only show if room */}
+                  {showFormatDropdown && (
+                    <FormatDropdown
+                      blockButtons={blockButtons}
+                      onMouseDownCapture={handleButtonMouseDownCapture}
+                      onClickCapture={handleButtonClickCapture}
                     />
-                  );
-                }
-
-                const Btn = buttons[name];
-                if (!Btn) {
-                  console.log(`[TOOLBAR] Button "${name}" not found in buttons config`);
-                  return null;
-                }
-
-                return (
-                  <span key={`${name}-${i}`} data-toolbar-button={name}>
-                    <Btn />
-                  </span>
-                );
-              })}
+                  )}
+                  {/* Visible inline format buttons */}
+                  {visibleButtons.map(({ name, element }, i) => (
+                    <span key={`${name}-${i}`} data-toolbar-button={name}>
+                      {element}
+                    </span>
+                  ))}
+                </>
 
               {/* Render persistent helpers (like LinkEditor) - they use editor.hydra for positioning */}
               {persistentHelpers.map((Helper, idx) => (
@@ -803,7 +882,7 @@ const SyncedSlateToolbar = ({
       {/* Three-dots menu button */}
       <button
         style={{
-          background: '#fff',
+          background: menuOpen ? '#e8e8e8' : '#fff',
           border: 'none',
           padding: '4px 6px',
           cursor: 'pointer',
@@ -813,17 +892,46 @@ const SyncedSlateToolbar = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          flexShrink: 0, // Don't shrink - always visible
         }}
         title="More options"
         onClick={(e) => {
           e.stopPropagation();
           const rect = e.currentTarget.getBoundingClientRect();
-          onOpenMenu?.(rect);
+          setMenuButtonRect(rect);
+          setMenuOpen(!menuOpen);
         }}
       >
         ⋯
       </button>
     </div>
+
+    {/* Dropdown menu with overflow buttons and actions */}
+    {menuOpen && (
+      <DropdownMenu
+        selectedBlock={selectedBlock}
+        onDeleteBlock={onDeleteBlock}
+        menuButtonRect={menuButtonRect}
+        onClose={() => setMenuOpen(false)}
+        onOpenSettings={() => {
+          // Expand sidebar if collapsed
+          const sidebarContainer = document.querySelector('.sidebar-container');
+          if (sidebarContainer?.classList.contains('collapsed')) {
+            const triggerButton = sidebarContainer.querySelector('.trigger');
+            triggerButton?.click();
+          }
+        }}
+        parentId={parentId}
+        onSelectBlock={onSelectBlock}
+        overflowButtons={overflowButtons}
+        showFormatDropdown={!showFormatDropdown}
+        blockButtons={blockButtons}
+        editor={editor}
+        onChange={handleChange}
+        onMouseDownCapture={handleButtonMouseDownCapture}
+        onClickCapture={handleButtonClickCapture}
+      />
+    )}
     </>
   );
 };

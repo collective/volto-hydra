@@ -65,7 +65,7 @@
     "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image"]
   },
   "allow_discussion": false,
-  "is_folderish": false,
+  "is_folderish": true,
   "exclude_from_nav": false,
   "created": "2025-01-01T12:00:00+00:00",
   "modified": "2025-01-01T12:00:00+00:00",
@@ -79,8 +79,16 @@
       "document_actions": [],
       "object": [
         {
+          "id": "view",
+          "title": "View"
+        },
+        {
           "id": "edit",
           "title": "Edit"
+        },
+        {
+          "id": "folderContents",
+          "title": "Contents"
         }
       ],
       "object_buttons": [],

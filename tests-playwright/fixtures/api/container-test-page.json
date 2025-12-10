@@ -1,0 +1,132 @@
+{
+  "@id": "http://localhost:8888/container-test-page",
+  "@type": "Document",
+  "UID": "container-test-page-uid",
+  "id": "container-test-page",
+  "title": "Container Test Page",
+  "description": "A test page with nested container blocks",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "columns-1": {
+      "@type": "columns",
+      "title": "My Columns Section",
+      "top_images": {
+        "top-img-1": {
+          "@type": "image",
+          "url": "http://localhost:8888/test-image-1.jpg",
+          "alt": "Top Image 1"
+        },
+        "top-img-2": {
+          "@type": "image",
+          "url": "http://localhost:8888/test-image-2.jpg",
+          "alt": "Top Image 2"
+        }
+      },
+      "top_images_layout": {"items": ["top-img-1", "top-img-2"]},
+      "columns": {
+        "col-1": {
+          "@type": "column",
+          "title": "Left Column",
+          "blocks": {
+            "text-1a": {
+              "@type": "slate",
+              "value": [{"type": "p", "children": [{"text": "Col 1 Text 1"}]}],
+              "plaintext": "Col 1 Text 1"
+            },
+            "text-1b": {
+              "@type": "slate",
+              "value": [{"type": "p", "children": [{"text": "Col 1 Text 2"}]}],
+              "plaintext": "Col 1 Text 2"
+            }
+          },
+          "blocks_layout": {"items": ["text-1a", "text-1b"]}
+        },
+        "col-2": {
+          "@type": "column",
+          "title": "Right Column",
+          "blocks": {
+            "text-2a": {
+              "@type": "slate",
+              "value": [{"type": "p", "children": [{"text": "Col 2 Text 1"}]}],
+              "plaintext": "Col 2 Text 1"
+            }
+          },
+          "blocks_layout": {"items": ["text-2a"]}
+        }
+      },
+      "columns_layout": {"items": ["col-1", "col-2"]}
+    },
+    "text-after": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Text after columns"}]}],
+      "plaintext": "Text after columns"
+    },
+    "grid-1": {
+      "@type": "gridBlock",
+      "blocks": {
+        "grid-cell-1": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Grid Cell 1"}]}],
+          "plaintext": "Grid Cell 1"
+        },
+        "grid-cell-2": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Grid Cell 2"}]}],
+          "plaintext": "Grid Cell 2"
+        }
+      },
+      "blocks_layout": {"items": ["grid-cell-1", "grid-cell-2"]}
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "columns-1", "text-after", "grid-1"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-01T12:00:00+00:00",
+  "modified": "2025-01-01T12:00:00+00:00",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "@components": {
+    "actions": {
+      "@id": "http://localhost:8888/container-test-page/@actions",
+      "document_actions": [],
+      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
+      "object_buttons": [],
+      "portal_tabs": [],
+      "site_actions": [],
+      "user": []
+    },
+    "breadcrumbs": {
+      "@id": "http://localhost:8888/container-test-page/@breadcrumbs",
+      "items": [
+        {"@id": "http://localhost:8888", "title": "Home"},
+        {"@id": "http://localhost:8888/container-test-page", "title": "Container Test Page"}
+      ],
+      "root": "http://localhost:8888"
+    },
+    "navigation": {
+      "@id": "http://localhost:8888/container-test-page/@navigation",
+      "items": []
+    },
+    "workflow": {
+      "@id": "http://localhost:8888/container-test-page/@workflow"
+    }
+  },
+  "can_manage_portlets": true,
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_add": true
+}

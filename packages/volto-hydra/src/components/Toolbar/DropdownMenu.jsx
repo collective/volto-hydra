@@ -1,24 +1,48 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useDispatch } from 'react-redux';
-import { deleteBlock, previousBlockId } from '@plone/volto/helpers';
-import { setSidebarTab } from '@plone/volto/actions';
+import SlateButtonsWrapper from './SlateButtonsWrapper';
+import FormatDropdown from './FormatDropdown';
 
 /**
  * Dropdown Menu for Block Actions
  *
- * Renders a dropdown menu with Settings and Remove options.
+ * Renders a dropdown menu with:
+ * - Overflow buttons (formatting buttons that don't fit in toolbar)
+ * - Settings, Select Container, and Remove options
  * Uses React portal to avoid container clipping issues.
+ *
+ * Overflow buttons are wrapped in a Slate context using the passed editor
+ * so that useSlate() works for the button components.
  */
 const DropdownMenu = ({
   selectedBlock,
-  properties,
-  onChangeFormData,
-  onSelectBlock,
+  onDeleteBlock,
   menuButtonRect,
   onClose,
+  onOpenSettings,
+  parentId,
+  onSelectBlock,
+  overflowButtons = [], // Array of { name, element } for buttons that overflow
+  showFormatDropdown = false, // Whether to show FormatDropdown in overflow
+  blockButtons = [], // Block buttons for FormatDropdown
+  editor, // Slate editor for overflow buttons context
+  onChange, // Change handler for overflow buttons to propagate changes
+  onMouseDownCapture, // Capture handler for flushing buffer before format
+  onClickCapture, // Capture handler to block click when mousedown was intercepted
 }) => {
-  const dispatch = useDispatch();
+  const menuRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [onClose]);
 
   if (!menuButtonRect) {
     return null;
@@ -26,22 +50,29 @@ const DropdownMenu = ({
 
   const handleSettings = () => {
     onClose();
-    // TODO: Open settings sidebar
+    // Open/expand the sidebar if collapsed
+    if (onOpenSettings) {
+      onOpenSettings();
+    }
+  };
+
+  const handleSelectContainer = () => {
+    onClose();
+    if (parentId && onSelectBlock) {
+      onSelectBlock(parentId);
+    }
   };
 
   const handleRemove = () => {
     onClose();
     if (selectedBlock) {
-      const previous = previousBlockId(properties, selectedBlock);
-      const newFormData = deleteBlock(properties, selectedBlock);
-      onChangeFormData(newFormData);
-      onSelectBlock(previous);
-      dispatch(setSidebarTab(1));
+      onDeleteBlock(selectedBlock, true);
     }
   };
 
   return createPortal(
     <div
+      ref={menuRef}
       className="volto-hydra-dropdown-menu"
       style={{
         position: 'fixed',
@@ -57,29 +88,97 @@ const DropdownMenu = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="volto-hydra-dropdown-item"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '10px',
-          cursor: 'pointer',
-          fontSize: '15px',
-          fontWeight: '500',
-        }}
-        onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-        onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-        onClick={handleSettings}
-      >
-        ⚙️ Settings
-      </div>
-      <div
-        style={{
-          height: '1px',
-          background: 'rgba(0, 0, 0, 0.1)',
-          margin: '0 10px',
-        }}
-      />
+      {/* Overflow buttons - formatting buttons that don't fit in toolbar */}
+      {(overflowButtons.length > 0 || showFormatDropdown) && editor && (
+        <SlateButtonsWrapper
+          editor={editor}
+          initialValue={editor.children}
+          onChange={onChange}
+          onMouseDownCapture={onMouseDownCapture}
+          onClickCapture={onClickCapture}
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '2px',
+            padding: '8px',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          {/* FormatDropdown when it doesn't fit in toolbar */}
+          {showFormatDropdown && blockButtons.length > 0 && (
+            <FormatDropdown
+              blockButtons={blockButtons}
+              onMouseDownCapture={onMouseDownCapture}
+              onClickCapture={onClickCapture}
+            />
+          )}
+          {overflowButtons.map(({ name, element }) => (
+            <div
+              key={name}
+              data-toolbar-button={name}
+              style={{ display: 'inline-flex' }}
+            >
+              {element}
+            </div>
+          ))}
+        </SlateButtonsWrapper>
+      )}
+      {/* Settings option - only shown when onOpenSettings is provided (toolbar usage) */}
+      {onOpenSettings && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={handleSettings}
+          >
+            ⚙️ Settings
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
+      {/* Select Container option - only shown for nested blocks with a parent */}
+      {parentId && onSelectBlock && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={handleSelectContainer}
+          >
+            ⬆️ Select Container
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
       <div
         className="volto-hydra-dropdown-item"
         style={{
