@@ -1,6 +1,9 @@
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineNuxtConfig({
+  nitro: {
+    preset: 'static'
+  },
   app: {
     head: {
       htmlAttrs: {
@@ -20,6 +23,9 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false, // "npm run generate -- --envName edit" == SPA
+      nitro: {
+        preset: 'static'
+      },
       routeRules: {
         "/**": {
           cors: true,
