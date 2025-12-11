@@ -1,2 +1,6 @@
+[build]
+  command = "npm run generate"
+  publish = ".output/public"
+
 [images]
   remote_images = ["https://hydra-api.pretagov.com/.*"]
