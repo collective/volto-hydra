@@ -152,6 +152,12 @@ function renderSlateBlock(block) {
             case 'blockquote':
                 html += `<blockquote data-editable-field="value"${nodeIdAttr}>${text}</blockquote>`;
                 break;
+            case 'ul':
+                html += `<ul data-editable-field="value"${nodeIdAttr}>${renderListItems(node.children)}</ul>`;
+                break;
+            case 'ol':
+                html += `<ol data-editable-field="value"${nodeIdAttr}>${renderListItems(node.children)}</ol>`;
+                break;
             default:
                 // Fallback for unknown block types
                 html += `<p data-editable-field="value"${nodeIdAttr}>${text}</p>`;
@@ -159,6 +165,26 @@ function renderSlateBlock(block) {
     });
 
     return html || '<p data-editable-field="value">Empty block</p>';
+}
+
+/**
+ * Render list items (li elements) for ul/ol lists.
+ * Each li can contain text nodes, links, and other inline elements.
+ * @param {Array} items - Array of li nodes
+ * @returns {string} HTML string
+ */
+function renderListItems(items) {
+    if (!items || !Array.isArray(items)) return '';
+
+    return items.map(item => {
+        if (item.type === 'li') {
+            const nodeIdAttr = item.nodeId !== undefined ? ` data-node-id="${item.nodeId}"` : '';
+            const content = renderChildren(item.children || []);
+            return `<li${nodeIdAttr}>${content}</li>`;
+        }
+        // If not an li, render as inline content (shouldn't happen in valid Slate)
+        return renderChildren([item]);
+    }).join('');
 }
 
 /**

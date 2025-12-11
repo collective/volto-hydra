@@ -3,7 +3,6 @@ import {
   getAllowedBlocksList,
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
-import HydraSlateWidget from './widgets/HydraSlateWidget';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 
 const applyConfig = (config) => {
@@ -40,9 +39,6 @@ const applyConfig = (config) => {
   // Add the frontendPreviwUrl reducer
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
 
-  // Register the HydraSlateWidget that exposes editor instances
-  config.widgets.widget.hydra_slate = HydraSlateWidget;
-
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.type.blocks = HiddenBlocksWidget;
 
@@ -51,31 +47,29 @@ const applyConfig = (config) => {
   // This is separate from schema (used for sidebar settings form)
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
-    blockSchema: {
-      title: 'Text',
-      fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
-      properties: {
-        value: {
-          title: 'Body',
-          widget: 'hydra_slate',
-          // Default value for new slate blocks - used by applyBlockDefaults
-          default: config.settings.slate.defaultValue(),
-        },
-      },
-      required: [],
-    },
+    // TEMPORARILY DISABLED - testing if blockSchema richtext causes slate corruption
+    // blockSchema: {
+    //   title: 'Text',
+    //   fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
+    //   properties: {
+    //     value: {
+    //       title: 'Body',
+    //       widget: 'richtext',
+    //       // Default value for new slate blocks - used by applyBlockDefaults
+    //       default: config.settings.slate.defaultValue(),
+    //     },
+    //   },
+    //   required: [],
+    // },
     schemaEnhancer: ({ formData, schema, intl }) => {
-      // Preserve existing default if present (from blockSchema)
-      const existingDefault = schema.properties?.value?.default;
+      // NOTE: Do NOT use blockSchema with widget: 'richtext' - it causes Slate corruption
+      // because blockSchema runs during block registration, before proper isolation
+      // Use 'slate' widget (JSON format), NOT 'richtext' (HTML format)
       schema.properties.value = {
         title: 'Body',
-        widget: 'hydra_slate',
-        ...(existingDefault !== undefined && { default: existingDefault }),
+        widget: 'slate',
       };
-      // Add to the beginning of the fields array to make it more visible
-      if (!schema.fieldsets[0].fields.includes('value')) {
-        schema.fieldsets[0].fields.unshift('value');
-      }
+      schema.fieldsets[0].fields.unshift('value');
       return schema;
     },
     sidebarTab: 1,

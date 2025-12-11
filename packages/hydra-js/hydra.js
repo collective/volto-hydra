@@ -3344,35 +3344,26 @@ export class Bridge {
       // Clone the object to ensure it's extensible
       json = JSON.parse(JSON.stringify(json));
 
-      // Skip text nodes - they shouldn't have nodeIds
-      // Text nodes are identified by having a 'text' property
-      if (json.hasOwnProperty('text')) {
+      // Skip text-only nodes - they shouldn't have nodeIds
+      // A proper Slate text node has 'text' but NO 'children' and NO 'type'
+      // Note: Some malformed data might have both 'text' AND 'children' on element nodes
+      // (like li) - these should be treated as elements, not text nodes
+      const isTextNode = json.hasOwnProperty('text') &&
+                         !json.hasOwnProperty('children') &&
+                         !json.hasOwnProperty('type');
+      if (isTextNode) {
         return json;
       }
 
       // Assign path-based nodeId to this element
       json.nodeId = path;
 
-      // Recursively process children
-      for (const key in json) {
-        if (json.hasOwnProperty(key) && key !== 'nodeId') {
-          // For children arrays, build paths like "0.0", "0.1", etc.
-          if (key === 'children' && Array.isArray(json[key])) {
-            json[key] = json[key].map((child, index) => {
-              const childPath = `${path}.${index}`;
-              return this.addNodeIds(child, childPath);
-            });
-          } else if (Array.isArray(json[key])) {
-            // Handle other arrays (less common in Slate)
-            json[key] = json[key].map((item, index) => {
-              const itemPath = `${path}.${key}.${index}`;
-              return this.addNodeIds(item, itemPath);
-            });
-          } else {
-            // For non-array properties, pass the same path
-            json[key] = this.addNodeIds(json[key], path);
-          }
-        }
+      // Only process children array - don't recurse into metadata like 'data'
+      if (json.children && Array.isArray(json.children)) {
+        json.children = json.children.map((child, index) => {
+          const childPath = `${path}.${index}`;
+          return this.addNodeIds(child, childPath);
+        });
       }
     }
     return json;

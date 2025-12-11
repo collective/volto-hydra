@@ -1,0 +1,133 @@
+{
+  "@id": "http://localhost:8888/complex-slate-page",
+  "@type": "Document",
+  "UID": "complex-slate-page-uid-12345",
+  "id": "complex-slate-page",
+  "title": "Complex Slate Page",
+  "description": "A page with complex Slate structures (lists with links)",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "block-list-links": {
+      "@type": "slate",
+      "plaintext": "NUXT.js Example Framework7 Example Next.js Example",
+      "styles": {},
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {"text": ""},
+                {
+                  "type": "link",
+                  "data": {"url": "https://hydra-nuxt-flowbrite.netlify.app/"},
+                  "children": [{"text": "NUXT.js Example"}]
+                },
+                {"text": ""}
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {"text": ""},
+                {
+                  "type": "link",
+                  "data": {"url": "https://hydra-vue-f7.netlify.app/"},
+                  "children": [{"text": "Framework7 Example (mobile app)"}]
+                },
+                {"text": ""}
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {"text": ""},
+                {
+                  "type": "link",
+                  "data": {"url": "https://hydra-blogsite-nextjs.vercel.app"},
+                  "children": [{"text": "Next.js Example"}]
+                },
+                {"text": ""}
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {"text": ""},
+                {
+                  "type": "link",
+                  "data": {"url": "https://hydra.pretagov.com"},
+                  "children": [{"text": "Edit either of these frontends: hydra.pretagov.com"}]
+                },
+                {"text": ""}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "block-simple-para": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{"text": "Simple paragraph after the list"}]
+        }
+      ],
+      "plaintext": "Simple paragraph after the list"
+    }
+  },
+  "blocks_layout": {
+    "items": ["block-list-links", "block-simple-para"]
+  },
+  "allow_discussion": false,
+  "is_folderish": true,
+  "exclude_from_nav": false,
+  "created": "2025-01-01T12:00:00+00:00",
+  "modified": "2025-01-01T12:00:00+00:00",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "@components": {
+    "actions": {
+      "@id": "http://localhost:8888/complex-slate-page/@actions",
+      "document_actions": [],
+      "object": [
+        {"id": "view", "title": "View"},
+        {"id": "edit", "title": "Edit"},
+        {"id": "folderContents", "title": "Contents"}
+      ],
+      "object_buttons": [],
+      "portal_tabs": [],
+      "site_actions": [],
+      "user": []
+    },
+    "breadcrumbs": {
+      "@id": "http://localhost:8888/complex-slate-page/@breadcrumbs",
+      "items": [
+        {"@id": "http://localhost:8888", "title": "Home"},
+        {"@id": "http://localhost:8888/complex-slate-page", "title": "Complex Slate Page"}
+      ],
+      "root": "http://localhost:8888"
+    },
+    "navigation": {
+      "@id": "http://localhost:8888/complex-slate-page/@navigation",
+      "items": []
+    },
+    "workflow": {
+      "@id": "http://localhost:8888/complex-slate-page/@workflow"
+    }
+  },
+  "can_manage_portlets": true,
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_add": true
+}

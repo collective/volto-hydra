@@ -8,11 +8,17 @@ export class AdminUIHelper {
     public readonly page: Page,
     public readonly adminUrl: string = 'http://localhost:3001'
   ) {
-    // Capture browser console errors and warnings only (filter out verbose debug logs)
+    // Capture browser console - all logs locally, only errors/warnings in CI
     this.page.on('console', (msg) => {
       const type = msg.type();
-      if (type === 'error' || type === 'warning') {
-        console.log(`[BROWSER ${type.toUpperCase()}] ${msg.text()}`);
+      if (process.env.CI) {
+        // CI: only errors and warnings
+        if (type === 'error' || type === 'warning') {
+          console.log(`[BROWSER ${type.toUpperCase()}] ${msg.text()}`);
+        }
+      } else {
+        // Local: all console output for debugging
+        console.log(`[${type}] ${msg.text()}`);
       }
     });
 

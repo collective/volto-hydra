@@ -384,6 +384,73 @@ describe('HydraBridge.getNodePath()', () => {
     });
   });
 
+  describe('List structure scenarios', () => {
+    test('text inside list item with link', () => {
+      // DOM structure from Nuxt RichText component for:
+      // Slate: { type: 'ul', children: [{ type: 'li', children: [
+      //   { text: '' }, { type: 'link', children: [{ text: 'NUXT.js Example' }] }, { text: '' }
+      // ]}]}
+      // Note: ul is MISSING data-node-id (bug in RichText.vue)
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul class="list-disc">' +  // NO data-node-id on ul!
+        '<li data-node-id="0.0">' +
+        '<a data-node-id="0.0.1" href="#">NUXT.js Example</a>' +
+        '</li>' +
+        '</ul>' +
+        '</div>';
+
+      const linkText = document.querySelector('a').firstChild;
+      const path = bridge.getNodePath(linkText);
+
+      // Path should be [0, 0, 1, 0]:
+      // [0] = ul (first child of editable field)
+      // [0, 0] = li (first child of ul)
+      // [0, 0, 1] = link (second child of li, index from node-id)
+      // [0, 0, 1, 0] = text inside link
+      expect(path).toEqual([0, 0, 1, 0]);
+    });
+
+    test('text directly in list item (before link)', () => {
+      // When user clicks on empty text before the link inside li
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul class="list-disc">' +
+        '<li data-node-id="0.0">' +
+        'before text' +
+        '<a data-node-id="0.0.1" href="#">link</a>' +
+        '</li>' +
+        '</ul>' +
+        '</div>';
+
+      const li = document.querySelector('li');
+      const beforeText = li.firstChild; // Text node "before text"
+      const path = bridge.getNodePath(beforeText);
+
+      // Path should be [0, 0, 0]:
+      // li has node-id "0.0", text is first child (index 0)
+      expect(path).toEqual([0, 0, 0]);
+    });
+
+    test('ul with data-node-id (correct rendering)', () => {
+      // If ul HAD data-node-id (correct implementation)
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul data-node-id="0" class="list-disc">' +
+        '<li data-node-id="0.0">' +
+        '<a data-node-id="0.0.1" href="#">NUXT.js Example</a>' +
+        '</li>' +
+        '</ul>' +
+        '</div>';
+
+      const linkText = document.querySelector('a').firstChild;
+      const path = bridge.getNodePath(linkText);
+
+      // Same expected path - ul's node-id "0" should be parsed
+      expect(path).toEqual([0, 0, 1, 0]);
+    });
+  });
+
   describe('Double wrapper scenarios', () => {
     test('double wrapper with same node-id renders correctly', () => {
       // DOM: When a renderer wraps text twice (e.g., bold+italic using same node-id)

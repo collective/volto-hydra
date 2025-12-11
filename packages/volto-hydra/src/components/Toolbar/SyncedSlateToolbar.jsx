@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, Component } from 'react';
 import { Slate, ReactEditor } from 'slate-react';
 import { Transforms, Node, Range, Editor, Point } from 'slate';
-import { isEqual } from 'lodash';
+import { isEqual, cloneDeep } from 'lodash';
 import config from '@plone/volto/registry';
 import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
 import { BlockButton } from '@plone/volto-slate/editor/ui';
@@ -214,7 +214,6 @@ const SyncedSlateToolbar = ({
       // Check if focus went to the iframe
       const iframe = document.getElementById('previewIframe');
       if (document.activeElement === iframe) {
-        console.log('[TOOLBAR] Focus moved to iframe, dispatching mousedown to close popups');
         // Dispatch synthetic mousedown on document to trigger handleClickOutside
         const mousedownEvent = new MouseEvent('mousedown', {
           bubbles: true,
@@ -272,7 +271,6 @@ const SyncedSlateToolbar = ({
 
       if (!popup) {
         if (linkEditorWasVisibleRef.current) {
-          console.log('[TOOLBAR] LinkEditor removed from DOM, was visible');
           linkEditorWasVisibleRef.current = false;
           handlePopupClosed();
         }
@@ -283,16 +281,13 @@ const SyncedSlateToolbar = ({
       const isVisible = style.opacity !== '0' && style.display !== 'none' && style.visibility !== 'hidden';
 
       if (linkEditorWasVisibleRef.current && !isVisible) {
-        console.log('[TOOLBAR] LinkEditor became hidden');
         handlePopupClosed();
       }
       linkEditorWasVisibleRef.current = isVisible;
     };
 
     const handlePopupClosed = () => {
-      console.log('[TOOLBAR] handlePopupClosed called, activeFormatRequestId:', activeFormatRequestIdRef.current);
       if (activeFormatRequestIdRef.current) {
-        console.log('[TOOLBAR] LinkEditor closed, sending update to unblock iframe, requestId:', activeFormatRequestIdRef.current);
         onChangeFormData(form, currentSelection, activeFormatRequestIdRef.current);
         activeFormatRequestIdRef.current = null;
       }
@@ -313,6 +308,11 @@ const SyncedSlateToolbar = ({
     const fieldName = blockUI?.focusedFieldName || 'value';
     const fieldValue = block[fieldName];
 
+    // DEBUG: Log first li keys to trace corruption
+    if (fieldValue?.[0]?.children?.[0]) {
+      const firstChild = fieldValue[0].children[0];
+    }
+
     // Only sync editor for slate fields - non-slate fields don't use the Slate editor
     const blockType = block?.['@type'];
     const blockTypeFields = blockFieldTypes?.[blockType] || {};
@@ -331,49 +331,43 @@ const SyncedSlateToolbar = ({
         // We have pending local changes - check if Redux caught up
         if (isEqual(fieldValue, lastSentValueRef.current)) {
           // Redux now has our value, safe to sync
-          console.log('[TOOLBAR] Redux caught up, syncing editor.children');
           // CRITICAL: When structure changes (e.g., format removed), selection paths may become invalid.
           // Check if current selection is valid for new children, deselect if not.
           const hadToDeselect = !isSelectionValidForDocument(editor.selection, fieldValue);
           if (hadToDeselect) {
-            console.log('[TOOLBAR] Selection invalid for new structure, deselecting');
             Transforms.deselect(editor);
           }
-          editor.children = fieldValue;
+          // CRITICAL: Clone to prevent Slate normalization from mutating Redux state
+          editor.children = cloneDeep(fieldValue);
           internalValueRef.current = fieldValue;
           lastSentValueRef.current = null;
           // If we deselected, try to restore selection from currentSelection if it's valid
           if (hadToDeselect && currentSelection && isSelectionValidForDocument(currentSelection, fieldValue)) {
-            console.log('[TOOLBAR] Restoring valid selection from currentSelection');
             try {
               Transforms.select(editor, currentSelection);
               editor.savedSelection = currentSelection;
             } catch (e) {
-              console.log('[TOOLBAR] Failed to restore selection:', e.message);
             }
           }
           safeIncrementRenderKey();
         } else {
           // Redux still has old value, don't overwrite our local changes
-          console.log('[TOOLBAR] Skipping sync - Redux has old value, waiting for catch up');
         }
       } else {
         // No pending changes, this is an external change (from iframe), sync it
-        console.log('[TOOLBAR] External change detected, syncing editor.children');
         // Must deselect before changing children to avoid invalid selection errors
         // Selection will be synced after children update if currentSelection is valid
         Transforms.deselect(editor);
-        editor.children = fieldValue;
+        // CRITICAL: Clone to prevent Slate normalization from mutating Redux state
+        editor.children = cloneDeep(fieldValue);
         internalValueRef.current = fieldValue;
         safeIncrementRenderKey();
       }
     } else if (fieldValue && !isEqual(fieldValue, internalValueRef.current)) {
-      console.log('[TOOLBAR] Updating internalValueRef (children already synced)');
       internalValueRef.current = fieldValue;
       lastSentValueRef.current = null;
     } else if (fieldValue && lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
       // Redux caught up and editor.children already matches - just clear the ref
-      console.log('[TOOLBAR] Redux caught up, clearing lastSentValueRef');
       lastSentValueRef.current = null;
     }
 
@@ -405,7 +399,6 @@ const SyncedSlateToolbar = ({
         // Store requestId so handleChange can include it in FORM_DATA
         // This allows iframe to match FORM_DATA to the FLUSH_BUFFER that started blocking
         activeFormatRequestIdRef.current = requestId;
-        console.log('[TOOLBAR] Stored activeFormatRequestId:', requestId);
         button.dataset.bypassCapture = 'true';
         // Find the actual clickable element - Semantic UI Button renders as <a> tag
         // The onMouseDown handler is on the <a> tag, not the wrapper
@@ -444,7 +437,6 @@ const SyncedSlateToolbar = ({
     }
     processedTransformRequestIdRef.current = requestId;
 
-    console.log('[TOOLBAR] Processing transformAction:', transformAction);
 
     // Store requestId so handleChange includes it in FORM_DATA for iframe unblocking
     if (requestId) {
@@ -457,7 +449,6 @@ const SyncedSlateToolbar = ({
       switch (type) {
         case 'format':
           const format = transformAction.format;
-          console.log('[TOOLBAR] Applying format:', format);
 
           // Check if selection is collapsed (cursor, no range)
           const isCollapsed = editor.selection && Range.isCollapsed(editor.selection);
@@ -483,7 +474,6 @@ const SyncedSlateToolbar = ({
                   if (requestId) {
                     onChangeFormData(form, editor.selection, requestId);
                     activeFormatRequestIdRef.current = null;
-                    console.log('[TOOLBAR] Sent selection-only update with requestId to unblock iframe');
                   }
                 } else {
                   // No point after - insert empty text node after and position there
@@ -492,7 +482,6 @@ const SyncedSlateToolbar = ({
                   if (newAfterPoint) {
                     Transforms.select(editor, newAfterPoint);
                   }
-                  console.log('[TOOLBAR] Inserted text node and moved cursor after inline element');
                 }
               }
             } else {
@@ -514,13 +503,11 @@ const SyncedSlateToolbar = ({
                 const [, insertedPath] = insertedEntry;
                 // Position cursor at the start of the empty text inside the inline element
                 Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
-                console.log('[TOOLBAR] Inserted empty inline element and positioned cursor inside');
               }
 
               // DON'T call onChangeFormData here - handleChange will fire because we changed children
               // handleChange will pick up activeFormatRequestIdRef.current and include it
               // (Unlike selection-only changes where we must call explicitly)
-              console.log('[TOOLBAR] Prospective format applied, handleChange will send update');
             }
           } else {
             // Range selection - use toggleInlineFormat to wrap/unwrap selected text
@@ -744,10 +731,6 @@ const SyncedSlateToolbar = ({
 
   // Debug: Check what blockFieldTypes the toolbar is receiving
   if (blockType === 'hero') {
-    console.log('[TOOLBAR] Hero block - blockFieldTypes keys:', Object.keys(blockFieldTypes || {}));
-    console.log('[TOOLBAR] Hero block - blockFieldTypes[hero]:', blockFieldTypes?.['hero']);
-    console.log('[TOOLBAR] fieldName:', fieldName, 'fieldType:', fieldType, 'showFormatButtons:', showFormatButtons);
-    console.log('[TOOLBAR] fieldValue:', fieldValue, 'hasValidSlateValue:', fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0);
   }
 
   // CRITICAL: Only show Slate if we actually have a valid field value array
@@ -762,6 +745,11 @@ const SyncedSlateToolbar = ({
     : hasValidSlateValue
     ? fieldValue
     : [{type: 'p', children: [{text: '', nodeId: 2}], nodeId: 1}];
+
+  // DEBUG: Log first li keys during render to trace when corruption happens
+  if (currentValue?.[0]?.children?.[0]) {
+    const firstChild = currentValue[0].children[0];
+  }
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect

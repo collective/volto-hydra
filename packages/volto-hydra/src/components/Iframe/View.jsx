@@ -7,6 +7,7 @@ import {
   applyBlockDefaults,
   previousBlockId,
 } from '@plone/volto/helpers';
+import { validateAndLog } from '../../utils/formDataValidation';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -471,11 +472,23 @@ const Iframe = (props) => {
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get('iframe_url') ||
     urlFromEnv[0];
-  const [iframeSrc, setIframeSrc] = useState(getUrlWithAdminParams(u, token));
+  // Initialize to null to avoid SSR/client hydration mismatch (token differs)
+  const [iframeSrc, setIframeSrc] = useState(null);
+
+  const intl = useIntl();
+
+  // Extract block field types - stored in state so it can be updated when frontend config is merged
+  // Must be declared before useEffects that reference it
+  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
 
   // Subscribe to form data from Redux to detect changes
   // This provides a new reference on updates, unlike the mutated form prop
   const formDataFromRedux = useSelector((state) => state.form?.global);
+
+  // Validate properties from Redux on mount and change
+  useEffect(() => {
+    validateAndLog(properties, 'properties (from Redux)', blockFieldTypes);
+  }, [properties, blockFieldTypes]);
 
   useEffect(() => {
     setIframeSrc(getUrlWithAdminParams(u, token));
@@ -518,11 +531,6 @@ const Iframe = (props) => {
   }, [formDataFromRedux, selectedBlock, blocksConfig]);
 
   const history = useHistory();
-
-  const intl = useIntl();
-
-  // Extract block field types - stored in state so it can be updated when frontend config is merged
-  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
 
   const onInsertBlock = (id, value, current) => {
     if (value?.['@type'] === 'slate') {
@@ -705,6 +713,9 @@ const Iframe = (props) => {
           break;
 
         case 'INLINE_EDIT_DATA':
+          // Validate data from postMessage before using it
+          validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
+
           inlineEditCounterRef.current += 1;
           // Update combined state atomically - formData, blockPathMap, selection together
           // If flushRequestId is present, this was a flush response - also set completedFlushRequestId
@@ -768,6 +779,9 @@ const Iframe = (props) => {
           break;
 
         case 'SLATE_TRANSFORM_REQUEST':
+          // Validate data from postMessage before using it
+          validateAndLog(event.data.data, 'SLATE_TRANSFORM_REQUEST', blockFieldTypes);
+
           // Unified transform request from iframe - always includes form data with buffer
           // transformType: 'format', 'paste', 'delete', 'enter'
           // fieldName: which field is being edited (e.g., 'value', 'description')
@@ -921,6 +935,8 @@ const Iframe = (props) => {
           break;
 
         case 'UPDATE_BLOCKS_LAYOUT':
+          // Validate data from postMessage before using it
+          validateAndLog(event.data.data, 'UPDATE_BLOCKS_LAYOUT', blockFieldTypes);
           onChangeFormData(event.data.data);
           break;
 
@@ -1675,6 +1691,8 @@ const Iframe = (props) => {
             containerConfig,
           );
 
+          // Validate data from sidebar before using it
+          validateAndLog(newFormData, 'onChangeBlock (sidebar)', blockFieldTypes);
           onChangeFormData(newFormData);
         }}
       />
