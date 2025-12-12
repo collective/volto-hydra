@@ -102,7 +102,8 @@ export default defineConfig({
             NODE_ENV: 'production',
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
+            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -129,11 +130,23 @@ export default defineConfig({
           env: {
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
+            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
           },
         },
+    // Nuxt frontend for testing Nuxt-specific scenarios
+    {
+      name: 'Nuxt Frontend (Test)',
+      command: 'npm run dev:test',
+      url: 'http://localhost:3003',
+      timeout: 120 * 1000, // 2 minutes for Nuxt compilation
+      reuseExistingServer: !process.env.CI,
+      cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
   ],
 });

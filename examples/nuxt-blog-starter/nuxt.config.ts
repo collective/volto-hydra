@@ -49,10 +49,41 @@ export default defineNuxtConfig({
       },
       image: {
         provider: 'netlify',
-      }        
-      // generate: {
-      //   fallback: "index.html", // Uses '404.html' instead of the default '200.html'
-      // },
+      }
+    },
+    test: {
+      // Test environment: HTTP mode, points to mock API on localhost:8888
+      ssr: false,
+      devServer: {
+        https: false  // Disable HTTPS for test mode
+      },
+      routeRules: {
+        "/**": {
+          cors: true,
+          security: {
+            headers: {
+              contentSecurityPolicy: {
+                'img-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888'],
+                'connect-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888'],
+                'frame-ancestors': ['*']
+              },
+              crossOriginResourcePolicy: "cross-origin",
+              xFrameOptions: false
+            }
+          }
+        }
+      },
+      runtimeConfig: {
+        public: {
+          image_alias: '',
+          backendBaseUrl: 'http://localhost:8888',
+          adminUrl: 'http://localhost:3001',
+        }
+      },
+      image: {
+        provider: 'ipx',
+        domains: ['localhost'],
+      }
     }
   },
   runtimeConfig: {
@@ -92,10 +123,12 @@ export default defineNuxtConfig({
   },
   vite: {
     plugins: [
-      mkcert({
-        savePath: './certs', // save the generated certificate into certs directory
-        force: true, // force generation of certs even without setting https property in the vite config
-      }),  
+      // mkcert disabled - certs already generated manually
+      // mkcert({
+      //   savePath: './certs',
+      //   force: false,
+      //   mkcertPath: '/usr/local/bin/mkcert',
+      // }),
     ],
   
         /* options for vite */

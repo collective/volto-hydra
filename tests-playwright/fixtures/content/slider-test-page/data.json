@@ -1,0 +1,111 @@
+{
+  "@id": "/slider-test-page",
+  "@type": "Document",
+  "id": "slider-test-page",
+  "title": "Slider Test Page",
+  "description": "A test page with slider block",
+  "blocks": {
+    "title-block-uuid": {
+      "@type": "title"
+    },
+    "slider-block-uuid": {
+      "@type": "slider",
+      "autoplayDelay": 4000,
+      "autoplayEnabled": false,
+      "slides": [
+        {
+          "@id": "slide-1-uuid",
+          "buttonText": "See Content Types",
+          "description": "Test slide description with some text",
+          "flagAlign": "left",
+          "head_title": "Welcome to Hydra",
+          "href": [
+            {
+              "@id": "/test-page",
+              "@type": "Document",
+              "title": "Test Page"
+            }
+          ],
+          "preview_image": [
+            {
+              "@id": "/images/test-image.jpg",
+              "@type": "Image",
+              "image_field": "image",
+              "image_scales": {
+                "image": [
+                  {
+                    "content-type": "image/jpeg",
+                    "download": "@@images/image-1800.jpeg",
+                    "filename": "test-image.jpg",
+                    "height": 1200,
+                    "width": 1800,
+                    "scales": {
+                      "large": {
+                        "download": "@@images/image-800.jpeg",
+                        "height": 533,
+                        "width": 800
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "title": "You can use this site to test Hydra"
+        },
+        {
+          "@id": "slide-2-uuid",
+          "buttonText": "See all blocks",
+          "description": "Frontend freedom makes it easy to create beautiful experiences",
+          "flagAlign": "right",
+          "head_title": "Multiple Frontends",
+          "hideButton": false,
+          "href": [
+            {
+              "@id": "/another-page",
+              "@type": "Document",
+              "title": "Another Page"
+            }
+          ],
+          "preview_image": [
+            {
+              "@id": "/images/test-image-2.jpg",
+              "@type": "Image",
+              "image_field": "image",
+              "image_scales": {
+                "image": [
+                  {
+                    "content-type": "image/jpeg",
+                    "download": "@@images/image-1800.jpeg",
+                    "filename": "test-image-2.jpg",
+                    "height": 1200,
+                    "width": 1800,
+                    "scales": {}
+                  }
+                ]
+              }
+            }
+          ],
+          "title": "Any frontend for Plone 6"
+        }
+      ]
+    },
+    "slate-after-slider": {
+      "@type": "slate",
+      "plaintext": "Content after slider",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            { "text": "This text appears after the slider. Click on " },
+            { "type": "strong", "children": [{ "text": "bold text" }] },
+            { "text": " to test getNodePath." }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block-uuid", "slider-block-uuid", "slate-after-slider"]
+  }
+}
