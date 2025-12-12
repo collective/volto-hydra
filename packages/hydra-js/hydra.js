@@ -1136,7 +1136,123 @@ export class Bridge {
       return null;
     }
 
+    // Validate the selection paths against the actual Slate value
+    // Log detailed debugging info if invalid, but still send the path so the error is visible
+    const validationResult = this.validateSelectionPaths(anchor, focus, range.commonAncestorContainer);
+    if (!validationResult.valid) {
+      console.error('[HYDRA] Invalid selection path detected! This will cause a Slate error.\n\n' +
+        `Anchor path: [${anchor.path.join(', ')}], offset: ${anchor.offset}\n` +
+        `Focus path: [${focus.path.join(', ')}], offset: ${focus.offset}\n\n` +
+        `Error: ${validationResult.error}\n\n` +
+        `DOM structure:\n${validationResult.domStructure}\n\n` +
+        `Slate structure:\n${validationResult.slateStructure}`
+      );
+      // Still return the selection so it blows up visibly in Volto
+    }
+
     return { anchor, focus };
+  }
+
+  /**
+   * Validates that selection paths exist in the Slate structure.
+   * Returns detailed debugging info if invalid.
+   */
+  validateSelectionPaths(anchor, focus, commonAncestor) {
+    // Find the editable field container and block
+    let editableField = commonAncestor;
+    while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+      editableField = editableField.parentNode;
+    }
+    if (!editableField) {
+      return { valid: true }; // Can't validate without editable field
+    }
+
+    // Find the block element
+    let blockElement = editableField;
+    while (blockElement && !blockElement.hasAttribute?.('data-block-uid')) {
+      blockElement = blockElement.parentNode;
+    }
+    if (!blockElement) {
+      return { valid: true }; // Can't validate without block
+    }
+
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const fieldName = editableField.getAttribute('data-editable-field');
+    const blockData = this.getBlockData(blockUid);
+
+    if (!blockData || !blockData[fieldName]) {
+      return { valid: true }; // Can't validate without Slate value
+    }
+
+    const slateValue = blockData[fieldName];
+    if (!Array.isArray(slateValue)) {
+      return { valid: true }; // Not a Slate field
+    }
+
+    // Validate anchor path
+    const anchorValid = this.isPathValidInSlate(anchor.path, slateValue);
+    const focusValid = this.isPathValidInSlate(focus.path, slateValue);
+
+    if (anchorValid && focusValid) {
+      return { valid: true };
+    }
+
+    // Build DOM structure for debugging
+    const domStructure = this.buildDomStructureForDebug(editableField);
+    const slateStructure = JSON.stringify(slateValue, null, 2).substring(0, 500);
+
+    return {
+      valid: false,
+      error: !anchorValid
+        ? `Anchor path [${anchor.path.join(', ')}] not found in Slate`
+        : `Focus path [${focus.path.join(', ')}] not found in Slate`,
+      domStructure,
+      slateStructure,
+    };
+  }
+
+  /**
+   * Checks if a path exists in a Slate value
+   */
+  isPathValidInSlate(path, value) {
+    let current = { children: value };
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+      if (!current.children || !Array.isArray(current.children)) {
+        return false;
+      }
+      if (index < 0 || index >= current.children.length) {
+        return false;
+      }
+      current = current.children[index];
+    }
+    return true;
+  }
+
+  /**
+   * Builds a string representation of the DOM structure for debugging
+   */
+  buildDomStructureForDebug(element, depth = 0) {
+    const indent = '  '.repeat(depth);
+    let result = '';
+
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent.substring(0, 30);
+        result += `${indent}TEXT: "${text}"${child.textContent.length > 30 ? '...' : ''}\n`;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        const nodeId = child.getAttribute('data-node-id');
+        const nodeIdAttr = nodeId ? ` data-node-id="${nodeId}"` : '';
+        result += `${indent}<${tag}${nodeIdAttr}>\n`;
+        if (depth < 3) {
+          result += this.buildDomStructureForDebug(child, depth + 1);
+        }
+      } else if (child.nodeType === Node.COMMENT_NODE) {
+        result += `${indent}<!-- comment -->\n`;
+      }
+    }
+    return result;
   }
 
   /**
@@ -1235,28 +1351,43 @@ export class Bridge {
    * Calculate the Slate index of a node among its siblings.
    * Elements with data-node-id use their ID's last component.
    * Text nodes use the next index after the previous sibling.
+   * Empty/whitespace text nodes (Vue artifacts) map to the previous real content.
    */
   getSlateIndexAmongSiblings(node, parent) {
-    const siblings = Array.from(parent.childNodes);
-    const nodeIndex = siblings.indexOf(node);
+    // Filter to only "real" Slate nodes (non-empty text, elements with data-node-id)
+    // This ignores Vue/Nuxt empty text node artifacts
+    const isRealNode = (n) =>
+      (n.nodeType === Node.ELEMENT_NODE && n.hasAttribute('data-node-id')) ||
+      (n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
 
-    // Look at all siblings before this node to determine Slate index
-    let slateIndex = 0;
-    for (let i = 0; i < nodeIndex; i++) {
-      const sibling = siblings[i];
-      if (sibling.nodeType === Node.ELEMENT_NODE && sibling.hasAttribute('data-node-id')) {
-        // Element with data-node-id: parse its index from the ID
-        const nodeId = sibling.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/); // Split on . or -
-        const lastIndex = parseInt(parts[parts.length - 1], 10);
-        slateIndex = lastIndex + 1; // Next index after this element
-      } else if (sibling.nodeType === Node.TEXT_NODE) {
-        // Text node: takes the next index
-        slateIndex++;
+    const allSiblings = Array.from(parent.childNodes);
+    const realSiblings = allSiblings.filter(isRealNode);
+
+    // If target is an empty node (Vue artifact), find the previous real sibling
+    let targetNode = node;
+    if (!isRealNode(node)) {
+      const nodeIndex = allSiblings.indexOf(node);
+      for (let i = nodeIndex - 1; i >= 0; i--) {
+        if (isRealNode(allSiblings[i])) {
+          targetNode = allSiblings[i];
+          break;
+        }
+      }
+      // If no real sibling found before, return 0
+      if (!isRealNode(targetNode)) {
+        return 0;
       }
     }
 
-    return slateIndex;
+    // For elements with data-node-id, use the index from the ID
+    if (targetNode.nodeType === Node.ELEMENT_NODE && targetNode.hasAttribute('data-node-id')) {
+      const nodeId = targetNode.getAttribute('data-node-id');
+      const parts = nodeId.split(/[.-]/);
+      return parseInt(parts[parts.length - 1], 10);
+    }
+
+    // For text nodes, find position in filtered list
+    return realSiblings.indexOf(targetNode);
   }
 
   /**
@@ -1341,9 +1472,8 @@ export class Bridge {
         // Parse the parent's path from its node ID
         const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
-        // Text node index within the parent element
-        const siblings = Array.from(parent.childNodes);
-        const textIndex = siblings.indexOf(node);
+        // Text node index within the parent element (filtered for Vue artifacts)
+        const textIndex = this.getSlateIndexAmongSiblings(node, parent);
 
         // Build path: parent path + text index
         path.push(...parts, textIndex);

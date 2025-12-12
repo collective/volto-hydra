@@ -31,12 +31,11 @@ test.describe('Nuxt Frontend - Slider Block', () => {
     await helper.login();
   });
 
-  test('slider page loads in Nuxt frontend', async ({ page }) => {
+  test('slider page loads in Nuxt frontend', async () => {
     // Navigate to the slider test page in edit mode
-    await page.goto('/slider-test-page/edit');
+    await helper.navigateToEdit('/slider-test-page');
 
-    // Wait for the iframe to load
-    const iframe = page.frameLocator('iframe');
+    const iframe = helper.getIframe();
 
     // Wait for Nuxt to hydrate and render the page
     // The title block should be visible
@@ -48,13 +47,13 @@ test.describe('Nuxt Frontend - Slider Block', () => {
     await expect(iframe.locator('[data-block-uid="slider-block-uuid"]')).toBeVisible();
   });
 
-  test('clicking text after bold in slate block returns correct path', async ({ page }) => {
+  test('clicking text after bold in slate block returns correct path', async () => {
     // This test reproduces the getNodePath bug:
     // Clicking on text after bold element should return correct Slate path
 
-    await page.goto('/slider-test-page/edit');
+    await helper.navigateToEdit('/slider-test-page');
 
-    const iframe = page.frameLocator('iframe');
+    const iframe = helper.getIframe();
 
     // Wait for the slate block after the slider to load
     const slateBlock = iframe.locator('[data-block-uid="slate-after-slider"]');
@@ -62,25 +61,20 @@ test.describe('Nuxt Frontend - Slider Block', () => {
 
     // Find the text "to test getNodePath" which comes after the bold "bold text"
     // In Nuxt, text leaves are wrapped in spans without nodeId
-    const textAfterBold = slateBlock.locator('text="to test getNodePath."');
+    const textAfterBold = slateBlock.locator('text=" to test getNodePath."');
 
     // Click on the text after bold
     await textAfterBold.click();
 
-    // The block should be selected without errors
-    // Check that no error toast appeared
-    const errorToast = page.locator('.Toastify__toast--error');
-    await expect(errorToast).not.toBeVisible({ timeout: 2000 });
-
-    // Verify the block is selected in the sidebar or toolbar
-    // The Quanta toolbar should appear for the slate block
-    await expect(page.locator('.volto-hydra-quanta-toolbar')).toBeVisible({ timeout: 5000 });
+    // Wait for the quanta toolbar to appear for the slate block
+    // This will fail if getNodePath returned an error
+    await helper.waitForQuantaToolbar('slate-after-slider');
   });
 
-  test('slider slides are rendered with correct structure', async ({ page }) => {
-    await page.goto('/slider-test-page/edit');
+  test('slider slides are rendered with correct structure', async () => {
+    await helper.navigateToEdit('/slider-test-page');
 
-    const iframe = page.frameLocator('iframe');
+    const iframe = helper.getIframe();
 
     // Wait for slider to load
     const slider = iframe.locator('[data-block-uid="slider-block-uuid"]');

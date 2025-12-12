@@ -47,6 +47,52 @@ describe('Bridge.getNodePath()', () => {
     delete global.Node;
   });
 
+  /**
+   * Helper to create DOM with Vue-style empty/whitespace text node artifacts.
+   * Vue/Nuxt templates create empty ("") and whitespace (" ") text nodes
+   * between elements that don't appear when using innerHTML.
+   *
+   * @param {string} html - HTML string to parse
+   * @returns {DocumentFragment} - DOM with Vue-style artifacts injected
+   */
+  function createVueStyleDOM(html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const fragment = template.content;
+
+    // Recursively inject Vue-style artifacts into all elements
+    function injectArtifacts(element) {
+      if (element.nodeType !== Node.ELEMENT_NODE) return;
+
+      const children = Array.from(element.childNodes);
+
+      // Insert artifacts at the start
+      element.insertBefore(document.createTextNode(' '), element.firstChild);
+      element.insertBefore(document.createTextNode(''), element.firstChild);
+
+      // Insert artifacts between each existing child
+      for (let i = children.length - 1; i > 0; i--) {
+        const child = children[i];
+        element.insertBefore(document.createTextNode(''), child);
+      }
+
+      // Insert artifact at the end
+      element.appendChild(document.createTextNode(''));
+
+      // Recurse into child elements
+      for (const child of children) {
+        injectArtifacts(child);
+      }
+    }
+
+    // Inject into all top-level elements
+    for (const child of Array.from(fragment.childNodes)) {
+      injectArtifacts(child);
+    }
+
+    return fragment;
+  }
+
   describe('Plain text scenarios', () => {
     test('plain text directly in paragraph', () => {
       // DOM: <p data-editable-field="value" data-node-id="0">Hello world</p>
@@ -640,6 +686,118 @@ describe('Bridge.getNodePath()', () => {
       // Even with whitespace, the path to this text should be based on Slate structure
       // Slate doesn't see whitespace-only nodes, so path should be [1, 2]
       expect(bridge.getNodePath(targetText)).toEqual([1, 2]);
+    });
+  });
+
+  describe('Nuxt slider page bug - path [0,3] should be [0,2]', () => {
+    test('text BEFORE bold + bold + text AFTER (Nuxt richtext.vue structure)', () => {
+      // Exact reproduction from Nuxt playwright test error:
+      // Slate: {"children":[{"type":"p","children":[
+      //   {"text":"This text appears after the slider. Click on "},
+      //   {"type":"strong","children":[{"text":"bold text"}]},
+      //   {"text":" to test getNodePath."}
+      // ]}]}
+      // Bug: clicking on " to test getNodePath." returns [0, 3] instead of [0, 2]
+      //
+      // Nuxt richtext.vue renders:
+      // - Text leaves (no type): plain text node, NO wrapper
+      // - Typed elements (strong): <strong data-node-id="...">text</strong>
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">' +
+        'This text appears after the slider. Click on ' +
+        '<strong data-node-id="0-1">bold text</strong>' +
+        ' to test getNodePath.' +
+        '</p>' +
+        '</div>';
+
+      const p = document.querySelector('p');
+      // Find the text node " to test getNodePath." (the last text node in p)
+      const textAfterBold = p.lastChild;
+
+      // Slate structure:
+      // [0] = paragraph
+      //   [0, 0] = text "This text appears..."
+      //   [0, 1] = strong with "bold text"
+      //   [0, 2] = text " to test getNodePath."
+      //
+      // Expected path for clicking on last text: [0, 2]
+      expect(bridge.getNodePath(textAfterBold)).toEqual([0, 2]);
+    });
+
+    test('text BEFORE bold + bold + text AFTER with Vue empty text nodes', () => {
+      // Vue/Nuxt creates EMPTY text nodes ("") and whitespace-only nodes (" ")
+      // as artifacts of template rendering. Use createVueStyleDOM helper to simulate.
+      const fragment = createVueStyleDOM(
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">' +
+        'This text appears after the slider. Click on ' +
+        '<strong data-node-id="0.1">bold text</strong>' +
+        ' to test getNodePath.' +
+        '</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const p = document.querySelector('p');
+      // Find the actual text node (not the Vue artifacts)
+      const textAfterBold = Array.from(p.childNodes).find(
+        (n) => n.nodeType === Node.TEXT_NODE && n.textContent.includes('to test')
+      );
+
+      // Without the fix: counts empty/whitespace text nodes, returns wrong path
+      // With the fix: skips empty/whitespace, uses data-node-id from strong (0.1 -> index 2)
+      // Expected path: [0, 2]
+      expect(bridge.getNodePath(textAfterBold)).toEqual([0, 2]);
+    });
+
+    test('clicking empty Vue artifact INSIDE strong returns correct path', () => {
+      // Bug reproduction: clicking on empty text node after "bold text" inside strong
+      // Error: path [0,1,3] returned instead of [0,3,0]
+      //
+      // Slate structure with two strongs:
+      // p.children = [
+      //   {text: "This text appears after the "},  // [0,0]
+      //   {type: "strong", children: [{text: "slider"}]},  // [0,1]
+      //   {text: ". Click on "},  // [0,2]
+      //   {type: "strong", children: [{text: "bold text"}]},  // [0,3]
+      //   {text: " to test getNodePath."}  // [0,4]
+      // ]
+      const fragment = createVueStyleDOM(
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">' +
+        'This text appears after the ' +
+        '<strong data-node-id="0.1">slider</strong>' +
+        '. Click on ' +
+        '<strong data-node-id="0.3">bold text</strong>' +
+        ' to test getNodePath.' +
+        '</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      // Find the LAST empty Vue artifact text node INSIDE the second strong (after "bold text")
+      const strong2 = document.querySelectorAll('strong')[1];
+      const strongChildren = Array.from(strong2.childNodes);
+
+      // Verify DOM structure: should have artifacts at start, content, artifact at end
+      // Expected: ["", " ", "bold text", ""]
+      expect(strongChildren.length).toBeGreaterThanOrEqual(4);
+      expect(strongChildren[strongChildren.length - 1].nodeType).toBe(Node.TEXT_NODE);
+      expect(strongChildren[strongChildren.length - 1].textContent).toBe('');
+
+      // Find the "bold text" node and the empty node after it
+      const boldTextNode = strongChildren.find(n => n.textContent === 'bold text');
+      expect(boldTextNode).toBeDefined();
+
+      const emptyAfterBoldText = strongChildren[strongChildren.length - 1];  // last child is empty artifact
+      expect(emptyAfterBoldText.textContent.trim()).toBe('');  // confirm it's empty
+
+      // Click on the empty text node AFTER "bold text" inside the second strong
+      // This empty node doesn't exist in Slate - it should map to the text at [0,3,0]
+      // Bug: was returning wrong path like [0,1,3]
+      // Expected: [0,3,0] (text inside second strong)
+      expect(bridge.getNodePath(emptyAfterBoldText)).toEqual([0, 3, 0]);
     });
   });
 });
