@@ -27,8 +27,7 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.editBlockTextInIframe(blockId, 'Text to make bold');
 
     // STEP 1: Verify the text content is correct
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     const textContent = await helper.getCleanTextContent(editor);
     expect(textContent).toBe('Text to make bold');
     console.log('[TEST] Step 1: Text content verified:', textContent);

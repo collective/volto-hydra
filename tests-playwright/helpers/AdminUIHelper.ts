@@ -863,13 +863,40 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the editor locator for a block.
+   * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
+   *
+   * @param blockId - The block UID
+   * @returns The editor locator
+   */
+  async getEditorLocator(blockId: string): Promise<Locator> {
+    const iframe = this.getIframe();
+    // Try descendant first (mock frontend: data-block-uid > [contenteditable])
+    let editor = iframe
+      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
+      .first();
+
+    const isVisible = await editor.isVisible().catch(() => false);
+
+    if (!isVisible) {
+      // Try same-element selector (Nuxt: data-block-uid AND contenteditable on same element)
+      editor = iframe.locator(
+        `[data-block-uid="${blockId}"][contenteditable="true"]`,
+      );
+    }
+
+    return editor;
+  }
+
+  /**
    * Get the text content of an editor, stripping ZWS characters.
    * ZWS characters (\u200B, \uFEFF) are inserted for cursor positioning
    * but are invisible to users, so tests should verify what users see.
    */
   async getCleanTextContent(editor: Locator): Promise<string> {
     const text = (await editor.textContent()) || '';
-    return text.replace(/[\u200B\uFEFF]/g, '');
+    // Strip ZWS and trim whitespace (Vue/Nuxt can have template whitespace)
+    return text.replace(/[\u200B\uFEFF]/g, '').trim();
   }
 
   /**
@@ -908,9 +935,11 @@ export class AdminUIHelper {
     options: { timeout?: number } = {}
   ): Promise<void> {
     const timeout = options.timeout ?? 5000;
-    const selector = format === 'bold'
-      ? 'span[style*="font-weight: bold"]'
-      : 'span[style*="font-style: italic"]';
+    // Support both inline styles (mock frontend) and semantic tags (Nuxt/Vue frontend)
+    const selector =
+      format === 'bold'
+        ? 'span[style*="font-weight: bold"], strong, b'
+        : 'span[style*="font-style: italic"], em, i';
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
 
     await expect(editor.locator(selector)).toHaveText(regex, { timeout });

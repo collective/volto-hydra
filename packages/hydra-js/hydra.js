@@ -180,24 +180,40 @@ export class Bridge {
 
   /**
    * Get editable fields that belong directly to a block, excluding nested blocks' fields.
+   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement[]} Array of editable field elements that belong to this block
    */
   getOwnEditableFields(blockElement) {
+    const result = [];
+    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
+    if (blockElement.hasAttribute('data-editable-field')) {
+      result.push(blockElement);
+    }
+    // Also check descendants
     const allFields = blockElement.querySelectorAll('[data-editable-field]');
-    return Array.from(allFields).filter(
-      (field) => this.fieldBelongsToBlock(field, blockElement),
-    );
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        result.push(field);
+      }
+    }
+    return result;
   }
 
   /**
    * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
+   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement|null} The first editable field or null if none
    */
   getOwnFirstEditableField(blockElement) {
+    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
+    if (blockElement.hasAttribute('data-editable-field')) {
+      return blockElement;
+    }
+    // Check descendants
     const allFields = blockElement.querySelectorAll('[data-editable-field]');
     for (const field of allFields) {
       if (this.fieldBelongsToBlock(field, blockElement)) {
@@ -205,6 +221,23 @@ export class Bridge {
       }
     }
     return null;
+  }
+
+  /**
+   * Get an editable field by name that belongs to a block.
+   * Also checks if the blockElement itself has the field (Nuxt pattern).
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @param {string} fieldName - The field name to find
+   * @returns {HTMLElement|null} The editable field or null if not found
+   */
+  getEditableFieldByName(blockElement, fieldName) {
+    // Check if block element itself is the editable field (Nuxt: both attrs on same element)
+    if (blockElement.getAttribute('data-editable-field') === fieldName) {
+      return blockElement;
+    }
+    // Check descendants
+    return blockElement.querySelector(`[data-editable-field="${fieldName}"]`);
   }
 
   /**
@@ -979,7 +1012,7 @@ export class Bridge {
 
       // Visual feedback on current element
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-      const editableField = block?.querySelector('[data-editable-field]');
+      const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'wait';
       }
@@ -997,7 +1030,7 @@ export class Bridge {
 
       // Restore visual feedback on current element (may be new after re-render)
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-      const editableField = block?.querySelector('[data-editable-field]');
+      const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'text';
       }
@@ -1090,7 +1123,7 @@ export class Bridge {
    */
   handleTransformTimeout(blockId) {
     const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-    const editableField = block?.querySelector('[data-editable-field="value"]');
+    const editableField = block ? this.getOwnFirstEditableField(block) : null;
 
     if (editableField) {
       // Show error state - permanently disable editing
@@ -1812,7 +1845,7 @@ export class Bridge {
     // This ensures clicking a field focuses it immediately (no double-click required)
     // Skip focus if editing from sidebar - don't steal focus from sidebar fields
     if (this.focusedFieldName && !skipFocus) {
-      const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+      const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
 
       if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
         // Focus the field
@@ -2146,7 +2179,7 @@ export class Bridge {
           }
 
           // Check if field was already editable before we do anything
-          const editableField = currentBlockElement.querySelector('[data-editable-field]');
+          const editableField = this.getOwnFirstEditableField(currentBlockElement);
           const wasAlreadyEditable = editableField?.getAttribute('contenteditable') === 'true';
 
           // Set contenteditable on editable fields immediately (not waiting for FORM_DATA)
@@ -2155,7 +2188,7 @@ export class Bridge {
           // Focus and position cursor for editable fields (text or slate type)
           // Use focusedFieldName to find the specific field that was clicked, not just the first one
           let contentEditableField = this.focusedFieldName
-            ? currentBlockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`)
+            ? this.getEditableFieldByName(currentBlockElement, this.focusedFieldName)
             : currentBlockElement.querySelector('[contenteditable="true"]');
 
           // Verify the field belongs to THIS block, not a nested block
@@ -3840,7 +3873,7 @@ export class Bridge {
         // String/textarea field or slate without nodeIds - degenerate case
         // Selection path is [0] with just an offset
         // Find the editable field directly by data-editable-field attribute
-        const editableField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+        const editableField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
         if (!editableField) {
           console.warn('[HYDRA] Could not find editable field:', this.focusedFieldName);
           return;
