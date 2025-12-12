@@ -1,10 +1,12 @@
 /**
- * Unit tests for HydraBridge.getNodePath()
+ * Unit tests for Bridge.getNodePath()
  * Tests various DOM structures and verifies correct Slate path generation
+ * Uses the ACTUAL Bridge implementation from hydra.js
  */
 
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { JSDOM } from 'jsdom';
+import { Bridge } from './hydra.js';
 
 // Mock console methods to suppress debug output during tests
 const originalConsoleLog = console.log;
@@ -20,7 +22,7 @@ afterEach(() => {
   console.warn = originalConsoleWarn;
 });
 
-describe('HydraBridge.getNodePath()', () => {
+describe('Bridge.getNodePath()', () => {
   let dom;
   let document;
   let bridge;
@@ -29,108 +31,20 @@ describe('HydraBridge.getNodePath()', () => {
     // Set up JSDOM environment
     dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
     document = dom.window.document;
+
+    // Set up globals that Bridge expects
     global.document = document;
+    global.window = dom.window;
     global.Node = dom.window.Node;
 
-    // Create a minimal HydraBridge instance for testing
-    // This mock matches the actual implementation in hydra.js
-    bridge = {
-      getSlateIndexAmongSiblings: function (node, parent) {
-        const siblings = Array.from(parent.childNodes);
-        const nodeIndex = siblings.indexOf(node);
+    // Create Bridge instance using the ACTUAL implementation from hydra.js
+    bridge = new Bridge('http://localhost:3001');
+  });
 
-        // Look at all siblings before this node to determine Slate index
-        let slateIndex = 0;
-        for (let i = 0; i < nodeIndex; i++) {
-          const sibling = siblings[i];
-          if (
-            sibling.nodeType === Node.ELEMENT_NODE &&
-            sibling.hasAttribute('data-node-id')
-          ) {
-            // Element with data-node-id: parse its index from the ID
-            const nodeId = sibling.getAttribute('data-node-id');
-            const parts = nodeId.split(/[.-]/); // Split on . or -
-            const lastIndex = parseInt(parts[parts.length - 1], 10);
-            slateIndex = lastIndex + 1; // Next index after this element
-          } else if (sibling.nodeType === Node.TEXT_NODE) {
-            // Text node: takes the next index
-            slateIndex++;
-          }
-        }
-
-        return slateIndex;
-      },
-
-      getNodePath: function (node) {
-        const path = [];
-        let current = node;
-
-        // If starting with a text node, calculate its Slate index
-        if (node.nodeType === Node.TEXT_NODE) {
-          const parent = node.parentNode;
-
-          // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
-          if (
-            parent.hasAttribute?.('data-node-id') &&
-            parent.nodeName !== 'P' &&
-            parent.nodeName !== 'DIV' &&
-            !parent.hasAttribute?.('data-editable-field')
-          ) {
-            const nodeId = parent.getAttribute('data-node-id');
-            // Parse the parent's path from its node ID
-            const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
-            // Text node index within the parent element
-            const siblings = Array.from(parent.childNodes);
-            const textIndex = siblings.indexOf(node);
-            // Build path: parent path + text index
-            path.push(...parts, textIndex);
-            return path;
-          } else {
-            // Parent is a block element or doesn't have data-node-id
-            const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
-            path.push(slateIndex);
-            current = parent;
-          }
-        }
-
-        // Walk up the DOM tree building the path
-        while (current) {
-          const hasNodeId = current.hasAttribute?.('data-node-id');
-          const hasEditableField = current.hasAttribute?.('data-editable-field');
-          const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
-
-          // Process current node
-          if (hasNodeId) {
-            const nodeId = current.getAttribute('data-node-id');
-            // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
-            const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
-            // Prepend these path components
-            for (let i = parts.length - 1; i >= 0; i--) {
-              path.unshift(parts[i]);
-            }
-          }
-
-          // Stop if we've reached the editable field container or slate editor
-          if (hasEditableField || hasSlateEditor) {
-            break;
-          }
-
-          current = current.parentNode;
-        }
-
-        // If we didn't find the editable field or slate editor, path is invalid
-        if (!current) {
-          return null;
-        }
-
-        // Ensure path has at least block index
-        if (path.length === 0) {
-          return [0, 0]; // Default to first block, first text
-        }
-
-        return path;
-      },
-    };
+  afterEach(() => {
+    delete global.document;
+    delete global.window;
+    delete global.Node;
   });
 
   describe('Plain text scenarios', () => {
@@ -451,6 +365,148 @@ describe('HydraBridge.getNodePath()', () => {
     });
   });
 
+  describe('Text leaf wrapper scenarios (Vue/Nuxt)', () => {
+    test('text wrapped in span with empty nodeId inside strong', () => {
+      // Bug scenario: Vue wraps text in span even when text has no nodeId
+      // <strong data-node-id="1.1"><span data-node-id="">Disclaimer</span></strong>
+      // Slate structure: [1, 1] = strong, [1, 1, 0] = text
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First para</p>' +
+        '<p data-node-id="1">' +
+        '<span data-node-id="1-0">preamble </span>' +
+        '<strong data-node-id="1-1"><span data-node-id="">Disclaimer</span></strong>' +
+        '</p>' +
+        '</div>';
+
+      const strongSpan = document.querySelector('strong span');
+      const textNode = strongSpan.firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [1, 1, 0] - should skip the wrapper span with empty nodeId
+      expect(path).toEqual([1, 1, 0]);
+    });
+
+    test('text wrapped in span with undefined nodeId inside strong', () => {
+      // Vue might render undefined as string "undefined"
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1"><span data-node-id="undefined">Disclaimer</span></strong>' +
+        '</p>' +
+        '</div>';
+
+      const textNode = document.querySelector('strong span').firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [1, 1, 0] - should skip the wrapper span with "undefined" nodeId
+      expect(path).toEqual([1, 1, 0]);
+    });
+
+    test('text wrapped in span WITHOUT nodeId attribute inside strong', () => {
+      // Best case: Vue doesn't render the attribute at all
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1"><span>Disclaimer</span></strong>' +
+        '</p>' +
+        '</div>';
+
+      const textNode = document.querySelector('strong span').firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [1, 1, 0] - walks up correctly since span has no nodeId
+      expect(path).toEqual([1, 1, 0]);
+    });
+
+    test('plain text directly in strong (no wrapper span)', () => {
+      // This is the ideal rendering without extra wrapper
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '</p>' +
+        '</div>';
+
+      const textNode = document.querySelector('strong').firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [1, 1, 0]
+      expect(path).toEqual([1, 1, 0]);
+    });
+
+    test('exact production DOM structure from Nuxt', () => {
+      // Exact DOM from production: spans without any data-node-id attribute
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0"><span></span><strong data-node-id="0.1"><span></span></strong><span>You can use this site.</span></p>' +
+        '<p data-node-id="1"><span></span><strong data-node-id="1.1"><span>Disclaimer</span></strong><span>: This instance is reset.</span></p>' +
+        '</div>';
+
+      // Click on "Disclaimer" text inside strong > span
+      const strongSpan = document.querySelectorAll('strong')[1].querySelector('span');
+      const textNode = strongSpan.firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [1, 1, 0] - text inside strong at [1, 1]
+      expect(path).toEqual([1, 1, 0]);
+    });
+
+    test('list with links - li and link HAVE nodeId', () => {
+      // When li and link have nodeIds, path calculation works
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul class="list-disc">' +
+        '<li data-node-id="0.0"><span></span><a data-node-id="0.0.1" href="#"><span>NUXT.js Example</span></a><span></span></li>' +
+        '<li data-node-id="0.1"><span></span><a data-node-id="0.1.1" href="#"><span>Framework7 Example</span></a><span></span></li>' +
+        '</ul>' +
+        '</div>';
+
+      const linkSpan = document.querySelector('a span');
+      const textNode = linkSpan.firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [0, 0, 1, 0] - text inside link at [0, 0, 1]
+      expect(path).toEqual([0, 0, 1, 0]);
+    });
+
+    test('EXACT production list DOM - NO nodeIds anywhere - returns null with error', () => {
+      // Exact production DOM: NO data-node-id on ul, li, or a elements!
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul class="list-disc list-inside mx-4">' +
+        '<li><span></span><a href="#" class="underline"><span>NUXT.js Example</span></a><span></span></li>' +
+        '<li><span></span><a href="#" class="underline"><span>Framework7 Example</span></a><span></span></li>' +
+        '</ul>' +
+        '</div>';
+
+      const linkSpan = document.querySelector('a span');
+      const textNode = linkSpan.firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Without nodeIds, getNodePath returns null and logs helpful error
+      // showing which elements are missing data-node-id
+      expect(path).toBeNull();
+    });
+
+    test('list with links - ul HAS nodeId (correct rendering)', () => {
+      // If ul had data-node-id (ideal rendering)
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul data-node-id="0" class="list-disc">' +
+        '<li data-node-id="0.0"><span></span><a data-node-id="0.0.1" href="#"><span>NUXT.js Example</span></a><span></span></li>' +
+        '</ul>' +
+        '</div>';
+
+      const linkSpan = document.querySelector('a span');
+      const textNode = linkSpan.firstChild;
+      const path = bridge.getNodePath(textNode);
+
+      // Expected: [0, 0, 1, 0]
+      expect(path).toEqual([0, 0, 1, 0]);
+    });
+  });
+
   describe('Double wrapper scenarios', () => {
     test('double wrapper with same node-id renders correctly', () => {
       // DOM: When a renderer wraps text twice (e.g., bold+italic using same node-id)
@@ -490,6 +546,100 @@ describe('HydraBridge.getNodePath()', () => {
       expect(bridge.getNodePath(boldText)).toEqual([0, 1, 0]);
       // afterText is after element with node-id 0-1, so Slate index = 1+1 = 2
       expect(bridge.getNodePath(afterText)).toEqual([0, 2]);
+    });
+  });
+
+  describe('Production bug reproduction - path [1,3] should be [1,2]', () => {
+    test('empty text + strong + text AFTER (direct text nodes in p)', () => {
+      // Exact Slate structure from production error:
+      // {"children":[{"text":""},{"children":[{"text":"Disclaimer"}],"type":"strong"},{"text":": This instance..."}],"type":"p"}
+      // Expected: clicking on text at index 2 should return [1, 2]
+      // Bug: returning [1, 3]
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1"><strong data-node-id="1-1">Disclaimer</strong>: This instance is reset every night</p>' +
+        '</div>';
+
+      const p = document.querySelectorAll('p')[1]; // Second paragraph
+      const textAfterStrong = p.lastChild; // ": This instance..."
+
+      // Text after strong (node-id 1-1) should be at Slate index 2 (1+1)
+      // Full path: [1, 2] (paragraph 1, child 2)
+      expect(bridge.getNodePath(textAfterStrong)).toEqual([1, 2]);
+    });
+
+    test('empty text + strong + text AFTER (with empty text node)', () => {
+      // Same structure but WITH the empty text node at child 0
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1">Disclaimer</strong>: This instance is reset every night</p>' +
+        '</div>';
+
+      const p = document.querySelectorAll('p')[1];
+      // Add empty text node at the beginning (before strong)
+      const emptyText = document.createTextNode('');
+      p.insertBefore(emptyText, p.firstChild);
+
+      const textAfterStrong = p.lastChild;
+
+      // Now structure is: [empty text, strong, text after]
+      // Child 0: empty text
+      // Child 1: strong (node-id 1-1)
+      // Child 2: text ": This instance..."
+      // Path should be [1, 2]
+      expect(bridge.getNodePath(textAfterStrong)).toEqual([1, 2]);
+    });
+
+    test('text wrapped in spans (Nuxt wrapper scenario)', () => {
+      // Nuxt might wrap text leaves in spans without nodeId
+      // DOM: <p data-node-id="1"><span></span><strong data-node-id="1-1">Disclaimer</strong><span>: This...</span></p>
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1">' +
+        '<span></span>' + // empty text wrapper (no nodeId)
+        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '<span>: This instance is reset every night</span>' + // text wrapper (no nodeId)
+        '</p>' +
+        '</div>';
+
+      const p = document.querySelectorAll('p')[1];
+      const lastSpan = p.lastElementChild; // span wrapping ": This instance..."
+      const textInSpan = lastSpan.firstChild;
+
+      // Clicking on text inside the wrapper span
+      // Span is at DOM index 2 in p.children (after empty span and strong)
+      // But Slate index should be 2 (empty=0, strong=1, text=2)
+      // Full path: [1, 2, 0] or [1, 2] depending on how wrapper is handled
+      // The text inside a wrapper span without nodeId should resolve to the parent's position
+      expect(bridge.getNodePath(textInSpan)).toEqual([1, 2]);
+    });
+
+    test('text with whitespace nodes in p (HTML formatting)', () => {
+      // HTML often has whitespace between tags that creates text nodes
+      // This might explain path [1, 3] vs expected [1, 2]
+      document.body.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1">\n' + // whitespace text node!
+        '  <strong data-node-id="1-1">Disclaimer</strong>\n' + // more whitespace!
+        '  : This instance is reset every night\n' +
+        '</p>' +
+        '</div>';
+
+      const p = document.querySelectorAll('p')[1];
+      // Find the text node that contains ": This instance"
+      const textNodes = Array.from(p.childNodes).filter(
+        (n) => n.nodeType === Node.TEXT_NODE && n.textContent.includes('This instance')
+      );
+      const targetText = textNodes[0];
+
+      // Even with whitespace, the path to this text should be based on Slate structure
+      // Slate doesn't see whitespace-only nodes, so path should be [1, 2]
+      expect(bridge.getNodePath(targetText)).toEqual([1, 2]);
     });
   });
 });

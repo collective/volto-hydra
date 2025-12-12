@@ -292,6 +292,53 @@ export class Bridge {
     window.parent.postMessage(message, this.adminOrigin);
   }
 
+  /**
+   * Shows a developer warning overlay in the iframe.
+   * Used to alert developers about configuration issues.
+   *
+   * @param {string} title - Warning title
+   * @param {string} message - Detailed message with DOM info
+   */
+  showDeveloperWarning(title, message) {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'hydra-dev-warning';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      max-width: 500px;
+      max-height: 80vh;
+      background: #fef2f2;
+      border: 2px solid #dc2626;
+      border-radius: 8px;
+      padding: 16px;
+      z-index: 999999;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      overflow: auto;
+    `;
+
+    overlay.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <strong style="color: #dc2626; font-size: 14px;">⚠️ ${title}</strong>
+        <button id="hydra-warning-close" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
+      </div>
+      <pre style="white-space: pre-wrap; word-break: break-word; margin: 0; color: #1f2937;">${message}</pre>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Close button
+    document.getElementById('hydra-warning-close')?.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    // Auto-hide after 30 seconds
+    setTimeout(() => overlay.remove(), 30000);
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Bridge Class Initialization and Navigation Event Handling
   ////////////////////////////////////////////////////////////////////////////////
@@ -1245,23 +1292,54 @@ export class Bridge {
     const path = [];
     let current = node;
 
+    // Inline elements that wrap text content (used to detect text leaf wrappers)
+    const INLINE_WRAPPER_ELEMENTS = [
+      'SPAN',
+      'STRONG',
+      'EM',
+      'B',
+      'I',
+      'U',
+      'S',
+      'CODE',
+      'A',
+      'SUB',
+      'SUP',
+      'MARK',
+    ];
+
+    // Helper to check if element is an inline wrapper (using CSS if available)
+    const isInlineElement = (el) => {
+      if (typeof window !== 'undefined' && window.getComputedStyle) {
+        const display = window.getComputedStyle(el).display;
+        if (display && display !== '') {
+          return display === 'inline' || display === 'inline-block';
+        }
+      }
+      // Fall back to tag name (JSDOM or no CSS)
+      return INLINE_WRAPPER_ELEMENTS.includes(el.nodeName);
+    };
 
     // If starting with a text node, calculate its Slate index
     if (node.nodeType === Node.TEXT_NODE) {
       const parent = node.parentNode;
 
-      // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
+      // Check if parent has VALID data-node-id AND is an inline element (span, strong, etc.)
       // Inline elements wrap their text directly, blocks (p, div) may have multiple text children
+      // Skip empty or "undefined" nodeId values (from frontends that render undefined as string)
+      const parentNodeId = parent.hasAttribute?.('data-node-id')
+        ? parent.getAttribute('data-node-id')
+        : null;
+      const hasValidNodeId =
+        parentNodeId && parentNodeId !== '' && parentNodeId !== 'undefined';
       if (
-        parent.hasAttribute?.('data-node-id') &&
+        hasValidNodeId &&
         parent.nodeName !== 'P' &&
         parent.nodeName !== 'DIV' &&
         !parent.hasAttribute?.('data-editable-field')
       ) {
-        const nodeId = parent.getAttribute('data-node-id');
-
         // Parse the parent's path from its node ID
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
         // Text node index within the parent element
         const siblings = Array.from(parent.childNodes);
@@ -1271,25 +1349,51 @@ export class Bridge {
         path.push(...parts, textIndex);
         return path;
       } else {
-        // Parent is a block element or doesn't have data-node-id
-        // Calculate Slate index among siblings considering node IDs
-        const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
-        path.push(slateIndex);
-        current = parent;
+        // Parent doesn't have nodeId - is it a block element or inline wrapper?
+        // Inline wrappers (span, etc.) represent text leaves - don't count text inside
+        // Block elements (p, h1-h6, li, etc.) contain multiple children - count text position
+        const isWrapper =
+          isInlineElement(parent) &&
+          !parent.hasAttribute?.('data-editable-field');
+
+        if (isWrapper) {
+          // Parent is an inline wrapper without nodeId (like Nuxt spans for text leaves)
+          // Don't add textIndex - the wrapper represents the whole text leaf
+          // Let the while loop calculate the wrapper's position in the block
+          current = parent;
+        } else {
+          // Parent is a block element - calculate text's Slate index among siblings
+          const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
+          path.push(slateIndex);
+          current = parent;
+        }
       }
     }
 
     // Walk up the DOM tree building the path
     let depth = 0;
+    let foundContainer = false;
+    let foundNodeIdInWalk = false;
     while (current) {
-      const hasNodeId = current.hasAttribute?.('data-node-id');
       const hasEditableField = current.hasAttribute?.('data-editable-field');
       const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
 
+      // Track if we've found an editable container
+      if (hasEditableField || hasSlateEditor) {
+        foundContainer = true;
+      }
 
-      // Process current node
-      if (hasNodeId) {
-        const nodeId = current.getAttribute('data-node-id');
+      // Check for valid nodeId (skip empty or "undefined" values from frontends)
+      const nodeId = current.hasAttribute?.('data-node-id')
+        ? current.getAttribute('data-node-id')
+        : null;
+      const hasValidNodeId =
+        nodeId && nodeId !== '' && nodeId !== 'undefined';
+
+      // Process current node if it has a valid nodeId
+      // Must process BEFORE checking editable-field since element can have both
+      if (hasValidNodeId) {
+        foundNodeIdInWalk = true;
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
         const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
@@ -1297,20 +1401,91 @@ export class Bridge {
         for (let i = parts.length - 1; i >= 0; i--) {
           path.unshift(parts[i]);
         }
+
+        // NodeIds are ABSOLUTE paths - stop after finding the first valid one
+        // e.g., nodeId "1-1" means [1, 1], don't continue to add parent's nodeId
+        break;
       }
 
-      // Stop if we've reached the editable field container or slate editor
+      // Stop if we've reached the editable field container or slate editor (without nodeId)
       if (hasEditableField || hasSlateEditor) {
         break;
       }
 
-      current = current.parentNode;
+      // Element without nodeId - only calculate index for inline wrapper elements
+      // that could contain text (span, strong, etc.). Skip void elements (br, img, hr).
+      const parent = current.parentNode;
+      if (
+        parent &&
+        current.nodeType === Node.ELEMENT_NODE &&
+        INLINE_WRAPPER_ELEMENTS.includes(current.nodeName)
+      ) {
+        const slateIndex = this.getSlateIndexAmongSiblings(current, parent);
+        path.unshift(slateIndex);
+      }
+
+      current = parent;
       depth++;
     }
 
+    // Verify we're within an editable container - if not found, continue walking up
+    if (!foundContainer && current) {
+      let checkNode = current.parentNode;
+      while (checkNode) {
+        if (
+          checkNode.hasAttribute?.('data-editable-field') ||
+          checkNode.hasAttribute?.('data-slate-editor')
+        ) {
+          foundContainer = true;
+          break;
+        }
+        checkNode = checkNode.parentNode;
+      }
+    }
+
     // If we didn't find the editable field or slate editor, path is invalid
-    if (!current) {
+    if (!current || !foundContainer) {
       console.warn('[HYDRA] getNodePath - no container found, returning null');
+      return null;
+    }
+
+    // If no nodeId was found, show visible error and log details
+    if (!foundNodeIdInWalk) {
+      // Build DOM path showing which elements are missing data-node-id
+      const domPath = [];
+      let walkNode = node;
+      while (walkNode && walkNode !== current?.parentNode) {
+        if (walkNode.nodeType === Node.ELEMENT_NODE) {
+          const tag = walkNode.tagName.toLowerCase();
+          const nodeId = walkNode.getAttribute?.('data-node-id');
+          const classes = walkNode.className ? `.${walkNode.className.split(' ').join('.')}` : '';
+          if (nodeId) {
+            domPath.unshift(`<${tag}${classes} data-node-id="${nodeId}">`);
+          } else {
+            domPath.unshift(`<${tag}${classes}> ⚠️ MISSING data-node-id`);
+          }
+        } else if (walkNode.nodeType === Node.TEXT_NODE) {
+          const text = walkNode.textContent?.slice(0, 20) || '';
+          domPath.unshift(`"${text}${walkNode.textContent?.length > 20 ? '...' : ''}"`);
+        }
+        walkNode = walkNode.parentNode;
+      }
+
+      const errorMsg =
+        'DOM path:\n' + domPath.map((p, i) => '  '.repeat(i) + p).join('\n');
+
+      console.error('[HYDRA] Selection sync failed - missing data-node-id\n\n' + errorMsg);
+
+      // Show visible warning overlay in iframe (only once per session)
+      if (!this._shownNodeIdWarning) {
+        this._shownNodeIdWarning = true;
+        this.showDeveloperWarning(
+          'Hydra: Missing data-node-id attributes',
+          'Selection sync disabled. Your frontend must render data-node-id on Slate elements.\n\n' +
+            errorMsg +
+            '\n\nSee browser console for details.'
+        );
+      }
       return null;
     }
 
