@@ -48,6 +48,7 @@ import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
 import { setSidebarTab } from '@plone/volto/actions';
+import blockSVG from '@plone/volto/icons/block.svg';
 import { setAllowedBlocksList } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
@@ -338,7 +339,7 @@ function parseSvgToIconFormat(svgString) {
 
 /**
  * Process blocksConfig to convert string SVG icons to Volto's format.
- * Modifies the config in place.
+ * Modifies the config in place. Uses blockSVG as fallback for missing icons.
  */
 function processBlockIcons(blocksConfig) {
   if (!blocksConfig || typeof blocksConfig !== 'object') {
@@ -347,14 +348,19 @@ function processBlockIcons(blocksConfig) {
 
   Object.keys(blocksConfig).forEach((blockType) => {
     const blockConfig = blocksConfig[blockType];
-    if (blockConfig && typeof blockConfig.icon === 'string') {
+    if (!blockConfig) return;
+
+    if (typeof blockConfig.icon === 'string') {
       const parsedIcon = parseSvgToIconFormat(blockConfig.icon);
       if (parsedIcon) {
         blockConfig.icon = parsedIcon;
       } else {
-        // Remove invalid string icons to prevent Icon component errors
-        delete blockConfig.icon;
+        // Invalid string icon - use fallback
+        blockConfig.icon = blockSVG;
       }
+    } else if (!blockConfig.icon) {
+      // No icon provided - use fallback
+      blockConfig.icon = blockSVG;
     }
   });
 }

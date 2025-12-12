@@ -3345,6 +3345,16 @@ export class Bridge {
     if (editableField) {
       // Make the field contenteditable - child inline elements inherit this
       editableField.setAttribute('contenteditable', 'true');
+
+      // Ensure minimum dimensions if element has no height (empty content)
+      // This keeps empty fields visible/clickable for user interaction
+      const rect = editableField.getBoundingClientRect();
+      if (rect.height === 0) {
+        editableField.style.minHeight = '1.5em';
+      }
+      if (rect.width === 0) {
+        editableField.style.minWidth = '1em';
+      }
     }
 
     if (editableField && blockUid) {

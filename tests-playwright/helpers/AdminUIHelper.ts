@@ -940,12 +940,17 @@ export class AdminUIHelper {
 
   /**
    * Get the text content of a block in the iframe.
+   * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
    */
   async getBlockTextInIframe(blockId: string): Promise<string> {
     const iframe = this.getIframe();
-    // Get text from the editable field (data-editable-field), not the entire block (which includes toolbar buttons)
-    // Don't require contenteditable="true" because it's only set when the block is selected
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    // Try descendant first (mock frontend: data-block-uid > [data-editable-field])
+    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+
+    if ((await editor.count()) === 0) {
+      // Nuxt pattern: data-block-uid and data-editable-field on same element
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`).first();
+    }
 
     // Wait a moment for any pending mutations to complete
     await this.page.waitForTimeout(100);
@@ -967,9 +972,10 @@ export class AdminUIHelper {
       .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
       .first();
 
-    const isVisible = await editor.isVisible().catch(() => false);
+    // Use count() instead of isVisible() - element might exist but be scrolled out of view
+    const count = await editor.count().catch(() => 0);
 
-    if (!isVisible) {
+    if (count === 0) {
       // Try same-element selector (Nuxt: data-block-uid AND contenteditable on same element)
       editor = iframe.locator(
         `[data-block-uid="${blockId}"][contenteditable="true"]`,
@@ -1486,6 +1492,7 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to a specific position in a contenteditable element.
+   * Uses Selection.modify() to move by visible characters, handling Vue/Nuxt empty text nodes.
    *
    * @param editor - The contenteditable element
    * @param position - The character offset position to move to (0-based)
@@ -1493,17 +1500,20 @@ export class AdminUIHelper {
   async moveCursorToPosition(editor: any, position: number): Promise<void> {
     await editor.evaluate(
       (el: any, pos: number) => {
-        const textNode = el.firstChild;
-        if (!textNode || textNode.nodeType !== 3) {
-          // Node.TEXT_NODE = 3
-          throw new Error('Expected first child to be a text node');
-        }
-        const range = el.ownerDocument.createRange();
-        const selection = el.ownerDocument.defaultView.getSelection();
-        range.setStart(textNode, pos);
-        range.collapse(true);
+        const doc = el.ownerDocument;
+        const selection = doc.defaultView.getSelection();
+
+        // First, move cursor to start of element
+        const range = doc.createRange();
+        range.selectNodeContents(el);
+        range.collapse(true); // Collapse to start
         selection.removeAllRanges();
         selection.addRange(range);
+
+        // Then move forward by visible characters using Selection.modify()
+        for (let i = 0; i < pos; i++) {
+          selection.modify('move', 'forward', 'character');
+        }
       },
       position,
     );

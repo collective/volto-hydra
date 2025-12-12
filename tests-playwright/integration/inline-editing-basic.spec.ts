@@ -279,10 +279,6 @@ test.describe('Inline Editing - Basic', () => {
     // Wait for the correct number of blocks to be created
     await expect(iframe.locator('[data-block-uid]')).toHaveCount(initialBlocks + 1, { timeout: 3000 });
 
-    // Wait for the old block's Quanta toolbar to disappear (means new block got selected)
-    const oldBlockToolbar = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra--quanta-toolbar`);
-    await expect(oldBlockToolbar).not.toBeVisible({ timeout: 2000 });
-
     // Get the new block (should be right after the old block)
     const allBlocks = await iframe.locator('[data-block-uid]').all();
     const newBlockIndex = allBlocks.findIndex(async (block) => {
@@ -293,9 +289,11 @@ test.describe('Inline Editing - Basic', () => {
     const newBlockUid = await newBlock.getAttribute('data-block-uid');
     expect(newBlockUid).toBeTruthy();
 
-    // Verify the new block is contenteditable using helper that handles both frontend structures
+    // Wait for the new block to be selected (visible with toolbar)
+    await helper.waitForBlockSelected(newBlockUid!);
+
+    // Verify the new block is contenteditable
     const newEditor = await helper.getEditorLocator(newBlockUid!);
-    await expect(newEditor).toBeVisible({ timeout: 2000 });
     const isContentEditable = await newEditor.getAttribute('contenteditable');
     expect(isContentEditable).toBe('true');
 
