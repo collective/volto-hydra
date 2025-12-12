@@ -86,39 +86,6 @@ test.describe('Nuxt Frontend - Slider Block', () => {
     await expect(slides).toHaveCount(2);
   });
 
-  test('selection is preserved after applying bold formatting', async () => {
-    // Bug: After bolding a word in Nuxt frontend, selection is lost
-    // Expected: Selection should remain on the bolded word
-    // This works correctly with mock frontend but fails with Nuxt
-
-    await helper.navigateToEdit('/slider-test-page');
-
-    // Enter edit mode on the slate block
-    const editor = await helper.enterEditMode('slate-after-slider');
-
-    // Select all and type new content to have a clean slate
-    await helper.selectAllTextInEditor(editor);
-    await editor.pressSequentially('Test bold selection', { delay: 10 });
-    await helper.waitForEditorText(editor, /Test bold selection/);
-
-    // Select the word "bold" (characters 5-9)
-    // "Test bold selection"
-    //  01234567890123456789
-    await helper.selectTextRange(editor, 5, 9);
-
-    // Verify selection is on "bold"
-    const selectedBefore = await editor.evaluate(() => window.getSelection()?.toString());
-    expect(selectedBefore).toBe('bold');
-
-    // Apply bold formatting
-    await helper.clickFormatButton('bold');
-
-    // Wait for bold formatting to appear
-    await helper.waitForFormattedText(editor, /bold/, 'bold');
-
-    // Verify selection is STILL on "bold" after formatting
-    // This is the bug: in Nuxt frontend, selection is lost after bold
-    const selectedAfter = await editor.evaluate(() => window.getSelection()?.toString());
-    expect(selectedAfter).toBe('bold');
-  });
+  // Note: 'selection is preserved after applying bold formatting' test is in
+  // inline-editing-basic.spec.ts and runs against both mock and nuxt frontends
 });

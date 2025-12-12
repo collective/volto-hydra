@@ -868,10 +868,24 @@ const Iframe = (props) => {
               onSelectBlock(newBlockId);
 
               // Send FORM_DATA message to trigger iframe re-render with new block
+              // Include selectedBlockUid and selection so iframe knows to select the new block
+              // and place cursor at start of the new block's value field
               if (iframeOriginRef.current) {
                 const updatedBlockPathMap = buildBlockPathMap(updatedFormData, config.blocks.blocksConfig);
+                // Selection at start of new block (path [0,0] = first paragraph, first text position)
+                const newBlockSelection = {
+                  anchor: { path: [0, 0], offset: 0 },
+                  focus: { path: [0, 0], offset: 0 },
+                };
                 event.source.postMessage(
-                  { type: 'FORM_DATA', data: updatedFormData, blockPathMap: updatedBlockPathMap, formatRequestId: enterRequestId },
+                  {
+                    type: 'FORM_DATA',
+                    data: updatedFormData,
+                    blockPathMap: updatedBlockPathMap,
+                    formatRequestId: enterRequestId,
+                    selectedBlockUid: newBlockId,
+                    transformedSelection: newBlockSelection,
+                  },
                   event.origin,
                 );
               }

@@ -64,11 +64,10 @@ test.describe('Inline Editing - Formatting', () => {
       message: 'Step 8: After clicking bold button'
     });
 
-    // STEP 9: Verify the text is bold by checking for <span style="font-weight: bold"> tag
-    const blockHtml = await editor.innerHTML();
-    console.log('[TEST] Step 9: Final HTML:', blockHtml);
-    expect(blockHtml).toContain('style="font-weight: bold"');
-    expect(blockHtml).toContain('Text to make bold');
+    // STEP 9: Verify the text is bold
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('Text to make bold');
   });
 
   test('bold formatting syncs with Admin UI', async ({ page }) => {
@@ -90,17 +89,12 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.clickFormatButton('bold');
 
     // Wait for bold formatting to sync from Admin UI to iframe
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible({ timeout: 10000 });
-
-    // Verify bold in iframe
-    await expect(async () => {
-      const blockHtml = await editor.innerHTML();
-      expect(blockHtml).toContain('style="font-weight: bold"');
-    }).toPass({ timeout: 5000 });
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible({ timeout: 10000 });
 
     // Wait for the bold formatting to visually appear in the sidebar's React Slate editor
     // The sidebar Slate editor renders bold text with <strong> tags
-    const sidebarSlateEditor = page.locator('[role="complementary"][aria-label="Sidebar"] [contenteditable="true"]');
+    const sidebarSlateEditor = helper.getSidebarSlateEditor('value');
     await expect(sidebarSlateEditor.locator('strong')).toContainText('Synced bold text', { timeout: 5000 });
   });
 
@@ -112,12 +106,12 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Bold and italic text', { delay: 10 });
 
-    // Select all text using JavaScript Selection API
+    // Select all text again for formatting
     await helper.selectAllTextInEditor(editor);
 
     // Assert selection exists and covers all text
@@ -136,11 +130,11 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForFormattedText(editor, /Bold and italic text/, 'italic');
 
     // Verify both formats are applied
-    // Note: hydra.js renders formatting as inline styles, not semantic tags
-    const blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('font-weight: bold');
-    expect(blockHtml).toContain('font-style: italic');
-    expect(blockHtml).toContain('Bold and italic text');
+    const boldSelector = helper.getFormatSelector('bold');
+    const italicSelector = helper.getFormatSelector('italic');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    await expect(editor.locator(italicSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('Bold and italic text');
   });
 
   test('format button shows active state for formatted text', async ({ page }) => {
@@ -151,16 +145,17 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Text with bold', { delay: 10 });
     await helper.waitForEditorText(editor, /Text with bold/);
 
-    // Select all text in the editor using JavaScript Selection API
+    // Select all text again for formatting
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible();
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
 
     // Verify selection is still on the formatted text
     await helper.verifySelectionMatches(editor, 'Text with bold');
@@ -179,30 +174,25 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Toggle bold text', { delay: 10 });
     await helper.waitForEditorText(editor, /Toggle bold text/);
 
-    // Select all text in the editor using JavaScript Selection API
+    // Select all text again for formatting
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible();
-
-    // Verify bold was applied
-    let blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('style="font-weight: bold"');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
 
     // Click bold button again to remove formatting
     await helper.selectAllTextInEditor(editor); // Re-select text
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).not.toBeVisible();
+    await expect(editor.locator(boldSelector)).not.toBeVisible();
 
-    // Verify bold was removed
-    blockHtml = await editor.innerHTML();
-    expect(blockHtml).not.toContain('style="font-weight: bold"');
-    expect(blockHtml).toContain('Toggle bold text');
+    // Verify text is still there
+    expect(await editor.textContent()).toContain('Toggle bold text');
   });
 
   test('format persists after typing', async ({ page }) => {
@@ -213,13 +203,13 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and type text
+    // Enter edit mode and type text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Bold text', { delay: 10 });
     await helper.waitForEditorText(editor, /Bold text/);
 
-    // Select all and make it bold, wait for formatting AND content to be stable
+    // Select all again and make it bold, wait for formatting AND content to be stable
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
     await helper.waitForFormattedText(editor, /Bold text/, 'bold');
@@ -232,8 +222,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Bold text more/);
 
     // Check if new text inherits bold formatting
-    const html = await editor.innerHTML();
-    expect(html).toContain('style="font-weight: bold"');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
     const text = await helper.getCleanTextContent(editor);
     expect(text).toContain('Bold text more');
   });
@@ -307,7 +297,8 @@ test.describe('Inline Editing - Formatting', () => {
     console.log('[TEST] First bold click done');
 
     // Verify bold markup exists using DOM assertion
-    const boldSpan = editor.locator('span[style*="font-weight: bold"]');
+    const boldSelector = helper.getFormatSelector('bold');
+    const boldSpan = editor.locator(boldSelector);
     await expect(boldSpan).toBeVisible();
     await expect(boldSpan).toHaveText('bold');
 
@@ -457,7 +448,8 @@ test.describe('Inline Editing - Formatting', () => {
     console.log('[TEST] Final HTML:', html);
 
     // "world" should be bold (may contain trailing ZWS for cursor positioning)
-    const boldSpan = editor.locator('span[style*="font-weight: bold"]');
+    const boldSelector = helper.getFormatSelector('bold');
+    const boldSpan = editor.locator(boldSelector);
     await expect(boldSpan).toHaveText(/world/);
 
     // " testing" should NOT be inside the bold span
@@ -539,8 +531,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForFormattedText(editor, /Test with sidebar closed/, 'bold');
 
     // Verify bold was applied
-    const blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('style="font-weight: bold"');
-    expect(blockHtml).toContain('Test with sidebar closed');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('Test with sidebar closed');
   });
 });

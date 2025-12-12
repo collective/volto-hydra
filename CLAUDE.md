@@ -78,6 +78,13 @@ The health endpoint (`core/packages/volto/razzle.config.js`) returns:
 - `tests-playwright/integration/inline-editing.spec.ts` - Tests inline editing functionality
 - `tests-playwright/integration/drag-and-drop.spec.ts` - Tests block reordering via drag and drop
 
+## Test Helpers
+
+List all AdminUIHelper methods:
+```bash
+grep -E '^\s+(async\s+)?[a-zA-Z_]+\(' tests-playwright/helpers/AdminUIHelper.ts | grep -v 'if\s*(' | grep -v 'for\s*(' | sed 's/^\s*//' | awk -F'(' '{print $1}' | sed 's/async //' | sort -u
+```
+
 ## Manual Development Server
 
 To manually start the servers for development/testing:
@@ -171,5 +178,7 @@ lsof -ti:8888,3001,3002 2>/dev/null | xargs kill -9 2>/dev/null
 - only git commit when I ask you to
 - Playwright's `webServer.reuseExistingServer: true` means it will use a manually-started Volto server if available
 - The test setup skips `build:deps` to avoid parcel segfault in non-interactive shells
-- **NEVER* kill node processes. check if you really need to kill a process as some tests reload
+- **NEVER* kill all node processes haphazardly. check if you really need to kill a process as some tests reload
 - to check volto is compiling use http://localhost:3002/health
+- custom schemas are registered in the renderer.js on init.
+- node ids are added dynamically by hydra.js

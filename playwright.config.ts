@@ -73,7 +73,18 @@ export default defineConfig({
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
         /container-.*\.spec\.ts/, // Skip container tests (not yet supported in Nuxt)
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
+        /unit\/.*\.spec\.ts/, // Unit tests don't need to run per-frontend
       ],
+    },
+    // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
+    {
+      name: 'nuxt-specific',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+      testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
     },
 
     // Uncomment to test on Firefox and WebKit

@@ -252,9 +252,13 @@ export class AdminUIHelper {
       }
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
-      const editableField = block.locator('[contenteditable="true"]');
+      // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
+      const childEditable = block.locator('[contenteditable="true"]');
+      const selfEditable = iframe.locator(
+        `[data-block-uid="${blockId}"][contenteditable="true"]`,
+      );
       try {
-        await editableField.waitFor({ state: 'visible', timeout: 5000 });
+        await childEditable.or(selfEditable).first().waitFor({ state: 'visible', timeout: 5000 });
       } catch (e) {
         throw new Error(`Block "${blockId}" was clicked but no contenteditable field appeared. Check that hydra.js is handling the block selection.`);
       }
@@ -740,6 +744,28 @@ export class AdminUIHelper {
   }
 
   /**
+   * Apply a format to the currently selected text in an editor.
+   * This is a higher-level helper that:
+   * 1. Clicks the format button
+   * 2. Waits for the formatted text to appear
+   * 3. Re-selects all text (to restore selection after DOM re-render)
+   *
+   * Use this instead of clickFormatButton when you need to apply multiple
+   * formats in sequence, as the DOM re-render can lose the selection.
+   */
+  async applyFormat(
+    editor: Locator,
+    format: 'bold' | 'italic',
+    expectedText: RegExp | string,
+  ): Promise<void> {
+    await this.clickFormatButton(format);
+    await this.waitForFormattedText(editor, expectedText, format);
+    // Re-select all text to restore selection after DOM re-render
+    // There is a bug if this is not automatically done by hydra.js
+    // await this.selectAllTextInEditor(editor);
+  }
+
+  /**
    * Check if a format button is in active state.
    * Semantic UI Button with active={true} gets the "active" CSS class.
    */
@@ -791,33 +817,24 @@ export class AdminUIHelper {
    * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
-    await editor.evaluate((el) => {
-      // Find the first and last text nodes in the element
-      // This handles both plain text and formatted text (e.g., <span>text</span>)
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-      const firstTextNode = walker.nextNode();
-      if (!firstTextNode) {
-        throw new Error('No text nodes found in editor');
-      }
+    // Get the expected text content (visible text, trimmed)
+    const expectedText = await editor.evaluate((el) => el.textContent?.trim() || '');
 
-      // Find the last text node
-      let lastTextNode = firstTextNode;
-      let node;
-      while ((node = walker.nextNode())) {
-        lastTextNode = node;
-      }
+    // Use platform-appropriate keyboard shortcut (Cmd+A on Mac, Ctrl+A elsewhere)
+    await editor.press('ControlOrMeta+a');
 
-      const range = document.createRange();
-      range.setStart(firstTextNode, 0);
-      range.setEnd(lastTextNode, lastTextNode.textContent?.length || 0);
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    });
-    // Give the selection time to register and trigger selectionchange event
-    await this.page.waitForTimeout(100);
+    // Wait for selection to match the editor's text content
+    await expect
+      .poll(
+        async () => {
+          return editor.evaluate(() => {
+            const sel = window.getSelection();
+            return sel?.toString().trim() || '';
+          });
+        },
+        { timeout: 5000 }
+      )
+      .toBe(expectedText);
   }
 
   /**
@@ -999,6 +1016,16 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the CSS selector for a format type that works with both frontends.
+   * Mock frontend uses inline styles, Nuxt uses semantic tags.
+   */
+  getFormatSelector(format: 'bold' | 'italic'): string {
+    return format === 'bold'
+      ? 'span[style*="font-weight: bold"], strong, b'
+      : 'span[style*="font-style: italic"], em, i';
+  }
+
+  /**
    * Wait for formatted text (bold/italic) to appear in the editor.
    * Useful for waiting until formatting has been applied after Ctrl+B or toolbar clicks.
    */
@@ -1006,17 +1033,29 @@ export class AdminUIHelper {
     editor: Locator,
     pattern: RegExp | string,
     format: 'bold' | 'italic',
-    options: { timeout?: number } = {}
+    options: { timeout?: number } = {},
   ): Promise<void> {
     const timeout = options.timeout ?? 5000;
-    // Support both inline styles (mock frontend) and semantic tags (Nuxt/Vue frontend)
-    const selector =
-      format === 'bold'
-        ? 'span[style*="font-weight: bold"], strong, b'
-        : 'span[style*="font-style: italic"], em, i';
+    const selector = this.getFormatSelector(format);
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
 
-    await expect(editor.locator(selector)).toHaveText(regex, { timeout });
+    // Use filter to find elements matching the pattern, first() handles multiple matches
+    await expect(editor.locator(selector).filter({ hasText: regex }).first()).toBeVisible({ timeout });
+  }
+
+  /**
+   * Wait for formatted text (bold/italic) to be removed from the editor.
+   * Useful for waiting until formatting has been removed after toggling off.
+   */
+  async waitForFormattingRemoved(
+    editor: Locator,
+    format: 'bold' | 'italic',
+    options: { timeout?: number } = {},
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    const selector = this.getFormatSelector(format);
+
+    await expect(editor.locator(selector)).not.toBeVisible({ timeout });
   }
 
   /**
@@ -1371,14 +1410,42 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the end of the text in a contenteditable element.
-   * Uses JavaScript to avoid triggering window scroll (unlike keyboard End key).
+   * Finds the last non-whitespace text node and places cursor at the end of it.
+   * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
   async moveCursorToEnd(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(false); // Collapse to end
+
+      // Find all text nodes, keeping only ones with actual content
+      const walker = el.ownerDocument.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null,
+      );
+      let lastContentTextNode = null;
+      let node;
+      while ((node = walker.nextNode())) {
+        // Skip whitespace-only text nodes (newlines, spaces between elements)
+        if (node.textContent && node.textContent.trim().length > 0) {
+          lastContentTextNode = node;
+        }
+      }
+
+      if (lastContentTextNode) {
+        // Place cursor at end of last content text node
+        range.setStart(
+          lastContentTextNode,
+          lastContentTextNode.textContent?.length || 0,
+        );
+        range.collapse(true);
+      } else {
+        // Fallback: no text nodes, collapse to end of container
+        range.selectNodeContents(el);
+        range.collapse(false);
+      }
+
       selection.removeAllRanges();
       selection.addRange(range);
     });
@@ -1386,14 +1453,32 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the start of the text in a contenteditable element.
-   * Uses JavaScript to avoid triggering window scroll (unlike keyboard Home key).
+   * Finds the first text node and places cursor at the start of it.
+   * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
   async moveCursorToStart(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(true); // Collapse to start
+
+      // Find the first text node in the element
+      const walker = el.ownerDocument.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null,
+      );
+      const firstTextNode = walker.nextNode();
+
+      if (firstTextNode) {
+        // Place cursor at start of first text node
+        range.setStart(firstTextNode, 0);
+        range.collapse(true);
+      } else {
+        // Fallback: no text nodes, collapse to start of container
+        range.selectNodeContents(el);
+        range.collapse(true);
+      }
+
       selection.removeAllRanges();
       selection.addRange(range);
     });
@@ -1703,8 +1788,20 @@ export class AdminUIHelper {
    * Matches Cypress pattern: #sidebar-properties .field-wrapper-{fieldname}
    */
   async hasSidebarField(fieldName: string): Promise<boolean> {
-    const fieldWrapper = this.page.locator(`#sidebar-properties .field-wrapper-${fieldName}`);
+    const fieldWrapper = this.page.locator(
+      `#sidebar-properties .field-wrapper-${fieldName}`,
+    );
     return await fieldWrapper.isVisible();
+  }
+
+  /**
+   * Get the sidebar slate editor locator for a specific field.
+   * Returns the contenteditable element for the field's slate widget.
+   */
+  getSidebarSlateEditor(fieldName: string): Locator {
+    return this.page.locator(
+      `#sidebar-properties .field-wrapper-${fieldName} [contenteditable="true"]`,
+    );
   }
 
   /**
