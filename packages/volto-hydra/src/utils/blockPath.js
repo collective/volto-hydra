@@ -714,6 +714,15 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       }, blocksConfig);
     }
 
+    // Call initialValue if defined (like Volto's _applyBlockInitialValue)
+    const childBlockConfig = blocksConfig?.[childBlockType];
+    if (childBlockConfig?.initialValue) {
+      childBlockData = childBlockConfig.initialValue({
+        id: childBlockId,
+        value: childBlockData,
+      });
+    }
+
     // Recursively initialize the child if it's also a container
     childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, options);
 
