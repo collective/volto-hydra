@@ -1399,12 +1399,19 @@ export class AdminUIHelper {
   async enterEditMode(blockId: string): Promise<any> {
     const iframe = this.getIframe();
     // Use [data-editable-field] to find editor regardless of contenteditable state
-    const editor = iframe
+    // Try descendant first (mock frontend), then same element (Nuxt frontend)
+    let editor = iframe
       .locator(`[data-block-uid="${blockId}"] [data-editable-field]`)
       .first();
 
-    // Check if the editor is already visible and focused
-    const isVisible = await editor.isVisible().catch(() => false);
+    // Check if descendant selector found anything
+    let isVisible = await editor.isVisible().catch(() => false);
+
+    if (!isVisible) {
+      // Try same-element selector (Nuxt: data-block-uid and data-editable-field on same element)
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`);
+      isVisible = await editor.isVisible().catch(() => false);
+    }
 
     if (isVisible) {
       // Check if already editable

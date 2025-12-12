@@ -5,17 +5,15 @@
       <RichText v-for="child in subs" :key="child.nodeId" :node="child" />
     </NuxtLink>
   </template>
-  <ul v-else-if="node.type === 'ul'" class="list-disc list-inside mx-4">
+  <ul v-else-if="node.type === 'ul'" class="list-disc list-inside mx-4" :data-node-id="node.nodeId">
     {{ node.text }}
     <RichText v-for="child in subs" :key="child.nodeId" :node="child" />
   </ul>
-  <ol v-else-if="node.type === 'ol'" class="list-decimal list-inside mx-4">
+  <ol v-else-if="node.type === 'ol'" class="list-decimal list-inside mx-4" :data-node-id="node.nodeId">
     {{ node.text }}
     <RichText v-for="child in subs" :key="child.nodeId" :node="child" />
   </ol>
-  <span v-else-if="!node.type" :data-node-id="node.nodeId">
-    {{ node.text }}
-  </span>
+  <template v-else-if="!node.type">{{ node.text }}</template>
   <component v-else :is="node.type" :data-node-id="node.nodeId">
     {{ node.text }}
     <RichText v-for="child in subs" :key="child.nodeId" :node="child" />

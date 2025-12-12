@@ -55,7 +55,7 @@
 
 <script setup>
 
-import { initBridge } from '../packages/hydra.js';
+import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();

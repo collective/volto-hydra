@@ -45,17 +45,35 @@ export default defineConfig({
     video: process.env.VIDEO ? 'retain-on-failure' : 'off',
   },
 
-  /* Configure projects for major browsers */
+  /* Configure projects for different frontends */
   projects: [
+    // Mock frontend (default) - tests run against mock HTML frontend on port 8888
     {
-      name: 'chromium',
+      name: 'mock',
       use: {
         ...devices['Desktop Chrome'],
-        // Explicit viewport for consistent behavior between local and CI
         viewport: { width: 1280, height: 720 },
-        // Grant clipboard permissions for paste tests
         permissions: ['clipboard-read', 'clipboard-write'],
       },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests
+      ],
+    },
+    // Nuxt frontend - tests run against Nuxt frontend on port 3003
+    {
+      name: 'nuxt',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        // Pre-set iframe_url cookie to use Nuxt frontend
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
+        /container-.*\.spec\.ts/, // Skip container tests (not yet supported in Nuxt)
+        /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
+      ],
     },
 
     // Uncomment to test on Firefox and WebKit
