@@ -299,10 +299,7 @@ test.describe('Inline Editing - Links', () => {
 
     // Create text and select it
     await helper.editBlockTextInIframe(blockId, 'Click here');
-    const iframe = helper.getIframe();
-    // Use [data-editable-field] instead of [contenteditable="true"] because
-    // contenteditable may be false when editor is blocked during format operations
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click link button to open LinkEditor
@@ -443,16 +440,7 @@ test.describe('Inline Editing - Links', () => {
     const editor = await helper.getEditorLocator(blockId);
 
     // Select "link" text (characters 7-11)
-    await editor.evaluate((el) => {
-      const textNode = el.firstChild;
-      if (!textNode) throw new Error('No text node found');
-      const range = document.createRange();
-      const selection = window.getSelection();
-      range.setStart(textNode, 7);
-      range.setEnd(textNode, 11);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
+    await helper.selectTextRange(editor, 7, 11);
 
     // Create link
     await helper.clickFormatButton('link');
