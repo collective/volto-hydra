@@ -137,6 +137,80 @@ export class AdminUIHelper {
   }
 
   /**
+   * Inject the preserveWhitespaceDOM helper into the iframe.
+   * This helper creates DOM while preserving whitespace text nodes that innerHTML would collapse.
+   * Vue/Nuxt templates create these from newlines/indentation.
+   *
+   * After calling this, tests can use: (window as any).preserveWhitespaceDOM('<div>\\n  <p>text</p>\\n</div>')
+   */
+  async injectPreserveWhitespaceHelper(): Promise<void> {
+    const iframe = this.getIframe();
+    await iframe.locator('body').evaluate(() => {
+      (window as any).preserveWhitespaceDOM = function(html: string): DocumentFragment {
+        const fragment = document.createDocumentFragment();
+
+        function parseHTML(htmlStr: string, parent: Node): string {
+          let remaining = htmlStr;
+
+          while (remaining.length > 0) {
+            const tagStart = remaining.indexOf('<');
+
+            if (tagStart === -1) {
+              if (remaining.length > 0) {
+                parent.appendChild(document.createTextNode(remaining));
+              }
+              break;
+            }
+
+            if (tagStart > 0) {
+              const text = remaining.slice(0, tagStart);
+              parent.appendChild(document.createTextNode(text));
+              remaining = remaining.slice(tagStart);
+            }
+
+            if (remaining.startsWith('</')) {
+              return remaining;
+            }
+
+            const tagEnd = remaining.indexOf('>');
+            if (tagEnd === -1) break;
+
+            const tagContent = remaining.slice(1, tagEnd);
+            const selfClosing = tagContent.endsWith('/');
+            const tagParts = (selfClosing ? tagContent.slice(0, -1) : tagContent).trim().split(/\s+/);
+            const tagName = tagParts[0];
+
+            const element = document.createElement(tagName);
+
+            const attrStr = tagParts.slice(1).join(' ');
+            const attrRegex = /([a-zA-Z-]+)(?:="([^"]*)")?/g;
+            let match;
+            while ((match = attrRegex.exec(attrStr)) !== null) {
+              element.setAttribute(match[1], match[2] || '');
+            }
+
+            parent.appendChild(element);
+            remaining = remaining.slice(tagEnd + 1);
+
+            if (!selfClosing) {
+              remaining = parseHTML(remaining, element);
+              const closeTag = `</${tagName}>`;
+              if (remaining.startsWith(closeTag)) {
+                remaining = remaining.slice(closeTag.length);
+              }
+            }
+          }
+
+          return remaining;
+        }
+
+        parseHTML(html, fragment);
+        return fragment;
+      };
+    });
+  }
+
+  /**
    * Click on a block within the preview iframe.
    * Waits for the block to be selected (have the outline) after clicking.
    *

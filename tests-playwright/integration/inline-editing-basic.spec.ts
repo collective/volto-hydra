@@ -223,9 +223,7 @@ test.describe('Inline Editing - Basic', () => {
     const initialBlocks = await iframe.locator('[data-block-uid]').count();
 
     // Click the first block and type text
-    await helper.clickBlockInIframe(blockId);
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
+    const editor = await helper.enterEditMode(blockId);
     await editor.evaluate((el) => { el.textContent = ''; });
     await editor.pressSequentially('First line', { delay: 10 });
 

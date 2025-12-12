@@ -1139,6 +1139,123 @@ export class Bridge {
   }
 
   ////////////////////////////////////////////////////////////////////////////////
+  // Cursor Position Correction - Handle template whitespace
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Checks if a node is on invalid whitespace (text node outside any data-node-id element).
+   * This happens when cursor lands on template whitespace in Vue/Nuxt templates.
+   *
+   * @param {Node} node - The DOM node to check
+   * @returns {boolean} True if the node is on invalid whitespace
+   */
+  isOnInvalidWhitespace(node) {
+    if (!node) return false;
+
+    // Only check text nodes
+    if (node.nodeType !== Node.TEXT_NODE) return false;
+
+    // Walk up to find if there's a data-node-id ancestor before hitting data-editable-field
+    let current = node.parentNode;
+    while (current) {
+      // If we hit an element with data-node-id, cursor is valid
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+      // If we hit the editable field container without finding data-node-id, cursor is on whitespace
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-editable-field')) {
+        return true;
+      }
+      current = current.parentNode;
+    }
+
+    // Not inside an editable field at all
+    return false;
+  }
+
+  /**
+   * Gets the valid position for a node on invalid whitespace.
+   * Whitespace can only be before first block or after last block.
+   *
+   * @param {Node} node - The text node that's on invalid whitespace
+   * @returns {{textNode: Node, offset: number}|null} Target position, or null if not found
+   */
+  getValidPositionForWhitespace(node) {
+    if (!node) return null;
+
+    // Find the editable field container
+    let container = node.parentNode;
+    while (container && !container.hasAttribute?.('data-editable-field')) {
+      container = container.parentNode;
+    }
+    if (!container) return null;
+
+    // Get first and last elements with data-node-id
+    const firstNodeIdEl = container.querySelector('[data-node-id]');
+    const allNodeIdEls = container.querySelectorAll('[data-node-id]');
+    const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
+
+    if (!firstNodeIdEl) return null;
+
+    // Determine if whitespace is before first or after last by comparing DOM positions
+    const position = node.compareDocumentPosition(firstNodeIdEl);
+    const isBeforeFirst = position & Node.DOCUMENT_POSITION_FOLLOWING;
+
+    if (isBeforeFirst) {
+      // Whitespace before first block → start of first text node
+      const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
+      const textNode = walker.nextNode();
+      return textNode ? { textNode, offset: 0 } : null;
+    } else {
+      // Whitespace after last block → end of last text node
+      const walker = document.createTreeWalker(lastNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
+      let lastText = null;
+      while (walker.nextNode()) {
+        lastText = walker.currentNode;
+      }
+      return lastText ? { textNode: lastText, offset: lastText.textContent.length } : null;
+    }
+  }
+
+  /**
+   * Corrects cursor/selection if it's on invalid whitespace.
+   * For collapsed selections, moves cursor to nearest valid position.
+   * For range selections, corrects each end independently.
+   *
+   * @returns {boolean} True if selection was corrected
+   */
+  correctInvalidWhitespaceSelection() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+    const anchorOnWhitespace = this.isOnInvalidWhitespace(range.startContainer);
+    const focusOnWhitespace = this.isOnInvalidWhitespace(range.endContainer);
+
+    if (!anchorOnWhitespace && !focusOnWhitespace) return false;
+
+    // Get corrected positions
+    const anchorPos = anchorOnWhitespace
+      ? this.getValidPositionForWhitespace(range.startContainer)
+      : { textNode: range.startContainer, offset: range.startOffset };
+    const focusPos = focusOnWhitespace
+      ? this.getValidPositionForWhitespace(range.endContainer)
+      : { textNode: range.endContainer, offset: range.endOffset };
+
+    if (!anchorPos || !focusPos) return false;
+
+    // Set corrected selection
+    const newRange = document.createRange();
+    newRange.setStart(anchorPos.textNode, anchorPos.offset);
+    newRange.setEnd(focusPos.textNode, focusPos.offset);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+
+    log('correctInvalidWhitespaceSelection: Corrected selection');
+    return true;
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
   // Selection Serialization - Convert DOM selection to Slate selection
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -1348,7 +1465,66 @@ export class Bridge {
       return null;
     }
 
-    return { path, offset: textOffset };
+    // Calculate offset using range.toString() for proper whitespace normalization
+    // This handles Vue/Nuxt whitespace artifacts that don't match Slate's model
+    const normalizedOffset = this.calculateNormalizedOffset(textNode, textOffset);
+
+    return { path, offset: normalizedOffset };
+  }
+
+  /**
+   * Calculate text offset using range.toString() for whitespace normalization.
+   * Finds the start of the current Slate text leaf and measures to cursor.
+   */
+  calculateNormalizedOffset(textNode, domOffset) {
+    const parent = textNode.parentNode;
+    if (!parent) return domOffset;
+
+    // Find the start point for measuring - either:
+    // 1. End of preceding element with data-node-id (text is after formatted span)
+    // 2. Start of parent element with data-node-id (text is inside formatted span)
+    // 3. Start of parent if no preceding element (first text in block)
+
+    let startNode = null;
+    let startAtEnd = false;
+
+    // Check if parent has data-node-id (text is inside formatted element)
+    if (parent.hasAttribute?.('data-node-id')) {
+      startNode = parent;
+      startAtEnd = false; // Measure from start of parent
+    } else {
+      // Find preceding sibling with data-node-id
+      const siblings = Array.from(parent.childNodes);
+      const nodeIndex = siblings.indexOf(textNode);
+
+      for (let i = nodeIndex - 1; i >= 0; i--) {
+        const sib = siblings[i];
+        if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+          startNode = sib;
+          startAtEnd = true; // Measure from end of preceding element
+          break;
+        }
+      }
+    }
+
+    // Create range from start point to cursor
+    const range = document.createRange();
+
+    if (startNode && startAtEnd) {
+      // Measure from end of preceding element
+      range.setStartAfter(startNode);
+    } else if (startNode) {
+      // Measure from start of parent element
+      range.setStart(startNode, 0);
+    } else {
+      // No preceding element - measure from start of parent
+      range.setStart(parent, 0);
+    }
+
+    range.setEnd(textNode, domOffset);
+
+    // range.toString() normalizes whitespace as the browser renders it
+    return range.toString().length;
   }
 
   /**
@@ -1387,40 +1563,31 @@ export class Bridge {
    * Empty/whitespace text nodes (Vue artifacts) map to the previous real content.
    */
   getSlateIndexAmongSiblings(node, parent) {
-    // Filter to only "real" Slate nodes (non-empty text, elements with data-node-id)
-    // This ignores Vue/Nuxt empty text node artifacts
-    const isRealNode = (n) =>
-      (n.nodeType === Node.ELEMENT_NODE && n.hasAttribute('data-node-id')) ||
-      (n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
-
-    const allSiblings = Array.from(parent.childNodes);
-    const realSiblings = allSiblings.filter(isRealNode);
-
-    // If target is an empty node (Vue artifact), find the previous real sibling
-    let targetNode = node;
-    if (!isRealNode(node)) {
-      const nodeIndex = allSiblings.indexOf(node);
-      for (let i = nodeIndex - 1; i >= 0; i--) {
-        if (isRealNode(allSiblings[i])) {
-          targetNode = allSiblings[i];
-          break;
-        }
-      }
-      // If no real sibling found before, return 0
-      if (!isRealNode(targetNode)) {
-        return 0;
-      }
-    }
-
     // For elements with data-node-id, use the index from the ID
-    if (targetNode.nodeType === Node.ELEMENT_NODE && targetNode.hasAttribute('data-node-id')) {
-      const nodeId = targetNode.getAttribute('data-node-id');
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-node-id')) {
+      const nodeId = node.getAttribute('data-node-id');
       const parts = nodeId.split(/[.-]/);
       return parseInt(parts[parts.length - 1], 10);
     }
 
-    // For text nodes, find position in filtered list
-    return realSiblings.indexOf(targetNode);
+    // For text nodes (including whitespace), find the preceding element with data-node-id
+    // The text node's index = (preceding element's last id part) + 1
+    // This works regardless of whitespace because all text after an element
+    // belongs to the next Slate text leaf
+    const siblings = Array.from(parent.childNodes);
+    const nodeIndex = siblings.indexOf(node);
+
+    for (let i = nodeIndex - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+        const nodeId = sib.getAttribute('data-node-id');
+        const parts = nodeId.split(/[.-]/);
+        return parseInt(parts[parts.length - 1], 10) + 1;
+      }
+    }
+
+    // No preceding element with node-id - this is the first child (index 0)
+    return 0;
   }
 
   /**
@@ -1612,8 +1779,24 @@ export class Bridge {
       return null;
     }
 
-    // If no nodeId was found, show visible error and log details
+    // If no nodeId was found, cursor is on invalid whitespace.
+    // The selectionchange listener should have corrected this before serialization,
+    // so this shouldn't normally happen. Return null to indicate invalid position.
     if (!foundNodeIdInWalk) {
+      log('getNodePath: No nodeId found (cursor on whitespace?), returning null');
+      return null;
+    }
+
+    // This error path should no longer be reachable, but keep for safety
+    if (false && !foundNodeIdInWalk) {
+      // Find the editable container for context
+      let container = node;
+      while (container && !container.hasAttribute?.('data-editable-field')) {
+        container = container.parentNode;
+      }
+      const blockUid = container?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid') || 'unknown';
+      const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+
       // Build DOM path showing which elements are missing data-node-id
       const domPath = [];
       let walkNode = node;
@@ -1628,14 +1811,20 @@ export class Bridge {
             domPath.unshift(`<${tag}${classes}> ⚠️ MISSING data-node-id`);
           }
         } else if (walkNode.nodeType === Node.TEXT_NODE) {
-          const text = walkNode.textContent?.slice(0, 20) || '';
-          domPath.unshift(`"${text}${walkNode.textContent?.length > 20 ? '...' : ''}"`);
+          const text = walkNode.textContent?.slice(0, 30) || '';
+          domPath.unshift(`"${text}${walkNode.textContent?.length > 30 ? '...' : ''}"`);
         }
         walkNode = walkNode.parentNode;
       }
 
+      // Get container innerHTML for debugging (truncated)
+      const containerHtml = container?.innerHTML?.slice(0, 200) || 'N/A';
+
       const errorMsg =
-        'DOM path:\n' + domPath.map((p, i) => '  '.repeat(i) + p).join('\n');
+        `Block: ${blockUid}, Field: ${fieldName}\n\n` +
+        'DOM path (text node → container):\n' +
+        domPath.map((p, i) => '  '.repeat(i) + p).join('\n') +
+        '\n\nContainer HTML:\n' + containerHtml + (container?.innerHTML?.length > 200 ? '...' : '');
 
       console.error('[HYDRA] Selection sync failed - missing data-node-id\n\n' + errorMsg);
 
@@ -2107,11 +2296,23 @@ export class Bridge {
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
       this.selectionChangeListener = () => {
+        // Skip if we're correcting selection (prevents infinite loop)
+        if (this._isCorrectingWhitespaceSelection) return;
+
         const selection = window.getSelection();
         const offset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : -1;
         log('selectionchange fired, cursor offset:', offset);
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
+          // Correct cursor if it's on invalid whitespace (template artifacts)
+          this._isCorrectingWhitespaceSelection = true;
+          const corrected = this.correctInvalidWhitespaceSelection();
+          this._isCorrectingWhitespaceSelection = false;
+          if (corrected) {
+            // Selection was corrected, this will trigger another selectionchange
+            return;
+          }
+
           this.savedSelection = this.serializeSelection();
 
           // Don't send SELECTION_CHANGE during external updates (FORM_DATA from Admin)
