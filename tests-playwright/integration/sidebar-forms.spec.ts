@@ -59,7 +59,7 @@ test.describe('Sidebar Forms - Slate Block Behavior', () => {
 
     // Edit the value field in the sidebar (Volto Hydra feature)
     // This is a Slate editor field, so we need to interact with it properly
-    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const valueField = helper.getSidebarSlateEditor('value');
     await valueField.click();
     await valueField.fill('Updated text content');
 
@@ -94,7 +94,7 @@ test.describe('Sidebar Forms - Slate Block Behavior', () => {
     expect(originalText).toContain('This is a test paragraph');
 
     // Edit the value field in the sidebar - first change
-    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const valueField = helper.getSidebarSlateEditor('value');
     await valueField.click();
     await valueField.fill('First change');
     await page.waitForTimeout(500);
@@ -322,7 +322,7 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     await helper.openSidebarTab('Block');
 
     // Click on the sidebar slate value field (this field IS editable in iframe too)
-    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const valueField = helper.getSidebarSlateEditor('value');
     await valueField.click();
 
     // Type one character - this triggers form data update which syncs to iframe
@@ -372,7 +372,7 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     });
 
     // Type in sidebar (this triggers FORM_DATA round-trip)
-    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const valueField = helper.getSidebarSlateEditor('value');
     await valueField.click();
     await page.keyboard.type('test');
     await page.waitForTimeout(500);

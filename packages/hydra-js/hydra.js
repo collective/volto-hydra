@@ -180,24 +180,40 @@ export class Bridge {
 
   /**
    * Get editable fields that belong directly to a block, excluding nested blocks' fields.
+   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement[]} Array of editable field elements that belong to this block
    */
   getOwnEditableFields(blockElement) {
+    const result = [];
+    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
+    if (blockElement.hasAttribute('data-editable-field')) {
+      result.push(blockElement);
+    }
+    // Also check descendants
     const allFields = blockElement.querySelectorAll('[data-editable-field]');
-    return Array.from(allFields).filter(
-      (field) => this.fieldBelongsToBlock(field, blockElement),
-    );
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        result.push(field);
+      }
+    }
+    return result;
   }
 
   /**
    * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
+   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement|null} The first editable field or null if none
    */
   getOwnFirstEditableField(blockElement) {
+    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
+    if (blockElement.hasAttribute('data-editable-field')) {
+      return blockElement;
+    }
+    // Check descendants
     const allFields = blockElement.querySelectorAll('[data-editable-field]');
     for (const field of allFields) {
       if (this.fieldBelongsToBlock(field, blockElement)) {
@@ -205,6 +221,23 @@ export class Bridge {
       }
     }
     return null;
+  }
+
+  /**
+   * Get an editable field by name that belongs to a block.
+   * Also checks if the blockElement itself has the field (Nuxt pattern).
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @param {string} fieldName - The field name to find
+   * @returns {HTMLElement|null} The editable field or null if not found
+   */
+  getEditableFieldByName(blockElement, fieldName) {
+    // Check if block element itself is the editable field (Nuxt: both attrs on same element)
+    if (blockElement.getAttribute('data-editable-field') === fieldName) {
+      return blockElement;
+    }
+    // Check descendants
+    return blockElement.querySelector(`[data-editable-field="${fieldName}"]`);
   }
 
   /**
@@ -290,6 +323,53 @@ export class Bridge {
     }
 
     window.parent.postMessage(message, this.adminOrigin);
+  }
+
+  /**
+   * Shows a developer warning overlay in the iframe.
+   * Used to alert developers about configuration issues.
+   *
+   * @param {string} title - Warning title
+   * @param {string} message - Detailed message with DOM info
+   */
+  showDeveloperWarning(title, message) {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'hydra-dev-warning';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      max-width: 500px;
+      max-height: 80vh;
+      background: #fef2f2;
+      border: 2px solid #dc2626;
+      border-radius: 8px;
+      padding: 16px;
+      z-index: 999999;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      overflow: auto;
+    `;
+
+    overlay.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <strong style="color: #dc2626; font-size: 14px;">⚠️ ${title}</strong>
+        <button id="hydra-warning-close" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
+      </div>
+      <pre style="white-space: pre-wrap; word-break: break-word; margin: 0; color: #1f2937;">${message}</pre>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Close button
+    document.getElementById('hydra-warning-close')?.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    // Auto-hide after 30 seconds
+    setTimeout(() => overlay.remove(), 30000);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -525,6 +605,15 @@ export class Bridge {
             // back to Admin when the update originated FROM Admin
             this.isProcessingExternalUpdate = true;
 
+            // Check if Admin wants to select a different block (e.g., after Enter creates new block)
+            // Update selectedBlockUid BEFORE re-render so all subsequent code uses the new block
+            const adminSelectedBlockUid = event.data.selectedBlockUid;
+            const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
+            if (needsBlockSwitch) {
+              log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
+              this.selectedBlockUid = adminSelectedBlockUid;
+            }
+
             // Call the callback first to trigger the re-render
             log('Calling onEditChange callback to trigger re-render');
             callback(this.formData);
@@ -610,19 +699,15 @@ export class Bridge {
             // Skip focus if this is from sidebar editing (no transformedSelection)
             const skipFocus = !event.data.transformedSelection;
 
-            // Check if Admin wants to select a different block (e.g., after adding a new block)
-            // This handles the timing issue where SELECT_BLOCK arrives before the block exists
-            const adminSelectedBlockUid = event.data.selectedBlockUid;
-            const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
-
+            // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
+            // For existing block, just update UI positions
             if (needsBlockSwitch) {
-              // Admin selected a different block - select it after re-render
-              // This will trigger selectBlock() which sends BLOCK_SELECTED back to Admin
+              // New block created (e.g., Enter key) - need full selectBlock setup
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
+                  const newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
                   if (newBlockElement) {
-                    log('Selecting block from FORM_DATA selectedBlockUid:', adminSelectedBlockUid);
+                    log('Selecting new block from FORM_DATA:', this.selectedBlockUid);
                     this.selectBlock(newBlockElement);
                   }
                 });
@@ -932,7 +1017,7 @@ export class Bridge {
 
       // Visual feedback on current element
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-      const editableField = block?.querySelector('[data-editable-field]');
+      const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'wait';
       }
@@ -950,7 +1035,7 @@ export class Bridge {
 
       // Restore visual feedback on current element (may be new after re-render)
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-      const editableField = block?.querySelector('[data-editable-field]');
+      const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'text';
       }
@@ -1043,7 +1128,7 @@ export class Bridge {
    */
   handleTransformTimeout(blockId) {
     const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-    const editableField = block?.querySelector('[data-editable-field="value"]');
+    const editableField = block ? this.getOwnFirstEditableField(block) : null;
 
     if (editableField) {
       // Show error state - permanently disable editing
@@ -1056,6 +1141,154 @@ export class Bridge {
 
     console.error('[HYDRA] Transform timeout for block:', blockId);
     this.pendingTransform = null;
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
+  // Cursor Position Correction - Handle template whitespace
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Checks if a node is on invalid whitespace (text node outside any data-node-id element).
+   * This happens when cursor lands on template whitespace in Vue/Nuxt templates.
+   *
+   * @param {Node} node - The DOM node to check
+   * @returns {boolean} True if the node is on invalid whitespace
+   */
+  isOnInvalidWhitespace(node) {
+    if (!node) return false;
+
+    // Handle both text nodes and element nodes (cursor can be on either)
+    // For element nodes, check if the element itself is in an invalid position
+    let startNode = node;
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // If cursor is on an element with data-node-id, it's valid
+      if (node.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+      // If cursor is on the editable field container itself, it's invalid
+      if (node.hasAttribute?.('data-editable-field')) {
+        return true;
+      }
+      startNode = node;
+    } else if (node.nodeType !== Node.TEXT_NODE) {
+      // Other node types (comments, etc.) - not our concern
+      return false;
+    }
+
+    // Walk up to find if there's a data-node-id ancestor before hitting data-editable-field
+    let current = startNode.nodeType === Node.TEXT_NODE ? startNode.parentNode : startNode.parentNode;
+    while (current) {
+      // If we hit an element with data-node-id, cursor is valid
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+      // If we hit the editable field container without finding data-node-id, cursor is on whitespace
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-editable-field')) {
+        return true;
+      }
+      current = current.parentNode;
+    }
+
+    // Not inside an editable field at all
+    return false;
+  }
+
+  /**
+   * Gets the valid position for a node on invalid whitespace.
+   * Whitespace can only be before first block or after last block.
+   *
+   * @param {Node} node - The text node that's on invalid whitespace
+   * @returns {{textNode: Node, offset: number}|null} Target position, or null if not found
+   */
+  getValidPositionForWhitespace(node) {
+    if (!node) return null;
+
+    // Find the editable field container
+    // For element nodes, check if the node itself is the container
+    let container = node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-editable-field')
+      ? node
+      : node.parentNode;
+    while (container && !container.hasAttribute?.('data-editable-field')) {
+      container = container.parentNode;
+    }
+    if (!container) return null;
+
+    // Get first and last elements with data-node-id
+    const firstNodeIdEl = container.querySelector('[data-node-id]');
+    const allNodeIdEls = container.querySelectorAll('[data-node-id]');
+    const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
+
+    if (!firstNodeIdEl) return null;
+
+    // Determine if whitespace is before first or after last by comparing DOM positions
+    const position = node.compareDocumentPosition(firstNodeIdEl);
+    const isBeforeFirst = position & Node.DOCUMENT_POSITION_FOLLOWING;
+
+    if (isBeforeFirst) {
+      // Whitespace before first block → start of first text node
+      const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
+      const textNode = walker.nextNode();
+      return textNode ? { textNode, offset: 0 } : null;
+    } else {
+      // Whitespace after last block → end of last text node
+      const walker = document.createTreeWalker(lastNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
+      let lastText = null;
+      while (walker.nextNode()) {
+        lastText = walker.currentNode;
+      }
+      return lastText ? { textNode: lastText, offset: lastText.textContent.length } : null;
+    }
+  }
+
+  /**
+   * Corrects cursor/selection if it's on invalid whitespace.
+   * For collapsed selections, moves cursor to nearest valid position.
+   * For range selections, corrects each end independently.
+   *
+   * @returns {boolean} True if selection was corrected
+   */
+  correctInvalidWhitespaceSelection() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+    const anchorOnWhitespace = this.isOnInvalidWhitespace(range.startContainer);
+    const focusOnWhitespace = this.isOnInvalidWhitespace(range.endContainer);
+
+    // Debug: always log this to understand correction behavior
+    console.warn('[HYDRA] correctInvalidWhitespaceSelection:', {
+      anchorOnWhitespace,
+      focusOnWhitespace,
+      anchorNodeType: range.startContainer.nodeType,
+      anchorContent: range.startContainer.textContent?.substring(0, 20),
+      anchorParent: range.startContainer.parentElement?.tagName,
+      anchorParentHasNodeId: range.startContainer.parentElement?.hasAttribute('data-node-id'),
+      anchorParentHasField: range.startContainer.parentElement?.hasAttribute('data-editable-field'),
+    });
+
+    if (!anchorOnWhitespace && !focusOnWhitespace) return false;
+
+    // Get corrected positions
+    const anchorPos = anchorOnWhitespace
+      ? this.getValidPositionForWhitespace(range.startContainer)
+      : { textNode: range.startContainer, offset: range.startOffset };
+    const focusPos = focusOnWhitespace
+      ? this.getValidPositionForWhitespace(range.endContainer)
+      : { textNode: range.endContainer, offset: range.endOffset };
+
+    log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
+
+    if (!anchorPos || !focusPos) return false;
+
+    // Set corrected selection
+    const newRange = document.createRange();
+    newRange.setStart(anchorPos.textNode, anchorPos.offset);
+    newRange.setEnd(focusPos.textNode, focusPos.offset);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+
+    log('correctInvalidWhitespaceSelection: Corrected selection');
+    return true;
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -1089,7 +1322,123 @@ export class Bridge {
       return null;
     }
 
+    // Validate the selection paths against the actual Slate value
+    // Log detailed debugging info if invalid, but still send the path so the error is visible
+    const validationResult = this.validateSelectionPaths(anchor, focus, range.commonAncestorContainer);
+    if (!validationResult.valid) {
+      console.error('[HYDRA] Invalid selection path detected! This will cause a Slate error.\n\n' +
+        `Anchor path: [${anchor.path.join(', ')}], offset: ${anchor.offset}\n` +
+        `Focus path: [${focus.path.join(', ')}], offset: ${focus.offset}\n\n` +
+        `Error: ${validationResult.error}\n\n` +
+        `DOM structure:\n${validationResult.domStructure}\n\n` +
+        `Slate structure:\n${validationResult.slateStructure}`
+      );
+      // Still return the selection so it blows up visibly in Volto
+    }
+
     return { anchor, focus };
+  }
+
+  /**
+   * Validates that selection paths exist in the Slate structure.
+   * Returns detailed debugging info if invalid.
+   */
+  validateSelectionPaths(anchor, focus, commonAncestor) {
+    // Find the editable field container and block
+    let editableField = commonAncestor;
+    while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+      editableField = editableField.parentNode;
+    }
+    if (!editableField) {
+      return { valid: true }; // Can't validate without editable field
+    }
+
+    // Find the block element
+    let blockElement = editableField;
+    while (blockElement && !blockElement.hasAttribute?.('data-block-uid')) {
+      blockElement = blockElement.parentNode;
+    }
+    if (!blockElement) {
+      return { valid: true }; // Can't validate without block
+    }
+
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const fieldName = editableField.getAttribute('data-editable-field');
+    const blockData = this.getBlockData(blockUid);
+
+    if (!blockData || !blockData[fieldName]) {
+      return { valid: true }; // Can't validate without Slate value
+    }
+
+    const slateValue = blockData[fieldName];
+    if (!Array.isArray(slateValue)) {
+      return { valid: true }; // Not a Slate field
+    }
+
+    // Validate anchor path
+    const anchorValid = this.isPathValidInSlate(anchor.path, slateValue);
+    const focusValid = this.isPathValidInSlate(focus.path, slateValue);
+
+    if (anchorValid && focusValid) {
+      return { valid: true };
+    }
+
+    // Build DOM structure for debugging
+    const domStructure = this.buildDomStructureForDebug(editableField);
+    const slateStructure = JSON.stringify(slateValue, null, 2).substring(0, 500);
+
+    return {
+      valid: false,
+      error: !anchorValid
+        ? `Anchor path [${anchor.path.join(', ')}] not found in Slate`
+        : `Focus path [${focus.path.join(', ')}] not found in Slate`,
+      domStructure,
+      slateStructure,
+    };
+  }
+
+  /**
+   * Checks if a path exists in a Slate value
+   */
+  isPathValidInSlate(path, value) {
+    let current = { children: value };
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+      if (!current.children || !Array.isArray(current.children)) {
+        return false;
+      }
+      if (index < 0 || index >= current.children.length) {
+        return false;
+      }
+      current = current.children[index];
+    }
+    return true;
+  }
+
+  /**
+   * Builds a string representation of the DOM structure for debugging
+   */
+  buildDomStructureForDebug(element, depth = 0) {
+    const indent = '  '.repeat(depth);
+    let result = '';
+
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent.substring(0, 30);
+        result += `${indent}TEXT: "${text}"${child.textContent.length > 30 ? '...' : ''}\n`;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        const nodeId = child.getAttribute('data-node-id');
+        const nodeIdAttr = nodeId ? ` data-node-id="${nodeId}"` : '';
+        result += `${indent}<${tag}${nodeIdAttr}>\n`;
+        if (depth < 3) {
+          result += this.buildDomStructureForDebug(child, depth + 1);
+        }
+      } else if (child.nodeType === Node.COMMENT_NODE) {
+        result += `${indent}<!-- comment -->\n`;
+      }
+    }
+    return result;
   }
 
   /**
@@ -1152,7 +1501,68 @@ export class Bridge {
       return null;
     }
 
-    return { path, offset: textOffset };
+    // Calculate offset using range.toString() for proper whitespace normalization
+    // This handles Vue/Nuxt whitespace artifacts that don't match Slate's model
+    const normalizedOffset = this.calculateNormalizedOffset(textNode, textOffset);
+
+    return { path, offset: normalizedOffset };
+  }
+
+  /**
+   * Calculate text offset using range.toString() for whitespace normalization.
+   * Finds the start of the current Slate text leaf and measures to cursor.
+   */
+  calculateNormalizedOffset(textNode, domOffset) {
+    const parent = textNode.parentNode;
+    if (!parent) return domOffset;
+
+    // Find the start point for measuring - either:
+    // 1. End of preceding element with data-node-id (text is after formatted span)
+    // 2. Start of parent element with data-node-id (text is inside formatted span)
+    // 3. Start of parent if no preceding element (first text in block)
+
+    let startNode = null;
+    let startAtEnd = false;
+
+    // First check for preceding sibling with data-node-id (e.g., text after <strong>)
+    // This takes priority over parent having data-node-id
+    const siblings = Array.from(parent.childNodes);
+    const nodeIndex = siblings.indexOf(textNode);
+
+    for (let i = nodeIndex - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+        startNode = sib;
+        startAtEnd = true; // Measure from end of preceding element
+        break;
+      }
+    }
+
+    // If no preceding sibling with data-node-id, check if parent has data-node-id
+    // (text is inside formatted element like <strong>)
+    if (!startNode && parent.hasAttribute?.('data-node-id')) {
+      startNode = parent;
+      startAtEnd = false; // Measure from start of parent
+    }
+
+    // Create range from start point to cursor
+    const range = document.createRange();
+
+    if (startNode && startAtEnd) {
+      // Measure from end of preceding element
+      range.setStartAfter(startNode);
+    } else if (startNode) {
+      // Measure from start of parent element
+      range.setStart(startNode, 0);
+    } else {
+      // No preceding element - measure from start of parent
+      range.setStart(parent, 0);
+    }
+
+    range.setEnd(textNode, domOffset);
+
+    // range.toString() normalizes whitespace as the browser renders it
+    return range.toString().length;
   }
 
   /**
@@ -1188,28 +1598,34 @@ export class Bridge {
    * Calculate the Slate index of a node among its siblings.
    * Elements with data-node-id use their ID's last component.
    * Text nodes use the next index after the previous sibling.
+   * Empty/whitespace text nodes (Vue artifacts) map to the previous real content.
    */
   getSlateIndexAmongSiblings(node, parent) {
+    // For elements with data-node-id, use the index from the ID
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-node-id')) {
+      const nodeId = node.getAttribute('data-node-id');
+      const parts = nodeId.split(/[.-]/);
+      return parseInt(parts[parts.length - 1], 10);
+    }
+
+    // For text nodes (including whitespace), find the preceding element with data-node-id
+    // The text node's index = (preceding element's last id part) + 1
+    // This works regardless of whitespace because all text after an element
+    // belongs to the next Slate text leaf
     const siblings = Array.from(parent.childNodes);
     const nodeIndex = siblings.indexOf(node);
 
-    // Look at all siblings before this node to determine Slate index
-    let slateIndex = 0;
-    for (let i = 0; i < nodeIndex; i++) {
-      const sibling = siblings[i];
-      if (sibling.nodeType === Node.ELEMENT_NODE && sibling.hasAttribute('data-node-id')) {
-        // Element with data-node-id: parse its index from the ID
-        const nodeId = sibling.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/); // Split on . or -
-        const lastIndex = parseInt(parts[parts.length - 1], 10);
-        slateIndex = lastIndex + 1; // Next index after this element
-      } else if (sibling.nodeType === Node.TEXT_NODE) {
-        // Text node: takes the next index
-        slateIndex++;
+    for (let i = nodeIndex - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+        const nodeId = sib.getAttribute('data-node-id');
+        const parts = nodeId.split(/[.-]/);
+        return parseInt(parts[parts.length - 1], 10) + 1;
       }
     }
 
-    return slateIndex;
+    // No preceding element with node-id - this is the first child (index 0)
+    return 0;
   }
 
   /**
@@ -1245,51 +1661,107 @@ export class Bridge {
     const path = [];
     let current = node;
 
+    // Inline elements that wrap text content (used to detect text leaf wrappers)
+    const INLINE_WRAPPER_ELEMENTS = [
+      'SPAN',
+      'STRONG',
+      'EM',
+      'B',
+      'I',
+      'U',
+      'S',
+      'CODE',
+      'A',
+      'SUB',
+      'SUP',
+      'MARK',
+    ];
+
+    // Helper to check if element is an inline wrapper (using CSS if available)
+    const isInlineElement = (el) => {
+      if (typeof window !== 'undefined' && window.getComputedStyle) {
+        const display = window.getComputedStyle(el).display;
+        if (display && display !== '') {
+          return display === 'inline' || display === 'inline-block';
+        }
+      }
+      // Fall back to tag name (JSDOM or no CSS)
+      return INLINE_WRAPPER_ELEMENTS.includes(el.nodeName);
+    };
 
     // If starting with a text node, calculate its Slate index
     if (node.nodeType === Node.TEXT_NODE) {
       const parent = node.parentNode;
 
-      // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
+      // Check if parent has VALID data-node-id AND is an inline element (span, strong, etc.)
       // Inline elements wrap their text directly, blocks (p, div) may have multiple text children
+      // Skip empty or "undefined" nodeId values (from frontends that render undefined as string)
+      const parentNodeId = parent.hasAttribute?.('data-node-id')
+        ? parent.getAttribute('data-node-id')
+        : null;
+      const hasValidNodeId =
+        parentNodeId && parentNodeId !== '' && parentNodeId !== 'undefined';
       if (
-        parent.hasAttribute?.('data-node-id') &&
+        hasValidNodeId &&
         parent.nodeName !== 'P' &&
         parent.nodeName !== 'DIV' &&
         !parent.hasAttribute?.('data-editable-field')
       ) {
-        const nodeId = parent.getAttribute('data-node-id');
-
         // Parse the parent's path from its node ID
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
-        // Text node index within the parent element
-        const siblings = Array.from(parent.childNodes);
-        const textIndex = siblings.indexOf(node);
+        // Text node index within the parent element (filtered for Vue artifacts)
+        const textIndex = this.getSlateIndexAmongSiblings(node, parent);
 
         // Build path: parent path + text index
         path.push(...parts, textIndex);
         return path;
       } else {
-        // Parent is a block element or doesn't have data-node-id
-        // Calculate Slate index among siblings considering node IDs
-        const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
-        path.push(slateIndex);
-        current = parent;
+        // Parent doesn't have nodeId - is it a block element or inline wrapper?
+        // Inline wrappers (span, etc.) represent text leaves - don't count text inside
+        // Block elements (p, h1-h6, li, etc.) contain multiple children - count text position
+        const isWrapper =
+          isInlineElement(parent) &&
+          !parent.hasAttribute?.('data-editable-field');
+
+        if (isWrapper) {
+          // Parent is an inline wrapper without nodeId (like Nuxt spans for text leaves)
+          // Don't add textIndex - the wrapper represents the whole text leaf
+          // Let the while loop calculate the wrapper's position in the block
+          current = parent;
+        } else {
+          // Parent is a block element - calculate text's Slate index among siblings
+          const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
+          path.push(slateIndex);
+          current = parent;
+        }
       }
     }
 
     // Walk up the DOM tree building the path
     let depth = 0;
+    let foundContainer = false;
+    let foundNodeIdInWalk = false;
     while (current) {
-      const hasNodeId = current.hasAttribute?.('data-node-id');
       const hasEditableField = current.hasAttribute?.('data-editable-field');
       const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
 
+      // Track if we've found an editable container
+      if (hasEditableField || hasSlateEditor) {
+        foundContainer = true;
+      }
 
-      // Process current node
-      if (hasNodeId) {
-        const nodeId = current.getAttribute('data-node-id');
+      // Check for valid nodeId (skip empty or "undefined" values from frontends)
+      const nodeId = current.hasAttribute?.('data-node-id')
+        ? current.getAttribute('data-node-id')
+        : null;
+      const hasValidNodeId =
+        nodeId && nodeId !== '' && nodeId !== 'undefined';
+
+      // Process current node if it has a valid nodeId
+      // Must process BEFORE checking editable-field since element can have both
+      if (hasValidNodeId) {
+        foundNodeIdInWalk = true;
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
         const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
@@ -1297,20 +1769,106 @@ export class Bridge {
         for (let i = parts.length - 1; i >= 0; i--) {
           path.unshift(parts[i]);
         }
+
+        // NodeIds are ABSOLUTE paths - stop after finding the first valid one
+        // e.g., nodeId "1-1" means [1, 1], don't continue to add parent's nodeId
+        break;
       }
 
-      // Stop if we've reached the editable field container or slate editor
+      // Stop if we've reached the editable field container or slate editor (without nodeId)
       if (hasEditableField || hasSlateEditor) {
         break;
       }
 
-      current = current.parentNode;
+      // Element without nodeId - only calculate index for inline wrapper elements
+      // that could contain text (span, strong, etc.). Skip void elements (br, img, hr).
+      const parent = current.parentNode;
+      if (
+        parent &&
+        current.nodeType === Node.ELEMENT_NODE &&
+        INLINE_WRAPPER_ELEMENTS.includes(current.nodeName)
+      ) {
+        const slateIndex = this.getSlateIndexAmongSiblings(current, parent);
+        path.unshift(slateIndex);
+      }
+
+      current = parent;
       depth++;
     }
 
+    // Verify we're within an editable container - if not found, continue walking up
+    if (!foundContainer && current) {
+      let checkNode = current.parentNode;
+      while (checkNode) {
+        if (
+          checkNode.hasAttribute?.('data-editable-field') ||
+          checkNode.hasAttribute?.('data-slate-editor')
+        ) {
+          foundContainer = true;
+          break;
+        }
+        checkNode = checkNode.parentNode;
+      }
+    }
+
     // If we didn't find the editable field or slate editor, path is invalid
-    if (!current) {
+    if (!current || !foundContainer) {
       console.warn('[HYDRA] getNodePath - no container found, returning null');
+      return null;
+    }
+
+    // If no nodeId was found, cursor may be on invalid whitespace or DOM is missing data-node-id.
+    // Log detailed debug info to help diagnose the issue.
+    if (!foundNodeIdInWalk) {
+      // Find the editable container for context
+      let container = node;
+      while (container && !container.hasAttribute?.('data-editable-field')) {
+        container = container.parentNode;
+      }
+      const blockUid = container?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid') || 'unknown';
+      const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+
+      // Build DOM path showing which elements are missing data-node-id
+      const domPath = [];
+      let walkNode = node;
+      while (walkNode && walkNode !== current?.parentNode) {
+        if (walkNode.nodeType === Node.ELEMENT_NODE) {
+          const tag = walkNode.tagName.toLowerCase();
+          const nodeId = walkNode.getAttribute?.('data-node-id');
+          const classes = walkNode.className ? `.${walkNode.className.split(' ').join('.')}` : '';
+          if (nodeId) {
+            domPath.unshift(`<${tag}${classes} data-node-id="${nodeId}">`);
+          } else {
+            domPath.unshift(`<${tag}${classes}> ⚠️ MISSING data-node-id`);
+          }
+        } else if (walkNode.nodeType === Node.TEXT_NODE) {
+          const text = walkNode.textContent?.slice(0, 30) || '';
+          domPath.unshift(`"${text}${walkNode.textContent?.length > 30 ? '...' : ''}"`);
+        }
+        walkNode = walkNode.parentNode;
+      }
+
+      // Get container innerHTML for debugging (truncated)
+      const containerHtml = container?.innerHTML?.slice(0, 200) || 'N/A';
+
+      const errorMsg =
+        `Block: ${blockUid}, Field: ${fieldName}\n\n` +
+        'DOM path (text node → container):\n' +
+        domPath.map((p, i) => '  '.repeat(i) + p).join('\n') +
+        '\n\nContainer HTML:\n' + containerHtml + (container?.innerHTML?.length > 200 ? '...' : '');
+
+      console.error('[HYDRA] Selection sync failed - missing data-node-id\n\n' + errorMsg);
+
+      // Show visible warning overlay in iframe (only once per session)
+      if (!this._shownNodeIdWarning) {
+        this._shownNodeIdWarning = true;
+        this.showDeveloperWarning(
+          'Hydra: Missing data-node-id attributes',
+          'Selection sync disabled. Your frontend must render data-node-id on Slate elements.\n\n' +
+            errorMsg +
+            '\n\nSee browser console for details.'
+        );
+      }
       return null;
     }
 
@@ -1507,7 +2065,7 @@ export class Bridge {
     // This ensures clicking a field focuses it immediately (no double-click required)
     // Skip focus if editing from sidebar - don't steal focus from sidebar fields
     if (this.focusedFieldName && !skipFocus) {
-      const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+      const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
 
       if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
         // Focus the field
@@ -1769,11 +2327,23 @@ export class Bridge {
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
       this.selectionChangeListener = () => {
+        // Skip if we're correcting selection (prevents infinite loop)
+        if (this._isCorrectingWhitespaceSelection) return;
+
         const selection = window.getSelection();
         const offset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : -1;
         log('selectionchange fired, cursor offset:', offset);
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
+          // Correct cursor if it's on invalid whitespace (template artifacts)
+          this._isCorrectingWhitespaceSelection = true;
+          const corrected = this.correctInvalidWhitespaceSelection();
+          this._isCorrectingWhitespaceSelection = false;
+          if (corrected) {
+            // Selection was corrected, this will trigger another selectionchange
+            return;
+          }
+
           this.savedSelection = this.serializeSelection();
 
           // Don't send SELECTION_CHANGE during external updates (FORM_DATA from Admin)
@@ -1841,7 +2411,7 @@ export class Bridge {
           }
 
           // Check if field was already editable before we do anything
-          const editableField = currentBlockElement.querySelector('[data-editable-field]');
+          const editableField = this.getOwnFirstEditableField(currentBlockElement);
           const wasAlreadyEditable = editableField?.getAttribute('contenteditable') === 'true';
 
           // Set contenteditable on editable fields immediately (not waiting for FORM_DATA)
@@ -1850,7 +2420,7 @@ export class Bridge {
           // Focus and position cursor for editable fields (text or slate type)
           // Use focusedFieldName to find the specific field that was clicked, not just the first one
           let contentEditableField = this.focusedFieldName
-            ? currentBlockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`)
+            ? this.getEditableFieldByName(currentBlockElement, this.focusedFieldName)
             : currentBlockElement.querySelector('[contenteditable="true"]');
 
           // Verify the field belongs to THIS block, not a nested block
@@ -2775,6 +3345,16 @@ export class Bridge {
     if (editableField) {
       // Make the field contenteditable - child inline elements inherit this
       editableField.setAttribute('contenteditable', 'true');
+
+      // Ensure minimum dimensions if element has no height (empty content)
+      // This keeps empty fields visible/clickable for user interaction
+      const rect = editableField.getBoundingClientRect();
+      if (rect.height === 0) {
+        editableField.style.minHeight = '1.5em';
+      }
+      if (rect.width === 0) {
+        editableField.style.minWidth = '1em';
+      }
     }
 
     if (editableField && blockUid) {
@@ -3484,94 +4064,119 @@ export class Bridge {
         return;
       }
 
-      let anchorElement, focusElement;
-      let anchorTextResult = null;
-      let focusTextResult = null;
-
-      // Check if this is a slate field with complex structure (has nodeIds)
+      // Check if this is a slate field with nodeIds
       const isSlateWithNodeIds = fieldType === 'slate' && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
 
+      let anchorElement, focusElement;
+
       if (isSlateWithNodeIds) {
-        // Slate field with nodeIds - use existing path-based lookup
+        // Find the parent elements by nodeId from path
         const anchorResult = this.getNodeIdFromPath(fieldValue, slateSelection.anchor.path);
         const focusResult = this.getNodeIdFromPath(fieldValue, slateSelection.focus.path);
 
         if (!anchorResult || !focusResult) {
+          console.warn('[HYDRA] Could not get nodeId from path');
           return;
         }
 
-        // Find DOM elements by nodeId
         anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
         focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
         if (!anchorElement || !focusElement) {
-          console.warn('[HYDRA] Could not find DOM elements for nodeIds:', { anchorResult, focusResult });
+          console.warn('[HYDRA] Could not find elements by nodeId');
           return;
         }
-
-        // Find DOM children using Slate child index
-        if (anchorResult.textChildIndex !== null) {
-          const anchorChild = this.findChildBySlateIndex(anchorElement, anchorResult.textChildIndex);
-          if (anchorChild) {
-            anchorTextResult = this.findTextNodeInChild(anchorChild, slateSelection.anchor.offset);
-          } else {
-            console.warn('[HYDRA] Could not find anchor child at Slate index:', anchorResult.textChildIndex);
-          }
-        } else {
-          anchorTextResult = this.findTextNodeInChild(anchorElement, slateSelection.anchor.offset);
-        }
-
-        if (focusResult.textChildIndex !== null) {
-          const focusChild = this.findChildBySlateIndex(focusElement, focusResult.textChildIndex);
-          if (focusChild) {
-            focusTextResult = this.findTextNodeInChild(focusChild, slateSelection.focus.offset);
-          } else {
-            console.warn('[HYDRA] Could not find focus child at Slate index:', focusResult.textChildIndex);
-          }
-        } else {
-          focusTextResult = this.findTextNodeInChild(focusElement, slateSelection.focus.offset);
-        }
       } else {
-        // String/textarea field or slate without nodeIds - degenerate case
-        // Selection path is [0] with just an offset
-        // Find the editable field directly by data-editable-field attribute
-        const editableField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+        // Simple field - use the editable field directly
+        const editableField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
         if (!editableField) {
           console.warn('[HYDRA] Could not find editable field:', this.focusedFieldName);
           return;
         }
-
-        // Both anchor and focus use the same element for simple text fields
         anchorElement = focusElement = editableField;
-        anchorTextResult = this.findTextNodeInChild(editableField, slateSelection.anchor.offset);
-        focusTextResult = this.findTextNodeInChild(editableField, slateSelection.focus.offset);
       }
 
+      // Use Range + toString().length to find exact DOM positions
+      // This uses the browser's text model which handles empty nodes, whitespace, etc.
+      const anchorPos = this.findPositionByVisibleOffset(anchorElement, slateSelection.anchor.offset);
+      const focusPos = this.findPositionByVisibleOffset(focusElement, slateSelection.focus.offset);
 
-      if (!anchorTextResult || !focusTextResult) {
-        console.warn('[HYDRA] Selection restoration failed - could not find text nodes');
+      if (!anchorPos || !focusPos) {
+        console.warn('[HYDRA] Could not find positions by visible offset');
         return;
       }
 
-      // Create range
-      const range = document.createRange();
+      // Set the actual selection
       const selection = window.getSelection();
+      if (!selection) return;
 
-      range.setStart(anchorTextResult.node, anchorTextResult.offset);
-      range.setEnd(focusTextResult.node, focusTextResult.offset);
+      const range = document.createRange();
+      range.setStart(anchorPos.node, anchorPos.offset);
+      range.setEnd(focusPos.node, focusPos.offset);
 
-      selection?.removeAllRanges();
-      selection?.addRange(range);
+      selection.removeAllRanges();
+      selection.addRange(range);
 
-      log('Selection set, verifying:', {
-        anchorNode: selection?.anchorNode?.nodeName,
-        anchorOffset: selection?.anchorOffset,
-        anchorParent: selection?.anchorNode?.parentElement?.tagName,
-        rangeCount: selection?.rangeCount
+      log('Selection restored via Range:', {
+        anchorOffset: slateSelection.anchor.offset,
+        focusOffset: slateSelection.focus.offset,
+        selectedText: selection.toString()
       });
     } catch (e) {
       console.error('[HYDRA] Error restoring Slate selection:', e);
     }
+  }
+
+  /**
+   * Find DOM position (node + offset) by visible character offset.
+   * Uses Range.toString().length to match the browser's text model,
+   * which naturally handles empty text nodes, whitespace normalization, etc.
+   *
+   * @param {HTMLElement} element - Element to search within
+   * @param {number} targetOffset - Target character offset in visible text
+   * @returns {{node: Node, offset: number}|null} DOM position or null
+   */
+  findPositionByVisibleOffset(element, targetOffset) {
+    // Handle offset 0 - return start of first text node
+    if (targetOffset === 0) {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+      const firstText = walker.nextNode();
+      if (firstText) {
+        return { node: firstText, offset: 0 };
+      }
+      return null;
+    }
+
+    const range = document.createRange();
+    range.setStart(element, 0);
+
+    // Walk through text nodes, extending range until toString().length matches
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while ((node = walker.nextNode())) {
+      for (let i = 0; i <= node.textContent.length; i++) {
+        range.setEnd(node, i);
+        if (range.toString().length === targetOffset) {
+          return { node, offset: i };
+        }
+        // If we've gone past the target, we won't find it
+        if (range.toString().length > targetOffset) {
+          return null;
+        }
+      }
+    }
+
+    // If we exhausted all nodes, return end of last text node
+    const lastWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    let lastNode = null;
+    while ((node = lastWalker.nextNode())) {
+      lastNode = node;
+    }
+    if (lastNode) {
+      return { node: lastNode, offset: lastNode.textContent.length };
+    }
+
+    return null;
   }
 
   /**
@@ -3651,6 +4256,11 @@ export class Bridge {
 
     for (const child of parentElement.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
+        // Skip empty text nodes - Vue creates these from {{ node.text }} when undefined
+        // They don't correspond to any Slate children
+        if (child.textContent.length === 0) {
+          continue;
+        }
         if (slateIndex === slateChildIndex) {
           return child;
         }
@@ -3682,6 +4292,12 @@ export class Bridge {
    * @returns {{node: Text, offset: number}|null} Text node and validated offset, or null
    */
   findTextNodeInChild(child, offset) {
+    // Helper to check if a text node is empty (has no visible content)
+    // Vue/Nuxt creates empty text nodes from {{ node.text }} when text is undefined
+    const isEmptyTextNode = (textNode) => {
+      return textNode.textContent.length === 0;
+    };
+
     // Helper to adjust offset for ZWS-only text nodes
     // If offset is 0 in a ZWS-only node, position AFTER the ZWS
     // This helps browsers preserve the cursor inside inline elements when typing
@@ -3695,13 +4311,16 @@ export class Bridge {
     };
 
     if (child.nodeType === Node.TEXT_NODE) {
-      // Direct text node - use it with the offset (adjusted for ZWS)
+      // Direct text node - skip if empty
+      if (isEmptyTextNode(child)) {
+        return null;
+      }
       const validOffset = adjustOffsetForZWS(child, offset);
       return { node: child, offset: validOffset };
     }
 
     if (child.nodeType === Node.ELEMENT_NODE) {
-      // Element node - find the first text node within
+      // Element node - find the first NON-EMPTY text node within
       const walker = document.createTreeWalker(
         child,
         NodeFilter.SHOW_TEXT,
@@ -3709,7 +4328,11 @@ export class Bridge {
         false
       );
 
-      const textNode = walker.nextNode();
+      let textNode = walker.nextNode();
+      // Skip empty text nodes (Vue artifact from {{ node.text }} when undefined)
+      while (textNode && isEmptyTextNode(textNode)) {
+        textNode = walker.nextNode();
+      }
       if (textNode) {
         const validOffset = adjustOffsetForZWS(textNode, offset);
         return { node: textNode, offset: validOffset };

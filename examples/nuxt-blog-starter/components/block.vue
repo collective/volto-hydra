@@ -17,12 +17,12 @@
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
     <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
-      :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+      :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
       <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
-        :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       <figcaption>
         <h2>{{ block.title }}</h2>
         <div v-if="block?.description" data-editable-field="description">

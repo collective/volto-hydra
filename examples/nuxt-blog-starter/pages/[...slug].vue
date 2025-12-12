@@ -55,7 +55,7 @@
 
 <script setup>
 
-import { initBridge } from '../packages/hydra.js';
+import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
@@ -77,7 +77,7 @@ onMounted(() => {
                     id: 'hello_from_the_other_side',
                     title: 'Hello from the other side',
                     group: 'common',
-                    icon: "test",
+                    icon: 'test', // Invalid icon string - fallback to block.svg
                     blockSchema: {
                         required: ['title'],
                         fieldsets: [

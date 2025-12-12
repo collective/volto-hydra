@@ -53,6 +53,9 @@ jobs:
           RAZZLE_API_PATH: http://localhost:8888
           RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
+      - name: Install Nuxt dependencies
+        run: |
+          cd examples/nuxt-blog-starter && npm install
       - name: Run unit tests (hydra-js)
         run: |
           pnpm --filter hydra-js test

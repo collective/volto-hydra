@@ -2,7 +2,10 @@ import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Navigation and URL Handling', () => {
-  test('External URLs do not load in iframe', async ({ page }) => {
+  test('External URLs do not load in iframe', async ({ page }, testInfo) => {
+    // Skip on Nuxt - test-page has hero block not supported in Nuxt
+    test.skip(testInfo.project.name === 'nuxt', 'test-page has custom hero block');
+
     const helper = new AdminUIHelper(page);
 
     await helper.login();

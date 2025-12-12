@@ -16,6 +16,9 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     await page.goto('http://localhost:8888/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+
+    // Inject helper for creating DOM with preserved whitespace (Vue/Nuxt template artifacts)
+    await helper.injectPreserveWhitespaceHelper();
   });
 
   test('plain text directly in paragraph', async () => {
@@ -578,6 +581,398 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(paths.span1Text).toEqual([0, 0, 0]);
     expect(paths.whitespace).toEqual([0, 1]); // Slate index from previous sibling's data-node-id
     expect(paths.span2Text).toEqual([0, 1, 0]); // Path from data-node-id="0-1"
+  });
+
+  test('empty paragraph with placeholder BR', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-editable-field="value" data-node-id="0"><br></p>';
+      document.body.appendChild(container);
+
+      const brElement = container.querySelector('br');
+      const result = (window as any).bridge.getNodePath(brElement);
+
+      container.remove();
+      return result;
+    });
+
+    // BR element walks up to find parent with data-node-id, returns [0]
+    expect(path).toEqual([0]);
+  });
+
+  test('deeply nested structure', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value"><div><div><p data-node-id="0">text</p></div></div></div>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('p')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Only elements with data-node-id are counted
+    expect(path).toEqual([0, 0]);
+  });
+
+  test('text wrapped in span WITHOUT nodeId inside strong', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1"><span>Disclaimer</span></strong>' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('strong span')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Span without nodeId should be skipped, path from strong is [1, 1, 0]
+    expect(path).toEqual([1, 1, 0]);
+  });
+
+  test('plain text directly in strong (no wrapper span)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('strong')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    expect(path).toEqual([1, 1, 0]);
+  });
+
+  test('double wrapper with same node-id', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-editable-field="value" data-node-id="0">' +
+        '<strong data-node-id="0-0"><em data-node-id="0-0">styled text</em></strong>' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('em')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Both wrappers have same node-id "0-0", path should be [0, 0, 0]
+    expect(path).toEqual([0, 0, 0]);
+  });
+
+  test('double wrapper with text before and after', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-editable-field="value" data-node-id="0">' +
+        'before <strong data-node-id="0-1"><em data-node-id="0-1">bold</em></strong> after' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const p = container.querySelector('p')!;
+      const beforeText = p.firstChild;
+      const boldText = container.querySelector('em')!.firstChild;
+      const afterText = p.lastChild;
+
+      const result = {
+        before: (window as any).bridge.getNodePath(beforeText),
+        bold: (window as any).bridge.getNodePath(boldText),
+        after: (window as any).bridge.getNodePath(afterText),
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.before).toEqual([0, 0]);
+    expect(paths.bold).toEqual([0, 1, 0]);
+    expect(paths.after).toEqual([0, 2]);
+  });
+
+  test('production bug - empty text + strong + text AFTER', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1"><strong data-node-id="1-1">Disclaimer</strong>: This instance is reset every night</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const p = container.querySelectorAll('p')[1];
+      const textAfterStrong = p.lastChild;
+      const result = (window as any).bridge.getNodePath(textAfterStrong);
+
+      container.remove();
+      return result;
+    });
+
+    // Text after strong (node-id 1-1) should be at Slate index 2 (1+1)
+    expect(path).toEqual([1, 2]);
+  });
+
+  test('text wrapped in spans (Nuxt wrapper scenario)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1">' +
+        '<span></span>' +
+        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '<span>: This instance is reset every night</span>' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const p = container.querySelectorAll('p')[1];
+      const lastSpan = p.lastElementChild as HTMLElement;
+      const textInSpan = lastSpan.firstChild;
+      const result = (window as any).bridge.getNodePath(textInSpan);
+
+      container.remove();
+      return result;
+    });
+
+    // Text inside wrapper span without nodeId resolves to parent's position
+    expect(path).toEqual([1, 2]);
+  });
+
+  test('list with links - li and link HAVE nodeId', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul class="list-disc">' +
+        '<li data-node-id="0.0"><span></span><a data-node-id="0.0.1" href="#"><span>NUXT.js Example</span></a><span></span></li>' +
+        '</ul>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const linkSpan = container.querySelector('a span')!;
+      const textNode = linkSpan.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Expected: [0, 0, 1, 0] - text inside link at [0, 0, 1]
+    expect(path).toEqual([0, 0, 1, 0]);
+  });
+
+  test('text BEFORE bold + bold + text AFTER (Nuxt structure)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">' +
+        'This text appears after the slider. Click on ' +
+        '<strong data-node-id="0-1">bold text</strong>' +
+        ' to test getNodePath.' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const p = container.querySelector('p')!;
+      const textAfterBold = p.lastChild;
+      const result = (window as any).bridge.getNodePath(textAfterBold);
+
+      container.remove();
+      return result;
+    });
+
+    // Expected path for clicking on last text: [0, 2]
+    expect(path).toEqual([0, 2]);
+  });
+
+  test('whitespace text node before p in container (Vue template artifact)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Use the injected helper that preserves whitespace text nodes
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-whitespace-container" data-editable-field="value">\n' +
+        '  <p data-node-id="0">Hello world</p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-whitespace-container')!;
+      const whitespaceNode = container.firstChild as Text;
+      const bridge = (window as any).bridge;
+
+      const isTextNode = whitespaceNode?.nodeType === Node.TEXT_NODE;
+      const textContent = whitespaceNode?.textContent;
+
+      // Test isOnInvalidWhitespace detection
+      const isInvalid = bridge.isOnInvalidWhitespace(whitespaceNode);
+
+      // Test cursor correction: set cursor on whitespace, then correct it
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(whitespaceNode, 0);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Cursor should now be on whitespace
+      const cursorBeforeCorrection = selection.anchorNode;
+
+      // Correct the selection
+      bridge.correctInvalidWhitespaceSelection();
+
+      // After correction, cursor should be in the first text node inside the p
+      const cursorAfterCorrection = selection.anchorNode;
+      const offsetAfterCorrection = selection.anchorOffset;
+      const cursorInValidNode = cursorAfterCorrection?.parentElement?.hasAttribute('data-node-id');
+
+      container.remove();
+
+      return {
+        isTextNode,
+        textContent,
+        isInvalid,
+        cursorWasOnWhitespace: cursorBeforeCorrection === whitespaceNode,
+        cursorInValidNode,
+        offsetAfterCorrection,
+      };
+    });
+
+    expect(result.isTextNode).toBe(true);
+    expect(result.textContent).toBe('\n  ');
+    expect(result.isInvalid).toBe(true);
+    expect(result.cursorWasOnWhitespace).toBe(true);
+    // After correction, cursor should be in a valid node (inside element with data-node-id)
+    expect(result.cursorInValidNode).toBe(true);
+    expect(result.offsetAfterCorrection).toBe(0); // Start of first text node
+  });
+
+  test('text BEFORE bold + bold + text AFTER with Vue whitespace', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-vue-whitespace" data-editable-field="value">\n' +
+        '  <p data-node-id="0">\n' +
+        '    This text appears after the slider. Click on \n' +
+        '    <strong data-node-id="0.1">bold text</strong>\n' +
+        '     to test getNodePath.\n' +
+        '  </p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-vue-whitespace')!;
+      const p = container.querySelector('p')!;
+      // Find the actual text node containing "to test" (not whitespace artifacts)
+      const textAfterBold = Array.from(p.childNodes).find(
+        (n: any) => n.nodeType === Node.TEXT_NODE && n.textContent?.includes('to test')
+      );
+
+      const result = (window as any).bridge.getNodePath(textAfterBold);
+
+      container.remove();
+
+      return result;
+    });
+
+    // With range.toString() normalization, path should be [0, 2]
+    expect(path).toEqual([0, 2]);
+  });
+
+  test('text with leading whitespace INSIDE strong returns correct path', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Two strongs with Vue template whitespace
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-leading-whitespace" data-editable-field="value">\n' +
+        '  <p data-node-id="0">\n' +
+        '    This text appears after the \n' +
+        '    <strong data-node-id="0.1">slider</strong>\n' +
+        '    . Click on \n' +
+        '    <strong data-node-id="0.3">\n      bold text\n    </strong>\n' +
+        '     to test getNodePath.\n' +
+        '  </p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-leading-whitespace')!;
+      // Find text inside the second strong - includes leading/trailing whitespace
+      const strong2 = container.querySelectorAll('strong')[1];
+      const textInStrong = strong2.firstChild;
+
+      const isTextNode = textInStrong?.nodeType === Node.TEXT_NODE;
+      const textContent = (textInStrong as Text)?.textContent;
+      const path = (window as any).bridge.getNodePath(textInStrong);
+
+      container.remove();
+
+      return { isTextNode, textContent, path };
+    });
+
+    expect(result.isTextNode).toBe(true);
+    // The text includes template whitespace
+    expect(result.textContent).toBe('\n      bold text\n    ');
+    // Even with leading whitespace, should resolve to [0, 3, 0]
+    expect(result.path).toEqual([0, 3, 0]);
   });
 });
 

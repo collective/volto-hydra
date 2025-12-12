@@ -137,6 +137,80 @@ export class AdminUIHelper {
   }
 
   /**
+   * Inject the preserveWhitespaceDOM helper into the iframe.
+   * This helper creates DOM while preserving whitespace text nodes that innerHTML would collapse.
+   * Vue/Nuxt templates create these from newlines/indentation.
+   *
+   * After calling this, tests can use: (window as any).preserveWhitespaceDOM('<div>\\n  <p>text</p>\\n</div>')
+   */
+  async injectPreserveWhitespaceHelper(): Promise<void> {
+    const iframe = this.getIframe();
+    await iframe.locator('body').evaluate(() => {
+      (window as any).preserveWhitespaceDOM = function(html: string): DocumentFragment {
+        const fragment = document.createDocumentFragment();
+
+        function parseHTML(htmlStr: string, parent: Node): string {
+          let remaining = htmlStr;
+
+          while (remaining.length > 0) {
+            const tagStart = remaining.indexOf('<');
+
+            if (tagStart === -1) {
+              if (remaining.length > 0) {
+                parent.appendChild(document.createTextNode(remaining));
+              }
+              break;
+            }
+
+            if (tagStart > 0) {
+              const text = remaining.slice(0, tagStart);
+              parent.appendChild(document.createTextNode(text));
+              remaining = remaining.slice(tagStart);
+            }
+
+            if (remaining.startsWith('</')) {
+              return remaining;
+            }
+
+            const tagEnd = remaining.indexOf('>');
+            if (tagEnd === -1) break;
+
+            const tagContent = remaining.slice(1, tagEnd);
+            const selfClosing = tagContent.endsWith('/');
+            const tagParts = (selfClosing ? tagContent.slice(0, -1) : tagContent).trim().split(/\s+/);
+            const tagName = tagParts[0];
+
+            const element = document.createElement(tagName);
+
+            const attrStr = tagParts.slice(1).join(' ');
+            const attrRegex = /([a-zA-Z-]+)(?:="([^"]*)")?/g;
+            let match;
+            while ((match = attrRegex.exec(attrStr)) !== null) {
+              element.setAttribute(match[1], match[2] || '');
+            }
+
+            parent.appendChild(element);
+            remaining = remaining.slice(tagEnd + 1);
+
+            if (!selfClosing) {
+              remaining = parseHTML(remaining, element);
+              const closeTag = `</${tagName}>`;
+              if (remaining.startsWith(closeTag)) {
+                remaining = remaining.slice(closeTag.length);
+              }
+            }
+          }
+
+          return remaining;
+        }
+
+        parseHTML(html, fragment);
+        return fragment;
+      };
+    });
+  }
+
+  /**
    * Click on a block within the preview iframe.
    * Waits for the block to be selected (have the outline) after clicking.
    *
@@ -178,9 +252,13 @@ export class AdminUIHelper {
       }
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
-      const editableField = block.locator('[contenteditable="true"]');
+      // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
+      const childEditable = block.locator('[contenteditable="true"]');
+      const selfEditable = iframe.locator(
+        `[data-block-uid="${blockId}"][contenteditable="true"]`,
+      );
       try {
-        await editableField.waitFor({ state: 'visible', timeout: 5000 });
+        await childEditable.or(selfEditable).first().waitFor({ state: 'visible', timeout: 5000 });
       } catch (e) {
         throw new Error(`Block "${blockId}" was clicked but no contenteditable field appeared. Check that hydra.js is handling the block selection.`);
       }
@@ -666,6 +744,28 @@ export class AdminUIHelper {
   }
 
   /**
+   * Apply a format to the currently selected text in an editor.
+   * This is a higher-level helper that:
+   * 1. Clicks the format button
+   * 2. Waits for the formatted text to appear
+   * 3. Re-selects all text (to restore selection after DOM re-render)
+   *
+   * Use this instead of clickFormatButton when you need to apply multiple
+   * formats in sequence, as the DOM re-render can lose the selection.
+   */
+  async applyFormat(
+    editor: Locator,
+    format: 'bold' | 'italic',
+    expectedText: RegExp | string,
+  ): Promise<void> {
+    await this.clickFormatButton(format);
+    await this.waitForFormattedText(editor, expectedText, format);
+    // Re-select all text to restore selection after DOM re-render
+    // There is a bug if this is not automatically done by hydra.js
+    // await this.selectAllTextInEditor(editor);
+  }
+
+  /**
    * Check if a format button is in active state.
    * Semantic UI Button with active={true} gets the "active" CSS class.
    */
@@ -717,33 +817,24 @@ export class AdminUIHelper {
    * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
-    await editor.evaluate((el) => {
-      // Find the first and last text nodes in the element
-      // This handles both plain text and formatted text (e.g., <span>text</span>)
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-      const firstTextNode = walker.nextNode();
-      if (!firstTextNode) {
-        throw new Error('No text nodes found in editor');
-      }
+    // Get the expected text content (visible text, trimmed)
+    const expectedText = await editor.evaluate((el) => el.textContent?.trim() || '');
 
-      // Find the last text node
-      let lastTextNode = firstTextNode;
-      let node;
-      while ((node = walker.nextNode())) {
-        lastTextNode = node;
-      }
+    // Use platform-appropriate keyboard shortcut (Cmd+A on Mac, Ctrl+A elsewhere)
+    await editor.press('ControlOrMeta+a');
 
-      const range = document.createRange();
-      range.setStart(firstTextNode, 0);
-      range.setEnd(lastTextNode, lastTextNode.textContent?.length || 0);
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    });
-    // Give the selection time to register and trigger selectionchange event
-    await this.page.waitForTimeout(100);
+    // Wait for selection to match the editor's text content
+    await expect
+      .poll(
+        async () => {
+          return editor.evaluate(() => {
+            const sel = window.getSelection();
+            return sel?.toString().trim() || '';
+          });
+        },
+        { timeout: 5000 }
+      )
+      .toBe(expectedText);
   }
 
   /**
@@ -849,17 +940,49 @@ export class AdminUIHelper {
 
   /**
    * Get the text content of a block in the iframe.
+   * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
    */
   async getBlockTextInIframe(blockId: string): Promise<string> {
     const iframe = this.getIframe();
-    // Get text from the editable field (data-editable-field), not the entire block (which includes toolbar buttons)
-    // Don't require contenteditable="true" because it's only set when the block is selected
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    // Try descendant first (mock frontend: data-block-uid > [data-editable-field])
+    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+
+    if ((await editor.count()) === 0) {
+      // Nuxt pattern: data-block-uid and data-editable-field on same element
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`).first();
+    }
 
     // Wait a moment for any pending mutations to complete
     await this.page.waitForTimeout(100);
 
     return (await editor.textContent()) || '';
+  }
+
+  /**
+   * Get the editor locator for a block.
+   * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
+   *
+   * @param blockId - The block UID
+   * @returns The editor locator
+   */
+  async getEditorLocator(blockId: string): Promise<Locator> {
+    const iframe = this.getIframe();
+    // Try descendant first (mock frontend: data-block-uid > [contenteditable])
+    let editor = iframe
+      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
+      .first();
+
+    // Use count() instead of isVisible() - element might exist but be scrolled out of view
+    const count = await editor.count().catch(() => 0);
+
+    if (count === 0) {
+      // Try same-element selector (Nuxt: data-block-uid AND contenteditable on same element)
+      editor = iframe.locator(
+        `[data-block-uid="${blockId}"][contenteditable="true"]`,
+      );
+    }
+
+    return editor;
   }
 
   /**
@@ -869,7 +992,8 @@ export class AdminUIHelper {
    */
   async getCleanTextContent(editor: Locator): Promise<string> {
     const text = (await editor.textContent()) || '';
-    return text.replace(/[\u200B\uFEFF]/g, '');
+    // Strip ZWS and trim whitespace (Vue/Nuxt can have template whitespace)
+    return text.replace(/[\u200B\uFEFF]/g, '').trim();
   }
 
   /**
@@ -898,6 +1022,16 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the CSS selector for a format type that works with both frontends.
+   * Mock frontend uses inline styles, Nuxt uses semantic tags.
+   */
+  getFormatSelector(format: 'bold' | 'italic'): string {
+    return format === 'bold'
+      ? 'span[style*="font-weight: bold"], strong, b'
+      : 'span[style*="font-style: italic"], em, i';
+  }
+
+  /**
    * Wait for formatted text (bold/italic) to appear in the editor.
    * Useful for waiting until formatting has been applied after Ctrl+B or toolbar clicks.
    */
@@ -905,15 +1039,29 @@ export class AdminUIHelper {
     editor: Locator,
     pattern: RegExp | string,
     format: 'bold' | 'italic',
-    options: { timeout?: number } = {}
+    options: { timeout?: number } = {},
   ): Promise<void> {
     const timeout = options.timeout ?? 5000;
-    const selector = format === 'bold'
-      ? 'span[style*="font-weight: bold"]'
-      : 'span[style*="font-style: italic"]';
+    const selector = this.getFormatSelector(format);
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
 
-    await expect(editor.locator(selector)).toHaveText(regex, { timeout });
+    // Use filter to find elements matching the pattern, first() handles multiple matches
+    await expect(editor.locator(selector).filter({ hasText: regex }).first()).toBeVisible({ timeout });
+  }
+
+  /**
+   * Wait for formatted text (bold/italic) to be removed from the editor.
+   * Useful for waiting until formatting has been removed after toggling off.
+   */
+  async waitForFormattingRemoved(
+    editor: Locator,
+    format: 'bold' | 'italic',
+    options: { timeout?: number } = {},
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    const selector = this.getFormatSelector(format);
+
+    await expect(editor.locator(selector)).not.toBeVisible({ timeout });
   }
 
   /**
@@ -1268,14 +1416,42 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the end of the text in a contenteditable element.
-   * Uses JavaScript to avoid triggering window scroll (unlike keyboard End key).
+   * Finds the last non-whitespace text node and places cursor at the end of it.
+   * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
   async moveCursorToEnd(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(false); // Collapse to end
+
+      // Find all text nodes, keeping only ones with actual content
+      const walker = el.ownerDocument.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null,
+      );
+      let lastContentTextNode = null;
+      let node;
+      while ((node = walker.nextNode())) {
+        // Skip whitespace-only text nodes (newlines, spaces between elements)
+        if (node.textContent && node.textContent.trim().length > 0) {
+          lastContentTextNode = node;
+        }
+      }
+
+      if (lastContentTextNode) {
+        // Place cursor at end of last content text node
+        range.setStart(
+          lastContentTextNode,
+          lastContentTextNode.textContent?.length || 0,
+        );
+        range.collapse(true);
+      } else {
+        // Fallback: no text nodes, collapse to end of container
+        range.selectNodeContents(el);
+        range.collapse(false);
+      }
+
       selection.removeAllRanges();
       selection.addRange(range);
     });
@@ -1283,14 +1459,32 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the start of the text in a contenteditable element.
-   * Uses JavaScript to avoid triggering window scroll (unlike keyboard Home key).
+   * Finds the first text node and places cursor at the start of it.
+   * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
   async moveCursorToStart(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(true); // Collapse to start
+
+      // Find the first text node in the element
+      const walker = el.ownerDocument.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null,
+      );
+      const firstTextNode = walker.nextNode();
+
+      if (firstTextNode) {
+        // Place cursor at start of first text node
+        range.setStart(firstTextNode, 0);
+        range.collapse(true);
+      } else {
+        // Fallback: no text nodes, collapse to start of container
+        range.selectNodeContents(el);
+        range.collapse(true);
+      }
+
       selection.removeAllRanges();
       selection.addRange(range);
     });
@@ -1298,6 +1492,7 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to a specific position in a contenteditable element.
+   * Uses Selection.modify() to move by visible characters, handling Vue/Nuxt empty text nodes.
    *
    * @param editor - The contenteditable element
    * @param position - The character offset position to move to (0-based)
@@ -1305,17 +1500,20 @@ export class AdminUIHelper {
   async moveCursorToPosition(editor: any, position: number): Promise<void> {
     await editor.evaluate(
       (el: any, pos: number) => {
-        const textNode = el.firstChild;
-        if (!textNode || textNode.nodeType !== 3) {
-          // Node.TEXT_NODE = 3
-          throw new Error('Expected first child to be a text node');
-        }
-        const range = el.ownerDocument.createRange();
-        const selection = el.ownerDocument.defaultView.getSelection();
-        range.setStart(textNode, pos);
-        range.collapse(true);
+        const doc = el.ownerDocument;
+        const selection = doc.defaultView.getSelection();
+
+        // First, move cursor to start of element
+        const range = doc.createRange();
+        range.selectNodeContents(el);
+        range.collapse(true); // Collapse to start
         selection.removeAllRanges();
         selection.addRange(range);
+
+        // Then move forward by visible characters using Selection.modify()
+        for (let i = 0; i < pos; i++) {
+          selection.modify('move', 'forward', 'character');
+        }
       },
       position,
     );
@@ -1399,12 +1597,19 @@ export class AdminUIHelper {
   async enterEditMode(blockId: string): Promise<any> {
     const iframe = this.getIframe();
     // Use [data-editable-field] to find editor regardless of contenteditable state
-    const editor = iframe
+    // Try descendant first (mock frontend), then same element (Nuxt frontend)
+    let editor = iframe
       .locator(`[data-block-uid="${blockId}"] [data-editable-field]`)
       .first();
 
-    // Check if the editor is already visible and focused
-    const isVisible = await editor.isVisible().catch(() => false);
+    // Check if descendant selector found anything
+    let isVisible = await editor.isVisible().catch(() => false);
+
+    if (!isVisible) {
+      // Try same-element selector (Nuxt: data-block-uid and data-editable-field on same element)
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`);
+      isVisible = await editor.isVisible().catch(() => false);
+    }
 
     if (isVisible) {
       // Check if already editable
@@ -1593,8 +1798,20 @@ export class AdminUIHelper {
    * Matches Cypress pattern: #sidebar-properties .field-wrapper-{fieldname}
    */
   async hasSidebarField(fieldName: string): Promise<boolean> {
-    const fieldWrapper = this.page.locator(`#sidebar-properties .field-wrapper-${fieldName}`);
+    const fieldWrapper = this.page.locator(
+      `#sidebar-properties .field-wrapper-${fieldName}`,
+    );
     return await fieldWrapper.isVisible();
+  }
+
+  /**
+   * Get the sidebar slate editor locator for a specific field.
+   * Returns the contenteditable element for the field's slate widget.
+   */
+  getSidebarSlateEditor(fieldName: string): Locator {
+    return this.page.locator(
+      `#sidebar-properties .field-wrapper-${fieldName} [contenteditable="true"]`,
+    );
   }
 
   /**

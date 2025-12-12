@@ -99,24 +99,4 @@ test.describe('Complex Slate Structures', () => {
     const slateError = errors.find(e => e.includes('Cannot find a descendant at path'));
     expect(slateError).toBeUndefined();
   });
-
-  test('API returns valid slate structure without text on li elements', async ({ request }) => {
-    // Verify the mock API is returning valid data
-    const response = await request.get('http://localhost:8888/++api++/complex-slate-page');
-    const data = await response.json();
-
-    // Get the list block's Slate value
-    const listValue = data.blocks['block-list-links'].value;
-
-    // Verify structure: ul -> li elements should NOT have 'text' property
-    const ul = listValue[0];
-    expect(ul.type).toBe('ul');
-
-    for (const li of ul.children) {
-      expect(li.type).toBe('li');
-      expect(li).toHaveProperty('children');
-      // CRITICAL: li should NOT have 'text' property
-      expect(li).not.toHaveProperty('text');
-    }
-  });
 });

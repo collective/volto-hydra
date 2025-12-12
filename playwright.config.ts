@@ -45,17 +45,46 @@ export default defineConfig({
     video: process.env.VIDEO ? 'retain-on-failure' : 'off',
   },
 
-  /* Configure projects for major browsers */
+  /* Configure projects for different frontends */
   projects: [
+    // Mock frontend (default) - tests run against mock HTML frontend on port 8888
     {
-      name: 'chromium',
+      name: 'mock',
       use: {
         ...devices['Desktop Chrome'],
-        // Explicit viewport for consistent behavior between local and CI
         viewport: { width: 1280, height: 720 },
-        // Grant clipboard permissions for paste tests
         permissions: ['clipboard-read', 'clipboard-write'],
       },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests
+      ],
+    },
+    // Nuxt frontend - tests run against Nuxt frontend on port 3003
+    {
+      name: 'nuxt',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        // Pre-set iframe_url cookie to use Nuxt frontend
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
+        /container-.*\.spec\.ts/, // Skip container tests (not yet supported in Nuxt)
+        /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
+        /unit\/.*\.spec\.ts/, // Unit tests don't need to run per-frontend
+      ],
+    },
+    // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
+    {
+      name: 'nuxt-specific',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+      testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
     },
 
     // Uncomment to test on Firefox and WebKit
@@ -102,7 +131,8 @@ export default defineConfig({
             NODE_ENV: 'production',
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
+            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -129,11 +159,23 @@ export default defineConfig({
           env: {
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
+            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
           },
         },
+    // Nuxt frontend for testing Nuxt-specific scenarios
+    {
+      name: 'Nuxt Frontend (Test)',
+      command: 'npm run dev:test',
+      url: 'http://localhost:3003',
+      timeout: 120 * 1000, // 2 minutes for Nuxt compilation
+      reuseExistingServer: !process.env.CI,
+      cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
   ],
 });

@@ -117,11 +117,135 @@ function filterActionsForAuth(content, authenticated) {
   return filtered;
 }
 
+/**
+ * Get root-level navigation items from contentDB
+ * Used by both @navigation component and @search endpoint
+ */
+function getRootNavigationItems() {
+  return Object.entries(contentDB)
+    .filter(([path]) => {
+      if (path === '/') return false; // Exclude site root itself
+      const pathParts = path.split('/').filter(p => p);
+      return pathParts.length === 1; // Only root-level items
+    })
+    .map(([, content]) => ({
+      '@id': content['@id'],
+      '@type': content['@type'],
+      'id': content.id,
+      'title': content.title,
+      'description': content.description || '',
+      'review_state': content.review_state || 'published',
+      'UID': content.UID,
+      'items': [],  // Child items (empty for flat structure, needed for depth=2)
+    }));
+}
+
+/**
+ * Generate @components for a content item (breadcrumbs, navigation, workflow, actions)
+ */
+function generateComponents(urlPath, baseUrl) {
+  const fullUrl = `${baseUrl}${urlPath}`;
+  const pathParts = urlPath.split('/').filter(Boolean);
+
+  // Build breadcrumb items
+  const breadcrumbItems = [{ '@id': baseUrl, 'title': 'Home' }];
+  let currentPath = '';
+  for (const part of pathParts) {
+    currentPath += '/' + part;
+    const partContent = contentDB[currentPath];
+    breadcrumbItems.push({
+      '@id': baseUrl + currentPath,
+      'title': partContent?.title || part
+    });
+  }
+
+  return {
+    'actions': {
+      '@id': `${fullUrl}/@actions`,
+      'document_actions': [],
+      'object': [
+        { 'id': 'view', 'title': 'View' },
+        { 'id': 'edit', 'title': 'Edit' },
+        { 'id': 'folderContents', 'title': 'Contents' }
+      ],
+      'object_buttons': [],
+      'portal_tabs': [],
+      'site_actions': [],
+      'user': []
+    },
+    'breadcrumbs': {
+      '@id': `${fullUrl}/@breadcrumbs`,
+      'items': breadcrumbItems,
+      'root': baseUrl
+    },
+    'navigation': {
+      '@id': `${fullUrl}/@navigation`,
+      'items': getRootNavigationItems()
+    },
+    'workflow': {
+      '@id': `${fullUrl}/@workflow`
+    }
+  };
+}
+
+/**
+ * Enrich content with generated fields (@id, @components, permissions, etc.)
+ * Content files use distribution format with relative @id paths.
+ */
+function enrichContent(content, urlPath, baseUrl) {
+  // Convert relative @id to full URL if needed
+  let fullUrl = content['@id'];
+  if (fullUrl && !fullUrl.startsWith('http')) {
+    fullUrl = baseUrl + fullUrl;
+  } else {
+    fullUrl = `${baseUrl}${urlPath}`;
+  }
+
+  // Convert parent @id to full URL if needed
+  let parent = content.parent;
+  if (parent && parent['@id'] && !parent['@id'].startsWith('http')) {
+    parent = {
+      ...parent,
+      '@id': baseUrl + parent['@id']
+    };
+  } else if (!parent) {
+    parent = {
+      '@id': baseUrl,
+      '@type': 'Plone Site',
+      'title': 'Site'
+    };
+  }
+
+  return {
+    ...content,
+    '@id': fullUrl,
+    'UID': content.UID || `${content.id || urlPath.replace(/\//g, '-')}-uid`,
+    'review_state': content.review_state || 'published',
+    'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
+    'allow_discussion': content.allow_discussion !== undefined ? content.allow_discussion : false,
+    'exclude_from_nav': content.exclude_from_nav || false,
+    'created': content.created || '2025-01-01T12:00:00+00:00',
+    'modified': content.modified || '2025-01-01T12:00:00+00:00',
+    'lock': content.lock || { 'locked': false, 'stealable': true },
+    'parent': parent,
+    '@components': generateComponents(urlPath, baseUrl),
+    // Permissions - always grant for mock API
+    'can_manage_portlets': true,
+    'can_view': true,
+    'can_edit': true,
+    'can_delete': true,
+    'can_add': true,
+    'can_list_contents': true
+  };
+}
+
 // Load initial content from fixtures
 function loadInitialContent() {
+  const baseUrl = `http://localhost:${PORT}`;
+
   // Add site root content
   contentDB['/'] = {
-    '@id': 'http://localhost:8888/',
+    '@id': baseUrl + '/',
     '@type': 'Plone Site',
     'id': 'Plone',
     'title': 'Plone Site',
@@ -129,47 +253,29 @@ function loadInitialContent() {
     'items': [],
     'items_total': 0,
     'is_folderish': true,
-    '@components': {
-      'actions': {
-        '@id': 'http://localhost:8888/@actions',
-        'document_actions': [],
-        'object': [
-          { 'id': 'view', 'title': 'View' },
-          { 'id': 'edit', 'title': 'Edit' },
-          { 'id': 'folderContents', 'title': 'Contents' }
-        ],
-        'object_buttons': [],
-        'portal_tabs': [],
-        'site_actions': [],
-        'user': []
-      },
-      'breadcrumbs': {
-        '@id': 'http://localhost:8888/@breadcrumbs',
-        'items': [],
-        'root': 'http://localhost:8888'
-      },
-      'navigation': {
-        '@id': 'http://localhost:8888/@navigation',
-        'items': []
-      },
-      'workflow': {
-        '@id': 'http://localhost:8888/@workflow'
-      }
-    }
+    '@components': generateComponents('/', baseUrl),
+    'can_manage_portlets': true,
+    'can_view': true,
+    'can_edit': true,
+    'can_delete': true,
+    'can_add': true,
+    'can_list_contents': true
   };
   console.log('Loaded content: /');
 
-  // Load all JSON files from api directory (except schema files)
-  const apiDir = path.join(__dirname, 'api');
-  if (fs.existsSync(apiDir)) {
-    const files = fs.readdirSync(apiDir);
-    files.forEach((file) => {
-      if (file.endsWith('.json') && !file.startsWith('schema-')) {
-        const filePath = path.join(apiDir, file);
-        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        const urlPath = new URL(content['@id']).pathname;
-        contentDB[urlPath] = content;
-        console.log(`Loaded content: ${urlPath}`);
+  // Load all content from content/{page-id}/data.json structure
+  const contentDir = path.join(__dirname, 'content');
+  if (fs.existsSync(contentDir)) {
+    const dirs = fs.readdirSync(contentDir, { withFileTypes: true });
+    dirs.forEach((dir) => {
+      if (dir.isDirectory()) {
+        const dataPath = path.join(contentDir, dir.name, 'data.json');
+        if (fs.existsSync(dataPath)) {
+          const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+          const urlPath = '/' + (content.id || dir.name);
+          contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
+          console.log(`Loaded content: ${urlPath}`);
+        }
       }
     });
   }
@@ -183,21 +289,20 @@ loadInitialContent();
  * Falls back to cached contentDB if no file exists.
  */
 function getContent(urlPath) {
-  // Check if there's a JSON file for this path in the api directory
-  const apiDir = path.join(__dirname, 'api');
-  if (fs.existsSync(apiDir)) {
-    const files = fs.readdirSync(apiDir);
-    for (const file of files) {
-      if (file.endsWith('.json') && !file.startsWith('schema-')) {
-        const filePath = path.join(apiDir, file);
-        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        const contentPath = new URL(content['@id']).pathname;
-        if (contentPath === urlPath) {
-          return content;
-        }
-      }
+  const baseUrl = `http://localhost:${PORT}`;
+
+  // Check if there's a data.json file for this path in content/{page-id}/
+  const contentDir = path.join(__dirname, 'content');
+  const pageId = urlPath.replace(/^\//, ''); // Remove leading slash
+
+  if (pageId && fs.existsSync(contentDir)) {
+    const dataPath = path.join(contentDir, pageId, 'data.json');
+    if (fs.existsSync(dataPath)) {
+      const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      return enrichContent(content, urlPath, baseUrl);
     }
   }
+
   // Fall back to cached contentDB
   return contentDB[urlPath];
 }
@@ -430,22 +535,8 @@ app.get('*/@search', (req, res) => {
     // For site root (/), return all root-level items
     // For other paths, return their children (if any)
     if (searchPath === '' || searchPath === '/') {
-      // Root level - return all items that are direct children of root
-      items = Object.entries(contentDB)
-        .filter(([path]) => {
-          if (path === '/') return false; // Exclude site root itself
-          const pathParts = path.split('/').filter(p => p);
-          return pathParts.length === 1; // Only root-level items
-        })
-        .map(([path, content]) => ({
-          '@id': content['@id'],
-          '@type': content['@type'],
-          'id': content.id,
-          'title': content.title,
-          'description': content.description || '',
-          'review_state': content.review_state || 'published',
-          'UID': content.UID,
-        }));
+      // Root level - use shared helper
+      items = getRootNavigationItems();
     } else {
       // Specific path - return its children
       // For Documents (non-folderish items), this will be empty

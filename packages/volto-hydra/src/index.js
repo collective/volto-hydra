@@ -47,20 +47,12 @@ const applyConfig = (config) => {
   // This is separate from schema (used for sidebar settings form)
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
-    // TEMPORARILY DISABLED - testing if blockSchema richtext causes slate corruption
-    // blockSchema: {
-    //   title: 'Text',
-    //   fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
-    //   properties: {
-    //     value: {
-    //       title: 'Body',
-    //       widget: 'richtext',
-    //       // Default value for new slate blocks - used by applyBlockDefaults
-    //       default: config.settings.slate.defaultValue(),
-    //     },
-    //   },
-    //   required: [],
-    // },
+    // initialValue is called by Volto's _applyBlockInitialValue when adding new blocks
+    // This ensures slate blocks get proper initial structure (hydra.js adds nodeIds)
+    initialValue: ({ id, value }) => ({
+      ...value,
+      value: value.value || config.settings.slate.defaultValue(),
+    }),
     schemaEnhancer: ({ formData, schema, intl }) => {
       // NOTE: Do NOT use blockSchema with widget: 'richtext' - it causes Slate corruption
       // because blockSchema runs during block registration, before proper isolation
