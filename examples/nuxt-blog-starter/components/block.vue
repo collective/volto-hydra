@@ -39,9 +39,9 @@
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
     class="grid grid-flow-col gap-4 mt-6 mb-6"
-    :class="['grid-cols-' + block.blocks_layout.items.length, `bg-${block.styles.backgroundColor || 'white'}-700`]">
+    :class="['grid-cols-' + block.blocks_layout.items.length, `bg-${block.styles?.backgroundColor || 'white'}-700`]">
     <div v-for="uid in block.blocks_layout.items" class="p-4"
-      :class="[`bg-${!block.styles.backgroundColor ? 'grey' : 'white'}-700`]">
+      :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]">
       <Block :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"></Block>
     </div>
 
