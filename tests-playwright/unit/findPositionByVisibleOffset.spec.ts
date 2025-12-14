@@ -288,4 +288,158 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     expect(result.endText).toBe(' bold text');
     expect(result.endOffset).toBe(10); // end of " bold text"
   });
+
+  test('prospective formatting: offset 0 in ZWS-only inline element positions after ZWS', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1"></span></p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const span = container.querySelector('span')!;
+      // Add ZWS to empty span (like ensureZeroWidthSpaces does)
+      span.appendChild(document.createTextNode('\uFEFF'));
+
+      // Find position at offset 0 inside the span (for prospective formatting)
+      const result = (window as any).bridge.findPositionByVisibleOffset(span, 0);
+
+      container.remove();
+
+      return {
+        text: result?.node?.textContent,
+        offset: result?.offset,
+        isZWS: result?.node?.textContent === '\uFEFF',
+      };
+    });
+
+    // Should position AFTER the ZWS (offset 1) so typing inserts inside the span
+    expect(result.isZWS).toBe(true);
+    expect(result.offset).toBe(1); // After the ZWS, not before
+  });
+
+  test('cursor exit: offset at end of inline element returns end of text inside', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // When exiting bold: "Hello " (6) + "world" (5) = offset 11
+    // Without text after span, position should be at end of "world"
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      const p = document.createElement('p');
+      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-node-id', '0');
+
+      p.appendChild(document.createTextNode('Hello '));
+      const span = document.createElement('span');
+      span.setAttribute('data-node-id', '0-1');
+      span.textContent = 'world';
+      p.appendChild(span);
+      // No text node after span
+
+      container.appendChild(p);
+      document.body.appendChild(container);
+
+      const result = (window as any).bridge.findPositionByVisibleOffset(p, 11);
+
+      container.remove();
+
+      return {
+        text: result?.node?.textContent,
+        offset: result?.offset,
+      };
+    });
+
+    // Offset 11 = end of "world" (only option without text after)
+    expect(result.text).toBe('world');
+    expect(result.offset).toBe(5);
+  });
+
+  test('cursor exit: offset at end of inline element with text after returns start of next text', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // When there IS text after: "Hello " (6) + "world" (5) + " after"
+    // Offset 11 should prefer start of " after" over end of "world"
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      const p = document.createElement('p');
+      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-node-id', '0');
+
+      p.appendChild(document.createTextNode('Hello '));
+      const span = document.createElement('span');
+      span.setAttribute('data-node-id', '0-1');
+      span.textContent = 'world';
+      p.appendChild(span);
+      p.appendChild(document.createTextNode(' after'));
+
+      container.appendChild(p);
+      document.body.appendChild(container);
+
+      const result = (window as any).bridge.findPositionByVisibleOffset(p, 11);
+
+      container.remove();
+
+      return {
+        text: result?.node?.textContent,
+        offset: result?.offset,
+      };
+    });
+
+    // Offset 11 should be at start of " after" (offset 0), not end of "world"
+    // This ensures cursor exits the inline element
+    expect(result.text).toBe(' after');
+    expect(result.offset).toBe(0);
+  });
+
+  test('cursor exit: with ZWS inside span from prospective formatting', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // After prospective formatting + typing "world", span contains "﻿world" (ZWS + text)
+    // After toggling off, offset 11 should land in ZWS after span
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      const p = document.createElement('p');
+      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-node-id', '0');
+
+      p.appendChild(document.createTextNode('Hello '));
+      const span = document.createElement('span');
+      span.setAttribute('data-node-id', '0-1');
+      // ZWS from prospective formatting + typed text
+      span.appendChild(document.createTextNode('\uFEFF' + 'world'));
+      p.appendChild(span);
+      // ZWS after span (added by ensureZeroWidthSpaces)
+      p.appendChild(document.createTextNode('\uFEFF'));
+
+      container.appendChild(p);
+      document.body.appendChild(container);
+
+      // Visible chars: "Hello " (6) + "world" (5) = 11
+      // ZWS chars are not counted
+      const result = (window as any).bridge.findPositionByVisibleOffset(p, 11);
+
+      container.remove();
+
+      return {
+        text: result?.node?.textContent,
+        offset: result?.offset,
+        parentTagName: result?.node?.parentElement?.tagName,
+      };
+    });
+
+    // Offset 11 should land in the ZWS AFTER the span, not inside the span
+    // Offset is 1 (after the ZWS) so cursor is clearly inside the ZWS text node
+    // This prevents browser from putting typed text inside the preceding inline element
+    expect(result.text).toBe('\uFEFF');
+    expect(result.offset).toBe(1);
+    // Parent should be P (paragraph), not SPAN
+    expect(result.parentTagName).toBe('P');
+  });
 });

@@ -986,6 +986,9 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     await page.goto('http://localhost:8888/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+
+    // Inject helper for creating DOM with preserved whitespace
+    await helper.injectPreserveWhitespaceHelper();
   });
 
   test('path to text node returns parent nodeId', async () => {
@@ -1126,7 +1129,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
       }
 
       // Now find the text node with the correct absolute offset
-      const textResult = (window as any).bridge.findTextNodeAndOffset(element, absoluteOffset);
+      const textResult = (window as any).bridge.findPositionByVisibleOffset(element, absoluteOffset);
 
       container.remove();
 
@@ -1215,5 +1218,107 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     });
 
     expect(result).toBeNull();
+  });
+
+  // ZWS-specific tests for cursor exit scenarios
+  test('ZWS text node after inline element returns correct path', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-zws-after" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1">world</span>\uFEFF</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-zws-after')!;
+      const p = container.querySelector('p')!;
+      const span = p.querySelector('span')!;
+
+      const result = {
+        helloText: (window as any).bridge.getNodePath(p.childNodes[0]),
+        worldText: (window as any).bridge.getNodePath(span.firstChild),
+        zwsText: (window as any).bridge.getNodePath(p.childNodes[2]),
+        childNodesCount: p.childNodes.length,
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.childNodesCount).toBe(3);
+    expect(paths.helloText).toEqual([0, 0]);
+    expect(paths.worldText).toEqual([0, 1, 0]);
+    // ZWS after span should be at index 2 (third child of paragraph)
+    expect(paths.zwsText).toEqual([0, 2]);
+  });
+
+  test('ZWS inside empty inline element (prospective formatting)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-zws-inside" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFF</span></p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-zws-inside')!;
+      const p = container.querySelector('p')!;
+      const span = p.querySelector('span')!;
+
+      const result = {
+        helloText: (window as any).bridge.getNodePath(p.childNodes[0]),
+        zwsInsideSpan: (window as any).bridge.getNodePath(span.firstChild),
+        childNodesCount: p.childNodes.length,
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.childNodesCount).toBe(2);
+    expect(paths.helloText).toEqual([0, 0]);
+    // ZWS inside span should have path inside the span element
+    expect(paths.zwsInsideSpan).toEqual([0, 1, 0]);
+  });
+
+  test('ZWS + typed text inside span with ZWS after (cursor exit scenario)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-zws-both" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFFworld</span>\uFEFF</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-zws-both')!;
+      const p = container.querySelector('p')!;
+      const span = p.querySelector('span')!;
+
+      const result = {
+        helloText: (window as any).bridge.getNodePath(p.childNodes[0]),
+        zwsPlusWorldText: (window as any).bridge.getNodePath(span.firstChild),
+        zwsAfterSpan: (window as any).bridge.getNodePath(p.childNodes[2]),
+        childNodesCount: p.childNodes.length,
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.childNodesCount).toBe(3);
+    expect(paths.helloText).toEqual([0, 0]);
+    // Text with ZWS prefix inside span should have path inside the span
+    expect(paths.zwsPlusWorldText).toEqual([0, 1, 0]);
+    // ZWS after span should be at index 2
+    expect(paths.zwsAfterSpan).toEqual([0, 2]);
   });
 });
