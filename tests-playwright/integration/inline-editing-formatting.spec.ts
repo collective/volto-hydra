@@ -361,13 +361,52 @@ test.describe('Inline Editing - Formatting', () => {
     // Wait for the bold formatting to appear
     await helper.waitForFormattedText(editor, /world/, 'bold');
 
-    // Verify "Hello " is NOT bold (should be plain text)
+    // Verify the HTML structure (waitForFormattedText already verified bold contains "world")
+    const html = await editor.innerHTML();
+    console.log('[TEST] Final HTML:', html);
+  });
+
+  test('prospective formatting: toolbar button click then type applies bold to new text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    // Type "Hello " (not bold)
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Click bold button to enable bold mode for subsequent text
+    await helper.clickFormatButton('bold');
+
+    // Wait for bold button to become active (indicates bold mode is on)
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Type "world" - this should be bold
+    await editor.pressSequentially('world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello world/);
+
+    // Wait for the bold formatting to appear
+    await helper.waitForFormattedText(editor, /world/, 'bold');
+
+    // Verify the HTML structure
     const html = await editor.innerHTML();
     console.log('[TEST] Final HTML:', html);
 
-    // The structure should be: "Hello " (plain) + <span style="font-weight: bold">world</span>
-    // Or the entire "Hello world" might be bold if prospective formatting wraps from cursor
-    expect(html).toMatch(/font-weight.*bold/);
+    // Verify "Hello " is NOT bold - only "world" should be bold (prospective formatting)
+    const boldSelector = helper.getFormatSelector('bold');
+    const boldContent = await editor.locator(boldSelector).textContent();
+    const cleanBoldContent = boldContent?.replace(/[\uFEFF\u200B]/g, '').trim();
+    console.log('[TEST] Bold content:', cleanBoldContent);
+    expect(cleanBoldContent).toBe('world');
   });
 
   test('prospective formatting: toggle bold off after typing bold text', async ({
@@ -405,12 +444,16 @@ test.describe('Inline Editing - Formatting', () => {
     // Wait for the bold formatting to appear
     await helper.waitForFormattedText(editor, /world/, 'bold');
 
-    // Check selection state before toggling off
+    // Check selection state before toggling off - cursor should be collapsed at end of "world"
     const selectionInfo = await helper.getSelectionInfo(editor);
     console.log('[TEST] Selection before second ControlOrMeta+b:', JSON.stringify(selectionInfo));
     expect(selectionInfo.editorHasFocus).toBe(true);
     expect(selectionInfo.isCollapsed).toBe(true);
-    expect(selectionInfo.anchorOffset).toBe(6); // ZWS + "world" = 6 chars
+    // Cursor should be at end of bold text (offset varies based on ZWS presence)
+    const boldText = await editor.locator(helper.getFormatSelector('bold')).textContent();
+    const cleanBoldText = boldText?.replace(/[\uFEFF\u200B]/g, '');
+    expect(cleanBoldText).toBe('world');
+    expect(selectionInfo.anchorOffset).toBeGreaterThanOrEqual(5); // At least at end of "world"
 
     // Press Cmd+B again to toggle bold OFF
     console.log('[TEST] Second ControlOrMeta+b - toggling bold off');

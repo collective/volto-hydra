@@ -78,7 +78,7 @@
 // onEditChange
 
 // Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
-let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
+let debugEnabled = true; // TEMP: Enable for debugging
 const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
 
 /**
@@ -629,7 +629,6 @@ export class Bridge {
                 if (this.selectedBlockUid) {
                   const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
                   if (blockElement) {
-                    this.ensureZeroWidthSpaces(blockElement);
                     // Re-attach mutation observer after DOM re-render
                     // The old observer was watching the old blockElement which no longer exists
                     this.observeBlockTextChanges(blockElement);
@@ -729,7 +728,7 @@ export class Bridge {
           // Parent is requesting a buffer flush before applying format
           // This ensures the parent's Slate editor has the latest text
           const requestId = event.data.requestId;
-          log('Received FLUSH_BUFFER request, requestId:', requestId);
+          log('Received FLUSH_BUFFER request, requestId:', requestId, 'savedSelection:', this.savedSelection);
 
           // Block input during format operation - will be unblocked when FORM_DATA arrives
           // This prevents any text changes from being sent while format is being applied
@@ -747,12 +746,13 @@ export class Bridge {
           } else {
             // No pending text - send BUFFER_FLUSHED immediately (safe to proceed)
             // Include current selection so toolbar has it when applying format
+            const selection = this.serializeSelection();
+            log('No pending text, sending BUFFER_FLUSHED with selection:', selection);
             this.sendMessageToParent({
               type: 'BUFFER_FLUSHED',
               requestId: requestId,
-              selection: this.serializeSelection(),
+              selection: selection,
             });
-            log('No pending text, sent BUFFER_FLUSHED immediately');
           }
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
@@ -1203,6 +1203,8 @@ export class Bridge {
   getValidPositionForWhitespace(node) {
     if (!node) return null;
 
+    log('getValidPositionForWhitespace: node=', node.nodeType === Node.TEXT_NODE ? 'TEXT' : node.tagName, 'content=', JSON.stringify(node.textContent?.substring(0, 20)));
+
     // Find the editable field container
     // For element nodes, check if the node itself is the container
     let container = node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-editable-field')
@@ -1211,23 +1213,32 @@ export class Bridge {
     while (container && !container.hasAttribute?.('data-editable-field')) {
       container = container.parentNode;
     }
-    if (!container) return null;
+    if (!container) {
+      log('getValidPositionForWhitespace: no container found');
+      return null;
+    }
 
     // Get first and last elements with data-node-id
     const firstNodeIdEl = container.querySelector('[data-node-id]');
     const allNodeIdEls = container.querySelectorAll('[data-node-id]');
     const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
 
-    if (!firstNodeIdEl) return null;
+    if (!firstNodeIdEl) {
+      log('getValidPositionForWhitespace: no firstNodeIdEl found');
+      return null;
+    }
 
     // Determine if whitespace is before first or after last by comparing DOM positions
     const position = node.compareDocumentPosition(firstNodeIdEl);
     const isBeforeFirst = position & Node.DOCUMENT_POSITION_FOLLOWING;
 
+    log('getValidPositionForWhitespace: isBeforeFirst=', isBeforeFirst, 'firstNodeIdEl=', firstNodeIdEl.tagName, 'nodeId=', firstNodeIdEl.getAttribute('data-node-id'));
+
     if (isBeforeFirst) {
       // Whitespace before first block → start of first text node
       const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
       const textNode = walker.nextNode();
+      log('getValidPositionForWhitespace: returning start of first text node:', textNode?.textContent?.substring(0, 20));
       return textNode ? { textNode, offset: 0 } : null;
     } else {
       // Whitespace after last block → end of last text node
@@ -1236,6 +1247,7 @@ export class Bridge {
       while (walker.nextNode()) {
         lastText = walker.currentNode;
       }
+      log('getValidPositionForWhitespace: returning end of last text node:', lastText?.textContent?.substring(0, 20), 'offset:', lastText?.textContent?.length);
       return lastText ? { textNode: lastText, offset: lastText.textContent.length } : null;
     }
   }
@@ -1255,18 +1267,15 @@ export class Bridge {
     const anchorOnWhitespace = this.isOnInvalidWhitespace(range.startContainer);
     const focusOnWhitespace = this.isOnInvalidWhitespace(range.endContainer);
 
-    // Debug: always log this to understand correction behavior
-    console.warn('[HYDRA] correctInvalidWhitespaceSelection:', {
+    if (!anchorOnWhitespace && !focusOnWhitespace) return false;
+
+    // Only log when actually correcting
+    log('correctInvalidWhitespaceSelection: correcting cursor on invalid whitespace', {
       anchorOnWhitespace,
       focusOnWhitespace,
-      anchorNodeType: range.startContainer.nodeType,
       anchorContent: range.startContainer.textContent?.substring(0, 20),
       anchorParent: range.startContainer.parentElement?.tagName,
-      anchorParentHasNodeId: range.startContainer.parentElement?.hasAttribute('data-node-id'),
-      anchorParentHasField: range.startContainer.parentElement?.hasAttribute('data-editable-field'),
     });
-
-    if (!anchorOnWhitespace && !focusOnWhitespace) return false;
 
     // Get corrected positions
     const anchorPos = anchorOnWhitespace
@@ -1304,6 +1313,12 @@ export class Bridge {
   serializeSelection() {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) {
+      // No live DOM selection - use savedSelection if available
+      // This happens when iframe loses focus (e.g., toolbar button click)
+      if (this.savedSelection) {
+        log('serializeSelection: using savedSelection (no live selection)');
+        return this.savedSelection;
+      }
       return null;
     }
 
@@ -1917,33 +1932,13 @@ export class Bridge {
    *
    * @param {HTMLElement} container - The container element to process
    */
-  ensureZeroWidthSpaces(container) {
-    // Find inline elements with data-node-id that might be empty
-    // Inline formatting elements: strong, em, span (for del/u), code, a
-    const inlineElements = container.querySelectorAll(
-      'strong[data-node-id], em[data-node-id], span[data-node-id], code[data-node-id], a[data-node-id]'
-    );
-
-    inlineElements.forEach(el => {
-      // Check if element has no text content and no child nodes
-      if (el.textContent === '' && el.childNodes.length === 0) {
-        // Insert zero-width no-break space for cursor positioning
-        el.appendChild(document.createTextNode('\uFEFF'));
-        log('Added ZWS to empty inline element:', el.tagName, el.getAttribute('data-node-id'));
-      }
-
-      // Also ensure there's a text node AFTER inline elements for cursor exit
-      // When toggling format off, cursor needs a place to go after the inline element
-      const nextSibling = el.nextSibling;
-      if (!nextSibling || (nextSibling.nodeType !== Node.TEXT_NODE)) {
-        // No text node after inline element - add ZWS so cursor can exit
-        const zws = document.createTextNode('\uFEFF');
-        el.parentNode.insertBefore(zws, el.nextSibling);
-        log('Added ZWS after inline element for cursor exit:', el.tagName, el.getAttribute('data-node-id'));
-      }
-    });
-  }
-
+  /**
+   * Find empty inline elements in Slate value that need ZWS for cursor positioning.
+   * Returns array of nodeIds that should have ZWS.
+   *
+   * An inline element is any node with a type AND children (not a text leaf).
+   * We detect empty inlines by checking if children is just [{text: ''}].
+   */
   /**
    * Strip zero-width spaces from text content.
    * ZWS characters are added for cursor positioning in empty elements and should be
@@ -2052,8 +2047,7 @@ export class Bridge {
     // The renderer may have replaced DOM elements, removing contenteditable attributes
     this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
 
-    // Ensure empty inline formatting elements have ZWS for cursor positioning
-    this.ensureZeroWidthSpaces(blockElement);
+    // Note: ZWS for cursor positioning is added just-in-time in restoreSlateSelection
 
     // Determine field type for focused field (supports nested blocks via blockPathMap)
     const blockData = this.getBlockData(this.selectedBlockUid);
@@ -4036,6 +4030,7 @@ export class Bridge {
    * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
    */
   restoreSlateSelection(slateSelection, formData) {
+    log('restoreSlateSelection called with:', JSON.stringify(slateSelection));
     if (!slateSelection || !slateSelection.anchor || !slateSelection.focus) {
       console.warn('[HYDRA] Invalid Slate selection:', slateSelection);
       return;
@@ -4044,6 +4039,7 @@ export class Bridge {
     try {
       // Find the selected block and determine field type
       if (!this.selectedBlockUid || !this.focusedFieldName) {
+        log('restoreSlateSelection: missing selectedBlockUid or focusedFieldName');
         return;
       }
 
@@ -4068,6 +4064,11 @@ export class Bridge {
       const isSlateWithNodeIds = fieldType === 'slate' && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
 
       let anchorElement, focusElement;
+      let anchorPos = null;
+      let focusPos = null;
+
+      let anchorOffset = slateSelection.anchor.offset;
+      let focusOffset = slateSelection.focus.offset;
 
       if (isSlateWithNodeIds) {
         // Find the parent elements by nodeId from path
@@ -4082,9 +4083,84 @@ export class Bridge {
         anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
         focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
+        log('restoreSlateSelection: looking for nodeIds', {
+          anchorNodeId: anchorResult.nodeId,
+          focusNodeId: focusResult.nodeId,
+          anchorElementFound: !!anchorElement,
+          focusElementFound: !!focusElement,
+          anchorElementTag: anchorElement?.tagName,
+          focusElementTag: focusElement?.tagName,
+          anchorElementHTML: anchorElement?.outerHTML?.substring(0, 100),
+        });
+
         if (!anchorElement || !focusElement) {
           console.warn('[HYDRA] Could not find elements by nodeId');
           return;
+        }
+
+        // Helper to create ZWS position for cursor placement
+        const ensureZwsPosition = (result, offset, parentChildren) => {
+          // Case 1: Cursor exit - offset 0 in text after an inline element
+          if (result.textChildIndex !== null && offset === 0 && result.textChildIndex > 0) {
+            const prevChild = parentChildren[result.textChildIndex - 1];
+            if (prevChild && prevChild.type && prevChild.nodeId) {
+              const inlineElement = document.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
+              if (inlineElement) {
+                // Create ZWS text node right after the inline element
+                const zwsNode = document.createTextNode('\uFEFF');
+                inlineElement.parentNode.insertBefore(zwsNode, inlineElement.nextSibling);
+                log('restoreSlateSelection: cursor exit - created ZWS after inline:', prevChild.nodeId);
+                return { node: zwsNode, offset: 1 }; // Position after ZWS
+              }
+            }
+          }
+
+          // Case 2: Prospective formatting - offset 0 inside an empty inline element
+          const targetElement = document.querySelector(`[data-node-id="${result.nodeId}"]`);
+          if (targetElement && offset === 0) {
+            const visibleText = targetElement.textContent.replace(/[\uFEFF\u200B]/g, '');
+            if (visibleText === '') {
+              // Empty inline - add ZWS inside and position after it
+              const zwsNode = document.createTextNode('\uFEFF');
+              targetElement.appendChild(zwsNode);
+              log('restoreSlateSelection: prospective formatting - created ZWS inside empty inline:', result.nodeId);
+              return { node: zwsNode, offset: 1 }; // Position after ZWS
+            }
+          }
+
+          return null; // Not a ZWS case, use normal positioning
+        };
+
+        // Try ZWS positioning first
+        if (anchorResult.parentChildren) {
+          anchorPos = ensureZwsPosition(anchorResult, slateSelection.anchor.offset, anchorResult.parentChildren);
+        }
+        if (focusResult.parentChildren) {
+          focusPos = ensureZwsPosition(focusResult, slateSelection.focus.offset, focusResult.parentChildren);
+        }
+
+        // Fall back to offset calculation for non-ZWS cases
+        if (!anchorPos) {
+          if (anchorResult.textChildIndex !== null && anchorResult.parentChildren) {
+            anchorOffset = this.calculateAbsoluteOffset(
+              anchorResult.parentChildren,
+              anchorResult.textChildIndex,
+              slateSelection.anchor.offset
+            );
+            log('Calculated absolute anchor offset:', anchorOffset, 'from textChildIndex:', anchorResult.textChildIndex);
+          }
+          anchorPos = this.findPositionByVisibleOffset(anchorElement, anchorOffset);
+        }
+        if (!focusPos) {
+          if (focusResult.textChildIndex !== null && focusResult.parentChildren) {
+            focusOffset = this.calculateAbsoluteOffset(
+              focusResult.parentChildren,
+              focusResult.textChildIndex,
+              slateSelection.focus.offset
+            );
+            log('Calculated absolute focus offset:', focusOffset, 'from textChildIndex:', focusResult.textChildIndex);
+          }
+          focusPos = this.findPositionByVisibleOffset(focusElement, focusOffset);
         }
       } else {
         // Simple field - use the editable field directly
@@ -4094,12 +4170,15 @@ export class Bridge {
           return;
         }
         anchorElement = focusElement = editableField;
+        // For simple fields, use findPositionByVisibleOffset
+        anchorPos = this.findPositionByVisibleOffset(anchorElement, anchorOffset);
+        focusPos = this.findPositionByVisibleOffset(focusElement, focusOffset);
       }
 
-      // Use Range + toString().length to find exact DOM positions
-      // This uses the browser's text model which handles empty nodes, whitespace, etc.
-      const anchorPos = this.findPositionByVisibleOffset(anchorElement, slateSelection.anchor.offset);
-      const focusPos = this.findPositionByVisibleOffset(focusElement, slateSelection.focus.offset);
+      log('restoreSlateSelection: findPositionByVisibleOffset returned', {
+        anchorPos: anchorPos ? { nodeText: anchorPos.node?.textContent, offset: anchorPos.offset, parentTag: anchorPos.node?.parentElement?.tagName } : null,
+        focusPos: focusPos ? { nodeText: focusPos.node?.textContent, offset: focusPos.offset, parentTag: focusPos.node?.parentElement?.tagName } : null,
+      });
 
       if (!anchorPos || !focusPos) {
         console.warn('[HYDRA] Could not find positions by visible offset');
@@ -4137,33 +4216,93 @@ export class Bridge {
    * @returns {{node: Node, offset: number}|null} DOM position or null
    */
   findPositionByVisibleOffset(element, targetOffset) {
+    const zwsPattern = /[\uFEFF\u200B]/g;
+
+    // Helper to count visible chars (excluding ZWS)
+    const visibleLength = (text) => text.replace(zwsPattern, '').length;
+
+    log('findPositionByVisibleOffset: element=', element.tagName, 'nodeId=', element.getAttribute('data-node-id'), 'targetOffset=', targetOffset);
+
     // Handle offset 0 - return start of first text node
     if (targetOffset === 0) {
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
-      const firstText = walker.nextNode();
+      let firstText = walker.nextNode();
+      // Skip empty text nodes (Vue/Nuxt renders {{ node.text }} as empty text nodes)
+      while (firstText && firstText.textContent.length === 0) {
+        log('findPositionByVisibleOffset: offset=0, skipping empty text node');
+        firstText = walker.nextNode();
+      }
       if (firstText) {
+        // If this is a ZWS-only text node, position AFTER the ZWS
+        // This helps browsers preserve the cursor inside inline elements when typing
+        if (visibleLength(firstText.textContent) === 0) {
+          log('findPositionByVisibleOffset: offset=0, ZWS-only node, returning end:', firstText.textContent.length);
+          return { node: firstText, offset: firstText.textContent.length };
+        }
+        log('findPositionByVisibleOffset: offset=0, returning start of first text');
         return { node: firstText, offset: 0 };
       }
       return null;
     }
 
-    const range = document.createRange();
-    range.setStart(element, 0);
-
-    // Walk through text nodes, extending range until toString().length matches
+    // Walk through text nodes, counting visible chars (excluding ZWS)
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    let visibleOffset = 0;
     let node;
+    let nodeIndex = 0;
+
     while ((node = walker.nextNode())) {
-      for (let i = 0; i <= node.textContent.length; i++) {
-        range.setEnd(node, i);
-        if (range.toString().length === targetOffset) {
+      const text = node.textContent;
+      const nodeVisibleLen = visibleLength(text);
+      log('findPositionByVisibleOffset: node[' + nodeIndex + ']:', {
+        text: JSON.stringify(text),
+        visibleLen: nodeVisibleLen,
+        visibleOffset,
+        parentTag: node.parentElement?.tagName,
+        parentNodeId: node.parentElement?.getAttribute('data-node-id'),
+      });
+      nodeIndex++;
+
+      // Count visible chars in this node
+      for (let i = 0; i <= text.length; i++) {
+        const visibleCharsUpToI = visibleLength(text.substring(0, i));
+        const totalVisible = visibleOffset + visibleCharsUpToI;
+
+        if (totalVisible === targetOffset) {
+          // If we're at the END of this text node, check if there's a next text node
+          if (i === text.length) {
+            let nextNode = walker.nextNode();
+            // Skip empty text nodes (Vue/Nuxt renders empty text nodes)
+            while (nextNode && nextNode.textContent.length === 0) {
+              log('findPositionByVisibleOffset: at end of node, skipping empty nextNode');
+              nextNode = walker.nextNode();
+            }
+            if (nextNode) {
+              // Prefer start of next text node (for cursor exit from inline elements)
+              // BUT if nextNode is ZWS-only, position AFTER the ZWS (offset = length)
+              // This ensures cursor is clearly inside the ZWS text node, not at boundary
+              const nextVisibleLen = visibleLength(nextNode.textContent);
+              if (nextVisibleLen === 0 && nextNode.textContent.length > 0) {
+                // ZWS-only node - position after the ZWS
+                log('findPositionByVisibleOffset: at end of node, nextNode is ZWS, positioning AFTER ZWS');
+                return { node: nextNode, offset: nextNode.textContent.length };
+              }
+              log('findPositionByVisibleOffset: at end of node, preferring next node');
+              return { node: nextNode, offset: 0 };
+            }
+            walker.currentNode = node;
+          }
+          log('findPositionByVisibleOffset: FOUND at node offset', i);
           return { node, offset: i };
         }
-        // If we've gone past the target, we won't find it
-        if (range.toString().length > targetOffset) {
-          return null;
+
+        if (totalVisible > targetOffset) {
+          // We've passed it - return previous position
+          log('findPositionByVisibleOffset: PASSED target, returning', i - 1);
+          return i > 0 ? { node, offset: i - 1 } : null;
         }
       }
+      visibleOffset += nodeVisibleLen;
     }
 
     // If we exhausted all nodes, return end of last text node
@@ -4174,63 +4313,6 @@ export class Bridge {
     }
     if (lastNode) {
       return { node: lastNode, offset: lastNode.textContent.length };
-    }
-
-    return null;
-  }
-
-  /**
-   * Find the text node and offset within an element given a character offset
-   * Walks through all text nodes in the element to find the right position
-   *
-   * @param {HTMLElement} element - Parent element to search within
-   * @param {number} targetOffset - Character offset from start of element's text content
-   * @returns {{node: Text, offset: number}|null} Text node and offset, or null if not found
-   */
-  findTextNodeAndOffset(element, targetOffset) {
-    let currentOffset = 0;
-
-    // Walk through all child nodes recursively
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
-
-    let textNode = walker.nextNode();
-    while (textNode) {
-      const nodeLength = textNode.textContent.length;
-
-      // Check if the target offset falls within this text node
-      if (currentOffset + nodeLength >= targetOffset) {
-        let offset = targetOffset - currentOffset;
-        // If this is a ZWS-only text node and offset is 0, position AFTER the ZWS
-        // This helps browsers preserve the cursor inside inline elements when typing
-        const zwsPattern = /^[\uFEFF\u200B]+$/;
-        if (offset === 0 && zwsPattern.test(textNode.textContent)) {
-          offset = textNode.textContent.length;
-          log('findTextNodeAndOffset: ZWS node detected, positioning after ZWS, offset:', offset);
-        }
-        return { node: textNode, offset };
-      }
-
-      currentOffset += nodeLength;
-      textNode = walker.nextNode();
-    }
-
-    // If we didn't find it, return the last text node with its max offset
-    // This handles the case where targetOffset is at the very end
-    walker.currentNode = element;
-    let lastTextNode = null;
-    textNode = walker.nextNode();
-    while (textNode) {
-      lastTextNode = textNode;
-      textNode = walker.nextNode();
-    }
-
-    if (lastTextNode) {
-      return { node: lastTextNode, offset: lastTextNode.textContent.length };
     }
 
     return null;
@@ -4590,6 +4672,7 @@ export class Bridge {
       const nodeId = closestNode.getAttribute('data-node-id');
       // Strip ZWS characters before updating - they're only for cursor positioning in DOM
       const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
+      log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
       // Use blockData from getBlockData (already retrieved above) to support nested blocks
       const updatedJson = this.updateJsonNode(
         blockData,
@@ -4657,8 +4740,12 @@ export class Bridge {
       if (flushRequestId) {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
-      // Add current selection at send time (not creation time)
-      this.pendingTextUpdate.selection = this.serializeSelection();
+      // Use savedSelection - it's already cached from selectionchange events
+      // Don't call serializeSelection() here as focus may have moved to toolbar
+      this.pendingTextUpdate.selection = this.savedSelection;
+      log('flushPendingTextUpdates: sending text update with savedSelection:',
+          'anchor:', this.pendingTextUpdate.selection?.anchor,
+          'focus:', this.pendingTextUpdate.selection?.focus);
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
       this.pendingTextUpdate = null;
       return true; // Had pending text

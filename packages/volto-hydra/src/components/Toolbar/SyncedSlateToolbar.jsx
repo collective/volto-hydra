@@ -300,6 +300,69 @@ const SyncedSlateToolbar = ({
     return () => clearInterval(intervalId);
   }, [form, currentSelection, onChangeFormData]);
 
+  // Helper function for applying inline format with prospective formatting support
+  // Used by both hotkey transforms and toolbar button clicks
+  const applyInlineFormat = useCallback((format, requestId) => {
+    if (!editor) return;
+
+    // Store requestId so handleChange includes it in FORM_DATA for iframe unblocking
+    if (requestId) {
+      activeFormatRequestIdRef.current = requestId;
+    }
+
+    const isCollapsed = editor.selection && Range.isCollapsed(editor.selection);
+    const formatIsActive = isBlockActive(editor, format);
+
+    if (isCollapsed) {
+      // Prospective formatting - handle differently for collapsed selections
+      if (formatIsActive) {
+        // Cursor is inside the format element - exit it (move cursor after)
+        const [inlineEntry] = Editor.nodes(editor, {
+          match: n => n.type === format,
+          mode: 'lowest',
+        });
+
+        if (inlineEntry) {
+          const [, inlinePath] = inlineEntry;
+          const afterPoint = Editor.after(editor, inlinePath);
+          if (afterPoint) {
+            Transforms.select(editor, afterPoint);
+            // Selection-only change won't trigger handleChange, so manually send FORM_DATA
+            if (requestId) {
+              onChangeFormData(form, editor.selection, requestId);
+              activeFormatRequestIdRef.current = null;
+            }
+          } else {
+            Transforms.insertNodes(editor, { text: '' }, { at: [...inlinePath.slice(0, -1), inlinePath[inlinePath.length - 1] + 1] });
+            const newAfterPoint = Editor.after(editor, inlinePath);
+            if (newAfterPoint) {
+              Transforms.select(editor, newAfterPoint);
+            }
+          }
+        }
+      } else {
+        // Cursor is NOT inside the format element - enable prospective formatting
+        const inlineNode = { type: format, children: [{ text: '' }] };
+        Transforms.insertNodes(editor, inlineNode);
+
+        const [insertedEntry] = Editor.nodes(editor, {
+          match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '',
+          mode: 'lowest',
+          reverse: true,
+        });
+
+        if (insertedEntry) {
+          const [, insertedPath] = insertedEntry;
+          Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
+        }
+        // handleChange will fire because we changed children
+      }
+    } else {
+      // Range selection - use toggleInlineFormat to wrap/unwrap selected text
+      toggleInlineFormat(editor, format);
+    }
+  }, [editor, form, onChangeFormData]);
+
   // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
   useEffect(() => {
     const block = getBlock(selectedBlock);
@@ -396,33 +459,44 @@ const SyncedSlateToolbar = ({
       const { requestId, button } = pendingFlushRef.current;
       if (requestId === completedFlushRequestId) {
         pendingFlushRef.current = null;
-        // Store requestId so handleChange can include it in FORM_DATA
-        // This allows iframe to match FORM_DATA to the FLUSH_BUFFER that started blocking
-        activeFormatRequestIdRef.current = requestId;
-        button.dataset.bypassCapture = 'true';
-        // Find the actual clickable element - Semantic UI Button renders as <a> tag
-        // The onMouseDown handler is on the <a> tag, not the wrapper
-        const clickableElement = button.querySelector('a.ui.button') || button.querySelector('button') || button;
-        // Dispatch mousedown event since Slate buttons apply formatting on mousedown
-        // We need bubbles: true for React's event delegation to work
-        // Mark the event so AddLinkForm's handleClickOutside can ignore it
-        const mousedownEvent = new MouseEvent('mousedown', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-        });
-        mousedownEvent._hydraReDispatch = true;
-        // Store on window so handleClickOutside can check it
-        window._hydraReDispatchEvent = mousedownEvent;
-        clickableElement.dispatchEvent(mousedownEvent);
-        // Clean up after a tick
-        setTimeout(() => {
-          window._hydraReDispatchEvent = null;
-        }, 0);
-        delete button.dataset.bypassCapture;
+
+        // Get button name and check if it's a MarkElementButton (inline format)
+        const buttonName = button.dataset.toolbarButton;
+        const buttonToFormat = {
+          bold: 'strong',
+          italic: 'em',
+          underline: 'u',
+          strikethrough: 'del',
+          sub: 'sub',
+          sup: 'sup',
+          code: 'code',
+        };
+        const format = buttonToFormat[buttonName];
+
+        if (format) {
+          // MarkElementButton - use shared prospective formatting logic
+          applyInlineFormat(format, requestId);
+        } else {
+          // Non-MarkElementButton (BlockButton, etc.) - dispatch to volto-slate button
+          activeFormatRequestIdRef.current = requestId;
+          button.dataset.bypassCapture = 'true';
+          const clickableElement = button.querySelector('a.ui.button') || button.querySelector('button') || button;
+          const mousedownEvent = new MouseEvent('mousedown', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+          });
+          mousedownEvent._hydraReDispatch = true;
+          window._hydraReDispatchEvent = mousedownEvent;
+          clickableElement.dispatchEvent(mousedownEvent);
+          setTimeout(() => {
+            window._hydraReDispatchEvent = null;
+          }, 0);
+          delete button.dataset.bypassCapture;
+        }
       }
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey, getBlock]);
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey, getBlock, applyInlineFormat]);
 
   // Handle transformAction from iframe (format, paste, delete)
   // These arrive atomically with form data, so editor already has the latest text
@@ -437,82 +511,10 @@ const SyncedSlateToolbar = ({
     }
     processedTransformRequestIdRef.current = requestId;
 
-
-    // Store requestId so handleChange includes it in FORM_DATA for iframe unblocking
-    if (requestId) {
-      activeFormatRequestIdRef.current = requestId;
-    }
-
-    // Selection is already synced from iframeSyncState via the earlier useEffect
-
     try {
       switch (type) {
         case 'format':
-          const format = transformAction.format;
-
-          // Check if selection is collapsed (cursor, no range)
-          const isCollapsed = editor.selection && Range.isCollapsed(editor.selection);
-          const formatIsActive = isBlockActive(editor, format);
-
-          if (isCollapsed) {
-            // Prospective formatting - handle differently for collapsed selections
-            if (formatIsActive) {
-              // Cursor is inside the format element - exit it (move cursor after)
-              // Find the inline element we're in and move cursor after it
-              const [inlineEntry] = Editor.nodes(editor, {
-                match: n => n.type === format,
-                mode: 'lowest',
-              });
-
-              if (inlineEntry) {
-                const [, inlinePath] = inlineEntry;
-                // Move cursor to after the inline element
-                const afterPoint = Editor.after(editor, inlinePath);
-                if (afterPoint) {
-                  Transforms.select(editor, afterPoint);
-                  // Selection-only change won't trigger handleChange, so manually send FORM_DATA to unblock
-                  if (requestId) {
-                    onChangeFormData(form, editor.selection, requestId);
-                    activeFormatRequestIdRef.current = null;
-                  }
-                } else {
-                  // No point after - insert empty text node after and position there
-                  Transforms.insertNodes(editor, { text: '' }, { at: [...inlinePath.slice(0, -1), inlinePath[inlinePath.length - 1] + 1] });
-                  const newAfterPoint = Editor.after(editor, inlinePath);
-                  if (newAfterPoint) {
-                    Transforms.select(editor, newAfterPoint);
-                  }
-                }
-              }
-            } else {
-              // Cursor is NOT inside the format element - enable prospective formatting
-              // Insert an empty inline element and position cursor inside it
-              const inlineNode = { type: format, children: [{ text: '' }] };
-              Transforms.insertNodes(editor, inlineNode);
-
-              // Move cursor inside the newly inserted inline element
-              // After insertion, cursor should be after the inserted node
-              // We need to move it inside the empty text child
-              const [insertedEntry] = Editor.nodes(editor, {
-                match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '',
-                mode: 'lowest',
-                reverse: true, // Start from cursor position going backwards
-              });
-
-              if (insertedEntry) {
-                const [, insertedPath] = insertedEntry;
-                // Position cursor at the start of the empty text inside the inline element
-                Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
-              }
-
-              // DON'T call onChangeFormData here - handleChange will fire because we changed children
-              // handleChange will pick up activeFormatRequestIdRef.current and include it
-              // (Unlike selection-only changes where we must call explicitly)
-            }
-          } else {
-            // Range selection - use toggleInlineFormat to wrap/unwrap selected text
-            toggleInlineFormat(editor, format);
-          }
+          applyInlineFormat(transformAction.format, requestId);
           break;
 
         case 'paste':
@@ -551,7 +553,7 @@ const SyncedSlateToolbar = ({
 
     // Clear the transform action
     onTransformApplied?.();
-  }, [transformAction, editor, onTransformApplied, form, onChangeFormData]);
+  }, [transformAction, editor, onTransformApplied, form, onChangeFormData, applyInlineFormat]);
 
   // Set editor.hydra with iframe positioning data for persistent helpers
   // NOTE: editor is stable (created once), so we don't include it in dependencies
