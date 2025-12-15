@@ -435,6 +435,8 @@ test.describe('Quanta Toolbar - Format Dropdown', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
+    const iframe = helper.getIframe();
+
     // Click on Slate block and place cursor inside
     await helper.clickBlockInIframe('block-1-uuid');
     const editableField = await helper.getEditorLocator('block-1-uuid');

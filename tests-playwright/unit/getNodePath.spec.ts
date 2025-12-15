@@ -901,6 +901,167 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(result.offsetAfterCorrection).toBe(0); // Start of first text node
   });
 
+  test('range selection on whitespace nodes preserves selection span', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Create DOM with whitespace before and after content (Vue template artifacts)
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-range-whitespace" data-editable-field="value">\n' +
+        '  <p data-node-id="0">Grid Cell 2</p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-range-whitespace')!;
+      const p = container.querySelector('p')!;
+      const whitespaceNodeBefore = container.firstChild as Text;
+      const whitespaceNodeAfter = container.lastChild as Text;
+      const bridge = (window as any).bridge;
+
+      // Both should be invalid whitespace
+      const beforeIsInvalid = bridge.isOnInvalidWhitespace(whitespaceNodeBefore);
+      const afterIsInvalid = bridge.isOnInvalidWhitespace(whitespaceNodeAfter);
+
+      // Set a RANGE selection from whitespace before to whitespace after
+      // This simulates "select all" when Vue has whitespace artifacts
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(whitespaceNodeBefore, 0);
+      range.setEnd(whitespaceNodeAfter, whitespaceNodeAfter.length);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const selectionBeforeCorrection = selection.toString();
+
+      // Correct the selection
+      bridge.correctInvalidWhitespaceSelection();
+
+      // After correction, selection should span the actual content
+      const selectionAfterCorrection = selection.toString();
+      const anchorNode = selection.anchorNode;
+      const focusNode = selection.focusNode;
+      const anchorOffset = selection.anchorOffset;
+      const focusOffset = selection.focusOffset;
+
+      container.remove();
+
+      return {
+        beforeIsInvalid,
+        afterIsInvalid,
+        selectionBeforeCorrection,
+        selectionAfterCorrection,
+        anchorInP: p.contains(anchorNode),
+        focusInP: p.contains(focusNode),
+        anchorOffset,
+        focusOffset,
+        expectedText: 'Grid Cell 2',
+      };
+    });
+
+    expect(result.beforeIsInvalid).toBe(true);
+    expect(result.afterIsInvalid).toBe(true);
+    // After correction, selection should contain the text content
+    expect(result.selectionAfterCorrection).toBe(result.expectedText);
+    // Anchor should be at start (offset 0), focus at end (offset 11)
+    expect(result.anchorInP).toBe(true);
+    expect(result.focusInP).toBe(true);
+    expect(result.anchorOffset).toBe(0);
+    expect(result.focusOffset).toBe(11); // "Grid Cell 2".length
+  });
+
+  test('element-based selection on editable field is not invalid whitespace', async () => {
+    // When browser's selectText() is used, it sets selection on the ELEMENT, not text nodes
+    // This is a valid "select all" selection and should NOT be flagged as invalid whitespace
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.id = 'test-element-selection';
+      container.setAttribute('data-editable-field', 'value');
+      container.innerHTML = '<p data-node-id="0">Grid Cell 2</p>';
+      document.body.appendChild(container);
+
+      const bridge = (window as any).bridge;
+
+      // Check if the editable field ELEMENT is flagged as invalid whitespace
+      // It should NOT be - element-based selections are valid
+      const elementIsInvalid = bridge.isOnInvalidWhitespace(container);
+
+      // Also check that a valid text node inside is not flagged
+      const textNode = container.querySelector('p')?.firstChild;
+      const textIsInvalid = bridge.isOnInvalidWhitespace(textNode);
+
+      container.remove();
+
+      return {
+        elementIsInvalid,
+        textIsInvalid,
+      };
+    });
+
+    // Element-based selections should NOT be flagged as invalid
+    expect(result.elementIsInvalid).toBe(false);
+    // Text inside a data-node-id element is valid
+    expect(result.textIsInvalid).toBe(false);
+  });
+
+  test('serializePoint handles element-based selection with Vue empty text nodes', async () => {
+    // When selectText() is used, the selection may resolve to empty Vue text nodes
+    // serializePoint should find the valid text nodes inside data-node-id elements
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Create DOM like Nuxt renders with Vue template whitespace artifacts
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-serialize-element" data-editable-field="value">\n' +
+        '  <p data-node-id="0">Grid Cell 2</p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-serialize-element')!;
+      const bridge = (window as any).bridge;
+
+      // Set element-based selection like selectText() does
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(container, 0); // Before first child (whitespace text node)
+      range.setEnd(container, container.childNodes.length); // After last child
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Try to serialize - should find valid text nodes inside P
+      const serialized = bridge.serializeSelection();
+
+      container.remove();
+
+      return {
+        serialized,
+        hasAnchor: serialized?.anchor != null,
+        hasFocus: serialized?.focus != null,
+        anchorPath: serialized?.anchor?.path,
+        focusPath: serialized?.focus?.path,
+        anchorOffset: serialized?.anchor?.offset,
+        focusOffset: serialized?.focus?.offset,
+      };
+    });
+
+    // Serialization should succeed (not return null)
+    expect(result.serialized).not.toBeNull();
+    expect(result.hasAnchor).toBe(true);
+    expect(result.hasFocus).toBe(true);
+    // Path should be [0, 0] - first paragraph, first text child
+    expect(result.anchorPath).toEqual([0, 0]);
+    expect(result.focusPath).toEqual([0, 0]);
+    // Anchor at start (offset 0), focus at end (offset 11 = "Grid Cell 2".length)
+    expect(result.anchorOffset).toBe(0);
+    expect(result.focusOffset).toBe(11);
+  });
+
   test('text BEFORE bold + bold + text AFTER with Vue whitespace', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');

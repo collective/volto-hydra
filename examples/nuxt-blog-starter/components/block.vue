@@ -16,12 +16,20 @@
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+    <a v-if="block.href" :href="block.href" class="image-link">
+      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+    </a>
+    <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
       :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
-      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+      <a v-if="block.href" :href="block.href" class="image-link">
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+          :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+      </a>
+      <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       <figcaption>
         <h2>{{ block.title }}</h2>

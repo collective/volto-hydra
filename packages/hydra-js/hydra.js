@@ -1157,23 +1157,13 @@ export class Bridge {
   isOnInvalidWhitespace(node) {
     if (!node) return false;
 
-    // Handle both text nodes and element nodes (cursor can be on either)
-    // For element nodes, check if the element itself is in an invalid position
-    let startNode = node;
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      // If cursor is on an element with data-node-id, it's valid
-      if (node.hasAttribute?.('data-node-id')) {
-        return false;
-      }
-      // If cursor is on the editable field container itself, it's invalid
-      if (node.hasAttribute?.('data-editable-field')) {
-        return true;
-      }
-      startNode = node;
-    } else if (node.nodeType !== Node.TEXT_NODE) {
-      // Other node types (comments, etc.) - not our concern
+    // Only TEXT nodes can be "invalid whitespace" (Vue template artifacts like "\n  ")
+    // Element-based selections are valid (e.g., browser's selectText() uses container element)
+    if (node.nodeType !== Node.TEXT_NODE) {
       return false;
     }
+
+    let startNode = node;
 
     // Walk up to find if there's a data-node-id ancestor before hitting data-editable-field
     let current = startNode.nodeType === Node.TEXT_NODE ? startNode.parentNode : startNode.parentNode;
@@ -1198,12 +1188,13 @@ export class Bridge {
    * Whitespace can only be before first block or after last block.
    *
    * @param {Node} node - The text node that's on invalid whitespace
+   * @param {boolean} isRangeEnd - If true, this is the end of a range selection (return end position)
    * @returns {{textNode: Node, offset: number}|null} Target position, or null if not found
    */
-  getValidPositionForWhitespace(node) {
+  getValidPositionForWhitespace(node, isRangeEnd = false) {
     if (!node) return null;
 
-    log('getValidPositionForWhitespace: node=', node.nodeType === Node.TEXT_NODE ? 'TEXT' : node.tagName, 'content=', JSON.stringify(node.textContent?.substring(0, 20)));
+    log('getValidPositionForWhitespace: node=', node.nodeType === Node.TEXT_NODE ? 'TEXT' : node.tagName, 'content=', JSON.stringify(node.textContent?.substring(0, 20)), 'isRangeEnd=', isRangeEnd);
 
     // Find the editable field container
     // For element nodes, check if the node itself is the container
@@ -1228,20 +1219,25 @@ export class Bridge {
       return null;
     }
 
-    // Determine if whitespace is before first or after last by comparing DOM positions
-    const position = node.compareDocumentPosition(firstNodeIdEl);
-    const isBeforeFirst = position & Node.DOCUMENT_POSITION_FOLLOWING;
+    // If isRangeEnd is specified, use that to determine position (for serializing range selections)
+    // Otherwise, determine based on DOM position of the whitespace
+    let returnEndPosition = isRangeEnd;
+    if (!isRangeEnd) {
+      // Determine if whitespace is before first or after last by comparing DOM positions
+      const position = node.compareDocumentPosition(firstNodeIdEl);
+      const isBeforeFirst = position & Node.DOCUMENT_POSITION_FOLLOWING;
+      returnEndPosition = !isBeforeFirst; // After content = return end position
+      log('getValidPositionForWhitespace: isBeforeFirst=', isBeforeFirst, 'firstNodeIdEl=', firstNodeIdEl.tagName, 'nodeId=', firstNodeIdEl.getAttribute('data-node-id'));
+    }
 
-    log('getValidPositionForWhitespace: isBeforeFirst=', isBeforeFirst, 'firstNodeIdEl=', firstNodeIdEl.tagName, 'nodeId=', firstNodeIdEl.getAttribute('data-node-id'));
-
-    if (isBeforeFirst) {
-      // Whitespace before first block → start of first text node
+    if (!returnEndPosition) {
+      // Start position → start of first text node
       const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
       const textNode = walker.nextNode();
       log('getValidPositionForWhitespace: returning start of first text node:', textNode?.textContent?.substring(0, 20));
       return textNode ? { textNode, offset: 0 } : null;
     } else {
-      // Whitespace after last block → end of last text node
+      // End position → end of last text node
       const walker = document.createTreeWalker(lastNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
       let lastText = null;
       while (walker.nextNode()) {
@@ -1510,10 +1506,22 @@ export class Bridge {
     }
 
     // Walk up to find the path through the Slate structure
-    const path = this.getNodePath(textNode);
+    let path = this.getNodePath(textNode);
     if (!path) {
-      console.warn('[HYDRA] serializePoint: getNodePath returned null for textNode:', textNode);
-      return null;
+      // Text node might be a Vue template artifact (whitespace text node outside data-node-id)
+      // Use getValidPositionForWhitespace to find the first/last valid text node
+      // isRangeEnd=true for end position (offset > 0), false for start (offset === 0)
+      const isEndPosition = offset > 0;
+      const validPos = this.getValidPositionForWhitespace(textNode, isEndPosition);
+      if (validPos) {
+        textNode = validPos.textNode;
+        textOffset = validPos.offset;
+        path = this.getNodePath(textNode);
+      }
+      if (!path) {
+        console.warn('[HYDRA] serializePoint: getNodePath returned null for textNode:', textNode);
+        return null;
+      }
     }
 
     // Calculate offset using range.toString() for proper whitespace normalization
