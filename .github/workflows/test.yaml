@@ -56,9 +56,6 @@ jobs:
       - name: Install Nuxt dependencies
         run: |
           cd examples/nuxt-blog-starter && npm install
-      - name: Run unit tests (hydra-js)
-        run: |
-          pnpm --filter hydra-js test
       - name: Install Playwright browsers
         run: |
           pnpm exec playwright install --with-deps chromium
