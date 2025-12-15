@@ -290,4 +290,121 @@ test.describe('Bridge.updateJsonNode()', () => {
     // No element has 'text' property
     expect(() => validateSlateStructure(result.value)).not.toThrow();
   });
+
+  test('updates specific child by index in paragraph with inline elements', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Simulate typing " normal" after a strong element
+    // DOM: [TEXT "Hello "][STRONG [TEXT "bold"]][TEXT " normal"]
+    // Slate: [{text: "Hello "}, {type: strong, children: [{text: "bold"}]}, {text: ""}]
+    const result = await body.evaluate(() => {
+      const input = {
+        '@type': 'slate',
+        value: [
+          {
+            type: 'p',
+            nodeId: '0',
+            children: [
+              { text: 'Hello ' },
+              {
+                type: 'strong',
+                nodeId: '0.1',
+                children: [{ text: 'bold' }],
+              },
+              { text: '' },
+            ],
+          },
+        ],
+      };
+      // Update child at index 2 (the text node after the strong)
+      return (window as any).bridge.updateJsonNode(
+        JSON.parse(JSON.stringify(input)),
+        '0',
+        ' normal',
+        2 // childIndex
+      );
+    });
+
+    // First text node should be UNCHANGED
+    expect(result.value[0].children[0].text).toBe('Hello ');
+    // Strong element should be preserved with its text
+    expect(result.value[0].children[1].type).toBe('strong');
+    expect(result.value[0].children[1].children[0].text).toBe('bold');
+    // Third text node (index 2) should have the new text
+    expect(result.value[0].children[2].text).toBe(' normal');
+    // Structure should still be valid
+    expect(() => validateSlateStructure(result.value)).not.toThrow();
+  });
+
+  test('updates specific child by index when inline element is at index 0', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Paragraph starting with bold: [STRONG "Bold"][TEXT " after"]
+    const result = await body.evaluate(() => {
+      const input = {
+        '@type': 'slate',
+        value: [
+          {
+            type: 'p',
+            nodeId: '0',
+            children: [
+              {
+                type: 'strong',
+                nodeId: '0.0',
+                children: [{ text: 'Bold' }],
+              },
+              { text: ' after' },
+            ],
+          },
+        ],
+      };
+      // Update child at index 1 (text after strong)
+      return (window as any).bridge.updateJsonNode(
+        JSON.parse(JSON.stringify(input)),
+        '0',
+        ' after typing',
+        1 // childIndex
+      );
+    });
+
+    // Strong element should be unchanged
+    expect(result.value[0].children[0].type).toBe('strong');
+    expect(result.value[0].children[0].children[0].text).toBe('Bold');
+    // Second child should have updated text
+    expect(result.value[0].children[1].text).toBe(' after typing');
+    // Structure should still be valid
+    expect(() => validateSlateStructure(result.value)).not.toThrow();
+  });
+
+  test('childIndex null falls back to updating first child', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Without childIndex, should use original behavior (update children[0])
+    const result = await body.evaluate(() => {
+      const input = {
+        '@type': 'slate',
+        value: [
+          {
+            type: 'p',
+            nodeId: '0',
+            children: [{ text: 'Hello' }],
+          },
+        ],
+      };
+      // No childIndex - fallback behavior
+      return (window as any).bridge.updateJsonNode(
+        JSON.parse(JSON.stringify(input)),
+        '0',
+        'Updated',
+        null
+      );
+    });
+
+    // First child should be updated (fallback behavior)
+    expect(result.value[0].children[0].text).toBe('Updated');
+    expect(() => validateSlateStructure(result.value)).not.toThrow();
+  });
 });

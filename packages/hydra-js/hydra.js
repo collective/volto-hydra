@@ -1114,7 +1114,7 @@ export class Bridge {
         // but our MutationObserver only watches for characterData mutations
         const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
         if (editableField && this.isInlineEditing) {
-          this.handleTextChange(editableField, textNode.parentElement);
+          this.handleTextChange(editableField, textNode.parentElement, textNode);
         }
       }
     }
@@ -3615,13 +3615,15 @@ export class Bridge {
       mutations.forEach((mutation) => {
         if (mutation.type === 'characterData' && this.isInlineEditing) {
           // Find the editable field element (works for both Slate and non-Slate fields)
+          const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
           const targetElement = parentEl?.closest('[data-editable-field]');
 
           if (targetElement) {
             // Pass parentEl so handleTextChange can find the actual node that changed
             // (e.g., SPAN for inline formatting) rather than the whole editable field (P)
-            this.handleTextChange(targetElement, parentEl);
+            // Also pass the mutated text node so we can identify which child to update
+            this.handleTextChange(targetElement, parentEl, mutatedTextNode);
           } else {
             console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
@@ -4630,8 +4632,9 @@ export class Bridge {
    * Handle the text changed in the block element with attr data-editable-field,
    * by getting changed text from DOM and send it to the adminUI
    * @param {HTMLElement} target
+   * @param {Node} mutatedTextNode - The actual text node that was modified (optional)
    */
-  handleTextChange(target, mutatedNodeParent = null) {
+  handleTextChange(target, mutatedNodeParent = null, mutatedTextNode = null) {
     const blockUid = target
       .closest('[data-block-uid]')
       .getAttribute('data-block-uid');
@@ -4674,14 +4677,38 @@ export class Bridge {
       }
 
       const nodeId = closestNode.getAttribute('data-node-id');
-      // Strip ZWS characters before updating - they're only for cursor positioning in DOM
-      const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
-      log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
+
+      // Check if we're typing in a paragraph that has inline elements
+      // In this case, we need to update the specific text node, not the whole paragraph
+      let textContent;
+      let childIndex = null;
+
+      if (mutatedTextNode && closestNode === mutatedNodeParent &&
+          closestNode.hasAttribute('data-editable-field')) {
+        // Text node is direct child of paragraph (plain text after/before inline elements)
+        // Find which child index this text node is at
+        const childNodes = Array.from(closestNode.childNodes);
+        childIndex = childNodes.indexOf(mutatedTextNode);
+        if (childIndex >= 0) {
+          // Update only this specific text node's content
+          textContent = this.stripZeroWidthSpaces(mutatedTextNode.textContent);
+          log('handleTextChange: nodeId=', nodeId, 'childIndex=', childIndex, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
+        }
+      }
+
+      if (childIndex === null) {
+        // Fallback: update using innerText of the whole node (original behavior)
+        // This handles inline elements (STRONG, EM, etc.) which have their own nodeId
+        textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
+        log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
+      }
+
       // Use blockData from getBlockData (already retrieved above) to support nested blocks
       const updatedJson = this.updateJsonNode(
         blockData,
         nodeId,
         textContent,
+        childIndex,
       );
 
       const currBlock = document.querySelector(
@@ -4777,24 +4804,35 @@ export class Bridge {
    * @param {JSON} json Block's data
    * @param {BigInteger} nodeId Node ID of the element
    * @param {String} newText Updated text
+   * @param {Number} childIndex Optional index of child to update (for paragraphs with inline elements)
    * @returns {JSON} Updated JSON object
    */
-  updateJsonNode(json, nodeId, newText) {
+  updateJsonNode(json, nodeId, newText, childIndex = null) {
     if (Array.isArray(json)) {
-      return json.map((item) => this.updateJsonNode(item, nodeId, newText));
+      return json.map((item) => this.updateJsonNode(item, nodeId, newText, childIndex));
     } else if (typeof json === 'object' && json !== null) {
       // Compare nodeIds as strings (path-based IDs like "0", "0.0", etc.)
       if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
         if (json.hasOwnProperty('text')) {
           json.text = newText;
+        } else if (childIndex !== null && json.children && json.children[childIndex]) {
+          // Update specific child by index (for typing in paragraphs with inline elements)
+          const child = json.children[childIndex];
+          if (child.hasOwnProperty('text')) {
+            child.text = newText;
+          } else if (child.children && child.children[0]) {
+            // Child is an inline element, update its first text child
+            child.children[0].text = newText;
+          }
         } else {
+          // Fallback: update first child (original behavior)
           json.children[0].text = newText;
         }
         return json;
       }
       for (const key in json) {
         if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-          json[key] = this.updateJsonNode(json[key], nodeId, newText);
+          json[key] = this.updateJsonNode(json[key], nodeId, newText, childIndex);
         }
       }
     }
