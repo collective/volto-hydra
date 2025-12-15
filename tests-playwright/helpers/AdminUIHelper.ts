@@ -207,6 +207,50 @@ export class AdminUIHelper {
         parseHTML(html, fragment);
         return fragment;
       };
+
+      // Vue-style DOM helper: splits text nodes at whitespace boundaries and converts
+      // whitespace-only segments to empty text nodes, matching Vue's template interpolation behavior
+      // Vue creates: [empty ""][content][empty ""] from "<p>\n{{ text }}\n</p>"
+      (window as any).vueStyleDOM = function(html: string): DocumentFragment {
+        const fragment = (window as any).preserveWhitespaceDOM(html);
+
+        // Walk all text nodes and split at whitespace/content boundaries
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+        const nodesToProcess: Text[] = [];
+        let node;
+        while ((node = walker.nextNode())) {
+          nodesToProcess.push(node as Text);
+        }
+
+        nodesToProcess.forEach(textNode => {
+          const text = textNode.textContent || '';
+          // Match pattern: (leading whitespace)(content)(trailing whitespace)
+          const match = text.match(/^(\s*)(.*?)(\s*)$/s);
+          if (match) {
+            const [, leading, content, trailing] = match;
+            // Only split if there's actual content with surrounding whitespace
+            if (content && (leading || trailing)) {
+              const parent = textNode.parentNode;
+              if (parent) {
+                // Create replacement nodes: empty for whitespace, content as-is
+                if (leading) {
+                  parent.insertBefore(document.createTextNode(''), textNode);
+                }
+                parent.insertBefore(document.createTextNode(content), textNode);
+                if (trailing) {
+                  parent.insertBefore(document.createTextNode(''), textNode);
+                }
+                parent.removeChild(textNode);
+              }
+            } else if (!content && text) {
+              // Whitespace-only node -> convert to empty
+              textNode.textContent = '';
+            }
+          }
+        });
+
+        return fragment;
+      };
     });
   }
 

@@ -504,6 +504,58 @@ test.describe('Inline Editing - Formatting', () => {
     expect(cleanBoldContent).toBe('world');
   });
 
+  test('prospective formatting: toggle on then off without typing preserves cursor position', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello world/);
+
+    // Ensure cursor is at end and get position
+    await helper.moveCursorToEnd(editor);
+    const selectionBefore = await helper.getSelectionInfo(editor);
+    console.log('[TEST] Selection before toggle:', JSON.stringify(selectionBefore));
+    expect(selectionBefore.isCollapsed).toBe(true);
+
+    // Toggle bold ON (Ctrl+B) - creates empty bold element with ZWS
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Toggle bold OFF (Ctrl+B again) without typing anything
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    // Verify cursor position after toggle off
+    const selectionAfter = await helper.getSelectionInfo(editor);
+    console.log('[TEST] Selection after toggle off:', JSON.stringify(selectionAfter));
+
+    // Cursor should still be collapsed and editor should have focus
+    expect(selectionAfter.isCollapsed).toBe(true);
+    expect(selectionAfter.editorHasFocus).toBe(true);
+
+    // The visible offset should be the same (at end of "Hello world" = 11)
+    // Note: actual DOM offset may differ due to ZWS, but visible text position should be same
+    const textContent = await helper.getCleanTextContent(editor);
+    expect(textContent).toBe('Hello world');
+
+    // Verify cursor is at the end by checking offset equals text length
+    // (accounting for possible ZWS characters)
+    expect(selectionAfter.anchorOffset).toBeGreaterThanOrEqual(textContent.length);
+  });
+
   test('prospective formatting: clipboard strips ZWS from bold text', async ({
     page,
     context,

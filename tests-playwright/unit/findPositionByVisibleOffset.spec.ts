@@ -14,6 +14,8 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     await page.goto('http://localhost:8888/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+    // Inject helper for creating DOM with preserved whitespace (Vue/Nuxt template artifacts)
+    await helper.injectPreserveWhitespaceHelper();
   });
 
   test('finds position at offset 0', async () => {
@@ -441,5 +443,62 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     expect(result.offset).toBe(1);
     // Parent should be P (paragraph), not SPAN
     expect(result.parentTagName).toBe('P');
+  });
+
+  test('returns null when element contains only empty text nodes', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const fragment = (window as any).vueStyleDOM(
+        '<p id="test-all-empty" data-node-id="0">\n\n\n</p>'
+      );
+      document.body.appendChild(fragment);
+
+      const p = document.getElementById('test-all-empty')!;
+
+      // All text nodes are empty, so any offset should return null
+      const result = (window as any).bridge.findPositionByVisibleOffset(p, 0);
+
+      p.remove();
+
+      return result;
+    });
+
+    expect(result).toBeNull();
+  });
+
+  test('offset beyond text length with Vue empty text nodes returns end of last non-empty node', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Vue/Nuxt creates empty text nodes ("") from template interpolation boundaries
+    // Structure after vueStyleDOM: [empty ""][Hello world][empty ""]
+    const result = await body.evaluate(() => {
+      const fragment = (window as any).vueStyleDOM(
+        '<p id="test-trailing-empty" data-node-id="0">\n' +
+        'Hello world\n' +
+        '</p>'
+      );
+      document.body.appendChild(fragment);
+
+      const p = document.getElementById('test-trailing-empty')!;
+
+      // Request offset 12, but "Hello world" is only 11 chars
+      // Should return end of "Hello world", NOT offset 0 in trailing empty node
+      const result = (window as any).bridge.findPositionByVisibleOffset(p, 12);
+
+      p.remove();
+
+      return {
+        text: result?.node?.textContent,
+        offset: result?.offset,
+        textLength: result?.node?.textContent?.length,
+      };
+    });
+
+    // Should be at end of "Hello world" (offset 11), not in an empty text node
+    expect(result.text).toBe('Hello world');
+    expect(result.offset).toBe(11);
   });
 });
