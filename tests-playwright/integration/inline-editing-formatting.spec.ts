@@ -556,6 +556,62 @@ test.describe('Inline Editing - Formatting', () => {
     expect(selectionAfter.anchorOffset).toBeGreaterThanOrEqual(textContent.length);
   });
 
+  test('prospective formatting: toggle on, type, off, type, on again does not double text', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Step 1: Toggle bold ON (prospective formatting)
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Step 2: Type bold text
+    await editor.pressSequentially('bold', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold/);
+
+    // Step 3: Toggle bold OFF (cursor exit)
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    // Step 4: Type non-bold text
+    await editor.pressSequentially(' normal', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold normal/);
+
+    // Verify text so far
+    let textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Text after first cycle:', textContent);
+    expect(textContent).toBe('Hello bold normal');
+
+    // Step 5: Toggle bold ON again (second prospective formatting)
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Step 6: Type more bold text
+    await editor.pressSequentially(' more', { delay: 10 });
+
+    // Verify final text - should NOT have doubled
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Text after second prospective formatting:', textContent);
+    expect(textContent).toBe('Hello bold normal more');
+  });
+
   test('prospective formatting: clipboard strips ZWS from bold text', async ({
     page,
     context,

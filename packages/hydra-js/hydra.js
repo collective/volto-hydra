@@ -126,8 +126,6 @@ export class Bridge {
     this.scrollTimeout = null; // Timer for scroll debouncing
     this.isProcessingExternalUpdate = false; // Flag to suppress messages during FORM_DATA processing
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
-    this.selectionRestoreObserver = null; // MutationObserver for waiting until DOM settles before restoring selection
-    this.selectionRestoreTimeout = null; // Debounce timer for selection restore
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
     this.init(options); // Initialize the bridge
@@ -661,12 +659,12 @@ export class Bridge {
                 // Only restore selection for toolbar format operations (has transformedSelection)
                 // NOT for sidebar edits - those should not steal focus from sidebar
                 if (event.data.transformedSelection) {
+                  // Store expected selection so selectionchange handler can suppress it
+                  this.expectedSelectionFromAdmin = event.data.transformedSelection;
                   // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
                   // the selection we're about to restore from transformedSelection
                   this.savedClickPosition = null;
-                  // Use MutationObserver-based restore to wait for Vue/React to finish rendering
-                  // Observes document level so it survives element replacement during re-renders
-                  this.restoreSelectionWhenDomSettles(event.data.transformedSelection, this.formData);
+                  this.restoreSlateSelection(event.data.transformedSelection, this.formData);
                 }
                 // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
                 // Clear the processing flag BEFORE replay so handleTextChange can process buffered text
@@ -2360,28 +2358,11 @@ export class Bridge {
             if (matches) {
               // Same selection as Admin sent - this is the restore, suppress it
               log('Selection matches Admin restore - not sending back');
-              // Clean up - selection restore complete
-              this.expectedSelectionFromAdmin = null;
-              if (this.selectionRestoreObserver) {
-                this.selectionRestoreObserver.disconnect();
-                this.selectionRestoreObserver = null;
-              }
-              if (this.selectionRestoreTimeout) {
-                clearTimeout(this.selectionRestoreTimeout);
-                this.selectionRestoreTimeout = null;
-              }
               return;
             } else {
-              // Different selection - if MutationObserver is still active, it will handle the retry
-              // Otherwise this is a user action
-              if (this.selectionRestoreObserver) {
-                log('Selection differs from Admin restore - MutationObserver will retry');
-                return; // Don't send SELECTION_CHANGE, observer will restore after DOM settles
-              } else {
-                // Observer already disconnected - this is user action
-                log('Selection differs from Admin restore - user action');
-                this.expectedSelectionFromAdmin = null;
-              }
+              // Different selection - user moved cursor/selected text, clear expected
+              log('Selection differs from Admin restore - user action');
+              this.expectedSelectionFromAdmin = null;
             }
           }
 
@@ -4223,79 +4204,6 @@ export class Bridge {
     } catch (e) {
       console.error('[HYDRA] Error restoring Slate selection:', e);
     }
-  }
-
-  /**
-   * Restore selection after waiting for DOM to settle.
-   * Uses MutationObserver on document to detect when framework (Vue/React) finishes rendering.
-   * Observes document level so it survives element replacement during re-renders.
-   *
-   * @param {Object} slateSelection - The Slate selection to restore
-   * @param {Object} formData - Current form data
-   */
-  restoreSelectionWhenDomSettles(slateSelection, formData) {
-    // Clean up any previous observer/timeout
-    if (this.selectionRestoreObserver) {
-      this.selectionRestoreObserver.disconnect();
-      this.selectionRestoreObserver = null;
-    }
-    if (this.selectionRestoreTimeout) {
-      clearTimeout(this.selectionRestoreTimeout);
-      this.selectionRestoreTimeout = null;
-    }
-
-    // Store the selection we want to restore
-    this.expectedSelectionFromAdmin = slateSelection;
-
-    const doRestore = () => {
-      log('DOM settled, restoring selection');
-      if (this.selectionRestoreObserver) {
-        this.selectionRestoreObserver.disconnect();
-        this.selectionRestoreObserver = null;
-      }
-      if (this.selectionRestoreTimeout) {
-        clearTimeout(this.selectionRestoreTimeout);
-        this.selectionRestoreTimeout = null;
-      }
-      if (this.expectedSelectionFromAdmin) {
-        this.restoreSlateSelection(this.expectedSelectionFromAdmin, this.formData);
-      }
-    };
-
-    // Debounce function - reset timer on each mutation
-    const scheduleRestore = () => {
-      if (this.selectionRestoreTimeout) {
-        clearTimeout(this.selectionRestoreTimeout);
-      }
-      // Wait 50ms after last DOM mutation before restoring
-      this.selectionRestoreTimeout = setTimeout(doRestore, 50);
-    };
-
-    // Set up MutationObserver on document to watch for DOM changes
-    // Observe at document level so it survives element replacement during Vue/React re-renders
-    this.selectionRestoreObserver = new MutationObserver((mutations) => {
-      log('DOM mutation detected, debouncing selection restore');
-      scheduleRestore();
-    });
-
-    // Observe the entire document for changes
-    this.selectionRestoreObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
-    // Also set a max timeout in case no mutations occur (DOM already stable)
-    // This handles the case where React/mock renders synchronously
-    scheduleRestore();
-
-    // Safety timeout - if DOM never settles, restore anyway after 500ms
-    setTimeout(() => {
-      if (this.selectionRestoreObserver) {
-        log('Max wait reached, forcing selection restore');
-        doRestore();
-      }
-    }, 500);
   }
 
   /**
