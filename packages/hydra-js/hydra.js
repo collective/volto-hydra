@@ -1585,7 +1585,8 @@ export class Bridge {
     range.setEnd(textNode, domOffset);
 
     // range.toString() normalizes whitespace as the browser renders it
-    return range.toString().length;
+    // Strip ZWS characters since they don't exist in Slate's model
+    return this.stripZeroWidthSpaces(range.toString()).length;
   }
 
   /**
@@ -4691,13 +4692,17 @@ export class Bridge {
       let textContent;
       let childIndex = null;
 
-      if (mutatedTextNode && closestNode === mutatedNodeParent &&
-          closestNode.hasAttribute('data-editable-field')) {
-        // Text node is direct child of paragraph (plain text after/before inline elements)
-        // Find which child index this text node is at
-        const childNodes = Array.from(closestNode.childNodes);
-        childIndex = childNodes.indexOf(mutatedTextNode);
-        if (childIndex >= 0) {
+      // Check if closestNode has mixed content (text nodes + element children like STRONG/EM)
+      // If so, we need to track which specific text node was modified, not use full innerText
+      const hasElementChildren = Array.from(closestNode.childNodes).some(n => n.nodeType === Node.ELEMENT_NODE);
+
+      if (mutatedTextNode && closestNode === mutatedNodeParent && hasElementChildren) {
+        // Text node is direct child of element with mixed content
+        // Use getNodePath to get the correct Slate path (handles Vue whitespace nodes)
+        const slatePath = this.getNodePath(mutatedTextNode);
+        if (slatePath && slatePath.length > 1) {
+          // Last element of path is the child index within the parent
+          childIndex = slatePath[slatePath.length - 1];
           // Update only this specific text node's content
           textContent = this.stripZeroWidthSpaces(mutatedTextNode.textContent);
           log('handleTextChange: nodeId=', nodeId, 'childIndex=', childIndex, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);

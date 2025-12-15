@@ -1482,4 +1482,54 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     // ZWS after span should be at index 2
     expect(paths.zwsAfterSpan).toEqual([0, 2]);
   });
+
+  test('serializePoint excludes ZWS from offset calculation', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Simulate cursor exit scenario: ZWS is prepended to text node after inline element
+    // DOM: "Hello " + <strong>bold</strong> + [ZWS + " normal"]
+    // Slate: "Hello " + strong + " normal" (no ZWS)
+    // When cursor is at end, offset should be 7 (length of " normal"), not 8
+    const result = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-serialize-zws" data-block-uid="test-block" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong>\uFEFF normal</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-serialize-zws')!;
+      const p = container.querySelector('p')!;
+      // The text node after strong: ZWS + " normal"
+      const textNodeAfterStrong = p.childNodes[2];
+
+      // Place cursor at end of this text node (after " normal", position 8 in DOM)
+      const range = document.createRange();
+      range.setStart(textNodeAfterStrong, 8); // After ZWS + " normal"
+      range.setEnd(textNodeAfterStrong, 8);
+
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const bridge = (window as any).bridge;
+      const serialized = bridge.serializeSelection();
+
+      container.remove();
+
+      return {
+        serialized,
+        domTextLength: textNodeAfterStrong.textContent?.length,
+        anchorOffset: serialized?.anchor?.offset,
+        focusOffset: serialized?.focus?.offset,
+      };
+    });
+
+    // DOM text is 8 chars (ZWS + " normal")
+    expect(result.domTextLength).toBe(8);
+    // But serialized offset should be 7 (excluding ZWS)
+    expect(result.anchorOffset).toBe(7);
+    expect(result.focusOffset).toBe(7);
+  });
 });

@@ -14,6 +14,7 @@ test.describe('Bridge.updateJsonNode()', () => {
     await page.goto('http://localhost:8888/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+    await helper.injectPreserveWhitespaceHelper();
   });
 
   /**
@@ -406,5 +407,74 @@ test.describe('Bridge.updateJsonNode()', () => {
     // First child should be updated (fallback behavior)
     expect(result.value[0].children[0].text).toBe('Updated');
     expect(() => validateSlateStructure(result.value)).not.toThrow();
+  });
+
+  test('handleTextChange detects childIndex in Nuxt-style DOM (P without data-editable-field)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Simulate Nuxt structure: DIV[data-editable-field] > P[data-node-id] > [text, STRONG, text]
+    // When typing " normal" in the third text node, handleTextChange should detect childIndex=2
+    const result = await body.evaluate(() => {
+      // Create Nuxt-style DOM structure
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-nuxt-handletext" data-block-uid="test-block" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> normal</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-nuxt-handletext')!;
+      const p = container.querySelector('p')!;
+      const textNodeAfterStrong = p.childNodes[2]; // " normal"
+
+      // Set up bridge with mock block data
+      const bridge = (window as any).bridge;
+      bridge.blockPathMap = {
+        'test-block': { path: ['blocks', 'test-block'] },
+      };
+      bridge.formData = {
+        blocks: {
+          'test-block': {
+            '@type': 'slate',
+            value: [
+              {
+                type: 'p',
+                nodeId: '0',
+                children: [
+                  { text: 'Hello ' },
+                  { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+                  { text: '' }, // Empty initially, will be updated to " normal"
+                ],
+              },
+            ],
+          },
+        },
+      };
+
+      // Call handleTextChange simulating a mutation on the text node after strong
+      // This should detect childIndex=2 and update only that child
+      bridge.handleTextChange(container, p, textNodeAfterStrong);
+
+      // Get the updated block data
+      const updatedBlock = bridge.formData.blocks['test-block'];
+      container.remove();
+
+      return {
+        child0: updatedBlock.value[0].children[0],
+        child1: updatedBlock.value[0].children[1],
+        child2: updatedBlock.value[0].children[2],
+      };
+    });
+
+    // CRITICAL: First text node should be UNCHANGED (not "Hello bold normal")
+    expect(result.child0.text).toBe('Hello ');
+
+    // Strong element should be preserved
+    expect(result.child1.type).toBe('strong');
+    expect(result.child1.children[0].text).toBe('bold');
+
+    // Third text node should have the new text
+    expect(result.child2.text).toBe(' normal');
   });
 });
