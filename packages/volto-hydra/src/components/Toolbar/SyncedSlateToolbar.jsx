@@ -232,19 +232,46 @@ const SyncedSlateToolbar = ({
   const internalValueRef = useRef(null);
 
   // Force re-renders when value changes (to update button active states)
-  const [renderKey, setRenderKey] = useState(0);
-
   // State for dropdown menu
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuButtonRect, setMenuButtonRect] = useState(null);
 
-  // Helper to safely increment renderKey without unmounting popups
-  // When LinkEditor is open, we skip the remount to prevent this.input.focus() errors
-  const safeIncrementRenderKey = useCallback(() => {
-    if (!linkEditorWasVisibleRef.current) {
-      setRenderKey((k) => k + 1);
+  // Helper to replace editor content using proper Slate APIs
+  // Direct assignment (editor.children = X) bypasses Slate-react's state tracking,
+  // causing "Cannot find descendant at path" errors when transforms run afterward
+  // Optional transformCallback runs INSIDE the same withoutNormalizing block
+  // so all operations are batched together
+  const replaceEditorContent = useCallback((newValue, selection, transformCallback) => {
+    // Set flag to prevent onChange from sending updates back during sync
+    isSyncingRef.current = true;
+    try {
+      Editor.withoutNormalizing(editor, () => {
+        // Remove all existing nodes
+        while (editor.children.length > 0) {
+          Transforms.removeNodes(editor, { at: [0] });
+        }
+        // Insert new content (cloned to prevent Slate normalization from mutating Redux state)
+        const newNodes = cloneDeep(newValue);
+        for (let i = 0; i < newNodes.length; i++) {
+          Transforms.insertNodes(editor, newNodes[i], { at: [i] });
+        }
+        // Restore selection if valid
+        if (selection && isSelectionValidForDocument(selection, newValue)) {
+          try {
+            Transforms.select(editor, selection);
+          } catch (e) {
+            // Selection invalid, ignore
+          }
+        }
+        // Run transform callback inside the same batch if provided
+        if (transformCallback) {
+          transformCallback();
+        }
+      });
+    } finally {
+      isSyncingRef.current = false;
     }
-  }, []);
+  }, [editor]);
 
   // Track the last value we sent to Redux to avoid overwriting local changes
   const lastSentValueRef = useRef(null);
@@ -255,6 +282,8 @@ const SyncedSlateToolbar = ({
   const activeFormatRequestIdRef = useRef(null);
   // Track processed transform requestIds to prevent double-application
   const processedTransformRequestIdRef = useRef(null);
+  // Track when we're syncing content to prevent onChange from sending updates back
+  const isSyncingRef = useRef(false);
   // Track LinkEditor visibility across effect restarts (persists when dependencies change)
   const linkEditorWasVisibleRef = useRef(false);
 
@@ -342,8 +371,10 @@ const SyncedSlateToolbar = ({
         }
       } else {
         // Cursor is NOT inside the format element - enable prospective formatting
+        console.log('[TOOLBAR FORMAT] Before insertNodes:', JSON.stringify(editor.children?.[0]?.children?.length), 'selection:', JSON.stringify(editor.selection));
         const inlineNode = { type: format, children: [{ text: '' }] };
         Transforms.insertNodes(editor, inlineNode);
+        console.log('[TOOLBAR FORMAT] After insertNodes:', JSON.stringify(editor.children?.[0]?.children?.length), 'ops:', editor.operations.length);
 
         const [insertedEntry] = Editor.nodes(editor, {
           match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '',
@@ -354,6 +385,9 @@ const SyncedSlateToolbar = ({
         if (insertedEntry) {
           const [, insertedPath] = insertedEntry;
           Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
+          console.log('[TOOLBAR FORMAT] After select, insertedPath:', JSON.stringify(insertedPath), 'selection:', JSON.stringify(editor.selection));
+        } else {
+          console.log('[TOOLBAR FORMAT] WARNING: Could not find inserted node!');
         }
         // handleChange will fire because we changed children
       }
@@ -363,162 +397,44 @@ const SyncedSlateToolbar = ({
     }
   }, [editor, form, onChangeFormData]);
 
-  // Sync editor state when form data or selection changes (like Volto's componentDidUpdate)
+  // Sync editor state when form data, selection, or transform changes
   useEffect(() => {
+    // === SETUP ===
     const block = getBlock(selectedBlock);
     if (!selectedBlock || !block) return;
 
     const fieldName = blockUI?.focusedFieldName || 'value';
     const fieldValue = block[fieldName];
 
-    // DEBUG: Log first li keys to trace corruption
-    if (fieldValue?.[0]?.children?.[0]) {
-      const firstChild = fieldValue[0].children[0];
-    }
-
-    // Only sync editor for slate fields - non-slate fields don't use the Slate editor
+    // Only sync for slate fields
     const blockType = block?.['@type'];
-    const blockTypeFields = blockFieldTypes?.[blockType] || {};
-    const fieldType = blockTypeFields[fieldName];
+    const fieldType = blockFieldTypes?.[blockType]?.[fieldName];
     if (fieldType !== 'slate') {
-      // Clear internalValueRef so we don't use stale slate value when switching to a slate field
       internalValueRef.current = null;
       return;
     }
 
-    // Update editor.children if external value changed (like Volto line 158)
-    // BUT don't overwrite local changes - only sync if Redux has caught up to what we sent
-    // or if the value came from somewhere else (iframe text changes)
-    if (fieldValue && !isEqual(fieldValue, editor.children)) {
-      if (lastSentValueRef.current) {
-        // We have pending local changes - check if Redux caught up
-        if (isEqual(fieldValue, lastSentValueRef.current)) {
-          // Redux now has our value, safe to sync
-          // CRITICAL: When structure changes (e.g., format removed), selection paths may become invalid.
-          // Check if current selection is valid for new children, deselect if not.
-          const hadToDeselect = !isSelectionValidForDocument(editor.selection, fieldValue);
-          if (hadToDeselect) {
-            Transforms.deselect(editor);
-          }
-          // CRITICAL: Clone to prevent Slate normalization from mutating Redux state
-          editor.children = cloneDeep(fieldValue);
-          internalValueRef.current = fieldValue;
-          lastSentValueRef.current = null;
-          // If we deselected, try to restore selection from currentSelection if it's valid
-          if (hadToDeselect && currentSelection && isSelectionValidForDocument(currentSelection, fieldValue)) {
-            try {
-              Transforms.select(editor, currentSelection);
-              editor.savedSelection = currentSelection;
-            } catch (e) {
-            }
-          }
-          safeIncrementRenderKey();
-        } else {
-          // Redux still has old value, don't overwrite our local changes
-        }
-      } else {
-        // No pending changes, this is an external change (from iframe), sync it
-        // Must deselect before changing children to avoid invalid selection errors
-        // Selection will be synced after children update if currentSelection is valid
-        Transforms.deselect(editor);
-        // CRITICAL: Clone to prevent Slate normalization from mutating Redux state
-        editor.children = cloneDeep(fieldValue);
-        internalValueRef.current = fieldValue;
-        safeIncrementRenderKey();
-      }
-    } else if (fieldValue && !isEqual(fieldValue, internalValueRef.current)) {
-      internalValueRef.current = fieldValue;
-      lastSentValueRef.current = null;
-    } else if (fieldValue && lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
-      // Redux caught up and editor.children already matches - just clear the ref
-      lastSentValueRef.current = null;
-    }
+    // === DETERMINE WHAT NEEDS TO HAPPEN ===
+    const contentNeedsSync = fieldValue && !isEqual(fieldValue, editor.children);
+    const hasUnprocessedTransform = transformAction &&
+      transformAction.requestId !== processedTransformRequestIdRef.current;
 
-    // Update editor selection using Transforms (like Volto line 167)
-    // Only sync if selection is valid for current document structure
-    if (currentSelection && !isEqual(currentSelection, editor.selection)) {
-      try {
-        Transforms.select(editor, currentSelection);
-        // Save selection for Link plugin to use
-        editor.savedSelection = currentSelection;
+    // Skip sync if we have pending local changes that Redux hasn't caught up to yet
+    const hasPendingLocalChanges = lastSentValueRef.current &&
+      !isEqual(fieldValue, lastSentValueRef.current);
 
-        // Force re-render to update button active states when selection changes
-        safeIncrementRenderKey();
-      } catch (e) {
-        // Selection is invalid for current document - likely stale, ignore it
-        console.warn('[TOOLBAR] Selection transform failed (ignoring stale selection):', e.message);
-      }
-    } else if (currentSelection) {
-      // Still update savedSelection even if selection hasn't changed
-      editor.savedSelection = currentSelection;
-    }
+    console.log('[TOOLBAR SYNC] contentNeedsSync:', contentNeedsSync,
+      'hasUnprocessedTransform:', hasUnprocessedTransform,
+      'hasPendingLocalChanges:', hasPendingLocalChanges);
 
-    // Check if there's a pending flush request to complete
-    // This runs regardless of whether formData changed (handles BUFFER_FLUSHED case)
-    if (completedFlushRequestId && pendingFlushRef.current) {
-      const { requestId, button } = pendingFlushRef.current;
-      if (requestId === completedFlushRequestId) {
-        pendingFlushRef.current = null;
-
-        // Get button name and check if it's a MarkElementButton (inline format)
-        const buttonName = button.dataset.toolbarButton;
-        const buttonToFormat = {
-          bold: 'strong',
-          italic: 'em',
-          underline: 'u',
-          strikethrough: 'del',
-          sub: 'sub',
-          sup: 'sup',
-          code: 'code',
-        };
-        const format = buttonToFormat[buttonName];
-
-        if (format) {
-          // MarkElementButton - use shared prospective formatting logic
-          applyInlineFormat(format, requestId);
-        } else {
-          // Non-MarkElementButton (BlockButton, etc.) - dispatch to volto-slate button
-          activeFormatRequestIdRef.current = requestId;
-          button.dataset.bypassCapture = 'true';
-          const clickableElement = button.querySelector('a.ui.button') || button.querySelector('button') || button;
-          const mousedownEvent = new MouseEvent('mousedown', {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-          });
-          mousedownEvent._hydraReDispatch = true;
-          window._hydraReDispatchEvent = mousedownEvent;
-          clickableElement.dispatchEvent(mousedownEvent);
-          setTimeout(() => {
-            window._hydraReDispatchEvent = null;
-          }, 0);
-          delete button.dataset.bypassCapture;
-        }
-      }
-    }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, safeIncrementRenderKey, getBlock, applyInlineFormat]);
-
-  // Handle transformAction from iframe (format, paste, delete)
-  // These arrive atomically with form data, so editor already has the latest text
-  useEffect(() => {
-    if (!transformAction || !editor) return;
-
-    const { type, requestId } = transformAction;
-
-    // Skip if we already processed this transform (prevents double-application during re-renders)
-    if (requestId && requestId === processedTransformRequestIdRef.current) {
-      return;
-    }
-    processedTransformRequestIdRef.current = requestId;
-
-    try {
+    // Helper to apply transform based on type
+    const applyTransform = () => {
+      const { type, requestId } = transformAction;
       switch (type) {
         case 'format':
           applyInlineFormat(transformAction.format, requestId);
           break;
-
         case 'paste':
-          // Paste has no button - use direct Slate transforms
           const pastedSlate = slateTransforms.htmlToSlate(transformAction.html);
           let fragment = [];
           pastedSlate.forEach((node) => {
@@ -534,26 +450,98 @@ const SyncedSlateToolbar = ({
             Transforms.insertNodes(editor, fragment);
           }
           break;
-
         case 'delete':
-          // Delete has no button - use direct Slate transforms
           Transforms.delete(editor, {
             unit: 'character',
             reverse: transformAction.direction === 'backward',
           });
           break;
-
         default:
           console.warn('[TOOLBAR] Unknown transform type:', type);
       }
+    };
 
-    } catch (e) {
-      console.error('[TOOLBAR] Error applying transform:', e);
+    // === EXECUTE ===
+    if (contentNeedsSync && !hasPendingLocalChanges) {
+      // Content changed - sync it first
+      console.log('[TOOLBAR SYNC] Syncing content from iframe, currentSelection:', JSON.stringify(currentSelection));
+
+      // If there's a transform, run it in the same batch
+      const transformCallback = hasUnprocessedTransform ? () => {
+        processedTransformRequestIdRef.current = transformAction.requestId;
+        console.log('[TOOLBAR SYNC] Applying transform in batch');
+        applyTransform();
+        onTransformApplied?.();
+      } : null;
+
+      replaceEditorContent(fieldValue, currentSelection, transformCallback);
+
+      // Update internalValueRef from editor.children AFTER transform (not fieldValue)
+      internalValueRef.current = editor.children;
+      lastSentValueRef.current = null;
+
+    } else if (hasUnprocessedTransform) {
+      // No content sync needed, but transform is pending
+      // Transform sets its own selection (e.g., cursor inside new format element)
+      processedTransformRequestIdRef.current = transformAction.requestId;
+      console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
+      applyTransform();
+
+    } else if (lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
+      // Redux caught up to our local changes
+      lastSentValueRef.current = null;
+    } else if (currentSelection && !isEqual(currentSelection, editor.selection) &&
+               isSelectionValidForDocument(currentSelection, editor.children)) {
+      // Selection-only change - update editor's selection
+      // This handles clicks that move cursor without changing content
+      console.log('[TOOLBAR SYNC] Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
+      try {
+        Transforms.select(editor, currentSelection);
+      } catch (e) {
+        // Selection invalid, ignore
+      }
     }
 
-    // Clear the transform action
-    onTransformApplied?.();
-  }, [transformAction, editor, onTransformApplied, form, onChangeFormData, applyInlineFormat]);
+    // Update savedSelection from editor.selection AFTER all operations complete
+    // This ensures Link plugin gets the correct position after transforms
+    if (editor.selection) {
+      editor.savedSelection = editor.selection;
+    }
+
+    // Update internal ref if content matches but ref is stale
+    if (fieldValue && !isEqual(fieldValue, internalValueRef.current)) {
+      internalValueRef.current = fieldValue;
+    }
+
+    // === HANDLE TOOLBAR BUTTON FLUSH REQUESTS ===
+    if (completedFlushRequestId && pendingFlushRef.current) {
+      const { requestId, button } = pendingFlushRef.current;
+      if (requestId === completedFlushRequestId) {
+        pendingFlushRef.current = null;
+        const buttonName = button.dataset.toolbarButton;
+        const buttonToFormat = {
+          bold: 'strong', italic: 'em', underline: 'u',
+          strikethrough: 'del', sub: 'sub', sup: 'sup', code: 'code',
+        };
+        const format = buttonToFormat[buttonName];
+
+        if (format) {
+          applyInlineFormat(format, requestId);
+        } else {
+          // Non-format button - dispatch click event
+          activeFormatRequestIdRef.current = requestId;
+          button.dataset.bypassCapture = 'true';
+          const clickable = button.querySelector('a.ui.button') || button.querySelector('button') || button;
+          const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window });
+          event._hydraReDispatch = true;
+          window._hydraReDispatchEvent = event;
+          clickable.dispatchEvent(event);
+          setTimeout(() => { window._hydraReDispatchEvent = null; }, 0);
+          delete button.dataset.bypassCapture;
+        }
+      }
+    }
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied]);
 
   // Set editor.hydra with iframe positioning data for persistent helpers
   // NOTE: editor is stable (created once), so we don't include it in dependencies
@@ -575,6 +563,13 @@ const SyncedSlateToolbar = ({
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
     (newValue) => {
+      console.log('[TOOLBAR onChange] called, isSyncing:', isSyncingRef.current, 'selection:', JSON.stringify(editor.selection));
+      // Skip during content sync - we're just updating local state, not sending changes
+      if (isSyncingRef.current) {
+        console.log('[TOOLBAR onChange] Skipping - syncing in progress');
+        return;
+      }
+
       // Update internal value tracker
       internalValueRef.current = newValue;
 
@@ -838,7 +833,6 @@ const SyncedSlateToolbar = ({
         >
             <SlateErrorBoundary>
               <Slate
-                key={renderKey}
                 editor={editor}
                 initialValue={currentValue}
                 onChange={handleChange}

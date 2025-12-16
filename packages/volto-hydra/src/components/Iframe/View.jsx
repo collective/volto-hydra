@@ -721,6 +721,7 @@ const Iframe = (props) => {
         case 'INLINE_EDIT_DATA':
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
+          console.log('[VIEW] INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, 'third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
 
           inlineEditCounterRef.current += 1;
           // Update combined state atomically - formData, blockPathMap, selection together
@@ -913,6 +914,7 @@ const Iframe = (props) => {
               type: event.data.transformType,
               requestId: event.data.requestId,
             };
+            console.log('[VIEW] SLATE_TRANSFORM_REQUEST requestId:', event.data.requestId, 'data third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
             // Add type-specific fields
             if (event.data.transformType === 'format') {
               transformAction.format = event.data.format;
@@ -1002,13 +1004,8 @@ const Iframe = (props) => {
           break;
         }
 
-        case 'SELECTION_CHANGE':
-          // Store current selection from iframe for format operations
-          setIframeSyncState(prev => ({
-            ...prev,
-            selection: event.data.selection,
-          }));
-          break;
+        // NOTE: SELECTION_CHANGE was removed - selection is now always sent
+        // WITH text content in INLINE_EDIT_DATA to keep them atomic/in-sync.
 
         case 'BLOCK_SELECTED': {
           // Update block UI state and selection atomically

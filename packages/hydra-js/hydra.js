@@ -614,6 +614,10 @@ export class Bridge {
               this.selectedBlockUid = adminSelectedBlockUid;
             }
 
+            // Extract formatRequestId early so it's available in rAF callbacks
+            const formatRequestId = event.data.formatRequestId;
+            log('FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
+
             // Call the callback first to trigger the re-render
             log('Calling onEditChange callback to trigger re-render');
             callback(this.formData);
@@ -664,8 +668,21 @@ export class Bridge {
                   // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
                   // the selection we're about to restore from transformedSelection
                   this.savedClickPosition = null;
-                  this.restoreSlateSelection(event.data.transformedSelection, this.formData);
+                  try {
+                    this.restoreSlateSelection(event.data.transformedSelection, this.formData);
+                  } catch (e) {
+                    console.error('[HYDRA] Error restoring selection:', e);
+                  }
                 }
+
+                // Unblock after selection restore - iframe state is now fully settled
+                // This ensures the next keypress sees correct DOM and selection state
+                // This MUST run even if selection restore fails, so it's outside the try/catch
+                if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
+                  log('Unblocking input for', this.pendingTransform.blockId, '- after selection restore');
+                  this.setBlockProcessing(this.pendingTransform.blockId, false);
+                }
+
                 // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
                 // Clear the processing flag BEFORE replay so handleTextChange can process buffered text
                 this.isProcessingExternalUpdate = false;
@@ -679,19 +696,6 @@ export class Bridge {
             // Those are triggered by user clicks (selectBlock()) or SELECT_BLOCK messages
             // FORM_DATA is just data synchronization - it updates the rendered blocks
             // but should not change which block is selected or create/destroy toolbars
-
-            // Unblock input if this FORM_DATA has a matching formatRequestId
-            // This ensures we only unblock for the specific format operation that caused blocking
-            const formatRequestId = event.data.formatRequestId;
-            log('FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
-            if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
-              log('Unblocking input for', this.pendingTransform.blockId, '- formatRequestId matches');
-              this.setBlockProcessing(this.pendingTransform.blockId, false);
-            } else if (formatRequestId) {
-              log('formatRequestId', formatRequestId, 'does not match pending requestId:', this.pendingTransform?.requestId);
-            } else {
-              log('No formatRequestId in FORM_DATA, not unblocking');
-            }
 
             // Update block UI overlay positions after form data changes
             // Blocks might have resized after form updates
@@ -2334,8 +2338,14 @@ export class Bridge {
         if (this._isCorrectingWhitespaceSelection) return;
 
         const selection = window.getSelection();
-        const offset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : -1;
-        log('selectionchange fired, cursor offset:', offset);
+        const range = selection?.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        log('selectionchange fired:', {
+          anchorOffset: selection?.anchorOffset,
+          focusOffset: selection?.focusOffset,
+          rangeStart: range?.startOffset,
+          rangeEnd: range?.endOffset,
+          collapsed: selection?.isCollapsed,
+        });
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
           // Correct cursor if it's on invalid whitespace (template artifacts)
@@ -2364,6 +2374,11 @@ export class Bridge {
             const matches =
               JSON.stringify(expected.anchor) === JSON.stringify(current.anchor) &&
               JSON.stringify(expected.focus) === JSON.stringify(current.focus);
+            log('selectionchange: comparing selections', {
+              expected: JSON.stringify(expected),
+              current: JSON.stringify(current),
+              matches,
+            });
             if (matches) {
               // Same selection as Admin sent - this is the restore, suppress it
               log('Selection matches Admin restore - not sending back');
@@ -2373,27 +2388,16 @@ export class Bridge {
               log('Selection differs from Admin restore - user action');
               this.expectedSelectionFromAdmin = null;
             }
+          } else {
+            log('selectionchange: no expectedSelectionFromAdmin, sending new selection');
           }
 
-          // Don't send SELECTION_CHANGE during typing - selection will be included
-          // when text buffer flushes. This ensures formData and selection stay atomic.
-          // Only send standalone SELECTION_CHANGE when user moves cursor without typing
-          // (clicking, arrow keys, selecting text).
-          if (this.pendingTextUpdate || this.textUpdateTimer) {
-            // Text activity in progress - selection will be sent with the text
-            return;
-          }
-
-          // No pending text - send standalone SELECTION_CHANGE for toolbar state updates
-          if (this.savedSelection && this.selectedBlockUid) {
-            window.parent.postMessage(
-              {
-                type: 'SELECTION_CHANGE',
-                blockId: this.selectedBlockUid,
-                selection: this.savedSelection,
-              },
-              this.adminOrigin,
-            );
+          // IMPORTANT: Buffer selection changes WITH the text content.
+          // This ensures text and selection are always atomic/in-sync. If sent
+          // separately, Admin could receive stale selection that doesn't match
+          // the text content, causing formats to be applied incorrectly.
+          if (this.selectedBlockUid) {
+            this.bufferUpdate('selectionChange');
           }
         }
       };
@@ -4548,6 +4552,7 @@ export class Bridge {
    * @returns {Object} Deep copy of formData without nodeIds
    */
   getFormDataWithoutNodeIds() {
+    log('getFormDataWithoutNodeIds: current formData value:', JSON.stringify(this.formData?.blocks?.[this.selectedBlockUid]?.value));
     const formDataCopy = JSON.parse(JSON.stringify(this.formData));
 
     // Recursively strip nodeIds from all blocks (including nested)
@@ -4733,6 +4738,7 @@ export class Bridge {
         // Update the block in place (getBlockData returns a reference)
         Object.assign(block, updatedJson);
         block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
+        log('handleTextChange: updated formData value:', JSON.stringify(block.value));
       }
     } else {
       // Non-Slate field - update field directly with text content
@@ -4743,27 +4749,34 @@ export class Bridge {
       }
     }
 
-    // Store the pending update - create a deep copy and strip nodeIds
-    // NodeIds are internal to hydra.js and should not be sent to Admin UI
+    // Buffer the update - text and selection are captured together
+    this.bufferUpdate(fieldType === 'slate' ? 'textChangeSlate' : 'textChange');
+  }
+
+  /**
+   * Buffer an update to be sent after debounce.
+   * Text and selection are always sent together to keep them atomic/in-sync.
+   *
+   * @param {string} [from] - Source of the update for debugging
+   */
+  bufferUpdate(from = 'unknown') {
+    // Always capture BOTH current data and current selection together
     this.pendingTextUpdate = {
       type: 'INLINE_EDIT_DATA',
       data: this.getFormDataWithoutNodeIds(),
-      from: fieldType === 'slate' ? 'textChangeSlate' : 'textChange',
+      selection: this.serializeSelection(),
+      from: from,
     };
 
-    // Clear existing timer and set new one - batches rapid changes
+    // Reset the debounce timer
     if (this.textUpdateTimer) {
       clearTimeout(this.textUpdateTimer);
     }
-
-    // Send update after 300ms of no typing (debounce)
     this.textUpdateTimer = setTimeout(() => {
       if (this.pendingTextUpdate) {
-        // Add current selection at send time (not creation time)
-        this.pendingTextUpdate.selection = this.serializeSelection();
         this.sendMessageToParent(this.pendingTextUpdate);
         this.pendingTextUpdate = null;
-        this.textUpdateTimer = null; // Clear the timer reference
+        this.textUpdateTimer = null;
       }
     }, 300);
   }
@@ -4784,17 +4797,15 @@ export class Bridge {
       if (flushRequestId) {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
-      // Use savedSelection - it's already cached from selectionchange events
-      // Don't call serializeSelection() here as focus may have moved to toolbar
-      this.pendingTextUpdate.selection = this.savedSelection;
-      log('flushPendingTextUpdates: sending text update with savedSelection:',
+      // Buffer already contains matching data+selection captured together
+      log('flushPendingTextUpdates: sending buffered update:',
           'anchor:', this.pendingTextUpdate.selection?.anchor,
           'focus:', this.pendingTextUpdate.selection?.focus);
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
       this.pendingTextUpdate = null;
-      return true; // Had pending text
+      return true; // Had pending update
     }
-    return false; // No pending text
+    return false; // No pending update
   }
 
   /**
