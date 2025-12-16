@@ -474,6 +474,9 @@ const SyncedSlateToolbar = ({
       // If there's a transform, run it in the same batch
       const transformCallback = hasUnprocessedTransform ? () => {
         processedTransformRequestIdRef.current = transformAction.requestId;
+        // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
+        // This is needed for delete/paste transforms that don't go through applyInlineFormat
+        activeFormatRequestIdRef.current = transformAction.requestId;
         console.log('[TOOLBAR SYNC] Applying transform in batch');
         applyTransform();
         onTransformApplied?.();
@@ -487,12 +490,24 @@ const SyncedSlateToolbar = ({
 
     } else if (hasUnprocessedTransform) {
       // No content sync needed, but transform is pending
-      // Transform sets its own selection (e.g., cursor inside new format element)
       processedTransformRequestIdRef.current = transformAction.requestId;
       console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
       // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
       // This is needed for delete/paste transforms that don't go through applyInlineFormat
       activeFormatRequestIdRef.current = transformAction.requestId;
+      // IMPORTANT: Apply the selection from the iframe before running the transform
+      // The transform request includes the selection where the format should be applied,
+      // but the editor's selection may be stale (e.g., at end of paragraph instead of
+      // the selected text range). We need to update editor.selection first.
+      if (currentSelection && !isEqual(currentSelection, editor.selection) &&
+          isSelectionValidForDocument(currentSelection, editor.children)) {
+        console.log('[TOOLBAR SYNC] Applying selection before transform:', JSON.stringify(currentSelection));
+        try {
+          Transforms.select(editor, currentSelection);
+        } catch (e) {
+          console.warn('[TOOLBAR SYNC] Failed to apply selection before transform:', e.message);
+        }
+      }
       applyTransform();
 
     } else if (lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
