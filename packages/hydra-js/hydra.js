@@ -4116,12 +4116,30 @@ export class Bridge {
         // Helper to create ZWS position for cursor placement
         const ensureZwsPosition = (result, offset, parentChildren) => {
           // Case 1: Cursor exit - offset 0 in text after an inline element
+          // When there's existing text after the inline element, DON'T create ZWS or position at offset 0.
+          // This avoids the browser creating a new text node when typing at offset 0.
+          // Instead, return null to let findPositionByVisibleOffset handle it naturally.
           if (result.textChildIndex !== null && offset === 0 && result.textChildIndex > 0) {
             const prevChild = parentChildren[result.textChildIndex - 1];
             if (prevChild && prevChild.type && prevChild.nodeId) {
               const inlineElement = document.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
               if (inlineElement) {
-                // Create ZWS text node right after the inline element
+                // Check if there's already a text node after the inline element
+                const existingTextNode = inlineElement.nextSibling;
+                log('restoreSlateSelection: cursor exit check - inlineElement.nextSibling:', existingTextNode?.nodeType, 'text:', JSON.stringify(existingTextNode?.textContent));
+                if (existingTextNode && existingTextNode.nodeType === Node.TEXT_NODE) {
+                  const existingText = existingTextNode.textContent.replace(/[\uFEFF\u200B]/g, '');
+                  if (existingText.length > 0) {
+                    // There's existing text - prepend ZWS to it and position after the ZWS
+                    // This ensures typing modifies this text node rather than creating a new one
+                    if (!existingTextNode.textContent.startsWith('\uFEFF')) {
+                      existingTextNode.textContent = '\uFEFF' + existingTextNode.textContent;
+                    }
+                    log('restoreSlateSelection: cursor exit - prepended ZWS to existing text, positioning after ZWS');
+                    return { node: existingTextNode, offset: 1 };
+                  }
+                }
+                // No existing text or empty text - create ZWS text node right after the inline element
                 const zwsNode = document.createTextNode('\uFEFF');
                 inlineElement.parentNode.insertBefore(zwsNode, inlineElement.nextSibling);
                 log('restoreSlateSelection: cursor exit - created ZWS after inline:', prevChild.nodeId);
