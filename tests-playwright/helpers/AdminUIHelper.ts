@@ -974,6 +974,40 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the visible text before and after the cursor position.
+   * Uses Range APIs to get accurate text regardless of DOM structure.
+   * Strips ZWS characters to return only visible text.
+   */
+  async getTextAroundCursor(editor: Locator): Promise<{
+    textBefore: string;
+    textAfter: string;
+  }> {
+    return await editor.evaluate((el) => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        return { textBefore: '', textAfter: '' };
+      }
+
+      const range = sel.getRangeAt(0);
+      const ZWS = '\u200B\uFEFF';
+
+      // Get text before cursor
+      const beforeRange = document.createRange();
+      beforeRange.selectNodeContents(el);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+      const textBefore = beforeRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+
+      // Get text after cursor
+      const afterRange = document.createRange();
+      afterRange.selectNodeContents(el);
+      afterRange.setStart(range.endContainer, range.endOffset);
+      const textAfter = afterRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+
+      return { textBefore, textAfter };
+    });
+  }
+
+  /**
    * Get the number of blocks rendered in the iframe.
    */
   async getBlockCountInIframe(): Promise<number> {

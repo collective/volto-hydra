@@ -1523,7 +1523,7 @@ export class Bridge {
         path = this.getNodePath(textNode);
       }
       if (!path) {
-        console.warn('[HYDRA] serializePoint: getNodePath returned null for textNode:', textNode);
+        // getNodePath returns null for non-Slate fields (expected) or missing data-node-id (error logged there)
         return null;
       }
     }
@@ -1853,8 +1853,20 @@ export class Bridge {
       while (container && !container.hasAttribute?.('data-editable-field')) {
         container = container.parentNode;
       }
-      const blockUid = container?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid') || 'unknown';
+      const blockElement = container?.closest?.('[data-block-uid]');
+      const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
+      const blockType = blockElement?.getAttribute('data-block-type') || 'unknown';
       const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+
+      // Check if this field is supposed to be a Slate field
+      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+      const fieldType = blockTypeFields[fieldName];
+
+      // Only log error for Slate fields - non-Slate text fields don't need data-node-id
+      if (fieldType !== 'slate') {
+        // This is a plain text field, just return null without error
+        return null;
+      }
 
       // Build DOM path showing which elements are missing data-node-id
       const domPath = [];

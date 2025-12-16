@@ -34,6 +34,10 @@ function renderContent(content) {
     container.innerHTML = '';
 
     const { blocks, blocks_layout } = content;
+    if (!blocks_layout) {
+        console.warn('[RENDERER] No blocks_layout in content, nothing to render');
+        return;
+    }
     const items = blocks_layout.items || [];
 
     items.forEach(blockId => {
