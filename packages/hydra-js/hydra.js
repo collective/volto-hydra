@@ -2367,7 +2367,14 @@ export class Bridge {
 
           // Check if this selection matches what Admin just sent us
           // If so, this is the result of restoring their selection - don't echo it back
-          if (this.expectedSelectionFromAdmin && this.savedSelection) {
+          if (this.expectedSelectionFromAdmin) {
+            // We're expecting a specific selection from Admin
+            if (!this.savedSelection) {
+              // Selection serialization failed (DOM might be re-rendering)
+              // Don't send anything yet - wait for stable DOM
+              log('selectionchange: expectedSelectionFromAdmin set but savedSelection null - waiting');
+              return;
+            }
             const expected = this.expectedSelectionFromAdmin;
             const current = this.savedSelection;
             // Compare anchor and focus paths and offsets
@@ -4208,10 +4215,6 @@ export class Bridge {
         focusPos = this.findPositionByVisibleOffset(focusElement, focusOffset);
       }
 
-      log('restoreSlateSelection: findPositionByVisibleOffset returned', {
-        anchorPos: anchorPos ? { nodeText: anchorPos.node?.textContent, offset: anchorPos.offset, parentTag: anchorPos.node?.parentElement?.tagName } : null,
-        focusPos: focusPos ? { nodeText: focusPos.node?.textContent, offset: focusPos.offset, parentTag: focusPos.node?.parentElement?.tagName } : null,
-      });
 
       if (!anchorPos || !focusPos) {
         console.warn('[HYDRA] Could not find positions by visible offset');
@@ -4229,11 +4232,6 @@ export class Bridge {
       selection.removeAllRanges();
       selection.addRange(range);
 
-      log('Selection restored via Range:', {
-        anchorOffset: slateSelection.anchor.offset,
-        focusOffset: slateSelection.focus.offset,
-        selectedText: selection.toString()
-      });
     } catch (e) {
       console.error('[HYDRA] Error restoring Slate selection:', e);
     }
@@ -4726,8 +4724,39 @@ export class Bridge {
         if (slatePath && slatePath.length > 1) {
           // Last element of path is the child index within the parent
           childIndex = slatePath[slatePath.length - 1];
-          // Update only this specific text node's content
-          textContent = this.stripZeroWidthSpaces(mutatedTextNode.textContent);
+
+          // Merge all adjacent text nodes at this position using Range.toString()
+          // This normalizes whitespace correctly and handles Vue/React text node splitting
+          let startNode = mutatedTextNode;
+          let endNode = mutatedTextNode;
+
+          // Walk backwards to find start of this text run (stop at element nodes)
+          while (startNode.previousSibling) {
+            const prev = startNode.previousSibling;
+            if (prev.nodeType === Node.ELEMENT_NODE) break;
+            if (prev.nodeType === Node.TEXT_NODE) {
+              startNode = prev;
+            } else {
+              break;
+            }
+          }
+
+          // Walk forward to find end of this text run (stop at element nodes)
+          while (endNode.nextSibling) {
+            const next = endNode.nextSibling;
+            if (next.nodeType === Node.ELEMENT_NODE) break;
+            if (next.nodeType === Node.TEXT_NODE) {
+              endNode = next;
+            } else {
+              break;
+            }
+          }
+
+          // Use Range to get normalized text content
+          const range = document.createRange();
+          range.setStart(startNode, 0);
+          range.setEnd(endNode, endNode.textContent.length);
+          textContent = this.stripZeroWidthSpaces(range.toString());
           log('handleTextChange: nodeId=', nodeId, 'childIndex=', childIndex, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
         }
       }

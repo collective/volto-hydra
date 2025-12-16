@@ -354,6 +354,8 @@ const SyncedSlateToolbar = ({
         if (inlineEntry) {
           const [, inlinePath] = inlineEntry;
           const afterPoint = Editor.after(editor, inlinePath);
+          const formBlockValue = form?.blocks?.[selectedBlock]?.value?.[0]?.children;
+          console.log('[TOOLBAR FORMAT] Cursor exit: inlinePath:', JSON.stringify(inlinePath), 'afterPoint:', JSON.stringify(afterPoint), 'editor.children:', JSON.stringify(editor.children?.[0]?.children), 'form.blocks.value:', JSON.stringify(formBlockValue));
           if (afterPoint) {
             Transforms.select(editor, afterPoint);
             // Selection-only change won't trigger handleChange, so manually send FORM_DATA
@@ -362,6 +364,7 @@ const SyncedSlateToolbar = ({
               activeFormatRequestIdRef.current = null;
             }
           } else {
+            console.log('[TOOLBAR FORMAT] Cursor exit: NO afterPoint, inserting empty text node');
             Transforms.insertNodes(editor, { text: '' }, { at: [...inlinePath.slice(0, -1), inlinePath[inlinePath.length - 1] + 1] });
             const newAfterPoint = Editor.after(editor, inlinePath);
             if (newAfterPoint) {
@@ -371,10 +374,10 @@ const SyncedSlateToolbar = ({
         }
       } else {
         // Cursor is NOT inside the format element - enable prospective formatting
-        console.log('[TOOLBAR FORMAT] Before insertNodes:', JSON.stringify(editor.children?.[0]?.children?.length), 'selection:', JSON.stringify(editor.selection));
+        console.log('[TOOLBAR FORMAT] Before insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'selection:', JSON.stringify(editor.selection));
         const inlineNode = { type: format, children: [{ text: '' }] };
         Transforms.insertNodes(editor, inlineNode);
-        console.log('[TOOLBAR FORMAT] After insertNodes:', JSON.stringify(editor.children?.[0]?.children?.length), 'ops:', editor.operations.length);
+        console.log('[TOOLBAR FORMAT] After insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'ops:', editor.operations.length);
 
         const [insertedEntry] = Editor.nodes(editor, {
           match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '',
@@ -425,7 +428,9 @@ const SyncedSlateToolbar = ({
 
     console.log('[TOOLBAR SYNC] contentNeedsSync:', contentNeedsSync,
       'hasUnprocessedTransform:', hasUnprocessedTransform,
-      'hasPendingLocalChanges:', hasPendingLocalChanges);
+      'hasPendingLocalChanges:', hasPendingLocalChanges,
+      'fieldValue[0].children:', JSON.stringify(fieldValue?.[0]?.children),
+      'editor.children[0].children:', JSON.stringify(editor.children?.[0]?.children));
 
     // Helper to apply transform based on type
     const applyTransform = () => {
@@ -490,10 +495,14 @@ const SyncedSlateToolbar = ({
     } else if (lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
       // Redux caught up to our local changes
       lastSentValueRef.current = null;
-    } else if (currentSelection && !isEqual(currentSelection, editor.selection) &&
+    } else if (!hasPendingLocalChanges && !contentNeedsSync &&
+               currentSelection && !isEqual(currentSelection, editor.selection) &&
                isSelectionValidForDocument(currentSelection, editor.children)) {
       // Selection-only change - update editor's selection
       // This handles clicks that move cursor without changing content
+      // IMPORTANT: Don't apply when hasPendingLocalChanges or contentNeedsSync is true,
+      // as the selection from Redux is stale and would overwrite the correct selection
+      // from a recent format operation
       console.log('[TOOLBAR SYNC] Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
       try {
         Transforms.select(editor, currentSelection);
