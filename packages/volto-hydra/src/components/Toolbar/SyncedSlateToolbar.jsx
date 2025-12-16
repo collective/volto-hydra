@@ -490,6 +490,9 @@ const SyncedSlateToolbar = ({
       // Transform sets its own selection (e.g., cursor inside new format element)
       processedTransformRequestIdRef.current = transformAction.requestId;
       console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
+      // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
+      // This is needed for delete/paste transforms that don't go through applyInlineFormat
+      activeFormatRequestIdRef.current = transformAction.requestId;
       applyTransform();
 
     } else if (lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {

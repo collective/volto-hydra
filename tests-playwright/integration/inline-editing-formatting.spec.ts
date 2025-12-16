@@ -546,14 +546,16 @@ test.describe('Inline Editing - Formatting', () => {
     expect(selectionAfter.isCollapsed).toBe(true);
     expect(selectionAfter.editorHasFocus).toBe(true);
 
-    // The visible offset should be the same (at end of "Hello world" = 11)
-    // Note: actual DOM offset may differ due to ZWS, but visible text position should be same
+    // Visible text should still be "Hello world"
     const textContent = await helper.getCleanTextContent(editor);
     expect(textContent).toBe('Hello world');
 
-    // Verify cursor is at the end by checking offset equals text length
-    // (accounting for possible ZWS characters)
-    expect(selectionAfter.anchorOffset).toBeGreaterThanOrEqual(textContent.length);
+    // Verify cursor is at the end using visible text before/after cursor
+    // (DOM offset varies due to ZWS nodes, but visible position should be at end)
+    const textAround = await helper.getTextAroundCursor(editor);
+    console.log('[TEST] Text around cursor:', JSON.stringify(textAround));
+    expect(textAround.textBefore).toBe('Hello world');
+    expect(textAround.textAfter).toBe('');
   });
 
   test('prospective formatting: toggle on, type, off, type, on again does not double text', async ({
@@ -612,6 +614,68 @@ test.describe('Inline Editing - Formatting', () => {
     expect(textContent).toBe('Hello bold normal more');
   });
 
+  test('prospective formatting: toggle in middle of text preserves text to right', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('one two three four five', { delay: 10 });
+    await helper.waitForEditorText(editor, /one two three four five/);
+
+    // Click in the middle of the text (after "two ")
+    await helper.selectTextRange(editor, 8, 8); // Position cursor after "one two "
+
+    // Step 1: Toggle bold ON and type
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await editor.pressSequentially('BOLD', { delay: 10 });
+
+    let textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] After first bold:', textContent);
+    expect(textContent).toBe('one two BOLDthree four five');
+
+    // Step 2: Toggle bold OFF and type
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    await editor.pressSequentially(' normal ', { delay: 10 });
+
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] After normal text:', textContent);
+    expect(textContent).toBe('one two BOLD normal three four five');
+
+    // Step 3: Toggle bold ON again - THIS IS WHERE TEXT MIGHT DISAPPEAR
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Verify text to the right is still there
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] After third toggle (no typing yet):', textContent);
+    expect(textContent).toBe('one two BOLD normal three four five');
+
+    // Type more bold text
+    await editor.pressSequentially('MORE', { delay: 10 });
+
+    // Final verification - all text should be preserved
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Final text:', textContent);
+    expect(textContent).toBe('one two BOLD normal MOREthree four five');
+  });
+
   test('prospective formatting: clipboard strips ZWS from bold text', async ({
     page,
     context,
@@ -650,6 +714,55 @@ test.describe('Inline Editing - Formatting', () => {
     // Clipboard should have "Hello world" without any ZWS characters
     expect(clipboardText).toBe('Hello world');
     expect(clipboardText).not.toMatch(/[\uFEFF\u200B]/);
+  });
+
+  test('input not blocked after bolding and deleting selected text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    // Type "one two three"
+    await editor.pressSequentially('one two three', { delay: 10 });
+    await helper.waitForEditorText(editor, /one two three/);
+
+    // Select "two" - text is "one two three", "two" is at offset 4-7
+    await helper.selectTextRange(editor, 4, 7);
+
+    // Bold the selected text
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Wait for format to be applied
+    await helper.waitForFormattedText(editor, /two/, 'bold');
+
+    // Delete the bolded text
+    await editor.press('Backspace');
+
+    // Wait a moment for any blocking to clear
+    await page.waitForTimeout(200);
+
+    // Now try to type - this should work and not be blocked
+    await editor.pressSequentially('NEW', { delay: 50 });
+
+    // Verify the new text was typed
+    await expect(async () => {
+      const textContent = await helper.getCleanTextContent(editor);
+      console.log('[TEST] Text after delete and type:', textContent);
+      expect(textContent).toContain('NEW');
+    }).toPass({ timeout: 5000 });
+
+    // Final text should be "one NEW three" (with "two" replaced by "NEW")
+    const finalText = await helper.getCleanTextContent(editor);
+    expect(finalText).toBe('one NEW three');
   });
 
   test('format button still works when sidebar is closed', async ({ page }) => {
