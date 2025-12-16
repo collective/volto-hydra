@@ -1862,9 +1862,10 @@ export class Bridge {
       const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
       const fieldType = blockTypeFields[fieldName];
 
-      // Only log error for Slate fields - non-Slate text fields don't need data-node-id
-      if (fieldType !== 'slate') {
-        // This is a plain text field, just return null without error
+      // Only skip error for KNOWN non-Slate fields
+      // If fieldType is undefined (not registered), assume it could be Slate and show error
+      if (fieldType && fieldType !== 'slate') {
+        // This is a known non-Slate text field, just return null without error
         return null;
       }
 
