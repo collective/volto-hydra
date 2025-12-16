@@ -59,6 +59,7 @@ export default defineNuxtConfig({
     test: {
       // Test environment: HTTP mode, points to mock API on localhost:8888
       ssr: false,
+      devtools: { enabled: false },
       devServer: {
         https: false  // Disable HTTPS for test mode
       },
