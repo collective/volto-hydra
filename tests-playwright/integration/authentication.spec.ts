@@ -77,15 +77,15 @@ test.describe('Authentication and Access Control', () => {
     // Get the iframe
     const iframe = helper.getIframe();
 
-    // Wait for content to load in iframe
-    const heading = iframe.locator('h1').first();
-    await heading.waitFor();
-    await expect(heading).toBeVisible();
+    // Wait for content to load in iframe - check for block element (works for both mock and nuxt)
+    const block = iframe.locator('[data-block-uid]').first();
+    await block.waitFor();
+    await expect(block).toBeVisible();
 
-    const headingText = await heading.textContent();
-    expect(headingText).toBeTruthy();
-    expect(headingText).not.toContain('Unauthorized');
-    expect(headingText).not.toContain('403');
+    // Verify no auth errors
+    const pageContent = await iframe.locator('body').textContent();
+    expect(pageContent).not.toContain('Unauthorized');
+    expect(pageContent).not.toContain('403');
   });
 
   test('Authentication token is passed to frontend iframe', async ({ page }) => {
@@ -94,9 +94,9 @@ test.describe('Authentication and Access Control', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Wait for iframe to load
+    // Wait for iframe to load - check for block element (works for both mock and nuxt)
     const iframe = helper.getIframe();
-    await iframe.locator('h1').first().waitFor();
+    await iframe.locator('[data-block-uid]').first().waitFor();
 
     // Check that iframe URL contains access_token parameter
     const iframeSrc = await page.locator('iframe').getAttribute('src');
