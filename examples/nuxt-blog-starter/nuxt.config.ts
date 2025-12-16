@@ -128,6 +128,10 @@ export default defineNuxtConfig({
       }
   },
   vite: {
+    // Force pre-bundle these deps at startup to avoid 504 timeouts in CI
+    optimizeDeps: {
+      include: ['flowbite', 'errx'],
+    },
     plugins: [
       // mkcert disabled - certs already generated manually
       // mkcert({
