@@ -2049,6 +2049,9 @@ export class AdminUIHelper {
         }).toPass({ timeout: 2000 });
       }
 
+      // Small wait to ensure selection is stable before typing
+      await this.page.waitForTimeout(50);
+
       await contentEditable.pressSequentially(value, { delay: 10 }); // Type replaces selection
       await contentEditable.blur(); // Trigger blur to commit the value
       return;

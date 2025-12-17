@@ -323,9 +323,11 @@ test.describe('Inline Editing - Basic', () => {
     const newText = 'Make this bold';
     await helper.setSidebarFieldValue('value', newText);
 
-    // Verify the iframe updated with the new text
-    const iframeText = await helper.getBlockTextInIframe(blockId);
-    expect(iframeText).toContain(newText);
+    // Verify the iframe updated with the new text (wait for sync)
+    await expect(async () => {
+      const iframeText = await helper.getBlockTextInIframe(blockId);
+      expect(iframeText).toContain(newText);
+    }).toPass({ timeout: 5000 });
 
     // Select all text in the sidebar editor and apply bold formatting
     const sidebarEditor = helper.getSidebarSlateEditor('value');
