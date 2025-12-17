@@ -742,7 +742,7 @@ const Iframe = (props) => {
         case 'INLINE_EDIT_DATA':
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
-          console.log('[VIEW] INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, 'third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
+          log('INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, 'third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
 
           inlineEditCounterRef.current += 1;
           // Update combined state atomically - formData, blockPathMap, selection together
@@ -935,7 +935,7 @@ const Iframe = (props) => {
               type: event.data.transformType,
               requestId: event.data.requestId,
             };
-            console.log('[VIEW] SLATE_TRANSFORM_REQUEST requestId:', event.data.requestId, 'data third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
+            log('SLATE_TRANSFORM_REQUEST requestId:', event.data.requestId, 'data third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
             // Add type-specific fields
             if (event.data.transformType === 'format') {
               transformAction.format = event.data.format;
@@ -1045,7 +1045,7 @@ const Iframe = (props) => {
           const isNewBlock = !isPositionUpdateOnly &&
                              (!blockUI || blockUI.blockUid !== event.data.blockUid) &&
                              selectedBlock !== event.data.blockUid;
-          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
+          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
 
           // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
           if (isNewBlock) {
@@ -1076,6 +1076,13 @@ const Iframe = (props) => {
                 prevBlockUI.rect?.width === event.data.rect?.width &&
                 prevBlockUI.rect?.height === event.data.rect?.height) {
               return prevBlockUI; // Return same reference to skip re-render
+            }
+            // Reject BLOCK_SELECTED with zero rect - this happens when block element is detached
+            // during frontend re-render (e.g., mock frontend's innerHTML replacement)
+            // Accepting zero rect would cause toolbar to jump to wrong position
+            if (event.data.blockUid && (event.data.rect?.width === 0 || event.data.rect?.height === 0)) {
+              log('[VIEW] Ignoring BLOCK_SELECTED with zero rect (element detached):', event.data.src);
+              return prevBlockUI;
             }
 
             // Assert required fields - fail loudly if BLOCK_SELECTED is missing data
