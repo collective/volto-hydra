@@ -60,6 +60,13 @@
     <!-- Optional title for columns block -->
     <h3 v-if="block.title" data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
 
+    <!-- Top images row - horizontal layout for images above columns -->
+    <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4" data-block-field="top_images">
+      <Block v-for="imgId in block.top_images_layout.items" :key="imgId"
+             :block_uid="imgId" :block="block.top_images[imgId]" :data="data" :contained="true"
+             data-block-add="right" />
+    </div>
+
     <!-- Columns row - horizontal layout -->
     <div class="columns-row flex gap-4" data-block-field="columns">
       <div v-for="columnId in (block.columns_layout?.items || [])" :key="columnId"

@@ -1966,41 +1966,51 @@ test.describe('Container Block Drag and Drop', () => {
       .count();
     expect(initialText1aInCol1).toBe(1);
 
-    // Select text-1a
+    // Select text-1a (a slate block)
     await helper.clickBlockInIframe('text-1a');
     await page.waitForTimeout(300);
 
-    // Try to drag to col-1 level (drop on col-1 which expects column siblings, not slate)
-    // columns container only allows 'column' blocks, not 'slate'
+    // Try to drag slate block to top_images container (which only allows 'image')
+    // The top_images container only allows image blocks, not slate
+    // Hydra will walk up to find a valid container (page level) that allows slate
     const dragHandle = await helper.getDragHandle();
+    const topImg1 = iframe.locator('[data-block-uid="top-img-1"]');
 
-    // Use horizontal drag to col-1 (which is in columns container that only allows 'column' blocks)
-    // expectIndicator=false because slate is not allowed as a sibling of columns
+    // Use horizontal drag to top-img-1 (in top_images container that only allows 'image')
+    // expectIndicator=true because hydra walks up to find valid parent (page level)
     const indicatorShown = await helper.dragBlockWithMouseHorizontal(
       dragHandle,
-      col1,
+      topImg1,
       false, // insertAfter=false (left side)
-      false, // expectIndicator=false (drop should be rejected)
+      true, // expectIndicator=true (drop redirected to valid parent)
     );
 
-    // Indicator should not have been shown
-    expect(indicatorShown).toBe(false);
+    // Indicator should have been shown (for the valid parent container)
+    expect(indicatorShown).toBe(true);
 
-    // text-1a should still be inside col-1 (move to columns level should be rejected)
+    // text-1a should have moved (not still in col-1)
     const finalText1aInCol1 = await col1
       .locator('[data-block-uid="text-1a"]')
       .count();
-    expect(finalText1aInCol1).toBe(1);
+    expect(finalText1aInCol1).toBe(0);
 
-    // text-1a should NOT be a sibling of col-1/col-2 in the columns container
+    // CRITICAL: text-1a should NOT be in the top_images container
+    // Even though we dragged to top-img-1, slate is not allowed there
     const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const directChildren = await columnsBlock
-      .locator('.columns-row > [data-block-uid]')
+    const topImagesChildren = await columnsBlock
+      .locator('.top-images-row > [data-block-uid]')
       .all();
-    const directChildUids = await Promise.all(
-      directChildren.map((b) => b.getAttribute('data-block-uid')),
+    const topImagesUids = await Promise.all(
+      topImagesChildren.map((b) => b.getAttribute('data-block-uid')),
     );
-    expect(directChildUids).not.toContain('text-1a');
+    expect(topImagesUids).not.toContain('text-1a');
+
+    // text-1a should be at page level (sibling of columns-1, not inside it)
+    const pageLevelBlocks = iframe.locator('[data-block-uid]:not([data-block-uid] [data-block-uid])');
+    const pageLevelUids = await pageLevelBlocks.evaluateAll(blocks =>
+      blocks.map(b => b.getAttribute('data-block-uid'))
+    );
+    expect(pageLevelUids).toContain('text-1a');
   });
 
   test('column block cannot be dragged to page level (page allowedBlocks restriction)', async ({
