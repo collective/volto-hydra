@@ -2494,10 +2494,9 @@ test.describe('data-block-selector Navigation', () => {
     await expect(slider).toBeVisible();
 
     // Initially slide-1 is visible, slide-2 is hidden
-    const slide1 = iframe.locator('[data-block-uid="slide-1"]');
-    const slide2 = iframe.locator('[data-block-uid="slide-2"]');
-    await expect(slide1).toBeVisible();
-    await expect(slide2).toBeHidden();
+    // Use helper that handles both display:none and translate-based hiding
+    expect(await helper.isBlockHiddenInIframe('slide-1')).toBe(false);
+    expect(await helper.isBlockHiddenInIframe('slide-2')).toBe(true);
 
     // Click on slide-1 to select it first
     await helper.clickBlockInIframe('slide-1');
@@ -2563,12 +2562,59 @@ test.describe('data-block-selector Navigation', () => {
     await nextButton.click();
     await helper.waitForQuantaToolbar('slide-3');
 
-    // Click the "next" button - should do nothing since we're at the end
+    // Click the "next" button at the last slide
+    // Behavior depends on carousel implementation:
+    // - Non-wrapping carousel: stays on slide-3
+    // - Wrapping carousel (Flowbite): goes to slide-1
     await nextButton.click();
 
-    // slide-3 should still be selected (no change)
-    // Use waitForQuantaToolbar to confirm it's still on slide-3
-    await helper.waitForQuantaToolbar('slide-3');
+    // Accept either slide-3 (stayed) or slide-1 (wrapped)
+    await expect(async () => {
+      const slide3Selected = await helper.isQuantaToolbarVisibleInIframe('slide-3');
+      const slide1Selected = await helper.isQuantaToolbarVisibleInIframe('slide-1');
+      expect(slide3Selected || slide1Selected).toBeTruthy();
+    }).toPass({ timeout: 10000 });
+  });
+
+  test('outline does not follow old block during +1 navigation animation', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select slide-1
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Get the initial outline position as baseline
+    const initialBox = await helper.getBlockOutlineBoundingBox();
+    expect(initialBox).not.toBeNull();
+    const baselineX = initialBox!.x;
+    console.log(`[TEST] Baseline outline X: ${baselineX}`);
+
+    // Monitor outline position while clicking +1
+    // The outline should never go significantly left of the baseline
+    // (which would indicate it's following the old slide as it animates offscreen)
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+
+    const result = await helper.monitorOutlinePositionDuringAction(
+      async () => {
+        await nextButton.click();
+        await helper.waitForQuantaToolbar('slide-2');
+      },
+      baselineX - 50, // Allow 50px tolerance for minor positioning variations
+      16, // Check every 16ms (~60fps)
+    );
+
+    console.log(`[TEST] Monitor result: minXSeen=${result.minXSeen}, badPositionDetected=${result.badPositionDetected}`);
+    console.log(`[TEST] Position samples: ${result.positions.length}`);
+
+    // The outline should never have gone to a bad position (far left)
+    expect(result.badPositionDetected).toBe(false);
   });
 
   test('clicking dot indicator selects that specific slide', async ({

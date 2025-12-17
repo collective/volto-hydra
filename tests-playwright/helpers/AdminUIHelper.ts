@@ -137,6 +137,39 @@ export class AdminUIHelper {
   }
 
   /**
+   * Check if a block is hidden in the iframe.
+   * Matches hydra.js's isElementHidden logic:
+   * - display: none or visibility: hidden
+   * - zero dimensions
+   * - translated outside container bounds (e.g., Flowbite carousel)
+   */
+  async isBlockHiddenInIframe(blockId: string): Promise<boolean> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    return await block.evaluate((el) => {
+      if (!el) return true;
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return true;
+      }
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        return true;
+      }
+      // Check if element is translated/positioned outside its container
+      const container = el.parentElement?.closest('[data-block-uid]');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        if (rect.right <= containerRect.left || rect.left >= containerRect.right) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  /**
    * Inject the preserveWhitespaceDOM helper into the iframe.
    * This helper creates DOM while preserving whitespace text nodes that innerHTML would collapse.
    * Vue/Nuxt templates create these from newlines/indentation.
@@ -1245,6 +1278,62 @@ export class AdminUIHelper {
   async getBlockOutlineBoundingBox(): Promise<{ x: number; y: number; width: number; height: number } | null> {
     const outline = this.page.locator('.volto-hydra-block-outline');
     return await outline.boundingBox();
+  }
+
+  /**
+   * Monitor the outline position during an action and check if it ever appears at an invalid position.
+   * Returns true if the outline was ever at a bad position (x < minX or visible when should be hidden).
+   *
+   * @param action - The async action to perform while monitoring
+   * @param minX - Minimum acceptable X position (outline going left of this is bad)
+   * @param checkInterval - How often to check position in ms
+   * @returns Object with badPositionDetected and details about what was found
+   */
+  async monitorOutlinePositionDuringAction(
+    action: () => Promise<void>,
+    minX: number = 0,
+    checkInterval: number = 16,
+  ): Promise<{ badPositionDetected: boolean; minXSeen: number | null; positions: Array<{ x: number; y: number; visible: boolean }> }> {
+    const outline = this.page.locator('.volto-hydra-block-outline');
+    const positions: Array<{ x: number; y: number; visible: boolean }> = [];
+    let badPositionDetected = false;
+    let minXSeen: number | null = null;
+    let monitoring = true;
+
+    // Start monitoring in background
+    const monitorPromise = (async () => {
+      while (monitoring) {
+        const visible = await outline.isVisible().catch(() => false);
+        if (visible) {
+          const box = await outline.boundingBox().catch(() => null);
+          if (box) {
+            positions.push({ x: box.x, y: box.y, visible: true });
+            if (minXSeen === null || box.x < minXSeen) {
+              minXSeen = box.x;
+            }
+            if (box.x < minX) {
+              badPositionDetected = true;
+              console.log(`[TEST] Bad outline position detected: x=${box.x} < minX=${minX}`);
+            }
+          }
+        } else {
+          positions.push({ x: 0, y: 0, visible: false });
+        }
+        await new Promise((r) => setTimeout(r, checkInterval));
+      }
+    })();
+
+    // Perform the action
+    await action();
+
+    // Wait a bit more after action completes to catch any delayed updates
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Stop monitoring
+    monitoring = false;
+    await monitorPromise.catch(() => {}); // Ignore any errors from the monitoring loop
+
+    return { badPositionDetected, minXSeen, positions };
   }
 
   /**

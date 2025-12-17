@@ -729,7 +729,30 @@ export class Bridge {
             } else if (this.selectedBlockUid) {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  let blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  // If block is hidden (e.g., carousel slide), try to make it visible
+                  if (blockElement && this.isElementHidden(blockElement)) {
+                    log('FORM_DATA: selected block is hidden, trying to make visible:', this.selectedBlockUid);
+                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    if (madeVisible) {
+                      // Wait for block to become visible, then update UI
+                      const waitForVisible = async () => {
+                        for (let i = 0; i < 10; i++) {
+                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                          if (blockElement && !this.isElementHidden(blockElement)) {
+                            log('FORM_DATA: block now visible, updating UI');
+                            this.updateBlockUIAfterFormData(blockElement, skipFocus);
+                            return;
+                          }
+                        }
+                        log('FORM_DATA: timeout waiting for block to become visible');
+                      };
+                      waitForVisible();
+                      this.replayBufferedEvents();
+                      return;
+                    }
+                  }
                   if (blockElement) {
                     this.updateBlockUIAfterFormData(blockElement, skipFocus);
                   }
@@ -879,16 +902,17 @@ export class Bridge {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
-      event.stopPropagation();
-
       // Handle data-block-selector clicks (carousel nav buttons, etc.)
-      // Don't preventDefault - let frontend handle visibility changes
+      // Don't stopPropagation or preventDefault - let frontend handle visibility changes
       const selectorElement = event.target.closest('[data-block-selector]');
       if (selectorElement) {
         const selector = selectorElement.getAttribute('data-block-selector');
         this.handleBlockSelector(selector, selectorElement);
         return;
       }
+
+      // Stop propagation for block clicks (but not selector clicks above)
+      event.stopPropagation();
 
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
@@ -2587,78 +2611,235 @@ export class Bridge {
    */
   handleBlockSelector(selector, triggerElement) {
     log('handleBlockSelector:', selector, 'trigger:', triggerElement.className);
-    let targetUid;
 
-    if (selector === '+1' || selector === '-1') {
-      // Find sibling relative to current block or the container
-      const containerBlock = triggerElement.closest('[data-block-uid]');
-      if (!containerBlock) {
-        log('handleBlockSelector: no container found');
-        return;
-      }
-      const containerUid = containerBlock.getAttribute('data-block-uid');
-      log('handleBlockSelector: container =', containerUid);
+    // Find the container block
+    const containerBlock = triggerElement.closest('[data-block-uid]');
+    if (!containerBlock) {
+      log('handleBlockSelector: no container found');
+      return;
+    }
+    const containerUid = containerBlock.getAttribute('data-block-uid');
+    log('handleBlockSelector: container =', containerUid);
 
-      // Get all nested blocks whose immediate parent container is this one
-      // (i.e., blocks directly owned by this container, not deeply nested)
-      const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
-      log('handleBlockSelector: allNestedBlocks =', allNestedBlocks.length);
-      const childBlocks = Array.from(allNestedBlocks).filter((el) => {
-        // Check that this block's parent container is our container
-        const parentContainer = el.parentElement?.closest('[data-block-uid]');
-        return parentContainer?.getAttribute('data-block-uid') === containerUid;
-      });
-      log('handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
+    // Get all child blocks in this container
+    const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
+    const childBlocks = Array.from(allNestedBlocks).filter((el) => {
+      const parentContainer = el.parentElement?.closest('[data-block-uid]');
+      return parentContainer?.getAttribute('data-block-uid') === containerUid;
+    });
+    log('handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
 
-      if (childBlocks.length === 0) {
-        log('handleBlockSelector: no child blocks found');
-        return;
-      }
-
-      // Find current index - use currently selected block if it's in this container
-      let currentIndex = -1;
-      if (this.selectedBlockUid) {
-        currentIndex = childBlocks.findIndex(
-          el => el.getAttribute('data-block-uid') === this.selectedBlockUid
-        );
-      }
-
-      // If no block selected or selected block not in container, start from first/last
-      if (currentIndex === -1) {
-        currentIndex = selector === '+1' ? -1 : childBlocks.length;
-      }
-
-      const offset = parseInt(selector, 10);
-      const targetIndex = currentIndex + offset;
-
-      // Bounds check
-      if (targetIndex >= 0 && targetIndex < childBlocks.length) {
-        targetUid = childBlocks[targetIndex].getAttribute('data-block-uid');
-      }
-    } else {
-      // Direct UID reference
-      targetUid = selector;
+    if (childBlocks.length === 0) {
+      log('handleBlockSelector: no child blocks found');
+      return;
     }
 
-    log('handleBlockSelector: targetUid =', targetUid);
-    if (targetUid) {
-      // Wait for the frontend's click handler to show/hide slides,
-      // then select the block once it's visible
-      const waitForBlockAndSelect = (retries = 10) => {
-        const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
-        if (targetElement && targetElement.offsetParent !== null) {
-          // Block exists and is visible (offsetParent is null for hidden elements)
-          log('handleBlockSelector: selecting', targetUid);
-          this.selectBlock(targetElement);
-        } else if (retries > 0) {
-          // Wait a bit for frontend to render/show the block
-          setTimeout(() => waitForBlockAndSelect(retries - 1), 50);
-        } else {
-          log('handleBlockSelector: block not visible after retries', targetUid);
+    // For direct UID selector, target that specific block
+    if (selector !== '+1' && selector !== '-1') {
+      const targetUid = selector;
+      log('handleBlockSelector: direct selector targetUid =', targetUid);
+      this.waitForBlockVisibleAndSelect(targetUid);
+      return;
+    }
+
+    // Helper to get fresh child blocks (DOM may re-render)
+    const getFreshChildBlocks = () => {
+      const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
+      if (!container) return [];
+      const allNested = container.querySelectorAll('[data-block-uid]');
+      return Array.from(allNested).filter((el) => {
+        const parent = el.parentElement?.closest('[data-block-uid]');
+        return parent?.getAttribute('data-block-uid') === containerUid;
+      });
+    };
+
+    // Find the child block that's most centered within the container
+    // Only returns a child if it's actually visible (center within container bounds)
+    const findMostCenteredChild = (children, container) => {
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.left + containerRect.width / 2;
+
+      let best = null;
+      let bestDistance = Infinity;
+
+      for (const child of children) {
+        const rect = child.getBoundingClientRect();
+        const childCenter = rect.left + rect.width / 2;
+
+        // Only consider children whose center is within the container bounds
+        if (childCenter < containerRect.left || childCenter > containerRect.right) {
+          continue;
         }
-      };
-      // Start after a short delay to let click event propagate to frontend
-      setTimeout(waitForBlockAndSelect, 0);
+
+        const distance = Math.abs(childCenter - containerCenter);
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = child;
+        }
+      }
+      return best;
+    };
+
+    // For +1/-1, calculate the target block and wait for it to become visible
+    // Stop any existing tracking and hide the block UI immediately
+    this.stopTransitionTracking();
+    window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+
+    const currentlyVisibleElement = findMostCenteredChild(childBlocks, containerBlock);
+    const currentVisibleUid = currentlyVisibleElement?.getAttribute('data-block-uid');
+
+    // Debug: log position of all children
+    childBlocks.forEach(el => {
+      const uid = el.getAttribute('data-block-uid');
+      const rect = el.getBoundingClientRect();
+      log(`handleBlockSelector: ${uid} rect.left=${Math.round(rect.left)}`);
+    });
+    log('handleBlockSelector: currently visible =', currentVisibleUid);
+
+    // Calculate the expected target block based on +1/-1
+    let currentIndex = childBlocks.findIndex(
+      el => el.getAttribute('data-block-uid') === currentVisibleUid
+    );
+    if (currentIndex === -1) currentIndex = 0;
+
+    const offset = parseInt(selector, 10);
+    let targetIndex = currentIndex + offset;
+
+    // Handle wrapping
+    if (targetIndex < 0) {
+      targetIndex = childBlocks.length - 1;
+    } else if (targetIndex >= childBlocks.length) {
+      targetIndex = 0;
+    }
+
+    const targetUid = childBlocks[targetIndex]?.getAttribute('data-block-uid');
+    log('handleBlockSelector: target =', targetUid, '(index', currentIndex, '+', offset, '→', targetIndex, ')');
+
+    // Check if target block is visible (centered within container bounds)
+    // Also returns position for stability tracking
+    const getTargetVisibility = (container) => {
+      const targetEl = document.querySelector(`[data-block-uid="${targetUid}"]`);
+      if (!targetEl || !container) return { visible: false, x: null };
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const targetCenter = targetRect.left + targetRect.width / 2;
+
+      // Target is visible if its center is within container bounds
+      const visible = targetCenter >= containerRect.left && targetCenter <= containerRect.right;
+      return { visible, x: targetRect.left };
+    };
+
+    // Track stability - target must be visible AND position stable
+    let stableCount = 0;
+    let lastX = null;
+    const STABLE_THRESHOLD = 3;
+    const POSITION_TOLERANCE = 2; // pixels
+
+    // Wait for target to become visible AND position to stabilize
+    const waitForTarget = (retries = 40) => {
+      const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
+      const freshChildBlocks = getFreshChildBlocks();
+
+      const { visible, x } = getTargetVisibility(container);
+
+      if (visible) {
+        // Check if position is also stable (not animating)
+        const positionStable = lastX !== null && Math.abs(x - lastX) < POSITION_TOLERANCE;
+
+        if (positionStable) {
+          stableCount++;
+        } else {
+          stableCount = 0; // Reset if position changed
+        }
+        lastX = x;
+
+        if (retries === 40 || retries === 30 || retries === 20 || retries === 10 || retries === 1) {
+          log(`handleBlockSelector poll: retries=${retries} target=${targetUid} visible=true x=${Math.round(x)} stableCount=${stableCount}`);
+        }
+
+        if (stableCount >= STABLE_THRESHOLD) {
+          log('handleBlockSelector: target visible and position stable, selecting', targetUid);
+          const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+          if (targetElement) {
+            this.selectBlock(targetElement);
+          }
+          return;
+        }
+      } else {
+        stableCount = 0;
+        lastX = null;
+        if (retries === 40 || retries === 30 || retries === 20 || retries === 10 || retries === 1) {
+          log(`handleBlockSelector poll: retries=${retries} target=${targetUid} visible=false`);
+        }
+      }
+
+      if (retries > 0) {
+        setTimeout(() => waitForTarget(retries - 1), 50);
+      } else {
+        // Target never became visible - fall back to most centered child
+        log('handleBlockSelector: target not visible after settling, finding most centered');
+        const centeredChild = container ? findMostCenteredChild(freshChildBlocks, container) : null;
+        const centeredUid = centeredChild?.getAttribute('data-block-uid');
+        log('handleBlockSelector: fallback to most centered =', centeredUid);
+        if (centeredChild) {
+          this.selectBlock(centeredChild);
+        } else if (container) {
+          // No child found - select the parent container
+          log('handleBlockSelector: no centered child found, selecting parent container');
+          this.selectBlock(container);
+        }
+      }
+    };
+
+    // Start after a short delay to let click event propagate to frontend
+    setTimeout(waitForTarget, 50);
+  }
+
+  /**
+   * Fallback for +1/-1 selection when visibility doesn't change.
+   * Used for carousels that use transforms instead of hiding elements.
+   */
+  handleBlockSelectorFallback(selector, childBlocks, currentVisibleUid) {
+    let currentIndex = childBlocks.findIndex(
+      el => el.getAttribute('data-block-uid') === currentVisibleUid
+    );
+    if (currentIndex === -1) currentIndex = 0;
+
+    const offset = parseInt(selector, 10);
+    let targetIndex = currentIndex + offset;
+
+    // Handle wrapping
+    if (targetIndex < 0) {
+      targetIndex = childBlocks.length - 1;
+    } else if (targetIndex >= childBlocks.length) {
+      targetIndex = 0;
+    }
+
+    const targetUid = childBlocks[targetIndex]?.getAttribute('data-block-uid');
+    log('handleBlockSelector fallback: targetUid =', targetUid);
+
+    if (targetUid) {
+      const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+      if (targetElement) {
+        this.selectBlock(targetElement);
+      }
+    }
+  }
+
+  /**
+   * Wait for a specific block to become visible, then select it.
+   */
+  waitForBlockVisibleAndSelect(targetUid, retries = 10) {
+    const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+    if (targetElement && !this.isElementHidden(targetElement)) {
+      log('handleBlockSelector: selecting', targetUid);
+      this.selectBlock(targetElement);
+    } else if (retries > 0) {
+      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1), 50);
+    } else {
+      log('handleBlockSelector: block not visible after retries', targetUid);
     }
   }
 
@@ -2814,6 +2995,169 @@ export class Bridge {
     // Observe border-box to catch padding/border changes too (not just content)
     // This ensures the selection outline updates for any visual size change
     this.blockResizeObserver.observe(blockElement, { box: 'border-box' });
+
+    // Also track position during CSS transitions (e.g., carousel slide animations)
+    this.observeBlockTransition(blockElement, blockUid);
+  }
+
+  /**
+   * Stops all block position tracking immediately.
+   * Called when navigating to a new block to prevent stale position updates.
+   */
+  stopTransitionTracking() {
+    if (this._transitionAnimationFrame) {
+      cancelAnimationFrame(this._transitionAnimationFrame);
+      this._transitionAnimationFrame = null;
+    }
+    if (this._initialTrackingTimeout) {
+      clearTimeout(this._initialTrackingTimeout);
+      this._initialTrackingTimeout = null;
+    }
+    if (this._transitionMutationObserver) {
+      this._transitionMutationObserver.disconnect();
+      this._transitionMutationObserver = null;
+    }
+    // Remove transitionend listener from the tracked element
+    if (this._transitionEndHandler && this._trackedBlockElement) {
+      this._trackedBlockElement.removeEventListener(
+        'transitionend',
+        this._transitionEndHandler,
+      );
+      this._transitionEndHandler = null;
+      this._trackedBlockElement = null;
+    }
+    // Also disconnect resize observer to prevent stale updates
+    if (this.blockResizeObserver) {
+      this.blockResizeObserver.disconnect();
+      this.blockResizeObserver = null;
+    }
+    // Clear scroll timeout that might re-send position updates
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null;
+    }
+    // Clear the uid to stop any in-flight tracking loops
+    this._trackingBlockUid = null;
+  }
+
+  /**
+   * Tracks block position during CSS transitions/animations.
+   * ResizeObserver doesn't fire for transform changes, so we poll during transitions.
+   *
+   * @param {Element} blockElement - The block element to observe.
+   * @param {string} blockUid - The block's UID.
+   */
+  observeBlockTransition(blockElement, blockUid) {
+    // Clean up existing transition tracking
+    if (this._transitionAnimationFrame) {
+      cancelAnimationFrame(this._transitionAnimationFrame);
+      this._transitionAnimationFrame = null;
+    }
+    if (this._transitionEndHandler) {
+      blockElement.removeEventListener('transitionend', this._transitionEndHandler);
+    }
+    if (this._initialTrackingTimeout) {
+      clearTimeout(this._initialTrackingTimeout);
+      this._initialTrackingTimeout = null;
+    }
+
+    let isTracking = false;
+    this._trackingBlockUid = blockUid;
+
+    const trackPosition = () => {
+      // Stop if tracking was cancelled or block changed
+      if (!isTracking || this._trackingBlockUid !== blockUid) {
+        return;
+      }
+
+      const newRect = blockElement.getBoundingClientRect();
+      const lastRect = this._lastBlockRect;
+
+      if (lastRect) {
+        const topChanged = Math.abs(newRect.top - lastRect.top) > 1;
+        const leftChanged = Math.abs(newRect.left - lastRect.left) > 1;
+
+        if (topChanged || leftChanged) {
+          this._lastBlockRect = newRect;
+          this.sendBlockSelected('transitionTracker', blockElement);
+        }
+      }
+
+      this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
+    };
+
+    // Start tracking when transition starts (detected by style changes)
+    const startTracking = () => {
+      if (!isTracking) {
+        isTracking = true;
+        log('observeBlockTransition: starting position tracking for:', blockUid);
+        trackPosition();
+      }
+    };
+
+    const stopTracking = () => {
+      isTracking = false;
+      if (this._transitionAnimationFrame) {
+        cancelAnimationFrame(this._transitionAnimationFrame);
+        this._transitionAnimationFrame = null;
+      }
+      log('observeBlockTransition: stopped tracking for:', blockUid);
+
+      // Final position update
+      if (this.selectedBlockUid === blockUid) {
+        const finalRect = blockElement.getBoundingClientRect();
+        if (this._lastBlockRect) {
+          const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
+                        Math.abs(finalRect.top - this._lastBlockRect.top) > 1;
+          if (moved) {
+            this._lastBlockRect = finalRect;
+            this.sendBlockSelected('transitionEnd', blockElement);
+          }
+        }
+      }
+    };
+
+    // Stop tracking when transition ends
+    this._transitionEndHandler = stopTracking;
+    this._trackedBlockElement = blockElement;
+
+    blockElement.addEventListener('transitionend', this._transitionEndHandler);
+
+    // Use MutationObserver to detect when transform/translate classes change
+    if (this._transitionMutationObserver) {
+      this._transitionMutationObserver.disconnect();
+    }
+
+    this._transitionMutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' &&
+            (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+          const style = window.getComputedStyle(blockElement);
+          // Check if element has a transition and transform
+          if (style.transition && style.transition !== 'none' &&
+              (style.transform !== 'none' || style.translate !== 'none')) {
+            startTracking();
+          }
+        }
+      }
+    });
+
+    this._transitionMutationObserver.observe(blockElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+
+    // Always do initial position tracking for 500ms after selection
+    // This catches animations on parent elements (e.g., Flowbite carousel)
+    // where the transform is not directly on the selected block
+    startTracking();
+    this._initialTrackingTimeout = setTimeout(() => {
+      // Only stop if no ongoing transition was detected
+      // (transitionend handler will stop it if one was detected)
+      if (isTracking && this.selectedBlockUid === blockUid) {
+        stopTracking();
+      }
+    }, 500);
   }
 
   /**
@@ -3732,7 +4076,20 @@ export class Bridge {
       return true;
     }
     const rect = el.getBoundingClientRect();
-    return rect.width === 0 && rect.height === 0;
+    if (rect.width === 0 && rect.height === 0) {
+      return true;
+    }
+    // Check if element is translated/positioned outside its container
+    // (e.g., Flowbite carousel uses translate-x-full to hide slides)
+    const container = el.parentElement?.closest('[data-block-uid]');
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      // Element is hidden if it's completely outside the container bounds
+      if (rect.right <= containerRect.left || rect.left >= containerRect.right) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
