@@ -373,8 +373,7 @@ export class AdminUIHelper {
       }
 
       // Find and click the LAST "‹ BlockType" parent navigation button in sidebar
-      // (the one closest to the current block - clicking it navigates up one level)
-      // Buttons are ordered root-to-current, so last is the current block's header
+      // Clicking it closes that section and navigates up one level
       const parentButton = parentButtonLocator.last();
       const buttonExists = (await parentButton.count()) > 0;
 
@@ -423,11 +422,15 @@ export class AdminUIHelper {
       await titleElement.first().scrollIntoViewIfNeeded();
       await titleElement.first().click();
     } else {
-      // Fall back to clicking on the block's border area (top-left corner)
+      // Fall back to clicking on the block's border area
+      // Avoid data-block-selector elements (like carousel nav buttons on the sides)
       const blockBox = await block.boundingBox();
       if (blockBox) {
-        // Click 5px from left edge and 5px from top - on the border area
-        await block.click({ position: { x: 5, y: 5 } });
+        // Click at top center - avoids nav buttons (on sides) and child blocks (in middle)
+        // The top border area is typically safe for containers like carousels
+        await block.click({
+          position: { x: blockBox.width / 2, y: 3 },
+        });
       } else {
         throw new Error(
           `Cannot get bounding box for block "${blockId}" to click on border`,
