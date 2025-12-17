@@ -159,6 +159,56 @@ onMounted(() => {
                         required: [],
                     },
                 },
+                // Slider container: uses object_list widget (volto-slider-block format)
+                slider: {
+                    id: 'slider',
+                    title: 'Slider',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
+                    group: 'common',
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['slides', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                            },
+                        ],
+                        properties: {
+                            slides: {
+                                title: 'Slides',
+                                widget: 'object_list',
+                                schema: {
+                                    title: 'Slide',
+                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+                                    properties: {
+                                        head_title: { title: 'Kicker', type: 'string' },
+                                        title: { title: 'Title', type: 'string' },
+                                        description: { title: 'Description', type: 'string', widget: 'textarea' },
+                                        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                                        buttonText: { title: 'Button Text', type: 'string' },
+                                        hideButton: { title: 'Hide Button', type: 'boolean' },
+                                    },
+                                },
+                            },
+                            autoplayEnabled: {
+                                title: 'Autoplay Enabled',
+                                type: 'boolean',
+                                default: false,
+                            },
+                            autoplayDelay: {
+                                title: 'Autoplay Delay',
+                                type: 'integer',
+                                default: 4000,
+                            },
+                            autoplayJump: {
+                                title: 'Autoplay Jump',
+                                type: 'boolean',
+                                default: false,
+                            },
+                        },
+                        required: [],
+                    },
+                },
             };
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');

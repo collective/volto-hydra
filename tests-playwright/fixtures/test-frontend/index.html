@@ -196,7 +196,7 @@
                                             {
                                                 id: 'default',
                                                 title: 'Default',
-                                                fields: ['slides'],
+                                                fields: ['slides', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
                                             },
                                         ],
                                         properties: {
@@ -204,13 +204,32 @@
                                                 title: 'Slides',
                                                 widget: 'object_list',
                                                 schema: {
-                                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'description', 'head_title'] }],
+                                                    title: 'Slide',
+                                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
                                                     properties: {
+                                                        head_title: { title: 'Kicker', type: 'string' },
                                                         title: { title: 'Title', type: 'string' },
-                                                        description: { title: 'Description', type: 'string' },
-                                                        head_title: { title: 'Head Title', type: 'string' },
+                                                        description: { title: 'Description', type: 'string', widget: 'textarea' },
+                                                        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                                                        buttonText: { title: 'Button Text', type: 'string' },
+                                                        hideButton: { title: 'Hide Button', type: 'boolean' },
                                                     },
                                                 },
+                                            },
+                                            autoplayEnabled: {
+                                                title: 'Autoplay Enabled',
+                                                type: 'boolean',
+                                                default: false,
+                                            },
+                                            autoplayDelay: {
+                                                title: 'Autoplay Delay',
+                                                type: 'integer',
+                                                default: 4000,
+                                            },
+                                            autoplayJump: {
+                                                title: 'Autoplay Jump',
+                                                type: 'boolean',
+                                                default: false,
                                             },
                                         },
                                         required: [],

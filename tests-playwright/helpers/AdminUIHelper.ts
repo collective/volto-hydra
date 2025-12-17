@@ -483,7 +483,6 @@ export class AdminUIHelper {
 
     // Check for common block type indicators
     const selectors = [
-      '[data-block-type]',
       '.block-editor-slate',
       '.block-editor-image',
       '.block-editor h2',
@@ -492,12 +491,6 @@ export class AdminUIHelper {
     for (const selector of selectors) {
       const element = sidebar.locator(selector).first();
       if (await element.isVisible()) {
-        // Try to extract block type
-        const dataAttr = await element.getAttribute('data-block-type');
-        if (dataAttr) {
-          return dataAttr;
-        }
-
         // Try from class names
         const classAttr = await element.getAttribute('class');
         if (classAttr) {
@@ -2113,9 +2106,7 @@ export class AdminUIHelper {
 
     // Try to find the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
-        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
-      ).first();
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         return true;
@@ -2151,9 +2142,7 @@ export class AdminUIHelper {
     // Try to find and click the block type button within the block chooser
     for (const name of possibleNames) {
       // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
-        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
-      ).first();
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         await blockButton.click();

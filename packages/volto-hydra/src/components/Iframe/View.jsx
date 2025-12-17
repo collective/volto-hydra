@@ -1749,6 +1749,7 @@ const Iframe = (props) => {
             parentBlockId,
             fieldName,
             newOrder,
+            config.blocks?.blocksConfig,
           );
           onChangeFormData(newFormData);
         }}

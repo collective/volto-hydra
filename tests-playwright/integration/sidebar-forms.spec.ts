@@ -471,6 +471,77 @@ test.describe('Sidebar Forms - Block Type Differences', () => {
   });
 });
 
+test.describe('Sidebar Forms - object_list Item Fields', () => {
+  test('clicking object_list item (slider slide) shows sidebar with item schema fields', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // Click on slide-1 (an object_list item within the slider block)
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // object_list items should show fields from their itemSchema
+    // The slider schema defines: title, description, head_title
+    const hasTitleField = await helper.hasSidebarField('title');
+    const hasDescriptionField = await helper.hasSidebarField('description');
+    const hasHeadTitleField = await helper.hasSidebarField('head_title');
+
+    expect(hasTitleField).toBe(true);
+    expect(hasDescriptionField).toBe(true);
+    expect(hasHeadTitleField).toBe(true);
+  });
+
+  test('object_list item sidebar shows correct field values', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // Click on slide-1
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Get field values - should match the data in carousel-test-page/data.json
+    const titleValue = await helper.getSidebarFieldValue('title');
+    const headTitleValue = await helper.getSidebarFieldValue('head_title');
+
+    expect(titleValue).toBe('Slide 1');
+    expect(headTitleValue).toBe('Welcome');
+  });
+
+  test('editing object_list item field in sidebar updates the data', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // Click on slide-1 (the visible active slide)
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Verify initial value
+    const initialTitle = await helper.getSidebarFieldValue('title');
+    expect(initialTitle).toBe('Slide 1');
+
+    // Edit the title field
+    await helper.setSidebarFieldValue('title', 'Updated Slide Title');
+
+    // Wait for update to propagate
+    await helper.waitForFieldValueToBe('title', 'Updated Slide Title');
+
+    // Verify field shows new value
+    const newTitleValue = await helper.getSidebarFieldValue('title');
+    expect(newTitleValue).toBe('Updated Slide Title');
+  });
+});
+
 test.describe('Sidebar Forms - Field Validation', () => {
   test('Sidebar fields list matches expected fields for Image block', async ({ page }) => {
     const helper = new AdminUIHelper(page);

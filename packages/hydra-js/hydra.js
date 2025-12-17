@@ -1868,8 +1868,11 @@ export class Bridge {
       }
       const blockElement = container?.closest?.('[data-block-uid]');
       const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
-      const blockType = blockElement?.getAttribute('data-block-type') || 'unknown';
       const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+
+      // Get block type via getBlockData (handles object_list items with virtual @type)
+      const blockData = blockUid !== 'unknown' ? this.getBlockData(blockUid) : null;
+      const blockType = blockData?.['@type'] || 'unknown';
 
       // Check if this field is supposed to be a Slate field
       const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
