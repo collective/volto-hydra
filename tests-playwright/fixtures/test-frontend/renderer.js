@@ -93,6 +93,11 @@ function renderBlock(blockId, block) {
             wrapper.classList.add('carousel-block');
             wrapper.innerHTML = renderCarouselBlock(block);
             break;
+        case 'slider':
+            // Slider uses object_list format (slides as array with @id)
+            wrapper.classList.add('carousel-block');
+            wrapper.innerHTML = renderSliderBlock(block);
+            break;
         case 'slide':
             wrapper.innerHTML = renderSlideBlock(block);
             break;
@@ -583,18 +588,83 @@ function renderCarouselBlock(block) {
 }
 
 /**
- * Render a slide block (child of carousel).
+ * Render a slider block using object_list format (slides as array with @id).
+ * This is the volto-slider-block format.
+ *
+ * @param {Object} block - Slider block data with slides array
+ * @returns {string} HTML string
+ */
+function renderSliderBlock(block) {
+    const slides = block.slides || [];
+    const activeSlideId = slides[0]?.['@id'] || null;
+
+    let html = '<div class="carousel-container" style="position: relative; padding: 20px; background: #f5f5f5; border-radius: 8px; min-height: 120px;">';
+
+    // Navigation button - Previous (selects previous sibling)
+    html += '<button data-block-selector="-1" class="carousel-prev" style="position: absolute; left: 5px; top: 50%; transform: translateY(-50%); z-index: 10; padding: 10px; cursor: pointer;">←</button>';
+
+    // Slides container - only ONE slide visible at a time
+    html += '<div class="slides-wrapper" style="position: relative; margin: 0 50px; min-height: 80px;">';
+
+    slides.forEach((slide, index) => {
+        const slideId = slide['@id'];
+        if (!slideId) return;
+
+        // Only first slide is visible, others are hidden
+        const isActive = slideId === activeSlideId;
+        const displayStyle = isActive ? 'block' : 'none';
+
+        // Render slide as nested block - hidden slides still have data-block-uid
+        html += `<div data-block-uid="${slideId}" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
+        html += renderSlideBlock(slide);
+        html += '</div>';
+    });
+
+    html += '</div>';
+
+    // Navigation button - Next (selects next sibling)
+    html += '<button data-block-selector="+1" class="carousel-next" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); z-index: 10; padding: 10px; cursor: pointer;">→</button>';
+
+    // Direct selector buttons for each slide (like dot indicators)
+    // Only show dots for first half of slides to test both direct selector and +1/-1 fallback
+    const halfLength = Math.ceil(slides.length / 2);
+    html += '<div class="slide-indicators" style="text-align: center; margin-top: 10px;">';
+    slides.forEach((slide, index) => {
+        const slideId = slide['@id'];
+        if (index < halfLength) {
+            // First half: show direct selector dot
+            html += `<button data-block-selector="${slideId}" class="slide-dot" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; cursor: pointer; border: 1px solid #999; background: ${slideId === activeSlideId ? '#333' : '#fff'};">${index + 1}</button>`;
+        } else {
+            // Second half: no direct selector, must use +1/-1 navigation
+            html += `<span class="slide-dot no-selector" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; display: inline-block; border: 1px solid #ccc; background: ${slideId === activeSlideId ? '#333' : '#eee'};">${index + 1}</span>`;
+        }
+    });
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Render a slide block (child of carousel/slider).
+ * Supports both old format (title, content) and volto-slider-block format (title, description, head_title).
  * @param {Object} block - Slide block data
  * @returns {string} HTML string
  */
 function renderSlideBlock(block) {
     const title = block.title || 'Untitled Slide';
-    const content = block.content || '';
+    // Support both old format (content) and new format (description)
+    const description = block.description || block.content || '';
+    const headTitle = block.head_title || '';
 
-    return `
-        <h4 data-editable-field="title" style="margin: 0 0 8px 0;">${title}</h4>
-        <p data-editable-field="content" style="margin: 0; color: #666;">${content}</p>
-    `;
+    let html = '';
+    if (headTitle) {
+        html += `<div data-editable-field="head_title" style="font-size: 12px; color: #888; margin-bottom: 4px;">${headTitle}</div>`;
+    }
+    html += `<h4 data-editable-field="title" style="margin: 0 0 8px 0;">${title}</h4>`;
+    html += `<p data-editable-field="description" style="margin: 0; color: #666;">${description}</p>`;
+
+    return html;
 }
 
 /**

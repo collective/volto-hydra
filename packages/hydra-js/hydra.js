@@ -154,6 +154,12 @@ export class Bridge {
         }
       }
       if (current) {
+        // Inject virtual @type for object_list items (e.g., 'slider:slides')
+        // This allows field type lookup to work without items having actual @type
+        if (pathInfo.itemType) {
+          log('getBlockData: found object_list item via path, injecting @type:', pathInfo.itemType);
+          return { ...current, '@type': pathInfo.itemType };
+        }
         log('getBlockData: found via path, @type:', current['@type']);
         return current;
       }

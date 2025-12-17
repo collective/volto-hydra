@@ -2489,9 +2489,9 @@ test.describe('data-block-selector Navigation', () => {
 
     const iframe = helper.getIframe();
 
-    // Verify carousel structure is loaded
-    const carousel = iframe.locator('[data-block-uid="carousel-1"]');
-    await expect(carousel).toBeVisible();
+    // Verify slider structure is loaded
+    const slider = iframe.locator('[data-block-uid="slider-1"]');
+    await expect(slider).toBeVisible();
 
     // Initially slide-1 is visible, slide-2 is hidden
     const slide1 = iframe.locator('[data-block-uid="slide-1"]');
@@ -2610,7 +2610,7 @@ test.describe('data-block-selector Navigation', () => {
     const iframe = helper.getIframe();
 
     // First click on the carousel container to see its child blocks in sidebar
-    await helper.clickContainerBlockInIframe('carousel-1');
+    await helper.clickContainerBlockInIframe('slider-1');
 
     const sidebar = page.locator('.sidebar-container');
     // Wait for carousel's ChildBlocksWidget to show Slides section
@@ -2638,7 +2638,7 @@ test.describe('data-block-selector Navigation', () => {
     const sidebar = page.locator('.sidebar-container');
 
     // Click on carousel container first
-    await helper.clickContainerBlockInIframe('carousel-1');
+    await helper.clickContainerBlockInIframe('slider-1');
     // Wait for carousel's ChildBlocksWidget to show Slides section
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
 
@@ -2653,7 +2653,7 @@ test.describe('data-block-selector Navigation', () => {
     await helper.waitForQuantaToolbar('slide-3');
 
     // Now go back to carousel and select slide-1
-    await helper.clickContainerBlockInIframe('carousel-1');
+    await helper.clickContainerBlockInIframe('slider-1');
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
 
     // Select first slide entry

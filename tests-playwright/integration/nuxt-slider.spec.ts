@@ -32,31 +32,31 @@ test.describe('Nuxt Frontend - Slider Block', () => {
   });
 
   test('slider page loads in Nuxt frontend', async () => {
-    // Navigate to the slider test page in edit mode
-    await helper.navigateToEdit('/slider-test-page');
+    // Navigate to the carousel test page in edit mode (uses slider block)
+    await helper.navigateToEdit('/carousel-test-page');
 
     const iframe = helper.getIframe();
 
     // Wait for Nuxt to hydrate and render the page
     // The title block should be visible
-    await expect(iframe.locator('[data-block-uid="title-block-uuid"]')).toBeVisible({
+    await expect(iframe.locator('[data-block-uid="title-block"]')).toBeVisible({
       timeout: 30000,
     });
 
     // Verify the slider block is rendered
-    await expect(iframe.locator('[data-block-uid="slider-block-uuid"]')).toBeVisible();
+    await expect(iframe.locator('[data-block-uid="slider-1"]')).toBeVisible();
   });
 
   test('clicking text after bold in slate block returns correct path', async () => {
     // This test reproduces the getNodePath bug:
     // Clicking on text after bold element should return correct Slate path
 
-    await helper.navigateToEdit('/slider-test-page');
+    await helper.navigateToEdit('/carousel-test-page');
 
     const iframe = helper.getIframe();
 
     // Wait for the slate block after the slider to load
-    const slateBlock = iframe.locator('[data-block-uid="slate-after-slider"]');
+    const slateBlock = iframe.locator('[data-block-uid="text-after"]');
     await expect(slateBlock).toBeVisible({ timeout: 30000 });
 
     // Find the text "to test getNodePath" which comes after the bold "bold text"
@@ -68,22 +68,22 @@ test.describe('Nuxt Frontend - Slider Block', () => {
 
     // Wait for the quanta toolbar to appear for the slate block
     // This will fail if getNodePath returned an error
-    await helper.waitForQuantaToolbar('slate-after-slider');
+    await helper.waitForQuantaToolbar('text-after');
   });
 
   test('slider slides are rendered with correct structure', async () => {
-    await helper.navigateToEdit('/slider-test-page');
+    await helper.navigateToEdit('/carousel-test-page');
 
     const iframe = helper.getIframe();
 
     // Wait for slider to load
-    const slider = iframe.locator('[data-block-uid="slider-block-uuid"]');
+    const slider = iframe.locator('[data-block-uid="slider-1"]');
     await expect(slider).toBeVisible({ timeout: 30000 });
 
     // Check that slides are rendered
     // The Nuxt block.vue renders slides with data-carousel-item
     const slides = slider.locator('[data-carousel-item]');
-    await expect(slides).toHaveCount(2);
+    await expect(slides).toHaveCount(3);
   });
 
   // Note: 'selection is preserved after applying bold formatting' test is in

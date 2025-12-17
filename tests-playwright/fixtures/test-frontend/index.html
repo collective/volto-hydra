@@ -184,10 +184,11 @@
                                         required: [],
                                     },
                                 },
-                                // Carousel container: for testing data-block-selector
-                                carousel: {
-                                    id: 'carousel',
-                                    title: 'Carousel',
+                                // Slider container: uses object_list widget (volto-slider-block format)
+                                // Slides are stored as array with @id instead of blocks/blocks_layout
+                                slider: {
+                                    id: 'slider',
+                                    title: 'Slider',
                                     icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
                                     group: 'common',
                                     blockSchema: {
@@ -201,9 +202,15 @@
                                         properties: {
                                             slides: {
                                                 title: 'Slides',
-                                                type: 'blocks',
-                                                allowedBlocks: ['slide'],
-                                                defaultBlock: 'slide',
+                                                widget: 'object_list',
+                                                schema: {
+                                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'description', 'head_title'] }],
+                                                    properties: {
+                                                        title: { title: 'Title', type: 'string' },
+                                                        description: { title: 'Description', type: 'string' },
+                                                        head_title: { title: 'Head Title', type: 'string' },
+                                                    },
+                                                },
                                             },
                                         },
                                         required: [],
@@ -275,7 +282,7 @@
                     // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge(adminOrigin, {
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'carousel', 'accordion'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion'],
                         voltoConfig: voltoConfig,
                     });
 

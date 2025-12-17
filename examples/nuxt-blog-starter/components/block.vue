@@ -114,31 +114,31 @@
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div v-for="block in block.slides" data-block-uid="block['@id']"
+        <div v-for="slide in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
           class="hidden duration-700 ease-linear bg-center flex items-center"
-          :class="{ 'bg-gray-700': !block.preview_image, 'bg-blend-multiply': !block.preview_image, 'bg-no-repeat': !block.preview_image, 'bg-cover': block.preview_image }"
-          data-carousel-item :style="imageProps(block.preview_image[0], true).class">
+          :class="{ 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }"
+          data-carousel-item :style="slide.preview_image?.[0] ? imageProps(slide.preview_image[0], true).class : ''">
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
-            :class="{ 'right-0': block.flagAlign == 'right' }">
-            <div>{{ block.head_title }}</div>
-            <h5 :id="`heading-${block['@id']}`"
+            :class="{ 'right-0': slide.flagAlign == 'right' }">
+            <div>{{ slide.head_title }}</div>
+            <h5 :id="`heading-${slide['@id']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
-              {{ block.title }}</h5>
+              {{ slide.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">
-              {{ block.description }}</p>
-              <NuxtLink v-if="block.href" :to="getUrl(block.href[0])" data-editable-field="buttonText"
+              {{ slide.description }}</p>
+              <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${block['@id']}`">
-              
-              {{ block.buttonText || 'Read More' }}</NuxtLink>
+              :aria-describedby="`heading-${slide['@id']}`">
+
+              {{ slide.buttonText || 'Read More' }}</NuxtLink>
           </div>
         </div>
       </div>
       <!-- Slider indicators -->
       <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
-        <button v-for="(block, index) in block.slides" type="button" class="w-3 h-3 rounded-full" aria-current="true"
-          aria-label="Slide 1" :data-carousel-slide-to="index"></button>
+        <button v-for="(slide, index) in block.slides" :key="slide['@id']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
+          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index"></button>
       </div>
       <!-- Slider controls -->
       <button type="button"

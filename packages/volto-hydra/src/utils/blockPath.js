@@ -100,10 +100,10 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
         : blockConfig?.blockSchema;
 
       if (schema?.properties) {
-        // Look for fields with type: 'blocks' (container fields)
+        // Look for fields with type: 'blocks' or widget: 'object_list' (container fields)
         Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
           if (fieldDef.type === 'blocks') {
-            // This is a container field - recurse into it
+            // Standard container field - recurse into it
             const nestedBlocks = block[fieldName];
             const layoutFieldName = `${fieldName}_layout`;
             const nestedLayout = block[layoutFieldName]?.items;
@@ -118,6 +118,28 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
                 fieldDef.maxLength || null, // Pass maxLength from schema
                 fieldName, // Pass the container field name
               );
+            }
+          } else if (fieldDef.widget === 'object_list') {
+            // object_list widget: items stored as array with @id field (e.g., volto-slider-block)
+            // Items share the same schema defined in fieldDef.schema
+            const items = block[fieldName];
+            if (Array.isArray(items)) {
+              items.forEach((item, index) => {
+                const itemId = item['@id'];
+                if (itemId) {
+                  // Use parentBlockType:fieldName as virtual type for itemSchema lookup
+                  const itemType = `${blockType}:${fieldName}`;
+                  pathMap[itemId] = {
+                    path: [...blockPath, fieldName, index],
+                    parentId: blockId,
+                    containerField: fieldName,
+                    allowedSiblingTypes: [itemType], // All items share same schema
+                    maxSiblings: null,
+                    isObjectListItem: true, // Flag for array-based CRUD operations
+                    itemType, // Virtual type for schema lookup
+                  };
+                }
+              });
             }
           }
         });
@@ -295,6 +317,25 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
           maxLength: fieldDef.maxLength || null,
         };
       }
+    } else if (fieldDef.widget === 'object_list') {
+      // object_list: items stored as array with @id field
+      const items = parentBlock[fieldName];
+      if (Array.isArray(items)) {
+        const itemIndex = items.findIndex(item => item['@id'] === blockId);
+        if (itemIndex !== -1) {
+          const itemType = `${parentType}:${fieldName}`;
+          return {
+            fieldName,
+            parentId,
+            allowedBlocks: [itemType],
+            defaultBlock: itemType,
+            maxLength: null,
+            isObjectList: true,
+            itemSchema: fieldDef.schema,
+            itemIndex, // Track position in array for CRUD
+          };
+        }
+      }
     }
   }
 
@@ -339,7 +380,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   const containerFields = [];
 
-  // Check for schema-defined container fields (type: 'blocks')
+  // Check for schema-defined container fields (type: 'blocks' or widget: 'object_list')
   if (schema?.properties) {
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
       if (fieldDef.type === 'blocks') {
@@ -349,6 +390,18 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           allowedBlocks: fieldDef.allowedBlocks || null,
           defaultBlock: fieldDef.defaultBlock || null,
           maxLength: fieldDef.maxLength || null,
+        });
+      } else if (fieldDef.widget === 'object_list') {
+        // object_list: items stored as array, virtual type is blockType:fieldName
+        const itemType = `${blockType}:${fieldName}`;
+        containerFields.push({
+          fieldName,
+          title: fieldDef.title || fieldName,
+          allowedBlocks: [itemType], // Single virtual type
+          defaultBlock: itemType,
+          maxLength: null,
+          isObjectList: true,
+          itemSchema: fieldDef.schema, // Store itemSchema for editing
         });
       }
     }
@@ -402,8 +455,7 @@ export function insertBlockInContainer(formData, blockPathMap, afterBlockId, new
   }
 
   // Container-level insertion
-  const { parentId, fieldName } = containerConfig;
-  const layoutFieldName = `${fieldName}_layout`;
+  const { parentId, fieldName, isObjectList } = containerConfig;
 
   // Get the parent block using path
   const parentPath = blockPathMap[parentId]?.path;
@@ -413,24 +465,42 @@ export function insertBlockInContainer(formData, blockPathMap, afterBlockId, new
     throw new Error(`[HYDRA] Could not find parent block ${parentId} for container insertion`);
   }
 
-  // Create new container field with the added block
-  const newContainerBlocks = {
-    ...parentBlock[fieldName],
-    [newBlockId]: newBlockData,
-  };
+  let updatedParentBlock;
 
-  // Insert into layout after the selected block
-  const currentItems = parentBlock[layoutFieldName]?.items || [];
-  const insertIndex = currentItems.indexOf(afterBlockId) + 1;
-  const newItems = [...currentItems];
-  newItems.splice(insertIndex, 0, newBlockId);
+  if (isObjectList) {
+    // object_list: items stored as array with @id field
+    const items = [...(parentBlock[fieldName] || [])];
+    const afterIndex = items.findIndex(item => item['@id'] === afterBlockId);
+    const insertIndex = afterIndex + 1;
+    // Insert new item with @id
+    items.splice(insertIndex, 0, { '@id': newBlockId, ...newBlockData });
 
-  // Update the parent block with new blocks and layout
-  const updatedParentBlock = {
-    ...parentBlock,
-    [fieldName]: newContainerBlocks,
-    [layoutFieldName]: { items: newItems },
-  };
+    updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: items,
+    };
+  } else {
+    // Standard container: blocks object + blocks_layout
+    const layoutFieldName = `${fieldName}_layout`;
+
+    // Create new container field with the added block
+    const newContainerBlocks = {
+      ...parentBlock[fieldName],
+      [newBlockId]: newBlockData,
+    };
+
+    // Insert into layout after the selected block
+    const currentItems = parentBlock[layoutFieldName]?.items || [];
+    const insertIndex = currentItems.indexOf(afterBlockId) + 1;
+    const newItems = [...currentItems];
+    newItems.splice(insertIndex, 0, newBlockId);
+
+    updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: newContainerBlocks,
+      [layoutFieldName]: { items: newItems },
+    };
+  }
 
   // Use path-aware update to handle nested containers
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -462,8 +532,7 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
   }
 
   // Container-level deletion
-  const { parentId, fieldName } = containerConfig;
-  const layoutFieldName = `${fieldName}_layout`;
+  const { parentId, fieldName, isObjectList } = containerConfig;
 
   // Get the parent block using path
   const parentPath = blockPathMap[parentId]?.path;
@@ -473,19 +542,33 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
     throw new Error(`[HYDRA] Could not find parent block ${parentId} for container deletion`);
   }
 
-  // Remove block from container field
-  const { [blockId]: removed, ...remainingBlocks } = parentBlock[fieldName];
+  let updatedParentBlock;
 
-  // Remove from layout
-  const currentItems = parentBlock[layoutFieldName]?.items || [];
-  const newItems = currentItems.filter((id) => id !== blockId);
+  if (isObjectList) {
+    // object_list: filter out item by @id
+    const items = (parentBlock[fieldName] || []).filter(item => item['@id'] !== blockId);
 
-  // Update the parent block with remaining blocks and layout
-  const updatedParentBlock = {
-    ...parentBlock,
-    [fieldName]: remainingBlocks,
-    [layoutFieldName]: { items: newItems },
-  };
+    updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: items,
+    };
+  } else {
+    // Standard container: remove from blocks object and layout
+    const layoutFieldName = `${fieldName}_layout`;
+
+    // Remove block from container field
+    const { [blockId]: removed, ...remainingBlocks } = parentBlock[fieldName];
+
+    // Remove from layout
+    const currentItems = parentBlock[layoutFieldName]?.items || [];
+    const newItems = currentItems.filter((id) => id !== blockId);
+
+    updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: remainingBlocks,
+      [layoutFieldName]: { items: newItems },
+    };
+  }
 
   // Use path-aware update to handle nested containers
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -515,7 +598,7 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
   }
 
   // Container-level mutation
-  const { parentId, fieldName } = containerConfig;
+  const { parentId, fieldName, isObjectList } = containerConfig;
 
   const parentPath = blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
@@ -524,13 +607,28 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
     throw new Error(`[HYDRA] Could not find parent block ${parentId} for container mutation`);
   }
 
-  const updatedParentBlock = {
-    ...parentBlock,
-    [fieldName]: {
-      ...parentBlock[fieldName],
-      [blockId]: newBlockData,
-    },
-  };
+  let updatedParentBlock;
+
+  if (isObjectList) {
+    // object_list: find item by @id and update it
+    const items = (parentBlock[fieldName] || []).map(item =>
+      item['@id'] === blockId ? { '@id': blockId, ...newBlockData } : item
+    );
+
+    updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: items,
+    };
+  } else {
+    // Standard container: update block in blocks object
+    updatedParentBlock = {
+      ...parentBlock,
+      [fieldName]: {
+        ...parentBlock[fieldName],
+        [blockId]: newBlockData,
+      },
+    };
+  }
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
 }
@@ -756,9 +854,8 @@ export function reorderBlocksInContainer(
   parentBlockId,
   fieldName,
   newOrder,
+  blocksConfig = null,
 ) {
-  const layoutFieldName = `${fieldName}_layout`;
-
   if (!parentBlockId) {
     // Page-level reorder
     return {
@@ -780,10 +877,34 @@ export function reorderBlocksInContainer(
     return formData;
   }
 
-  const updatedParent = {
-    ...parentBlock,
-    [layoutFieldName]: { items: newOrder },
-  };
+  // Detect if this is an object_list field
+  const parentType = parentBlock['@type'];
+  const parentConfig = blocksConfig?.[parentType];
+  const schema = typeof parentConfig?.blockSchema === 'function'
+    ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+    : parentConfig?.blockSchema;
+  const fieldDef = schema?.properties?.[fieldName];
+  const isObjectList = fieldDef?.widget === 'object_list';
+
+  let updatedParent;
+
+  if (isObjectList) {
+    // object_list: reorder array items by @id
+    const items = parentBlock[fieldName] || [];
+    const reorderedItems = newOrder.map(id => items.find(item => item['@id'] === id)).filter(Boolean);
+
+    updatedParent = {
+      ...parentBlock,
+      [fieldName]: reorderedItems,
+    };
+  } else {
+    // Standard container: update layout items
+    const layoutFieldName = `${fieldName}_layout`;
+    updatedParent = {
+      ...parentBlock,
+      [layoutFieldName]: { items: newOrder },
+    };
+  }
 
   return setBlockByPath(formData, parentPath, updatedParent);
 }

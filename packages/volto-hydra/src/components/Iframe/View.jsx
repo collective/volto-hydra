@@ -196,6 +196,27 @@ const extractBlockFieldTypes = (intl) => {
           fieldType = 'textarea';
         } else if (field.type === 'string') {
           fieldType = 'string';
+        } else if (field.widget === 'object_list' && field.schema?.properties) {
+          // object_list widget: extract field types from itemSchema
+          // Store under virtual type key: blockType:fieldName
+          const itemTypeKey = `${blockType}:${fieldName}`;
+          blockFieldTypes[itemTypeKey] = {};
+
+          Object.keys(field.schema.properties).forEach((itemFieldName) => {
+            const itemField = field.schema.properties[itemFieldName];
+            let itemFieldType = null;
+            if (itemField.widget === 'slate') {
+              itemFieldType = 'slate';
+            } else if (itemField.widget === 'textarea') {
+              itemFieldType = 'textarea';
+            } else if (itemField.type === 'string') {
+              itemFieldType = 'string';
+            }
+
+            if (itemFieldType) {
+              blockFieldTypes[itemTypeKey][itemFieldName] = itemFieldType;
+            }
+          });
         }
 
         if (fieldType) {
