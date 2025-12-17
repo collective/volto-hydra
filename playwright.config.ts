@@ -99,6 +99,7 @@ export default defineConfig({
   ],
 
   /* Start mock API server and Volto dev server before running tests */
+  /* In CI, servers are started in advance by the workflow - Playwright just reuses them */
   webServer: [
     {
       // Mock Plone API server - must start BEFORE Volto
@@ -106,7 +107,7 @@ export default defineConfig({
       command: `node ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
       url: 'http://localhost:8888/health',
       timeout: 50 * 1000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true, // Always reuse if running - CI starts in advance, local dev starts manually
       cwd: process.cwd(),
       stdout: 'pipe',
       stderr: 'pipe',
@@ -123,7 +124,7 @@ export default defineConfig({
             'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start:prod',
           url: 'http://localhost:3001', // Health check on SSR server directly
           timeout: 30 * 1000, // 30 seconds should be plenty for starting prebuilt server
-          reuseExistingServer: false,
+          reuseExistingServer: true, // CI starts server in advance
           cwd: process.cwd(),
           stdout: 'pipe',
           stderr: 'pipe',
@@ -150,9 +151,7 @@ export default defineConfig({
             'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start',
           url: 'http://localhost:3002/health', // Health check on webpack-dev-server (returns 200 when ready)
           timeout: 300 * 1000, // 5 minutes for initial webpack compilation
-          reuseExistingServer: !process.env.CI, // Reuse in local dev, start fresh in CI
-          // IMPORTANT: When reuseExistingServer is true, Playwright SKIPS the health check!
-          // This means tests can run against a broken/compiling server. We should add a manual check.
+          reuseExistingServer: true, // Always reuse - local dev starts manually
           cwd: process.cwd(),
           stdout: 'pipe',
           stderr: 'pipe',
@@ -172,7 +171,7 @@ export default defineConfig({
       command: 'npm run dev:test',
       url: 'http://localhost:3003',
       timeout: 120 * 1000, // 2 minutes for Nuxt compilation
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true, // CI starts server in advance, local dev starts manually
       cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
       stdout: 'pipe',
       stderr: 'pipe',

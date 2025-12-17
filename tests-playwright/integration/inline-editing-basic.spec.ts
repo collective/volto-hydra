@@ -417,26 +417,18 @@ test.describe('Inline Editing - Basic', () => {
     const sidebarEditor = helper.getSidebarSlateEditor('value');
     await sidebarEditor.click();
     await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
-
-    // Wait for sidebar toolbar to appear and click bold
-    const sidebarToolbar = await helper.waitForSidebarSlateToolbar();
-    const sidebarBoldButton = await helper.getSidebarToolbarButton(sidebarToolbar, 'bold');
-    console.log('[TEST] Clicking bold in sidebar');
-    await sidebarBoldButton.click();
+    console.log('[TEST] Applying bold via Ctrl+B in sidebar');
+    await sidebarEditor.press('ControlOrMeta+b'); // Apply bold via keyboard shortcut
 
     // Wait for bold formatting to appear in iframe
     await helper.waitForFormattedText(editor, /Make this bold/, 'bold');
     console.log('[TEST] Bold applied successfully');
 
-    // Step 4: Now remove bold from sidebar - select all again and click bold to toggle off
+    // Step 4: Now remove bold from sidebar - select all again and toggle bold off
     await sidebarEditor.click();
     await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
-
-    // Wait for sidebar toolbar again and click bold to remove formatting
-    const sidebarToolbar2 = await helper.waitForSidebarSlateToolbar();
-    const sidebarBoldButton2 = await helper.getSidebarToolbarButton(sidebarToolbar2, 'bold');
-    console.log('[TEST] Clicking bold again in sidebar to remove formatting');
-    await sidebarBoldButton2.click();
+    console.log('[TEST] Removing bold via Ctrl+B in sidebar');
+    await sidebarEditor.press('ControlOrMeta+b'); // Remove bold via keyboard shortcut
 
     // Wait for bold formatting to be removed from iframe
     await helper.waitForFormattingRemoved(editor, 'bold');

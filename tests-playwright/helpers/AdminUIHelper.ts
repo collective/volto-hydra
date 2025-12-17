@@ -3235,36 +3235,26 @@ export class AdminUIHelper {
    * @returns ElementHandle for the toolbar element
    */
   async waitForSidebarSlateToolbar(timeout: number = 5000): Promise<ElementHandle> {
-    // Wait for a .slate-inline-toolbar with opacity=1 that is NOT the quanta-toolbar
-    await this.page.waitForFunction(() => {
-      const toolbars = document.querySelectorAll('.slate-inline-toolbar:not(.quanta-toolbar)');
-      for (const toolbar of toolbars) {
-        const style = window.getComputedStyle(toolbar);
-        if (style.opacity === '1') {
-          return true;
+    // Wait for toolbar and get it in a single atomic operation
+    // This avoids race conditions where toolbar disappears between wait and get
+    const toolbarHandle = await this.page.waitForFunction(
+      () => {
+        const toolbars = document.querySelectorAll(
+          '.slate-inline-toolbar:not(.quanta-toolbar)',
+        );
+        for (const toolbar of toolbars) {
+          const style = window.getComputedStyle(toolbar);
+          if (style.opacity === '1') {
+            return toolbar; // Return the element itself
+          }
         }
-      }
-      return false;
-    }, { timeout });
-
-    // Get the visible toolbar element
-    const toolbarHandle = await this.page.evaluateHandle(() => {
-      const toolbars = document.querySelectorAll('.slate-inline-toolbar:not(.quanta-toolbar)');
-      for (const toolbar of toolbars) {
-        const style = window.getComputedStyle(toolbar);
-        if (style.opacity === '1') {
-          return toolbar;
-        }
-      }
-      return null;
-    });
-
-    if (!toolbarHandle) {
-      throw new Error('Sidebar Slate toolbar not found after waiting');
-    }
+        return null;
+      },
+      { timeout },
+    );
 
     console.log('[TEST] Sidebar Slate toolbar is visible');
-    return toolbarHandle as ElementHandle;
+    return toolbarHandle as unknown as ElementHandle;
   }
 
   /**
@@ -3279,16 +3269,21 @@ export class AdminUIHelper {
     toolbar: ElementHandle,
     format: 'bold' | 'italic' | 'strikethrough' | 'link'
   ): Promise<ElementHandle> {
-    const formatTitle = format.charAt(0).toUpperCase() + format.slice(1); // Capitalize first letter
+    const formatTitle = format.charAt(0).toUpperCase() + format.slice(1);
 
     const buttonHandle = await toolbar.evaluateHandle((tb, title) => {
       const button = tb.querySelector(`[title*="${title}" i]`);
       return button;
     }, formatTitle);
 
-    if (!buttonHandle) {
+    // Check if the handle wraps null
+    const isNull = await buttonHandle.evaluate((el) => el === null);
+    if (isNull) {
       throw new Error(`Format button "${format}" not found in sidebar toolbar`);
     }
+
+    // Scroll into view to avoid "outside of viewport" issues
+    await buttonHandle.evaluate((el) => (el as Element).scrollIntoView({ block: 'center' }));
 
     console.log(`[TEST] Found sidebar toolbar button: ${format}`);
     return buttonHandle as ElementHandle;

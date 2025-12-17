@@ -56,9 +56,55 @@ jobs:
       - name: Install Nuxt dependencies
         run: |
           cd examples/nuxt-blog-starter && npm install
+      - name: Start servers in background
+        run: |
+          # Start mock API server
+          node tests-playwright/fixtures/mock-api-server.js &
+
+          # Start Volto production server
+          PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 \
+            pnpm --filter @plone/volto start:prod &
+
+          # Start Nuxt test server
+          cd examples/nuxt-blog-starter && npm run dev:test &
+
+          # Give servers a moment to start their processes
+          sleep 5
+        env:
+          VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
       - name: Install Playwright browsers
         run: |
           pnpm exec playwright install --with-deps chromium
+      - name: Wait for servers to be ready
+        run: |
+          echo "Waiting for mock API (8888)..."
+          for i in {1..60}; do
+            if curl -s http://localhost:8888/health > /dev/null; then
+              echo "Mock API ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for Volto (3001)..."
+          for i in {1..60}; do
+            if curl -s http://localhost:3001 > /dev/null; then
+              echo "Volto ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for Nuxt (3003)..."
+          for i in {1..90}; do
+            if curl -s http://localhost:3003 > /dev/null; then
+              echo "Nuxt ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "All servers ready!"
       - name: Run Playwright tests
         run: |
           pnpm exec playwright test
