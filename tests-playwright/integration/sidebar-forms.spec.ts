@@ -540,6 +540,39 @@ test.describe('Sidebar Forms - object_list Item Fields', () => {
     const newTitleValue = await helper.getSidebarFieldValue('title');
     expect(newTitleValue).toBe('Updated Slide Title');
   });
+
+  test('editing slide title inline updates sidebar field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // Click on slide-1 to select it
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Verify initial title value in sidebar
+    const initialTitle = await helper.getSidebarFieldValue('title');
+    expect(initialTitle).toBe('Slide 1');
+
+    // Edit the title inline in the iframe (specify 'title' field to avoid clicking head_title)
+    const titleEditor = await helper.getEditorLocator('slide-1', 'title');
+    await titleEditor.click();
+    await helper.selectAllTextInEditor(titleEditor);
+    await titleEditor.pressSequentially('Inline Edited', { delay: 10 });
+
+    // Wait for sync and verify sidebar updated
+    await helper.waitForFieldValueToBe('title', 'Inline Edited');
+
+    // Now edit in sidebar and verify iframe updates
+    await helper.setSidebarFieldValue('title', 'Sidebar Edited');
+    await helper.waitForFieldValueToBe('title', 'Sidebar Edited');
+
+    // Verify iframe shows the new title
+    await expect(titleEditor).toHaveText('Sidebar Edited');
+  });
 });
 
 test.describe('Sidebar Forms - Field Validation', () => {

@@ -1083,10 +1083,19 @@ export class AdminUIHelper {
    * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
    *
    * @param blockId - The block UID
+   * @param fieldName - Optional field name to target a specific editable field (e.g., 'title', 'description')
    * @returns The editor locator
    */
-  async getEditorLocator(blockId: string): Promise<Locator> {
+  async getEditorLocator(blockId: string, fieldName?: string): Promise<Locator> {
     const iframe = this.getIframe();
+
+    // If field name specified, target that specific field
+    if (fieldName) {
+      return iframe.locator(
+        `[data-block-uid="${blockId}"] [data-editable-field="${fieldName}"]`,
+      );
+    }
+
     // Try descendant first (mock frontend: data-block-uid > [contenteditable])
     let editor = iframe
       .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)

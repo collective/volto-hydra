@@ -156,9 +156,11 @@ export class Bridge {
       if (current) {
         // Inject virtual @type for object_list items (e.g., 'slider:slides')
         // This allows field type lookup to work without items having actual @type
+        // IMPORTANT: Mutate the original object, don't return a copy, so that
+        // modifications to the returned object update formData for inline editing sync
         if (pathInfo.itemType) {
           log('getBlockData: found object_list item via path, injecting @type:', pathInfo.itemType);
-          return { ...current, '@type': pathInfo.itemType };
+          current['@type'] = pathInfo.itemType;
         }
         log('getBlockData: found via path, @type:', current['@type']);
         return current;
