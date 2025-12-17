@@ -63,6 +63,10 @@ export default defineNuxtConfig({
       devServer: {
         https: false  // Disable HTTPS for test mode
       },
+      // Disable rate limiting for tests
+      security: {
+        rateLimiter: false
+      },
       routeRules: {
         "/**": {
           cors: true,
@@ -75,7 +79,8 @@ export default defineNuxtConfig({
               },
               crossOriginResourcePolicy: "cross-origin",
               xFrameOptions: false
-            }
+            },
+            rateLimiter: false
           }
         }
       },
