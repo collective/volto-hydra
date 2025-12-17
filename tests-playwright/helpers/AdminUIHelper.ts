@@ -2016,11 +2016,27 @@ export class AdminUIHelper {
       return;
     }
 
-    // Try contenteditable
+    // Try contenteditable (Slate editors)
+    // Note: fill() doesn't reliably clear Slate editors, use select-all + type
     const contentEditable = fieldWrapper.locator('[contenteditable="true"]');
     if (await contentEditable.isVisible()) {
+      // Get current text to verify selection
+      const currentText = await contentEditable.textContent() || '';
+
       await contentEditable.click();
-      await contentEditable.fill(value);
+      await contentEditable.press('ControlOrMeta+a'); // Select all existing content
+
+      // Verify selection covers all text before typing
+      if (currentText.trim()) {
+        await expect(async () => {
+          const selectedText = await contentEditable.evaluate(() =>
+            window.getSelection()?.toString() || ''
+          );
+          expect(selectedText.trim()).toBe(currentText.trim());
+        }).toPass({ timeout: 2000 });
+      }
+
+      await contentEditable.pressSequentially(value, { delay: 10 }); // Type replaces selection
       await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
