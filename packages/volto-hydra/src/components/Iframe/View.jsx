@@ -1285,36 +1285,42 @@ const Iframe = (props) => {
       return;
     }
 
-    // Normal Redux form data change (from sidebar editing)
-    // Skip if formData hasn't actually changed from what we already have synced
-    // This prevents echoing back data we just sent to Redux from toolbar
-    if (JSON.stringify(formToUse) === JSON.stringify(iframeSyncState.formData)) {
+    // Normal Redux form data change (from sidebar editing, drag and drop, etc.)
+    // Use iframeSyncState.formData ONLY when pendingSelectBlockUid is set - that's set by
+    // handleSidebarAdd which also sets formData/blockPathMap atomically before Redux updates.
+    // For all other cases (sidebar edits, drag and drop), use formDataFromRedux since
+    // iframeSyncState.formData isn't updated for those operations.
+    const dataToSend = iframeSyncState.pendingSelectBlockUid
+      ? iframeSyncState.formData
+      : formToUse;
+    const blockPathMapToSend = iframeSyncState.pendingSelectBlockUid
+      ? iframeSyncState.blockPathMap
+      : buildBlockPathMap(formToUse, config.blocks.blocksConfig);
+
+    // Skip if no data to send
+    if (!iframeOriginRef.current || !dataToSend) {
       return;
     }
-    if (iframeOriginRef.current && formToUse) {
-      const updatedBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig);
-      log('Sending FORM_DATA with blockPathMap keys:', Object.keys(updatedBlockPathMap));
-      log('blockPathMap for text-1a:', updatedBlockPathMap['text-1a']);
-      // Include pendingSelectBlockUid so iframe can select the block after re-rendering
-      // This is needed when a new block is added - the block doesn't exist in DOM yet
-      const message = {
-        type: 'FORM_DATA',
-        data: formToUse,
-        blockPathMap: updatedBlockPathMap,
-        selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
-      };
-      log('FORM_DATA selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
-      document.getElementById('previewIframe')?.contentWindow?.postMessage(
-        message,
-        iframeOriginRef.current,
-      );
-      // Clear pendingSelectBlockUid after sending
-      if (iframeSyncState.pendingSelectBlockUid) {
-        setIframeSyncState(prev => ({
-          ...prev,
-          pendingSelectBlockUid: null,
-        }));
-      }
+
+    // Send FORM_DATA to iframe - iframeSyncState.formData is always the source of truth
+    log('Sending FORM_DATA with blockPathMap keys:', Object.keys(blockPathMapToSend));
+    const message = {
+      type: 'FORM_DATA',
+      data: dataToSend,
+      blockPathMap: blockPathMapToSend,
+      selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
+    };
+    log('FORM_DATA selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
+    document.getElementById('previewIframe')?.contentWindow?.postMessage(
+      message,
+      iframeOriginRef.current,
+    );
+    // Clear pendingSelectBlockUid after sending
+    if (iframeSyncState.pendingSelectBlockUid) {
+      setIframeSyncState(prev => ({
+        ...prev,
+        pendingSelectBlockUid: null,
+      }));
     }
   // NOTE: Only depend on formDataFromRedux, toolbarRequestDone, and pendingSelectBlockUid.
   // Do NOT depend on iframeSyncState.formData/selection - those change during
@@ -1485,8 +1491,13 @@ const Iframe = (props) => {
       );
       if (newFormData) {
         onChangeFormData(newFormData);
+        // Include newFormData and blockPathMap in state update so FORM_DATA useEffect
+        // sends the correct data (Redux dispatch is async, might not update formDataFromRedux yet)
+        const newBlockPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig);
         setIframeSyncState((prev) => ({
           ...prev,
+          formData: newFormData,
+          blockPathMap: newBlockPathMap,
           pendingSelectBlockUid: newBlockId,
         }));
         dispatch(setSidebarTab(1));
