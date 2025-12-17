@@ -609,9 +609,11 @@ test.describe('Inline Editing - Formatting', () => {
     await editor.pressSequentially(' more', { delay: 10 });
 
     // Verify final text - should NOT have doubled
-    textContent = await helper.getCleanTextContent(editor);
-    console.log('[TEST] Text after second prospective formatting:', textContent);
-    expect(textContent).toBe('Hello bold normal more');
+    await expect(async () => {
+      textContent = await helper.getCleanTextContent(editor);
+      console.log('[TEST] Text after second prospective formatting:', textContent);
+      expect(textContent).toBe('Hello bold normal more');
+    }).toPass({ timeout: 5000 });
   });
 
   test('prospective formatting: toggle in middle of text preserves text to right', async ({
