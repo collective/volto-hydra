@@ -20,6 +20,9 @@
 // Global render counter for testing re-render behavior
 window.hydraRenderCount = window.hydraRenderCount || 0;
 
+// Slider state: track slide count to detect new slides { [blockId]: slideCount }
+const sliderSlideCount = {};
+
 /**
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with blocks and blocks_layout
@@ -96,7 +99,7 @@ function renderBlock(blockId, block) {
         case 'slider':
             // Slider uses object_list format (slides as array with @id)
             wrapper.classList.add('carousel-block');
-            wrapper.innerHTML = renderSliderBlock(block);
+            wrapper.innerHTML = renderSliderBlock(block, blockId);
             break;
         case 'slide':
             wrapper.innerHTML = renderSlideBlock(block);
@@ -592,11 +595,22 @@ function renderCarouselBlock(block) {
  * This is the volto-slider-block format.
  *
  * @param {Object} block - Slider block data with slides array
+ * @param {string} blockId - Block UID for state tracking
  * @returns {string} HTML string
  */
-function renderSliderBlock(block) {
+function renderSliderBlock(block, blockId) {
     const slides = block.slides || [];
-    const activeSlideId = slides[0]?.['@id'] || null;
+    const prevCount = sliderSlideCount[blockId] || 0;
+    const newCount = slides.length;
+
+    // Detect if a new slide was added - show it instead of first slide
+    let activeIndex = 0;
+    if (newCount > prevCount && prevCount > 0) {
+        activeIndex = newCount - 1; // New slide is at the end
+    }
+    sliderSlideCount[blockId] = newCount;
+
+    const activeSlideId = slides[activeIndex]?.['@id'] || null;
 
     let html = '<div class="carousel-container" style="position: relative; padding: 20px; background: #f5f5f5; border-radius: 8px; min-height: 120px;">';
 
@@ -652,7 +666,7 @@ function renderSliderBlock(block) {
  * @returns {string} HTML string
  */
 function renderSlideBlock(block) {
-    const title = block.title || 'Untitled Slide';
+    const title = block.title ?? '';
     // Support both old format (content) and new format (description)
     const description = block.description || block.content || '';
     const headTitle = block.head_title || '';
@@ -798,19 +812,24 @@ function initCarouselNavigation() {
         if (!selectorElement) return;
 
         const selector = selectorElement.getAttribute('data-block-selector');
+        console.log('[RENDERER] Carousel navigation click:', selector);
         const carousel = selectorElement.closest('[data-block-uid].carousel-block');
+        console.log('[RENDERER] Found carousel:', carousel?.getAttribute('data-block-uid'));
         if (!carousel) return;
 
         // Find all slides in this carousel
         const slidesWrapper = carousel.querySelector('.slides-wrapper');
+        console.log('[RENDERER] slidesWrapper:', slidesWrapper ? 'found' : 'NOT FOUND');
         if (!slidesWrapper) return;
 
         const slides = Array.from(slidesWrapper.querySelectorAll('[data-block-uid].slide'));
+        console.log('[RENDERER] slides found:', slides.length, slides.map(s => s.getAttribute('data-block-uid')));
         if (slides.length === 0) return;
 
         // Find currently active slide
         const currentSlide = slides.find(s => s.style.display !== 'none') || slides[0];
         const currentIndex = slides.indexOf(currentSlide);
+        console.log('[RENDERER] currentSlide:', currentSlide?.getAttribute('data-block-uid'), 'index:', currentIndex);
 
         let targetSlide = null;
         let targetIndex = -1;
@@ -831,9 +850,12 @@ function initCarouselNavigation() {
             targetIndex = slides.indexOf(targetSlide);
         }
 
+        console.log('[RENDERER] targetSlide:', targetSlide?.getAttribute('data-block-uid'), 'index:', targetIndex);
         if (targetSlide && targetSlide !== currentSlide) {
+            console.log('[RENDERER] Scheduling slide transition in 100ms');
             // Simulate animation delay (100ms) to test async waiting in hydra.js
             setTimeout(() => {
+                console.log('[RENDERER] Executing slide transition to:', targetSlide?.getAttribute('data-block-uid'));
                 // Hide all slides
                 slides.forEach(s => {
                     s.style.display = 'none';
@@ -842,6 +864,7 @@ function initCarouselNavigation() {
                 // Show target slide
                 targetSlide.style.display = 'block';
                 targetSlide.classList.add('active');
+                console.log('[RENDERER] Slide transition complete, slide-2 display:', targetSlide.style.display);
 
                 // Update dot indicators
                 const dots = carousel.querySelectorAll('.slide-dot');

@@ -114,9 +114,12 @@
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div v-for="slide in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
-          class="hidden duration-700 ease-linear bg-center flex items-center"
-          :class="{ 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }"
+        <div v-for="(slide, index) in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
+          class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
+          :class="[
+            isSlideActive(index) ? 'flex' : 'hidden',
+            { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
+          ]"
           data-carousel-item :style="slide.preview_image?.[0] ? imageProps(slide.preview_image[0], true).class : ''">
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
@@ -138,12 +141,12 @@
       <!-- Slider indicators -->
       <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
         <button v-for="(slide, index) in block.slides" :key="slide['@id']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
-          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index"></button>
+          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@id']"></button>
       </div>
       <!-- Slider controls -->
       <button type="button"
         class="absolute top-0 start-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
-        data-carousel-prev>
+        data-carousel-prev data-block-selector="-1">
         <span
           class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30 dark:bg-gray-800/30 group-hover:bg-white/50 dark:group-hover:bg-gray-800/60 group-focus:ring-4 group-focus:ring-white dark:group-focus:ring-gray-800/70 group-focus:outline-none">
           <svg class="w-4 h-4 text-white dark:text-gray-800 rtl:rotate-180" aria-hidden="true"
@@ -156,7 +159,7 @@
       </button>
       <button type="button"
         class="absolute top-0 end-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
-        data-carousel-next>
+        data-carousel-next data-block-selector="+1">
         <span
           class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30 dark:bg-gray-800/30 group-hover:bg-white/50 dark:group-hover:bg-gray-800/60 group-focus:ring-4 group-focus:ring-white dark:group-focus:ring-gray-800/70 group-focus:outline-none">
           <svg class="w-4 h-4 text-white dark:text-gray-800 rtl:rotate-180" aria-hidden="true"
@@ -278,6 +281,7 @@
 
 </template>
 <script setup>
+import { ref, watch, nextTick } from 'vue';
 import RichText from './richtext.vue';
 import Listing from './listing.vue';
 
@@ -300,6 +304,34 @@ const { block_uid, block, data } = defineProps({
     default: false
   }
 });
+
+// Slider state: track active slide and detect new slides
+const activeSlideIndex = ref(0);
+const prevSlideCount = ref(block.slides?.length || 0);
+
+// Watch for slide count changes to detect new slides and reinitialize Flowbite
+watch(
+  () => block.slides?.length,
+  async (newCount, oldCount) => {
+    // Only detect new slides after initial render (when oldCount is defined)
+    if (oldCount !== undefined && newCount > oldCount) {
+      // New slide added - show it (it's at the end)
+      activeSlideIndex.value = newCount - 1;
+
+      // Reinitialize Flowbite carousel to recognize new slides
+      if (process.client) {
+        await nextTick();
+        const flowbite = await import('flowbite');
+        flowbite.initCarousels();
+      }
+    }
+    prevSlideCount.value = newCount || 0;
+  },
+  { immediate: true }
+);
+
+// Helper to check if a slide should be visible
+const isSlideActive = (index) => index === activeSlideIndex.value;
 
 
 

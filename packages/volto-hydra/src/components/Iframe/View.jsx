@@ -1402,17 +1402,9 @@ const Iframe = (props) => {
 
   // Handle sidebar add - adds after the last child of the container
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
-    // Find the last child of the container
+    // Find the parent block and get its schema
     const parentPath = iframeSyncState.blockPathMap?.[parentBlockId]?.path;
     const parentBlock = getBlockByPath(properties, parentPath);
-    const layoutField = `${fieldName}_layout`;
-    const existingItems = parentBlock?.[layoutField]?.items || [];
-    const lastBlockId = existingItems[existingItems.length - 1] || null;
-
-    // Set which block we're adding after (for allowedBlocks computation)
-    setAddAfterBlockId(lastBlockId);
-
-    // Get allowedBlocks for the specific container field (not just the first one)
     const mergedBlocksConfig = config.blocks.blocksConfig;
     const parentType = parentBlock?.['@type'];
     const parentSchema =
@@ -1423,21 +1415,59 @@ const Iframe = (props) => {
           })
         : mergedBlocksConfig?.[parentType]?.blockSchema;
     const fieldDef = parentSchema?.properties?.[fieldName];
+
+    // Check if this is an object_list field (like volto-slider-block slides)
+    const isObjectList = fieldDef?.widget === 'object_list';
+
+    let lastBlockId;
+    if (isObjectList) {
+      // object_list: items stored as array with @id field
+      const existingItems = parentBlock?.[fieldName] || [];
+      const lastItem = existingItems[existingItems.length - 1];
+      lastBlockId = lastItem?.['@id'] || null;
+    } else {
+      // Standard container: blocks object + blocks_layout
+      const layoutField = `${fieldName}_layout`;
+      const existingItems = parentBlock?.[layoutField]?.items || [];
+      lastBlockId = existingItems[existingItems.length - 1] || null;
+    }
+
+    // Set which block we're adding after (for allowedBlocks computation)
+    setAddAfterBlockId(lastBlockId);
+
+    // Determine if we should auto-insert or show block chooser
     const containerAllowed = fieldDef?.allowedBlocks || null;
-    if (containerAllowed?.length === 1) {
-      // Only one allowed block type - auto-insert without showing chooser
-      const blockType = containerAllowed[0];
+    const shouldAutoInsert = isObjectList || containerAllowed?.length === 1;
+
+    if (shouldAutoInsert) {
+      // Auto-insert without showing chooser
       const newBlockId = uuid();
+      let newBlockData;
 
-      const mergedBlocksConfig = config.blocks.blocksConfig;
-      let newBlockData = { '@type': blockType };
-      newBlockData = initializeContainerBlock(newBlockData, mergedBlocksConfig, uuid, {
-        intl,
-        metadata,
-        properties,
-      });
+      if (isObjectList) {
+        // object_list: create empty item (insertBlockInContainer will add @id)
+        // Initialize with default values from itemSchema if available
+        newBlockData = {};
+        const itemSchema = fieldDef?.schema;
+        if (itemSchema?.properties) {
+          for (const [propName, propDef] of Object.entries(itemSchema.properties)) {
+            if (propDef.default !== undefined) {
+              newBlockData[propName] = propDef.default;
+            }
+          }
+        }
+      } else {
+        // Standard container: create block with @type
+        const blockType = containerAllowed[0];
+        newBlockData = { '@type': blockType };
+        newBlockData = initializeContainerBlock(newBlockData, mergedBlocksConfig, uuid, {
+          intl,
+          metadata,
+          properties,
+        });
+      }
 
-      const containerConfig = { parentId: parentBlockId, fieldName };
+      const containerConfig = { parentId: parentBlockId, fieldName, isObjectList };
       const newFormData = insertBlockInContainer(
         properties,
         iframeSyncState.blockPathMap,

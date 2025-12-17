@@ -714,10 +714,33 @@ export class Bridge {
             // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
             // For existing block, just update UI positions
             if (needsBlockSwitch) {
-              // New block created (e.g., Enter key) - need full selectBlock setup
+              // New block created (e.g., Enter key, sidebar add) - need full selectBlock setup
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  let newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  // If block is hidden (e.g., new carousel slide), try to make it visible first
+                  if (newBlockElement && this.isElementHidden(newBlockElement)) {
+                    log('FORM_DATA: new block is hidden, trying to make visible:', this.selectedBlockUid);
+                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    if (madeVisible) {
+                      // Wait for block to become visible, then select it
+                      const waitForVisible = async () => {
+                        for (let i = 0; i < 10; i++) {
+                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                          if (newBlockElement && !this.isElementHidden(newBlockElement)) {
+                            log('FORM_DATA: new block now visible, selecting');
+                            this.selectBlock(newBlockElement);
+                            return;
+                          }
+                        }
+                        log('FORM_DATA: timeout waiting for new block to become visible');
+                      };
+                      waitForVisible();
+                      this.replayBufferedEvents();
+                      return;
+                    }
+                  }
                   if (newBlockElement) {
                     log('Selecting new block from FORM_DATA:', this.selectedBlockUid);
                     this.selectBlock(newBlockElement);

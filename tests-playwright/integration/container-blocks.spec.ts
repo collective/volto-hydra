@@ -2718,6 +2718,134 @@ test.describe('data-block-selector Navigation', () => {
     // Wait for slide-1 to be selected
     await helper.waitForQuantaToolbar('slide-1');
   });
+
+  test('adding a new slide selects the new slide', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const sidebar = page.locator('.sidebar-container');
+
+    // Navigate to carousel container: click slide-1, then press Escape
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+
+    // Wait for sidebar to show Slides section
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Get initial slide count (should be 3)
+    const slideItems = sidebar.locator('.child-block-item');
+    const initialCount = await slideItems.count();
+    expect(initialCount).toBe(3);
+
+    // Add a new slide via the sidebar
+    await helper.addBlockViaSidebar('Slides');
+
+    // The new slide should be auto-selected after adding
+    // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
+    // not the ChildBlocksWidget list. So we verify by checking:
+    // 1. The sidebar shows slide form fields (Kicker field visible means slide is selected)
+    const kickerInput = sidebar.getByLabel('Kicker');
+    await expect(kickerInput).toBeVisible({ timeout: 10000 });
+
+    // 2. The Title field should be empty (new slide, not "Slide 1", "Slide 2", etc.)
+    // Use .last() because there are two title fields: page title and slide title
+    const titleInput = sidebar.locator('input[id="field-title"]').last();
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveValue('');
+
+    // Find the new slide - the one not in the original list
+    const iframe = helper.getIframe();
+    const originalIds = ['slide-1', 'slide-2', 'slide-3'];
+    const allSlides = await iframe
+      .locator('[data-block-uid="slider-1"] [data-block-uid]')
+      .all();
+    let newSlideId: string | null = null;
+    for (const slide of allSlides) {
+      const id = await slide.getAttribute('data-block-uid');
+      if (id && !originalIds.includes(id)) {
+        newSlideId = id;
+        break;
+      }
+    }
+    expect(newSlideId).toBeTruthy();
+
+    // Verify the new slide is selected (toolbar is on it)
+    await helper.waitForQuantaToolbar(newSlideId!);
+
+    // Use the helper to get the editor and verify it's empty
+    const editor = await helper.getEditorLocator(newSlideId!);
+    await expect(editor).toBeVisible();
+    await expect(editor).toHaveText('');
+
+    // 4. Navigate back to slider to verify 4 slides now exist
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    await expect(slideItems).toHaveCount(4);
+  });
+
+  test('adding a new slide via iframe add button selects the new slide', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const sidebar = page.locator('.sidebar-container');
+    const iframe = helper.getIframe();
+
+    // Select slide-1 to get the add button to appear
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Click the add button in the iframe to add a new slide
+    await helper.clickAddBlockButton();
+
+    // The new slide should be auto-selected after adding
+    // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
+    const kickerInput = sidebar.getByLabel('Kicker');
+    await expect(kickerInput).toBeVisible({ timeout: 10000 });
+
+    // The Title field should be empty (new slide)
+    const titleInput = sidebar.locator('input[id="field-title"]').last();
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveValue('');
+
+    // Find the new slide - the one not in the original list
+    const originalIds = ['slide-1', 'slide-2', 'slide-3'];
+    const allSlides = await iframe
+      .locator('[data-block-uid="slider-1"] [data-block-uid]')
+      .all();
+    let newSlideId: string | null = null;
+    for (const slide of allSlides) {
+      const id = await slide.getAttribute('data-block-uid');
+      if (id && !originalIds.includes(id)) {
+        newSlideId = id;
+        break;
+      }
+    }
+    expect(newSlideId).toBeTruthy();
+
+    // Verify the new slide is selected (toolbar is on it)
+    await helper.waitForQuantaToolbar(newSlideId!);
+
+    // Use the helper to get the editor and verify it's empty
+    const editor = await helper.getEditorLocator(newSlideId!);
+    await expect(editor).toBeVisible();
+    await expect(editor).toHaveText('');
+
+    // Navigate back to slider to verify 4 slides now exist
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    const slideItems = sidebar.locator('.child-block-item');
+    await expect(slideItems).toHaveCount(4);
+  });
 });
 
 // ============================================================================
