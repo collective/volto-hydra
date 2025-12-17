@@ -60,7 +60,6 @@ function renderContent(content) {
 function renderBlock(blockId, block) {
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', blockId);
-    wrapper.setAttribute('data-block-type', block['@type']);
 
     switch (block['@type']) {
         case 'slate':
@@ -91,6 +90,7 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderGridBlock(block);
             break;
         case 'carousel':
+            wrapper.classList.add('carousel-block');
             wrapper.innerHTML = renderCarouselBlock(block);
             break;
         case 'slide':
@@ -396,7 +396,7 @@ function renderColumnsBlock(block) {
             if (!img) return;
 
             // Render image as a nested block with data-block-uid and data-block-add="right"
-            html += `<div data-block-uid="${imgId}" data-block-type="image" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
+            html += `<div data-block-uid="${imgId}" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
             html += renderImageBlock(img);
             html += '</div>';
         });
@@ -412,7 +412,7 @@ function renderColumnsBlock(block) {
         if (!column) return;
 
         // Render column as a nested block with data-block-uid and data-block-add="right"
-        html += `<div data-block-uid="${columnId}" data-block-type="column" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
+        html += `<div data-block-uid="${columnId}" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
         html += renderColumnContent(column);
         html += '</div>';
     });
@@ -445,7 +445,7 @@ function renderColumnContent(column) {
         if (!block) return;
 
         // Render nested content block with data-block-uid and data-block-add="bottom"
-        html += `<div data-block-uid="${blockId}" data-block-type="${block['@type']}" data-block-add="bottom">`;
+        html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
 
         // Render inner content based on block type
         switch (block['@type']) {
@@ -493,7 +493,7 @@ function renderGridBlock(block) {
 
         // Render grid cell WITHOUT data-block-add attribute
         // This tests that hydra.js correctly infers direction from nesting depth
-        html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
+        html += `<div data-block-uid="${blockId}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
 
         // Render inner content based on block type
         switch (childBlock['@type']) {
@@ -553,7 +553,7 @@ function renderCarouselBlock(block) {
         const displayStyle = isActive ? 'block' : 'none';
 
         // Render slide as nested block - hidden slides still have data-block-uid
-        html += `<div data-block-uid="${slideId}" data-block-type="slide" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
+        html += `<div data-block-uid="${slideId}" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
         html += renderSlideBlock(slide);
         html += '</div>';
     });
@@ -619,7 +619,7 @@ function renderAccordionBlock(block) {
     headerLayout.forEach(blockId => {
         const childBlock = header[blockId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
             html += '</div>';
         }
@@ -634,7 +634,7 @@ function renderAccordionBlock(block) {
     contentLayout.forEach(blockId => {
         const childBlock = content[blockId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
             html += '</div>';
         }
@@ -728,14 +728,14 @@ function initCarouselNavigation() {
         if (!selectorElement) return;
 
         const selector = selectorElement.getAttribute('data-block-selector');
-        const carousel = selectorElement.closest('[data-block-uid][data-block-type="carousel"]');
+        const carousel = selectorElement.closest('[data-block-uid].carousel-block');
         if (!carousel) return;
 
         // Find all slides in this carousel
         const slidesWrapper = carousel.querySelector('.slides-wrapper');
         if (!slidesWrapper) return;
 
-        const slides = Array.from(slidesWrapper.querySelectorAll('[data-block-uid][data-block-type="slide"]'));
+        const slides = Array.from(slidesWrapper.querySelectorAll('[data-block-uid].slide'));
         if (slides.length === 0) return;
 
         // Find currently active slide

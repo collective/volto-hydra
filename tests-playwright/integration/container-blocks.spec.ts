@@ -1029,16 +1029,24 @@ test.describe('Empty Block Behavior', () => {
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
 
+    // Verify grid-cell-2 is gone before proceeding
+    await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).not.toBeVisible();
+
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
 
-    // Get the empty block's ID
-    const emptyBlockId = await iframe
-      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-uid');
+    // Verify grid-cell-1 is gone
+    await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).not.toBeVisible();
+
+    // Wait for a new block to appear in the grid (the empty replacement block)
+    const newBlockLocator = iframe.locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]').first();
+    await expect(newBlockLocator).toBeVisible({ timeout: 5000 });
+
+    // Get the new block's ID and click it
+    const emptyBlockId = await newBlockLocator.getAttribute('data-block-uid');
+    console.log('[TEST] New block ID after deletions:', emptyBlockId);
 
     // Click the empty block
     await helper.clickBlockInIframe(emptyBlockId!);

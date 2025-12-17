@@ -251,7 +251,9 @@ export class Bridge {
   getAddDirection(blockElement) {
     // Empty blocks should not have an add button - they are meant to be replaced
     // via block chooser, not have blocks added after them
-    if (blockElement.getAttribute('data-block-type') === 'empty') {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const blockData = this.getBlockData(blockUid);
+    if (blockData?.['@type'] === 'empty') {
       return 'hidden';
     }
 
