@@ -73,7 +73,7 @@ export default defineNuxtConfig({
           security: {
             headers: {
               contentSecurityPolicy: {
-                'img-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888'],
+                'img-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888', 'https://placehold.co'],
                 'connect-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888'],
                 'frame-ancestors': ['*']
               },

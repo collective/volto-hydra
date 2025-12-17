@@ -421,6 +421,10 @@ test.describe('Inline Editing - Basic', () => {
     await helper.openSidebarTab('Block');
 
     const sidebarEditor = helper.getSidebarSlateEditor('value');
+
+    // Wait for sidebar to sync content from iframe before applying formatting
+    await expect(sidebarEditor).toHaveText('Make this bold', { timeout: 5000 });
+
     await sidebarEditor.click();
     await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
     console.log('[TEST] Applying bold via Ctrl+B in sidebar');
