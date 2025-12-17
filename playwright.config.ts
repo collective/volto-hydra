@@ -71,7 +71,6 @@ export default defineConfig({
       },
       testIgnore: [
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
-        /container-.*\.spec\.ts/, // Skip container tests (not yet supported in Nuxt)
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
         /unit\/.*\.spec\.ts/, // Unit tests don't need to run per-frontend
       ],

@@ -58,11 +58,10 @@ test.describe('Container Block Detection', () => {
     const text2a = col2.locator('[data-block-uid="text-2a"]');
     await expect(text2a).toBeVisible();
 
-    // Verify data-block-add attributes for direction hints
+    // Verify data-block-add attributes for direction hints on columns
+    // Note: nested blocks inside columns don't require data-block-add - hydra infers direction from depth
     await expect(col1).toHaveAttribute('data-block-add', 'right');
     await expect(col2).toHaveAttribute('data-block-add', 'right');
-    await expect(text1a).toHaveAttribute('data-block-add', 'bottom');
-    await expect(text1b).toHaveAttribute('data-block-add', 'bottom');
   });
 
   test('clicking deeply nested block shows its settings in sidebar', async ({ page }) => {
@@ -905,11 +904,8 @@ test.describe('Empty Block Behavior', () => {
     expect(col1Blocks).toBe(1);
 
     // The block should be of type 'slate' (the defaultBlock), not 'empty'
-    const blockType = await iframe
-      .locator('[data-block-uid="col-1"] > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
-    expect(blockType).toBe('slate');
+    const newBlock = iframe.locator('[data-block-uid="col-1"] > [data-block-uid]').first();
+    await expect(helper.getSlateField(newBlock)).toBeVisible();
   });
 
   test('container with single allowedBlock creates that type when emptied', async ({
@@ -947,11 +943,9 @@ test.describe('Empty Block Behavior', () => {
     expect(columnBlocks).toBe(1);
 
     // The block should be of type 'column' (the single allowed type), not 'empty'
-    const blockType = await iframe
-      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
-    expect(blockType).toBe('column');
+    // Columns have class="column" in the renderer
+    const newColumn = iframe.locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]').first();
+    await expect(newColumn).toHaveClass(/column/);
   });
 
   test('deleting last block from container creates empty block', async ({
@@ -982,12 +976,11 @@ test.describe('Empty Block Behavior', () => {
       .count();
     expect(gridBlocks).toBe(1);
 
-    // The block should be of type 'empty'
+    // The block should be of type 'empty' (has data-hydra-empty attribute)
     const emptyBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
       .first();
-    const blockType = await emptyBlock.getAttribute('data-block-type');
-    expect(blockType).toBe('empty');
+    await expect(emptyBlock).toHaveAttribute('data-hydra-empty');
 
     // Empty block should have visible dashed border styling (injected by hydra.js)
     const borderStyle = await emptyBlock.evaluate((el) => {
@@ -1040,13 +1033,13 @@ test.describe('Empty Block Behavior', () => {
     // Verify grid-cell-1 is gone
     await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).not.toBeVisible();
 
-    // Wait for a new block to appear in the grid (the empty replacement block)
-    const newBlockLocator = iframe.locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]').first();
-    await expect(newBlockLocator).toBeVisible({ timeout: 5000 });
+    // Wait for an empty block to appear (hydra marks empty blocks with data-hydra-empty)
+    const emptyBlockLocator = iframe.locator('[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]');
+    await expect(emptyBlockLocator).toBeVisible({ timeout: 5000 });
 
-    // Get the new block's ID and click it
-    const emptyBlockId = await newBlockLocator.getAttribute('data-block-uid');
-    console.log('[TEST] New block ID after deletions:', emptyBlockId);
+    // Get the empty block's ID
+    const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
+    console.log('[TEST] Empty block ID after deletions:', emptyBlockId);
 
     // Click the empty block
     await helper.clickBlockInIframe(emptyBlockId!);
@@ -1098,8 +1091,7 @@ test.describe('Empty Block Behavior', () => {
     const slateBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
       .first();
-    const blockType = await slateBlock.getAttribute('data-block-type');
-    expect(blockType).toBe('slate');
+    await expect(helper.getSlateField(slateBlock)).toBeVisible();
 
     // The slate block should have proper empty content, not "Empty block" fallback
     // This verifies that onMutateBlock properly initializes the slate value
@@ -1147,11 +1139,8 @@ test.describe('Empty Block Behavior', () => {
     expect(childBlocks).toBeGreaterThan(0);
 
     // The block inside should be of type 'slate' (the defaultBlock)
-    const childBlockType = await newColumn
-      .locator('> [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
-    expect(childBlockType).toBe('slate');
+    const childBlock = newColumn.locator('> [data-block-uid]').first();
+    await expect(helper.getSlateField(childBlock)).toBeVisible();
   });
 
   test('adding columns block recursively initializes column with default block', async ({
@@ -1190,7 +1179,8 @@ test.describe('Empty Block Behavior', () => {
 
     // Find the newly added columns block (should be after text-after)
     // The page layout should now have: title-block, columns-1, text-after, NEW-COLUMNS, grid-1
-    const allColumnsBlocks = iframe.locator('[data-block-type="columns"]');
+    // Columns blocks have a .columns-row child - find all blocks with this structure
+    const allColumnsBlocks = iframe.locator('[data-block-uid]:has(> .columns-row)');
     const columnsCount = await allColumnsBlocks.count();
     expect(columnsCount).toBe(2); // Original columns-1 + new one
 
@@ -1206,10 +1196,9 @@ test.describe('Empty Block Behavior', () => {
     const columnCount = await columnChildren.count();
     expect(columnCount).toBeGreaterThanOrEqual(1);
 
-    // Get the first column
+    // Get the first column - columns have class="column"
     const firstColumn = columnChildren.first();
-    const columnType = await firstColumn.getAttribute('data-block-type');
-    expect(columnType).toBe('column');
+    await expect(firstColumn).toHaveClass(/column/);
 
     // The column should have at least one block inside (defaultBlock: 'slate')
     const columnContent = firstColumn.locator('> [data-block-uid]');
@@ -1217,10 +1206,8 @@ test.describe('Empty Block Behavior', () => {
     expect(contentCount).toBeGreaterThanOrEqual(1);
 
     // The content block should be slate (column's defaultBlock)
-    const contentType = await columnContent
-      .first()
-      .getAttribute('data-block-type');
-    expect(contentType).toBe('slate');
+    const contentBlock = columnContent.first();
+    await expect(helper.getSlateField(contentBlock)).toBeVisible();
   });
 });
 
@@ -2378,8 +2365,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(col2NewCount).toBe(1); // Should have a new default block
 
     // Verify it's a slate block (column's defaultBlock is 'slate')
-    const newSlateBlock = col2.locator('[data-block-type="slate"]');
-    await expect(newSlateBlock).toBeVisible();
+    const newBlock = col2.locator(':scope > [data-block-uid]').first();
+    await expect(helper.getSlateField(newBlock)).toBeVisible();
   });
 });
 

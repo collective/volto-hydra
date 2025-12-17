@@ -630,6 +630,9 @@ export class Bridge {
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                // Mark empty blocks so they can be styled (must run on every render)
+                this.markEmptyBlocks();
+
                 // IMPORTANT: Ensure ZWS in empty inline elements BEFORE restoring selection
                 // This allows cursor positioning inside empty formatting elements
                 if (this.selectedBlockUid) {
@@ -2063,6 +2066,24 @@ export class Bridge {
         textNode.textContent = newText;
       }
     }
+  }
+
+  /**
+   * Marks empty blocks in the DOM with a data attribute for styling.
+   * This allows hydra to style empty blocks without requiring the renderer
+   * to add special attributes.
+   */
+  markEmptyBlocks() {
+    const allBlocks = document.querySelectorAll('[data-block-uid]');
+    allBlocks.forEach((blockElement) => {
+      const blockUid = blockElement.getAttribute('data-block-uid');
+      const blockData = this.getBlockData(blockUid);
+      if (blockData?.['@type'] === 'empty') {
+        blockElement.setAttribute('data-hydra-empty', 'true');
+      } else {
+        blockElement.removeAttribute('data-hydra-empty');
+      }
+    });
   }
 
   /**
@@ -5281,6 +5302,11 @@ export class Bridge {
         [contenteditable] {
           outline: 0px solid transparent;
         }
+        /* Ensure empty editable fields are visible/clickable */
+        [data-editable-field]:empty {
+          min-height: 1.5em;
+          display: block;
+        }
         .volto-hydra--outline {
           position: relative !important;
         }
@@ -5497,7 +5523,8 @@ export class Bridge {
           margin: 0 1em;
         }
         /* Empty block visual indicator - always visible */
-        [data-block-type="empty"] {
+        /* Hydra adds data-hydra-empty attribute to blocks with @type: 'empty' in formData */
+        [data-hydra-empty] {
           border: 2px dashed #b8c6c8 !important;
           border-radius: 4px;
           background: rgba(200, 200, 200, 0.1);
@@ -5507,7 +5534,7 @@ export class Bridge {
           justify-content: center;
           cursor: pointer;
         }
-        [data-block-type="empty"]::after {
+        [data-hydra-empty]::after {
           content: '+';
           font-size: 24px;
           color: #b8c6c8;

@@ -95,6 +95,70 @@ onMounted(() => {
                         },
                     },
                 },
+                // Container block: columns contains column children AND top_images
+                columns: {
+                    id: 'columns',
+                    title: 'Columns',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="18" rx="1"/><rect x="14" y="3" width="8" height="18" rx="1"/></svg>',
+                    group: 'common',
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['title', 'top_images', 'columns'],
+                            },
+                        ],
+                        properties: {
+                            title: {
+                                title: 'Title',
+                                type: 'string',
+                            },
+                            top_images: {
+                                title: 'Top Images',
+                                type: 'blocks',
+                                allowedBlocks: ['image'],
+                                defaultBlock: 'image',
+                            },
+                            columns: {
+                                title: 'Columns',
+                                type: 'blocks',
+                                allowedBlocks: ['column'],
+                                maxLength: 4,
+                            },
+                        },
+                        required: [],
+                    },
+                },
+                // Nested container: column contains content blocks
+                column: {
+                    id: 'column',
+                    title: 'Column',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/></svg>',
+                    group: 'common',
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['title', 'blocks'],
+                            },
+                        ],
+                        properties: {
+                            title: {
+                                title: 'Title',
+                                type: 'string',
+                            },
+                            blocks: {
+                                title: 'Content',
+                                type: 'blocks',
+                                allowedBlocks: ['slate', 'image'],
+                                defaultBlock: 'slate',
+                            },
+                        },
+                        required: [],
+                    },
+                },
             };
             const bridge = initBridge(adminUrl, {
                 allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...Object.keys(newBlocks)],

@@ -697,4 +697,49 @@ test.describe('Inline Editing - Basic', () => {
     await expect(editor.locator(boldSelector)).not.toBeVisible();
     expect(await editor.textContent()).toContain('test');
   });
+
+  test('empty editable field is visible and clickable', async ({ page }) => {
+    // Empty editable fields should have minimum height so they're visible and clickable.
+    // This tests the CSS rule that hydra.js injects for [data-editable-field]:empty
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode and clear all content to make the block empty
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.press('Backspace');
+
+    // Wait for the content to be cleared
+    await page.waitForTimeout(200);
+
+    // Click on a different block to deselect the empty block
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForBlockSelected('block-2-uuid');
+
+    // Get the editable field locator - handles both Nuxt (attr on root) and mock (attr on child)
+    const editableField = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field="value"]`).or(
+      iframe.locator(`[data-block-uid="${blockId}"][data-editable-field="value"]`)
+    );
+
+    // The empty field should still be visible (have height > 0) even when not selected
+    await expect(editableField).toBeVisible();
+
+    // Verify it has meaningful height (at least 1em ~ 16px typically)
+    const height = await editableField.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.height;
+    });
+    expect(height).toBeGreaterThan(10); // Should have at least 10px height when empty
+
+    // Click on the empty block to select it - this should work because it has height
+    await helper.clickBlockInIframe(blockId);
+
+    // Verify the empty block is now selected
+    await helper.waitForBlockSelected(blockId);
+  });
 });

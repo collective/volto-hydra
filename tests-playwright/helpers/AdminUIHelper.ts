@@ -517,6 +517,19 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get a locator for the slate editable field in a block.
+   * The field may be on the block element itself (Nuxt) or a child element (mock).
+   * Use with expect().toBeVisible() to verify a block is a slate block.
+   * @param blockLocator - Locator for the block element with data-block-uid
+   */
+  getSlateField(blockLocator: Locator): Locator {
+    // Try child first (mock renderer), then self (Nuxt where attr is on root)
+    const childField = blockLocator.locator('[data-editable-field="value"]');
+    const selfField = blockLocator.and(this.page.locator('[data-editable-field="value"]'));
+    return childField.or(selfField);
+  }
+
+  /**
    * Check if the Quanta Toolbar is visible for a specific block.
    * The toolbar is rendered in the parent window (admin UI), positioned above the block in iframe.
    * Uses isBlockSelectedInIframe which verifies both visibility AND correct positioning.

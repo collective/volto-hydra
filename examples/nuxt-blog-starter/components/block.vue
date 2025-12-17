@@ -46,13 +46,33 @@
   </div>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
-    class="grid grid-flow-col gap-4 mt-6 mb-6"
-    :class="['grid-cols-' + block.blocks_layout.items.length, `bg-${block.styles?.backgroundColor || 'white'}-700`]">
-    <div v-for="uid in block.blocks_layout.items" class="p-4"
-      :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]">
-      <Block :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"></Block>
+    class="mt-6 mb-6"
+    :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
+    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + block.blocks_layout.items.length]">
+      <Block v-for="uid in block.blocks_layout.items" :key="uid"
+        :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"
+        class="p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
     </div>
+  </div>
 
+  <!-- Columns container block -->
+  <div v-else-if="block['@type'] == 'columns'" :data-block-uid="block_uid" class="columns-block my-4">
+    <!-- Optional title for columns block -->
+    <h3 v-if="block.title" data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
+
+    <!-- Columns row - horizontal layout -->
+    <div class="columns-row flex gap-4" data-block-field="columns">
+      <div v-for="columnId in (block.columns_layout?.items || [])" :key="columnId"
+           :data-block-uid="columnId" data-block-add="right"
+           class="column flex-1 p-3 border border-dashed border-gray-300 rounded">
+        <!-- Column title -->
+        <h4 v-if="block.columns?.[columnId]?.title" data-editable-field="title"
+            class="column-title mb-2 text-sm font-medium">{{ block.columns[columnId].title }}</h4>
+        <!-- Column content blocks - vertical layout, Block component adds data-block-uid -->
+        <Block v-for="blockId in (block.columns?.[columnId]?.blocks_layout?.items || [])" :key="blockId"
+               :block_uid="blockId" :block="block.columns[columnId].blocks[blockId]" :data="data" :contained="true" />
+      </div>
+    </div>
   </div>
 
   <div v-else-if="block['@type'] == 'teaser'"
@@ -239,6 +259,10 @@
       </div>
     </div>
   </section>
+
+  <!-- Empty block - placeholder for deleted blocks in containers -->
+  <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
+  </div>
 
   <div v-else :data-block-uid="block_uid">
     {{ 'Not implemented Block: @type=' + block['@type'] }}
