@@ -686,8 +686,6 @@ export class Bridge {
                 // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
                 // Clear the processing flag BEFORE replay so handleTextChange can process buffered text
                 this.isProcessingExternalUpdate = false;
-                // Replay any buffered keystrokes now that DOM is ready
-                this.replayBufferedEvents();
               });
             });
 
@@ -713,6 +711,8 @@ export class Bridge {
                     log('Selecting new block from FORM_DATA:', this.selectedBlockUid);
                     this.selectBlock(newBlockElement);
                   }
+                  // Replay any buffered keystrokes now that DOM is ready
+                  this.replayBufferedEvents();
                 });
               });
             } else if (this.selectedBlockUid) {
@@ -722,6 +722,8 @@ export class Bridge {
                   if (blockElement) {
                     this.updateBlockUIAfterFormData(blockElement, skipFocus);
                   }
+                  // Replay any buffered keystrokes now that DOM is ready
+                  this.replayBufferedEvents();
                 });
               });
             }
