@@ -1269,8 +1269,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     // The new column should be selected (toolbar visible)
     const newColumnId = await newColumn.getAttribute('data-block-uid');
     expect(newColumnId).toBeTruthy();
-    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(newColumnId!);
-    expect(hasToolbar).toBe(true);
+    // Wait for toolbar to appear after block insertion
+    await helper.waitForQuantaToolbar(newColumnId!);
 
     // The add button should be to the RIGHT of the new column (columns go horizontally)
     const positioning = await helper.verifyBlockUIPositioning(newColumnId!);

@@ -379,8 +379,11 @@ test.describe('Removing Blocks', () => {
     await helper.openQuantaToolbarMenu(remainingBlocks[0]);
     await helper.clickQuantaToolbarMenuOption(remainingBlocks[0], 'Remove');
 
-    const finalCount = await helper.getBlockCount();
-    expect(finalCount).toBe(initialCount - 2);
+    // Wait for the block count to reflect the removal
+    await expect(async () => {
+      const finalCount = await helper.getBlockCount();
+      expect(finalCount).toBe(initialCount - 2);
+    }).toPass({ timeout: 5000 });
   });
 });
 
