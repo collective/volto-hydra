@@ -160,8 +160,10 @@ onMounted(() => {
                     },
                 },
             };
+            // Page-level blocks (column is only allowed inside columns, not at page level)
+            const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
             const bridge = initBridge(adminUrl, {
-                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...Object.keys(newBlocks)],
+                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...pageLevelBlocks],
                 voltoConfig: {
                     blocks: {
                         blocksConfig: newBlocks,
