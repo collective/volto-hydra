@@ -1887,12 +1887,16 @@ export class AdminUIHelper {
       timeout: 5000,
     });
 
-    const focusInfo = await this.isEditorFocused(editor);
-    if (!focusInfo.isFocused) {
-      throw new Error(
-        `Block ${blockId} field${fieldName ? ` (${fieldName})` : ''} is not focused. Active element: ${focusInfo.activeElement}`,
-      );
-    }
+    // Wait for focus to be established (may take a moment after re-renders)
+    // Use polling instead of single check to handle race conditions with FORM_DATA re-renders
+    await expect(async () => {
+      const focusInfo = await this.isEditorFocused(editor);
+      if (!focusInfo.isFocused) {
+        throw new Error(
+          `Block ${blockId} field${fieldName ? ` (${fieldName})` : ''} is not focused. Active element: ${focusInfo.activeElement}`,
+        );
+      }
+    }).toPass({ timeout: 5000 });
 
     return editor;
   }
