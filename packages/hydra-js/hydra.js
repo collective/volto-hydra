@@ -1243,24 +1243,40 @@ export class Bridge {
       return false;
     }
 
-    let startNode = node;
-
-    // Walk up to find if there's a data-node-id ancestor before hitting data-editable-field
-    let current = startNode.nodeType === Node.TEXT_NODE ? startNode.parentNode : startNode.parentNode;
+    // Find the editable field container
+    let editableField = null;
+    let current = node.parentNode;
     while (current) {
-      // If we hit an element with data-node-id, cursor is valid
-      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
-        return false;
-      }
-      // If we hit the editable field container without finding data-node-id, cursor is on whitespace
       if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-editable-field')) {
-        return true;
+        editableField = current;
+        break;
       }
       current = current.parentNode;
     }
 
     // Not inside an editable field at all
-    return false;
+    if (!editableField) {
+      return false;
+    }
+
+    // If the editable field has no data-node-id elements, it's not Slate-rendered
+    // (e.g., Nuxt simple HTML) - don't try to correct whitespace
+    if (!editableField.querySelector('[data-node-id]')) {
+      return false;
+    }
+
+    // Walk up from node to find if there's a data-node-id ancestor before hitting the editable field
+    current = node.parentNode;
+    while (current && current !== editableField) {
+      // If we hit an element with data-node-id, cursor is valid
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+      current = current.parentNode;
+    }
+
+    // Reached editable field without finding data-node-id - cursor is on whitespace
+    return true;
   }
 
   /**
@@ -1376,6 +1392,14 @@ export class Bridge {
     log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
 
     if (!anchorPos.node || !focusPos.node) return false;
+
+    // Check if corrected position is same as current - if so, don't update (avoids infinite loop)
+    const anchorSame = anchorPos.node === range.startContainer && anchorPos.offset === range.startOffset;
+    const focusSame = focusPos.node === range.endContainer && focusPos.offset === range.endOffset;
+    if (anchorSame && focusSame) {
+      log('correctInvalidWhitespaceSelection: corrected position same as current, skipping to avoid loop');
+      return false;
+    }
 
     // Set corrected selection
     const newRange = document.createRange();
