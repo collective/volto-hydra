@@ -295,7 +295,11 @@ const ParentBlockSection = ({
               properties={formData}
               pathname={pathname}
               onChangeBlock={onChangeBlock}
-              onSelectBlock={onSelectBlock}
+              // For parent blocks, use no-op to prevent Edit components from changing
+              // selection when they initialize/render. This was causing parent blocks
+              // to get selected when clicking on child blocks (e.g., empty blocks).
+              // For current block, use real onSelectBlock for sub-selections.
+              onSelectBlock={isCurrentBlock ? onSelectBlock : () => {}}
               // These are needed but not used for sidebar-only rendering
               onMoveBlock={() => {}}
               onDeleteBlock={() => {}}

@@ -1068,11 +1068,14 @@ test.describe('Empty Block Behavior', () => {
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
 
-    // Get the empty block's ID
-    const emptyBlockId = await iframe
+    // Wait for empty block to be rendered inside grid-1
+    const emptyBlockLocator = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-uid');
+      .first();
+    await expect(emptyBlockLocator).toBeVisible({ timeout: 5000 });
+
+    // Get the empty block's ID
+    const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
 
     // Click the empty block to open chooser
     await helper.clickBlockInIframe(emptyBlockId!);

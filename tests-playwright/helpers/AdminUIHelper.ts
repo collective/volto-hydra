@@ -318,6 +318,9 @@ export class AdminUIHelper {
       const toolbar = this.page.locator('.quanta-toolbar');
       await toolbar.waitFor({ state: 'visible', timeout: 5000 });
 
+      // Wait for selection to settle
+      await this.waitForBlockSelected(blockId);
+
       // Check if the correct block is selected
       const result = await this.isBlockSelectedInIframe(blockId);
       if (!result.ok) {
@@ -348,8 +351,17 @@ export class AdminUIHelper {
   /**
    * Navigate up through parent blocks in the sidebar until reaching the target block.
    * Used when clicking on a container block selects a child instead.
+   *
+   * @param targetBlockId - The block ID we want to be selected
+   * @param expectedCurrentType - Optional: the type name of the block we expect to be currently selected
+   *                              (e.g., "Grid" if grid-1 was selected instead of the target)
+   * @param maxAttempts - Maximum navigation attempts
    */
-  async navigateToParentBlock(targetBlockId: string, maxAttempts: number = 10): Promise<void> {
+  async navigateToParentBlock(
+    targetBlockId: string,
+    expectedCurrentType?: string,
+    maxAttempts: number = 10
+  ): Promise<void> {
     // Wait for sidebar to be open
     await this.waitForSidebarOpen();
 
@@ -362,6 +374,27 @@ export class AdminUIHelper {
       throw new Error(
         `Cannot navigate to block "${targetBlockId}": no parent navigation buttons appeared in sidebar after 5s`
       );
+    }
+
+    // Debug: Get all parent button texts for error messages
+    const getParentButtonTexts = async () => {
+      const buttons = await parentButtonLocator.all();
+      const texts: string[] = [];
+      for (const btn of buttons) {
+        texts.push(await btn.textContent() || '(empty)');
+      }
+      return texts;
+    };
+
+    // If expectedCurrentType is provided, verify the sidebar shows it as the current block
+    if (expectedCurrentType) {
+      const buttonTexts = await getParentButtonTexts();
+      const lastButtonText = buttonTexts[buttonTexts.length - 1] || '';
+      if (!lastButtonText.includes(expectedCurrentType)) {
+        throw new Error(
+          `Sidebar state mismatch: expected current block type "${expectedCurrentType}" but found buttons: [${buttonTexts.join(', ')}]`
+        );
+      }
     }
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -378,8 +411,10 @@ export class AdminUIHelper {
       const buttonExists = (await parentButton.count()) > 0;
 
       if (!buttonExists) {
+        const buttonTexts = await getParentButtonTexts();
         throw new Error(
-          `Cannot navigate to block "${targetBlockId}": parent navigation buttons disappeared from sidebar`
+          `Cannot navigate to block "${targetBlockId}": parent navigation buttons disappeared from sidebar. ` +
+          `Last known buttons: [${buttonTexts.join(', ')}]`
         );
       }
 
@@ -387,8 +422,10 @@ export class AdminUIHelper {
       await this.page.waitForTimeout(300); // Wait for selection to update
     }
 
+    const buttonTexts = await getParentButtonTexts();
     throw new Error(
-      `Failed to navigate to block "${targetBlockId}" after ${maxAttempts} attempts`
+      `Failed to navigate to block "${targetBlockId}" after ${maxAttempts} attempts. ` +
+      `Current sidebar buttons: [${buttonTexts.join(', ')}]`
     );
   }
 
