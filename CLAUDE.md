@@ -15,19 +15,7 @@ This builds `@plone/registry` and `@plone/components`. Only needed once unless y
 
 ## Running Tests
 
-### Mock Parent Tests (Fast - No Volto)
-
-For quick iteration on hydra.js bridge and formatting logic without full Volto stack:
-
-```bash
-pnpm test:mock              # Run all mock parent tests (~4s)
-pnpm test:mock:headed       # Run with visible browser
-pnpm test:mock:ui           # Run in UI mode
-```
-
-These tests use only the mock API server and test frontend (no Volto compilation needed).
-
-### Full Integration Tests (With Volto)
+### Integration Tests
 
 Playwright automatically starts the Volto server and waits for compilation before running tests.
 

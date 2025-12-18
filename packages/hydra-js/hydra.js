@@ -884,9 +884,9 @@ export class Bridge {
 
     let fieldToFocus = null;
 
-    if (this.lastClickEvent) {
+    if (this.lastClickPosition?.target) {
       // Find the clicked editable field - only accept if it belongs to THIS block
-      const clickedElement = this.lastClickEvent.target;
+      const clickedElement = this.lastClickPosition.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
       log('Click event path - found clickedField:', !!clickedField);
       if (clickedField && this.fieldBelongsToBlock(clickedField, blockElement)) {
@@ -955,8 +955,22 @@ export class Bridge {
           event.preventDefault();
         }
 
-        // Store the click event for cursor positioning
-        this.lastClickEvent = event;
+        // Store click position relative to the editable element for cursor positioning
+        // Using relative coordinates ensures focus()/scroll doesn't invalidate the position
+        // Also store the target for field detection
+        const clickedEditableField = event.target.closest('[data-editable-field]');
+        const editableField = clickedEditableField || blockElement.querySelector('[data-editable-field]');
+        if (editableField) {
+          const rect = editableField.getBoundingClientRect();
+          this.lastClickPosition = {
+            relativeX: event.clientX - rect.left,
+            relativeY: event.clientY - rect.top,
+            editableField: editableField.getAttribute('data-editable-field'),
+            target: event.target, // For field detection
+          };
+        } else {
+          this.lastClickPosition = null;
+        }
         this.selectBlock(blockElement);
       }
     };
@@ -1315,6 +1329,22 @@ export class Bridge {
   }
 
   /**
+   * Validates a position and returns a corrected position if on invalid whitespace.
+   * @param {Node} node - The node containing the position
+   * @param {number} offset - The offset within the node
+   * @returns {{node: Node, offset: number}} The validated (possibly corrected) position
+   */
+  getValidatedPosition(node, offset) {
+    if (this.isOnInvalidWhitespace(node)) {
+      const validPos = this.getValidPositionForWhitespace(node);
+      if (validPos) {
+        return { node: validPos.textNode, offset: validPos.offset };
+      }
+    }
+    return { node, offset };
+  }
+
+  /**
    * Corrects cursor/selection if it's on invalid whitespace.
    * For collapsed selections, moves cursor to nearest valid position.
    * For range selections, corrects each end independently.
@@ -1339,22 +1369,18 @@ export class Bridge {
       anchorParent: range.startContainer.parentElement?.tagName,
     });
 
-    // Get corrected positions
-    const anchorPos = anchorOnWhitespace
-      ? this.getValidPositionForWhitespace(range.startContainer)
-      : { textNode: range.startContainer, offset: range.startOffset };
-    const focusPos = focusOnWhitespace
-      ? this.getValidPositionForWhitespace(range.endContainer)
-      : { textNode: range.endContainer, offset: range.endOffset };
+    // Get corrected positions using shared helper
+    const anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+    const focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
 
     log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
 
-    if (!anchorPos || !focusPos) return false;
+    if (!anchorPos.node || !focusPos.node) return false;
 
     // Set corrected selection
     const newRange = document.createRange();
-    newRange.setStart(anchorPos.textNode, anchorPos.offset);
-    newRange.setEnd(focusPos.textNode, focusPos.offset);
+    newRange.setStart(anchorPos.node, anchorPos.offset);
+    newRange.setEnd(focusPos.node, focusPos.offset);
     selection.removeAllRanges();
     selection.addRange(newRange);
 
@@ -2167,12 +2193,17 @@ export class Bridge {
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
     // Skip focus if editing from sidebar - don't steal focus from sidebar fields
-    if (this.focusedFieldName && !skipFocus) {
+    // EXCEPTION: If we have a savedClickPosition, we need to restore cursor even with skipFocus
+    // because the re-render may have destroyed the DOM element where cursor was positioned
+    const hasSavedClickPosition = !!this.savedClickPosition;
+    if (this.focusedFieldName && (!skipFocus || hasSavedClickPosition)) {
       const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
 
       if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
-        // Focus the field
-        focusedField.focus();
+        // Focus the field (only if not skipFocus, unless we need to restore click position)
+        if (!skipFocus || hasSavedClickPosition) {
+          focusedField.focus();
+        }
 
         // Position cursor at click location if we saved it
         if (this.savedClickPosition) {
@@ -2180,11 +2211,13 @@ export class Bridge {
           if (selection) {
             // Only restore click position if there's no existing non-collapsed selection
             if (!selection.rangeCount || selection.isCollapsed) {
+              // Convert relative position to screen coordinates using current element position
+              const currentRect = focusedField.getBoundingClientRect();
+              const clientX = currentRect.left + this.savedClickPosition.relativeX;
+              const clientY = currentRect.top + this.savedClickPosition.relativeY;
+
               // Position cursor at the click location using caretRangeFromPoint
-              const range = document.caretRangeFromPoint(
-                this.savedClickPosition.clientX,
-                this.savedClickPosition.clientY
-              );
+              const range = document.caretRangeFromPoint(clientX, clientY);
               if (range) {
                 selection.removeAllRanges();
                 selection.addRange(range);
@@ -2368,9 +2401,9 @@ export class Bridge {
     this.focusedFieldName = null;
 
     // Detect focused field from click location or first editable field
-    if (this.lastClickEvent) {
+    if (this.lastClickPosition?.target) {
       // Find the clicked editable field
-      const clickedElement = this.lastClickEvent.target;
+      const clickedElement = this.lastClickPosition.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
       if (clickedField) {
         this.focusedFieldName = clickedField.getAttribute('data-editable-field');
@@ -2564,17 +2597,34 @@ export class Bridge {
                 log('selectBlock skipping focus() - already focused');
               }
 
-              // If field was already editable, browser already handled cursor positioning
-              // on click - don't redo it (causes race with typing)
-              if (wasAlreadyEditable) {
-                log('Field already editable, trusting browser click positioning');
-                this.lastClickEvent = null;
-              } else if (this.lastClickEvent) {
-                // Field just became editable - need to position cursor
+              // If field was already editable AND already focused, browser already handled
+              // cursor positioning on click - don't redo it (causes race with typing)
+              // But if we had to call focus(), we need to restore click position because
+              // focus() moves cursor to end of text
+              if (wasAlreadyEditable && isAlreadyFocused) {
+                log('Field already editable and focused, trusting browser click positioning');
+                this.lastClickPosition = null;
+              } else if (this.lastClickPosition) {
+                // Need to position cursor at click location
+                // Convert relative position back to screen coordinates using current element position
+                const currentRect = contentEditableField.getBoundingClientRect();
+                const clientX = currentRect.left + this.lastClickPosition.relativeX;
+                const clientY = currentRect.top + this.lastClickPosition.relativeY;
+
+                log('Positioning cursor at click location:', {
+                  relativeX: this.lastClickPosition.relativeX,
+                  relativeY: this.lastClickPosition.relativeY,
+                  clientX,
+                  clientY,
+                  wasAlreadyEditable,
+                  isAlreadyFocused,
+                });
+
                 // Save click position for FORM_DATA handler to use after renderer updates
                 this.savedClickPosition = {
-                  clientX: this.lastClickEvent.clientX,
-                  clientY: this.lastClickEvent.clientY,
+                  relativeX: this.lastClickPosition.relativeX,
+                  relativeY: this.lastClickPosition.relativeY,
+                  editableField: this.lastClickPosition.editableField,
                 };
 
                 // Only restore click position if there's no existing non-collapsed selection
@@ -2586,26 +2636,39 @@ export class Bridge {
 
                 if (!hasNonCollapsedSelection) {
                   // Position cursor at the click location using caretRangeFromPoint
-                  const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
+                  const range = document.caretRangeFromPoint(clientX, clientY);
+                  log('caretRangeFromPoint result:', range ? {
+                    startContainer: range.startContainer.nodeName,
+                    startOffset: range.startOffset,
+                    text: range.startContainer.textContent?.substring(0, 30),
+                  } : null);
                   if (range) {
+                    // Validate position before setting (may land on invalid whitespace)
+                    const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+                    const finalRange = document.createRange();
+                    finalRange.setStart(validPos.node, validPos.offset);
+                    finalRange.collapse(true);
                     const selection = window.getSelection();
                     selection.removeAllRanges();
-                    selection.addRange(range);
+                    selection.addRange(finalRange);
+                    log('Cursor positioned at offset:', validPos.offset);
                   }
+                } else {
+                  log('Skipping cursor positioning - non-collapsed selection exists');
                 }
 
-                // Clear the stored click event
-                this.lastClickEvent = null;
+                // Clear the stored click position
+                this.lastClickPosition = null;
               }
             } else {
-              // No lastClickEvent, just log that we skipped cursor positioning
-              log('No lastClickEvent, skipping cursor positioning');
+              // No lastClickPosition, just log that we skipped cursor positioning
+              log('No lastClickPosition, skipping cursor positioning');
             }
           } else {
-            // Not an editable field type, clear click event if any
-            if (this.lastClickEvent) {
-              log('Non-editable field type, clearing lastClickEvent');
-              this.lastClickEvent = null;
+            // Not an editable field type, clear click position if any
+            if (this.lastClickPosition) {
+              log('Non-editable field type, clearing lastClickPosition');
+              this.lastClickPosition = null;
             }
           }
 

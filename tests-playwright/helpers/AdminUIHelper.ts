@@ -488,8 +488,13 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
     await block.waitFor({ state: 'visible', timeout });
-    // Also wait a bit for the selected class to be applied
-    await this.page.waitForTimeout(300);
+
+    // Wait for Admin UI to confirm selection by checking sidebar header shows this block
+    // The sidebar header updates when BLOCK_SELECTED message is processed
+    await expect(async () => {
+      const sidebarHeader = this.page.locator('.sidebar-section-header[data-is-current="true"]');
+      await expect(sidebarHeader).toBeVisible({ timeout: 100 });
+    }).toPass({ timeout });
 
     // Return the block locator for chaining
     return block;
@@ -1713,6 +1718,47 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get click coordinates for a specific character position in a text element.
+   * Uses the Range API to find the exact pixel position of a character.
+   *
+   * @param editor - The element containing the text
+   * @param charPosition - The character offset to get coordinates for (0-based)
+   * @returns Click position relative to the element, or null if not found
+   */
+  async getClickPositionForCharacter(
+    editor: Locator,
+    charPosition: number,
+  ): Promise<{ x: number; y: number } | null> {
+    return await editor.evaluate(
+      (el: HTMLElement, pos: number) => {
+        // Find the first text node
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        const textNode = walker.nextNode();
+        if (!textNode || !textNode.textContent) return null;
+
+        // Clamp position to valid range
+        const clampedPos = Math.min(pos, textNode.textContent.length);
+
+        // Create a range at the specified position
+        const range = document.createRange();
+        range.setStart(textNode, clampedPos);
+        range.collapse(true);
+
+        // Get the bounding rect of that position
+        const rect = range.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+
+        // Return position relative to element
+        return {
+          x: rect.left - elRect.left,
+          y: rect.top - elRect.top + rect.height / 2,
+        };
+      },
+      charPosition,
+    );
+  }
+
+  /**
    * Move cursor to a specific position in a contenteditable element.
    * Uses Selection.modify() to move by visible characters, handling Vue/Nuxt empty text nodes.
    *
@@ -1814,47 +1860,27 @@ export class AdminUIHelper {
    * during format operations (e.g., waiting for iframe flush to complete).
    *
    * @param blockId - The block UID to enter edit mode on
+   * @param fieldName - Optional field name to target (e.g., 'value', 'title'). If not provided, uses first editable field.
    * @returns The editor element, ready for text input
    */
-  async enterEditMode(blockId: string): Promise<any> {
+  async enterEditMode(blockId: string, fieldName?: string): Promise<any> {
     const iframe = this.getIframe();
-    // Use [data-editable-field] to find editor regardless of contenteditable state
-    // Try descendant first (mock frontend), then same element (Nuxt frontend)
-    let editor = iframe
-      .locator(`[data-block-uid="${blockId}"] [data-editable-field]`)
-      .first();
 
-    // Check if descendant selector found anything
-    let isVisible = await editor.isVisible().catch(() => false);
-
-    if (!isVisible) {
-      // Try same-element selector (Nuxt: data-block-uid and data-editable-field on same element)
-      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`);
-      isVisible = await editor.isVisible().catch(() => false);
-    }
-
-    if (isVisible) {
-      // Check if already editable
-      const isEditable = await editor.getAttribute('contenteditable');
-      if (isEditable === 'true') {
-        // Check if already focused
-        const focusInfo = await this.isEditorFocused(editor);
-        if (focusInfo.isFocused) {
-          // Already in edit mode, return the editor
-          return editor;
-        }
-      }
-    }
-
-    // Not in edit mode yet, need to click the block
+    // Click the block to select it
     const blockContainer = iframe.locator(`[data-block-uid="${blockId}"]`);
     await blockContainer.click();
+
+    // Wait for block selection to be confirmed by Admin UI
+    await this.waitForBlockSelected(blockId);
 
     // Wait for the Quanta toolbar to appear (indicating block is selected)
     await this.waitForQuantaToolbar(blockId, 5000);
 
-    // Wait for the editor element to appear
-    await editor.waitFor({ state: 'visible', timeout: 5000 });
+    // Now get the editor element (after block is selected and rendered)
+    const editor = await this.getEditorLocator(blockId, fieldName);
+
+    // Click the editor field to focus it
+    await editor.click();
 
     // Wait for contenteditable to become true (may be blocked briefly)
     await expect(editor).toHaveAttribute('contenteditable', 'true', {
@@ -1864,7 +1890,7 @@ export class AdminUIHelper {
     const focusInfo = await this.isEditorFocused(editor);
     if (!focusInfo.isFocused) {
       throw new Error(
-        `Block ${blockId} field is not focused. Active element: ${focusInfo.activeElement}`,
+        `Block ${blockId} field${fieldName ? ` (${fieldName})` : ''} is not focused. Active element: ${focusInfo.activeElement}`,
       );
     }
 

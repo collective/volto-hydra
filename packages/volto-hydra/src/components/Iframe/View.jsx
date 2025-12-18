@@ -473,6 +473,7 @@ const Iframe = (props) => {
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
+  const lastSentFormDataRef = useRef(null); // Track last sent formData to avoid redundant sends
   // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
   // This ensures toolbar sees all together in the same render
   // Initialize with properties so we have data from first render
@@ -1302,6 +1303,15 @@ const Iframe = (props) => {
       return;
     }
 
+    // Skip if data hasn't actually changed - prevents unnecessary re-renders that lose cursor position
+    // This can happen when Redux state updates (e.g., selected block change) create new object
+    // references even though form data content is identical.
+    // Only apply this check when there's no pendingSelectBlockUid - new block adds always need to send
+    if (!iframeSyncState.pendingSelectBlockUid && lastSentFormDataRef.current === dataToSend) {
+      log('Skipping FORM_DATA - same reference as last sent');
+      return;
+    }
+
     // Send FORM_DATA to iframe - iframeSyncState.formData is always the source of truth
     log('Sending FORM_DATA with blockPathMap keys:', Object.keys(blockPathMapToSend));
     const message = {
@@ -1315,6 +1325,8 @@ const Iframe = (props) => {
       message,
       iframeOriginRef.current,
     );
+    // Track what we sent to avoid redundant sends
+    lastSentFormDataRef.current = dataToSend;
     // Clear pendingSelectBlockUid after sending
     if (iframeSyncState.pendingSelectBlockUid) {
       setIframeSyncState(prev => ({
