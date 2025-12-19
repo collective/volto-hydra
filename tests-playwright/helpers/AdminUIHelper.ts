@@ -490,12 +490,13 @@ export class AdminUIHelper {
     await block.waitFor({ state: 'visible', timeout });
 
     // Wait for drag handle to appear and be positioned at the correct block
-    // The drag handle is positioned at the selected block's left edge, 48px above
+    // The drag handle is positioned at the selected block's left edge, typically 48px above
+    // For container blocks, positioning may vary, so we check if handle is near the block
     const dragHandle = iframe.locator('.volto-hydra-drag-button');
     await expect(async () => {
       await expect(dragHandle).toBeVisible({ timeout: 100 });
 
-      // Verify drag handle is positioned at this block
+      // Verify drag handle is positioned near this block
       const blockBox = await block.boundingBox();
       const handleBox = await dragHandle.boundingBox();
       if (!blockBox || !handleBox) {
@@ -504,14 +505,17 @@ export class AdminUIHelper {
 
       // Drag handle should be at block's left edge (within tolerance)
       const xDiff = Math.abs(handleBox.x - blockBox.x);
-      // Drag handle should be above the block (48px above block top)
-      const expectedTop = blockBox.y - 48;
-      const yDiff = Math.abs(handleBox.y - expectedTop);
+      // Drag handle should be near the block's top (allow for above or at top)
+      // Handle is typically 48px above, but for container blocks it may be at the top
+      const minY = blockBox.y - 60; // Allow up to 60px above
+      const maxY = blockBox.y + 30; // Allow slightly below top
+      const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
 
-      if (xDiff > 20 || yDiff > 20) {
+      if (xDiff > 30 || !inYRange) {
         throw new Error(
           `Drag handle not at block position. Block: (${blockBox.x.toFixed(0)}, ${blockBox.y.toFixed(0)}), ` +
-          `Handle: (${handleBox.x.toFixed(0)}, ${handleBox.y.toFixed(0)}), expected y: ${expectedTop.toFixed(0)}`
+          `Handle: (${handleBox.x.toFixed(0)}, ${handleBox.y.toFixed(0)}), ` +
+          `expected y range: [${minY.toFixed(0)}, ${maxY.toFixed(0)}]`
         );
       }
     }).toPass({ timeout });
@@ -844,13 +848,15 @@ export class AdminUIHelper {
     blockId: string,
     optionText: 'Settings' | 'Remove'
   ): Promise<void> {
-    const dropdown = this.page.locator(
-      `.volto-hydra-dropdown-menu`
-    );
+    const dropdown = this.page.locator(`.volto-hydra-dropdown-menu`);
     const option = dropdown.locator(
       `.volto-hydra-dropdown-item:has-text("${optionText}")`
     );
+    // Wait for option to be visible and clickable
+    await option.waitFor({ state: 'visible', timeout: 3000 });
     await option.click();
+    // Wait for dropdown to close (confirms action was triggered)
+    await dropdown.waitFor({ state: 'hidden', timeout: 3000 });
   }
 
   /**

@@ -1042,7 +1042,8 @@ test.describe('Empty Block Behavior', () => {
     console.log('[TEST] Empty block ID after deletions:', emptyBlockId);
 
     // Click the empty block
-    await helper.clickBlockInIframe(emptyBlockId!);
+    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    await emptyBlockLocator.click();
 
     // Block chooser should open automatically
     const blockChooser = page.locator('.blocks-chooser');
@@ -1069,16 +1070,18 @@ test.describe('Empty Block Behavior', () => {
     await helper.waitForBlockToDisappear('grid-cell-1');
 
     // Wait for empty block to be rendered inside grid-1
-    const emptyBlockLocator = iframe
-      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
-      .first();
+    // hydra marks empty blocks with data-hydra-empty attribute
+    const emptyBlockLocator = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]'
+    );
     await expect(emptyBlockLocator).toBeVisible({ timeout: 5000 });
 
     // Get the empty block's ID
     const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
 
     // Click the empty block to open chooser
-    await helper.clickBlockInIframe(emptyBlockId!);
+    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    await emptyBlockLocator.click();
 
     // Wait for block chooser
     const blockChooser = page.locator('.blocks-chooser');
