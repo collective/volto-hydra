@@ -1237,8 +1237,37 @@ export class Bridge {
   isOnInvalidWhitespace(node) {
     if (!node) return false;
 
+    // Handle ELEMENT nodes - cursor can land on wrapper DIV when clicking at edge of block
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // If this element has data-node-id, cursor position is valid
+      if (node.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+
+      // If this element is an editable field itself, it's valid
+      if (node.hasAttribute?.('data-editable-field')) {
+        return false;
+      }
+
+      // Check if this element is inside a block that has slate fields
+      const blockElement = node.closest?.('[data-block-uid]');
+      if (!blockElement) {
+        return false;
+      }
+
+      // Check if there's any data-node-id element inside the block
+      // (could be nested or on same element as editable-field)
+      const nodeIdElement = blockElement.querySelector('[data-node-id]');
+      if (nodeIdElement && !node.closest?.('[data-node-id]')) {
+        // Element is inside a block with slate content but outside data-node-id
+        log('isOnInvalidWhitespace: element inside block but outside data-node-id, tagName:', node.tagName);
+        return true;
+      }
+
+      return false;
+    }
+
     // Only TEXT nodes can be "invalid whitespace" (Vue template artifacts like "\n  ")
-    // Element-based selections are valid (e.g., browser's selectText() uses container element)
     if (node.nodeType !== Node.TEXT_NODE) {
       return false;
     }
@@ -1297,21 +1326,38 @@ export class Bridge {
     log('getValidPositionForWhitespace: node=', node.nodeType === Node.TEXT_NODE ? 'TEXT' : node.tagName, 'content=', JSON.stringify(node.textContent?.substring(0, 20)), 'isRangeEnd=', isRangeEnd);
 
     // Find the editable field container
+    let container = null;
+
     // For element nodes, check if the node itself is the container
-    let container = node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-editable-field')
-      ? node
-      : node.parentNode;
-    while (container && !container.hasAttribute?.('data-editable-field')) {
-      container = container.parentNode;
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-editable-field')) {
+      container = node;
     }
+    // Check if we can find editable field by walking up
+    if (!container) {
+      let current = node.parentNode;
+      while (current && !current.hasAttribute?.('data-editable-field')) {
+        current = current.parentNode;
+      }
+      container = current;
+    }
+    // For element nodes (like block wrapper), also check inside for editable field
+    if (!container && node.nodeType === Node.ELEMENT_NODE) {
+      container = node.querySelector?.('[data-editable-field]');
+    }
+
     if (!container) {
       log('getValidPositionForWhitespace: no container found');
       return null;
     }
 
     // Get first and last elements with data-node-id
-    const firstNodeIdEl = container.querySelector('[data-node-id]');
-    const allNodeIdEls = container.querySelectorAll('[data-node-id]');
+    // Check if container itself has data-node-id first, then look for descendants
+    const firstNodeIdEl = container.hasAttribute?.('data-node-id')
+      ? container
+      : container.querySelector('[data-node-id]');
+    const allNodeIdEls = container.hasAttribute?.('data-node-id')
+      ? [container, ...container.querySelectorAll('[data-node-id]')]
+      : container.querySelectorAll('[data-node-id]');
     const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
 
     if (!firstNodeIdEl) {
@@ -1993,6 +2039,14 @@ export class Bridge {
       // If fieldType is undefined (not registered), assume it could be Slate and show error
       if (fieldType && fieldType !== 'slate') {
         // This is a known non-Slate text field, just return null without error
+        return null;
+      }
+
+      // Check if container has ANY data-node-id elements
+      // If it does, the cursor is likely on whitespace and serializePoint will recover
+      // via getValidPositionForWhitespace - don't show warning yet
+      if (container?.querySelector('[data-node-id]')) {
+        // Container has valid slate elements - let caller try recovery
         return null;
       }
 
@@ -4073,6 +4127,11 @@ export class Bridge {
         // Handle Enter key to create new block
         if (e.key === 'Enter' && !e.shiftKey) {
           log('Enter key detected (no Shift)');
+
+          // Correct cursor if it's on invalid whitespace before checking data-node-id
+          // This handles the case where Enter is pressed before selectionchange fires
+          this.correctInvalidWhitespaceSelection();
+
           const selection = window.getSelection();
           log('Selection rangeCount:', selection.rangeCount);
           if (!selection.rangeCount) return;

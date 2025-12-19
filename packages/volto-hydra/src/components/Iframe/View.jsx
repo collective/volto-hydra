@@ -1007,6 +1007,14 @@ const Iframe = (props) => {
                 { intl, metadata, properties },
               );
             }
+            // Set pendingSelectBlockUid so the moved block stays selected after re-render
+            // Use flushSync to ensure state is committed before Redux update triggers useEffect
+            flushSync(() => {
+              setIframeSyncState(prev => ({
+                ...prev,
+                pendingSelectBlockUid: blockId,
+              }));
+            });
             onChangeFormData(newFormData);
           }
           break;

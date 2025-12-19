@@ -1539,6 +1539,56 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     expect(paths.zwsAfterSpan).toEqual([0, 2]);
   });
 
+  test('isOnInvalidWhitespace: element node inside block but outside data-node-id is invalid', async () => {
+    // When clicking at the edge of a block, the cursor may land on the wrapper DIV
+    // instead of inside the P element with data-node-id. This should be flagged as
+    // invalid so correctInvalidWhitespaceSelection can fix it.
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Structure: block wrapper DIV containing editable P with data-node-id
+      // <div data-block-uid="test-block">
+      //   <p data-editable-field="value" data-node-id="0">Hello</p>
+      // </div>
+      const wrapper = document.createElement('div');
+      wrapper.id = 'test-element-outside-nodeid';
+      wrapper.setAttribute('data-block-uid', 'test-block');
+      wrapper.innerHTML = '<p data-editable-field="value" data-node-id="0">Hello</p>';
+      document.body.appendChild(wrapper);
+
+      const bridge = (window as any).bridge;
+      const p = wrapper.querySelector('p')!;
+
+      // Test the wrapper DIV - cursor lands here when clicking at edge of block
+      // This is inside the block but outside data-node-id, should be invalid
+      const wrapperIsInvalid = bridge.isOnInvalidWhitespace(wrapper);
+
+      // Test the P element - has data-node-id, should be valid
+      const pIsInvalid = bridge.isOnInvalidWhitespace(p);
+
+      // Test text node inside P - should be valid
+      const textNode = p.firstChild;
+      const textIsInvalid = bridge.isOnInvalidWhitespace(textNode);
+
+      wrapper.remove();
+
+      return {
+        wrapperIsInvalid,
+        pIsInvalid,
+        textIsInvalid,
+      };
+    });
+
+    // Wrapper DIV is inside block but outside data-node-id - should be INVALID
+    // so the cursor can be corrected to a valid position inside the P
+    expect(result.wrapperIsInvalid).toBe(true);
+    // P element has data-node-id - should be valid
+    expect(result.pIsInvalid).toBe(false);
+    // Text inside P is valid
+    expect(result.textIsInvalid).toBe(false);
+  });
+
   test('serializePoint excludes ZWS from offset calculation', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');

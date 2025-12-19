@@ -269,8 +269,15 @@ test.describe('Inline Editing - Basic', () => {
     await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('First line', { delay: 10 });
 
-    // Move cursor to end of line
-    await helper.moveCursorToEnd(editor);
+    // Click past the end of text to position cursor on whitespace (simulates real user click)
+    // This tests the whitespace correction code path
+    const editorBox = await editor.boundingBox();
+    if (editorBox) {
+      // Click at the right edge of the editor, past the text content
+      await iframe.locator(`[data-block-uid="${blockId}"]`).click({
+        position: { x: editorBox.width - 5, y: editorBox.height / 2 },
+      });
+    }
 
     // Press Enter - in standard Volto this would create a new block
     // Must press Enter in the iframe context, not the page context
@@ -278,6 +285,10 @@ test.describe('Inline Editing - Basic', () => {
 
     // Wait for the correct number of blocks to be created
     await expect(iframe.locator('[data-block-uid]')).toHaveCount(initialBlocks + 1, { timeout: 3000 });
+
+    // Check that no error toast appeared (Missing data-node-id)
+    const errorToast = iframe.locator('#hydra-dev-warning');
+    await expect(errorToast).not.toBeVisible({ timeout: 1000 });
 
     // Get the new block (should be right after the old block)
     const allBlocks = await iframe.locator('[data-block-uid]').all();
