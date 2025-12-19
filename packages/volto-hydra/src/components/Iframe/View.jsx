@@ -1051,9 +1051,13 @@ const Iframe = (props) => {
           // Check if selected block is an empty block - if so, open block chooser
           // This should happen on every click of an empty block, not just "new" selections
           // BlockChooser will dynamically decide to mutate vs insert based on selected block type
+          // IMPORTANT: Rebuild blockPathMap from properties instead of using iframeSyncState.blockPathMap
+          // because React state updates are async and the state may be stale when BLOCK_SELECTED arrives
+          // shortly after a delete operation creates an empty block
+          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig);
           const selectedBlockData = getBlockByPath(
             properties,
-            iframeSyncState.blockPathMap?.[event.data.blockUid]?.path,
+            currentBlockPathMap?.[event.data.blockUid]?.path,
           ) || properties?.blocks?.[event.data.blockUid];
           if (selectedBlockData?.['@type'] === 'empty') {
             setAddNewBlockOpened(true);
