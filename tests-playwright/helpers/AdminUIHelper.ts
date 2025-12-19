@@ -489,11 +489,31 @@ export class AdminUIHelper {
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
     await block.waitFor({ state: 'visible', timeout });
 
-    // Wait for Admin UI to confirm selection by checking sidebar header shows this block
-    // The sidebar header updates when BLOCK_SELECTED message is processed
+    // Wait for drag handle to appear and be positioned at the correct block
+    // The drag handle is positioned at the selected block's left edge, 48px above
+    const dragHandle = iframe.locator('.volto-hydra-drag-button');
     await expect(async () => {
-      const sidebarHeader = this.page.locator('.sidebar-section-header[data-is-current="true"]');
-      await expect(sidebarHeader).toBeVisible({ timeout: 100 });
+      await expect(dragHandle).toBeVisible({ timeout: 100 });
+
+      // Verify drag handle is positioned at this block
+      const blockBox = await block.boundingBox();
+      const handleBox = await dragHandle.boundingBox();
+      if (!blockBox || !handleBox) {
+        throw new Error('Could not get bounding boxes');
+      }
+
+      // Drag handle should be at block's left edge (within tolerance)
+      const xDiff = Math.abs(handleBox.x - blockBox.x);
+      // Drag handle should be above the block (48px above block top)
+      const expectedTop = blockBox.y - 48;
+      const yDiff = Math.abs(handleBox.y - expectedTop);
+
+      if (xDiff > 20 || yDiff > 20) {
+        throw new Error(
+          `Drag handle not at block position. Block: (${blockBox.x.toFixed(0)}, ${blockBox.y.toFixed(0)}), ` +
+          `Handle: (${handleBox.x.toFixed(0)}, ${handleBox.y.toFixed(0)}), expected y: ${expectedTop.toFixed(0)}`
+        );
+      }
     }).toPass({ timeout });
 
     // Return the block locator for chaining

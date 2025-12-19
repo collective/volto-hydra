@@ -1445,7 +1445,15 @@ export class Bridge {
     const focus = this.serializePoint(focusNode, range.endOffset);
 
     if (!anchor || !focus) {
-      console.warn('[HYDRA] Could not serialize selection points');
+      // Only warn if this is a Slate field (has data-node-id elements)
+      // Non-Slate fields (simple text) can't be serialized and that's expected
+      let editableField = range.commonAncestorContainer;
+      while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+        editableField = editableField.parentNode;
+      }
+      if (editableField && editableField.querySelector('[data-node-id]')) {
+        console.warn('[HYDRA] Could not serialize selection points in Slate field');
+      }
       return null;
     }
 
