@@ -428,22 +428,32 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
  *
  * @param {Object} formData - The form data
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
- * @param {string} afterBlockId - Block ID to insert after
+ * @param {string} refBlockId - Reference block ID for positioning
  * @param {string} newBlockId - New block's ID
  * @param {Object} newBlockData - New block's data
  * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or null for page-level
+ * @param {'before'|'after'|'inside'} action - Where to insert relative to refBlockId
  * @returns {Object} New formData with block inserted
  */
-export function insertBlockInContainer(formData, blockPathMap, afterBlockId, newBlockId, newBlockData, containerConfig) {
+export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBlockId, newBlockData, containerConfig, action = 'after') {
+  // Helper to compute insert index based on action
+  const getInsertIndex = (items, refIndex) => {
+    if (action === 'before') return Math.max(0, refIndex);
+    if (action === 'after') return refIndex + 1;
+    if (action === 'inside') return items.length; // append at end
+    return refIndex + 1; // default to after
+  };
+
   // Page-level insertion (page is just a container with blocks/blocks_layout)
-  if (!containerConfig) {
+  if (!containerConfig || containerConfig.parentId === null) {
     const newBlocks = {
       ...formData.blocks,
       [newBlockId]: newBlockData,
     };
 
     const currentItems = formData.blocks_layout?.items || [];
-    const insertIndex = currentItems.indexOf(afterBlockId) + 1;
+    const refIndex = currentItems.indexOf(refBlockId);
+    const insertIndex = getInsertIndex(currentItems, refIndex);
     const newItems = [...currentItems];
     newItems.splice(insertIndex, 0, newBlockId);
 
@@ -470,9 +480,8 @@ export function insertBlockInContainer(formData, blockPathMap, afterBlockId, new
   if (isObjectList) {
     // object_list: items stored as array with @id field
     const items = [...(parentBlock[fieldName] || [])];
-    const afterIndex = items.findIndex(item => item['@id'] === afterBlockId);
-    const insertIndex = afterIndex + 1;
-    // Insert new item with @id
+    const refIndex = items.findIndex(item => item['@id'] === refBlockId);
+    const insertIndex = getInsertIndex(items, refIndex);
     items.splice(insertIndex, 0, { '@id': newBlockId, ...newBlockData });
 
     updatedParentBlock = {
@@ -483,15 +492,14 @@ export function insertBlockInContainer(formData, blockPathMap, afterBlockId, new
     // Standard container: blocks object + blocks_layout
     const layoutFieldName = `${fieldName}_layout`;
 
-    // Create new container field with the added block
     const newContainerBlocks = {
       ...parentBlock[fieldName],
       [newBlockId]: newBlockData,
     };
 
-    // Insert into layout after the selected block
     const currentItems = parentBlock[layoutFieldName]?.items || [];
-    const insertIndex = currentItems.indexOf(afterBlockId) + 1;
+    const refIndex = currentItems.indexOf(refBlockId);
+    const insertIndex = getInsertIndex(currentItems, refIndex);
     const newItems = [...currentItems];
     newItems.splice(insertIndex, 0, newBlockId);
 

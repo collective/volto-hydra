@@ -334,6 +334,79 @@ test.describe('Adding Blocks to Containers', () => {
       .count();
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
+
+  test('sidebar add at page level adds block to page blocks', async ({
+    page,
+  }) => {
+    // When no block is selected, the sidebar shows page-level "Blocks" section
+    // with an add button that should add blocks at the page level
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Count initial page-level blocks
+    const initialPageBlocks = await iframe
+      .locator('#content > [data-block-uid]')
+      .count();
+
+    // Select a top-level block then deselect by clicking parent arrow
+    await helper.clickBlockInIframe('columns-1');
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    // Click current block's arrow to deselect (returns to page level)
+    const currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
+    );
+    await currentHeader.click();
+    await page.waitForTimeout(300);
+
+    // Now the sidebar should show page-level "Blocks" section
+    const blocksSection = page.locator('.container-field-section', {
+      has: page.locator('.widget-title', { hasText: 'Blocks' }),
+    });
+    await expect(blocksSection).toBeVisible({ timeout: 5000 });
+
+    // Click the add button in the Blocks section
+    const addButton = blocksSection.getByRole('button', { name: 'Add block' });
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    // Block chooser should appear with page-level blocks
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Should show page-level blocks (Image, Text, Hero)
+    await expect(
+      blockChooser.getByRole('button', { name: 'Image' }),
+    ).toBeVisible();
+    await expect(
+      blockChooser.getByRole('button', { name: 'Text' }),
+    ).toBeVisible();
+
+    // Select Text to add a new block
+    await blockChooser.getByRole('button', { name: 'Text' }).click();
+
+    // Wait for block chooser to close and block to be added
+    await expect(blockChooser).not.toBeVisible({ timeout: 5000 });
+
+    // Page-level blocks should have increased by 1
+    await expect(iframe.locator('#content > [data-block-uid]')).toHaveCount(
+      initialPageBlocks + 1,
+      { timeout: 5000 },
+    );
+
+    // The new block should be the LAST page-level block (added at bottom)
+    const lastBlock = iframe.locator('#content > [data-block-uid]').last();
+    const lastBlockUid = await lastBlock.getAttribute('data-block-uid');
+    expect(lastBlockUid).not.toBe('grid-1'); // Not the original last block
+
+    // The new block should be selected (toolbar visible for it)
+    await helper.waitForBlockSelected(lastBlockUid!);
+  });
 });
 
 test.describe('Add Button Direction', () => {
