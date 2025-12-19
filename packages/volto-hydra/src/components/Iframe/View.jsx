@@ -494,6 +494,7 @@ const Iframe = (props) => {
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
+    pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
   }));
   const urlFromEnv = getURlsFromEnv();
   const u =
@@ -534,9 +535,17 @@ const Iframe = (props) => {
    * @param {string} blockType - Type of block to insert (e.g., 'slate', 'image')
    * @param {'before'|'after'|'inside'} action - Where to insert relative to blockId
    * @param {string} [fieldName] - For 'inside' action, which container field to insert into
+   * @param {Object} [options] - Optional settings
+   * @param {Object} [options.blockData] - Custom block data (skips default generation)
+   * @param {Object} [options.formData] - Pre-mutated formData to insert into
+   * @param {Object} [options.blockPathMap] - BlockPathMap for the formData
+   * @param {string} [options.formatRequestId] - Request ID to include in FORM_DATA response
    * @returns {string} The new block's ID
    */
-  const insertAndSelectBlock = useCallback((blockId, blockType, action, fieldName) => {
+  const insertAndSelectBlock = useCallback((blockId, blockType, action, fieldName, options = {}) => {
+    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId } = options;
+    const formData = customFormData || properties;
+    const blockPathMap = customBlockPathMap || iframeSyncState.blockPathMap;
     const mergedBlocksConfig = config.blocks.blocksConfig;
     const newBlockId = uuid();
 
@@ -546,8 +555,8 @@ const Iframe = (props) => {
     let fieldDef;
 
     if (action === 'inside') {
-      const parentBlock = getBlockByPath(properties, iframeSyncState.blockPathMap?.[blockId]?.path)
-        || properties?.blocks?.[blockId];
+      const parentBlock = getBlockByPath(formData, blockPathMap?.[blockId]?.path)
+        || formData?.blocks?.[blockId];
       const parentSchema =
         typeof mergedBlocksConfig?.[parentBlock?.['@type']]?.blockSchema === 'function'
           ? mergedBlocksConfig[parentBlock['@type']].blockSchema({
@@ -559,12 +568,14 @@ const Iframe = (props) => {
       isObjectList = fieldDef?.widget === 'object_list';
       containerConfig = { parentId: blockId, fieldName, isObjectList };
     } else {
-      containerConfig = getContainerFieldConfig(blockId, iframeSyncState.blockPathMap, properties, mergedBlocksConfig);
+      containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig);
     }
 
-    // Create block data
+    // Create block data (use custom data if provided)
     let blockData;
-    if (isObjectList) {
+    if (customBlockData) {
+      blockData = customBlockData;
+    } else if (isObjectList) {
       // object_list items: no @type, use itemSchema defaults
       blockData = {};
       const itemSchema = fieldDef?.schema;
@@ -587,8 +598,8 @@ const Iframe = (props) => {
 
     // Insert and update state
     const newFormData = insertBlockInContainer(
-      properties,
-      iframeSyncState.blockPathMap,
+      formData,
+      blockPathMap,
       blockId,
       newBlockId,
       blockData,
@@ -603,7 +614,11 @@ const Iframe = (props) => {
 
     onChangeFormData(newFormData);
     flushSync(() => {
-      setIframeSyncState((prev) => ({ ...prev, pendingSelectBlockUid: newBlockId }));
+      setIframeSyncState((prev) => ({
+        ...prev,
+        pendingSelectBlockUid: newBlockId,
+        ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
+      }));
     });
     dispatch(setSidebarTab(1));
 
@@ -870,7 +885,7 @@ const Iframe = (props) => {
                 ...currentBlock,
                 [enterFieldName]: topValue,
               };
-              let newFormData = mutateBlockInContainer(
+              const mutatedFormData = mutateBlockInContainer(
                 formToUseForEnter,
                 enterBlockPathMap,
                 enterBlockId,
@@ -878,47 +893,17 @@ const Iframe = (props) => {
                 containerConfig,
               );
 
-              // Create new block with content after cursor
-              const newBlockId = uuid();
+              // Insert new block with content after cursor, using unified flow
               const newBlockData = {
                 '@type': blockType,
                 [enterFieldName]: bottomValue,
               };
-              const updatedFormData = insertBlockInContainer(
-                newFormData,
-                enterBlockPathMap,
-                enterBlockId,
-                newBlockId,
-                newBlockData,
-                containerConfig,
-              );
-
-              // Update Redux state
-              onChangeFormData(updatedFormData);
-              onSelectBlock(newBlockId);
-
-              // Send FORM_DATA message to trigger iframe re-render with new block
-              // Include selectedBlockUid and selection so iframe knows to select the new block
-              // and place cursor at start of the new block's value field
-              if (iframeOriginRef.current) {
-                const updatedBlockPathMap = buildBlockPathMap(updatedFormData, config.blocks.blocksConfig);
-                // Selection at start of new block (path [0,0] = first paragraph, first text position)
-                const newBlockSelection = {
-                  anchor: { path: [0, 0], offset: 0 },
-                  focus: { path: [0, 0], offset: 0 },
-                };
-                event.source.postMessage(
-                  {
-                    type: 'FORM_DATA',
-                    data: updatedFormData,
-                    blockPathMap: updatedBlockPathMap,
-                    formatRequestId: enterRequestId,
-                    selectedBlockUid: newBlockId,
-                    transformedSelection: newBlockSelection,
-                  },
-                  event.origin,
-                );
-              }
+              insertAndSelectBlock(enterBlockId, blockType, 'after', null, {
+                blockData: newBlockData,
+                formData: mutatedFormData,
+                blockPathMap: enterBlockPathMap,
+                formatRequestId: enterRequestId,
+              });
             } catch (error) {
               console.error('[VIEW] Error handling enter transform:', error);
               event.source.postMessage(
@@ -1302,6 +1287,7 @@ const Iframe = (props) => {
     // Check if data actually changed (prevents echo)
     const dataChanged = JSON.stringify(formToUse?.blocks) !== JSON.stringify(iframeSyncState.formData?.blocks);
     const hasPendingSelect = !!iframeSyncState.pendingSelectBlockUid;
+    const hasPendingFormatRequest = !!iframeSyncState.pendingFormatRequestId;
 
     // Update local state
     if (dataChanged || newSelection !== iframeSyncState.selection) {
@@ -1311,6 +1297,7 @@ const Iframe = (props) => {
         blockPathMap: newBlockPathMap,
         selection: newSelection,
         ...(hasPendingSelect ? { pendingSelectBlockUid: null } : {}),
+        ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
       }));
     }
 
@@ -1321,6 +1308,7 @@ const Iframe = (props) => {
         data: formToUse,
         blockPathMap: newBlockPathMap,
         selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
+        ...(iframeSyncState.pendingFormatRequestId ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
       };
       log('Sending FORM_DATA, selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
