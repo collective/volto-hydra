@@ -1008,6 +1008,62 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(result.textIsInvalid).toBe(false);
   });
 
+  test('isOnInvalidWhitespace: ZWS after inline element is valid when parent has data-node-id', async () => {
+    // After cursor exit from bold (prospective formatting toggle off), a ZWS is created
+    // as a direct child of the paragraph. This ZWS should NOT be flagged as invalid
+    // whitespace, even though the paragraph is also the editable field.
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Structure after typing "Hello ", bold "world", then toggling bold off:
+      // <p data-editable-field="value" data-node-id="0">
+      //   "Hello "
+      //   <span data-node-id="0.1"><strong>world</strong></span>
+      //   "﻿"  <-- ZWS for cursor positioning after cursor exit
+      // </p>
+      const container = document.createElement('p');
+      container.id = 'test-cursor-exit-zws';
+      container.setAttribute('data-editable-field', 'value');
+      container.setAttribute('data-node-id', '0');
+
+      // Create the structure
+      const helloText = document.createTextNode('Hello ');
+      const span = document.createElement('span');
+      span.setAttribute('data-node-id', '0.1');
+      const strong = document.createElement('strong');
+      strong.textContent = 'world';
+      span.appendChild(strong);
+      const zwsText = document.createTextNode('\uFEFF'); // ZWS for cursor positioning
+
+      container.appendChild(helloText);
+      container.appendChild(span);
+      container.appendChild(zwsText);
+      document.body.appendChild(container);
+
+      const bridge = (window as any).bridge;
+
+      // The ZWS text node should NOT be flagged as invalid whitespace
+      // because its parent (the <p>) has data-node-id
+      const zwsIsInvalid = bridge.isOnInvalidWhitespace(zwsText);
+
+      // Also verify "Hello " text is valid
+      const helloIsInvalid = bridge.isOnInvalidWhitespace(helloText);
+
+      container.remove();
+
+      return {
+        zwsIsInvalid,
+        helloIsInvalid,
+      };
+    });
+
+    // ZWS after inline element should be valid (for cursor positioning)
+    expect(result.zwsIsInvalid).toBe(false);
+    // Regular text in paragraph is also valid
+    expect(result.helloIsInvalid).toBe(false);
+  });
+
   test('serializePoint handles element-based selection with Vue empty text nodes', async () => {
     // When selectText() is used, the selection may resolve to empty Vue text nodes
     // serializePoint should find the valid text nodes inside data-node-id elements

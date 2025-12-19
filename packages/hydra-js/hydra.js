@@ -1265,12 +1265,16 @@ export class Bridge {
       return false;
     }
 
-    // Walk up from node to find if there's a data-node-id ancestor before hitting the editable field
+    // Walk up from node to find if there's a data-node-id ancestor (including editableField itself)
     current = node.parentNode;
-    while (current && current !== editableField) {
+    while (current) {
       // If we hit an element with data-node-id, cursor is valid
       if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
         return false;
+      }
+      // Stop at editable field boundary
+      if (current === editableField) {
+        break;
       }
       current = current.parentNode;
     }
