@@ -2389,16 +2389,8 @@ export class AdminUIHelper {
   async waitForBlockToDisappear(blockId: string, timeout: number = 10000): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-
-    try {
-      await block.waitFor({ state: 'hidden', timeout });
-    } catch {
-      // Block might be completely removed from DOM
-      const count = await block.count();
-      if (count > 0) {
-        throw new Error(`Block ${blockId} still exists after timeout`);
-      }
-    }
+    // Use expect().not.toBeVisible() which auto-retries until element is gone
+    await expect(block).not.toBeVisible({ timeout });
   }
 
   /**
