@@ -124,7 +124,6 @@ export class Bridge {
     this.textUpdateTimer = null; // Timer for batching text updates
     this.pendingTextUpdate = null; // Pending text update data
     this.scrollTimeout = null; // Timer for scroll debouncing
-    this.isProcessingExternalUpdate = false; // Flag to suppress messages during FORM_DATA processing
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
@@ -501,15 +500,10 @@ export class Bridge {
               // Add nodeIds to all slate fields in all blocks
               this.addNodeIdsToAllSlateFields();
 
-              window.postMessage(
-                {
-                  type: 'FORM_DATA',
-                  data: this.formData,
-                  blockPathMap: this.blockPathMap,
-                  sender: 'hydrajs-initial',
-                },
-                window.location.origin,
-              );
+              // Call onContentChange callback directly to trigger initial render
+              if (this.onContentChangeCallback) {
+                this.onContentChangeCallback(this.formData);
+              }
             }
           }
         };
@@ -577,6 +571,8 @@ export class Bridge {
    * @param {function} callback - The function to call when form data is received.
    */
   onEditChange(callback) {
+    // Store callback so INITIAL_DATA handler can use it
+    this.onContentChangeCallback = callback;
     this.realTimeDataHandler = (event) => {
       // Learn admin origin from first message if needed
       if (this.learnOriginFromFirstMessage && !this.adminOrigin) {
@@ -596,7 +592,16 @@ export class Bridge {
           log('Received', event.data.type, 'message');
           if (event.data.data) {
             // Don't set isInlineEditing to false - user is still editing
+            // Check if focused field content changed - if so, this is a sidebar edit,
+            // not just a sync. Clear savedClickPosition to prevent stealing focus.
+            if (this.savedClickPosition && !this.focusedFieldValuesEqual(this.formData, event.data.data)) {
+              log('FORM_DATA: content changed, clearing savedClickPosition (sidebar edit)');
+              this.savedClickPosition = null;
+            }
+
             this.formData = JSON.parse(JSON.stringify(event.data.data));
+            // Store copy for echo detection - bufferUpdate compares against this
+            this.lastReceivedFormData = JSON.parse(JSON.stringify(event.data.data));
             // Store blockPathMap for looking up nested blocks
             this.blockPathMap = event.data.blockPathMap || {};
 
@@ -609,11 +614,6 @@ export class Bridge {
             if (this.selectedBlockUid && selectedBlockData) {
               log('Block data being passed to callback:', JSON.stringify(selectedBlockData.value));
             }
-
-            // Suppress outbound messages during external update processing
-            // This prevents hydra from sending SELECTION_CHANGE or INLINE_EDIT_DATA
-            // back to Admin when the update originated FROM Admin
-            this.isProcessingExternalUpdate = true;
 
             // Check if Admin wants to select a different block (e.g., after Enter creates new block)
             // Update selectedBlockUid BEFORE re-render so all subsequent code uses the new block
@@ -696,9 +696,6 @@ export class Bridge {
                   this.setBlockProcessing(this.pendingTransform.blockId, false);
                 }
 
-                // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
-                // Clear the processing flag BEFORE replay so handleTextChange can process buffered text
-                this.isProcessingExternalUpdate = false;
               });
             });
 
@@ -2283,8 +2280,9 @@ export class Bridge {
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
     // Skip focus if editing from sidebar - don't steal focus from sidebar fields
-    // EXCEPTION: If we have a savedClickPosition, we need to restore cursor even with skipFocus
-    // because the re-render may have destroyed the DOM element where cursor was positioned
+    // EXCEPTION: If we have savedClickPosition, restore cursor because the re-render
+    // may have destroyed the DOM element where cursor was positioned.
+    // Note: savedClickPosition is cleared in FORM_DATA handler when content changes (sidebar edit)
     const hasSavedClickPosition = !!this.savedClickPosition;
     if (this.focusedFieldName && (!skipFocus || hasSavedClickPosition)) {
       const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
@@ -2578,12 +2576,6 @@ export class Bridge {
 
           this.savedSelection = this.serializeSelection();
 
-          // Don't send SELECTION_CHANGE during external updates (FORM_DATA from Admin)
-          // The selection change was caused by Admin, not user action
-          if (this.isProcessingExternalUpdate) {
-            return;
-          }
-
           // Check if this selection matches what Admin just sent us
           // If so, this is the result of restoring their selection - don't echo it back
           if (this.expectedSelectionFromAdmin) {
@@ -2747,7 +2739,9 @@ export class Bridge {
                   log('Skipping cursor positioning - non-collapsed selection exists');
                 }
 
-                // Clear the stored click position
+                // Clear lastClickPosition - we've used it to position cursor
+                // Keep savedClickPosition for FORM_DATA handler in case React re-renders
+                // (staleness check in updateBlockUIAfterFormData handles old positions)
                 this.lastClickPosition = null;
               }
             } else {
@@ -5155,26 +5149,76 @@ export class Bridge {
    * @returns {Object} Deep copy of formData without nodeIds
    */
   getFormDataWithoutNodeIds() {
-    log('getFormDataWithoutNodeIds: current formData value:', JSON.stringify(this.formData?.blocks?.[this.selectedBlockUid]?.value));
     const formDataCopy = JSON.parse(JSON.stringify(this.formData));
 
-    // Recursively strip nodeIds from all blocks (including nested)
-    const stripNodeIds = (obj) => {
-      if (!obj || typeof obj !== 'object') return;
-      // If this looks like a block (has @type), strip its nodeIds
-      if (obj['@type']) {
-        this.resetJsonNodeIds(obj);
-      }
-      // Recurse into all properties to find nested blocks
-      for (const value of Object.values(obj)) {
-        if (value && typeof value === 'object') {
-          stripNodeIds(value);
+    // Strip nodeIds from slate fields only (value arrays in slate blocks)
+    const stripNodeIdsFromSlateFields = (blocks) => {
+      if (!blocks || typeof blocks !== 'object') return;
+      for (const blockId of Object.keys(blocks)) {
+        const block = blocks[blockId];
+        if (block && block['@type']) {
+          // Check if this block has slate fields and strip nodeIds from them
+          const blockType = block['@type'];
+          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+          for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
+            if (fieldType === 'slate' && block[fieldName]) {
+              this.resetJsonNodeIds(block[fieldName]);
+            }
+          }
+          // Also check nested blocks in container fields
+          if (block.blocks) {
+            stripNodeIdsFromSlateFields(block.blocks);
+          }
         }
       }
     };
 
-    stripNodeIds(formDataCopy);
+    if (formDataCopy.blocks) {
+      stripNodeIdsFromSlateFields(formDataCopy.blocks);
+    }
     return formDataCopy;
+  }
+
+  /**
+   * Compare focused field value between two formData objects
+   * @param {Object} formDataA - First formData object (old/current, may have nodeIds)
+   * @param {Object} formDataB - Second formData object (new/incoming, no nodeIds)
+   * @returns {boolean} True if values are equal (ignoring nodeIds)
+   */
+  focusedFieldValuesEqual(formDataA, formDataB) {
+    if (!this.selectedBlockUid || !this.focusedFieldName) {
+      return true; // No focused field to compare
+    }
+    // Use blockPathMap to find nested blocks (object_list items, etc.)
+    const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+    let blockA, blockB;
+    if (pathInfo?.path) {
+      // Navigate path in both formData objects
+      blockA = formDataA;
+      blockB = formDataB;
+      for (const key of pathInfo.path) {
+        blockA = blockA?.[key];
+        blockB = blockB?.[key];
+      }
+    } else {
+      // Fallback to top-level lookup
+      blockA = formDataA?.blocks?.[this.selectedBlockUid];
+      blockB = formDataB?.blocks?.[this.selectedBlockUid];
+    }
+    if (!blockA || !blockB) {
+      return false; // Can't find block - assume not equal (safe default)
+    }
+    // Deep copy and strip nodeIds before comparing (old formData has nodeIds, incoming doesn't)
+    const fieldA = blockA[this.focusedFieldName];
+    const fieldB = blockB[this.focusedFieldName];
+    if (fieldA === undefined || fieldB === undefined) {
+      return fieldA === fieldB;
+    }
+    const copyA = JSON.parse(JSON.stringify(fieldA));
+    const copyB = JSON.parse(JSON.stringify(fieldB));
+    this.resetJsonNodeIds(copyA);
+    this.resetJsonNodeIds(copyB);
+    return JSON.stringify(copyA) === JSON.stringify(copyB);
   }
 
   /**
@@ -5259,13 +5303,6 @@ export class Bridge {
 
     if (!editableField) {
       console.warn('[HYDRA] handleTextChange: No data-editable-field found');
-      return;
-    }
-
-    // Don't process text changes during external updates (FORM_DATA from Admin)
-    // The DOM mutation was caused by Admin re-rendering, not user typing
-    if (this.isProcessingExternalUpdate) {
-      console.warn('[HYDRA] handleTextChange: Ignoring - external update in progress');
       return;
     }
 
@@ -5371,7 +5408,8 @@ export class Bridge {
       if (block) {
         // Update the block in place (getBlockData returns a reference)
         Object.assign(block, updatedJson);
-        block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
+        // TODO: Re-enable plaintext sync once echo detection is fixed
+        // block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
         log('handleTextChange: updated formData value:', JSON.stringify(block.value));
       }
     } else {
@@ -5395,9 +5433,28 @@ export class Bridge {
    */
   bufferUpdate(from = 'unknown') {
     // Always capture BOTH current data and current selection together
+    const data = this.getFormDataWithoutNodeIds();
+
+    // Compare with last received FORM_DATA to detect echoes
+    // Only compare the focused editable field - other fields may differ (plaintext, etc.)
+    if (this.lastReceivedFormData) {
+      const isEcho = this.focusedFieldValuesEqual(data, this.lastReceivedFormData);
+      if (!isEcho) {
+        log('bufferUpdate: genuine edit detected, field:', this.focusedFieldName);
+      } else {
+        // Same content as what we received - this is an echo, skip
+        return;
+      }
+    }
+
+    // Genuine edit - increment sequence and buffer
+    const currentSeq = data._editSequence || 0;
+    log('bufferUpdate: sending genuine edit, seq:', currentSeq + 1);
+    data._editSequence = currentSeq + 1;
+    this.formData._editSequence = data._editSequence; // Update stored formData too
     this.pendingTextUpdate = {
       type: 'INLINE_EDIT_DATA',
-      data: this.getFormDataWithoutNodeIds(),
+      data: data,
       selection: this.serializeSelection(),
       from: from,
     };

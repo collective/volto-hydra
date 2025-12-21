@@ -201,6 +201,73 @@ test.describe('Inline Editing - Basic', () => {
     expect(finalText).toBe('Hello Beautiful World');
   });
 
+  test('typing in middle, waiting, then typing again syncs correctly to sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Click block to open sidebar
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+
+    // Enter edit mode - block-1 has "This is a test paragraph"
+    const editor = await helper.enterEditMode(blockId);
+
+    // Move cursor to middle of text (after "This is ")
+    await helper.moveCursorToPosition(editor, 8);
+
+    // Type first batch
+    await page.keyboard.type('FIRST');
+
+    // Wait for sync (debounce 300ms + round-trip)
+    await page.waitForTimeout(1000);
+
+    // Type second batch
+    await page.keyboard.type('SECOND');
+
+    // Wait for second sync
+    await page.waitForTimeout(1000);
+
+    // Check iframe text - cursor was after "This is " so text is inserted there
+    let iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toBe('This is FIRSTSECONDa test paragraph');
+
+    // Check sidebar text matches iframe
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+
+    // Now test delete - delete "SECOND" (6 chars) with backspace
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Backspace');
+    }
+
+    // Wait for sync
+    await page.waitForTimeout(1000);
+
+    // Check iframe text after delete
+    iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toBe('This is FIRSTa test paragraph');
+
+    // Check sidebar matches after delete
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+
+    // Type more after delete
+    await page.keyboard.type('THIRD');
+
+    // Wait for sync
+    await page.waitForTimeout(1000);
+
+    // Check final iframe text
+    iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toBe('This is FIRSTTHIRDa test paragraph');
+
+    // Check sidebar matches final state
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+  });
+
   test.skip('can undo and redo', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
