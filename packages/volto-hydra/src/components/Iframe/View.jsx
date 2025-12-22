@@ -11,7 +11,7 @@ import { validateAndLog } from '../../utils/formDataValidation';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
-  typeof window !== 'undefined' && window.HYDRA_DEBUG;
+  typeof window !== 'undefined' && (window.HYDRA_DEBUG || true);
 const log = (...args) => debugEnabled && console.log('[VIEW]', ...args);
 // eslint-disable-next-line no-unused-vars
 const logExtract = (...args) =>
@@ -474,6 +474,7 @@ const Iframe = (props) => {
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
+  const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
   // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
   // This ensures toolbar sees all together in the same render
   // Initialize with properties so we have data from first render
@@ -510,13 +511,12 @@ const Iframe = (props) => {
   // Must be declared before useEffects that reference it
   const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
 
-  // Subscribe to form data from Redux to detect changes
-  // This provides a new reference on updates, unlike the mutated form prop
-  const formDataFromRedux = useSelector((state) => state.form?.global);
+  // Note: We use `properties` prop from Form.jsx as the single source of truth
+  // This matches standard Volto's BlocksForm pattern (props, not Redux)
 
-  // Validate properties from Redux on mount and change
+  // Validate properties on mount and change
   useEffect(() => {
-    validateAndLog(properties, 'properties (from Redux)', blockFieldTypes);
+    validateAndLog(properties, 'properties (from Form)', blockFieldTypes);
   }, [properties, blockFieldTypes]);
 
   useEffect(() => {
@@ -590,7 +590,7 @@ const Iframe = (props) => {
       // Standard block with @type
       blockData = { '@type': blockType };
       if (blockType === 'slate') {
-        blockData.value = [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }];
+        blockData.value = [{ type: 'p', children: [{ text: '' }] }];
       }
       blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties });
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties });
@@ -635,7 +635,7 @@ const Iframe = (props) => {
 
     // Add initial slate value for slate blocks
     if (blockData['@type'] === 'slate' && !blockData.value) {
-      blockData.value = [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }];
+      blockData.value = [{ type: 'p', children: [{ text: '' }] }];
     }
 
     // Apply block defaults
@@ -759,21 +759,38 @@ const Iframe = (props) => {
         case 'INLINE_EDIT_DATA':
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
-          log('INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, 'third child text:', JSON.stringify(event.data.data?.blocks?.[Object.keys(event.data.data?.blocks || {})[0]]?.value?.[0]?.children?.[2]?.text));
+          const incomingSequence = event.data.data?._editSequence || 0;
+          // Use ref instead of state to avoid closure issues - ref is always current
+          const currentSequence = editSequenceRef.current;
+          log('INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, '_editSequence:', incomingSequence, 'currentSeq:', currentSequence);
 
-          inlineEditCounterRef.current += 1;
-          // Update combined state atomically - formData, blockPathMap, selection together
-          // If flushRequestId is present, this was a flush response - also set completedFlushRequestId
-          // so the toolbar knows it can proceed with the format button click
-          setIframeSyncState(prev => ({
-            ...prev,
-            formData: event.data.data,
-            blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig),
-            selection: event.data.selection || null,
-            ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
-          }));
-          // Also update Redux for persistence
-          onChangeFormData(event.data.data);
+          // Sequence logic:
+          // - incomingSeq > currentSeq: new edit from iframe, process it
+          // - incomingSeq <= currentSeq: echo or stale, only update selection
+          const isNewEdit = incomingSequence > currentSequence;
+
+          if (isNewEdit) {
+            // New edit from iframe - update everything
+            inlineEditCounterRef.current += 1;
+            editSequenceRef.current = incomingSequence; // Track the new sequence
+            setIframeSyncState(prev => ({
+              ...prev,
+              formData: event.data.data,
+              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig),
+              selection: event.data.selection || null,
+              ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
+            }));
+            log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux');
+            onChangeFormData(event.data.data);
+          } else {
+            // Echo or stale - only update selection and flush state
+            log('INLINE_EDIT_DATA: echo/stale, only updating selection');
+            setIframeSyncState(prev => ({
+              ...prev,
+              selection: event.data.selection || null,
+              ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
+            }));
+          }
           break;
 
         case 'BUFFER_FLUSHED':
@@ -1241,9 +1258,9 @@ const Iframe = (props) => {
   ]);
 
   // UNIFIED FORM SYNC: Syncs iframeSyncState AND sends FORM_DATA to iframe
-  // Triggers when Redux form changes or toolbar completes a format operation
+  // Triggers when Form's properties change or toolbar completes a format operation
   useEffect(() => {
-    const formToUse = formDataFromRedux || form;
+    const formToUse = properties || form;
 
     // Skip if this is an echo from INLINE_EDIT_DATA we just processed
     if (processedInlineEditCounterRef.current < inlineEditCounterRef.current) {
@@ -1253,28 +1270,34 @@ const Iframe = (props) => {
 
     // Case 1: Toolbar completed a format operation
     if (iframeSyncState.toolbarRequestDone) {
+      // Increment edit sequence for toolbar operations too
+      editSequenceRef.current++;
+      const formWithSequence = {
+        ...iframeSyncState.formData,
+        _editSequence: editSequenceRef.current,
+      };
       const message = {
         type: 'FORM_DATA',
-        data: iframeSyncState.formData,
+        data: formWithSequence,
         blockPathMap: iframeSyncState.blockPathMap,
         formatRequestId: iframeSyncState.toolbarRequestDone,
       };
       if (iframeSyncState.selection) {
         message.transformedSelection = iframeSyncState.selection;
       }
-      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId);
+      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId, '_editSequence:', editSequenceRef.current);
       document.getElementById('previewIframe')?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
       );
       flushSync(() => {
-        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null }));
+        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
       });
-      onChangeFormData(iframeSyncState.formData);
+      onChangeFormData(formWithSequence);
       return;
     }
 
-    // Case 2: Redux form data changed (sidebar edit, block add, etc.)
+    // Case 2: Form properties changed (sidebar edit, block add, etc.)
     if (!formToUse || !iframeOriginRef.current) {
       return;
     }
@@ -1296,40 +1319,44 @@ const Iframe = (props) => {
       }
     }
 
-    // Check if data actually changed (prevents echo)
-    const dataChanged = JSON.stringify(formToUse?.blocks) !== JSON.stringify(iframeSyncState.formData?.blocks);
     const hasPendingSelect = !!iframeSyncState.pendingSelectBlockUid;
     const hasPendingFormatRequest = !!iframeSyncState.pendingFormatRequestId;
 
-    // Update local state
-    if (dataChanged || newSelection !== iframeSyncState.selection) {
-      setIframeSyncState(prev => ({
-        ...prev,
-        formData: formToUse,
-        blockPathMap: newBlockPathMap,
-        selection: newSelection,
-        ...(hasPendingSelect ? { pendingSelectBlockUid: null } : {}),
-        ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
-      }));
-    }
+    // Always increment sequence - useEffect only runs when properties change
+    // The sequence is used to detect stale iframe echoes
+    editSequenceRef.current++;
 
-    // Send to iframe if data changed or new block needs selection
-    if (dataChanged || hasPendingSelect) {
-      const message = {
-        type: 'FORM_DATA',
-        data: formToUse,
-        blockPathMap: newBlockPathMap,
-        selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
-        ...(iframeSyncState.pendingFormatRequestId ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
-      };
-      log('Sending FORM_DATA, selectedBlockUid:', iframeSyncState.pendingSelectBlockUid);
-      document.getElementById('previewIframe')?.contentWindow?.postMessage(
-        message,
-        iframeOriginRef.current,
-      );
-    }
+    // Add _editSequence to form data for round-trip tracking
+    const formWithSequence = {
+      ...formToUse,
+      _editSequence: editSequenceRef.current,
+    };
+
+    // Update local state
+    setIframeSyncState(prev => ({
+      ...prev,
+      formData: formWithSequence,
+      blockPathMap: newBlockPathMap,
+      selection: newSelection,
+      ...(hasPendingSelect ? { pendingSelectBlockUid: null } : {}),
+      ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
+    }));
+
+    // Always send to iframe - sequence handles stale echo detection
+    const message = {
+      type: 'FORM_DATA',
+      data: formWithSequence,
+      blockPathMap: newBlockPathMap,
+      selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
+      ...(iframeSyncState.pendingFormatRequestId ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
+    };
+    log('Sending FORM_DATA, selectedBlockUid:', iframeSyncState.pendingSelectBlockUid, '_editSequence:', editSequenceRef.current);
+    document.getElementById('previewIframe')?.contentWindow?.postMessage(
+      message,
+      iframeOriginRef.current,
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formDataFromRedux, iframeSyncState.toolbarRequestDone]);
+  }, [properties, iframeSyncState.toolbarRequestDone]);
 
   const sidebarFocusEventListenerRef = useRef(null);
 
@@ -1439,17 +1466,17 @@ const Iframe = (props) => {
   //
   // After insertion (whether auto or via chooser):
   //
-  // 1. onChangeFormData(newFormData) - updates Redux
-  // 2. flushSync: set pendingSelectBlockUid - ensures flag is committed BEFORE Redux triggers useEffect
-  // 3. useEffect runs when formDataFromRedux changes, sees pendingSelectBlockUid
+  // 1. onChangeFormData(newFormData) - updates Form.jsx state
+  // 2. flushSync: set pendingSelectBlockUid - ensures flag is committed BEFORE Form re-renders
+  // 3. useEffect runs when properties change, sees pendingSelectBlockUid
   // 4. useEffect sends FORM_DATA with selectedBlockUid to iframe
   // 5. iframe receives FORM_DATA, calls selectBlock(selectedBlockUid)
   // 6. iframe sends BLOCK_SELECTED back to admin
   // 7. View.jsx receives BLOCK_SELECTED, sets blockUI and calls onSelectBlock
   //
   // The key insight: pendingSelectBlockUid is just a FLAG. The actual formData comes
-  // from Redux. The flushSync ensures the flag is set BEFORE the Redux update triggers
-  // the useEffect, so they arrive at the iframe together.
+  // from Form.jsx props. The flushSync ensures the flag is set BEFORE the props update
+  // triggers the useEffect, so they arrive at the iframe together.
   // ============================================================================
 
   // Handle sidebar add - adds inside a container's field as last child

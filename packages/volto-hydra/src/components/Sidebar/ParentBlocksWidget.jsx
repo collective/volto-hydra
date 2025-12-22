@@ -435,6 +435,7 @@ const ParentBlocksWidget = ({
   const currentBlockData = getBlockData(selectedBlock, formData, blockPathMap);
   const currentBlockType = currentBlockData?.['@type'];
 
+
   return (
     <>
       {createPortal(
