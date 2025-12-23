@@ -43,9 +43,9 @@ test.describe('Navigation and URL Handling', () => {
     await helper.waitForSidebarOpen();
 
     // Verify the page actually loaded in the iframe
+    // Use text content check instead of 'main' element (mock frontend uses #content, Nuxt uses main)
     const iframe = helper.getIframe();
-    await expect(iframe.locator('main')).toBeVisible({ timeout: 10000 });
-    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
 
     // Verify sidebar is showing the correct page
     const sidebar = page.locator('#sidebar-properties');
