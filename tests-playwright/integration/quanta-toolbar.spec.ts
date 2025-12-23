@@ -199,19 +199,14 @@ test.describe('Quanta Toolbar - Positioning', () => {
     const block = iframe.locator('[data-block-uid="grid-cell-2"]');
     await expect(block).toBeVisible();
 
-    // Click directly on the block (bypassing clickBlockInIframe which has timeout on alignment check)
+    // Click the block and wait for toolbar to be properly positioned
     await block.click();
-    await page.waitForTimeout(500);
+    await helper.waitForQuantaToolbar('grid-cell-2');
 
-    // Get the block's bounding box (relative to iframe viewport, then adjusted to page)
-    const blockBox = await block.boundingBox();
+    // Get bounding boxes for alignment check
+    const blockBox = await helper.getBlockBoundingBoxInIframe('grid-cell-2');
+    const outlineBox = await helper.getBlockOutlineBoundingBox();
     expect(blockBox).toBeTruthy();
-
-    // Get the toolbar outline's bounding box (in page coordinates)
-    // Use the correct class name: .volto-hydra-block-outline
-    const toolbarOutline = page.locator('.volto-hydra-block-outline');
-    await expect(toolbarOutline).toBeVisible({ timeout: 5000 });
-    const outlineBox = await toolbarOutline.boundingBox();
     expect(outlineBox).toBeTruthy();
 
     // The outline should align horizontally with the block
@@ -241,14 +236,10 @@ test.describe('Quanta Toolbar - Positioning', () => {
 
     const iframe = helper.getIframe();
 
-    // Click on grid-cell-2 (right side block in gridBlock)
+    // Click on grid-cell-2 (right side block in gridBlock) and wait for toolbar
     const block = iframe.locator('[data-block-uid="grid-cell-2"]');
     await block.click();
-    await page.waitForTimeout(500);
-
-    // The toolbar should be visible
-    const toolbar = page.locator('.quanta-toolbar');
-    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    await helper.waitForQuantaToolbar('grid-cell-2');
 
     // Try to open the toolbar menu using the helper
     // The menu button should be clickable and not intercepted by the sidebar

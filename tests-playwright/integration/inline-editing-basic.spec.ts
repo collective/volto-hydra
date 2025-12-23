@@ -889,4 +889,48 @@ test.describe('Inline Editing - Basic', () => {
     // Verify the empty block is now selected
     await helper.waitForBlockSelected(blockId);
   });
+
+  test('deleting across node boundaries (bold to normal text)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // text-after block has: "This text appears..." + <bold>bold text</bold> + " to test getNodePath."
+    const blockId = 'text-after';
+    await helper.clickBlockInIframe(blockId);
+
+    const editor = await helper.getEditorLocator(blockId);
+
+    // Select across the boundary: from "ld" in "bold" to "to" in " to test"
+    // "This text appears after the slider. Click on " (46 chars) + "bold" = starts at 46
+    // We want to select "ld text to" which spans bold -> normal text
+    // Adjust positions based on actual text offsets
+    await helper.selectTextRange(editor, 47, 57);
+
+    // Verify the selection spans the boundary
+    const selectionInfo = await helper.assertTextSelection(editor, 'ld text to');
+    console.log('[TEST] Cross-boundary selection:', selectionInfo.selectedText);
+
+    // Press Delete to remove the selected text
+    await page.keyboard.press('Delete');
+
+    // Wait for deletion to complete
+    await expect.poll(async () => {
+      const text = await helper.getCleanTextContent(editor);
+      return !text.includes('ld text to');
+    }, { timeout: 5000 }).toBe(true);
+
+    // Verify the result - should have "bo" + " test getNodePath."
+    const finalText = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Text after delete:', finalText);
+    expect(finalText).toContain('bo');
+    expect(finalText).toContain('test getNodePath');
+    expect(finalText).not.toContain('ld text to');
+
+    // Verify cursor is collapsed at deletion point
+    const cursorInfo = await helper.getCursorInfo(editor);
+    expect(cursorInfo.isFocused).toBe(true);
+    expect(cursorInfo.selectionCollapsed).toBe(true);
+  });
 });

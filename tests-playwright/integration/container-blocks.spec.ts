@@ -347,10 +347,11 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial page-level blocks
-    const initialPageBlocks = await iframe
-      .locator('#content > [data-block-uid]')
-      .count();
+    // Count initial page-level blocks (blocks without a [data-block-uid] ancestor)
+    const initialPageBlocks = await iframe.locator('body').evaluate((body) => {
+      return Array.from(body.querySelectorAll('[data-block-uid]'))
+        .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
+    });
 
     // Select a top-level block then deselect by clicking parent arrow
     await helper.clickBlockInIframe('columns-1');
@@ -394,14 +395,21 @@ test.describe('Adding Blocks to Containers', () => {
     await expect(blockChooser).not.toBeVisible({ timeout: 5000 });
 
     // Page-level blocks should have increased by 1
-    await expect(iframe.locator('#content > [data-block-uid]')).toHaveCount(
-      initialPageBlocks + 1,
-      { timeout: 5000 },
-    );
+    await expect
+      .poll(async () => {
+        return await iframe.locator('body').evaluate((body) => {
+          return Array.from(body.querySelectorAll('[data-block-uid]'))
+            .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
+        });
+      }, { timeout: 5000 })
+      .toBe(initialPageBlocks + 1);
 
     // The new block should be the LAST page-level block (added at bottom)
-    const lastBlock = iframe.locator('#content > [data-block-uid]').last();
-    const lastBlockUid = await lastBlock.getAttribute('data-block-uid');
+    const lastBlockUid = await iframe.locator('body').evaluate((body) => {
+      const pageLevelBlocks = Array.from(body.querySelectorAll('[data-block-uid]'))
+        .filter(el => !el.parentElement?.closest('[data-block-uid]'));
+      return pageLevelBlocks[pageLevelBlocks.length - 1]?.getAttribute('data-block-uid');
+    });
     expect(lastBlockUid).not.toBe('grid-1'); // Not the original last block
 
     // The new block should be selected (toolbar visible for it)
@@ -1072,9 +1080,12 @@ test.describe('Empty Block Behavior', () => {
 
     // Empty block should NOT have an add button next to it
     // Empty blocks are meant to be replaced via block chooser, not have blocks added after them
-    const emptyBlockId = await emptyBlock.getAttribute('data-block-uid');
-    await helper.clickBlockInIframe(emptyBlockId!);
-    await page.waitForTimeout(300);
+    // Use direct click since empty blocks don't show a toolbar (clickBlockInIframe expects toolbar)
+    await emptyBlock.click();
+
+    // Wait for block chooser to open (empty blocks open chooser on click)
+    const blockChooser = page.locator('.block-add-button-menu, .blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
     // Verify the add button is NOT visible in the admin UI
     const addButton = page.locator('.volto-hydra-add-button');
