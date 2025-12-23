@@ -3487,13 +3487,32 @@ export class Bridge {
 
         // Exclude the dragged block and its ghost from being drop targets
         const draggedBlockUid = blockElement.getAttribute('data-block-uid');
-        if (
-          closestBlock &&
-          (closestBlock === draggedBlock ||
-            closestBlock === blockElement ||
-            closestBlock.getAttribute('data-block-uid') === draggedBlockUid)
-        ) {
-          closestBlock = null;
+        const isSelfOrGhost = closestBlock &&
+          (closestBlock === draggedBlock || closestBlock === blockElement ||
+           closestBlock.getAttribute('data-block-uid') === draggedBlockUid);
+        if (isSelfOrGhost) closestBlock = null;
+
+        // Handle overshoot - find nearest block when cursor isn't over any block
+        if (!closestBlock) {
+          const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
+            .filter(el => el !== draggedBlock && el.getAttribute('data-block-uid') !== draggedBlockUid);
+
+          // Find nearest block by vertical distance to cursor
+          let nearest = { el: null, dist: Infinity, above: false };
+          for (const el of allBlocks) {
+            const rect = el.getBoundingClientRect();
+            const aboveDist = rect.top - e.clientY; // positive if cursor above block
+            const belowDist = e.clientY - rect.bottom; // positive if cursor below block
+            if (aboveDist > 0 && aboveDist < nearest.dist) {
+              nearest = { el, dist: aboveDist, above: true };
+            } else if (belowDist > 0 && belowDist < nearest.dist) {
+              nearest = { el, dist: belowDist, above: false };
+            }
+          }
+          if (nearest.el) {
+            closestBlock = nearest.el;
+            insertAt = nearest.above ? 0 : 1;
+          }
         }
 
         if (closestBlock) {
@@ -3557,108 +3576,48 @@ export class Bridge {
           if (!dropIndicator) {
             dropIndicator = document.createElement('div');
             dropIndicator.className = 'volto-hydra-drop-indicator';
-            dropIndicator.style.cssText = `
-              position: absolute;
-              background: transparent;
-              pointer-events: none;
-              z-index: 9998;
-              display: none;
-            `;
+            dropIndicator.style.cssText = 'position:absolute;background:transparent;pointer-events:none;z-index:9998;display:none;';
             document.body.appendChild(dropIndicator);
           }
 
-          const closestBlockRect = closestBlock.getBoundingClientRect();
+          const rect = closestBlock.getBoundingClientRect();
+          const isHorizontal = this.getAddDirection(closestBlock) === 'right';
 
-          // Check if this block uses horizontal layout
-          // Uses data-block-add attribute or infers from nesting depth
-          const addDirection = this.getAddDirection(closestBlock);
-          const isHorizontalLayout = addDirection === 'right';
+          // Determine insertion point based on mouse position relative to block center
+          const mousePos = isHorizontal ? e.clientX - rect.left : e.clientY - rect.top;
+          const blockSize = isHorizontal ? rect.width : rect.height;
+          insertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
 
-          if (isHorizontalLayout) {
-            // HORIZONTAL LAYOUT: Use X-axis to determine left/right insertion
-            const mouseXRelativeToBlock = e.clientX - closestBlockRect.left;
-            const isHoveringOverLeftHalf = mouseXRelativeToBlock < closestBlockRect.width / 2;
+          // Calculate indicator position in the gap between blocks
+          const sibling = insertAt === 0 ? closestBlock.previousElementSibling : closestBlock.nextElementSibling;
+          const siblingRect = sibling?.hasAttribute('data-block-uid') ? sibling.getBoundingClientRect() : null;
+          const indicatorSize = 4;
 
-            insertAt = isHoveringOverLeftHalf ? 0 : 1; // 0 = insert before (left), 1 = insert after (right)
+          let indicatorPos;
+          if (isHorizontal) {
+            const edge = insertAt === 0 ? rect.left : rect.right;
+            const siblingEdge = siblingRect ? (insertAt === 0 ? siblingRect.right : siblingRect.left) : edge;
+            const gap = insertAt === 0 ? rect.left - (siblingRect?.right || rect.left) : (siblingRect?.left || rect.right) - rect.right;
+            indicatorPos = (insertAt === 0 ? siblingRect?.right || rect.left : rect.right) + window.scrollX + gap / 2 - indicatorSize / 2;
 
-            // Position VERTICAL drop indicator
-            const indicatorWidth = 4;
-            let indicatorX;
-
-            if (insertAt === 0) {
-              // Inserting before (left of) this block - find the previous block
-              const prevBlock = closestBlock.previousElementSibling;
-              if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
-                const prevBlockRect = prevBlock.getBoundingClientRect();
-                const gap = closestBlockRect.left - prevBlockRect.right;
-                indicatorX = prevBlockRect.right + window.scrollX + (gap / 2) - (indicatorWidth / 2);
-              } else {
-                indicatorX = closestBlockRect.left + window.scrollX - (indicatorWidth / 2);
-              }
-            } else {
-              // Inserting after (right of) this block - find the next block
-              const nextBlock = closestBlock.nextElementSibling;
-              if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
-                const nextBlockRect = nextBlock.getBoundingClientRect();
-                const gap = nextBlockRect.left - closestBlockRect.right;
-                indicatorX = closestBlockRect.right + window.scrollX + (gap / 2) - (indicatorWidth / 2);
-              } else {
-                indicatorX = closestBlockRect.right + window.scrollX - (indicatorWidth / 2);
-              }
-            }
-
-            // Style as vertical indicator
-            dropIndicator.style.left = `${indicatorX}px`;
-            dropIndicator.style.top = `${closestBlockRect.top + window.scrollY}px`;
-            dropIndicator.style.width = `${indicatorWidth}px`;
-            dropIndicator.style.height = `${closestBlockRect.height}px`;
-            dropIndicator.style.borderTop = 'none';
-            dropIndicator.style.borderLeft = '3px dashed #007bff';
-            dropIndicator.style.display = 'block';
-            dropIndicatorVisible = true; // Mark indicator as visible - drop is allowed
+            Object.assign(dropIndicator.style, {
+              left: `${indicatorPos}px`, top: `${rect.top + window.scrollY}px`,
+              width: `${indicatorSize}px`, height: `${rect.height}px`,
+              borderTop: 'none', borderLeft: '3px dashed #007bff', display: 'block'
+            });
           } else {
-            // VERTICAL LAYOUT: Use Y-axis to determine top/bottom insertion (default behavior)
-            const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
-            const isHoveringOverTopHalf = mouseYRelativeToBlock < closestBlockRect.height / 2;
+            const edge = insertAt === 0 ? rect.top : rect.bottom;
+            const siblingEdge = siblingRect ? (insertAt === 0 ? siblingRect.bottom : siblingRect.top) : edge;
+            const gap = insertAt === 0 ? rect.top - (siblingRect?.bottom || rect.top) : (siblingRect?.top || rect.bottom) - rect.bottom;
+            indicatorPos = (insertAt === 0 ? siblingRect?.bottom || rect.top : rect.bottom) + window.scrollY + gap / 2 - indicatorSize / 2;
 
-            insertAt = isHoveringOverTopHalf ? 0 : 1; // 0 = insert before (top), 1 = insert after (bottom)
-
-            // Position HORIZONTAL drop indicator
-            const indicatorHeight = 4;
-            let indicatorY;
-
-            if (insertAt === 0) {
-              // Inserting before this block - find the previous block
-              const prevBlock = closestBlock.previousElementSibling;
-              if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
-                const prevBlockRect = prevBlock.getBoundingClientRect();
-                const gap = closestBlockRect.top - prevBlockRect.bottom;
-                indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-              } else {
-                indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
-              }
-            } else {
-              // Inserting after this block - find the next block
-              const nextBlock = closestBlock.nextElementSibling;
-              if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
-                const nextBlockRect = nextBlock.getBoundingClientRect();
-                const gap = nextBlockRect.top - closestBlockRect.bottom;
-                indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-              } else {
-                indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
-              }
-            }
-
-            // Style as horizontal indicator
-            dropIndicator.style.top = `${indicatorY}px`;
-            dropIndicator.style.left = `${closestBlockRect.left}px`;
-            dropIndicator.style.width = `${closestBlockRect.width}px`;
-            dropIndicator.style.height = `${indicatorHeight}px`;
-            dropIndicator.style.borderLeft = 'none';
-            dropIndicator.style.borderTop = '3px dashed #007bff';
-            dropIndicator.style.display = 'block';
-            dropIndicatorVisible = true; // Mark indicator as visible - drop is allowed
+            Object.assign(dropIndicator.style, {
+              top: `${indicatorPos}px`, left: `${rect.left}px`,
+              width: `${rect.width}px`, height: `${indicatorSize}px`,
+              borderLeft: 'none', borderTop: '3px dashed #007bff', display: 'block'
+            });
           }
+          dropIndicatorVisible = true;
         } else {
           // No valid drop target - hide indicator and mark as not droppable
           const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
