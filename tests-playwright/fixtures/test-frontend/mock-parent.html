@@ -418,10 +418,29 @@
               [fieldName || 'value']: updatedValue,
             };
 
+            // Build blockPathMap for the current blocks
+            const pathMap = {};
+            mockFormData.blocks_layout.items.forEach(bid => {
+              pathMap[bid] = {
+                path: ['blocks', bid],
+                parentId: null
+              };
+            });
+
+            // Block field types metadata
+            const fieldTypes = {
+              'slate': { value: 'slate' },
+              'text': { text: 'string' },
+              'multifield': { title: 'string', description: 'slate' },
+              'textarea': { content: 'textarea' }
+            };
+
             // Send FORM_DATA with formatRequestId so hydra.js knows to unblock
             const response = {
               type: 'FORM_DATA',
               data: mockFormData,
+              blockPathMap: pathMap,
+              blockFieldTypes: fieldTypes,
               formatRequestId: requestId,
               transformedSelection: selection,  // Must match what hydra.js checks for
             };
