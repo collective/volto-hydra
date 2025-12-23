@@ -1780,9 +1780,12 @@ export class AdminUIHelper {
   ): Promise<{ x: number; y: number } | null> {
     return await editor.evaluate(
       (el: HTMLElement, pos: number) => {
-        // Find the first text node
+        // Find the first text node with actual content (skip whitespace-only nodes)
         const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-        const textNode = walker.nextNode();
+        let textNode = walker.nextNode();
+        while (textNode && (!textNode.textContent || !textNode.textContent.trim())) {
+          textNode = walker.nextNode();
+        }
         if (!textNode || !textNode.textContent) return null;
 
         // Clamp position to valid range

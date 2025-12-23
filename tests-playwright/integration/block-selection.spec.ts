@@ -193,13 +193,20 @@ test.describe('Block Selection', () => {
 
     const iframe = helper.getIframe();
 
+    // Wait for iframe content to be ready - look for the specific text we'll be clicking
+    await expect(iframe.locator('text=Another paragraph for testing')).toBeVisible({ timeout: 15000 });
+
     // block-3-uuid contains "Another paragraph for testing"
     // Click in the middle of the text to position cursor there
     const blockId = 'block-3-uuid';
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
-    // Find the editable field by data-editable-field (not contenteditable, which isn't set until after click)
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
-    await editor.waitFor({ state: 'visible' });
+    // Find the editable field using helper that handles both Nuxt and mock patterns
+    const editor = helper.getSlateField(blockLocator);
+    await editor.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Wait for the text content to be rendered inside the editor
+    await expect(editor).toContainText('Another paragraph', { timeout: 5000 });
 
     // Get the click coordinates for the middle of the text
     // "Another paragraph for testing" is 29 chars, so position 14 is roughly middle
