@@ -1086,6 +1086,14 @@ const Iframe = (props) => {
           // it to be "re-selected" and scrolled back into view.
           const isPositionUpdateOnly = event.data.src === 'scrollHandler' ||
                                         event.data.src === 'resizeHandler';
+          // Reject BLOCK_SELECTED with zero rect early - this happens when block element is detached
+          // during frontend re-render (e.g., mock frontend's innerHTML replacement or carousel transition)
+          // Must check BEFORE calling onSelectBlock to avoid changing selectedBlock incorrectly
+          const hasZeroRect = event.data.blockUid && (event.data.rect?.width === 0 || event.data.rect?.height === 0);
+          if (hasZeroRect) {
+            log('[VIEW] Ignoring BLOCK_SELECTED with zero rect (element detached):', event.data.src);
+            return;
+          }
           // Only check selectedBlock - blockUI can be stale due to React's async state updates
           // When multiple BLOCK_SELECTED messages arrive rapidly (e.g., sidebar click + Escape),
           // blockUI may not have updated yet, causing onSelectBlock to be skipped incorrectly
@@ -1127,13 +1135,7 @@ const Iframe = (props) => {
                 prevBlockUI.rect?.height === event.data.rect?.height) {
               return prevBlockUI; // Return same reference to skip re-render
             }
-            // Reject BLOCK_SELECTED with zero rect - this happens when block element is detached
-            // during frontend re-render (e.g., mock frontend's innerHTML replacement)
-            // Accepting zero rect would cause toolbar to jump to wrong position
-            if (event.data.blockUid && (event.data.rect?.width === 0 || event.data.rect?.height === 0)) {
-              log('[VIEW] Ignoring BLOCK_SELECTED with zero rect (element detached):', event.data.src);
-              return prevBlockUI;
-            }
+            // Note: Zero rect check happens earlier (before onSelectBlock) so we return before reaching here
 
             // Assert required fields - fail loudly if BLOCK_SELECTED is missing data
             // Only check when selecting a block (blockUid not null) - deselection doesn't need these
