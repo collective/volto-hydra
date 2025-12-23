@@ -1,12 +1,17 @@
 # Slate Transforms Architecture
 
 **Status:** Implemented
-**Updated:** 2025-11-28
+**Updated:** 2025-12-19
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Data Flow](#data-flow)
+   - [Flow 1: Format Button Clicked](#flow-1-format-button-clicked-toolbar--iframe)
+   - [Flow 2: Sidebar Editing](#flow-2-sidebar-editing-sidebar--redux--toolbar)
+   - [Flow 3: Hotkey Format](#flow-3-hotkey-format-iframe--admin--iframe)
+   - [Flow 4: Block Selection](#flow-4-block-selection-iframe--admin)
+   - [Flow 5: Block Add](#flow-5-block-add-sidebar-or-iframe--admin--iframe)
 3. [Bridge Protocol](#bridge-protocol)
 4. [Selection Serialization](#selection-serialization)
 5. [Key Components](#key-components)
@@ -90,22 +95,22 @@ Uses a flush/requestId mechanism to ensure the iframe sends any pending text bef
 
 **Why flush?** Without it, user might type "hello", click Bold, but iframe hasn't sent "hello" yet—so only partial text gets formatted.
 
-### FLOW 2: Sidebar Editing (Sidebar → Redux → Toolbar)
+### FLOW 2: Sidebar Editing (Sidebar → Redux → Iframe)
 
 When user edits via the sidebar RichTextWidget:
 
 ```
 1. User edits in sidebar editor
 2. Sidebar onChange updates Redux form state
-3. View.jsx detects formDataFromRedux changed
-4. View.jsx validates selection (may clear if paths invalid)
-5. SyncedSlateToolbar receives new props
-6. useEffect syncs editor.children
-7. Toolbar re-renders with updated button states
+3. Unified Form Sync useEffect triggers (formDataFromRedux changed)
+4. JSON.stringify comparison detects data changed
+5. Updates iframeSyncState (formData, blockPathMap, validates selection)
+6. Sends FORM_DATA to iframe
+7. SyncedSlateToolbar receives new props, re-renders
 8. Iframe receives FORM_DATA and re-renders
 ```
 
-**Key:** No flush needed—changes originate from sidebar. But selection validation IS needed because document structure may change.
+**Key:** No flush needed—changes originate from sidebar. Echo prevention via JSON comparison ensures we don't send data back that came from the iframe.
 
 ### FLOW 3: Hotkey Format (Iframe → Admin → Iframe)
 
@@ -141,6 +146,46 @@ When user clicks a different block:
 ```
 
 **Why atomic?** Previously BLOCK_SELECTED and SELECTION_CHANGE were separate messages. When switching blocks quickly, toolbar could get new block ID but old selection, causing "Cannot find descendant at path" errors.
+
+**Note:** `OPEN_SETTINGS` (which opens the sidebar) does NOT call `onSelectBlock`. Selection is handled exclusively by `BLOCK_SELECTED`. This prevents race conditions where the sidebar opens but the toolbar doesn't see the selection yet.
+
+### FLOW 5: Block Add (Sidebar or Iframe → Admin → Iframe)
+
+Both sidebar add (via ChildBlocksWidget "+") and iframe add (via overlay "+" button) use `insertAndSelectBlock(blockId, blockType, action, fieldName)`:
+
+```
+1. User clicks add button (sidebar or iframe)
+2. Determine allowedBlocks for insertion context
+3. If single allowedBlock: auto-insert via insertAndSelectBlock
+   Else: show BlockChooser, then call insertAndSelectBlock on selection
+4. insertAndSelectBlock:
+   a. Creates block data with defaults
+   b. Calls insertBlockInContainer(blockId, newBlockId, blockData, containerConfig, action)
+   c. onChangeFormData(newFormData) - updates Redux
+   d. flushSync: set pendingSelectBlockUid flag
+   e. Opens sidebar tab
+5. Unified Form Sync useEffect triggers (formDataFromRedux changed)
+6. hasPendingSelect=true, so sends FORM_DATA with selectedBlockUid
+7. Iframe receives FORM_DATA, calls selectBlock(selectedBlockUid)
+8. Iframe sends BLOCK_SELECTED back to admin
+9. View.jsx receives BLOCK_SELECTED
+10. Sets blockUI (toolbar overlay) AND calls onSelectBlock (Redux)
+```
+
+**insertAndSelectBlock API:**
+- `blockId`: Reference block for positioning
+- `blockType`: Type of block to create (e.g., 'slate', 'image')
+- `action`: 'before' | 'after' | 'inside'
+- `fieldName`: For 'inside' action, which container field
+
+**Why flushSync?** Without it, there's a race condition:
+- `onChangeFormData` dispatches Redux update
+- Redux update triggers component re-render
+- useEffect runs with new formData but OLD state (pendingSelectBlockUid not yet committed)
+- FORM_DATA is sent WITHOUT selectedBlockUid
+- Block never gets selected
+
+With `flushSync`, the state update commits synchronously, before the Redux dispatch can trigger the useEffect.
 
 ### Selection Restoration
 
@@ -365,12 +410,21 @@ Key methods:
 
 `packages/volto-hydra/src/components/Iframe/View.jsx`
 
-Message handlers:
+**Unified Form Sync useEffect:** Single useEffect handles both state sync and iframe communication:
+- Triggers on `formDataFromRedux` or `toolbarRequestDone` changes
+- Updates `iframeSyncState` (formData, blockPathMap, validates selection)
+- Sends FORM_DATA to iframe when data changed or pendingSelectBlockUid set
+- Echo prevention via JSON.stringify comparison of blocks
+
+**Message handlers:**
 - `BLOCK_SELECTED` - Update blockUI and selection atomically
 - `SELECTION_CHANGE` - Update current selection
 - `SLATE_FORMAT_REQUEST` - Apply format via toolbar editor
 - `INLINE_EDIT_DATA` - Update form data from typing
 - `BUFFER_FLUSHED` - Trigger pending format button click
+
+**Key functions:**
+- `insertAndSelectBlock(blockId, blockType, action, fieldName)` - Unified block insertion
 
 ---
 

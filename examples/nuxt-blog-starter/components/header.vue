@@ -69,10 +69,10 @@ function nav(data) {
         return data?.navigation?.items;
     };
 function getUrl(item) {
-        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '/').replace(runtimeConfig.public.backendBaseUrl, '/')
+        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '')
     };
 function getId(item) {
-        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '/').replace(runtimeConfig.public.backendBaseUrl, '/')
+        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '')
     };
 
 function chunkArray(array, chunkSize) {

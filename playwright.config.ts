@@ -45,17 +45,45 @@ export default defineConfig({
     video: process.env.VIDEO ? 'retain-on-failure' : 'off',
   },
 
-  /* Configure projects for major browsers */
+  /* Configure projects for different frontends */
   projects: [
+    // Mock frontend (default) - tests run against mock HTML frontend on port 8888
     {
-      name: 'chromium',
+      name: 'mock',
       use: {
         ...devices['Desktop Chrome'],
-        // Explicit viewport for consistent behavior between local and CI
         viewport: { width: 1280, height: 720 },
-        // Grant clipboard permissions for paste tests
         permissions: ['clipboard-read', 'clipboard-write'],
       },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests
+      ],
+    },
+    // Nuxt frontend - tests run against Nuxt frontend on port 3003
+    {
+      name: 'nuxt',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        // Pre-set iframe_url cookie to use Nuxt frontend
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
+        /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
+        /unit\/.*\.spec\.ts/, // Unit tests don't need to run per-frontend
+      ],
+    },
+    // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
+    {
+      name: 'nuxt-specific',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+      testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
     },
 
     // Uncomment to test on Firefox and WebKit
@@ -70,6 +98,7 @@ export default defineConfig({
   ],
 
   /* Start mock API server and Volto dev server before running tests */
+  /* In CI, servers are started in advance by the workflow - Playwright just reuses them */
   webServer: [
     {
       // Mock Plone API server - must start BEFORE Volto
@@ -77,7 +106,7 @@ export default defineConfig({
       command: `node ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
       url: 'http://localhost:8888/health',
       timeout: 50 * 1000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true, // Always reuse if running - CI starts in advance, local dev starts manually
       cwd: process.cwd(),
       stdout: 'pipe',
       stderr: 'pipe',
@@ -94,7 +123,7 @@ export default defineConfig({
             'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start:prod',
           url: 'http://localhost:3001', // Health check on SSR server directly
           timeout: 30 * 1000, // 30 seconds should be plenty for starting prebuilt server
-          reuseExistingServer: false,
+          reuseExistingServer: true, // CI starts server in advance
           cwd: process.cwd(),
           stdout: 'pipe',
           stderr: 'pipe',
@@ -102,7 +131,8 @@ export default defineConfig({
             NODE_ENV: 'production',
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
+            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -120,20 +150,30 @@ export default defineConfig({
             'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start',
           url: 'http://localhost:3002/health', // Health check on webpack-dev-server (returns 200 when ready)
           timeout: 300 * 1000, // 5 minutes for initial webpack compilation
-          reuseExistingServer: !process.env.CI, // Reuse in local dev, start fresh in CI
-          // IMPORTANT: When reuseExistingServer is true, Playwright SKIPS the health check!
-          // This means tests can run against a broken/compiling server. We should add a manual check.
+          reuseExistingServer: true, // Always reuse - local dev starts manually
           cwd: process.cwd(),
           stdout: 'pipe',
           stderr: 'pipe',
           env: {
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888',
+            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
           },
         },
+    // Nuxt frontend for testing Nuxt-specific scenarios
+    {
+      name: 'Nuxt Frontend (Test)',
+      command: 'npm run dev:test',
+      url: 'http://localhost:3003',
+      timeout: 120 * 1000, // 2 minutes for Nuxt compilation
+      reuseExistingServer: true, // CI starts server in advance, local dev starts manually
+      cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
   ],
 });

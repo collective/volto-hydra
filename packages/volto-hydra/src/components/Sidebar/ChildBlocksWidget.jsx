@@ -33,10 +33,31 @@ const messages = defineMessages({
 
 /**
  * Get child blocks for a specific container field
+ * Supports both standard containers (blocks + blocks_layout) and object_list (array with @id)
  */
-const getChildBlocks = (blockData, fieldName, formData) => {
+const getChildBlocks = (blockData, fieldName, formData, isObjectList = false) => {
   if (!blockData || !blockData[fieldName]) return [];
 
+  if (isObjectList) {
+    // object_list: items stored as array with @id field (e.g., volto-slider-block)
+    const items = blockData[fieldName] || [];
+    if (!Array.isArray(items)) return [];
+
+    return items.map((item, index) => {
+      const blockId = item['@id'];
+      // object_list items don't have @type, use a generic title or item field
+      const title = item.title || item.plaintext || `Item ${index + 1}`;
+
+      return {
+        id: blockId,
+        type: 'object_list_item',
+        title: title,
+        data: item,
+      };
+    });
+  }
+
+  // Standard container: blocks object + blocks_layout
   const layoutField = `${fieldName}_layout`;
   const items = blockData[layoutField]?.items || [];
   const blocksData = blockData[fieldName] || {};
@@ -236,7 +257,7 @@ const ChildBlocksWidget = ({
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        const childBlocks = getChildBlocks(blockData, field.fieldName, formData);
+        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList);
         return (
           <ContainerFieldSection
             key={field.fieldName}

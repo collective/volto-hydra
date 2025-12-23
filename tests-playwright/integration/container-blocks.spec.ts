@@ -58,11 +58,10 @@ test.describe('Container Block Detection', () => {
     const text2a = col2.locator('[data-block-uid="text-2a"]');
     await expect(text2a).toBeVisible();
 
-    // Verify data-block-add attributes for direction hints
+    // Verify data-block-add attributes for direction hints on columns
+    // Note: nested blocks inside columns don't require data-block-add - hydra infers direction from depth
     await expect(col1).toHaveAttribute('data-block-add', 'right');
     await expect(col2).toHaveAttribute('data-block-add', 'right');
-    await expect(text1a).toHaveAttribute('data-block-add', 'bottom');
-    await expect(text1b).toHaveAttribute('data-block-add', 'bottom');
   });
 
   test('clicking deeply nested block shows its settings in sidebar', async ({ page }) => {
@@ -334,6 +333,87 @@ test.describe('Adding Blocks to Containers', () => {
       .locator('#content > [data-block-uid]')
       .count();
     expect(finalPageBlocks).toBe(initialPageBlocks);
+  });
+
+  test('sidebar add at page level adds block to page blocks', async ({
+    page,
+  }) => {
+    // When no block is selected, the sidebar shows page-level "Blocks" section
+    // with an add button that should add blocks at the page level
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Count initial page-level blocks (blocks without a [data-block-uid] ancestor)
+    const initialPageBlocks = await iframe.locator('body').evaluate((body) => {
+      return Array.from(body.querySelectorAll('[data-block-uid]'))
+        .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
+    });
+
+    // Select a top-level block then deselect by clicking parent arrow
+    await helper.clickBlockInIframe('columns-1');
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    // Click current block's arrow to deselect (returns to page level)
+    const currentHeader = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
+    );
+    await currentHeader.click();
+    await page.waitForTimeout(300);
+
+    // Now the sidebar should show page-level "Blocks" section
+    const blocksSection = page.locator('.container-field-section', {
+      has: page.locator('.widget-title', { hasText: 'Blocks' }),
+    });
+    await expect(blocksSection).toBeVisible({ timeout: 5000 });
+
+    // Click the add button in the Blocks section
+    const addButton = blocksSection.getByRole('button', { name: 'Add block' });
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    // Block chooser should appear with page-level blocks
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Should show page-level blocks (Image, Text, Hero)
+    await expect(
+      blockChooser.getByRole('button', { name: 'Image' }),
+    ).toBeVisible();
+    await expect(
+      blockChooser.getByRole('button', { name: 'Text' }),
+    ).toBeVisible();
+
+    // Select Text to add a new block
+    await blockChooser.getByRole('button', { name: 'Text' }).click();
+
+    // Wait for block chooser to close and block to be added
+    await expect(blockChooser).not.toBeVisible({ timeout: 5000 });
+
+    // Page-level blocks should have increased by 1
+    await expect
+      .poll(async () => {
+        return await iframe.locator('body').evaluate((body) => {
+          return Array.from(body.querySelectorAll('[data-block-uid]'))
+            .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
+        });
+      }, { timeout: 5000 })
+      .toBe(initialPageBlocks + 1);
+
+    // The new block should be the LAST page-level block (added at bottom)
+    const lastBlockUid = await iframe.locator('body').evaluate((body) => {
+      const pageLevelBlocks = Array.from(body.querySelectorAll('[data-block-uid]'))
+        .filter(el => !el.parentElement?.closest('[data-block-uid]'));
+      return pageLevelBlocks[pageLevelBlocks.length - 1]?.getAttribute('data-block-uid');
+    });
+    expect(lastBlockUid).not.toBe('grid-1'); // Not the original last block
+
+    // The new block should be selected (toolbar visible for it)
+    await helper.waitForBlockSelected(lastBlockUid!);
   });
 });
 
@@ -905,11 +985,8 @@ test.describe('Empty Block Behavior', () => {
     expect(col1Blocks).toBe(1);
 
     // The block should be of type 'slate' (the defaultBlock), not 'empty'
-    const blockType = await iframe
-      .locator('[data-block-uid="col-1"] > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
-    expect(blockType).toBe('slate');
+    const newBlock = iframe.locator('[data-block-uid="col-1"] > [data-block-uid]').first();
+    await expect(helper.getSlateField(newBlock)).toBeVisible();
   });
 
   test('container with single allowedBlock creates that type when emptied', async ({
@@ -947,11 +1024,9 @@ test.describe('Empty Block Behavior', () => {
     expect(columnBlocks).toBe(1);
 
     // The block should be of type 'column' (the single allowed type), not 'empty'
-    const blockType = await iframe
-      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
-    expect(blockType).toBe('column');
+    // Columns have class="column" in the renderer
+    const newColumn = iframe.locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]').first();
+    await expect(newColumn).toHaveClass(/column/);
   });
 
   test('deleting last block from container creates empty block', async ({
@@ -982,12 +1057,11 @@ test.describe('Empty Block Behavior', () => {
       .count();
     expect(gridBlocks).toBe(1);
 
-    // The block should be of type 'empty'
+    // The block should be of type 'empty' (has data-hydra-empty attribute)
     const emptyBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
       .first();
-    const blockType = await emptyBlock.getAttribute('data-block-type');
-    expect(blockType).toBe('empty');
+    await expect(emptyBlock).toHaveAttribute('data-hydra-empty');
 
     // Empty block should have visible dashed border styling (injected by hydra.js)
     const borderStyle = await emptyBlock.evaluate((el) => {
@@ -1006,9 +1080,12 @@ test.describe('Empty Block Behavior', () => {
 
     // Empty block should NOT have an add button next to it
     // Empty blocks are meant to be replaced via block chooser, not have blocks added after them
-    const emptyBlockId = await emptyBlock.getAttribute('data-block-uid');
-    await helper.clickBlockInIframe(emptyBlockId!);
-    await page.waitForTimeout(300);
+    // Use direct click since empty blocks don't show a toolbar (clickBlockInIframe expects toolbar)
+    await emptyBlock.click();
+
+    // Wait for block chooser to open (empty blocks open chooser on click)
+    const blockChooser = page.locator('.block-add-button-menu, .blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
     // Verify the add button is NOT visible in the admin UI
     const addButton = page.locator('.volto-hydra-add-button');
@@ -1029,19 +1106,28 @@ test.describe('Empty Block Behavior', () => {
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
 
+    // Verify grid-cell-2 is gone before proceeding
+    await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).not.toBeVisible();
+
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
 
+    // Verify grid-cell-1 is gone
+    await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).not.toBeVisible();
+
+    // Wait for an empty block to appear (hydra marks empty blocks with data-hydra-empty)
+    const emptyBlockLocator = iframe.locator('[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]');
+    await expect(emptyBlockLocator).toBeVisible({ timeout: 5000 });
+
     // Get the empty block's ID
-    const emptyBlockId = await iframe
-      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-uid');
+    const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
+    console.log('[TEST] Empty block ID after deletions:', emptyBlockId);
 
     // Click the empty block
-    await helper.clickBlockInIframe(emptyBlockId!);
+    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    await emptyBlockLocator.click();
 
     // Block chooser should open automatically
     const blockChooser = page.locator('.blocks-chooser');
@@ -1067,14 +1153,19 @@ test.describe('Empty Block Behavior', () => {
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
 
+    // Wait for empty block to be rendered inside grid-1
+    // hydra marks empty blocks with data-hydra-empty attribute
+    const emptyBlockLocator = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]'
+    );
+    await expect(emptyBlockLocator).toBeVisible({ timeout: 5000 });
+
     // Get the empty block's ID
-    const emptyBlockId = await iframe
-      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
-      .first()
-      .getAttribute('data-block-uid');
+    const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
 
     // Click the empty block to open chooser
-    await helper.clickBlockInIframe(emptyBlockId!);
+    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    await emptyBlockLocator.click();
 
     // Wait for block chooser
     const blockChooser = page.locator('.blocks-chooser');
@@ -1090,8 +1181,7 @@ test.describe('Empty Block Behavior', () => {
     const slateBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
       .first();
-    const blockType = await slateBlock.getAttribute('data-block-type');
-    expect(blockType).toBe('slate');
+    await expect(helper.getSlateField(slateBlock)).toBeVisible();
 
     // The slate block should have proper empty content, not "Empty block" fallback
     // This verifies that onMutateBlock properly initializes the slate value
@@ -1139,11 +1229,8 @@ test.describe('Empty Block Behavior', () => {
     expect(childBlocks).toBeGreaterThan(0);
 
     // The block inside should be of type 'slate' (the defaultBlock)
-    const childBlockType = await newColumn
-      .locator('> [data-block-uid]')
-      .first()
-      .getAttribute('data-block-type');
-    expect(childBlockType).toBe('slate');
+    const childBlock = newColumn.locator('> [data-block-uid]').first();
+    await expect(helper.getSlateField(childBlock)).toBeVisible();
   });
 
   test('adding columns block recursively initializes column with default block', async ({
@@ -1182,7 +1269,8 @@ test.describe('Empty Block Behavior', () => {
 
     // Find the newly added columns block (should be after text-after)
     // The page layout should now have: title-block, columns-1, text-after, NEW-COLUMNS, grid-1
-    const allColumnsBlocks = iframe.locator('[data-block-type="columns"]');
+    // Columns blocks have a .columns-row child - find all blocks with this structure
+    const allColumnsBlocks = iframe.locator('[data-block-uid]:has(> .columns-row)');
     const columnsCount = await allColumnsBlocks.count();
     expect(columnsCount).toBe(2); // Original columns-1 + new one
 
@@ -1198,10 +1286,9 @@ test.describe('Empty Block Behavior', () => {
     const columnCount = await columnChildren.count();
     expect(columnCount).toBeGreaterThanOrEqual(1);
 
-    // Get the first column
+    // Get the first column - columns have class="column"
     const firstColumn = columnChildren.first();
-    const columnType = await firstColumn.getAttribute('data-block-type');
-    expect(columnType).toBe('column');
+    await expect(firstColumn).toHaveClass(/column/);
 
     // The column should have at least one block inside (defaultBlock: 'slate')
     const columnContent = firstColumn.locator('> [data-block-uid]');
@@ -1209,10 +1296,8 @@ test.describe('Empty Block Behavior', () => {
     expect(contentCount).toBeGreaterThanOrEqual(1);
 
     // The content block should be slate (column's defaultBlock)
-    const contentType = await columnContent
-      .first()
-      .getAttribute('data-block-type');
-    expect(contentType).toBe('slate');
+    const contentBlock = columnContent.first();
+    await expect(helper.getSlateField(contentBlock)).toBeVisible();
   });
 });
 
@@ -1269,8 +1354,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     // The new column should be selected (toolbar visible)
     const newColumnId = await newColumn.getAttribute('data-block-uid');
     expect(newColumnId).toBeTruthy();
-    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(newColumnId!);
-    expect(hasToolbar).toBe(true);
+    // Wait for toolbar to appear after block insertion
+    await helper.waitForQuantaToolbar(newColumnId!);
 
     // The add button should be to the RIGHT of the new column (columns go horizontally)
     const positioning = await helper.verifyBlockUIPositioning(newColumnId!);
@@ -1971,41 +2056,51 @@ test.describe('Container Block Drag and Drop', () => {
       .count();
     expect(initialText1aInCol1).toBe(1);
 
-    // Select text-1a
+    // Select text-1a (a slate block)
     await helper.clickBlockInIframe('text-1a');
     await page.waitForTimeout(300);
 
-    // Try to drag to col-1 level (drop on col-1 which expects column siblings, not slate)
-    // columns container only allows 'column' blocks, not 'slate'
+    // Try to drag slate block to top_images container (which only allows 'image')
+    // The top_images container only allows image blocks, not slate
+    // Hydra will walk up to find a valid container (page level) that allows slate
     const dragHandle = await helper.getDragHandle();
+    const topImg1 = iframe.locator('[data-block-uid="top-img-1"]');
 
-    // Use horizontal drag to col-1 (which is in columns container that only allows 'column' blocks)
-    // expectIndicator=false because slate is not allowed as a sibling of columns
+    // Use horizontal drag to top-img-1 (in top_images container that only allows 'image')
+    // expectIndicator=true because hydra walks up to find valid parent (page level)
     const indicatorShown = await helper.dragBlockWithMouseHorizontal(
       dragHandle,
-      col1,
+      topImg1,
       false, // insertAfter=false (left side)
-      false, // expectIndicator=false (drop should be rejected)
+      true, // expectIndicator=true (drop redirected to valid parent)
     );
 
-    // Indicator should not have been shown
-    expect(indicatorShown).toBe(false);
+    // Indicator should have been shown (for the valid parent container)
+    expect(indicatorShown).toBe(true);
 
-    // text-1a should still be inside col-1 (move to columns level should be rejected)
+    // text-1a should have moved (not still in col-1)
     const finalText1aInCol1 = await col1
       .locator('[data-block-uid="text-1a"]')
       .count();
-    expect(finalText1aInCol1).toBe(1);
+    expect(finalText1aInCol1).toBe(0);
 
-    // text-1a should NOT be a sibling of col-1/col-2 in the columns container
+    // CRITICAL: text-1a should NOT be in the top_images container
+    // Even though we dragged to top-img-1, slate is not allowed there
     const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const directChildren = await columnsBlock
-      .locator('.columns-row > [data-block-uid]')
+    const topImagesChildren = await columnsBlock
+      .locator('.top-images-row > [data-block-uid]')
       .all();
-    const directChildUids = await Promise.all(
-      directChildren.map((b) => b.getAttribute('data-block-uid')),
+    const topImagesUids = await Promise.all(
+      topImagesChildren.map((b) => b.getAttribute('data-block-uid')),
     );
-    expect(directChildUids).not.toContain('text-1a');
+    expect(topImagesUids).not.toContain('text-1a');
+
+    // text-1a should be at page level (sibling of columns-1, not inside it)
+    const pageLevelBlocks = iframe.locator('[data-block-uid]:not([data-block-uid] [data-block-uid])');
+    const pageLevelUids = await pageLevelBlocks.evaluateAll(blocks =>
+      blocks.map(b => b.getAttribute('data-block-uid'))
+    );
+    expect(pageLevelUids).toContain('text-1a');
   });
 
   test('column block cannot be dragged to page level (page allowedBlocks restriction)', async ({
@@ -2370,8 +2465,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(col2NewCount).toBe(1); // Should have a new default block
 
     // Verify it's a slate block (column's defaultBlock is 'slate')
-    const newSlateBlock = col2.locator('[data-block-type="slate"]');
-    await expect(newSlateBlock).toBeVisible();
+    const newBlock = col2.locator(':scope > [data-block-uid]').first();
+    await expect(helper.getSlateField(newBlock)).toBeVisible();
   });
 });
 
@@ -2484,15 +2579,14 @@ test.describe('data-block-selector Navigation', () => {
 
     const iframe = helper.getIframe();
 
-    // Verify carousel structure is loaded
-    const carousel = iframe.locator('[data-block-uid="carousel-1"]');
-    await expect(carousel).toBeVisible();
+    // Verify slider structure is loaded
+    const slider = iframe.locator('[data-block-uid="slider-1"]');
+    await expect(slider).toBeVisible();
 
     // Initially slide-1 is visible, slide-2 is hidden
-    const slide1 = iframe.locator('[data-block-uid="slide-1"]');
-    const slide2 = iframe.locator('[data-block-uid="slide-2"]');
-    await expect(slide1).toBeVisible();
-    await expect(slide2).toBeHidden();
+    // Use helper that handles both display:none and translate-based hiding
+    expect(await helper.isBlockHiddenInIframe('slide-1')).toBe(false);
+    expect(await helper.isBlockHiddenInIframe('slide-2')).toBe(true);
 
     // Click on slide-1 to select it first
     await helper.clickBlockInIframe('slide-1');
@@ -2558,12 +2652,59 @@ test.describe('data-block-selector Navigation', () => {
     await nextButton.click();
     await helper.waitForQuantaToolbar('slide-3');
 
-    // Click the "next" button - should do nothing since we're at the end
+    // Click the "next" button at the last slide
+    // Behavior depends on carousel implementation:
+    // - Non-wrapping carousel: stays on slide-3
+    // - Wrapping carousel (Flowbite): goes to slide-1
     await nextButton.click();
 
-    // slide-3 should still be selected (no change)
-    // Use waitForQuantaToolbar to confirm it's still on slide-3
-    await helper.waitForQuantaToolbar('slide-3');
+    // Accept either slide-3 (stayed) or slide-1 (wrapped)
+    await expect(async () => {
+      const slide3Selected = await helper.isQuantaToolbarVisibleInIframe('slide-3');
+      const slide1Selected = await helper.isQuantaToolbarVisibleInIframe('slide-1');
+      expect(slide3Selected || slide1Selected).toBeTruthy();
+    }).toPass({ timeout: 10000 });
+  });
+
+  test('outline does not follow old block during +1 navigation animation', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select slide-1
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Get the initial outline position as baseline
+    const initialBox = await helper.getBlockOutlineBoundingBox();
+    expect(initialBox).not.toBeNull();
+    const baselineX = initialBox!.x;
+    console.log(`[TEST] Baseline outline X: ${baselineX}`);
+
+    // Monitor outline position while clicking +1
+    // The outline should never go significantly left of the baseline
+    // (which would indicate it's following the old slide as it animates offscreen)
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+
+    const result = await helper.monitorOutlinePositionDuringAction(
+      async () => {
+        await nextButton.click();
+        await helper.waitForQuantaToolbar('slide-2');
+      },
+      baselineX - 50, // Allow 50px tolerance for minor positioning variations
+      16, // Check every 16ms (~60fps)
+    );
+
+    console.log(`[TEST] Monitor result: minXSeen=${result.minXSeen}, badPositionDetected=${result.badPositionDetected}`);
+    console.log(`[TEST] Position samples: ${result.positions.length}`);
+
+    // The outline should never have gone to a bad position (far left)
+    expect(result.badPositionDetected).toBe(false);
   });
 
   test('clicking dot indicator selects that specific slide', async ({
@@ -2602,17 +2743,22 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
-    const iframe = helper.getIframe();
+    // For carousels, we can't click directly on the container because slides fill it.
+    // Instead, click on a visible child first, then press Escape to go to parent.
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
 
-    // First click on the carousel container to see its child blocks in sidebar
-    await helper.clickContainerBlockInIframe('carousel-1');
+    // Press Escape to navigate up to the parent container
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
 
     const sidebar = page.locator('.sidebar-container');
     // Wait for carousel's ChildBlocksWidget to show Slides section
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
 
     // Verify slide-2 is hidden in iframe (carousel shows only one slide at a time)
-    await expect(iframe.locator('[data-block-uid="slide-2"]')).toBeHidden();
+    // Use helper that handles both display:none and translate-based hiding
+    expect(await helper.isBlockHiddenInIframe('slide-2')).toBe(true);
 
     // Click on the second slide entry in the sidebar's ChildBlocksWidget
     // The widget shows blocks as "⋮⋮ Slide ›" (using block type title)
@@ -2632,8 +2778,12 @@ test.describe('data-block-selector Navigation', () => {
 
     const sidebar = page.locator('.sidebar-container');
 
-    // Click on carousel container first
-    await helper.clickContainerBlockInIframe('carousel-1');
+    // For carousels, navigate to container via child -> Escape
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+
     // Wait for carousel's ChildBlocksWidget to show Slides section
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
 
@@ -2647,8 +2797,9 @@ test.describe('data-block-selector Navigation', () => {
     // Wait for slide-3 to be selected (includes waiting for carousel transition)
     await helper.waitForQuantaToolbar('slide-3');
 
-    // Now go back to carousel and select slide-1
-    await helper.clickContainerBlockInIframe('carousel-1');
+    // Now go back to carousel container and select slide-1
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
 
     // Select first slide entry
@@ -2656,6 +2807,134 @@ test.describe('data-block-selector Navigation', () => {
 
     // Wait for slide-1 to be selected
     await helper.waitForQuantaToolbar('slide-1');
+  });
+
+  test('adding a new slide selects the new slide', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const sidebar = page.locator('.sidebar-container');
+
+    // Navigate to carousel container: click slide-1, then press Escape
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+
+    // Wait for sidebar to show Slides section
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Get initial slide count (should be 3)
+    const slideItems = sidebar.locator('.child-block-item');
+    const initialCount = await slideItems.count();
+    expect(initialCount).toBe(3);
+
+    // Add a new slide via the sidebar
+    await helper.addBlockViaSidebar('Slides');
+
+    // The new slide should be auto-selected after adding
+    // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
+    // not the ChildBlocksWidget list. So we verify by checking:
+    // 1. The sidebar shows slide form fields (Kicker field visible means slide is selected)
+    const kickerInput = sidebar.getByLabel('Kicker');
+    await expect(kickerInput).toBeVisible({ timeout: 10000 });
+
+    // 2. The Title field should be empty (new slide, not "Slide 1", "Slide 2", etc.)
+    // Use .last() because there are two title fields: page title and slide title
+    const titleInput = sidebar.locator('input[id="field-title"]').last();
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveValue('');
+
+    // Find the new slide - the one not in the original list
+    const iframe = helper.getIframe();
+    const originalIds = ['slide-1', 'slide-2', 'slide-3'];
+    const allSlides = await iframe
+      .locator('[data-block-uid="slider-1"] [data-block-uid]')
+      .all();
+    let newSlideId: string | null = null;
+    for (const slide of allSlides) {
+      const id = await slide.getAttribute('data-block-uid');
+      if (id && !originalIds.includes(id)) {
+        newSlideId = id;
+        break;
+      }
+    }
+    expect(newSlideId).toBeTruthy();
+
+    // Verify the new slide is selected (toolbar is on it)
+    await helper.waitForQuantaToolbar(newSlideId!);
+
+    // Use the helper to get the editor and verify it's empty
+    const editor = await helper.getEditorLocator(newSlideId!);
+    await expect(editor).toBeVisible();
+    await expect(editor).toHaveText('');
+
+    // 4. Navigate back to slider to verify 4 slides now exist
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    await expect(slideItems).toHaveCount(4);
+  });
+
+  test('adding a new slide via iframe add button selects the new slide', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const sidebar = page.locator('.sidebar-container');
+    const iframe = helper.getIframe();
+
+    // Select slide-1 to get the add button to appear
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Click the add button in the iframe to add a new slide
+    await helper.clickAddBlockButton();
+
+    // The new slide should be auto-selected after adding
+    // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
+    const kickerInput = sidebar.getByLabel('Kicker');
+    await expect(kickerInput).toBeVisible({ timeout: 10000 });
+
+    // The Title field should be empty (new slide)
+    const titleInput = sidebar.locator('input[id="field-title"]').last();
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveValue('');
+
+    // Find the new slide - the one not in the original list
+    const originalIds = ['slide-1', 'slide-2', 'slide-3'];
+    const allSlides = await iframe
+      .locator('[data-block-uid="slider-1"] [data-block-uid]')
+      .all();
+    let newSlideId: string | null = null;
+    for (const slide of allSlides) {
+      const id = await slide.getAttribute('data-block-uid');
+      if (id && !originalIds.includes(id)) {
+        newSlideId = id;
+        break;
+      }
+    }
+    expect(newSlideId).toBeTruthy();
+
+    // Verify the new slide is selected (toolbar is on it)
+    await helper.waitForQuantaToolbar(newSlideId!);
+
+    // Use the helper to get the editor and verify it's empty
+    const editor = await helper.getEditorLocator(newSlideId!);
+    await expect(editor).toBeVisible();
+    await expect(editor).toHaveText('');
+
+    // Navigate back to slider to verify 4 slides now exist
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    const slideItems = sidebar.locator('.child-block-item');
+    await expect(slideItems).toHaveCount(4);
   });
 });
 

@@ -527,6 +527,59 @@ Empty blocks are special blocks rendered when a container is empty or if a new s
 - if only one block type is allowed in a container then this is created instead of an empty block.
 
 
+#### Object List Containers
+
+Hydra also supports the `object_list` widget pattern used by some existing Volto blocks (like `volto-slider-block`).
+Unlike standard container blocks that use `blocks` + `blocks_layout`, object_list stores items as an array with `@id` fields:
+
+```json
+{
+  "@type": "slider",
+  "slides": [
+    { "@id": "slide-1", "title": "First Slide", "image": "..." },
+    { "@id": "slide-2", "title": "Second Slide", "image": "..." }
+  ]
+}
+```
+
+To enable visual editing for object_list containers:
+
+1. Define the schema with `widget: 'object_list'` and an item `schema`:
+```js
+slides: {
+  title: "Slides",
+  widget: 'object_list',
+  schema: {
+    properties: {
+      title: { title: "Title" },
+      image: { title: "Image", widget: "image" },
+      description: { title: "Description", widget: "slate" }
+    }
+  }
+}
+```
+
+2. In your frontend, render each item with `data-block-uid` set to the item's `@id`:
+```html
+<div class="slider" data-block-uid="slider-1">
+  <div class="slide" data-block-uid="slide-1">
+    <h2 data-editable-field="title">First Slide</h2>
+    <img data-editable-field="image" src="..."/>
+  </div>
+  <div class="slide" data-block-uid="slide-2">
+    <h2 data-editable-field="title">Second Slide</h2>
+    <img data-editable-field="image" src="..."/>
+  </div>
+</div>
+```
+
+Hydra will handle:
+- Block selection and highlighting for object_list items
+- Inline editing of item fields (text, images, etc.)
+- Adding/removing items via the sidebar
+- Drag and drop reordering of items
+
+
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 If you want to make the editing experience the most intuitive, you can enable real-time visual block editing, where an editor

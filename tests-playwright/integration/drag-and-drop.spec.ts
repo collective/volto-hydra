@@ -314,4 +314,41 @@ test.describe('Block Drag and Drop', () => {
     // All blocks should still be present (no duplication or loss)
     expect(finalOrder.length).toBe(initialBlocks.length);
   });
+
+  test('drop marker shows when overshooting past top of page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial block order
+    const initialBlocks = await helper.getBlockOrder();
+    expect(initialBlocks.length).toBeGreaterThanOrEqual(2);
+
+    const lastBlock = initialBlocks[initialBlocks.length - 1];
+
+    // Click the last block and start dragging
+    await helper.clickBlockInIframe(lastBlock);
+    await helper.waitForSidebarOpen();
+    await page.waitForTimeout(300);
+
+    // Start the drag
+    const startPos = await helper.getToolbarDragIconCenterInPageCoords();
+    await page.mouse.move(startPos.x, startPos.y);
+    await page.mouse.down();
+    await helper.verifyDragShadowVisible();
+
+    // Move mouse to above the page content (overshoot the top)
+    // The drop indicator should still show targeting the first block
+    await page.mouse.move(startPos.x, 10, { steps: 10 }); // Move to near top of viewport
+
+    // Verify drop indicator is visible even when overshooting
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    await expect(dropIndicator).toBeVisible({ timeout: 2000 });
+
+    // Clean up - release the drag
+    await page.mouse.up();
+  });
 });

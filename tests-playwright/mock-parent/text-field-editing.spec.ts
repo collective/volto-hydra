@@ -124,41 +124,9 @@ test.describe('Non-Slate Text Field Editing', () => {
     expect(html).not.toContain('\n');
   });
 
-  test('slate field allows Enter key (not prevented by string handler)', async ({ page }) => {
-    // Slate fields are multiline and have their own Enter handling
-    // Our string field Enter prevention should NOT affect slate fields
-    // This test verifies that pressing Enter in a slate field triggers a transform request
-    //
-    // IMPORTANT: We deliberately add a transform delay to test keyboard buffering.
-    // When Enter is pressed, a transform request is sent and the keyboard is blocked.
-    // Any keystrokes typed during the transform should be buffered and replayed
-    // into the new paragraph after the transform completes.
-
-    // Select the slate block
-    const slateBlock = await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
-    const slateField = slateBlock.locator('[data-editable-field="value"]');
-
-    // Clear and type initial text
-    await slateField.click();
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.type('First line');
-
-    // Set a transform delay to simulate slow server response
-    // This ensures keystrokes typed after Enter go into the buffer
-    await page.evaluate(() => {
-      (window as any).mockTransformDelay = 200;
-    });
-
-    // Press Enter - should trigger SLATE_TRANSFORM_REQUEST (not be prevented)
-    await page.keyboard.press('Enter');
-
-    // Type immediately while transform is in progress - these should be buffered
-    await page.keyboard.type('After Enter');
-
-    // Wait for transform to complete and buffered text to appear
-    await expect(slateField).toContainText('After Enter');
-  });
-
+  // NOTE: "slate field allows Enter key" test moved to integration tests
+  // (inline-editing-basic.spec.ts) because mock parent doesn't implement
+  // Enter key transforms - only format transforms are supported.
 
   test('ArrowRight moves cursor forward', async ({ page }) => {
     const textBlock = await helper.clickBlockInIframe('mock-text-block', { waitForToolbar: false });

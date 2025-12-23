@@ -4,7 +4,7 @@
   "UID": "carousel-test-page-uid",
   "id": "carousel-test-page",
   "title": "Carousel Test Page",
-  "description": "A test page with carousel block for data-block-selector testing",
+  "description": "A test page with slider block for data-block-selector testing",
   "review_state": "published",
   "parent": {
     "@id": "http://localhost:8888",
@@ -15,35 +15,46 @@
     "title-block": {
       "@type": "title"
     },
-    "carousel-1": {
-      "@type": "carousel",
-      "slides": {
-        "slide-1": {
-          "@type": "slide",
+    "slider-1": {
+      "@type": "slider",
+      "slides": [
+        {
+          "@id": "slide-1",
           "title": "Slide 1",
-          "content": "First slide content"
+          "description": "First slide content",
+          "head_title": "Welcome"
         },
-        "slide-2": {
-          "@type": "slide",
+        {
+          "@id": "slide-2",
           "title": "Slide 2",
-          "content": "Second slide content"
+          "description": "Second slide content",
+          "head_title": "Features"
         },
-        "slide-3": {
-          "@type": "slide",
+        {
+          "@id": "slide-3",
           "title": "Slide 3",
-          "content": "Third slide content"
+          "description": "Third slide content",
+          "head_title": "Get Started"
         }
-      },
-      "slides_layout": {"items": ["slide-1", "slide-2", "slide-3"]}
+      ]
     },
     "text-after": {
       "@type": "slate",
-      "value": [{"type": "p", "children": [{"text": "Text after carousel"}]}],
-      "plaintext": "Text after carousel"
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            { "text": "This text appears after the slider. Click on " },
+            { "type": "strong", "children": [{ "text": "bold text" }] },
+            { "text": " to test getNodePath." }
+          ]
+        }
+      ],
+      "plaintext": "This text appears after the slider. Click on bold text to test getNodePath."
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "carousel-1", "text-after"]
+    "items": ["title-block", "slider-1", "text-after"]
   },
   "allow_discussion": false,
   "is_folderish": false,

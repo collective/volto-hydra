@@ -55,7 +55,7 @@
 
 <script setup>
 
-import { initBridge } from '../packages/hydra.js';
+import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
@@ -77,7 +77,7 @@ onMounted(() => {
                     id: 'hello_from_the_other_side',
                     title: 'Hello from the other side',
                     group: 'common',
-                    icon: "test",
+                    icon: 'test', // Invalid icon string - fallback to block.svg
                     blockSchema: {
                         required: ['title'],
                         fieldsets: [
@@ -95,9 +95,163 @@ onMounted(() => {
                         },
                     },
                 },
+                // Hero block: simple landing page hero section
+                hero: {
+                    id: 'hero',
+                    title: 'Hero',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+                    group: 'common',
+                    mostUsed: true,
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['heading', 'subheading', 'buttonText', 'description'],
+                            },
+                        ],
+                        properties: {
+                            heading: {
+                                title: 'Heading',
+                                type: 'string',
+                            },
+                            subheading: {
+                                title: 'Subheading',
+                                type: 'string',
+                                widget: 'textarea',
+                            },
+                            buttonText: {
+                                title: 'Button Text',
+                                type: 'string',
+                            },
+                            description: {
+                                title: 'Description',
+                                type: 'array',
+                                widget: 'slate',
+                            },
+                        },
+                        required: [],
+                    },
+                },
+                // Container block: columns contains column children AND top_images
+                columns: {
+                    id: 'columns',
+                    title: 'Columns',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="18" rx="1"/><rect x="14" y="3" width="8" height="18" rx="1"/></svg>',
+                    group: 'common',
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['title', 'top_images', 'columns'],
+                            },
+                        ],
+                        properties: {
+                            title: {
+                                title: 'Title',
+                                type: 'string',
+                            },
+                            top_images: {
+                                title: 'Top Images',
+                                type: 'blocks',
+                                allowedBlocks: ['image'],
+                                defaultBlock: 'image',
+                            },
+                            columns: {
+                                title: 'Columns',
+                                type: 'blocks',
+                                allowedBlocks: ['column'],
+                                maxLength: 4,
+                            },
+                        },
+                        required: [],
+                    },
+                },
+                // Nested container: column contains content blocks
+                column: {
+                    id: 'column',
+                    title: 'Column',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/></svg>',
+                    group: 'common',
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['title', 'blocks'],
+                            },
+                        ],
+                        properties: {
+                            title: {
+                                title: 'Title',
+                                type: 'string',
+                            },
+                            blocks: {
+                                title: 'Content',
+                                type: 'blocks',
+                                allowedBlocks: ['slate', 'image'],
+                                defaultBlock: 'slate',
+                            },
+                        },
+                        required: [],
+                    },
+                },
+                // Slider container: uses object_list widget (volto-slider-block format)
+                slider: {
+                    id: 'slider',
+                    title: 'Slider',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
+                    group: 'common',
+                    blockSchema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['slides', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                            },
+                        ],
+                        properties: {
+                            slides: {
+                                title: 'Slides',
+                                widget: 'object_list',
+                                schema: {
+                                    title: 'Slide',
+                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+                                    properties: {
+                                        head_title: { title: 'Kicker', type: 'string' },
+                                        title: { title: 'Title', type: 'string' },
+                                        description: { title: 'Description', type: 'string', widget: 'textarea' },
+                                        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                                        buttonText: { title: 'Button Text', type: 'string' },
+                                        hideButton: { title: 'Hide Button', type: 'boolean' },
+                                    },
+                                },
+                            },
+                            autoplayEnabled: {
+                                title: 'Autoplay Enabled',
+                                type: 'boolean',
+                                default: false,
+                            },
+                            autoplayDelay: {
+                                title: 'Autoplay Delay',
+                                type: 'integer',
+                                default: 4000,
+                            },
+                            autoplayJump: {
+                                title: 'Autoplay Jump',
+                                type: 'boolean',
+                                default: false,
+                            },
+                        },
+                        required: [],
+                    },
+                },
             };
+            // Page-level blocks (column is only allowed inside columns, not at page level)
+            const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
             const bridge = initBridge(adminUrl, {
-                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...Object.keys(newBlocks)],
+                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...pageLevelBlocks],
                 voltoConfig: {
                     blocks: {
                         blocksConfig: newBlocks,

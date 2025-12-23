@@ -1,0 +1,52 @@
+{
+  "@id": "/test-page",
+  "@type": "Document",
+  "id": "test-page",
+  "title": "Test Page",
+  "description": "A test page with blocks",
+  "blocks": {
+    "block-1-uuid": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "This is a test paragraph" }]
+        }
+      ],
+      "plaintext": "This is a test paragraph"
+    },
+    "block-2-uuid": {
+      "@type": "image",
+      "url": "https://placehold.co/600x400",
+      "alt": "Test image"
+    },
+    "block-3-uuid": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Another paragraph for testing" }]
+        }
+      ],
+      "plaintext": "Another paragraph for testing"
+    },
+    "block-4-hero": {
+      "@type": "hero",
+      "heading": "Welcome Hero",
+      "subheading": "This is the hero subtitle",
+      "buttonText": "Click Me",
+      "description": [
+        { "type": "p", "children": [{ "text": "Rich text description" }] }
+      ]
+    },
+    "block-5-linked-image": {
+      "@type": "image",
+      "url": "https://placehold.co/600x400",
+      "alt": "Linked test image",
+      "href": "https://example.com"
+    }
+  },
+  "blocks_layout": {
+    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image"]
+  }
+}
