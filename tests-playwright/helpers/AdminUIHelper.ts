@@ -84,7 +84,8 @@ export class AdminUIHelper {
 
   /**
    * Navigate to the edit page for a piece of content.
-   * Uses pure client-side navigation to avoid SSR auth issues.
+   * If already on the page in view mode, clicks the Edit button.
+   * Otherwise uses client-side navigation to avoid SSR auth issues.
    */
   async navigateToEdit(contentPath: string): Promise<void> {
     // Ensure path starts with /
@@ -93,20 +94,28 @@ export class AdminUIHelper {
     }
 
     const editPath = `${contentPath}/edit`;
+    const currentUrl = this.page.url();
 
+    // Check if we're already on this page (view mode)
+    const isOnViewPage = currentUrl.includes(contentPath) && !currentUrl.includes('/edit');
 
-    // Use React Router to navigate client-side (avoids SSR)
-    await this.page.evaluate((path) => {
-      // @ts-ignore - window.__APP_HISTORY__ is set by Volto
-      if (window.__HISTORY__) {
-        window.__HISTORY__.push(path);
-      } else {
-        // Fallback to pushState + popstate event
-        window.history.pushState({}, '', path);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      }
-    }, editPath);
-
+    if (isOnViewPage) {
+      // Click the Edit button in the toolbar
+      const editButton = this.page.locator('#toolbar a.edit, #toolbar [aria-label="Edit"]');
+      await editButton.click({ timeout: 5000 });
+    } else {
+      // Use React Router to navigate client-side (avoids SSR)
+      await this.page.evaluate((path) => {
+        // @ts-ignore - window.__APP_HISTORY__ is set by Volto
+        if (window.__HISTORY__) {
+          window.__HISTORY__.push(path);
+        } else {
+          // Fallback to pushState + popstate event
+          window.history.pushState({}, '', path);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }, editPath);
+    }
 
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${editPath}`, { timeout: 10000 });
