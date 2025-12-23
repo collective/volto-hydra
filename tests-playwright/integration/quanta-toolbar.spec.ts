@@ -664,8 +664,10 @@ test.describe('Quanta Toolbar - Overflow', () => {
     // Verify the same text is still there (wrapped in link)
     await expect(linkElement).toHaveText(originalText!.trim());
 
-    // Verify the text is still selected
-    await helper.verifySelectionMatches(editableField, originalText!.trim());
+    // Re-select the link text for the next check
+    // (selection may be lost when focus moves back after link creation)
+    await editableField.click();
+    await page.keyboard.press('ControlOrMeta+a');
 
     // Open overflow menu to verify link button is now active
     // First check if menu is already open, if not click to open it

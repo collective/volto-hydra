@@ -45,6 +45,19 @@
       :class="['image-size-' + props.size, 'image-align-' + props.align]" loading="lazy" decoding="async" />
   </div>
 
+  <!-- Hero block - simple landing page hero section -->
+  <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
+       class="hero-block p-5 bg-gray-100 rounded-lg">
+    <h1 data-editable-field="heading" class="text-3xl font-bold mb-2">{{ block.heading }}</h1>
+    <p data-editable-field="subheading" class="text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
+    <div class="hero-description mb-4" data-editable-field="description">
+      <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
+    </div>
+    <button data-editable-field="buttonText" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+      {{ block.buttonText }}
+    </button>
+  </div>
+
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
     class="mt-6 mb-6"
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
@@ -57,8 +70,8 @@
 
   <!-- Columns container block -->
   <div v-else-if="block['@type'] == 'columns'" :data-block-uid="block_uid" class="columns-block my-4">
-    <!-- Optional title for columns block -->
-    <h3 v-if="block.title" data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
+    <!-- Title for columns block (always rendered for inline editing) -->
+    <h3 data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
 
     <!-- Top images row - horizontal layout for images above columns -->
     <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4" data-block-field="top_images">
