@@ -497,6 +497,38 @@ const Iframe = (props) => {
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
   }));
+
+  // Handle Escape key in Admin UI to navigate to parent block
+  // This is needed because when selecting via sidebar, focus stays in Admin UI,
+  // not iframe, so the iframe's Escape handler doesn't receive the event.
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key !== 'Escape') return;
+      if (!selectedBlock) return;
+
+      // Don't interfere with Escape in modals, dropdowns, etc.
+      const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"], .ui.modal');
+      if (isInPopup) return;
+
+      // Don't handle if focus is in iframe - let iframe's handler do it
+      const iframe = document.getElementById('previewIframe');
+      if (iframe && iframe.contains(document.activeElement)) return;
+
+      e.preventDefault();
+
+      // Get parent from blockPathMap
+      const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
+      const parentId = pathInfo?.parentId || null;
+      log('Admin Escape key - selecting parent:', parentId, 'from:', selectedBlock);
+
+      // Select parent (or deselect if no parent)
+      onSelectBlock(parentId);
+    };
+
+    document.addEventListener('keydown', handleEscape, true);
+    return () => document.removeEventListener('keydown', handleEscape, true);
+  }, [selectedBlock, iframeSyncState.blockPathMap, onSelectBlock]);
+
   const urlFromEnv = getURlsFromEnv();
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
@@ -1054,8 +1086,10 @@ const Iframe = (props) => {
           // it to be "re-selected" and scrolled back into view.
           const isPositionUpdateOnly = event.data.src === 'scrollHandler' ||
                                         event.data.src === 'resizeHandler';
+          // Only check selectedBlock - blockUI can be stale due to React's async state updates
+          // When multiple BLOCK_SELECTED messages arrive rapidly (e.g., sidebar click + Escape),
+          // blockUI may not have updated yet, causing onSelectBlock to be skipped incorrectly
           const isNewBlock = !isPositionUpdateOnly &&
-                             (!blockUI || blockUI.blockUid !== event.data.blockUid) &&
                              selectedBlock !== event.data.blockUid;
           log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
 

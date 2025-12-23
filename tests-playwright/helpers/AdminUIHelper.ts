@@ -547,6 +547,20 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for the sidebar to show a specific block type as the current block.
+   * The current block in the sidebar has data-is-current="true" on its header.
+   *
+   * @param blockTypeTitle - The display title of the block type (e.g., "Slider", "Slide", "Text")
+   * @param timeout - Maximum time to wait in milliseconds
+   */
+  async waitForSidebarCurrentBlock(blockTypeTitle: string, timeout: number = 10000): Promise<void> {
+    const sidebar = this.page.locator('.sidebar-container');
+    // The current block header has data-is-current="true" and contains the block type title
+    const currentBlockHeader = sidebar.locator('[data-is-current="true"]').filter({ hasText: blockTypeTitle });
+    await expect(currentBlockHeader).toBeVisible({ timeout });
+  }
+
+  /**
    * Open a specific sidebar tab (Page, Block, Order, etc.)
    *
    * Note: The Hydra sidebar uses a unified hierarchical view without tabs.

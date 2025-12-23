@@ -131,6 +131,32 @@ export class Bridge {
   }
 
   /**
+   * Central method for receiving form data from Admin UI.
+   * Sets both formData and lastReceivedFormData for echo detection.
+   * All incoming data (INITIAL_DATA, FORM_DATA) should use this.
+   *
+   * @param {Object} data - The form data from Admin UI
+   * @param {string} source - Where the data came from (for logging)
+   * @param {Object} [blockPathMap] - Optional blockPathMap for nested block lookup
+   */
+  setFormDataFromAdmin(data, source, blockPathMap) {
+    if (blockPathMap === undefined) {
+      throw new Error(`setFormDataFromAdmin: blockPathMap is required (source: ${source})`);
+    }
+
+    this.blockPathMap = blockPathMap;
+
+    const seq = data?._editSequence || 0;
+    // Use simple direct lookup for logging - getBlockData uses this.formData which isn't set yet
+    const blockData = this.selectedBlockUid ? data?.blocks?.[this.selectedBlockUid] : null;
+    const text = blockData?.value?.[0]?.children?.[0]?.text?.substring(0, 40);
+    log(`[setFormDataFromAdmin] source: ${source}, seq: ${seq}, block: ${this.selectedBlockUid}, text: ${JSON.stringify(text)}`);
+
+    this.formData = JSON.parse(JSON.stringify(data));
+    this.lastReceivedFormData = JSON.parse(JSON.stringify(data));
+  }
+
+  /**
    * Get block data by UID, supporting nested blocks via blockPathMap.
    * Falls back to top-level lookup if not found in blockPathMap.
    *
@@ -483,15 +509,13 @@ export class Bridge {
         const receiveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
-              this.formData = JSON.parse(JSON.stringify(e.data.data));
-              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
-
               // Store block field types metadata (blockId -> fieldName -> fieldType)
               this.blockFieldTypes = e.data.blockFieldTypes || {};
               log('Stored blockFieldTypes:', this.blockFieldTypes);
 
-              // Store blockPathMap for nested block lookup
-              this.blockPathMap = e.data.blockPathMap || {};
+              // Central method sets formData, lastReceivedFormData, and blockPathMap
+              this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
+              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
               log('Stored blockPathMap keys:', Object.keys(this.blockPathMap));
 
               // Store Slate configuration for keyboard shortcuts and toolbar
@@ -599,24 +623,8 @@ export class Bridge {
               this.savedClickPosition = null;
             }
 
-            this.formData = JSON.parse(JSON.stringify(event.data.data));
-            // Store copy for echo detection - bufferUpdate compares against this
-            this.lastReceivedFormData = JSON.parse(JSON.stringify(event.data.data));
-            // Store blockPathMap for looking up nested blocks
-            this.blockPathMap = event.data.blockPathMap || {};
-
-            // Add nodeIds to all slate blocks before rendering
-            // Admin UI never sends nodeIds, so we always need to add them
-            this.addNodeIdsToAllSlateFields();
-
-            // Log the block data to see if bold formatting is present
-            const selectedBlockData = this.getBlockData(this.selectedBlockUid);
-            if (this.selectedBlockUid && selectedBlockData) {
-              log('Block data being passed to callback:', JSON.stringify(selectedBlockData.value));
-            }
-
             // Check if Admin wants to select a different block (e.g., after Enter creates new block)
-            // Update selectedBlockUid BEFORE re-render so all subsequent code uses the new block
+            // Update selectedBlockUid BEFORE setFormDataFromAdmin so logging shows correct block
             const adminSelectedBlockUid = event.data.selectedBlockUid;
             const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
             if (needsBlockSwitch) {
@@ -624,9 +632,15 @@ export class Bridge {
               this.selectedBlockUid = adminSelectedBlockUid;
             }
 
+            // Central method for setting form data with logging (also sets blockPathMap)
+            this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
+
+            // Add nodeIds to all slate blocks before rendering
+            // Admin UI never sends nodeIds, so we always need to add them
+            this.addNodeIdsToAllSlateFields();
+
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
-            log('FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
 
             // Call the callback first to trigger the re-render
             log('Calling onEditChange callback to trigger re-render');
@@ -2909,8 +2923,18 @@ export class Bridge {
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2; // pixels
 
+    // Get the set of child block UIDs for checking if user navigated away
+    const childUids = new Set(childBlocks.map(el => el.getAttribute('data-block-uid')));
+
     // Wait for target to become visible AND position to stabilize
     const waitForTarget = (retries = 40) => {
+      // Check if user has navigated away (e.g., pressed Escape, clicked different block)
+      // Cancel if the selected block is no longer one of the children we're navigating
+      if (this.selectedBlockUid && !childUids.has(this.selectedBlockUid)) {
+        log('handleBlockSelector: user navigated away, canceling child selection. selected:', this.selectedBlockUid);
+        return;
+      }
+
       const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
       const freshChildBlocks = getFreshChildBlocks();
 
@@ -4158,6 +4182,20 @@ export class Bridge {
         const range = selection.getRangeAt(0);
         const node = range.startContainer;
 
+        // Check if selection spans element nodes (formatted content like STRONG, EM, etc.)
+        // If so, send as transform - don't let browser handle it locally
+        if (!range.collapsed) {
+          const hasElementNodes = this.selectionContainsElementNodes(range);
+          if (hasElementNodes) {
+            e.preventDefault();
+            log('Delete selection contains element nodes, sending transform');
+            this.sendTransformRequest(blockUid, 'delete', {
+              direction: e.key === 'Backspace' ? 'backward' : 'forward',
+            });
+            return;
+          }
+        }
+
         // Check if at node boundary
         const atStart = range.startOffset === 0;
         const atEnd =
@@ -5218,7 +5256,11 @@ export class Bridge {
     const copyB = JSON.parse(JSON.stringify(fieldB));
     this.resetJsonNodeIds(copyA);
     this.resetJsonNodeIds(copyB);
-    return JSON.stringify(copyA) === JSON.stringify(copyB);
+    const strA = JSON.stringify(copyA);
+    const strB = JSON.stringify(copyB);
+    const isEqual = strA === strB;
+    log('focusedFieldValuesEqual:', isEqual, 'A:', strA.substring(0, 100), 'B:', strB.substring(0, 100));
+    return isEqual;
   }
 
   /**
@@ -5434,24 +5476,26 @@ export class Bridge {
   bufferUpdate(from = 'unknown') {
     // Always capture BOTH current data and current selection together
     const data = this.getFormDataWithoutNodeIds();
+    const currentSeq = this.formData?._editSequence || 0;
+    const text = this.getBlockData(this.selectedBlockUid)?.value?.[0]?.children?.[0]?.text?.substring(0, 30);
 
-    // Compare with last received FORM_DATA to detect echoes
-    // Only compare the focused editable field - other fields may differ (plaintext, etc.)
+    // Check against lastReceivedFormData to avoid buffering echoes of what we just received/rendered
     if (this.lastReceivedFormData) {
       const isEcho = this.focusedFieldValuesEqual(data, this.lastReceivedFormData);
-      if (!isEcho) {
-        log('bufferUpdate: genuine edit detected, field:', this.focusedFieldName);
-      } else {
-        // Same content as what we received - this is an echo, skip
+      if (isEcho) {
+        // Same content as what we received - don't buffer
+        log('bufferUpdate: echo, skipping. from:', from, 'seq:', currentSeq);
         return;
       }
+    } else {
+      // No baseline yet - can't determine if this is an echo
+      log('bufferUpdate: no baseline, skipping. from:', from);
+      return;
     }
 
-    // Genuine edit - increment sequence and buffer
-    const currentSeq = data._editSequence || 0;
-    log('bufferUpdate: sending genuine edit, seq:', currentSeq + 1);
-    data._editSequence = currentSeq + 1;
-    this.formData._editSequence = data._editSequence; // Update stored formData too
+    log('bufferUpdate: buffering. from:', from, 'seq:', currentSeq, 'text:', JSON.stringify(text));
+
+    // Buffer the update - sequence will be assigned at SEND time, not buffer time
     this.pendingTextUpdate = {
       type: 'INLINE_EDIT_DATA',
       data: data,
@@ -5464,11 +5508,7 @@ export class Bridge {
       clearTimeout(this.textUpdateTimer);
     }
     this.textUpdateTimer = setTimeout(() => {
-      if (this.pendingTextUpdate) {
-        this.sendMessageToParent(this.pendingTextUpdate);
-        this.pendingTextUpdate = null;
-        this.textUpdateTimer = null;
-      }
+      this.flushPendingTextUpdates();
     }, 300);
   }
 
@@ -5484,15 +5524,26 @@ export class Bridge {
       this.textUpdateTimer = null;
     }
     if (this.pendingTextUpdate) {
+      // Assign sequence number at SEND time, not buffer time
+      // This ensures monotonically increasing sequences even if FORM_DATA arrives during debounce
+      const currentSeq = this.formData?._editSequence || 0;
+      const newSeq = currentSeq + 1;
+      this.pendingTextUpdate.data._editSequence = newSeq;
+      this.formData._editSequence = newSeq;
+
       // Include requestId if provided (for FLUSH_BUFFER coordination)
       if (flushRequestId) {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
-      // Buffer already contains matching data+selection captured together
-      log('flushPendingTextUpdates: sending buffered update:',
+
+      log('flushPendingTextUpdates: sending buffered update, seq:', newSeq,
           'anchor:', this.pendingTextUpdate.selection?.anchor,
           'focus:', this.pendingTextUpdate.selection?.focus);
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
+
+      // Update lastReceivedFormData to the data we just sent
+      // This is needed because admin doesn't send FORM_DATA back for inline edits (echo prevention)
+      this.lastReceivedFormData = JSON.parse(JSON.stringify(this.pendingTextUpdate.data));
       this.pendingTextUpdate = null;
       return true; // Had pending update
     }
@@ -5567,6 +5618,36 @@ export class Bridge {
   ////////////////////////////////////////////////////////////////////////////////
   // Text Formatting
   ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Check if a selection range involves formatted content (nested elements).
+   * Uses getNodePath to determine if selection is inside or spans inline formatting.
+   *
+   * Path length indicates nesting:
+   * - [0, 0] = text directly in paragraph (plain text)
+   * - [0, 1, 0] = text inside inline element like strong (formatted)
+   *
+   * @param {Range} range - The selection range
+   * @returns {boolean} True if selection involves formatted/structured content
+   */
+  selectionContainsElementNodes(range) {
+    // Get paths for start and end of selection
+    const startPath = this.getNodePath(range.startContainer);
+    const endPath = this.getNodePath(range.endContainer);
+
+    if (!startPath || !endPath) return false;
+
+    // Path length > 2 means inside nested element (e.g., strong inside p)
+    if (startPath.length > 2) return true;
+    if (endPath.length > 2) return true;
+
+    // If paths are identical, selection is within same text node - no structure
+    if (startPath.join('.') === endPath.join('.')) return false;
+
+    // Different paths means selection spans multiple children
+    // Could have elements between them (e.g., start [0,0], end [0,2] has [0,1] between)
+    return true;
+  }
 
   getSelectionHTML(range) {
     const div = document.createElement('div');
