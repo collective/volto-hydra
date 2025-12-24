@@ -1,0 +1,58 @@
+{
+  "@id": "http://localhost:8888/table-test-page",
+  "@type": "Document",
+  "UID": "table-test-page-uid",
+  "id": "table-test-page",
+  "title": "Table Test Page",
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "table-1": {
+      "@type": "slateTable",
+      "table": {
+        "hideHeaders": false,
+        "rows": [
+          {
+            "key": "row-1",
+            "cells": [
+              {
+                "key": "cell-1-1",
+                "type": "header",
+                "value": [{"type": "p", "children": [{"text": "Header 1"}]}]
+              },
+              {
+                "key": "cell-1-2",
+                "type": "header",
+                "value": [{"type": "p", "children": [{"text": "Header 2"}]}]
+              }
+            ]
+          },
+          {
+            "key": "row-2",
+            "cells": [
+              {
+                "key": "cell-2-1",
+                "type": "data",
+                "value": [{"type": "p", "children": [{"text": "Data 1"}]}]
+              },
+              {
+                "key": "cell-2-2",
+                "type": "data",
+                "value": [{"type": "p", "children": [{"text": "Data 2"}]}]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "text-after": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Text after table"}]}],
+      "plaintext": "Text after table"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "table-1", "text-after"]
+  }
+}

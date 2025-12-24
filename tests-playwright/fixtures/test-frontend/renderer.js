@@ -107,6 +107,9 @@ function renderBlock(blockId, block) {
         case 'accordion':
             wrapper.innerHTML = renderAccordionBlock(block);
             break;
+        case 'slateTable':
+            wrapper.innerHTML = renderSlateTableBlock(block);
+            break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
@@ -740,6 +743,46 @@ function renderAccordionBlock(block) {
 function renderNestedSlateBlock(block) {
     const plaintext = block.plaintext || '';
     return `<p data-editable-field="value" style="margin: 0;">${plaintext}</p>`;
+}
+
+/**
+ * Render a slateTable block.
+ * Each row and cell gets data-block-uid for selection.
+ * Cell content is editable via data-editable-field="value".
+ * @param {Object} block - slateTable block data
+ * @returns {string} HTML string
+ */
+function renderSlateTableBlock(block) {
+    const table = block.table || {};
+    const rows = table.rows || [];
+
+    let html = '<table style="border-collapse: collapse; width: 100%;">';
+
+    rows.forEach((row) => {
+        // Rows add downward (new row below)
+        html += `<tr data-block-uid="${row.key}" data-block-add="bottom">`;
+        const cells = row.cells || [];
+        cells.forEach((cell) => {
+            const tag = cell.type === 'header' ? 'th' : 'td';
+            const style = 'border: 1px solid #ccc; padding: 8px;';
+
+            // Render cell content from slate value
+            let cellContent = '';
+            const value = cell.value || [];
+            value.forEach((node) => {
+                const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+                const text = renderChildren(node.children || []);
+                cellContent += `<p data-editable-field="value"${nodeIdAttr}>${text}</p>`;
+            });
+
+            // Cells add to the right (new column)
+            html += `<${tag} data-block-uid="${cell.key}" data-block-add="right" style="${style}">${cellContent}</${tag}>`;
+        });
+        html += '</tr>';
+    });
+
+    html += '</table>';
+    return html;
 }
 
 /**

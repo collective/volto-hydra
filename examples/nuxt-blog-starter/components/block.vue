@@ -240,9 +240,15 @@
 
   <div v-else-if="block['@type'] == 'slateTable'" class="data-table" :data-block-uid="block_uid">
     <table>
-      <tr v-for="(row) in block.table.rows">
-        <component v-for="(cell) in row.cells" :key="cell.key" :is="(cell.type == 'header') ? 'th' : 'td'">
-          <RichText v-for="(node) in cell.value" :node="node" />
+      <tr v-for="(row) in block.table?.rows" :key="row.key" :data-block-uid="row.key" data-block-add="bottom">
+        <component
+          v-for="(cell) in row.cells"
+          :key="cell.key"
+          :is="(cell.type == 'header') ? 'th' : 'td'"
+          :data-block-uid="cell.key"
+          data-block-add="right"
+        >
+          <RichText v-for="(node, idx) in cell.value" :key="idx" :node="node" data-editable-field="value" />
         </component>
       </tr>
     </table>

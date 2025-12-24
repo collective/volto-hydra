@@ -30,30 +30,48 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
  * For object_list items, looks up the itemSchema.title from the parent's field definition
  */
 const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
-  if (!blockType) return 'Block';
-
-  // Check if this is an object_list item via blockPathMap
+  // Check if this is an object_list item via blockPathMap FIRST
+  // (object_list items often don't have @type, so blockType may be undefined)
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.isObjectListItem && pathInfo.itemType) {
-    // Parse virtual type: 'parentType:fieldName'
-    const [parentType, fieldName] = pathInfo.itemType.split(':');
-    const parentConfig = config.blocks?.blocksConfig?.[parentType];
-    if (parentConfig?.blockSchema) {
-      const parentSchema = typeof parentConfig.blockSchema === 'function'
-        ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : parentConfig.blockSchema;
-      const fieldDef = parentSchema?.properties?.[fieldName];
-      // Use itemSchema.title if available, otherwise fall back to field title
-      if (fieldDef?.schema?.title) {
-        return fieldDef.schema.title;
-      }
-      // Fallback: use singular form of field name (e.g., "slides" -> "Slide")
-      if (fieldDef?.title) {
-        const singular = fieldDef.title.replace(/s$/, '');
-        return singular;
+  if (pathInfo?.isObjectListItem) {
+    // Try to get title from itemType (parentType:fieldName format)
+    // For nested types like slateTable:rows:cells, parentType is slateTable:rows, fieldName is cells
+    if (pathInfo.itemType) {
+      const parts = pathInfo.itemType.split(':');
+      const fieldName = parts.pop(); // Last part is the field name
+      const parentType = parts.join(':'); // Everything else is parent type
+      const parentConfig = config.blocks?.blocksConfig?.[parentType];
+      if (parentConfig?.blockSchema) {
+        const parentSchema = typeof parentConfig.blockSchema === 'function'
+          ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+          : parentConfig.blockSchema;
+        const fieldDef = parentSchema?.properties?.[fieldName];
+        // Use itemSchema.title if available
+        if (fieldDef?.schema?.title) {
+          return fieldDef.schema.title;
+        }
+        // Fallback: use singular form of field title (e.g., "Slides" -> "Slide")
+        if (fieldDef?.title) {
+          const singular = fieldDef.title.replace(/s$/, '');
+          return singular;
+        }
+        // Fallback: derive from field name (e.g., "rows" -> "Row", "cells" -> "Cell")
+        if (fieldName) {
+          const singular = fieldName.replace(/s$/, '');
+          return singular.charAt(0).toUpperCase() + singular.slice(1);
+        }
       }
     }
+
+    // For nested object_list items without itemType, use containerField
+    // This handles deeply nested structures like slateTable (rows > cells)
+    if (pathInfo.containerField) {
+      const singular = pathInfo.containerField.replace(/s$/, '');
+      return singular.charAt(0).toUpperCase() + singular.slice(1);
+    }
   }
+
+  if (!blockType) return 'Block';
 
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   return blockConfig?.title || blockType;
@@ -146,35 +164,19 @@ const filterBlocksFields = (schema) => {
 /**
  * Get the block schema for a block type
  * Returns filtered schema (without blocks-type fields) or null
- * Handles object_list items by looking up the item schema from the parent's field definition
+ * For object_list items, uses itemSchema from blockPathMap
  */
 const getBlockSchema = (blockType, blockData, intl, blockPathMap, blockId) => {
-  if (!blockType) return null;
-
-  // Check if this is an object_list item via blockPathMap
+  // For object_list items, use itemSchema directly from pathMap
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.isObjectListItem && pathInfo.itemType) {
-    // Parse virtual type: 'parentType:fieldName'
-    const [parentType, fieldName] = pathInfo.itemType.split(':');
-    const parentConfig = config.blocks?.blocksConfig?.[parentType];
-    if (!parentConfig?.blockSchema) return null;
-
-    // Get parent schema
-    const parentSchema = typeof parentConfig.blockSchema === 'function'
-      ? parentConfig.blockSchema({ formData: {}, intl })
-      : parentConfig.blockSchema;
-
-    // Find the object_list field and get its item schema
-    const fieldDef = parentSchema?.properties?.[fieldName];
-    if (fieldDef?.widget === 'object_list' && fieldDef.schema) {
-      // Ensure schema has required field (InlineForm expects it)
-      return {
-        ...fieldDef.schema,
-        required: fieldDef.schema.required || [],
-      };
-    }
-    return null;
+  if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
+    return {
+      ...pathInfo.itemSchema,
+      required: pathInfo.itemSchema.required || [],
+    };
   }
+
+  if (!blockType) return null;
 
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   if (!blockConfig?.blockSchema) return null;
@@ -219,9 +221,12 @@ const ParentBlockSection = ({
   const targetId = isCurrentBlock ? 'sidebar-properties' : `parent-sidebar-${blockId}`;
 
   // Get the Edit component for this block type
-  const BlockEdit = config.blocks?.blocksConfig?.[blockType]?.edit;
+  // Skip Edit component if sidebarSchemaOnly is set (e.g., slateTable's Edit expects specific data structures)
+  const blockConfig = config.blocks?.blocksConfig?.[blockType];
+  const useSchemaOnly = blockConfig?.sidebarSchemaOnly;
+  const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
 
-  // Get schema for fallback rendering (when no Edit component)
+  // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
   const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl, blockPathMap, blockId) : null;
 
   const handleMenuClick = (e) => {

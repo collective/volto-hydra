@@ -3,6 +3,7 @@
  * Supports container blocks where blocks can be nested inside other blocks.
  */
 
+import { produce } from 'immer';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 
 /**
@@ -44,17 +45,24 @@ function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
 
 /**
  * Build a map of blockId -> path for all blocks in formData.
- * Traverses nested containers using schema to find `type: 'blocks'` fields.
+ * Uses unified traversal for both `type: 'blocks'` and `widget: 'object_list'` containers.
  *
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (overrides restricted-based computation)
- * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, containerField: string|null, allowedSiblingTypes: Array|null, maxSiblings: number|null }
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, containerField: string|null, ... }
  *
- * Path format: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
- * This allows accessing: formData.blocks['columns-1'].columns['col-1'].blocks['text-1a']
+ * Path format examples:
+ * - Page block: ['blocks', 'text-1']
+ * - Nested block: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
+ * - Object list item: ['blocks', 'slider-1', 'slides', 0]
+ * - Nested object list: ['blocks', 'table-1', 'table', 'rows', 0, 'cells', 1]
  */
-export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = null) {
+export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlocks = null) {
+  if (!intl) {
+    throw new Error('buildBlockPathMap requires intl parameter');
+  }
+
   const pathMap = {};
 
   if (!formData?.blocks) {
@@ -65,109 +73,184 @@ export function buildBlockPathMap(formData, blocksConfig, pageAllowedBlocks = nu
   const effectivePageAllowedBlocks = pageAllowedBlocks ??
     getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
+  // Helper to get block schema from blocksConfig
+  function getBlockSchema(blockType) {
+    const blockConfig = blocksConfig?.[blockType];
+    return typeof blockConfig?.blockSchema === 'function'
+      ? blockConfig.blockSchema({ formData: {}, intl })
+      : blockConfig?.blockSchema;
+  }
+
   /**
-   * Recursively traverse block structure.
-   * @param {Object} blocksObj - Object containing blocks keyed by uid
-   * @param {Array} layoutItems - Array of block uids in order
-   * @param {Array} currentPath - Path to this blocks object (e.g., ['blocks'] or ['blocks', 'columns-1', 'columns'])
-   * @param {string|null} parentId - Parent block's uid, or null for page-level
-   * @param {Array|null} allowedBlocks - Allowed block types in this container (from parent's schema)
-   * @param {number|null} maxLength - Maximum number of blocks allowed in this container
-   * @param {string|null} containerField - Name of the container field (e.g., 'columns', 'top_images', 'blocks')
+   * Process container fields in an item (block or object_list item).
+   * Scans schema for container fields and processes each one.
+   * This is the single recursion point for all container types.
    */
-  function traverse(blocksObj, layoutItems, currentPath, parentId, allowedBlocks = null, maxLength = null, containerField = null) {
-    if (!blocksObj || !layoutItems) return;
+  function processItem(item, itemId, itemPath, schema) {
+    if (!schema?.properties) return;
 
-    layoutItems.forEach((blockId) => {
-      const block = blocksObj[blockId];
-      if (!block) return;
-
-      // Store path for this block, including allowedBlocks and maxLength for validation
-      const blockPath = [...currentPath, blockId];
-      pathMap[blockId] = {
-        path: blockPath,
-        parentId: parentId,
-        containerField: containerField, // Which container field this block belongs to
-        allowedSiblingTypes: allowedBlocks, // What types are allowed as siblings in this container
-        maxSiblings: maxLength, // Maximum number of blocks allowed in this container
-      };
-
-      // Check if this block type has container fields (type: 'blocks')
-      const blockType = block['@type'];
-      const blockConfig = blocksConfig?.[blockType];
-      const schema = typeof blockConfig?.blockSchema === 'function'
-        ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : blockConfig?.blockSchema;
-
-      if (schema?.properties) {
-        // Look for fields with type: 'blocks' or widget: 'object_list' (container fields)
-        Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
-          if (fieldDef.type === 'blocks') {
-            // Standard container field - recurse into it
-            const nestedBlocks = block[fieldName];
-            const layoutFieldName = `${fieldName}_layout`;
-            const nestedLayout = block[layoutFieldName]?.items;
-
-            if (nestedBlocks && nestedLayout) {
-              traverse(
-                nestedBlocks,
-                nestedLayout,
-                [...blockPath, fieldName],
-                blockId,
-                fieldDef.allowedBlocks || null, // Pass allowedBlocks from schema
-                fieldDef.maxLength || null, // Pass maxLength from schema
-                fieldName, // Pass the container field name
-              );
-            }
-          } else if (fieldDef.widget === 'object_list') {
-            // object_list widget: items stored as array with @id field (e.g., volto-slider-block)
-            // Items share the same schema defined in fieldDef.schema
-            const items = block[fieldName];
-            if (Array.isArray(items)) {
-              items.forEach((item, index) => {
-                const itemId = item['@id'];
-                if (itemId) {
-                  // Use parentBlockType:fieldName as virtual type for itemSchema lookup
-                  const itemType = `${blockType}:${fieldName}`;
-                  pathMap[itemId] = {
-                    path: [...blockPath, fieldName, index],
-                    parentId: blockId,
-                    containerField: fieldName,
-                    allowedSiblingTypes: [itemType], // All items share same schema
-                    maxSiblings: null,
-                    isObjectListItem: true, // Flag for array-based CRUD operations
-                    itemType, // Virtual type for schema lookup
-                  };
-                }
-              });
-            }
-          }
-        });
+    Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
+      // Nested object widget (e.g., slateTable.table with widget: 'object')
+      // Descend into the nested schema
+      if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+        if (item[fieldName]) {
+          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef.schema);
+        }
+        return;
       }
 
-      // Also check for implicit container fields (blocks/blocks_layout without schema)
-      // This handles Volto's built-in container blocks like Grid
-      if (block.blocks && block.blocks_layout?.items && !pathMap[Object.keys(block.blocks)[0]]) {
-        // For implicit containers, allowedBlocks and maxLength come from block config level
-        const implicitAllowedBlocks = blockConfig?.allowedBlocks || null;
-        const implicitMaxLength = blockConfig?.maxLength || null;
-        traverse(
-          block.blocks,
-          block.blocks_layout.items,
-          [...blockPath, 'blocks'],
-          blockId,
-          implicitAllowedBlocks,
-          implicitMaxLength,
-          'blocks', // Implicit container field name
-        );
+      // Nested object property (legacy: has properties but no widget/type)
+      if (fieldDef.properties && !fieldDef.widget && !fieldDef.type) {
+        if (item[fieldName]) {
+          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef);
+        }
+        return;
+      }
+
+      // Container field - process its contents
+      if (fieldDef.type === 'blocks') {
+        processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef);
+      } else if (fieldDef.widget === 'object_list') {
+        // Use dataPath if provided to find data in a different location
+        const dataPath = fieldDef.dataPath || [fieldName];
+        let fieldData = item;
+        for (const key of dataPath) {
+          fieldData = fieldData?.[key];
+        }
+        if (fieldData) {
+          processObjectListContainer(item, itemId, itemPath, fieldName, fieldDef, dataPath);
+        }
+      }
+    });
+
+    // Also check for implicit container fields (blocks/blocks_layout without schema definition)
+    // This handles Volto's built-in container blocks like Grid
+    const firstBlockId = Object.keys(item.blocks || {})[0];
+    if (item.blocks && item.blocks_layout?.items && firstBlockId && !pathMap[firstBlockId]) {
+      const blockType = item['@type'];
+      const blockConfig = blocksConfig?.[blockType];
+      processBlocksContainer(item, itemId, itemPath, 'blocks', {
+        allowedBlocks: blockConfig?.allowedBlocks || null,
+        maxLength: blockConfig?.maxLength || null,
+      });
+    }
+  }
+
+  /**
+   * Process a type: 'blocks' container field.
+   * Items are stored in object + layout array pattern.
+   */
+  function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef) {
+    const blocks = parent[fieldName];
+    const layoutFieldName = `${fieldName}_layout`;
+    const layout = parent[layoutFieldName]?.items;
+    if (!blocks || !layout) return;
+
+    layout.forEach(blockId => {
+      const block = blocks[blockId];
+      if (!block) return;
+
+      const blockPath = [...parentPath, fieldName, blockId];
+      const blockType = block['@type'];
+      const blockSchema = getBlockSchema(blockType);
+
+      pathMap[blockId] = {
+        path: blockPath,
+        parentId,
+        containerField: fieldName,
+        allowedSiblingTypes: fieldDef.allowedBlocks || null,
+        maxSiblings: fieldDef.maxLength || null,
+      };
+
+      // RECURSE: process this block's container fields
+      if (blockSchema) {
+        processItem(block, blockId, blockPath, blockSchema);
+      }
+    });
+  }
+
+  /**
+   * Process a widget: 'object_list' container field.
+   * Items are stored as array with configurable ID field.
+   * @param {Array} dataPath - Path to actual data location (defaults to [fieldName])
+   */
+  function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null) {
+    // Navigate to actual data location using dataPath
+    const effectiveDataPath = dataPath || [fieldName];
+    let items = parent;
+    for (const key of effectiveDataPath) {
+      items = items?.[key];
+    }
+
+    // Handle both arrays and objects (Volto's form state can convert arrays to objects)
+    let itemsArray;
+    if (Array.isArray(items)) {
+      itemsArray = items;
+    } else if (items && typeof items === 'object') {
+      // Convert object with numeric keys to array (e.g., {"0": {...}, "1": {...}})
+      itemsArray = Object.values(items);
+    } else {
+      return;
+    }
+
+    const idField = fieldDef.idField || '@id';
+    const itemSchema = fieldDef.schema;
+
+    // Compute virtual type for items in this container
+    // Parent type is either a real block type (from @type) or a virtual type (for nested object_list)
+    const parentPathInfo = pathMap[parentId];
+    const parentType = parentPathInfo?.itemType || parent['@type'];
+    const itemType = `${parentType}:${fieldName}`;
+
+    itemsArray.forEach((item, index) => {
+      const itemId = item[idField];
+      if (!itemId) return;
+
+      // Build path using the actual data path (not schema field name)
+      const itemPath = [...parentPath, ...effectiveDataPath, index];
+
+      pathMap[itemId] = {
+        path: itemPath,
+        parentId,
+        containerField: fieldName,
+        isObjectListItem: true,
+        idField,
+        itemSchema, // For sidebar form rendering
+        dataPath: effectiveDataPath, // Store for later use
+        itemType, // Virtual type like 'slateTable:rows' or 'slateTable:rows:cells'
+        allowedSiblingTypes: [itemType], // Only allow same type as siblings
+      };
+
+      // RECURSE: process this item's container fields (same pattern!)
+      if (itemSchema) {
+        processItem(item, itemId, itemPath, itemSchema);
       }
     });
   }
 
   // Start traversal from page-level blocks
-  // Pass effectivePageAllowedBlocks so page-level blocks get the correct allowedSiblingTypes
-  const pageLayoutItems = formData.blocks_layout?.items || [];
-  traverse(formData.blocks, pageLayoutItems, ['blocks'], null, effectivePageAllowedBlocks, null, 'blocks');
+  const pageLayout = formData.blocks_layout?.items || [];
+  pageLayout.forEach(blockId => {
+    const block = formData.blocks[blockId];
+    if (!block) return;
+
+    const blockPath = ['blocks', blockId];
+    const blockType = block['@type'];
+    const blockSchema = getBlockSchema(blockType);
+
+    pathMap[blockId] = {
+      path: blockPath,
+      parentId: null,
+      containerField: 'blocks',
+      allowedSiblingTypes: effectivePageAllowedBlocks,
+      maxSiblings: null,
+    };
+
+    // Process this block's container fields
+    if (blockSchema) {
+      processItem(block, blockId, blockPath, blockSchema);
+    }
+  });
 
   return pathMap;
 }
@@ -199,18 +282,13 @@ export function getBlockByPath(formData, path) {
 export function setBlockByPath(formData, path, value) {
   if (!path || path.length === 0) return formData;
 
-  // Build nested update
-  const result = { ...formData };
-  let current = result;
-
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i];
-    current[key] = { ...current[key] };
-    current = current[key];
-  }
-
-  current[path[path.length - 1]] = value;
-  return result;
+  return produce(formData, draft => {
+    let current = draft;
+    for (const key of path.slice(0, -1)) {
+      current = current[key];
+    }
+    current[path[path.length - 1]] = value;
+  });
 }
 
 /**
@@ -223,7 +301,12 @@ export function setBlockByPath(formData, path, value) {
 export function getBlockById(formData, blockPathMap, blockId) {
   const pathInfo = blockPathMap?.[blockId];
   if (pathInfo?.path) {
-    return getBlockByPath(formData, pathInfo.path);
+    const block = getBlockByPath(formData, pathInfo.path);
+    // Inject virtual @type for object_list items
+    if (block && pathInfo.isObjectListItem && pathInfo.itemType) {
+      return { ...block, '@type': pathInfo.itemType };
+    }
+    return block;
   }
   // Fallback to direct lookup for page-level blocks
   return formData?.blocks?.[blockId];
@@ -271,6 +354,34 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   }
 
   const parentId = pathInfo.parentId;
+  const fieldName = pathInfo.containerField;
+
+  // For object_list items, we already have most info in pathInfo
+  if (pathInfo.isObjectListItem) {
+    // Get itemSchema and dataPath from parent's schema definition
+    const parentBlock = getBlockById(formData, blockPathMap, parentId);
+    const parentType = parentBlock?.['@type'];
+    const parentConfig = blocksConfig?.[parentType];
+    const schema = typeof parentConfig?.blockSchema === 'function'
+      ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+      : parentConfig?.blockSchema;
+    const fieldDef = schema?.properties?.[fieldName];
+
+    return {
+      fieldName,
+      parentId,
+      allowedBlocks: pathInfo.allowedSiblingTypes,
+      defaultBlock: pathInfo.itemType,
+      maxLength: pathInfo.maxSiblings,
+      isObjectList: true,
+      itemSchema: fieldDef?.schema,
+      itemIndex: pathInfo.path[pathInfo.path.length - 1], // Last element is index
+      idField: pathInfo.idField,
+      dataPath: pathInfo.dataPath || fieldDef?.dataPath || null, // Path to actual data location
+    };
+  }
+
+  // For standard blocks, look up container config from schema
   const parentBlock = getBlockById(formData, blockPathMap, parentId);
 
   if (!parentBlock) {
@@ -284,64 +395,22 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
     : parentConfig?.blockSchema;
 
-  if (!schema?.properties) {
-    // Check for implicit container (blocks/blocks_layout without schema)
-    // For these containers (like gridBlock), allowedBlocks/maxLength are at the block config level
-    const hasBlocks = !!parentBlock.blocks;
-    const layoutItems = parentBlock.blocks_layout?.items;
-    const includesBlock = layoutItems?.includes(blockId);
-    if (hasBlocks && includesBlock) {
+  // Check schema-defined container field
+  if (schema?.properties && fieldName) {
+    const fieldDef = schema.properties[fieldName];
+    if (fieldDef?.type === 'blocks') {
       return {
-        fieldName: 'blocks',
+        fieldName,
         parentId,
-        allowedBlocks: parentConfig?.allowedBlocks || null,
-        defaultBlock: parentConfig?.defaultBlock || null,
-        maxLength: parentConfig?.maxLength || null,
+        allowedBlocks: fieldDef.allowedBlocks || null,
+        defaultBlock: fieldDef.defaultBlock || null,
+        maxLength: fieldDef.maxLength || null,
       };
     }
-    return null;
   }
 
-  // Find which container field contains this block
-  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    if (fieldDef.type === 'blocks') {
-      const layoutFieldName = `${fieldName}_layout`;
-      const layoutItems = parentBlock[layoutFieldName]?.items;
-
-      if (layoutItems?.includes(blockId)) {
-        return {
-          fieldName,
-          parentId,
-          allowedBlocks: fieldDef.allowedBlocks || null,
-          defaultBlock: fieldDef.defaultBlock || null,
-          maxLength: fieldDef.maxLength || null,
-        };
-      }
-    } else if (fieldDef.widget === 'object_list') {
-      // object_list: items stored as array with @id field
-      const items = parentBlock[fieldName];
-      if (Array.isArray(items)) {
-        const itemIndex = items.findIndex(item => item['@id'] === blockId);
-        if (itemIndex !== -1) {
-          const itemType = `${parentType}:${fieldName}`;
-          return {
-            fieldName,
-            parentId,
-            allowedBlocks: [itemType],
-            defaultBlock: itemType,
-            maxLength: null,
-            isObjectList: true,
-            itemSchema: fieldDef.schema,
-            itemIndex, // Track position in array for CRUD
-          };
-        }
-      }
-    }
-  }
-
-  // Fallback: Check for implicit container (blocks/blocks_layout) even when schema exists
+  // Fallback: Check for implicit container (blocks/blocks_layout)
   // This handles blocks like gridBlock that have a schema but use implicit blocks/blocks_layout
-  // For these containers, allowedBlocks/maxLength are at the block config level
   const hasBlocks = !!parentBlock.blocks;
   const layoutItems = parentBlock.blocks_layout?.items;
   const includesBlock = layoutItems?.includes(blockId);
@@ -402,6 +471,8 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           maxLength: null,
           isObjectList: true,
           itemSchema: fieldDef.schema, // Store itemSchema for editing
+          idField: fieldDef.idField || '@id', // ID field name for items
+          dataPath: fieldDef.dataPath || null, // Path to actual data location
         });
       }
     }
@@ -478,16 +549,39 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
   let updatedParentBlock;
 
   if (isObjectList) {
-    // object_list: items stored as array with @id field
-    const items = [...(parentBlock[fieldName] || [])];
-    const refIndex = items.findIndex(item => item['@id'] === refBlockId);
-    const insertIndex = getInsertIndex(items, refIndex);
-    items.splice(insertIndex, 0, { '@id': newBlockId, ...newBlockData });
+    // object_list: items stored as array with configurable ID field
+    // Use dataPath to find actual data location (e.g., ['table', 'rows'] for slateTable)
+    const idField = containerConfig.idField || '@id';
+    const dataPath = containerConfig.dataPath || [fieldName];
 
-    updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: items,
-    };
+    // Navigate to data location using dataPath
+    let dataContainer = parentBlock;
+    for (let i = 0; i < dataPath.length - 1; i++) {
+      dataContainer = dataContainer?.[dataPath[i]];
+    }
+    const lastKey = dataPath[dataPath.length - 1];
+    const items = [...(dataContainer?.[lastKey] || [])];
+
+    const refIndex = items.findIndex(item => item[idField] === refBlockId);
+    const insertIndex = getInsertIndex(items, refIndex);
+    items.splice(insertIndex, 0, { [idField]: newBlockId, ...newBlockData });
+
+    // Rebuild parent block with updated data at correct path
+    if (dataPath.length === 1) {
+      updatedParentBlock = {
+        ...parentBlock,
+        [fieldName]: items,
+      };
+    } else {
+      // Deep update for nested dataPath (e.g., table.rows)
+      updatedParentBlock = { ...parentBlock };
+      let current = updatedParentBlock;
+      for (let i = 0; i < dataPath.length - 1; i++) {
+        current[dataPath[i]] = { ...current[dataPath[i]] };
+        current = current[dataPath[i]];
+      }
+      current[lastKey] = items;
+    }
   } else {
     // Standard container: blocks object + blocks_layout
     const layoutFieldName = `${fieldName}_layout`;
@@ -553,8 +647,9 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
   let updatedParentBlock;
 
   if (isObjectList) {
-    // object_list: filter out item by @id
-    const items = (parentBlock[fieldName] || []).filter(item => item['@id'] !== blockId);
+    // object_list: filter out item by configurable ID field
+    const idField = containerConfig.idField || '@id';
+    const items = (parentBlock[fieldName] || []).filter(item => item[idField] !== blockId);
 
     updatedParentBlock = {
       ...parentBlock,
@@ -618,9 +713,10 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
   let updatedParentBlock;
 
   if (isObjectList) {
-    // object_list: find item by @id and update it
+    // object_list: find item by configurable ID field and update it
+    const idField = containerConfig.idField || '@id';
     const items = (parentBlock[fieldName] || []).map(item =>
-      item['@id'] === blockId ? { '@id': blockId, ...newBlockData } : item
+      item[idField] === blockId ? { [idField]: blockId, ...newBlockData } : item
     );
 
     updatedParentBlock = {
@@ -782,6 +878,31 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
   let result = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    // Handle object_list containers (like cells in a row)
+    if (fieldDef.widget === 'object_list') {
+      const idField = fieldDef.idField || '@id';
+      const childId = uuidGenerator();
+      const childType = `${blockType}:${fieldName}`;
+
+      // Start with ID and virtual type
+      let childData = { [idField]: childId, '@type': childType };
+
+      // Apply schema defaults (e.g., slate fields get empty paragraph)
+      childData = applyBlockDefaults({ data: childData, intl }, blocksConfig);
+
+      // Recursively initialize nested containers
+      childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, options);
+
+      // Remove @type - object_list items don't store it in data
+      delete childData['@type'];
+
+      result = {
+        ...result,
+        [fieldName]: [childData],
+      };
+      continue;
+    }
+
     if (fieldDef.type !== 'blocks') {
       continue;
     }
@@ -897,9 +1018,10 @@ export function reorderBlocksInContainer(
   let updatedParent;
 
   if (isObjectList) {
-    // object_list: reorder array items by @id
+    // object_list: reorder array items by configurable ID field
+    const idField = fieldDef.idField || '@id';
     const items = parentBlock[fieldName] || [];
-    const reorderedItems = newOrder.map(id => items.find(item => item['@id'] === id)).filter(Boolean);
+    const reorderedItems = newOrder.map(id => items.find(item => item[idField] === id)).filter(Boolean);
 
     updatedParent = {
       ...parentBlock,

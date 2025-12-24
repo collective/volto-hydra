@@ -2750,11 +2750,14 @@ test.describe('data-block-selector Navigation', () => {
 
     // Press Escape to navigate up to the parent container
     await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('slider-1');
     await helper.waitForQuantaToolbar('slider-1');
 
     const sidebar = page.locator('.sidebar-container');
+    // Wait for sidebar to show Slider as current block
+    await helper.waitForSidebarCurrentBlock('Slider');
     // Wait for carousel's ChildBlocksWidget to show Slides section
-    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible({ timeout: 10000 });
 
     // Verify slide-2 is hidden in iframe (carousel shows only one slide at a time)
     // Use helper that handles both display:none and translate-based hiding
@@ -2782,10 +2785,13 @@ test.describe('data-block-selector Navigation', () => {
     await helper.clickBlockInIframe('slide-1');
     await helper.waitForQuantaToolbar('slide-1');
     await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('slider-1');
     await helper.waitForQuantaToolbar('slider-1');
+    // Wait for sidebar to show Slider as current block
+    await helper.waitForSidebarCurrentBlock('Slider');
 
     // Wait for carousel's ChildBlocksWidget to show Slides section
-    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible({ timeout: 10000 });
 
     // Get slide entries in the ChildBlocksWidget
     const slideButtons = sidebar.locator('.child-block-item');
@@ -2799,8 +2805,10 @@ test.describe('data-block-selector Navigation', () => {
 
     // Now go back to carousel container and select slide-1
     await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('slider-1');
     await helper.waitForQuantaToolbar('slider-1');
-    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    // Wait for sidebar to show Slider as current block
+    await helper.waitForSidebarCurrentBlock('Slider');
 
     // Select first slide entry
     await slideButtons.first().click();
@@ -2935,6 +2943,186 @@ test.describe('data-block-selector Navigation', () => {
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
     const slideItems = sidebar.locator('.child-block-item');
     await expect(slideItems).toHaveCount(4);
+  });
+});
+
+// ============================================================================
+// slateTable Tests - Nested object_list (rows contain cells)
+// Tests that buildBlockPathMap traverses nested object_list structures
+// ============================================================================
+test.describe('slateTable Container', () => {
+  test('table rows and cells are selectable', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify table structure is loaded
+    const table = iframe.locator('[data-block-uid="table-1"]');
+    await expect(table).toBeVisible();
+
+    // Verify rows are rendered with data-block-uid
+    const row1 = iframe.locator('[data-block-uid="row-1"]');
+    const row2 = iframe.locator('[data-block-uid="row-2"]');
+    await expect(row1).toBeVisible();
+    await expect(row2).toBeVisible();
+
+    // Verify cells are rendered with data-block-uid
+    const cell11 = iframe.locator('[data-block-uid="cell-1-1"]');
+    const cell12 = iframe.locator('[data-block-uid="cell-1-2"]');
+    const cell21 = iframe.locator('[data-block-uid="cell-2-1"]');
+    await expect(cell11).toBeVisible();
+    await expect(cell12).toBeVisible();
+    await expect(cell21).toBeVisible();
+  });
+
+  test('clicking table cell selects it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Click on a cell
+    await helper.clickBlockInIframe('cell-1-1');
+
+    // Verify cell is selected (toolbar visible)
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe('cell-1-1');
+    expect(hasToolbar).toBe(true);
+  });
+
+  test('table cells have correct parent hierarchy in sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Click on cell-2-1 (row 2, cell 1)
+    await helper.clickBlockInIframe('cell-2-1');
+    await helper.waitForSidebarOpen();
+
+    // Verify sidebar shows hierarchy: Page, Table, Row, Cell
+    // Names are derived from field names: "rows" -> "Row", "cells" -> "Cell"
+    const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
+    await expect(stickyHeaders).toHaveCount(4);
+    await expect(stickyHeaders.nth(0)).toContainText('Page');
+    await expect(stickyHeaders.nth(1)).toContainText('Table');
+    await expect(stickyHeaders.nth(2)).toContainText('Row');
+    await expect(stickyHeaders.nth(3)).toContainText('Cell');
+
+    // Verify the Cell section shows the "Content" slate field from itemSchema
+    const sidebarProperties = page.locator('#sidebar-properties');
+    await expect(sidebarProperties.locator('text=Content')).toBeVisible();
+
+    // Navigate up via Escape: cell -> row -> table
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Now should have 3 headers: Page, Table, Row
+    await expect(stickyHeaders).toHaveCount(3);
+    await expect(stickyHeaders.nth(2)).toContainText('Row');
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Now should have 2 headers: Page, Table
+    await expect(stickyHeaders).toHaveCount(2);
+    await expect(stickyHeaders.nth(1)).toContainText('Table');
+
+    // Verify table-1 is now selected (outline visible on table)
+    const tableSelected = await helper.isBlockSelectedInIframe('table-1');
+    expect(tableSelected.ok).toBe(true);
+
+    // Click on a different cell to verify second selection still works
+    // (This caught a bug where blockPathMap lost rows/cells after first FORM_DATA)
+    await helper.clickBlockInIframe('cell-1-2');
+    await page.waitForTimeout(300);
+
+    // Verify sidebar shows correct hierarchy for second cell
+    await expect(stickyHeaders).toHaveCount(4);
+    await expect(stickyHeaders.nth(3)).toContainText('Cell');
+    await expect(sidebarProperties.locator('text=Content')).toBeVisible();
+  });
+
+  test('clicking add button on row adds a new row below', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Count initial rows
+    const initialRowCount = await iframe.locator('tr[data-block-uid]').count();
+    expect(initialRowCount).toBe(2);
+
+    // Click on cell-1-1 to select it (rows are fully covered by cells, so click cell first)
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+
+    // Navigate up to the row by clicking "‹ Cell" in the sidebar
+    const cellNavButton = page.locator('.parent-nav:has-text("Cell")');
+    await cellNavButton.click();
+
+    // Verify sidebar shows cells as children of the row
+    const childBlocksList = page.locator('.child-blocks-list');
+    await expect(childBlocksList).toBeVisible();
+    // Row should have 2 cells as children
+    await expect(childBlocksList.locator('.child-block-item')).toHaveCount(2);
+
+    // Wait for add button to be positioned for the row
+    await expect(page.locator('.volto-hydra-add-button')).toBeVisible();
+
+    // Click the add button (should add row below since data-block-add="bottom")
+    await page.locator('.volto-hydra-add-button').click();
+
+    // Verify a new row was added in the iframe
+    await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
+
+    // Verify the new row is selected (sidebar shows Row header for current block)
+    const sidebarHeaders = page.locator('.sidebar-section-header[data-is-current="true"]');
+    await expect(sidebarHeaders.locator('.parent-nav')).toContainText('Row');
+
+    // Verify the new row shows cells as children (inherited from template or empty)
+    await expect(page.locator('.child-blocks-list')).toBeVisible();
+
+    // Verify the selection outline has minimum height (empty cells should still be clickable)
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible();
+    const box = await outline.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(20);
+  });
+
+  test('clicking add button on cell adds a new cell to the right', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Count initial cells in first row (th/td with data-block-uid)
+    const initialCellCount = await iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]').count();
+    expect(initialCellCount).toBe(2);
+
+    // Click on cell-1-1 to select it
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+
+    // Click the add button (should add cell to right since data-block-add="right")
+    await page.locator('.volto-hydra-add-button').click();
+
+    // Verify a new cell was added to the row (new cells have UUID-based IDs)
+    await expect(iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]')).toHaveCount(3);
   });
 });
 

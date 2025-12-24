@@ -202,6 +202,14 @@ const extractBlockFieldTypes = (intl) => {
           const itemTypeKey = `${blockType}:${fieldName}`;
           blockFieldTypes[itemTypeKey] = {};
 
+          // Also register virtual type in blocksConfig so getAllContainerFields works
+          if (!config.blocks.blocksConfig[itemTypeKey]) {
+            config.blocks.blocksConfig[itemTypeKey] = {
+              blockSchema: field.schema,
+              sidebarSchemaOnly: true, // Virtual types use schema form in sidebar
+            };
+          }
+
           Object.keys(field.schema.properties).forEach((itemFieldName) => {
             const itemField = field.schema.properties[itemFieldName];
             let itemFieldType = null;
@@ -215,6 +223,35 @@ const extractBlockFieldTypes = (intl) => {
 
             if (itemFieldType) {
               blockFieldTypes[itemTypeKey][itemFieldName] = itemFieldType;
+            }
+
+            // Handle nested object_list (e.g., rows containing cells)
+            if (itemField.widget === 'object_list' && itemField.schema?.properties) {
+              const nestedItemTypeKey = `${itemTypeKey}:${itemFieldName}`;
+              blockFieldTypes[nestedItemTypeKey] = {};
+
+              // Register nested virtual type in blocksConfig
+              if (!config.blocks.blocksConfig[nestedItemTypeKey]) {
+                config.blocks.blocksConfig[nestedItemTypeKey] = {
+                  blockSchema: itemField.schema,
+                  sidebarSchemaOnly: true,
+                };
+              }
+
+              Object.keys(itemField.schema.properties).forEach((nestedFieldName) => {
+                const nestedField = itemField.schema.properties[nestedFieldName];
+                let nestedFieldType = null;
+                if (nestedField.widget === 'slate') {
+                  nestedFieldType = 'slate';
+                } else if (nestedField.widget === 'textarea') {
+                  nestedFieldType = 'textarea';
+                } else if (nestedField.type === 'string') {
+                  nestedFieldType = 'string';
+                }
+                if (nestedFieldType) {
+                  blockFieldTypes[nestedItemTypeKey][nestedFieldName] = nestedFieldType;
+                }
+              });
             }
           });
         }
@@ -477,6 +514,8 @@ const Iframe = (props) => {
   const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
   // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
   // This ensures toolbar sees all together in the same render
+  const intl = useIntl();
+
   // Initialize with properties so we have data from first render
   //
   // UNIFIED STATE MODEL (see DATA FLOW ARCHITECTURE in SyncedSlateToolbar.jsx):
@@ -489,7 +528,7 @@ const Iframe = (props) => {
   //   this is for toolbar→iframe flow (format completion, including selection-only changes)
   const [iframeSyncState, setIframeSyncState] = useState(() => ({
     formData: properties,
-    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig), // Maps blockId -> { path, parentId, allowedSiblingTypes }
+    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig, intl),
     selection: null,
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
@@ -536,8 +575,6 @@ const Iframe = (props) => {
     urlFromEnv[0];
   // Initialize to null to avoid SSR/client hydration mismatch (token differs)
   const [iframeSrc, setIframeSrc] = useState(null);
-
-  const intl = useIntl();
 
   // Extract block field types - stored in state so it can be updated when frontend config is merged
   // Must be declared before useEffects that reference it
@@ -608,16 +645,13 @@ const Iframe = (props) => {
     if (customBlockData) {
       blockData = customBlockData;
     } else if (isObjectList) {
-      // object_list items: no @type, use itemSchema defaults
-      blockData = {};
-      const itemSchema = fieldDef?.schema;
-      if (itemSchema?.properties) {
-        for (const [propName, propDef] of Object.entries(itemSchema.properties)) {
-          if (propDef.default !== undefined) {
-            blockData[propName] = propDef.default;
-          }
-        }
-      }
+      // object_list items: use virtual type to initialize containers
+      const idField = fieldDef?.idField || '@id';
+      const virtualType = `${getBlockByPath(formData, blockPathMap?.[blockId]?.path)?.['@type'] || formData?.blocks?.[blockId]?.['@type']}:${fieldName}`;
+      blockData = { [idField]: newBlockId, '@type': virtualType };
+      // Initialize nested containers (e.g., cells in a row)
+      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties });
+      delete blockData['@type']; // object_list items don't store @type in data
     } else {
       // Standard block with @type
       blockData = { '@type': blockType };
@@ -808,7 +842,7 @@ const Iframe = (props) => {
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
-              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig),
+              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
               ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
             }));
@@ -886,7 +920,7 @@ const Iframe = (props) => {
               const formToUseForEnter = event.data.data;
 
               // Update iframeSyncState to keep it in sync
-              const enterBlockPathMap = buildBlockPathMap(formToUseForEnter, config.blocks.blocksConfig);
+              const enterBlockPathMap = buildBlockPathMap(formToUseForEnter, config.blocks.blocksConfig, intl);
               setIframeSyncState(prev => ({
                 ...prev,
                 formData: formToUseForEnter,
@@ -984,7 +1018,7 @@ const Iframe = (props) => {
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
-              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig),
+              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
               transformAction: transformAction,
             }));
@@ -1113,7 +1147,7 @@ const Iframe = (props) => {
           // IMPORTANT: Rebuild blockPathMap from properties instead of using iframeSyncState.blockPathMap
           // because React state updates are async and the state may be stale when BLOCK_SELECTED arrives
           // shortly after a delete operation creates an empty block
-          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig);
+          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
           const selectedBlockData = getBlockByPath(
             properties,
             currentBlockPathMap?.[event.data.blockUid]?.path,
@@ -1224,7 +1258,7 @@ const Iframe = (props) => {
 
           // 4. Build blockPathMap (now has complete schema knowledge)
           // No need to pass allowedBlocks - it's now derived from blocksConfig.restricted
-          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig);
+          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, intl);
           setIframeSyncState(prev => ({
             ...prev,
             blockPathMap: initialBlockPathMap,
@@ -1339,7 +1373,7 @@ const Iframe = (props) => {
     }
 
     // Build new blockPathMap
-    const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig);
+    const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
 
     // Validate selection (may be stale after document structure changes)
     let newSelection = iframeSyncState.selection;
@@ -1386,7 +1420,7 @@ const Iframe = (props) => {
       selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
       ...(iframeSyncState.pendingFormatRequestId ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
     };
-    log('Sending FORM_DATA, selectedBlockUid:', iframeSyncState.pendingSelectBlockUid, '_editSequence:', editSequenceRef.current);
+    log('Sending FORM_DATA to iframe. blockPathMap keys:', Object.keys(newBlockPathMap), 'selectedBlockUid:', iframeSyncState.pendingSelectBlockUid, '_editSequence:', editSequenceRef.current);
     document.getElementById('previewIframe')?.contentWindow?.postMessage(
       message,
       iframeOriginRef.current,
@@ -1774,7 +1808,7 @@ const Iframe = (props) => {
         onDeleteBlock={onDeleteBlock}
         onChangeBlock={(blockId, newBlockData) => {
           // Rebuild blockPathMap from current properties to ensure it's up to date
-          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig);
+          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
 
           // Find container config for nested blocks
           const pathInfo = currentBlockPathMap[blockId];
