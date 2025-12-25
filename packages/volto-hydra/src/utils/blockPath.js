@@ -7,6 +7,78 @@ import { produce } from 'immer';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 
 /**
+ * Get items array from a container (works for both object_list and blocks containers).
+ * @param {Object} parentBlock - The parent block containing the container
+ * @param {Object} containerConfig - Container configuration with fieldName, isObjectList, dataPath
+ * @returns {Array} The items array (copy for object_list, items array for blocks)
+ */
+function getContainerItems(parentBlock, containerConfig) {
+  const { fieldName, isObjectList, dataPath } = containerConfig;
+
+  if (isObjectList) {
+    const effectivePath = dataPath || [fieldName];
+    let container = parentBlock;
+    for (const key of effectivePath) {
+      container = container?.[key];
+    }
+    return [...(container || [])];
+  }
+
+  // blocks container: items are in fieldName_layout.items
+  const layoutFieldName = `${fieldName}_layout`;
+  return [...(parentBlock[layoutFieldName]?.items || [])];
+}
+
+/**
+ * Reorder items in a container by ID list.
+ * For object_list: finds items by idField and returns them in new order
+ * For blocks: just returns the newOrder as-is (IDs are the items)
+ * @param {Array} items - Current items from getContainerItems
+ * @param {Array<string>} newOrder - New order of item IDs
+ * @param {Object} containerConfig - Container configuration
+ * @returns {Array} Reordered items
+ */
+function reorderContainerItems(items, newOrder, containerConfig) {
+  if (containerConfig.isObjectList) {
+    const idField = containerConfig.idField || '@id';
+    return newOrder.map(id => items.find(item => item[idField] === id)).filter(Boolean);
+  }
+  return newOrder;
+}
+
+/**
+ * Set items array on a container (returns updated parent block).
+ * @param {Object} parentBlock - The parent block containing the container
+ * @param {Object} containerConfig - Container configuration
+ * @param {Array} items - New items array
+ * @param {Object} [blocksObj] - For blocks containers, the blocks object to merge
+ * @returns {Object} Updated parent block
+ */
+function setContainerItems(parentBlock, containerConfig, items, blocksObj = null) {
+  const { fieldName, isObjectList, dataPath } = containerConfig;
+
+  if (isObjectList) {
+    const effectivePath = dataPath || [fieldName];
+    const updatedParent = { ...parentBlock };
+    let current = updatedParent;
+    for (let i = 0; i < effectivePath.length - 1; i++) {
+      current[effectivePath[i]] = { ...current[effectivePath[i]] };
+      current = current[effectivePath[i]];
+    }
+    current[effectivePath[effectivePath.length - 1]] = items;
+    return updatedParent;
+  }
+
+  // blocks container: update both fieldName (blocks) and fieldName_layout (items)
+  const layoutFieldName = `${fieldName}_layout`;
+  return {
+    ...parentBlock,
+    [fieldName]: blocksObj || parentBlock[fieldName],
+    [layoutFieldName]: { items },
+  };
+}
+
+/**
  * Compute page-level allowed block types from blocksConfig's `restricted` property.
  * A block is allowed at page level if restricted is false or if restricted(context) returns false.
  *
@@ -202,12 +274,47 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
     const parentType = parentPathInfo?.itemType || parent['@type'];
     const itemType = `${parentType}:${fieldName}`;
 
+    // Track addMode for table-aware behavior
+    // addMode comes from block config (e.g., blocksConfig.slateTable.addMode = 'table')
+    // - First-level items (rows) get addMode from block config
+    // - Second-level items (cells) get parentAddMode from their parent row
+    const parentAddMode = parentPathInfo?.addMode || parentPathInfo?.parentAddMode || null;
+
+    // Get addMode from the actual block config if this is first-level (parent is a block, not an object_list item)
+    let addMode = null;
+    if (!parentPathInfo?.isObjectListItem) {
+      // Parent is a real block - check its config for addMode
+      const blockType = parent['@type'];
+      const blockConfig = blocksConfig?.[blockType];
+      addMode = blockConfig?.addMode || null;
+    }
+
     itemsArray.forEach((item, index) => {
       const itemId = item[idField];
       if (!itemId) return;
 
       // Build path using the actual data path (not schema field name)
       const itemPath = [...parentPath, ...effectiveDataPath, index];
+
+      // Compute available actions based on table mode
+      // Primary remove is hardcoded in DropdownMenu based on addDirection
+      // These are ADDITIONAL actions beyond the primary
+      let actions = null;
+      if (addMode === 'table') {
+        // First-level items in table mode (rows): insert row before/after
+        // Primary remove (Remove Row) is hardcoded based on addDirection
+        actions = {
+          toolbar: ['addRowBefore', 'addRowAfter'],
+          dropdown: [],
+        };
+      } else if (parentAddMode === 'table') {
+        // Second-level items in table mode (cells): all insert actions + delete row
+        // Primary remove (Remove Column) is hardcoded based on addDirection
+        actions = {
+          toolbar: ['addColumnBefore', 'addColumnAfter', 'addRowBefore', 'addRowAfter'],
+          dropdown: ['deleteRow'], // Additional action: delete parent row
+        };
+      }
 
       pathMap[itemId] = {
         path: itemPath,
@@ -219,6 +326,9 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         dataPath: effectiveDataPath, // Store for later use
         itemType, // Virtual type like 'slateTable:rows' or 'slateTable:rows:cells'
         allowedSiblingTypes: [itemType], // Only allow same type as siblings
+        addMode, // Table mode for this container (e.g., rows)
+        parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
+        actions, // Available actions for toolbar/dropdown
       };
 
       // RECURSE: process this item's container fields (same pattern!)
@@ -378,6 +488,8 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       itemIndex: pathInfo.path[pathInfo.path.length - 1], // Last element is index
       idField: pathInfo.idField,
       dataPath: pathInfo.dataPath || fieldDef?.dataPath || null, // Path to actual data location
+      addMode: pathInfo.addMode || null, // Table mode for this container
+      parentAddMode: pathInfo.parentAddMode || null, // Inherited from parent
     };
   }
 
@@ -546,62 +658,22 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
     throw new Error(`[HYDRA] Could not find parent block ${parentId} for container insertion`);
   }
 
+  const items = getContainerItems(parentBlock, containerConfig);
   let updatedParentBlock;
 
   if (isObjectList) {
-    // object_list: items stored as array with configurable ID field
-    // Use dataPath to find actual data location (e.g., ['table', 'rows'] for slateTable)
     const idField = containerConfig.idField || '@id';
-    const dataPath = containerConfig.dataPath || [fieldName];
-
-    // Navigate to data location using dataPath
-    let dataContainer = parentBlock;
-    for (let i = 0; i < dataPath.length - 1; i++) {
-      dataContainer = dataContainer?.[dataPath[i]];
-    }
-    const lastKey = dataPath[dataPath.length - 1];
-    const items = [...(dataContainer?.[lastKey] || [])];
-
     const refIndex = items.findIndex(item => item[idField] === refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
     items.splice(insertIndex, 0, { [idField]: newBlockId, ...newBlockData });
-
-    // Rebuild parent block with updated data at correct path
-    if (dataPath.length === 1) {
-      updatedParentBlock = {
-        ...parentBlock,
-        [fieldName]: items,
-      };
-    } else {
-      // Deep update for nested dataPath (e.g., table.rows)
-      updatedParentBlock = { ...parentBlock };
-      let current = updatedParentBlock;
-      for (let i = 0; i < dataPath.length - 1; i++) {
-        current[dataPath[i]] = { ...current[dataPath[i]] };
-        current = current[dataPath[i]];
-      }
-      current[lastKey] = items;
-    }
+    updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
     // Standard container: blocks object + blocks_layout
-    const layoutFieldName = `${fieldName}_layout`;
-
-    const newContainerBlocks = {
-      ...parentBlock[fieldName],
-      [newBlockId]: newBlockData,
-    };
-
-    const currentItems = parentBlock[layoutFieldName]?.items || [];
-    const refIndex = currentItems.indexOf(refBlockId);
-    const insertIndex = getInsertIndex(currentItems, refIndex);
-    const newItems = [...currentItems];
-    newItems.splice(insertIndex, 0, newBlockId);
-
-    updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: newContainerBlocks,
-      [layoutFieldName]: { items: newItems },
-    };
+    const newContainerBlocks = { ...parentBlock[fieldName], [newBlockId]: newBlockData };
+    const refIndex = items.indexOf(refBlockId);
+    const insertIndex = getInsertIndex(items, refIndex);
+    items.splice(insertIndex, 0, newBlockId);
+    updatedParentBlock = setContainerItems(parentBlock, containerConfig, items, newContainerBlocks);
   }
 
   // Use path-aware update to handle nested containers
@@ -645,36 +717,196 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
   }
 
   let updatedParentBlock;
+  const items = getContainerItems(parentBlock, containerConfig);
 
   if (isObjectList) {
-    // object_list: filter out item by configurable ID field
     const idField = containerConfig.idField || '@id';
-    const items = (parentBlock[fieldName] || []).filter(item => item[idField] !== blockId);
-
-    updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: items,
-    };
+    const filteredItems = items.filter(item => item[idField] !== blockId);
+    updatedParentBlock = setContainerItems(parentBlock, containerConfig, filteredItems);
   } else {
     // Standard container: remove from blocks object and layout
-    const layoutFieldName = `${fieldName}_layout`;
-
-    // Remove block from container field
     const { [blockId]: removed, ...remainingBlocks } = parentBlock[fieldName];
-
-    // Remove from layout
-    const currentItems = parentBlock[layoutFieldName]?.items || [];
-    const newItems = currentItems.filter((id) => id !== blockId);
-
-    updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: remainingBlocks,
-      [layoutFieldName]: { items: newItems },
-    };
+    const filteredItems = items.filter(id => id !== blockId);
+    updatedParentBlock = setContainerItems(parentBlock, containerConfig, filteredItems, remainingBlocks);
   }
 
   // Use path-aware update to handle nested containers
   return setBlockByPath(formData, parentPath, updatedParentBlock);
+}
+
+/**
+ * Insert a column into a table (add cell to ALL rows at the same position).
+ * Used when adding a cell in table mode (parentAddMode === 'table').
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {string} refCellId - Reference cell ID for positioning
+ * @param {Object} cellTemplate - Template for new cell data (without ID) - should have defaults already applied
+ * @param {'before'|'after'} action - Where to insert relative to refCellId
+ * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @returns {Object} { formData, insertedCellId } - Updated formData and the ID of the cell in the reference row
+ */
+export function insertTableColumn(formData, blockPathMap, refCellId, cellTemplate, action, uuidGenerator) {
+  const cellPathInfo = blockPathMap[refCellId];
+  if (!cellPathInfo || !cellPathInfo.parentAddMode) {
+    throw new Error('[HYDRA] insertTableColumn: cell is not in table mode');
+  }
+
+  // Get the row containing this cell
+  const rowId = cellPathInfo.parentId;
+  const rowPathInfo = blockPathMap[rowId];
+  if (!rowPathInfo) {
+    throw new Error('[HYDRA] insertTableColumn: could not find row for cell');
+  }
+
+  // Get the table block (grandparent of the cell)
+  const tableId = rowPathInfo.parentId;
+  const tablePathInfo = blockPathMap[tableId];
+  if (!tablePathInfo) {
+    throw new Error('[HYDRA] insertTableColumn: could not find table for row');
+  }
+
+  // Get table block data
+  const tableBlock = getBlockByPath(formData, tablePathInfo.path);
+  if (!tableBlock) {
+    throw new Error('[HYDRA] insertTableColumn: table block not found');
+  }
+
+  // Get rows using dataPath
+  const dataPath = rowPathInfo.dataPath || ['rows'];
+  let rows = tableBlock;
+  for (const key of dataPath) {
+    rows = rows?.[key];
+  }
+  if (!Array.isArray(rows)) {
+    throw new Error('[HYDRA] insertTableColumn: could not find rows array');
+  }
+
+  // Find the cell index in its row
+  const cellIdField = cellPathInfo.idField || 'key';
+  const currentRow = rows.find(row => row[rowPathInfo.idField || 'key'] === rowId);
+  if (!currentRow || !currentRow.cells) {
+    throw new Error('[HYDRA] insertTableColumn: could not find current row or cells');
+  }
+
+  const cellIndex = currentRow.cells.findIndex(cell => cell[cellIdField] === refCellId);
+  if (cellIndex === -1) {
+    throw new Error('[HYDRA] insertTableColumn: cell not found in row');
+  }
+
+  // Calculate insert index based on action
+  const insertIndex = action === 'before' ? cellIndex : cellIndex + 1;
+
+  // Track the cell ID we'll insert in the reference row (for selection)
+  let insertedCellId = null;
+
+  // Insert a new cell into EACH row at the same position
+  const updatedRows = rows.map((row) => {
+    const newCellId = uuidGenerator();
+
+    // Track the cell in the reference row for selection
+    if (row[rowPathInfo.idField || 'key'] === rowId) {
+      insertedCellId = newCellId;
+    }
+
+    const cells = [...(row.cells || [])];
+    cells.splice(insertIndex, 0, {
+      [cellIdField]: newCellId,
+      ...cellTemplate,
+    });
+
+    return { ...row, cells };
+  });
+
+  // Update the table block with new rows
+  let updatedTableBlock = { ...tableBlock };
+  let current = updatedTableBlock;
+  for (let i = 0; i < dataPath.length - 1; i++) {
+    current[dataPath[i]] = { ...current[dataPath[i]] };
+    current = current[dataPath[i]];
+  }
+  current[dataPath[dataPath.length - 1]] = updatedRows;
+
+  const newFormData = setBlockByPath(formData, tablePathInfo.path, updatedTableBlock);
+
+  return { formData: newFormData, insertedCellId };
+}
+
+/**
+ * Delete a column from a table (remove cell at same index from ALL rows).
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {string} cellId - Cell ID to delete (determines column index)
+ * @returns {Object} Updated formData with column removed
+ */
+export function deleteTableColumn(formData, blockPathMap, cellId) {
+  const cellPathInfo = blockPathMap[cellId];
+  if (!cellPathInfo || !cellPathInfo.parentAddMode) {
+    throw new Error('[HYDRA] deleteTableColumn: cell is not in table mode');
+  }
+
+  // Get the row containing this cell
+  const rowId = cellPathInfo.parentId;
+  const rowPathInfo = blockPathMap[rowId];
+  if (!rowPathInfo) {
+    throw new Error('[HYDRA] deleteTableColumn: could not find row for cell');
+  }
+
+  // Get the table block (grandparent of the cell)
+  const tableId = rowPathInfo.parentId;
+  const tablePathInfo = blockPathMap[tableId];
+  if (!tablePathInfo) {
+    throw new Error('[HYDRA] deleteTableColumn: could not find table for row');
+  }
+
+  // Get table block data
+  const tableBlock = getBlockByPath(formData, tablePathInfo.path);
+  if (!tableBlock) {
+    throw new Error('[HYDRA] deleteTableColumn: table block not found');
+  }
+
+  // Get rows using dataPath
+  const dataPath = rowPathInfo.dataPath || ['rows'];
+  let rows = tableBlock;
+  for (const key of dataPath) {
+    rows = rows?.[key];
+  }
+  if (!Array.isArray(rows)) {
+    throw new Error('[HYDRA] deleteTableColumn: could not find rows array');
+  }
+
+  // Find the cell index in its row
+  const cellIdField = cellPathInfo.idField || 'key';
+  const currentRow = rows.find(row => row[rowPathInfo.idField || 'key'] === rowId);
+  if (!currentRow || !currentRow.cells) {
+    throw new Error('[HYDRA] deleteTableColumn: could not find current row or cells');
+  }
+
+  const cellIndex = currentRow.cells.findIndex(cell => cell[cellIdField] === cellId);
+  if (cellIndex === -1) {
+    throw new Error('[HYDRA] deleteTableColumn: cell not found in row');
+  }
+
+  // Remove cell at this index from EACH row
+  const updatedRows = rows.map(row => {
+    const cells = [...(row.cells || [])];
+    if (cellIndex < cells.length) {
+      cells.splice(cellIndex, 1);
+    }
+    return { ...row, cells };
+  });
+
+  // Update the table block with new rows
+  let updatedTableBlock = { ...tableBlock };
+  let current = updatedTableBlock;
+  for (let i = 0; i < dataPath.length - 1; i++) {
+    current[dataPath[i]] = { ...current[dataPath[i]] };
+    current = current[dataPath[i]];
+  }
+  current[dataPath[dataPath.length - 1]] = updatedRows;
+
+  return setBlockByPath(formData, tablePathInfo.path, updatedTableBlock);
 }
 
 /**
@@ -710,28 +942,19 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
     throw new Error(`[HYDRA] Could not find parent block ${parentId} for container mutation`);
   }
 
+  const items = getContainerItems(parentBlock, containerConfig);
   let updatedParentBlock;
 
   if (isObjectList) {
-    // object_list: find item by configurable ID field and update it
     const idField = containerConfig.idField || '@id';
-    const items = (parentBlock[fieldName] || []).map(item =>
+    const updatedItems = items.map(item =>
       item[idField] === blockId ? { [idField]: blockId, ...newBlockData } : item
     );
-
-    updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: items,
-    };
+    updatedParentBlock = setContainerItems(parentBlock, containerConfig, updatedItems);
   } else {
     // Standard container: update block in blocks object
-    updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: {
-        ...parentBlock[fieldName],
-        [blockId]: newBlockData,
-      },
-    };
+    const blocksObj = { ...parentBlock[fieldName], [blockId]: newBlockData };
+    updatedParentBlock = setContainerItems(parentBlock, containerConfig, items, blocksObj);
   }
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -802,9 +1025,8 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     return formData;
   }
 
-  // Container-level: check container's blocks_layout
-  const { parentId, fieldName } = containerConfig;
-  const layoutFieldName = `${fieldName}_layout`;
+  // Container-level: check container's items
+  const { parentId, fieldName, isObjectList } = containerConfig;
 
   const parentPath = blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
@@ -813,34 +1035,38 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     return formData;
   }
 
-  const items = parentBlock[layoutFieldName]?.items || [];
-  if (items.length === 0) {
-    const newBlockId = uuidGenerator();
-    const blockType = getEmptyBlockType(containerConfig);
-    let blockData = { '@type': blockType };
+  const items = getContainerItems(parentBlock, containerConfig);
+  if (items.length > 0) {
+    return formData;
+  }
 
-    // Apply block defaults to get proper initial values
-    if (intl && blocksConfig) {
-      blockData = applyBlockDefaults({
-        data: blockData,
-        intl,
-        metadata,
-        properties,
-      }, blocksConfig);
+  // Container is empty - create a new empty item
+  const newBlockId = uuidGenerator();
+
+  if (isObjectList) {
+    const idField = containerConfig.idField || 'key';
+    let blockData = { [idField]: newBlockId };
+
+    // Initialize nested containers
+    if (intl && blocksConfig && containerConfig.defaultBlock) {
+      blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties });
     }
 
-    const updatedParentBlock = {
-      ...parentBlock,
-      [fieldName]: {
-        ...parentBlock[fieldName],
-        [newBlockId]: blockData,
-      },
-      [layoutFieldName]: { items: [newBlockId] },
-    };
+    const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [blockData]);
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }
 
-  return formData;
+  // Standard blocks container
+  const blockType = getEmptyBlockType(containerConfig);
+  let blockData = { '@type': blockType };
+
+  if (intl && blocksConfig) {
+    blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties }, blocksConfig);
+  }
+
+  const blocksObj = { ...parentBlock[fieldName], [newBlockId]: blockData };
+  const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [newBlockId], blocksObj);
+  return setBlockByPath(formData, parentPath, updatedParentBlock);
 }
 
 /**
@@ -861,7 +1087,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  * @returns {Object} Block data with container fields initialized (if applicable)
  */
 export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}) {
-  const { intl, metadata, properties } = options;
+  const { intl, metadata, properties, siblingData } = options;
   const blockType = blockData['@type'];
   const blockConfig = blocksConfig?.[blockType];
 
@@ -881,24 +1107,39 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     // Handle object_list containers (like cells in a row)
     if (fieldDef.widget === 'object_list') {
       const idField = fieldDef.idField || '@id';
-      const childId = uuidGenerator();
       const childType = `${blockType}:${fieldName}`;
 
-      // Start with ID and virtual type
-      let childData = { [idField]: childId, '@type': childType };
+      // For table mode: copy child count from sibling rows
+      // siblingData is passed when adding a new row to a table-mode container
+      let childCount = 1;
+      if (siblingData?.length > 0 && siblingData[0]?.[fieldName]) {
+        // Count children in first sibling row's same field
+        const siblingField = siblingData[0][fieldName];
+        childCount = Array.isArray(siblingField) ? siblingField.length : 1;
+      }
 
-      // Apply schema defaults (e.g., slate fields get empty paragraph)
-      childData = applyBlockDefaults({ data: childData, intl }, blocksConfig);
+      const children = [];
+      for (let i = 0; i < childCount; i++) {
+        const childId = uuidGenerator();
 
-      // Recursively initialize nested containers
-      childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, options);
+        // Start with ID and virtual type
+        let childData = { [idField]: childId, '@type': childType };
 
-      // Remove @type - object_list items don't store it in data
-      delete childData['@type'];
+        // Apply schema defaults (e.g., slate fields get empty paragraph)
+        childData = applyBlockDefaults({ data: childData, intl }, blocksConfig);
+
+        // Recursively initialize nested containers
+        childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, options);
+
+        // Remove @type - object_list items don't store it in data
+        delete childData['@type'];
+
+        children.push(childData);
+      }
 
       result = {
         ...result,
-        [fieldName]: [childData],
+        [fieldName]: children,
       };
       continue;
     }
@@ -1017,24 +1258,17 @@ export function reorderBlocksInContainer(
 
   let updatedParent;
 
-  if (isObjectList) {
-    // object_list: reorder array items by configurable ID field
-    const idField = fieldDef.idField || '@id';
-    const items = parentBlock[fieldName] || [];
-    const reorderedItems = newOrder.map(id => items.find(item => item[idField] === id)).filter(Boolean);
+  // Build containerConfig from fieldDef for helper functions
+  const containerConfig = {
+    fieldName,
+    isObjectList,
+    dataPath: fieldDef?.dataPath,
+    idField: fieldDef?.idField,
+  };
 
-    updatedParent = {
-      ...parentBlock,
-      [fieldName]: reorderedItems,
-    };
-  } else {
-    // Standard container: update layout items
-    const layoutFieldName = `${fieldName}_layout`;
-    updatedParent = {
-      ...parentBlock,
-      [layoutFieldName]: { items: newOrder },
-    };
-  }
+  const items = getContainerItems(parentBlock, containerConfig);
+  const reorderedItems = reorderContainerItems(items, newOrder, containerConfig);
+  updatedParent = setContainerItems(parentBlock, containerConfig, reorderedItems);
 
   return setBlockByPath(formData, parentPath, updatedParent);
 }

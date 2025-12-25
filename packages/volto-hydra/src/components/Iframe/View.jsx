@@ -42,13 +42,15 @@ function isSelectionValidForValue(selection, slateValue) {
 import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
-import { BlockChooser } from '@plone/volto/components';
+import { BlockChooser, Icon } from '@plone/volto/components';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
 import { setSidebarTab } from '@plone/volto/actions';
 import blockSVG from '@plone/volto/icons/block.svg';
+import columnAfterSVG from '@plone/volto/icons/column-after.svg';
+import rowAfterSVG from '@plone/volto/icons/row-after.svg';
 import { setAllowedBlocksList } from '../../utils/allowedBlockList';
 import toggleMark from '../../utils/toggleMark';
 import slateTransforms from '../../utils/slateTransforms';
@@ -56,7 +58,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -609,10 +611,11 @@ const Iframe = (props) => {
    * @param {Object} [options.formData] - Pre-mutated formData to insert into
    * @param {Object} [options.blockPathMap] - BlockPathMap for the formData
    * @param {string} [options.formatRequestId] - Request ID to include in FORM_DATA response
+   * @param {number} [options.selectChildIndex] - Select child at this index instead of the new block
    * @returns {string} The new block's ID
    */
   const insertAndSelectBlock = useCallback((blockId, blockType, action, fieldName, options = {}) => {
-    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId } = options;
+    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex } = options;
     const formData = customFormData || properties;
     const blockPathMap = customBlockPathMap || iframeSyncState.blockPathMap;
     const mergedBlocksConfig = config.blocks.blocksConfig;
@@ -638,6 +641,48 @@ const Iframe = (props) => {
       containerConfig = { parentId: blockId, fieldName, isObjectList };
     } else {
       containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig);
+      // For before/after, get isObjectList from containerConfig
+      isObjectList = containerConfig?.isObjectList || false;
+    }
+
+    // Check for table mode (from containerConfig which comes from pathMap)
+    const isTableMode = containerConfig?.addMode === 'table';
+    const isTableCell = containerConfig?.parentAddMode === 'table';
+
+    // Table mode: adding a cell adds a column (to ALL rows)
+    if (isTableCell && action !== 'inside') {
+      // Create cell template with defaults
+      const virtualType = blockPathMap[blockId]?.itemType; // e.g., 'slateTable:rows:cells'
+      let cellData = { '@type': virtualType };
+      cellData = applyBlockDefaults({ data: cellData, intl, metadata, properties }, mergedBlocksConfig);
+      cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties });
+      delete cellData['@type'];
+
+      const result = insertTableColumn(
+        formData,
+        blockPathMap,
+        blockId,
+        cellData,
+        action,
+        uuid,
+      );
+
+      if (!result?.formData) {
+        console.error('[VIEW] insertTableColumn failed');
+        return null;
+      }
+
+      onChangeFormData(result.formData);
+      flushSync(() => {
+        setIframeSyncState((prev) => ({
+          ...prev,
+          pendingSelectBlockUid: result.insertedCellId,
+          ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
+        }));
+      });
+      dispatch(setSidebarTab(1));
+
+      return result.insertedCellId;
     }
 
     // Create block data (use custom data if provided)
@@ -646,11 +691,53 @@ const Iframe = (props) => {
       blockData = customBlockData;
     } else if (isObjectList) {
       // object_list items: use virtual type to initialize containers
-      const idField = fieldDef?.idField || '@id';
-      const virtualType = `${getBlockByPath(formData, blockPathMap?.[blockId]?.path)?.['@type'] || formData?.blocks?.[blockId]?.['@type']}:${fieldName}`;
+      // For before/after: get idField from containerConfig, virtualType from pathInfo
+      // For inside: get from fieldDef
+      const idField = containerConfig?.idField || fieldDef?.idField || '@id';
+      let virtualType;
+      if (action === 'inside') {
+        // Get parent type and append field name
+        virtualType = `${getBlockByPath(formData, blockPathMap?.[blockId]?.path)?.['@type'] || formData?.blocks?.[blockId]?.['@type']}:${fieldName}`;
+      } else {
+        // For before/after, use the existing item's virtual type
+        virtualType = blockPathMap[blockId]?.itemType;
+      }
       blockData = { [idField]: newBlockId, '@type': virtualType };
+
+      // For table mode rows, pass sibling data so cells count is copied
+      let siblingData = null;
+      if (isTableMode) {
+        // Get existing rows for cell count reference
+        // For 'inside' action: blockId is the table, fieldName is 'rows'
+        // For 'before'/'after' action: blockId is a row, need to get parent table
+        let tableBlock;
+        let dataPath;
+        if (action === 'inside') {
+          tableBlock = getBlockByPath(formData, blockPathMap?.[blockId]?.path) || formData?.blocks?.[blockId];
+          dataPath = fieldDef?.dataPath || [fieldName];
+        } else {
+          // For before/after on a row, get the parent table
+          const rowPathInfo = blockPathMap?.[blockId];
+          const parentId = rowPathInfo?.parentId;
+          const parentPathInfo = blockPathMap?.[parentId];
+          tableBlock = getBlockByPath(formData, parentPathInfo?.path) || formData?.blocks?.[parentId];
+          // Get dataPath from the row's container field definition
+          const tableType = tableBlock?.['@type'];
+          const tableBlockSchema = typeof mergedBlocksConfig?.[tableType]?.blockSchema === 'function'
+            ? mergedBlocksConfig[tableType].blockSchema({ formData, intl: { formatMessage: (m) => m.defaultMessage } })
+            : mergedBlocksConfig?.[tableType]?.blockSchema;
+          const rowsFieldDef = tableBlockSchema?.properties?.[rowPathInfo.containerField];
+          dataPath = rowsFieldDef?.dataPath || [rowPathInfo.containerField];
+        }
+        let rowsData = tableBlock;
+        for (const key of dataPath) {
+          rowsData = rowsData?.[key];
+        }
+        siblingData = Array.isArray(rowsData) ? rowsData : null;
+      }
+
       // Initialize nested containers (e.g., cells in a row)
-      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties });
+      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData });
       delete blockData['@type']; // object_list items don't store @type in data
     } else {
       // Standard block with @type
@@ -678,11 +765,34 @@ const Iframe = (props) => {
       return null;
     }
 
+    // Determine which block to select
+    let selectBlockId = newBlockId;
+    if (selectChildIndex != null && blockData) {
+      // Find the first object_list field in the block and get the child at that index
+      // This is used when adding a row from a cell - we want to select the corresponding cell
+      const blockSchema = typeof mergedBlocksConfig?.[blockData['@type']?.split(':').slice(0, -1).join(':') + ':' + containerConfig?.fieldName]?.blockSchema === 'function'
+        ? mergedBlocksConfig[blockData['@type']?.split(':').slice(0, -1).join(':') + ':' + containerConfig?.fieldName].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+        : null;
+
+      // For table rows, cells are in the 'cells' field - look for object_list fields
+      for (const [fieldName, fieldValue] of Object.entries(blockData)) {
+        if (Array.isArray(fieldValue) && fieldValue[selectChildIndex]) {
+          const childItem = fieldValue[selectChildIndex];
+          // Get the ID field - typically 'key' or '@id'
+          const childId = childItem?.key || childItem?.['@id'];
+          if (childId) {
+            selectBlockId = childId;
+            break;
+          }
+        }
+      }
+    }
+
     onChangeFormData(newFormData);
     flushSync(() => {
       setIframeSyncState((prev) => ({
         ...prev,
-        pendingSelectBlockUid: newBlockId,
+        pendingSelectBlockUid: selectBlockId,
         ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
       }));
     });
@@ -1046,6 +1156,48 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(redoEvent);
           break;
+
+        case 'ACTION_REQUEST': {
+          // Generic action handler for custom operations like delete row/column
+          const { action, blockId: actionBlockId } = event.data;
+          const pathInfo = iframeSyncState.blockPathMap?.[actionBlockId];
+
+          if (action === 'deleteColumn' && pathInfo?.parentAddMode === 'table') {
+            // Delete column: remove cell at same index from ALL rows
+            const newFormData = deleteTableColumn(properties, iframeSyncState.blockPathMap, actionBlockId);
+            if (newFormData) {
+              onChangeFormData(newFormData);
+              // Select the parent row after column deletion
+              if (pathInfo.parentId) {
+                flushSync(() => {
+                  setIframeSyncState((prev) => ({
+                    ...prev,
+                    pendingSelectBlockUid: pathInfo.parentId,
+                  }));
+                });
+              }
+            }
+          } else if (action === 'deleteRow' && pathInfo?.addMode === 'table') {
+            // Delete row: use standard block deletion
+            const containerConfig = getContainerFieldConfig(actionBlockId, iframeSyncState.blockPathMap, properties, blocksConfig);
+            let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, actionBlockId, containerConfig);
+            if (newFormData && containerConfig) {
+              // Ensure container has at least one row
+              newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+              onChangeFormData(newFormData);
+              // Select the parent table after row deletion
+              if (pathInfo.parentId) {
+                flushSync(() => {
+                  setIframeSyncState((prev) => ({
+                    ...prev,
+                    pendingSelectBlockUid: pathInfo.parentId,
+                  }));
+                });
+              }
+            }
+          }
+          break;
+        }
 
         case 'UPDATE_BLOCKS_LAYOUT':
           // Validate data from postMessage before using it
@@ -1721,6 +1873,112 @@ const Iframe = (props) => {
             onSelectBlock={onSelectBlock}
             parentId={iframeSyncState.blockPathMap?.[selectedBlock]?.parentId}
             maxToolbarWidth={referenceElement?.getBoundingClientRect()?.width || 400}
+            blockActions={iframeSyncState.blockPathMap?.[selectedBlock]?.actions}
+            onBlockAction={(actionId) => {
+              // Generic action handler - dispatches based on action type
+              const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
+
+              if (actionId === 'deleteColumn' && pathInfo?.parentAddMode === 'table') {
+                const cellIndex = pathInfo.path[pathInfo.path.length - 1];
+                const newFormData = deleteTableColumn(properties, iframeSyncState.blockPathMap, selectedBlock);
+                if (newFormData) {
+                  // Determine what to select after deletion BEFORE triggering re-render
+                  let selectBlockId = pathInfo.parentId;
+
+                  if (cellIndex > 0) {
+                    // Find the cell in the previous column (same row)
+                    const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
+                    const rowBlock = getBlockByPath(newFormData, newBlockPathMap[pathInfo.parentId]?.path);
+                    if (rowBlock?.cells?.[cellIndex - 1]) {
+                      selectBlockId = rowBlock.cells[cellIndex - 1].key;
+                    }
+                  }
+
+                  // Set pending selection BEFORE form update to prevent sidebar from rendering deleted block
+                  flushSync(() => {
+                    setIframeSyncState((prev) => ({
+                      ...prev,
+                      pendingSelectBlockUid: selectBlockId,
+                    }));
+                  });
+
+                  // Clear current selection and update form
+                  onSelectBlock(null);
+                  onChangeFormData(newFormData);
+                }
+              } else if (actionId === 'deleteRow') {
+                // Delete row - works from row itself OR from a cell (deletes parent row)
+                let rowId = selectedBlock;
+                let rowPathInfo = pathInfo;
+                let cellIndex = null;
+
+                // If called from a cell, find the parent row and track cell index
+                if (pathInfo?.parentAddMode === 'table') {
+                  cellIndex = pathInfo.path[pathInfo.path.length - 1];
+                  rowId = pathInfo.parentId;
+                  rowPathInfo = iframeSyncState.blockPathMap?.[rowId];
+                }
+
+                if (rowPathInfo?.addMode === 'table') {
+                  const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig);
+                  const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
+
+                  let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
+                  if (newFormData && containerConfig) {
+                    newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+
+                    // Determine what to select after deletion BEFORE triggering re-render
+                    // If called from a cell, select corresponding cell in previous row
+                    // Otherwise, select the parent table
+                    let selectBlockId = rowPathInfo.parentId;
+
+                    if (cellIndex != null && rowIndex > 0) {
+                      // Find the previous row and its corresponding cell
+                      const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
+                      const tableBlock = getBlockByPath(newFormData, newBlockPathMap[rowPathInfo.parentId]?.path);
+                      const dataPath = containerConfig.dataPath || ['rows'];
+                      let rows = tableBlock;
+                      for (const key of dataPath) {
+                        rows = rows?.[key];
+                      }
+                      const prevRow = rows?.[rowIndex - 1];
+                      if (prevRow?.cells?.[cellIndex]) {
+                        selectBlockId = prevRow.cells[cellIndex].key;
+                      }
+                    }
+
+                    // Set pending selection BEFORE form update to prevent sidebar from rendering deleted block
+                    flushSync(() => {
+                      setIframeSyncState((prev) => ({
+                        ...prev,
+                        pendingSelectBlockUid: selectBlockId,
+                      }));
+                    });
+
+                    // Clear current selection and update form
+                    onSelectBlock(null);
+                    onChangeFormData(newFormData);
+                  }
+                }
+              } else if (actionId === 'addRowBefore' || actionId === 'addRowAfter') {
+                // Add row uses existing insertAndSelectBlock with 'before' or 'after'
+                // If called from a cell, use the parent row and track cell index for selection
+                const action = actionId === 'addRowBefore' ? 'before' : 'after';
+                let targetBlock = selectedBlock;
+                let selectChildIndex = null;
+                if (pathInfo?.parentAddMode === 'table') {
+                  // We're in a cell - find its index so we can select corresponding cell in new row
+                  // Cell index is the last element in the path
+                  selectChildIndex = pathInfo.path[pathInfo.path.length - 1];
+                  targetBlock = pathInfo.parentId;
+                }
+                insertAndSelectBlock(targetBlock, null, action, null, { selectChildIndex });
+              } else if (actionId === 'addColumnBefore' || actionId === 'addColumnAfter') {
+                // Add column uses insertAndSelectBlock which detects table mode
+                const action = actionId === 'addColumnBefore' ? 'before' : 'after';
+                insertAndSelectBlock(selectedBlock, null, action);
+              }
+            }}
           />
 
           {/* Add Button - positioned based on data-block-add direction */}
@@ -1764,6 +2022,24 @@ const Iframe = (props) => {
               ? iframeRect.top + blockUI.rect.top  // Top-right
               : iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
 
+            // Check if this is a table mode block (row or cell)
+            const isTableMode = pathInfo?.addMode === 'table' || pathInfo?.parentAddMode === 'table';
+
+            // Icon and title depend on table mode and direction
+            let addIcon;
+            let addTitle;
+            if (isTableMode) {
+              // Table mode: use row/column icons
+              addIcon = isRightDirection
+                ? <Icon name={columnAfterSVG} size="20px" />
+                : <Icon name={rowAfterSVG} size="20px" />;
+              addTitle = isRightDirection ? "Add column" : "Add row";
+            } else {
+              // Regular blocks: use simple + icon
+              addIcon = <span style={{ fontSize: '22px', lineHeight: 1 }}>+</span>;
+              addTitle = "Add block";
+            }
+
             return (
             <button
               className="volto-hydra-add-button"
@@ -1782,16 +2058,12 @@ const Iframe = (props) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '22px',
-                lineHeight: '1',
-                fontWeight: '400',
-                padding: '0 0 2px 0',
-                textAlign: 'center',
+                padding: '0',
               }}
               onClick={handleIframeAdd}
-              title="Add block"
+              title={addTitle}
             >
-              +
+              {addIcon}
             </button>
             );
           })()}

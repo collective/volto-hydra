@@ -5,6 +5,12 @@ import {
 } from './utils/allowedBlockList';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
+import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
+import rowAfterSVG from '@plone/volto/icons/row-after.svg';
+import rowDeleteSVG from '@plone/volto/icons/row-delete.svg';
+import columnBeforeSVG from '@plone/volto/icons/column-before.svg';
+import columnAfterSVG from '@plone/volto/icons/column-after.svg';
+import columnDeleteSVG from '@plone/volto/icons/column-delete.svg';
 
 const applyConfig = (config) => {
   // Patch setTimeout to catch focus errors from AddLinkForm
@@ -92,6 +98,7 @@ const applyConfig = (config) => {
   config.blocks.blocksConfig.slateTable = {
     ...config.blocks.blocksConfig.slateTable,
     sidebarSchemaOnly: true,
+    addMode: 'table', // Double-nested structure: rows contain cells, enables column add and row cell-count copying
     blockSchema: (props) => {
       const baseSchema = TableBlockSchema(props);
       return {
@@ -154,6 +161,18 @@ const applyConfig = (config) => {
         value: [{ type: 'p', children: [{ text: '' }] }],
       },
     ],
+  };
+
+  // Generic block actions registry
+  // Actions can be referenced by ID in pathMap and rendered in toolbar/dropdown
+  // Each action defines: label, icon (SVG import), and the action is dispatched by ID
+  config.settings.hydraActions = {
+    addRowBefore: { label: 'Add Row Before', icon: rowBeforeSVG },
+    addRowAfter: { label: 'Add Row After', icon: rowAfterSVG },
+    addColumnBefore: { label: 'Add Column Before', icon: columnBeforeSVG },
+    addColumnAfter: { label: 'Add Column After', icon: columnAfterSVG },
+    deleteRow: { label: 'Remove Row', icon: rowDeleteSVG },
+    deleteColumn: { label: 'Remove Column', icon: columnDeleteSVG },
   };
 
   return config;

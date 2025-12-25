@@ -4481,21 +4481,25 @@ export class Bridge {
       throw new Error('[HYDRA] blockPathMap is required but was not provided by admin');
     }
 
-    // Get all block IDs from blockPathMap (includes nested blocks)
-    const allBlockIds = Object.keys(this.blockPathMap);
-
-    allBlockIds.forEach((blockId) => {
-      // getBlockData returns a reference to the actual block in formData
+    Object.entries(this.blockPathMap).forEach(([blockId, pathInfo]) => {
       const block = this.getBlockData(blockId);
       if (!block) return;
 
+      // For object_list items, use itemSchema from pathMap
+      if (pathInfo.itemSchema?.properties) {
+        Object.entries(pathInfo.itemSchema.properties).forEach(([fieldName, fieldDef]) => {
+          if (fieldDef?.widget === 'slate' && block[fieldName]) {
+            block[fieldName] = this.addNodeIds(block[fieldName]);
+          }
+        });
+        return;
+      }
+
+      // For regular blocks, use blockFieldTypes
       const blockType = block['@type'];
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
-
-      // Check each field in the block
       Object.keys(fieldTypes).forEach((fieldName) => {
         if (fieldTypes[fieldName] === 'slate' && block[fieldName]) {
-          // Add nodeIds to the slate field's value
           block[fieldName] = this.addNodeIds(block[fieldName]);
         }
       });

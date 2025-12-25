@@ -3101,7 +3101,7 @@ test.describe('slateTable Container', () => {
     expect(box?.height).toBeGreaterThanOrEqual(20);
   });
 
-  test('clicking add button on cell adds a new cell to the right', async ({ page }) => {
+  test('clicking add button on cell adds a column to ALL rows', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -3110,19 +3110,373 @@ test.describe('slateTable Container', () => {
     const iframe = helper.getIframe();
     await iframe.locator('[data-block-uid="table-1"]').waitFor();
 
-    // Count initial cells in first row (th/td with data-block-uid)
-    const initialCellCount = await iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]').count();
-    expect(initialCellCount).toBe(2);
+    // Count initial cells in both rows (th/td with data-block-uid)
+    const initialRow1CellCount = await iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]').count();
+    const initialRow2CellCount = await iframe.locator('tr[data-block-uid="row-2"] th[data-block-uid], tr[data-block-uid="row-2"] td[data-block-uid]').count();
+    expect(initialRow1CellCount).toBe(2);
+    expect(initialRow2CellCount).toBe(2);
 
     // Click on cell-1-1 to select it
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
 
-    // Click the add button (should add cell to right since data-block-add="right")
+    // Click the add button (should add column - cell to ALL rows)
     await page.locator('.volto-hydra-add-button').click();
 
-    // Verify a new cell was added to the row (new cells have UUID-based IDs)
+    // Verify a new cell was added to BOTH rows (column add)
     await expect(iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]')).toHaveCount(3);
+    await expect(iframe.locator('tr[data-block-uid="row-2"] th[data-block-uid], tr[data-block-uid="row-2"] td[data-block-uid]')).toHaveCount(3);
+  });
+
+  test('new row has same cell count as existing rows', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // First add a column so rows have 3 cells
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+    await page.locator('.volto-hydra-add-button').click();
+    await expect(iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]')).toHaveCount(3);
+
+    // Navigate to row using Escape, then add a new row
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('row-1');
+    await page.locator('.volto-hydra-add-button').click();
+
+    // Wait for new row to appear (should have 3 rows total)
+    await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
+
+    // Verify new row has same cell count as existing rows (3 cells)
+    const allRows = iframe.locator('tr[data-block-uid]');
+    const rowCount = await allRows.count();
+    for (let i = 0; i < rowCount; i++) {
+      const row = allRows.nth(i);
+      const cellCount = await row.locator('th[data-block-uid], td[data-block-uid]').count();
+      expect(cellCount).toBe(3);
+    }
+  });
+
+  test('add button shows column icon for cells', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell - should show "Add column" title with SVG icon
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible();
+    await expect(addButton).toHaveAttribute('title', 'Add column');
+    // Icon should be an SVG (column-after icon)
+    await expect(addButton.locator('svg')).toBeVisible();
+  });
+
+  test('add button shows row icon for rows', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell first, then navigate to row using Escape
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('row-1');
+
+    // Should show "Add row" title with SVG icon
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible();
+    await expect(addButton).toHaveAttribute('title', 'Add row');
+    // Icon should be an SVG (row-after icon)
+    await expect(addButton.locator('svg')).toBeVisible();
+  });
+
+  test('dropdown menu shows Remove Row for rows', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell, then press Escape to navigate to parent row
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('row-1');
+
+    // Open dropdown menu (three dots button)
+    const menuButton = page.locator('.quanta-toolbar button:has-text("⋯")');
+    await expect(menuButton).toBeVisible();
+    await menuButton.click();
+
+    // Should show "Remove Row" instead of just "Remove"
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown).toBeVisible();
+    await expect(dropdown.getByText('Remove Row')).toBeVisible();
+  });
+
+  test('dropdown menu shows Remove Column for cells', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell (has addDirection: 'right' so shows "Remove Column")
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+
+    // Open dropdown menu (three dots button)
+    const menuButton = page.locator('.quanta-toolbar button:has-text("⋯")');
+    await expect(menuButton).toBeVisible();
+    await menuButton.click();
+
+    // Should show "Remove Column" instead of just "Remove"
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown).toBeVisible();
+    await expect(dropdown.getByText('Remove Column')).toBeVisible();
+  });
+
+  test('cell dropdown also shows Delete Row action', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+
+    // Open dropdown menu
+    const menuButton = page.locator('.quanta-toolbar button:has-text("⋯")');
+    await menuButton.click();
+
+    // Should show both "Remove Column" (primary) and "Remove Row" (additional action)
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown.getByText('Remove Column')).toBeVisible();
+    await expect(dropdown.getByText('Remove Row')).toBeVisible();
+  });
+
+  test('Remove Row removes row and selects corresponding cell in previous row', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Count initial rows
+    const table = iframe.locator('[data-block-uid="table-1"] table');
+    const initialRowCount = await table.locator('tr[data-block-uid]').count();
+    expect(initialRowCount).toBe(2);
+
+    // Select second cell in second row (cell-2-2)
+    await helper.clickBlockInIframe('cell-2-2');
+    await helper.waitForSidebarOpen();
+
+    // Open dropdown and click Remove Row (removes row-2 from within a cell)
+    const menuButton = page.locator('.quanta-toolbar button:has-text("⋯")');
+    await menuButton.click();
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await dropdown.getByText('Remove Row').click();
+
+    // Wait for row to be removed
+    await expect(table.locator('tr[data-block-uid]')).toHaveCount(initialRowCount - 1);
+
+    // Should select corresponding cell in previous row (cell-1-2 - same column position)
+    await helper.waitForBlockSelected('cell-1-2');
+  });
+
+  test('Remove Column removes cell from all rows and selects corresponding cell in previous column', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Count initial cells in first row
+    const table = iframe.locator('[data-block-uid="table-1"] table');
+    const firstRow = table.locator('tr[data-block-uid]').first();
+    const initialCellCount = await firstRow.locator('th[data-block-uid], td[data-block-uid]').count();
+    expect(initialCellCount).toBe(2);
+
+    // Select SECOND cell in first row (cell-1-2) so we can verify selection of previous column
+    await helper.clickBlockInIframe('cell-1-2');
+    await helper.waitForSidebarOpen();
+
+    // Open dropdown and click Remove Column
+    const menuButton = page.locator('.quanta-toolbar button:has-text("⋯")');
+    await menuButton.click();
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await dropdown.getByText('Remove Column').click();
+
+    // Wait for column to be removed from all rows
+    await expect(firstRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(initialCellCount - 1);
+
+    // Verify second row also lost a cell
+    const secondRow = table.locator('tr[data-block-uid]').nth(1);
+    await expect(secondRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(initialCellCount - 1);
+
+    // Should select corresponding cell in previous column (cell-1-1 - same row, previous column position)
+    await helper.waitForBlockSelected('cell-1-1');
+  });
+
+  test('toolbar shows insert action buttons for cells', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+
+    // Toolbar should have insert action buttons with icons
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar.locator('button[title="Add Column Before"]')).toBeVisible();
+    await expect(toolbar.locator('button[title="Add Column After"]')).toBeVisible();
+    await expect(toolbar.locator('button[title="Add Row Before"]')).toBeVisible();
+    await expect(toolbar.locator('button[title="Add Row After"]')).toBeVisible();
+  });
+
+  test('toolbar shows insert action buttons for rows', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Select a cell, then press Escape to navigate to parent row
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('row-1');
+
+    // Toolbar should have insert row action buttons
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar.locator('button[title="Add Row Before"]')).toBeVisible();
+    await expect(toolbar.locator('button[title="Add Row After"]')).toBeVisible();
+  });
+
+  test('Add Row Before creates row above current', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    const table = iframe.locator('[data-block-uid="table-1"] table');
+    const initialRowCount = await table.locator('tr[data-block-uid]').count();
+    expect(initialRowCount).toBe(2);
+
+    // Select second row via Escape from its cell
+    await helper.clickBlockInIframe('cell-2-1');
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('row-2');
+
+    // Click Add Row Before button
+    const toolbar = page.locator('.quanta-toolbar');
+    await toolbar.locator('button[title="Add Row Before"]').click();
+
+    // Wait for new row to be added
+    await expect(table.locator('tr[data-block-uid]')).toHaveCount(initialRowCount + 1);
+
+    // The new row should be at index 1 (before the second row which was at index 1)
+    // And the new row should have the same number of cells as existing rows
+    const newRow = table.locator('tr[data-block-uid]').nth(1);
+    await expect(newRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(2);
+  });
+
+  test('Add Column Before creates column in all rows', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    const table = iframe.locator('[data-block-uid="table-1"] table');
+    const firstRow = table.locator('tr[data-block-uid]').first();
+    const secondRow = table.locator('tr[data-block-uid]').nth(1);
+    const initialCellCount = await firstRow.locator('th[data-block-uid], td[data-block-uid]').count();
+    expect(initialCellCount).toBe(2);
+
+    // Select second cell in first row
+    await helper.clickBlockInIframe('cell-1-2');
+    await helper.waitForSidebarOpen();
+
+    // Click Add Column Before button
+    const toolbar = page.locator('.quanta-toolbar');
+    await toolbar.locator('button[title="Add Column Before"]').click();
+
+    // Wait for column to be added to all rows
+    await expect(firstRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(initialCellCount + 1);
+    await expect(secondRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(initialCellCount + 1);
+  });
+
+  test('Add Row Before from cell creates row and selects corresponding cell', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/table-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    const table = iframe.locator('[data-block-uid="table-1"] table');
+    const initialRowCount = await table.locator('tr[data-block-uid]').count();
+    expect(initialRowCount).toBe(2);
+
+    // Select SECOND cell in second row (cell-2-2)
+    await helper.clickBlockInIframe('cell-2-2');
+    await helper.waitForSidebarOpen();
+
+    // Click Add Row Before button from the cell's toolbar
+    const toolbar = page.locator('.quanta-toolbar');
+    await toolbar.locator('button[title="Add Row Before"]').click();
+
+    // Wait for new row to be added
+    await expect(table.locator('tr[data-block-uid]')).toHaveCount(initialRowCount + 1);
+
+    // The new row should have the correct number of cells (2, like existing rows)
+    const newRow = table.locator('tr[data-block-uid]').nth(1);
+    await expect(newRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(2);
+
+    // Should select the SECOND cell in the new row (corresponding to the cell we were in)
+    const secondCellInNewRow = newRow.locator('th[data-block-uid], td[data-block-uid]').nth(1);
+    const selectedBlockUid = await secondCellInNewRow.getAttribute('data-block-uid');
+    await helper.waitForBlockSelected(selectedBlockUid!);
   });
 });
 

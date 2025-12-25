@@ -3,9 +3,10 @@ import { Slate, ReactEditor } from 'slate-react';
 import { Transforms, Node, Range, Editor, Point } from 'slate';
 import { isEqual, cloneDeep } from 'lodash';
 import config from '@plone/volto/registry';
+import { Icon } from '@plone/volto/components';
 import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
 import { BlockButton } from '@plone/volto-slate/editor/ui';
-import slateTransforms from '../../utils/slateTransforms';
+import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
@@ -129,6 +130,8 @@ const SyncedSlateToolbar = ({
   onSelectBlock,
   parentId,
   maxToolbarWidth,
+  blockActions, // { toolbar: [...], dropdown: [...] } from pathMap.actions
+  onBlockAction, // Handler for block actions: (actionId) => void
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -142,8 +145,9 @@ const SyncedSlateToolbar = ({
   }, [form, blockPathMap]);
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
+  // Add withEmptyInlineRemoval to clean up empty formatting elements after delete
   const [editor] = useState(() => {
-    const ed = makeEditor();
+    const ed = withEmptyInlineRemoval(makeEditor());
 
     // Implement savedSelection for link plugin (stores selection from iframe)
     ed.savedSelection = null;
@@ -242,39 +246,33 @@ const SyncedSlateToolbar = ({
   // Optional transformCallback runs INSIDE the same withoutNormalizing block
   // so all operations are batched together
   const replaceEditorContent = useCallback((newValue, selection, transformCallback) => {
-    // Set flag to prevent onChange from sending updates back during sync
-    isSyncingRef.current = true;
-    try {
-      Editor.withoutNormalizing(editor, () => {
-        // Remove all existing nodes
-        while (editor.children.length > 0) {
-          Transforms.removeNodes(editor, { at: [0] });
+    Editor.withoutNormalizing(editor, () => {
+      // Remove all existing nodes
+      while (editor.children.length > 0) {
+        Transforms.removeNodes(editor, { at: [0] });
+      }
+      // Insert new content (cloned to prevent Slate normalization from mutating Redux state)
+      const newNodes = cloneDeep(newValue);
+      for (let i = 0; i < newNodes.length; i++) {
+        Transforms.insertNodes(editor, newNodes[i], { at: [i] });
+      }
+      // Restore selection if valid
+      if (selection && isSelectionValidForDocument(selection, newValue)) {
+        try {
+          Transforms.select(editor, selection);
+        } catch (e) {
+          // Selection invalid, ignore
         }
-        // Insert new content (cloned to prevent Slate normalization from mutating Redux state)
-        const newNodes = cloneDeep(newValue);
-        for (let i = 0; i < newNodes.length; i++) {
-          Transforms.insertNodes(editor, newNodes[i], { at: [i] });
-        }
-        // Restore selection if valid
-        if (selection && isSelectionValidForDocument(selection, newValue)) {
-          try {
-            Transforms.select(editor, selection);
-          } catch (e) {
-            // Selection invalid, ignore
-          }
-        }
-        // Run transform callback inside the same batch if provided
-        if (transformCallback) {
-          transformCallback();
-        }
-      });
-    } finally {
-      isSyncingRef.current = false;
-    }
+      }
+      // Run transform callback inside the same batch if provided
+      if (transformCallback) {
+        transformCallback();
+      }
+    });
   }, [editor]);
 
-  // Track the last value we sent to Redux to avoid overwriting local changes
-  const lastSentValueRef = useRef(null);
+  // Track last sequence we've seen to detect new data
+  const lastSeenSequenceRef = useRef(0);
 
   // Track pending flush request for button click coordination
   const pendingFlushRef = useRef(null); // { requestId, button }
@@ -282,8 +280,6 @@ const SyncedSlateToolbar = ({
   const activeFormatRequestIdRef = useRef(null);
   // Track processed transform requestIds to prevent double-application
   const processedTransformRequestIdRef = useRef(null);
-  // Track when we're syncing content to prevent onChange from sending updates back
-  const isSyncingRef = useRef(false);
   // Track LinkEditor visibility across effect restarts (persists when dependencies change)
   const linkEditorWasVisibleRef = useRef(false);
 
@@ -374,13 +370,15 @@ const SyncedSlateToolbar = ({
         }
       } else {
         // Cursor is NOT inside the format element - enable prospective formatting
+        // Use zero-width space (ZWS) to prevent withEmptyInlineRemoval from removing the node
+        // ZWS is invisible but makes the node non-empty, so normalization won't delete it
         console.log('[TOOLBAR FORMAT] Before insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'selection:', JSON.stringify(editor.selection));
-        const inlineNode = { type: format, children: [{ text: '' }] };
+        const inlineNode = { type: format, children: [{ text: '\u200B' }] };
         Transforms.insertNodes(editor, inlineNode);
         console.log('[TOOLBAR FORMAT] After insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'ops:', editor.operations.length);
 
         const [insertedEntry] = Editor.nodes(editor, {
-          match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '',
+          match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '\u200B',
           mode: 'lowest',
           reverse: true,
         });
@@ -418,19 +416,34 @@ const SyncedSlateToolbar = ({
     }
 
     // === DETERMINE WHAT NEEDS TO HAPPEN ===
-    const contentNeedsSync = fieldValue && !isEqual(fieldValue, editor.children);
+    const incomingSequence = form?._editSequence || 0;
+    const hasNewData = incomingSequence > lastSeenSequenceRef.current;
+    // Content sync is needed if fieldValue differs from editor.children
+    // The isEqual check handles echo detection - if they match, no sync needed
+    // We check hasNewData OR content difference to handle both cases:
+    // 1. hasNewData: sequence increased, check if content actually changed
+    // 2. !hasNewData: sequence didn't increase but content might have changed (edge case)
+    const contentIsDifferent = fieldValue && !isEqual(fieldValue, editor.children);
+    const contentNeedsSync = contentIsDifferent;
     const hasUnprocessedTransform = transformAction &&
       transformAction.requestId !== processedTransformRequestIdRef.current;
 
-    // Skip sync if we have pending local changes that Redux hasn't caught up to yet
-    const hasPendingLocalChanges = lastSentValueRef.current &&
-      !isEqual(fieldValue, lastSentValueRef.current);
-
-    console.log('[TOOLBAR SYNC] contentNeedsSync:', contentNeedsSync,
+    console.log('[TOOLBAR SYNC] hasNewData:', hasNewData,
+      'contentNeedsSync:', contentNeedsSync,
       'hasUnprocessedTransform:', hasUnprocessedTransform,
-      'hasPendingLocalChanges:', hasPendingLocalChanges,
-      'fieldValue[0].children:', JSON.stringify(fieldValue?.[0]?.children),
-      'editor.children[0].children:', JSON.stringify(editor.children?.[0]?.children));
+      'incomingSeq:', incomingSequence, 'lastSeenSeq:', lastSeenSequenceRef.current);
+
+    // Debug: check for ZWS differences
+    if (fieldValue && editor.children) {
+      const fieldText = fieldValue[0]?.children?.[0]?.text;
+      const editorText = editor.children[0]?.children?.[0]?.text;
+      if (fieldText !== editorText) {
+        console.log('[TOOLBAR SYNC] Text mismatch - fieldValue:', JSON.stringify(fieldText?.substring(0,40)),
+          'editor:', JSON.stringify(editorText?.substring(0,40)),
+          'fieldHasZWS:', fieldText?.includes('\u200B'),
+          'editorHasZWS:', editorText?.includes('\u200B'));
+      }
+    }
 
     // Helper to apply transform based on type
     const applyTransform = () => {
@@ -456,10 +469,16 @@ const SyncedSlateToolbar = ({
           }
           break;
         case 'delete':
-          Transforms.delete(editor, {
-            unit: 'character',
-            reverse: transformAction.direction === 'backward',
-          });
+          // When selection is collapsed, delete one character in the given direction
+          // When selection is a range, delete the entire selection (no unit option)
+          if (editor.selection && Range.isCollapsed(editor.selection)) {
+            Transforms.delete(editor, {
+              unit: 'character',
+              reverse: transformAction.direction === 'backward',
+            });
+          } else {
+            Transforms.delete(editor);
+          }
           break;
         default:
           console.warn('[TOOLBAR] Unknown transform type:', type);
@@ -467,9 +486,11 @@ const SyncedSlateToolbar = ({
     };
 
     // === EXECUTE ===
-    if (contentNeedsSync && !hasPendingLocalChanges) {
-      // Content changed - sync it first
-      console.log('[TOOLBAR SYNC] Syncing content from iframe, currentSelection:', JSON.stringify(currentSelection));
+    if (contentNeedsSync) {
+      // Only mark sequence as seen when we actually sync content
+      lastSeenSequenceRef.current = incomingSequence;
+      // Content changed from external source - sync it
+      console.log('[TOOLBAR SYNC] Syncing content from iframe, incomingSeq:', incomingSequence, 'fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
 
       // If there's a transform, run it in the same batch
       const transformCallback = hasUnprocessedTransform ? () => {
@@ -484,9 +505,12 @@ const SyncedSlateToolbar = ({
 
       replaceEditorContent(fieldValue, currentSelection, transformCallback);
 
+      // Debug: check what editor.children looks like after replace
+      console.log('[TOOLBAR SYNC] After replaceEditorContent, editor.children[0].children[0].text:',
+        JSON.stringify(editor.children?.[0]?.children?.[0]?.text?.substring(0, 40)));
+
       // Update internalValueRef from editor.children AFTER transform (not fieldValue)
       internalValueRef.current = editor.children;
-      lastSentValueRef.current = null;
 
     } else if (hasUnprocessedTransform) {
       // No content sync needed, but transform is pending
@@ -510,17 +534,12 @@ const SyncedSlateToolbar = ({
       }
       applyTransform();
 
-    } else if (lastSentValueRef.current && isEqual(fieldValue, lastSentValueRef.current)) {
-      // Redux caught up to our local changes
-      lastSentValueRef.current = null;
-    } else if (!hasPendingLocalChanges && !contentNeedsSync &&
+    } else if (!contentNeedsSync &&
                currentSelection && !isEqual(currentSelection, editor.selection) &&
                isSelectionValidForDocument(currentSelection, editor.children)) {
       // Selection-only change - update editor's selection
       // This handles clicks that move cursor without changing content
-      // IMPORTANT: Don't apply when hasPendingLocalChanges or contentNeedsSync is true,
-      // as the selection from Redux is stale and would overwrite the correct selection
-      // from a recent format operation
+      // No sequence check needed - selection is just current state, not conflicting edits
       console.log('[TOOLBAR SYNC] Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
       try {
         Transforms.select(editor, currentSelection);
@@ -590,12 +609,8 @@ const SyncedSlateToolbar = ({
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
     (newValue) => {
-      console.log('[TOOLBAR onChange] called, isSyncing:', isSyncingRef.current, 'selection:', JSON.stringify(editor.selection));
-      // Skip during content sync - we're just updating local state, not sending changes
-      if (isSyncingRef.current) {
-        console.log('[TOOLBAR onChange] Skipping - syncing in progress');
-        return;
-      }
+      const newText = newValue?.[0]?.children?.[0]?.text?.substring(0, 40);
+      console.log('[TOOLBAR onChange] called, newText:', JSON.stringify(newText), 'selection:', JSON.stringify(editor.selection));
 
       // Update internal value tracker
       internalValueRef.current = newValue;
@@ -604,10 +619,13 @@ const SyncedSlateToolbar = ({
       const block = getBlock(selectedBlock);
       const fieldName = blockUI?.focusedFieldName || 'value';
       const currentFieldValue = block?.[fieldName];
+      const currentText = currentFieldValue?.[0]?.children?.[0]?.text?.substring(0, 40);
 
       if (isEqual(newValue, currentFieldValue)) {
+        console.log('[TOOLBAR onChange] values equal, skipping');
         return;
       }
+      console.log('[TOOLBAR onChange] values DIFFER! newText:', JSON.stringify(newText), 'currentText:', JSON.stringify(currentText), '- SENDING TO REDUX');
 
       // Build updated form data with the correct field (supports nested blocks)
       const updatedBlock = {
@@ -616,8 +634,9 @@ const SyncedSlateToolbar = ({
       };
       const updatedForm = updateBlockInForm(selectedBlock, updatedBlock);
 
-      // Track what we're sending so useEffect doesn't overwrite with stale data
-      lastSentValueRef.current = newValue;
+      // NOTE: Don't add _editSequence here - View.jsx adds it when sending FORM_DATA
+      // View.jsx is the authoritative source for sequence numbers
+
       // Send form data AND selection together atomically to parent
       // This ensures the iframe receives both in sync
       // Include requestId if this is from a format operation (allows iframe to match and unblock)
@@ -768,7 +787,7 @@ const SyncedSlateToolbar = ({
     ? internalValueRef.current
     : hasValidSlateValue
     ? fieldValue
-    : [{type: 'p', children: [{text: '', nodeId: 2}], nodeId: 1}];
+    : [{type: 'p', children: [{text: ''}]}];
 
   // DEBUG: Log first li keys during render to trace when corruption happens
   if (currentValue?.[0]?.children?.[0]) {
@@ -797,7 +816,20 @@ const SyncedSlateToolbar = ({
   const hasFormatDropdown = blockButtons.length > 0;
   const formatDropdownSlots = hasFormatDropdown ? Math.ceil(FORMAT_DROPDOWN_WIDTH / BUTTON_WIDTH) : 0;
   const availableSlots = Math.max(0, Math.floor(availableForButtons / BUTTON_WIDTH));
-  const slotsForInlineButtons = Math.max(0, availableSlots - formatDropdownSlots);
+
+  // Block action buttons (e.g., add row/column for tables) also need slots
+  const blockActionToolbarItems = blockActions?.toolbar || [];
+
+  // Slate buttons come first in toolbar, so they get priority for slots
+  // Calculate slots for Slate (format dropdown + inline buttons) first
+  const slotsAfterFormatDropdown = Math.max(0, availableSlots - formatDropdownSlots);
+  const slotsForInlineButtons = Math.min(allInlineButtons.length, slotsAfterFormatDropdown);
+  const slotsUsedBySlate = formatDropdownSlots + slotsForInlineButtons;
+
+  // Block actions get remaining slots after Slate buttons
+  const slotsForBlockActions = Math.max(0, availableSlots - slotsUsedBySlate);
+  const visibleBlockActions = blockActionToolbarItems.slice(0, slotsForBlockActions);
+  const overflowBlockActions = blockActionToolbarItems.slice(slotsForBlockActions);
 
   // Show format dropdown only if there's room for it plus at least 1 inline button
   const showFormatDropdown = hasFormatDropdown && availableSlots >= formatDropdownSlots + 1;
@@ -890,6 +922,43 @@ const SyncedSlateToolbar = ({
           </div>
       )}
 
+      {/* Block action buttons (e.g., add row/column for tables) - only visible ones */}
+      {visibleBlockActions.length > 0 && onBlockAction && (() => {
+        const actionsRegistry = config.settings.hydraActions || {};
+        return (
+          <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center' }}>
+            {visibleBlockActions.map((actionId) => {
+              const actionDef = actionsRegistry[actionId] || { label: actionId };
+              return (
+                <button
+                  key={actionId}
+                  title={actionDef.label}
+                  onClick={() => onBlockAction(actionId)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '2px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#e8e8e8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  {actionDef.icon ? (
+                    <Icon name={actionDef.icon} size="18px" />
+                  ) : (
+                    actionDef.label
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Three-dots menu button */}
       <button
         style={{
@@ -941,6 +1010,12 @@ const SyncedSlateToolbar = ({
         onChange={handleChange}
         onMouseDownCapture={handleButtonMouseDownCapture}
         onClickCapture={handleButtonClickCapture}
+        tableActions={blockActions}
+        overflowBlockActions={overflowBlockActions}
+        onTableAction={onBlockAction}
+        addMode={blockPathMap?.[selectedBlock]?.addMode}
+        parentAddMode={blockPathMap?.[selectedBlock]?.parentAddMode}
+        addDirection={blockUI?.addDirection}
       />
     )}
     </>
