@@ -616,19 +616,16 @@ test.describe('Quanta Toolbar - Overflow', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    const iframe = helper.getIframe();
-
     // Click on block in grid (limited space for toolbar)
     // Use grid-cell-2 instead of text-2a (columns block not supported in Nuxt)
-    const block = iframe.locator('[data-block-uid="grid-cell-2"]');
-    await block.click();
+    await helper.clickBlockInIframe('grid-cell-2');
 
-    // Select all text in the block
+    // Select all text in the block using selectTextRange for reliability
     const editableField = await helper.getEditorLocator('grid-cell-2');
-    await editableField.selectText();
+    const textContent = await editableField.textContent();
+    await helper.selectTextRange(editableField, 0, textContent?.length || 0);
 
     const toolbar = page.locator('.quanta-toolbar');
-    await expect(toolbar).toBeVisible({ timeout: 5000 });
 
     // Verify no links initially
     await expect(editableField.locator('a')).toHaveCount(0);

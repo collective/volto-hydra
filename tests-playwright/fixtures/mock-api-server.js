@@ -268,7 +268,10 @@ function loadInitialContent() {
   if (fs.existsSync(contentDir)) {
     const dirs = fs.readdirSync(contentDir, { withFileTypes: true });
     dirs.forEach((dir) => {
-      if (dir.isDirectory()) {
+      // Support both real directories and symlinks to directories
+      const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
+        fs.statSync(path.join(contentDir, dir.name)).isDirectory());
+      if (isDir) {
         const dataPath = path.join(contentDir, dir.name, 'data.json');
         if (fs.existsSync(dataPath)) {
           const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
