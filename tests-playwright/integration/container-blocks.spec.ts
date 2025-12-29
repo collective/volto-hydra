@@ -2612,16 +2612,19 @@ test.describe('data-block-selector Navigation', () => {
 
     const iframe = helper.getIframe();
 
-    // First navigate to slide-2 by clicking the dot indicator
-    const slide2Dot = iframe.locator('[data-block-selector="slide-2"]');
-    await expect(slide2Dot).toBeVisible();
-    await slide2Dot.click();
+    // Start by selecting slide-1 using robust helper
+    await helper.clickBlockInIframe('slide-1');
+    expect(await helper.isQuantaToolbarVisibleInIframe('slide-1')).toBe(true);
 
-    // Verify slide-2 is selected
+    // Navigate to slide-2 using next button (same pattern as passing test)
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await expect(nextButton).toBeVisible();
+    await nextButton.click();
     await helper.waitForQuantaToolbar('slide-2');
 
     // Click the "prev" button (←) with data-block-selector="-1"
     const prevButton = iframe.locator('[data-block-selector="-1"]');
+    await expect(prevButton).toBeVisible();
     await prevButton.click();
 
     // Verify slide-1 is now selected
