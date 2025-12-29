@@ -679,6 +679,42 @@ app.post('*/@lock', (req, res) => {
 });
 
 /**
+ * GET *\/@@images/*
+ * Serve placeholder images for Plone image scales
+ * URLs like: /test-image-1.jpg/@@images/image/preview
+ */
+app.get('*/@@images/*', (req, res) => {
+  // Extract scale from URL (e.g., 'preview', 'teaser', 'large')
+  const scaleMatch = req.path.match(/@@images\/image\/(\w+)/);
+  const scale = scaleMatch ? scaleMatch[1] : 'preview';
+
+  // Define dimensions for common Plone image scales
+  const scaleDimensions = {
+    icon: { width: 32, height: 32 },
+    tile: { width: 64, height: 64 },
+    thumb: { width: 128, height: 128 },
+    mini: { width: 200, height: 200 },
+    preview: { width: 400, height: 400 },
+    teaser: { width: 600, height: 600 },
+    large: { width: 800, height: 800 },
+    great: { width: 1200, height: 1200 },
+    huge: { width: 1600, height: 1600 },
+  };
+
+  const { width, height } = scaleDimensions[scale] || scaleDimensions.preview;
+
+  // Generate a simple SVG placeholder image
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect width="100%" height="100%" fill="#e0e0e0"/>
+    <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="14" fill="#666"
+          text-anchor="middle" dominant-baseline="middle">${width}×${height}</text>
+  </svg>`;
+
+  res.set('Content-Type', 'image/svg+xml');
+  res.send(svg);
+});
+
+/**
  * GET /:path
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
