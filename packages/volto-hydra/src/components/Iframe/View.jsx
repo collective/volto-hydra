@@ -2078,6 +2078,85 @@ const Iframe = (props) => {
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}
         onDeleteBlock={onDeleteBlock}
+        onBlockAction={(actionId, blockId) => {
+          // Generic action handler - dispatches based on action type
+          // Used by sidebar dropdowns to handle table/block actions
+          const pathInfo = iframeSyncState.blockPathMap?.[blockId];
+
+          if (actionId === 'deleteColumn' && pathInfo?.parentAddMode === 'table') {
+            const cellIndex = pathInfo.path[pathInfo.path.length - 1];
+            const newFormData = deleteTableColumn(properties, iframeSyncState.blockPathMap, blockId);
+            if (newFormData) {
+              let selectBlockId = pathInfo.parentId;
+              if (cellIndex > 0) {
+                const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
+                const rowBlock = getBlockByPath(newFormData, newBlockPathMap[pathInfo.parentId]?.path);
+                if (rowBlock?.cells?.[cellIndex - 1]) {
+                  selectBlockId = rowBlock.cells[cellIndex - 1].key;
+                }
+              }
+              flushSync(() => {
+                setIframeSyncState((prev) => ({
+                  ...prev,
+                  pendingSelectBlockUid: selectBlockId,
+                }));
+              });
+              onSelectBlock(null);
+              onChangeFormData(newFormData);
+            }
+          } else if (actionId === 'deleteRow') {
+            let rowId = blockId;
+            let rowPathInfo = pathInfo;
+            let cellIndex = null;
+            if (pathInfo?.parentAddMode === 'table') {
+              cellIndex = pathInfo.path[pathInfo.path.length - 1];
+              rowId = pathInfo.parentId;
+              rowPathInfo = iframeSyncState.blockPathMap?.[rowId];
+            }
+            if (rowPathInfo?.addMode === 'table') {
+              const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig);
+              const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
+              let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
+              if (newFormData && containerConfig) {
+                newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+                let selectBlockId = rowPathInfo.parentId;
+                if (cellIndex != null && rowIndex > 0) {
+                  const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
+                  const tableBlock = getBlockByPath(newFormData, newBlockPathMap[rowPathInfo.parentId]?.path);
+                  const dataPath = containerConfig.dataPath || ['rows'];
+                  let rows = tableBlock;
+                  for (const key of dataPath) {
+                    rows = rows?.[key];
+                  }
+                  const prevRow = rows?.[rowIndex - 1];
+                  if (prevRow?.cells?.[cellIndex]) {
+                    selectBlockId = prevRow.cells[cellIndex].key;
+                  }
+                }
+                flushSync(() => {
+                  setIframeSyncState((prev) => ({
+                    ...prev,
+                    pendingSelectBlockUid: selectBlockId,
+                  }));
+                });
+                onSelectBlock(null);
+                onChangeFormData(newFormData);
+              }
+            }
+          } else if (actionId === 'addRowBefore' || actionId === 'addRowAfter') {
+            const action = actionId === 'addRowBefore' ? 'before' : 'after';
+            let targetBlock = blockId;
+            let selectChildIndex = null;
+            if (pathInfo?.parentAddMode === 'table') {
+              selectChildIndex = pathInfo.path[pathInfo.path.length - 1];
+              targetBlock = pathInfo.parentId;
+            }
+            insertAndSelectBlock(targetBlock, null, action, null, { selectChildIndex });
+          } else if (actionId === 'addColumnBefore' || actionId === 'addColumnAfter') {
+            const action = actionId === 'addColumnBefore' ? 'before' : 'after';
+            insertAndSelectBlock(blockId, null, action);
+          }
+        }}
         onChangeBlock={(blockId, newBlockData) => {
           // Rebuild blockPathMap from current properties to ensure it's up to date
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);

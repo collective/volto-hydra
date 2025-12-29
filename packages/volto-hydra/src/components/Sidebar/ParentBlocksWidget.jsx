@@ -22,6 +22,7 @@ import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
+import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 
@@ -207,6 +208,7 @@ const ParentBlockSection = ({
   onSelectBlock,
   onDeleteBlock,
   onChangeBlock,
+  onBlockAction,
   formData,
   pathname,
   intl,
@@ -253,7 +255,46 @@ const ParentBlockSection = ({
           <span className="nav-prefix">‹</span>
           <span>{title}</span>
         </button>
-        <div className="block-actions-menu">
+        <div className="block-actions-menu" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+          {/* Toolbar action buttons (e.g., add row/column for tables) */}
+          {(() => {
+            const pathInfo = blockPathMap?.[blockId];
+            const toolbarActions = pathInfo?.actions?.toolbar || [];
+            if (toolbarActions.length === 0 || !onBlockAction) return null;
+            const actionsRegistry = config.settings.hydraActions || {};
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                {toolbarActions.map((actionId) => {
+                  const actionDef = actionsRegistry[actionId] || { label: actionId };
+                  return (
+                    <button
+                      key={actionId}
+                      title={actionDef.label}
+                      onClick={() => onBlockAction(actionId, blockId)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '2px',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#e8e8e8')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                    >
+                      {actionDef.icon ? (
+                        <Icon name={actionDef.icon} size="18px" />
+                      ) : (
+                        actionDef.label
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <button
             ref={menuButtonRef}
             className="menu-trigger"
@@ -262,15 +303,25 @@ const ParentBlockSection = ({
           >
             •••
           </button>
-          {menuOpen && (
-            <DropdownMenu
-              selectedBlock={blockId}
-              onDeleteBlock={onDeleteBlock}
-              menuButtonRect={menuButtonRect}
-              onClose={() => setMenuOpen(false)}
-              // No onOpenSettings - we're already in sidebar/settings
-            />
-          )}
+          {menuOpen && (() => {
+            const pathInfo = blockPathMap?.[blockId];
+            return (
+              <DropdownMenu
+                selectedBlock={blockId}
+                onDeleteBlock={onDeleteBlock}
+                menuButtonRect={menuButtonRect}
+                onClose={() => setMenuOpen(false)}
+                // No onOpenSettings - we're already in sidebar/settings
+                parentId={parentId}
+                onSelectBlock={onSelectBlock}
+                tableActions={pathInfo?.actions}
+                onTableAction={onBlockAction ? (actionId) => onBlockAction(actionId, blockId) : null}
+                addMode={pathInfo?.addMode}
+                parentAddMode={pathInfo?.parentAddMode}
+                addDirection={pathInfo?.addDirection}
+              />
+            );
+          })()}
         </div>
       </div>
 
@@ -360,6 +411,7 @@ const ParentBlocksWidget = ({
   onSelectBlock,
   onDeleteBlock,
   onChangeBlock,
+  onBlockAction,
 }) => {
   const [isClient, setIsClient] = React.useState(false);
   const prevSelectedBlockRef = React.useRef(null);
@@ -464,6 +516,7 @@ const ParentBlocksWidget = ({
                 onSelectBlock={onSelectBlock}
                 onDeleteBlock={onDeleteBlock}
                 onChangeBlock={onChangeBlock}
+                onBlockAction={onBlockAction}
                 formData={formData}
                 pathname={pathname}
                 intl={intl}
@@ -484,6 +537,7 @@ const ParentBlocksWidget = ({
             onSelectBlock={onSelectBlock}
             onDeleteBlock={onDeleteBlock}
             onChangeBlock={onChangeBlock}
+            onBlockAction={onBlockAction}
             formData={formData}
             pathname={pathname}
             intl={intl}
@@ -503,6 +557,7 @@ ParentBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onDeleteBlock: PropTypes.func,
   onChangeBlock: PropTypes.func,
+  onBlockAction: PropTypes.func,
 };
 
 export default ParentBlocksWidget;
