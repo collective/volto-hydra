@@ -3146,9 +3146,12 @@ test.describe('slateTable Container', () => {
     await page.locator('.volto-hydra-add-button').click();
     await expect(iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]')).toHaveCount(3);
 
+    // Wait for the newly created cell to be selected (sidebar shows "Cell" as current)
+    await helper.waitForSidebarCurrentBlock('Cell');
+
     // Navigate to row using Escape, then add a new row
     await page.keyboard.press('Escape');
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForSidebarCurrentBlock('Row');
     await page.locator('.volto-hydra-add-button').click();
 
     // Wait for new row to appear (should have 3 rows total)
