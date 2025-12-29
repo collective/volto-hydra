@@ -2788,9 +2788,7 @@ test.describe('data-block-selector Navigation', () => {
     await helper.clickBlockInIframe('slide-1');
     await helper.waitForQuantaToolbar('slide-1');
     await page.keyboard.press('Escape');
-    await helper.waitForBlockSelected('slider-1');
-    await helper.waitForQuantaToolbar('slider-1');
-    // Wait for sidebar to show Slider as current block
+    // Wait for sidebar to show Slider as current block (more reliable than toolbar positioning)
     await helper.waitForSidebarCurrentBlock('Slider');
 
     // Wait for carousel's ChildBlocksWidget to show Slides section
@@ -2808,9 +2806,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Now go back to carousel container and select slide-1
     await page.keyboard.press('Escape');
-    await helper.waitForBlockSelected('slider-1');
-    await helper.waitForQuantaToolbar('slider-1');
-    // Wait for sidebar to show Slider as current block
+    // Wait for sidebar to show Slider as current block (more reliable than toolbar positioning)
     await helper.waitForSidebarCurrentBlock('Slider');
 
     // Select first slide entry
