@@ -1232,10 +1232,13 @@ export class AdminUIHelper {
     let text = '';
     await expect(async () => {
       text = (await editor.textContent()) || '';
-      // Strip zero-width spaces and other invisible characters
-      // (used for cursor positioning in empty inline elements)
-      // These are invisible to users, so test what users actually see
-      text = text.replace(/[\uFEFF\u200B\u00A0\u2060]/g, ' ').replace(/\s+/g, ' ').trim();
+      // Strip only truly invisible characters (ZWS, word joiner) - don't convert to space
+      // Keep NBSP as regular space since it's a visible space character
+      // Don't collapse multiple spaces - that could hide missing space bugs
+      text = text
+        .replace(/[\uFEFF\u200B\u2060]/g, '') // Remove invisible chars
+        .replace(/\u00A0/g, ' ') // Convert NBSP to regular space
+        .trim();
       expect(text).toMatch(regex);
     }).toPass({ timeout });
     return text;
