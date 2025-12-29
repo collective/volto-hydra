@@ -3562,4 +3562,46 @@ export class AdminUIHelper {
       await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
     }
   }
+
+  /**
+   * Click a block action button (e.g., Add Row Before, Add Column Before).
+   * Handles both toolbar and overflow dropdown locations since buttons may
+   * overflow to dropdown when toolbar is narrow.
+   *
+   * @param actionTitle - The title/label of the action button (e.g., 'Add Row Before')
+   */
+  async clickBlockAction(actionTitle: string): Promise<void> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+
+    // First try to find the button directly in the toolbar
+    const toolbarButton = toolbar.locator(`button[title="${actionTitle}"]`);
+    if (await toolbarButton.isVisible().catch(() => false)) {
+      await toolbarButton.click();
+      return;
+    }
+
+    // Button not in toolbar - look in the overflow dropdown
+    const dropdownTrigger = toolbar.locator('button[title="More options"]');
+    if (!(await dropdownTrigger.isVisible().catch(() => false))) {
+      throw new Error(
+        `Block action "${actionTitle}" not found in toolbar and no dropdown available`
+      );
+    }
+
+    await dropdownTrigger.click();
+
+    // Wait for dropdown to open and find the button
+    const dropdown = this.page.locator('.volto-hydra-dropdown-menu');
+    await dropdown.waitFor({ state: 'visible', timeout: 3000 });
+
+    const dropdownButton = dropdown.locator(`button[title="${actionTitle}"]`);
+    if (!(await dropdownButton.isVisible().catch(() => false))) {
+      throw new Error(
+        `Block action "${actionTitle}" not found in toolbar or dropdown`
+      );
+    }
+
+    await dropdownButton.click();
+  }
 }

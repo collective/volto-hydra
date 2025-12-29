@@ -3439,9 +3439,8 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-1-2');
     await helper.waitForSidebarOpen();
 
-    // Click Add Column Before button
-    const toolbar = page.locator('.quanta-toolbar');
-    await toolbar.locator('button[title="Add Column Before"]').click();
+    // Click Add Column Before button (may be in toolbar or overflow dropdown)
+    await helper.clickBlockAction('Add Column Before');
 
     // Wait for column to be added to all rows
     await expect(firstRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(initialCellCount + 1);
@@ -3465,9 +3464,8 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-2-2');
     await helper.waitForSidebarOpen();
 
-    // Click Add Row Before button from the cell's toolbar
-    const toolbar = page.locator('.quanta-toolbar');
-    await toolbar.locator('button[title="Add Row Before"]').click();
+    // Click Add Row Before button (may be in toolbar or overflow dropdown)
+    await helper.clickBlockAction('Add Row Before');
 
     // Wait for new row to be added
     await expect(table.locator('tr[data-block-uid]')).toHaveCount(initialRowCount + 1);
