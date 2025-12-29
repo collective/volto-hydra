@@ -2,12 +2,15 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import SlateButtonsWrapper from './SlateButtonsWrapper';
 import FormatDropdown from './FormatDropdown';
+import config from '@plone/volto/registry';
+import { Icon } from '@plone/volto/components';
 
 /**
  * Dropdown Menu for Block Actions
  *
  * Renders a dropdown menu with:
  * - Overflow buttons (formatting buttons that don't fit in toolbar)
+ * - Table actions (add row/column before, delete row/column) when in table mode
  * - Settings, Select Container, and Remove options
  * Uses React portal to avoid container clipping issues.
  *
@@ -29,6 +32,12 @@ const DropdownMenu = ({
   onChange, // Change handler for overflow buttons to propagate changes
   onMouseDownCapture, // Capture handler for flushing buffer before format
   onClickCapture, // Capture handler to block click when mousedown was intercepted
+  tableActions = null, // { toolbar: [...], dropdown: [...] } for table operations
+  overflowBlockActions = [], // Block actions that overflow from toolbar
+  onTableAction, // Handler for table actions: (action) => void
+  addMode, // 'table' if this is a row in a table
+  parentAddMode, // 'table' if this is a cell in a table row
+  addDirection, // 'right' or 'bottom' - determines Column vs Row terminology
 }) => {
   const menuRef = useRef(null);
 
@@ -88,14 +97,9 @@ const DropdownMenu = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Overflow buttons - formatting buttons that don't fit in toolbar */}
-      {(overflowButtons.length > 0 || showFormatDropdown) && editor && (
-        <SlateButtonsWrapper
-          editor={editor}
-          initialValue={editor.children}
-          onChange={onChange}
-          onMouseDownCapture={onMouseDownCapture}
-          onClickCapture={onClickCapture}
+      {/* Overflow buttons row - Slate formatting buttons followed by block actions */}
+      {((overflowButtons.length > 0 || showFormatDropdown) && editor) || overflowBlockActions.length > 0 ? (
+        <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -104,25 +108,118 @@ const DropdownMenu = ({
             borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
           }}
         >
-          {/* FormatDropdown when it doesn't fit in toolbar */}
-          {showFormatDropdown && blockButtons.length > 0 && (
-            <FormatDropdown
-              blockButtons={blockButtons}
+          {/* Slate formatting buttons */}
+          {(overflowButtons.length > 0 || showFormatDropdown) && editor && (
+            <SlateButtonsWrapper
+              editor={editor}
+              initialValue={editor.children}
+              onChange={onChange}
               onMouseDownCapture={onMouseDownCapture}
               onClickCapture={onClickCapture}
-            />
-          )}
-          {overflowButtons.map(({ name, element }) => (
-            <div
-              key={name}
-              data-toolbar-button={name}
-              style={{ display: 'inline-flex' }}
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '2px',
+              }}
             >
-              {element}
-            </div>
-          ))}
-        </SlateButtonsWrapper>
-      )}
+              {/* FormatDropdown when it doesn't fit in toolbar */}
+              {showFormatDropdown && blockButtons.length > 0 && (
+                <FormatDropdown
+                  blockButtons={blockButtons}
+                  onMouseDownCapture={onMouseDownCapture}
+                  onClickCapture={onClickCapture}
+                />
+              )}
+              {overflowButtons.map(({ name, element }) => (
+                <div
+                  key={name}
+                  data-toolbar-button={name}
+                  style={{ display: 'inline-flex' }}
+                >
+                  {element}
+                </div>
+              ))}
+            </SlateButtonsWrapper>
+          )}
+          {/* Overflow block actions (e.g., add row/column buttons that didn't fit) */}
+          {overflowBlockActions.length > 0 && onTableAction && (() => {
+            const actionsRegistry = config.settings.hydraActions || {};
+            return overflowBlockActions.map((actionId) => {
+              const actionDef = actionsRegistry[actionId] || { label: actionId };
+              return (
+                <button
+                  key={actionId}
+                  title={actionDef.label}
+                  onClick={() => {
+                    onClose();
+                    onTableAction(actionId);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '2px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#e8e8e8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  {actionDef.icon ? (
+                    <Icon name={actionDef.icon} size="18px" />
+                  ) : (
+                    actionDef.label
+                  )}
+                </button>
+              );
+            });
+          })()}
+        </div>
+      ) : null}
+      {/* Block actions from pathMap (e.g., table row/column operations) */}
+      {tableActions?.dropdown?.length > 0 && onTableAction && (() => {
+        const actionsRegistry = config.settings.hydraActions || {};
+        return (
+          <>
+            {tableActions.dropdown.map((actionId) => {
+              const actionDef = actionsRegistry[actionId] || { label: actionId };
+              return (
+                <div
+                  key={actionId}
+                  className="volto-hydra-dropdown-item"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                  }}
+                  onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+                  onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+                  onClick={() => {
+                    onClose();
+                    onTableAction(actionId);
+                  }}
+                >
+                  {actionDef.icon && <Icon name={actionDef.icon} size="20px" />}
+                  {actionDef.label}
+                </div>
+              );
+            })}
+            <div
+              style={{
+                height: '1px',
+                background: 'rgba(0, 0, 0, 0.1)',
+                margin: '0 10px',
+              }}
+            />
+          </>
+        );
+      })()}
       {/* Settings option - only shown when onOpenSettings is provided (toolbar usage) */}
       {onOpenSettings && (
         <>
@@ -179,22 +276,51 @@ const DropdownMenu = ({
           />
         </>
       )}
-      <div
-        className="volto-hydra-dropdown-item"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '10px',
-          cursor: 'pointer',
-          fontSize: '15px',
-          fontWeight: '500',
-        }}
-        onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-        onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-        onClick={handleRemove}
-      >
-        🗑️ Remove
-      </div>
+      {/* Remove action - label changes based on table mode and add direction */}
+      {(() => {
+        // Determine remove label and action based on table mode
+        // Uses addDirection to determine Column vs Row (same as add button icon)
+        const actionsRegistry = config.settings.hydraActions || {};
+        const isTableMode = addMode === 'table' || parentAddMode === 'table';
+        const isRightDirection = addDirection === 'right';
+
+        let removeLabel = 'Remove';
+        let removeAction = null;
+        let removeIcon = null;
+        if (isTableMode) {
+          removeAction = isRightDirection ? 'deleteColumn' : 'deleteRow';
+          const actionDef = actionsRegistry[removeAction] || {};
+          removeLabel = actionDef.label || (isRightDirection ? 'Remove Column' : 'Remove Row');
+          removeIcon = actionDef.icon;
+        }
+
+        return (
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={() => {
+              onClose();
+              if (removeAction && onTableAction) {
+                onTableAction(removeAction);
+              } else {
+                handleRemove();
+              }
+            }}
+          >
+            {removeIcon ? <Icon name={removeIcon} size="20px" /> : '🗑️'} {removeLabel}
+          </div>
+        );
+      })()}
     </div>,
     document.body,
   );

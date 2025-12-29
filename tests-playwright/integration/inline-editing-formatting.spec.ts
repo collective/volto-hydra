@@ -27,8 +27,7 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.editBlockTextInIframe(blockId, 'Text to make bold');
 
     // STEP 1: Verify the text content is correct
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     const textContent = await helper.getCleanTextContent(editor);
     expect(textContent).toBe('Text to make bold');
     console.log('[TEST] Step 1: Text content verified:', textContent);
@@ -65,11 +64,10 @@ test.describe('Inline Editing - Formatting', () => {
       message: 'Step 8: After clicking bold button'
     });
 
-    // STEP 9: Verify the text is bold by checking for <span style="font-weight: bold"> tag
-    const blockHtml = await editor.innerHTML();
-    console.log('[TEST] Step 9: Final HTML:', blockHtml);
-    expect(blockHtml).toContain('style="font-weight: bold"');
-    expect(blockHtml).toContain('Text to make bold');
+    // STEP 9: Verify the text is bold
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('Text to make bold');
   });
 
   test('bold formatting syncs with Admin UI', async ({ page }) => {
@@ -91,17 +89,12 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.clickFormatButton('bold');
 
     // Wait for bold formatting to sync from Admin UI to iframe
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible({ timeout: 10000 });
-
-    // Verify bold in iframe
-    await expect(async () => {
-      const blockHtml = await editor.innerHTML();
-      expect(blockHtml).toContain('style="font-weight: bold"');
-    }).toPass({ timeout: 5000 });
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible({ timeout: 10000 });
 
     // Wait for the bold formatting to visually appear in the sidebar's React Slate editor
     // The sidebar Slate editor renders bold text with <strong> tags
-    const sidebarSlateEditor = page.locator('[role="complementary"][aria-label="Sidebar"] [contenteditable="true"]');
+    const sidebarSlateEditor = helper.getSidebarSlateEditor('value');
     await expect(sidebarSlateEditor.locator('strong')).toContainText('Synced bold text', { timeout: 5000 });
   });
 
@@ -113,12 +106,12 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Bold and italic text', { delay: 10 });
 
-    // Select all text using JavaScript Selection API
+    // Select all text again for formatting
     await helper.selectAllTextInEditor(editor);
 
     // Assert selection exists and covers all text
@@ -137,11 +130,11 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForFormattedText(editor, /Bold and italic text/, 'italic');
 
     // Verify both formats are applied
-    // Note: hydra.js renders formatting as inline styles, not semantic tags
-    const blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('font-weight: bold');
-    expect(blockHtml).toContain('font-style: italic');
-    expect(blockHtml).toContain('Bold and italic text');
+    const boldSelector = helper.getFormatSelector('bold');
+    const italicSelector = helper.getFormatSelector('italic');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    await expect(editor.locator(italicSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('Bold and italic text');
   });
 
   test('format button shows active state for formatted text', async ({ page }) => {
@@ -152,16 +145,17 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Text with bold', { delay: 10 });
     await helper.waitForEditorText(editor, /Text with bold/);
 
-    // Select all text in the editor using JavaScript Selection API
+    // Select all text again for formatting
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible();
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
 
     // Verify selection is still on the formatted text
     await helper.verifySelectionMatches(editor, 'Text with bold');
@@ -180,30 +174,25 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Toggle bold text', { delay: 10 });
     await helper.waitForEditorText(editor, /Toggle bold text/);
 
-    // Select all text in the editor using JavaScript Selection API
+    // Select all text again for formatting
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible();
-
-    // Verify bold was applied
-    let blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('style="font-weight: bold"');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
 
     // Click bold button again to remove formatting
     await helper.selectAllTextInEditor(editor); // Re-select text
     await helper.clickFormatButton('bold');
-    await expect(editor.locator('span[style*="font-weight: bold"]')).not.toBeVisible();
+    await expect(editor.locator(boldSelector)).not.toBeVisible();
 
-    // Verify bold was removed
-    blockHtml = await editor.innerHTML();
-    expect(blockHtml).not.toContain('style="font-weight: bold"');
-    expect(blockHtml).toContain('Toggle bold text');
+    // Verify text is still there
+    expect(await editor.textContent()).toContain('Toggle bold text');
   });
 
   test('format persists after typing', async ({ page }) => {
@@ -214,13 +203,13 @@ test.describe('Inline Editing - Formatting', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and type text
+    // Enter edit mode and type text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Bold text', { delay: 10 });
     await helper.waitForEditorText(editor, /Bold text/);
 
-    // Select all and make it bold, wait for formatting AND content to be stable
+    // Select all again and make it bold, wait for formatting AND content to be stable
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('bold');
     await helper.waitForFormattedText(editor, /Bold text/, 'bold');
@@ -233,8 +222,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForEditorText(editor, /Bold text more/);
 
     // Check if new text inherits bold formatting
-    const html = await editor.innerHTML();
-    expect(html).toContain('style="font-weight: bold"');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
     const text = await helper.getCleanTextContent(editor);
     expect(text).toContain('Bold text more');
   });
@@ -308,7 +297,8 @@ test.describe('Inline Editing - Formatting', () => {
     console.log('[TEST] First bold click done');
 
     // Verify bold markup exists using DOM assertion
-    const boldSpan = editor.locator('span[style*="font-weight: bold"]');
+    const boldSelector = helper.getFormatSelector('bold');
+    const boldSpan = editor.locator(boldSelector);
     await expect(boldSpan).toBeVisible();
     await expect(boldSpan).toHaveText('bold');
 
@@ -371,13 +361,52 @@ test.describe('Inline Editing - Formatting', () => {
     // Wait for the bold formatting to appear
     await helper.waitForFormattedText(editor, /world/, 'bold');
 
-    // Verify "Hello " is NOT bold (should be plain text)
+    // Verify the HTML structure (waitForFormattedText already verified bold contains "world")
+    const html = await editor.innerHTML();
+    console.log('[TEST] Final HTML:', html);
+  });
+
+  test('prospective formatting: toolbar button click then type applies bold to new text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    // Type "Hello " (not bold)
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Click bold button to enable bold mode for subsequent text
+    await helper.clickFormatButton('bold');
+
+    // Wait for bold button to become active (indicates bold mode is on)
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Type "world" - this should be bold
+    await editor.pressSequentially('world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello world/);
+
+    // Wait for the bold formatting to appear
+    await helper.waitForFormattedText(editor, /world/, 'bold');
+
+    // Verify the HTML structure
     const html = await editor.innerHTML();
     console.log('[TEST] Final HTML:', html);
 
-    // The structure should be: "Hello " (plain) + <span style="font-weight: bold">world</span>
-    // Or the entire "Hello world" might be bold if prospective formatting wraps from cursor
-    expect(html).toMatch(/font-weight.*bold/);
+    // Verify "Hello " is NOT bold - only "world" should be bold (prospective formatting)
+    const boldSelector = helper.getFormatSelector('bold');
+    const boldContent = await editor.locator(boldSelector).textContent();
+    const cleanBoldContent = boldContent?.replace(/[\uFEFF\u200B]/g, '').trim();
+    console.log('[TEST] Bold content:', cleanBoldContent);
+    expect(cleanBoldContent).toBe('world');
   });
 
   test('prospective formatting: toggle bold off after typing bold text', async ({
@@ -415,12 +444,16 @@ test.describe('Inline Editing - Formatting', () => {
     // Wait for the bold formatting to appear
     await helper.waitForFormattedText(editor, /world/, 'bold');
 
-    // Check selection state before toggling off
+    // Check selection state before toggling off - cursor should be collapsed at end of "world"
     const selectionInfo = await helper.getSelectionInfo(editor);
     console.log('[TEST] Selection before second ControlOrMeta+b:', JSON.stringify(selectionInfo));
     expect(selectionInfo.editorHasFocus).toBe(true);
     expect(selectionInfo.isCollapsed).toBe(true);
-    expect(selectionInfo.anchorOffset).toBe(6); // ZWS + "world" = 6 chars
+    // Cursor should be at end of bold text (offset varies based on ZWS presence)
+    const boldText = await editor.locator(helper.getFormatSelector('bold')).textContent();
+    const cleanBoldText = boldText?.replace(/[\uFEFF\u200B]/g, '');
+    expect(cleanBoldText).toBe('world');
+    expect(selectionInfo.anchorOffset).toBeGreaterThanOrEqual(5); // At least at end of "world"
 
     // Press Cmd+B again to toggle bold OFF
     console.log('[TEST] Second ControlOrMeta+b - toggling bold off');
@@ -458,7 +491,8 @@ test.describe('Inline Editing - Formatting', () => {
     console.log('[TEST] Final HTML:', html);
 
     // "world" should be bold (may contain trailing ZWS for cursor positioning)
-    const boldSpan = editor.locator('span[style*="font-weight: bold"]');
+    const boldSelector = helper.getFormatSelector('bold');
+    const boldSpan = editor.locator(boldSelector);
     await expect(boldSpan).toHaveText(/world/);
 
     // " testing" should NOT be inside the bold span
@@ -468,6 +502,180 @@ test.describe('Inline Editing - Formatting', () => {
       ?.replace(/[\uFEFF\u200B]/g, '')
       .trim();
     expect(cleanBoldContent).toBe('world');
+  });
+
+  test('prospective formatting: toggle on then off without typing preserves cursor position', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello world', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello world/);
+
+    // Ensure cursor is at end and get position
+    await helper.moveCursorToEnd(editor);
+    const selectionBefore = await helper.getSelectionInfo(editor);
+    console.log('[TEST] Selection before toggle:', JSON.stringify(selectionBefore));
+    expect(selectionBefore.isCollapsed).toBe(true);
+
+    // Toggle bold ON (Ctrl+B) - creates empty bold element with ZWS
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Toggle bold OFF (Ctrl+B again) without typing anything
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    // Verify cursor position after toggle off
+    const selectionAfter = await helper.getSelectionInfo(editor);
+    console.log('[TEST] Selection after toggle off:', JSON.stringify(selectionAfter));
+
+    // Cursor should still be collapsed and editor should have focus
+    expect(selectionAfter.isCollapsed).toBe(true);
+    expect(selectionAfter.editorHasFocus).toBe(true);
+
+    // Visible text should still be "Hello world"
+    const textContent = await helper.getCleanTextContent(editor);
+    expect(textContent).toBe('Hello world');
+
+    // Verify cursor is at the end using visible text before/after cursor
+    // (DOM offset varies due to ZWS nodes, but visible position should be at end)
+    const textAround = await helper.getTextAroundCursor(editor);
+    console.log('[TEST] Text around cursor:', JSON.stringify(textAround));
+    expect(textAround.textBefore).toBe('Hello world');
+    expect(textAround.textAfter).toBe('');
+  });
+
+  test('prospective formatting: toggle on, type, off, type, on again does not double text', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Step 1: Toggle bold ON (prospective formatting)
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Step 2: Type bold text
+    await editor.pressSequentially('bold', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold/);
+
+    // Step 3: Toggle bold OFF (cursor exit)
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    // Step 4: Type non-bold text
+    await editor.pressSequentially(' normal', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold normal/);
+
+    // Verify text so far
+    let textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Text after first cycle:', textContent);
+    expect(textContent).toBe('Hello bold normal');
+
+    // Step 5: Toggle bold ON again (second prospective formatting)
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Step 6: Type more bold text
+    await editor.pressSequentially(' more', { delay: 10 });
+
+    // Verify final text - should NOT have doubled
+    await expect(async () => {
+      textContent = await helper.getCleanTextContent(editor);
+      console.log('[TEST] Text after second prospective formatting:', textContent);
+      expect(textContent).toBe('Hello bold normal more');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('prospective formatting: toggle in middle of text preserves text to right', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('one two three four five', { delay: 10 });
+    await helper.waitForEditorText(editor, /one two three four five/);
+
+    // Click in the middle of the text (after "two ")
+    await helper.selectTextRange(editor, 8, 8); // Position cursor after "one two "
+
+    // Step 1: Toggle bold ON and type
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await editor.pressSequentially('BOLD', { delay: 10 });
+
+    let textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] After first bold:', textContent);
+    expect(textContent).toBe('one two BOLDthree four five');
+
+    // Step 2: Toggle bold OFF and type
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+
+    await editor.pressSequentially(' normal ', { delay: 10 });
+
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] After normal text:', textContent);
+    expect(textContent).toBe('one two BOLD normal three four five');
+
+    // Step 3: Toggle bold ON again - THIS IS WHERE TEXT MIGHT DISAPPEAR
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Verify text to the right is still there
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] After third toggle (no typing yet):', textContent);
+    expect(textContent).toBe('one two BOLD normal three four five');
+
+    // Type more bold text
+    await editor.pressSequentially('MORE', { delay: 10 });
+
+    // Final verification - all text should be preserved
+    textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Final text:', textContent);
+    expect(textContent).toBe('one two BOLD normal MOREthree four five');
   });
 
   test('prospective formatting: clipboard strips ZWS from bold text', async ({
@@ -510,6 +718,57 @@ test.describe('Inline Editing - Formatting', () => {
     expect(clipboardText).not.toMatch(/[\uFEFF\u200B]/);
   });
 
+  test('input not blocked after bolding and deleting selected text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and clear the block
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    // Type "one two three"
+    await editor.pressSequentially('one two three', { delay: 10 });
+    await helper.waitForEditorText(editor, /one two three/);
+
+    // Select "two" - text is "one two three", "two" is at offset 4-7
+    await helper.selectTextRange(editor, 4, 7);
+
+    // Bold the selected text
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Wait for format to be applied
+    await helper.waitForFormattedText(editor, /two/, 'bold');
+
+    // Delete the bolded text
+    await editor.press('Backspace');
+
+    // Wait a moment for any blocking to clear
+    await page.waitForTimeout(200);
+
+    // Now try to type - this should work and not be blocked
+    await editor.pressSequentially('NEW', { delay: 50 });
+
+    // Verify the new text was typed
+    await expect(async () => {
+      const textContent = await helper.getCleanTextContent(editor);
+      console.log('[TEST] Text after delete and type:', textContent);
+      expect(textContent).toContain('NEW');
+    }).toPass({ timeout: 5000 });
+
+    // Final text should be "one NEW three" (with "two" replaced by "NEW")
+    // Use regex to allow flexible whitespace - exact spacing depends on renderer's CSS
+    // (white-space: pre-wrap preserves spaces, default CSS collapses them)
+    const finalText = await helper.getCleanTextContent(editor);
+    expect(finalText).toMatch(/one\s+NEW\s*three/);
+  });
+
   test('format button still works when sidebar is closed', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -540,8 +799,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.waitForFormattedText(editor, /Test with sidebar closed/, 'bold');
 
     // Verify bold was applied
-    const blockHtml = await editor.innerHTML();
-    expect(blockHtml).toContain('style="font-weight: bold"');
-    expect(blockHtml).toContain('Test with sidebar closed');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('Test with sidebar closed');
   });
 });

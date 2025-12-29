@@ -20,6 +20,9 @@
 // Global render counter for testing re-render behavior
 window.hydraRenderCount = window.hydraRenderCount || 0;
 
+// Slider state: track slide count to detect new slides { [blockId]: slideCount }
+const sliderSlideCount = {};
+
 /**
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with blocks and blocks_layout
@@ -34,6 +37,10 @@ function renderContent(content) {
     container.innerHTML = '';
 
     const { blocks, blocks_layout } = content;
+    if (!blocks_layout) {
+        console.warn('[RENDERER] No blocks_layout in content, nothing to render');
+        return;
+    }
     const items = blocks_layout.items || [];
 
     items.forEach(blockId => {
@@ -56,7 +63,6 @@ function renderContent(content) {
 function renderBlock(blockId, block) {
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', blockId);
-    wrapper.setAttribute('data-block-type', block['@type']);
 
     switch (block['@type']) {
         case 'slate':
@@ -87,13 +93,22 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderGridBlock(block);
             break;
         case 'carousel':
+            wrapper.classList.add('carousel-block');
             wrapper.innerHTML = renderCarouselBlock(block);
+            break;
+        case 'slider':
+            // Slider uses object_list format (slides as array with @id)
+            wrapper.classList.add('carousel-block');
+            wrapper.innerHTML = renderSliderBlock(block, blockId);
             break;
         case 'slide':
             wrapper.innerHTML = renderSlideBlock(block);
             break;
         case 'accordion':
             wrapper.innerHTML = renderAccordionBlock(block);
+            break;
+        case 'slateTable':
+            wrapper.innerHTML = renderSlateTableBlock(block);
             break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
@@ -392,7 +407,7 @@ function renderColumnsBlock(block) {
             if (!img) return;
 
             // Render image as a nested block with data-block-uid and data-block-add="right"
-            html += `<div data-block-uid="${imgId}" data-block-type="image" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
+            html += `<div data-block-uid="${imgId}" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
             html += renderImageBlock(img);
             html += '</div>';
         });
@@ -408,7 +423,7 @@ function renderColumnsBlock(block) {
         if (!column) return;
 
         // Render column as a nested block with data-block-uid and data-block-add="right"
-        html += `<div data-block-uid="${columnId}" data-block-type="column" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
+        html += `<div data-block-uid="${columnId}" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
         html += renderColumnContent(column);
         html += '</div>';
     });
@@ -441,7 +456,7 @@ function renderColumnContent(column) {
         if (!block) return;
 
         // Render nested content block with data-block-uid and data-block-add="bottom"
-        html += `<div data-block-uid="${blockId}" data-block-type="${block['@type']}" data-block-add="bottom">`;
+        html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
 
         // Render inner content based on block type
         switch (block['@type']) {
@@ -489,7 +504,7 @@ function renderGridBlock(block) {
 
         // Render grid cell WITHOUT data-block-add attribute
         // This tests that hydra.js correctly infers direction from nesting depth
-        html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
+        html += `<div data-block-uid="${blockId}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
 
         // Render inner content based on block type
         switch (childBlock['@type']) {
@@ -549,7 +564,7 @@ function renderCarouselBlock(block) {
         const displayStyle = isActive ? 'block' : 'none';
 
         // Render slide as nested block - hidden slides still have data-block-uid
-        html += `<div data-block-uid="${slideId}" data-block-type="slide" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
+        html += `<div data-block-uid="${slideId}" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
         html += renderSlideBlock(slide);
         html += '</div>';
     });
@@ -579,18 +594,94 @@ function renderCarouselBlock(block) {
 }
 
 /**
- * Render a slide block (child of carousel).
+ * Render a slider block using object_list format (slides as array with @id).
+ * This is the volto-slider-block format.
+ *
+ * @param {Object} block - Slider block data with slides array
+ * @param {string} blockId - Block UID for state tracking
+ * @returns {string} HTML string
+ */
+function renderSliderBlock(block, blockId) {
+    const slides = block.slides || [];
+    const prevCount = sliderSlideCount[blockId] || 0;
+    const newCount = slides.length;
+
+    // Detect if a new slide was added - show it instead of first slide
+    let activeIndex = 0;
+    if (newCount > prevCount && prevCount > 0) {
+        activeIndex = newCount - 1; // New slide is at the end
+    }
+    sliderSlideCount[blockId] = newCount;
+
+    const activeSlideId = slides[activeIndex]?.['@id'] || null;
+
+    let html = '<div class="carousel-container" style="position: relative; padding: 20px; background: #f5f5f5; border-radius: 8px; min-height: 120px;">';
+
+    // Navigation button - Previous (selects previous sibling)
+    html += '<button data-block-selector="-1" class="carousel-prev" style="position: absolute; left: 5px; top: 50%; transform: translateY(-50%); z-index: 10; padding: 10px; cursor: pointer;">←</button>';
+
+    // Slides container - only ONE slide visible at a time
+    html += '<div class="slides-wrapper" style="position: relative; margin: 0 50px; min-height: 80px;">';
+
+    slides.forEach((slide, index) => {
+        const slideId = slide['@id'];
+        if (!slideId) return;
+
+        // Only first slide is visible, others are hidden
+        const isActive = slideId === activeSlideId;
+        const displayStyle = isActive ? 'block' : 'none';
+
+        // Render slide as nested block - hidden slides still have data-block-uid
+        html += `<div data-block-uid="${slideId}" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
+        html += renderSlideBlock(slide);
+        html += '</div>';
+    });
+
+    html += '</div>';
+
+    // Navigation button - Next (selects next sibling)
+    html += '<button data-block-selector="+1" class="carousel-next" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); z-index: 10; padding: 10px; cursor: pointer;">→</button>';
+
+    // Direct selector buttons for each slide (like dot indicators)
+    // Only show dots for first half of slides to test both direct selector and +1/-1 fallback
+    const halfLength = Math.ceil(slides.length / 2);
+    html += '<div class="slide-indicators" style="text-align: center; margin-top: 10px;">';
+    slides.forEach((slide, index) => {
+        const slideId = slide['@id'];
+        if (index < halfLength) {
+            // First half: show direct selector dot
+            html += `<button data-block-selector="${slideId}" class="slide-dot" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; cursor: pointer; border: 1px solid #999; background: ${slideId === activeSlideId ? '#333' : '#fff'};">${index + 1}</button>`;
+        } else {
+            // Second half: no direct selector, must use +1/-1 navigation
+            html += `<span class="slide-dot no-selector" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; display: inline-block; border: 1px solid #ccc; background: ${slideId === activeSlideId ? '#333' : '#eee'};">${index + 1}</span>`;
+        }
+    });
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Render a slide block (child of carousel/slider).
+ * Supports both old format (title, content) and volto-slider-block format (title, description, head_title).
  * @param {Object} block - Slide block data
  * @returns {string} HTML string
  */
 function renderSlideBlock(block) {
-    const title = block.title || 'Untitled Slide';
-    const content = block.content || '';
+    const title = block.title ?? '';
+    // Support both old format (content) and new format (description)
+    const description = block.description || block.content || '';
+    const headTitle = block.head_title || '';
 
-    return `
-        <h4 data-editable-field="title" style="margin: 0 0 8px 0;">${title}</h4>
-        <p data-editable-field="content" style="margin: 0; color: #666;">${content}</p>
-    `;
+    let html = '';
+    if (headTitle) {
+        html += `<div data-editable-field="head_title" style="font-size: 12px; color: #888; margin-bottom: 4px;">${headTitle}</div>`;
+    }
+    html += `<h4 data-editable-field="title" style="margin: 0 0 8px 0;">${title}</h4>`;
+    html += `<p data-editable-field="description" style="margin: 0; color: #666;">${description}</p>`;
+
+    return html;
 }
 
 /**
@@ -615,7 +706,7 @@ function renderAccordionBlock(block) {
     headerLayout.forEach(blockId => {
         const childBlock = header[blockId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
             html += '</div>';
         }
@@ -630,7 +721,7 @@ function renderAccordionBlock(block) {
     contentLayout.forEach(blockId => {
         const childBlock = content[blockId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-type="${childBlock['@type']}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
             html += '</div>';
         }
@@ -652,6 +743,46 @@ function renderAccordionBlock(block) {
 function renderNestedSlateBlock(block) {
     const plaintext = block.plaintext || '';
     return `<p data-editable-field="value" style="margin: 0;">${plaintext}</p>`;
+}
+
+/**
+ * Render a slateTable block.
+ * Each row and cell gets data-block-uid for selection.
+ * Cell content is editable via data-editable-field="value".
+ * @param {Object} block - slateTable block data
+ * @returns {string} HTML string
+ */
+function renderSlateTableBlock(block) {
+    const table = block.table || {};
+    const rows = table.rows || [];
+
+    let html = '<table style="border-collapse: collapse; width: 100%;">';
+
+    rows.forEach((row) => {
+        // Rows add downward (new row below)
+        html += `<tr data-block-uid="${row.key}" data-block-add="bottom">`;
+        const cells = row.cells || [];
+        cells.forEach((cell) => {
+            const tag = cell.type === 'header' ? 'th' : 'td';
+            const style = 'border: 1px solid #ccc; padding: 8px;';
+
+            // Render cell content from slate value
+            let cellContent = '';
+            const value = cell.value || [];
+            value.forEach((node) => {
+                const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+                const text = renderChildren(node.children || []);
+                cellContent += `<p data-editable-field="value"${nodeIdAttr}>${text}</p>`;
+            });
+
+            // Cells add to the right (new column)
+            html += `<${tag} data-block-uid="${cell.key}" data-block-add="right" style="${style}">${cellContent}</${tag}>`;
+        });
+        html += '</tr>';
+    });
+
+    html += '</table>';
+    return html;
 }
 
 /**
@@ -724,19 +855,24 @@ function initCarouselNavigation() {
         if (!selectorElement) return;
 
         const selector = selectorElement.getAttribute('data-block-selector');
-        const carousel = selectorElement.closest('[data-block-uid][data-block-type="carousel"]');
+        console.log('[RENDERER] Carousel navigation click:', selector);
+        const carousel = selectorElement.closest('[data-block-uid].carousel-block');
+        console.log('[RENDERER] Found carousel:', carousel?.getAttribute('data-block-uid'));
         if (!carousel) return;
 
         // Find all slides in this carousel
         const slidesWrapper = carousel.querySelector('.slides-wrapper');
+        console.log('[RENDERER] slidesWrapper:', slidesWrapper ? 'found' : 'NOT FOUND');
         if (!slidesWrapper) return;
 
-        const slides = Array.from(slidesWrapper.querySelectorAll('[data-block-uid][data-block-type="slide"]'));
+        const slides = Array.from(slidesWrapper.querySelectorAll('[data-block-uid].slide'));
+        console.log('[RENDERER] slides found:', slides.length, slides.map(s => s.getAttribute('data-block-uid')));
         if (slides.length === 0) return;
 
         // Find currently active slide
         const currentSlide = slides.find(s => s.style.display !== 'none') || slides[0];
         const currentIndex = slides.indexOf(currentSlide);
+        console.log('[RENDERER] currentSlide:', currentSlide?.getAttribute('data-block-uid'), 'index:', currentIndex);
 
         let targetSlide = null;
         let targetIndex = -1;
@@ -757,9 +893,12 @@ function initCarouselNavigation() {
             targetIndex = slides.indexOf(targetSlide);
         }
 
+        console.log('[RENDERER] targetSlide:', targetSlide?.getAttribute('data-block-uid'), 'index:', targetIndex);
         if (targetSlide && targetSlide !== currentSlide) {
+            console.log('[RENDERER] Scheduling slide transition in 100ms');
             // Simulate animation delay (100ms) to test async waiting in hydra.js
             setTimeout(() => {
+                console.log('[RENDERER] Executing slide transition to:', targetSlide?.getAttribute('data-block-uid'));
                 // Hide all slides
                 slides.forEach(s => {
                     s.style.display = 'none';
@@ -768,6 +907,7 @@ function initCarouselNavigation() {
                 // Show target slide
                 targetSlide.style.display = 'block';
                 targetSlide.classList.add('active');
+                console.log('[RENDERER] Slide transition complete, slide-2 display:', targetSlide.style.display);
 
                 // Update dot indicators
                 const dots = carousel.querySelectorAll('.slide-dot');

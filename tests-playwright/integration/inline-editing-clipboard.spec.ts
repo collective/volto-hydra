@@ -52,11 +52,11 @@ test.describe('Inline Editing - Clipboard', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode
+    // Enter edit mode (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
 
-    // Type "Hello " then make "world" bold, then type " testing"
+    // Type "Hello " (replaces selection) then make "world" bold, then type " testing"
     await editor.pressSequentially('Hello ', { delay: 10 });
 
     // Apply bold formatting to "world"

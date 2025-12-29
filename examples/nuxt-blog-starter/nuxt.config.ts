@@ -1,4 +1,9 @@
 import mkcert from 'vite-plugin-mkcert'
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const hydraJsPath = resolve(__dirname, '../../packages/hydra-js')
 
 export default defineNuxtConfig({
   nitro: {
@@ -49,10 +54,47 @@ export default defineNuxtConfig({
       },
       image: {
         provider: 'netlify',
-      }        
-      // generate: {
-      //   fallback: "index.html", // Uses '404.html' instead of the default '200.html'
-      // },
+      }
+    },
+    test: {
+      // Test environment: HTTP mode, points to mock API on localhost:8888
+      ssr: false,
+      devtools: { enabled: false },
+      devServer: {
+        https: false  // Disable HTTPS for test mode
+      },
+      // Disable rate limiting for tests
+      security: {
+        rateLimiter: false
+      },
+      routeRules: {
+        "/**": {
+          cors: true,
+          security: {
+            headers: {
+              contentSecurityPolicy: {
+                'img-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888', 'https://placehold.co'],
+                'connect-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888'],
+                'frame-ancestors': ['*']
+              },
+              crossOriginResourcePolicy: "cross-origin",
+              xFrameOptions: false
+            },
+            rateLimiter: false
+          }
+        }
+      },
+      runtimeConfig: {
+        public: {
+          image_alias: '',
+          backendBaseUrl: 'http://localhost:8888',
+          adminUrl: 'http://localhost:3001',
+        }
+      },
+      image: {
+        provider: 'ipx',
+        domains: ['localhost'],
+      }
     }
   },
   runtimeConfig: {
@@ -91,13 +133,25 @@ export default defineNuxtConfig({
       }
   },
   vite: {
+    // Force pre-bundle these deps at startup to avoid 504 timeouts in CI
+    optimizeDeps: {
+      include: ['flowbite', 'errx'],
+    },
     plugins: [
-      mkcert({
-        savePath: './certs', // save the generated certificate into certs directory
-        force: true, // force generation of certs even without setting https property in the vite config
-      }),  
+      // mkcert disabled - certs already generated manually
+      // mkcert({
+      //   savePath: './certs',
+      //   force: false,
+      //   mkcertPath: '/usr/local/bin/mkcert',
+      // }),
     ],
-  
+    resolve: {
+      alias: {
+        // In test mode, use source hydra.js for live reload
+        // In production, use synced local copy (prebuild script syncs from source)
+        '@hydra-js': process.env.NUXT_ENV_NAME === 'test' ? hydraJsPath : './packages'
+      }
+    },
         /* options for vite */
     // ssr: true // enable unstable server-side rendering for development (false by default)
     // experimentWarning: false // hide experimental warning message (disabled by default for tests)

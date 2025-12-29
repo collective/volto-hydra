@@ -96,7 +96,10 @@ test.describe('Block Selection', () => {
     await helper.waitForQuantaToolbar(blockId);
   });
 
-  test('switching block selection updates visual state', async ({ page }) => {
+  test('switching block selection updates visual state', async ({ page }, testInfo) => {
+    // Skip on Nuxt - test-page has custom blocks that affect bounding box comparison
+    test.skip(testInfo.project.name === 'nuxt', 'Nuxt test-page has custom blocks');
+
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -179,6 +182,9 @@ test.describe('Block Selection', () => {
     await helper.waitForQuantaToolbar('block-2-uuid');
   });
 
+  // IMPORTANT: This test verifies that a SINGLE click on a text block focuses the editor
+  // at the correct cursor position. Do NOT change this to use enterEditMode or multiple
+  // clicks - the purpose is to test that hydra.js correctly handles focus on the first click.
   test('clicking text block puts cursor focus at correct position', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -187,24 +193,49 @@ test.describe('Block Selection', () => {
 
     const iframe = helper.getIframe();
 
-    // Click on a text block (block-3-uuid - "Another paragraph for testing")
-    const blockId = 'block-3-uuid';
-    await helper.clickBlockInIframe(blockId);
+    // Wait for iframe content to be ready - look for the specific text we'll be clicking
+    await expect(iframe.locator('text=Another paragraph for testing')).toBeVisible({ timeout: 15000 });
 
-    // Verify toolbar appeared (clickBlockInIframe already waits for this)
+    // block-3-uuid contains "Another paragraph for testing"
+    // Click in the middle of the text to position cursor there
+    const blockId = 'block-3-uuid';
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Find the editable field using helper that handles both Nuxt and mock patterns
+    const editor = helper.getSlateField(blockLocator);
+    await editor.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Wait for the text content to be rendered inside the editor
+    await expect(editor).toContainText('Another paragraph', { timeout: 5000 });
+
+    // Get the click coordinates for the middle of the text
+    // "Another paragraph for testing" is 29 chars, so position 14 is roughly middle
+    const clickPos = await helper.getClickPositionForCharacter(editor, 14);
+    expect(clickPos).toBeTruthy();
+    await editor.click({ position: clickPos! });
+
+    // Wait for block to be selected
+    await helper.waitForBlockSelected(blockId);
+
+    // Wait for contenteditable to become true after click
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Verify toolbar appeared
     const hasToolbar = await helper.isQuantaToolbarVisibleInIframe(blockId);
     expect(hasToolbar).toBe(true);
 
-    // Wait a moment for focus to be set asynchronously
-    await page.waitForTimeout(500);
+    // Verify cursor is in the middle of the text (not at start or end)
+    // This also verifies the editor is focused (can't have cursor position without focus)
+    const { textBefore, textAfter } = await helper.getTextAroundCursor(editor);
+    expect(textBefore.length).toBeGreaterThan(0);
+    expect(textAfter.length).toBeGreaterThan(0);
 
-    // Verify we can type immediately
-    await page.keyboard.type('TYPED');
-    await page.waitForTimeout(200);
+    // Verify we can type immediately - text should be inserted at cursor position
+    await editor.pressSequentially('TYPED');
 
-    // Verify the text was inserted into the block
-    const blockText = await iframe.locator(`[data-block-uid="${blockId}"]`).textContent();
-    expect(blockText).toContain('TYPED');
+    // Verify the text was inserted at the cursor position (between textBefore and textAfter)
+    const expectedText = textBefore + 'TYPED' + textAfter;
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).toContainText(expectedText);
   });
 
   test('selecting new block scrolls sidebar to show settings', async ({ page }) => {
@@ -377,7 +408,10 @@ test.describe('Block Selection', () => {
     await expect(linkElement).toBeVisible();
   });
 
-  test('scrolling selected block off screen does not scroll back', async ({ page }) => {
+  test('scrolling selected block off screen does not scroll back', async ({ page }, testInfo) => {
+    // Skip on Nuxt - uses container-test-page which has container blocks not yet supported
+    test.skip(testInfo.project.name === 'nuxt', 'Uses container-test-page');
+
     // Bug: After selecting a block, if user scrolls the iframe so the block
     // goes off screen, the page automatically scrolls back to the block.
     // This is disruptive to user workflow.

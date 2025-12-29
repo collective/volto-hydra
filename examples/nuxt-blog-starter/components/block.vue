@@ -16,13 +16,21 @@
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
-      :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+    <a v-if="block.href" :href="block.href" class="image-link">
+      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+    </a>
+    <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+      :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
-      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
-        :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+      <a v-if="block.href" :href="block.href" class="image-link">
+        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+          :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+      </a>
+      <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       <figcaption>
         <h2>{{ block.title }}</h2>
         <div v-if="block?.description" data-editable-field="description">
@@ -37,14 +45,54 @@
       :class="['image-size-' + props.size, 'image-align-' + props.align]" loading="lazy" decoding="async" />
   </div>
 
+  <!-- Hero block - simple landing page hero section -->
+  <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
+       class="hero-block p-5 bg-gray-100 rounded-lg">
+    <h1 data-editable-field="heading" class="text-3xl font-bold mb-2">{{ block.heading }}</h1>
+    <p data-editable-field="subheading" class="text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
+    <div class="hero-description mb-4" data-editable-field="description">
+      <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
+    </div>
+    <button data-editable-field="buttonText" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+      {{ block.buttonText }}
+    </button>
+  </div>
+
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
-    class="grid grid-flow-col gap-4 mt-6 mb-6"
-    :class="['grid-cols-' + block.blocks_layout.items.length, `bg-${block.styles.backgroundColor || 'white'}-700`]">
-    <div v-for="uid in block.blocks_layout.items" class="p-4"
-      :class="[`bg-${!block.styles.backgroundColor ? 'grey' : 'white'}-700`]">
-      <Block :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"></Block>
+    class="mt-6 mb-6"
+    :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
+    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + block.blocks_layout.items.length]">
+      <Block v-for="uid in block.blocks_layout.items" :key="uid"
+        :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"
+        class="p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+    </div>
+  </div>
+
+  <!-- Columns container block -->
+  <div v-else-if="block['@type'] == 'columns'" :data-block-uid="block_uid" class="columns-block my-4">
+    <!-- Title for columns block (always rendered for inline editing) -->
+    <h3 data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
+
+    <!-- Top images row - horizontal layout for images above columns -->
+    <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4" data-block-field="top_images">
+      <Block v-for="imgId in block.top_images_layout.items" :key="imgId"
+             :block_uid="imgId" :block="block.top_images[imgId]" :data="data" :contained="true"
+             data-block-add="right" />
     </div>
 
+    <!-- Columns row - horizontal layout -->
+    <div class="columns-row flex gap-4" data-block-field="columns">
+      <div v-for="columnId in (block.columns_layout?.items || [])" :key="columnId"
+           :data-block-uid="columnId" data-block-add="right"
+           class="column flex-1 p-3 border border-dashed border-gray-300 rounded">
+        <!-- Column title -->
+        <h4 v-if="block.columns?.[columnId]?.title" data-editable-field="title"
+            class="column-title mb-2 text-sm font-medium">{{ block.columns[columnId].title }}</h4>
+        <!-- Column content blocks - vertical layout, Block component adds data-block-uid -->
+        <Block v-for="blockId in (block.columns?.[columnId]?.blocks_layout?.items || [])" :key="blockId"
+               :block_uid="blockId" :block="block.columns[columnId].blocks[blockId]" :data="data" :contained="true" />
+      </div>
+    </div>
   </div>
 
   <div v-else-if="block['@type'] == 'teaser'"
@@ -79,36 +127,39 @@
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div v-for="block in block.slides" data-block-uid="block['@id']"
-          class="hidden duration-700 ease-linear bg-center flex items-center"
-          :class="{ 'bg-gray-700': !block.preview_image, 'bg-blend-multiply': !block.preview_image, 'bg-no-repeat': !block.preview_image, 'bg-cover': block.preview_image }"
-          data-carousel-item :style="imageProps(block.preview_image[0], true).class">
+        <div v-for="(slide, index) in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
+          class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
+          :class="[
+            isSlideActive(index) ? 'flex' : 'hidden',
+            { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
+          ]"
+          data-carousel-item :style="slide.preview_image?.[0] ? imageProps(slide.preview_image[0], true).class : ''">
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
-            :class="{ 'right-0': block.flagAlign == 'right' }">
-            <div>{{ block.head_title }}</div>
-            <h5 :id="`heading-${block['@id']}`"
+            :class="{ 'right-0': slide.flagAlign == 'right' }">
+            <div>{{ slide.head_title }}</div>
+            <h5 :id="`heading-${slide['@id']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
-              {{ block.title }}</h5>
+              {{ slide.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">
-              {{ block.description }}</p>
-              <NuxtLink v-if="block.href" :to="getUrl(block.href[0])" data-editable-field="buttonText"
+              {{ slide.description }}</p>
+              <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${block['@id']}`">
-              
-              {{ block.buttonText || 'Read More' }}</NuxtLink>
+              :aria-describedby="`heading-${slide['@id']}`">
+
+              {{ slide.buttonText || 'Read More' }}</NuxtLink>
           </div>
         </div>
       </div>
       <!-- Slider indicators -->
       <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
-        <button v-for="(block, index) in block.slides" type="button" class="w-3 h-3 rounded-full" aria-current="true"
-          aria-label="Slide 1" :data-carousel-slide-to="index"></button>
+        <button v-for="(slide, index) in block.slides" :key="slide['@id']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
+          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@id']"></button>
       </div>
       <!-- Slider controls -->
       <button type="button"
         class="absolute top-0 start-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
-        data-carousel-prev>
+        data-carousel-prev data-block-selector="-1">
         <span
           class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30 dark:bg-gray-800/30 group-hover:bg-white/50 dark:group-hover:bg-gray-800/60 group-focus:ring-4 group-focus:ring-white dark:group-focus:ring-gray-800/70 group-focus:outline-none">
           <svg class="w-4 h-4 text-white dark:text-gray-800 rtl:rotate-180" aria-hidden="true"
@@ -121,7 +172,7 @@
       </button>
       <button type="button"
         class="absolute top-0 end-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
-        data-carousel-next>
+        data-carousel-next data-block-selector="+1">
         <span
           class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30 dark:bg-gray-800/30 group-hover:bg-white/50 dark:group-hover:bg-gray-800/60 group-focus:ring-4 group-focus:ring-white dark:group-focus:ring-gray-800/70 group-focus:outline-none">
           <svg class="w-4 h-4 text-white dark:text-gray-800 rtl:rotate-180" aria-hidden="true"
@@ -189,9 +240,15 @@
 
   <div v-else-if="block['@type'] == 'slateTable'" class="data-table" :data-block-uid="block_uid">
     <table>
-      <tr v-for="(row) in block.table.rows">
-        <component v-for="(cell) in row.cells" :key="cell.key" :is="(cell.type == 'header') ? 'th' : 'td'">
-          <RichText v-for="(node) in cell.value" :node="node" />
+      <tr v-for="(row) in block.table?.rows" :key="row.key" :data-block-uid="row.key" data-block-add="bottom">
+        <component
+          v-for="(cell) in row.cells"
+          :key="cell.key"
+          :is="(cell.type == 'header') ? 'th' : 'td'"
+          :data-block-uid="cell.key"
+          data-block-add="right"
+        >
+          <RichText v-for="(node, idx) in cell.value" :key="idx" :node="node" data-editable-field="value" />
         </component>
       </tr>
     </table>
@@ -232,6 +289,10 @@
     </div>
   </section>
 
+  <!-- Empty block - placeholder for deleted blocks in containers -->
+  <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
+  </div>
+
   <div v-else :data-block-uid="block_uid">
     {{ 'Not implemented Block: @type=' + block['@type'] }}
     <pre>{{ block }}</pre>
@@ -239,6 +300,7 @@
 
 </template>
 <script setup>
+import { ref, watch, nextTick } from 'vue';
 import RichText from './richtext.vue';
 import Listing from './listing.vue';
 
@@ -261,6 +323,34 @@ const { block_uid, block, data } = defineProps({
     default: false
   }
 });
+
+// Slider state: track active slide and detect new slides
+const activeSlideIndex = ref(0);
+const prevSlideCount = ref(block.slides?.length || 0);
+
+// Watch for slide count changes to detect new slides and reinitialize Flowbite
+watch(
+  () => block.slides?.length,
+  async (newCount, oldCount) => {
+    // Only detect new slides after initial render (when oldCount is defined)
+    if (oldCount !== undefined && newCount > oldCount) {
+      // New slide added - show it (it's at the end)
+      activeSlideIndex.value = newCount - 1;
+
+      // Reinitialize Flowbite carousel to recognize new slides
+      if (process.client) {
+        await nextTick();
+        const flowbite = await import('flowbite');
+        flowbite.initCarousels();
+      }
+    }
+    prevSlideCount.value = newCount || 0;
+  },
+  { immediate: true }
+);
+
+// Helper to check if a slide should be visible
+const isSlideActive = (index) => index === activeSlideIndex.value;
 
 
 

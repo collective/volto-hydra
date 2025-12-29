@@ -15,19 +15,7 @@ This builds `@plone/registry` and `@plone/components`. Only needed once unless y
 
 ## Running Tests
 
-### Mock Parent Tests (Fast - No Volto)
-
-For quick iteration on hydra.js bridge and formatting logic without full Volto stack:
-
-```bash
-pnpm test:mock              # Run all mock parent tests (~4s)
-pnpm test:mock:headed       # Run with visible browser
-pnpm test:mock:ui           # Run in UI mode
-```
-
-These tests use only the mock API server and test frontend (no Volto compilation needed).
-
-### Full Integration Tests (With Volto)
+### Integration Tests
 
 Playwright automatically starts the Volto server and waits for compilation before running tests.
 
@@ -77,6 +65,13 @@ The health endpoint (`core/packages/volto/razzle.config.js`) returns:
 - `tests-playwright/integration/quanta-toolbar.spec.ts` - Tests Quanta toolbar appears on block selection
 - `tests-playwright/integration/inline-editing.spec.ts` - Tests inline editing functionality
 - `tests-playwright/integration/drag-and-drop.spec.ts` - Tests block reordering via drag and drop
+
+## Test Helpers
+
+List all AdminUIHelper methods:
+```bash
+grep -E '^\s+(async\s+)?[a-zA-Z_]+\(' tests-playwright/helpers/AdminUIHelper.ts | grep -v 'if\s*(' | grep -v 'for\s*(' | sed 's/^\s*//' | awk -F'(' '{print $1}' | sed 's/async //' | sort -u
+```
 
 ## Manual Development Server
 
@@ -171,5 +166,7 @@ lsof -ti:8888,3001,3002 2>/dev/null | xargs kill -9 2>/dev/null
 - only git commit when I ask you to
 - Playwright's `webServer.reuseExistingServer: true` means it will use a manually-started Volto server if available
 - The test setup skips `build:deps` to avoid parcel segfault in non-interactive shells
-- **NEVER* kill node processes. check if you really need to kill a process as some tests reload
+- **NEVER* kill all node processes haphazardly. check if you really need to kill a process as some tests reload
 - to check volto is compiling use http://localhost:3002/health
+- custom schemas are registered in the renderer.js on init.
+- node ids are added dynamically by hydra.js

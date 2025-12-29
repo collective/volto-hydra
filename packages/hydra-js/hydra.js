@@ -78,7 +78,7 @@
 // onEditChange
 
 // Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
-let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
+let debugEnabled = true; // TEMP: Enable for debugging
 const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
 
 /**
@@ -124,11 +124,36 @@ export class Bridge {
     this.textUpdateTimer = null; // Timer for batching text updates
     this.pendingTextUpdate = null; // Pending text update data
     this.scrollTimeout = null; // Timer for scroll debouncing
-    this.isProcessingExternalUpdate = false; // Flag to suppress messages during FORM_DATA processing
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
     this.init(options); // Initialize the bridge
+  }
+
+  /**
+   * Central method for receiving form data from Admin UI.
+   * Sets both formData and lastReceivedFormData for echo detection.
+   * All incoming data (INITIAL_DATA, FORM_DATA) should use this.
+   *
+   * @param {Object} data - The form data from Admin UI
+   * @param {string} source - Where the data came from (for logging)
+   * @param {Object} [blockPathMap] - Optional blockPathMap for nested block lookup
+   */
+  setFormDataFromAdmin(data, source, blockPathMap) {
+    if (blockPathMap === undefined) {
+      throw new Error(`setFormDataFromAdmin: blockPathMap is required (source: ${source})`);
+    }
+
+    this.blockPathMap = blockPathMap;
+
+    const seq = data?._editSequence || 0;
+    // Use simple direct lookup for logging - getBlockData uses this.formData which isn't set yet
+    const blockData = this.selectedBlockUid ? data?.blocks?.[this.selectedBlockUid] : null;
+    const text = blockData?.value?.[0]?.children?.[0]?.text?.substring(0, 40);
+    log(`[setFormDataFromAdmin] source: ${source}, seq: ${seq}, block: ${this.selectedBlockUid}, text: ${JSON.stringify(text)}`);
+
+    this.formData = JSON.parse(JSON.stringify(data));
+    this.lastReceivedFormData = JSON.parse(JSON.stringify(data));
   }
 
   /**
@@ -154,6 +179,14 @@ export class Bridge {
         }
       }
       if (current) {
+        // Inject virtual @type for object_list items (e.g., 'slider:slides')
+        // This allows field type lookup to work without items having actual @type
+        // IMPORTANT: Mutate the original object, don't return a copy, so that
+        // modifications to the returned object update formData for inline editing sync
+        if (pathInfo.itemType) {
+          log('getBlockData: found object_list item via path, injecting @type:', pathInfo.itemType);
+          current['@type'] = pathInfo.itemType;
+        }
         log('getBlockData: found via path, @type:', current['@type']);
         return current;
       }
@@ -180,24 +213,40 @@ export class Bridge {
 
   /**
    * Get editable fields that belong directly to a block, excluding nested blocks' fields.
+   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement[]} Array of editable field elements that belong to this block
    */
   getOwnEditableFields(blockElement) {
+    const result = [];
+    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
+    if (blockElement.hasAttribute('data-editable-field')) {
+      result.push(blockElement);
+    }
+    // Also check descendants
     const allFields = blockElement.querySelectorAll('[data-editable-field]');
-    return Array.from(allFields).filter(
-      (field) => this.fieldBelongsToBlock(field, blockElement),
-    );
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        result.push(field);
+      }
+    }
+    return result;
   }
 
   /**
    * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
+   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement|null} The first editable field or null if none
    */
   getOwnFirstEditableField(blockElement) {
+    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
+    if (blockElement.hasAttribute('data-editable-field')) {
+      return blockElement;
+    }
+    // Check descendants
     const allFields = blockElement.querySelectorAll('[data-editable-field]');
     for (const field of allFields) {
       if (this.fieldBelongsToBlock(field, blockElement)) {
@@ -205,6 +254,23 @@ export class Bridge {
       }
     }
     return null;
+  }
+
+  /**
+   * Get an editable field by name that belongs to a block.
+   * Also checks if the blockElement itself has the field (Nuxt pattern).
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @param {string} fieldName - The field name to find
+   * @returns {HTMLElement|null} The editable field or null if not found
+   */
+  getEditableFieldByName(blockElement, fieldName) {
+    // Check if block element itself is the editable field (Nuxt: both attrs on same element)
+    if (blockElement.getAttribute('data-editable-field') === fieldName) {
+      return blockElement;
+    }
+    // Check descendants
+    return blockElement.querySelector(`[data-editable-field="${fieldName}"]`);
   }
 
   /**
@@ -218,7 +284,9 @@ export class Bridge {
   getAddDirection(blockElement) {
     // Empty blocks should not have an add button - they are meant to be replaced
     // via block chooser, not have blocks added after them
-    if (blockElement.getAttribute('data-block-type') === 'empty') {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const blockData = this.getBlockData(blockUid);
+    if (blockData?.['@type'] === 'empty') {
       return 'hidden';
     }
 
@@ -290,6 +358,53 @@ export class Bridge {
     }
 
     window.parent.postMessage(message, this.adminOrigin);
+  }
+
+  /**
+   * Shows a developer warning overlay in the iframe.
+   * Used to alert developers about configuration issues.
+   *
+   * @param {string} title - Warning title
+   * @param {string} message - Detailed message with DOM info
+   */
+  showDeveloperWarning(title, message) {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'hydra-dev-warning';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      max-width: 500px;
+      max-height: 80vh;
+      background: #fef2f2;
+      border: 2px solid #dc2626;
+      border-radius: 8px;
+      padding: 16px;
+      z-index: 999999;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      overflow: auto;
+    `;
+
+    overlay.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <strong style="color: #dc2626; font-size: 14px;">⚠️ ${title}</strong>
+        <button id="hydra-warning-close" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
+      </div>
+      <pre style="white-space: pre-wrap; word-break: break-word; margin: 0; color: #1f2937;">${message}</pre>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Close button
+    document.getElementById('hydra-warning-close')?.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    // Auto-hide after 30 seconds
+    setTimeout(() => overlay.remove(), 30000);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -394,15 +509,13 @@ export class Bridge {
         const receiveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
-              this.formData = JSON.parse(JSON.stringify(e.data.data));
-              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
-
               // Store block field types metadata (blockId -> fieldName -> fieldType)
               this.blockFieldTypes = e.data.blockFieldTypes || {};
               log('Stored blockFieldTypes:', this.blockFieldTypes);
 
-              // Store blockPathMap for nested block lookup
-              this.blockPathMap = e.data.blockPathMap || {};
+              // Central method sets formData, lastReceivedFormData, and blockPathMap
+              this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
+              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
               log('Stored blockPathMap keys:', Object.keys(this.blockPathMap));
 
               // Store Slate configuration for keyboard shortcuts and toolbar
@@ -411,15 +524,10 @@ export class Bridge {
               // Add nodeIds to all slate fields in all blocks
               this.addNodeIdsToAllSlateFields();
 
-              window.postMessage(
-                {
-                  type: 'FORM_DATA',
-                  data: this.formData,
-                  blockPathMap: this.blockPathMap,
-                  sender: 'hydrajs-initial',
-                },
-                window.location.origin,
-              );
+              // Call onContentChange callback directly to trigger initial render
+              if (this.onContentChangeCallback) {
+                this.onContentChangeCallback(this.formData);
+              }
             }
           }
         };
@@ -487,6 +595,8 @@ export class Bridge {
    * @param {function} callback - The function to call when form data is received.
    */
   onEditChange(callback) {
+    // Store callback so INITIAL_DATA handler can use it
+    this.onContentChangeCallback = callback;
     this.realTimeDataHandler = (event) => {
       // Learn admin origin from first message if needed
       if (this.learnOriginFromFirstMessage && !this.adminOrigin) {
@@ -506,24 +616,31 @@ export class Bridge {
           log('Received', event.data.type, 'message');
           if (event.data.data) {
             // Don't set isInlineEditing to false - user is still editing
-            this.formData = JSON.parse(JSON.stringify(event.data.data));
-            // Store blockPathMap for looking up nested blocks
-            this.blockPathMap = event.data.blockPathMap || {};
+            // Check if focused field content changed - if so, this is a sidebar edit,
+            // not just a sync. Clear savedClickPosition to prevent stealing focus.
+            if (this.savedClickPosition && !this.focusedFieldValuesEqual(this.formData, event.data.data)) {
+              log('FORM_DATA: content changed, clearing savedClickPosition (sidebar edit)');
+              this.savedClickPosition = null;
+            }
+
+            // Check if Admin wants to select a different block (e.g., after Enter creates new block)
+            // Update selectedBlockUid BEFORE setFormDataFromAdmin so logging shows correct block
+            const adminSelectedBlockUid = event.data.selectedBlockUid;
+            const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
+            if (needsBlockSwitch) {
+              log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
+              this.selectedBlockUid = adminSelectedBlockUid;
+            }
+
+            // Central method for setting form data with logging (also sets blockPathMap)
+            this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
 
             // Add nodeIds to all slate blocks before rendering
             // Admin UI never sends nodeIds, so we always need to add them
             this.addNodeIdsToAllSlateFields();
 
-            // Log the block data to see if bold formatting is present
-            const selectedBlockData = this.getBlockData(this.selectedBlockUid);
-            if (this.selectedBlockUid && selectedBlockData) {
-              log('Block data being passed to callback:', JSON.stringify(selectedBlockData.value));
-            }
-
-            // Suppress outbound messages during external update processing
-            // This prevents hydra from sending SELECTION_CHANGE or INLINE_EDIT_DATA
-            // back to Admin when the update originated FROM Admin
-            this.isProcessingExternalUpdate = true;
+            // Extract formatRequestId early so it's available in rAF callbacks
+            const formatRequestId = event.data.formatRequestId;
 
             // Call the callback first to trigger the re-render
             log('Calling onEditChange callback to trigger re-render');
@@ -535,12 +652,14 @@ export class Bridge {
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                // Mark empty blocks so they can be styled (must run on every render)
+                this.markEmptyBlocks();
+
                 // IMPORTANT: Ensure ZWS in empty inline elements BEFORE restoring selection
                 // This allows cursor positioning inside empty formatting elements
                 if (this.selectedBlockUid) {
                   const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
                   if (blockElement) {
-                    this.ensureZeroWidthSpaces(blockElement);
                     // Re-attach mutation observer after DOM re-render
                     // The old observer was watching the old blockElement which no longer exists
                     this.observeBlockTextChanges(blockElement);
@@ -576,13 +695,21 @@ export class Bridge {
                   // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
                   // the selection we're about to restore from transformedSelection
                   this.savedClickPosition = null;
-                  this.restoreSlateSelection(event.data.transformedSelection, this.formData);
+                  try {
+                    this.restoreSlateSelection(event.data.transformedSelection, this.formData);
+                  } catch (e) {
+                    console.error('[HYDRA] Error restoring selection:', e);
+                  }
                 }
-                // Skip restoring savedSelection for sidebar edits - user is typing there, not in iframe
-                // Clear the processing flag BEFORE replay so handleTextChange can process buffered text
-                this.isProcessingExternalUpdate = false;
-                // Replay any buffered keystrokes now that DOM is ready
-                this.replayBufferedEvents();
+
+                // Unblock after selection restore - iframe state is now fully settled
+                // This ensures the next keypress sees correct DOM and selection state
+                // This MUST run even if selection restore fails, so it's outside the try/catch
+                if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
+                  log('Unblocking input for', this.pendingTransform.blockId, '- after selection restore');
+                  this.setBlockProcessing(this.pendingTransform.blockId, false);
+                }
+
               });
             });
 
@@ -592,48 +719,81 @@ export class Bridge {
             // FORM_DATA is just data synchronization - it updates the rendered blocks
             // but should not change which block is selected or create/destroy toolbars
 
-            // Unblock input if this FORM_DATA has a matching formatRequestId
-            // This ensures we only unblock for the specific format operation that caused blocking
-            const formatRequestId = event.data.formatRequestId;
-            log('FORM_DATA received with formatRequestId:', formatRequestId, 'pendingTransform:', JSON.stringify(this.pendingTransform));
-            if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
-              log('Unblocking input for', this.pendingTransform.blockId, '- formatRequestId matches');
-              this.setBlockProcessing(this.pendingTransform.blockId, false);
-            } else if (formatRequestId) {
-              log('formatRequestId', formatRequestId, 'does not match pending requestId:', this.pendingTransform?.requestId);
-            } else {
-              log('No formatRequestId in FORM_DATA, not unblocking');
-            }
-
             // Update block UI overlay positions after form data changes
             // Blocks might have resized after form updates
             // Skip focus if this is from sidebar editing (no transformedSelection)
             const skipFocus = !event.data.transformedSelection;
 
-            // Check if Admin wants to select a different block (e.g., after adding a new block)
-            // This handles the timing issue where SELECT_BLOCK arrives before the block exists
-            const adminSelectedBlockUid = event.data.selectedBlockUid;
-            const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
-
+            // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
+            // For existing block, just update UI positions
             if (needsBlockSwitch) {
-              // Admin selected a different block - select it after re-render
-              // This will trigger selectBlock() which sends BLOCK_SELECTED back to Admin
+              // New block created (e.g., Enter key, sidebar add) - need full selectBlock setup
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
+                  let newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  // If block is hidden (e.g., new carousel slide), try to make it visible first
+                  if (newBlockElement && this.isElementHidden(newBlockElement)) {
+                    log('FORM_DATA: new block is hidden, trying to make visible:', this.selectedBlockUid);
+                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    if (madeVisible) {
+                      // Wait for block to become visible, then select it
+                      const waitForVisible = async () => {
+                        for (let i = 0; i < 10; i++) {
+                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                          if (newBlockElement && !this.isElementHidden(newBlockElement)) {
+                            log('FORM_DATA: new block now visible, selecting');
+                            this.selectBlock(newBlockElement);
+                            return;
+                          }
+                        }
+                        log('FORM_DATA: timeout waiting for new block to become visible');
+                      };
+                      waitForVisible();
+                      this.replayBufferedEvents();
+                      return;
+                    }
+                  }
                   if (newBlockElement) {
-                    log('Selecting block from FORM_DATA selectedBlockUid:', adminSelectedBlockUid);
+                    log('Selecting new block from FORM_DATA:', this.selectedBlockUid);
                     this.selectBlock(newBlockElement);
                   }
+                  // Replay any buffered keystrokes now that DOM is ready
+                  this.replayBufferedEvents();
                 });
               });
             } else if (this.selectedBlockUid) {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  let blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  // If block is hidden (e.g., carousel slide), try to make it visible
+                  if (blockElement && this.isElementHidden(blockElement)) {
+                    log('FORM_DATA: selected block is hidden, trying to make visible:', this.selectedBlockUid);
+                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    if (madeVisible) {
+                      // Wait for block to become visible, then update UI
+                      const waitForVisible = async () => {
+                        for (let i = 0; i < 10; i++) {
+                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                          if (blockElement && !this.isElementHidden(blockElement)) {
+                            log('FORM_DATA: block now visible, updating UI');
+                            this.updateBlockUIAfterFormData(blockElement, skipFocus);
+                            return;
+                          }
+                        }
+                        log('FORM_DATA: timeout waiting for block to become visible');
+                      };
+                      waitForVisible();
+                      this.replayBufferedEvents();
+                      return;
+                    }
+                  }
                   if (blockElement) {
                     this.updateBlockUIAfterFormData(blockElement, skipFocus);
                   }
+                  // Replay any buffered keystrokes now that DOM is ready
+                  this.replayBufferedEvents();
                 });
               });
             }
@@ -644,7 +804,7 @@ export class Bridge {
           // Parent is requesting a buffer flush before applying format
           // This ensures the parent's Slate editor has the latest text
           const requestId = event.data.requestId;
-          log('Received FLUSH_BUFFER request, requestId:', requestId);
+          log('Received FLUSH_BUFFER request, requestId:', requestId, 'savedSelection:', this.savedSelection);
 
           // Block input during format operation - will be unblocked when FORM_DATA arrives
           // This prevents any text changes from being sent while format is being applied
@@ -662,12 +822,13 @@ export class Bridge {
           } else {
             // No pending text - send BUFFER_FLUSHED immediately (safe to proceed)
             // Include current selection so toolbar has it when applying format
+            const selection = this.serializeSelection();
+            log('No pending text, sending BUFFER_FLUSHED with selection:', selection);
             this.sendMessageToParent({
               type: 'BUFFER_FLUSHED',
               requestId: requestId,
-              selection: this.serializeSelection(),
+              selection: selection,
             });
-            log('No pending text, sent BUFFER_FLUSHED immediately');
           }
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
@@ -734,9 +895,9 @@ export class Bridge {
 
     let fieldToFocus = null;
 
-    if (this.lastClickEvent) {
+    if (this.lastClickPosition?.target) {
       // Find the clicked editable field - only accept if it belongs to THIS block
-      const clickedElement = this.lastClickEvent.target;
+      const clickedElement = this.lastClickPosition.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
       log('Click event path - found clickedField:', !!clickedField);
       if (clickedField && this.fieldBelongsToBlock(clickedField, blockElement)) {
@@ -777,16 +938,17 @@ export class Bridge {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
-      event.stopPropagation();
-
       // Handle data-block-selector clicks (carousel nav buttons, etc.)
-      // Don't preventDefault - let frontend handle visibility changes
+      // Don't stopPropagation or preventDefault - let frontend handle visibility changes
       const selectorElement = event.target.closest('[data-block-selector]');
       if (selectorElement) {
         const selector = selectorElement.getAttribute('data-block-selector');
         this.handleBlockSelector(selector, selectorElement);
         return;
       }
+
+      // Stop propagation for block clicks (but not selector clicks above)
+      event.stopPropagation();
 
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
@@ -804,8 +966,22 @@ export class Bridge {
           event.preventDefault();
         }
 
-        // Store the click event for cursor positioning
-        this.lastClickEvent = event;
+        // Store click position relative to the editable element for cursor positioning
+        // Using relative coordinates ensures focus()/scroll doesn't invalidate the position
+        // Also store the target for field detection
+        const clickedEditableField = event.target.closest('[data-editable-field]');
+        const editableField = clickedEditableField || blockElement.querySelector('[data-editable-field]');
+        if (editableField) {
+          const rect = editableField.getBoundingClientRect();
+          this.lastClickPosition = {
+            relativeX: event.clientX - rect.left,
+            relativeY: event.clientY - rect.top,
+            editableField: editableField.getAttribute('data-editable-field'),
+            target: event.target, // For field detection
+          };
+        } else {
+          this.lastClickPosition = null;
+        }
         this.selectBlock(blockElement);
       }
     };
@@ -932,7 +1108,7 @@ export class Bridge {
 
       // Visual feedback on current element
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-      const editableField = block?.querySelector('[data-editable-field]');
+      const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'wait';
       }
@@ -950,7 +1126,7 @@ export class Bridge {
 
       // Restore visual feedback on current element (may be new after re-render)
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-      const editableField = block?.querySelector('[data-editable-field]');
+      const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'text';
       }
@@ -1029,7 +1205,7 @@ export class Bridge {
         // but our MutationObserver only watches for characterData mutations
         const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
         if (editableField && this.isInlineEditing) {
-          this.handleTextChange(editableField, textNode.parentElement);
+          this.handleTextChange(editableField, textNode.parentElement, textNode);
         }
       }
     }
@@ -1043,7 +1219,7 @@ export class Bridge {
    */
   handleTransformTimeout(blockId) {
     const block = document.querySelector(`[data-block-uid="${blockId}"]`);
-    const editableField = block?.querySelector('[data-editable-field="value"]');
+    const editableField = block ? this.getOwnFirstEditableField(block) : null;
 
     if (editableField) {
       // Show error state - permanently disable editing
@@ -1059,6 +1235,245 @@ export class Bridge {
   }
 
   ////////////////////////////////////////////////////////////////////////////////
+  // Cursor Position Correction - Handle template whitespace
+  ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Checks if a node is on invalid whitespace (text node outside any data-node-id element).
+   * This happens when cursor lands on template whitespace in Vue/Nuxt templates.
+   *
+   * @param {Node} node - The DOM node to check
+   * @returns {boolean} True if the node is on invalid whitespace
+   */
+  isOnInvalidWhitespace(node) {
+    if (!node) return false;
+
+    // Handle ELEMENT nodes - cursor can land on wrapper DIV when clicking at edge of block
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // If this element has data-node-id, cursor position is valid
+      if (node.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+
+      // If this element is an editable field itself, it's valid
+      if (node.hasAttribute?.('data-editable-field')) {
+        return false;
+      }
+
+      // Check if this element is inside a block that has slate fields
+      const blockElement = node.closest?.('[data-block-uid]');
+      if (!blockElement) {
+        return false;
+      }
+
+      // Check if there's any data-node-id element inside the block
+      // (could be nested or on same element as editable-field)
+      const nodeIdElement = blockElement.querySelector('[data-node-id]');
+      if (nodeIdElement && !node.closest?.('[data-node-id]')) {
+        // Element is inside a block with slate content but outside data-node-id
+        log('isOnInvalidWhitespace: element inside block but outside data-node-id, tagName:', node.tagName);
+        return true;
+      }
+
+      return false;
+    }
+
+    // Only TEXT nodes can be "invalid whitespace" (Vue template artifacts like "\n  ")
+    if (node.nodeType !== Node.TEXT_NODE) {
+      return false;
+    }
+
+    // Find the editable field container
+    let editableField = null;
+    let current = node.parentNode;
+    while (current) {
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-editable-field')) {
+        editableField = current;
+        break;
+      }
+      current = current.parentNode;
+    }
+
+    // Not inside an editable field at all
+    if (!editableField) {
+      return false;
+    }
+
+    // If the editable field has no data-node-id elements, it's not Slate-rendered
+    // (e.g., Nuxt simple HTML) - don't try to correct whitespace
+    if (!editableField.querySelector('[data-node-id]')) {
+      return false;
+    }
+
+    // Walk up from node to find if there's a data-node-id ancestor (including editableField itself)
+    current = node.parentNode;
+    while (current) {
+      // If we hit an element with data-node-id, cursor is valid
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+        return false;
+      }
+      // Stop at editable field boundary
+      if (current === editableField) {
+        break;
+      }
+      current = current.parentNode;
+    }
+
+    // Reached editable field without finding data-node-id - cursor is on whitespace
+    return true;
+  }
+
+  /**
+   * Gets the valid position for a node on invalid whitespace.
+   * Whitespace can only be before first block or after last block.
+   *
+   * @param {Node} node - The text node that's on invalid whitespace
+   * @param {boolean} isRangeEnd - If true, this is the end of a range selection (return end position)
+   * @returns {{textNode: Node, offset: number}|null} Target position, or null if not found
+   */
+  getValidPositionForWhitespace(node, isRangeEnd = false) {
+    if (!node) return null;
+
+    log('getValidPositionForWhitespace: node=', node.nodeType === Node.TEXT_NODE ? 'TEXT' : node.tagName, 'content=', JSON.stringify(node.textContent?.substring(0, 20)), 'isRangeEnd=', isRangeEnd);
+
+    // Find the editable field container
+    let container = null;
+
+    // For element nodes, check if the node itself is the container
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-editable-field')) {
+      container = node;
+    }
+    // Check if we can find editable field by walking up
+    if (!container) {
+      let current = node.parentNode;
+      while (current && !current.hasAttribute?.('data-editable-field')) {
+        current = current.parentNode;
+      }
+      container = current;
+    }
+    // For element nodes (like block wrapper), also check inside for editable field
+    if (!container && node.nodeType === Node.ELEMENT_NODE) {
+      container = node.querySelector?.('[data-editable-field]');
+    }
+
+    if (!container) {
+      log('getValidPositionForWhitespace: no container found');
+      return null;
+    }
+
+    // Get first and last elements with data-node-id
+    // Check if container itself has data-node-id first, then look for descendants
+    const firstNodeIdEl = container.hasAttribute?.('data-node-id')
+      ? container
+      : container.querySelector('[data-node-id]');
+    const allNodeIdEls = container.hasAttribute?.('data-node-id')
+      ? [container, ...container.querySelectorAll('[data-node-id]')]
+      : container.querySelectorAll('[data-node-id]');
+    const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
+
+    if (!firstNodeIdEl) {
+      log('getValidPositionForWhitespace: no firstNodeIdEl found');
+      return null;
+    }
+
+    // If isRangeEnd is specified, use that to determine position (for serializing range selections)
+    // Otherwise, determine based on DOM position of the whitespace
+    let returnEndPosition = isRangeEnd;
+    if (!isRangeEnd) {
+      // Determine if whitespace is before first or after last by comparing DOM positions
+      const position = node.compareDocumentPosition(firstNodeIdEl);
+      const isBeforeFirst = position & Node.DOCUMENT_POSITION_FOLLOWING;
+      returnEndPosition = !isBeforeFirst; // After content = return end position
+      log('getValidPositionForWhitespace: isBeforeFirst=', isBeforeFirst, 'firstNodeIdEl=', firstNodeIdEl.tagName, 'nodeId=', firstNodeIdEl.getAttribute('data-node-id'));
+    }
+
+    if (!returnEndPosition) {
+      // Start position → start of first text node
+      const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
+      const textNode = walker.nextNode();
+      log('getValidPositionForWhitespace: returning start of first text node:', textNode?.textContent?.substring(0, 20));
+      return textNode ? { textNode, offset: 0 } : null;
+    } else {
+      // End position → end of last text node
+      const walker = document.createTreeWalker(lastNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
+      let lastText = null;
+      while (walker.nextNode()) {
+        lastText = walker.currentNode;
+      }
+      log('getValidPositionForWhitespace: returning end of last text node:', lastText?.textContent?.substring(0, 20), 'offset:', lastText?.textContent?.length);
+      return lastText ? { textNode: lastText, offset: lastText.textContent.length } : null;
+    }
+  }
+
+  /**
+   * Validates a position and returns a corrected position if on invalid whitespace.
+   * @param {Node} node - The node containing the position
+   * @param {number} offset - The offset within the node
+   * @returns {{node: Node, offset: number}} The validated (possibly corrected) position
+   */
+  getValidatedPosition(node, offset) {
+    if (this.isOnInvalidWhitespace(node)) {
+      const validPos = this.getValidPositionForWhitespace(node);
+      if (validPos) {
+        return { node: validPos.textNode, offset: validPos.offset };
+      }
+    }
+    return { node, offset };
+  }
+
+  /**
+   * Corrects cursor/selection if it's on invalid whitespace.
+   * For collapsed selections, moves cursor to nearest valid position.
+   * For range selections, corrects each end independently.
+   *
+   * @returns {boolean} True if selection was corrected
+   */
+  correctInvalidWhitespaceSelection() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+    const anchorOnWhitespace = this.isOnInvalidWhitespace(range.startContainer);
+    const focusOnWhitespace = this.isOnInvalidWhitespace(range.endContainer);
+
+    if (!anchorOnWhitespace && !focusOnWhitespace) return false;
+
+    // Only log when actually correcting
+    log('correctInvalidWhitespaceSelection: correcting cursor on invalid whitespace', {
+      anchorOnWhitespace,
+      focusOnWhitespace,
+      anchorContent: range.startContainer.textContent?.substring(0, 20),
+      anchorParent: range.startContainer.parentElement?.tagName,
+    });
+
+    // Get corrected positions using shared helper
+    const anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+    const focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+
+    log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
+
+    if (!anchorPos.node || !focusPos.node) return false;
+
+    // Check if corrected position is same as current - if so, don't update (avoids infinite loop)
+    const anchorSame = anchorPos.node === range.startContainer && anchorPos.offset === range.startOffset;
+    const focusSame = focusPos.node === range.endContainer && focusPos.offset === range.endOffset;
+    if (anchorSame && focusSame) {
+      log('correctInvalidWhitespaceSelection: corrected position same as current, skipping to avoid loop');
+      return false;
+    }
+
+    // Set corrected selection
+    const newRange = document.createRange();
+    newRange.setStart(anchorPos.node, anchorPos.offset);
+    newRange.setEnd(focusPos.node, focusPos.offset);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+
+    log('correctInvalidWhitespaceSelection: Corrected selection');
+    return true;
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////
   // Selection Serialization - Convert DOM selection to Slate selection
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -1071,6 +1486,12 @@ export class Bridge {
   serializeSelection() {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) {
+      // No live DOM selection - use savedSelection if available
+      // This happens when iframe loses focus (e.g., toolbar button click)
+      if (this.savedSelection) {
+        log('serializeSelection: using savedSelection (no live selection)');
+        return this.savedSelection;
+      }
       return null;
     }
 
@@ -1085,11 +1506,135 @@ export class Bridge {
     const focus = this.serializePoint(focusNode, range.endOffset);
 
     if (!anchor || !focus) {
-      console.warn('[HYDRA] Could not serialize selection points');
+      // Only warn if this is a Slate field (has data-node-id elements)
+      // Non-Slate fields (simple text) can't be serialized and that's expected
+      let editableField = range.commonAncestorContainer;
+      while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+        editableField = editableField.parentNode;
+      }
+      if (editableField && editableField.querySelector('[data-node-id]')) {
+        console.warn('[HYDRA] Could not serialize selection points in Slate field');
+      }
       return null;
     }
 
+    // Validate the selection paths against the actual Slate value
+    // Log detailed debugging info if invalid, but still send the path so the error is visible
+    const validationResult = this.validateSelectionPaths(anchor, focus, range.commonAncestorContainer);
+    if (!validationResult.valid) {
+      console.error('[HYDRA] Invalid selection path detected! This will cause a Slate error.\n\n' +
+        `Anchor path: [${anchor.path.join(', ')}], offset: ${anchor.offset}\n` +
+        `Focus path: [${focus.path.join(', ')}], offset: ${focus.offset}\n\n` +
+        `Error: ${validationResult.error}\n\n` +
+        `DOM structure:\n${validationResult.domStructure}\n\n` +
+        `Slate structure:\n${validationResult.slateStructure}`
+      );
+      // Still return the selection so it blows up visibly in Volto
+    }
+
     return { anchor, focus };
+  }
+
+  /**
+   * Validates that selection paths exist in the Slate structure.
+   * Returns detailed debugging info if invalid.
+   */
+  validateSelectionPaths(anchor, focus, commonAncestor) {
+    // Find the editable field container and block
+    let editableField = commonAncestor;
+    while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+      editableField = editableField.parentNode;
+    }
+    if (!editableField) {
+      return { valid: true }; // Can't validate without editable field
+    }
+
+    // Find the block element
+    let blockElement = editableField;
+    while (blockElement && !blockElement.hasAttribute?.('data-block-uid')) {
+      blockElement = blockElement.parentNode;
+    }
+    if (!blockElement) {
+      return { valid: true }; // Can't validate without block
+    }
+
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const fieldName = editableField.getAttribute('data-editable-field');
+    const blockData = this.getBlockData(blockUid);
+
+    if (!blockData || !blockData[fieldName]) {
+      return { valid: true }; // Can't validate without Slate value
+    }
+
+    const slateValue = blockData[fieldName];
+    if (!Array.isArray(slateValue)) {
+      return { valid: true }; // Not a Slate field
+    }
+
+    // Validate anchor path
+    const anchorValid = this.isPathValidInSlate(anchor.path, slateValue);
+    const focusValid = this.isPathValidInSlate(focus.path, slateValue);
+
+    if (anchorValid && focusValid) {
+      return { valid: true };
+    }
+
+    // Build DOM structure for debugging
+    const domStructure = this.buildDomStructureForDebug(editableField);
+    const slateStructure = JSON.stringify(slateValue, null, 2).substring(0, 500);
+
+    return {
+      valid: false,
+      error: !anchorValid
+        ? `Anchor path [${anchor.path.join(', ')}] not found in Slate`
+        : `Focus path [${focus.path.join(', ')}] not found in Slate`,
+      domStructure,
+      slateStructure,
+    };
+  }
+
+  /**
+   * Checks if a path exists in a Slate value
+   */
+  isPathValidInSlate(path, value) {
+    let current = { children: value };
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+      if (!current.children || !Array.isArray(current.children)) {
+        return false;
+      }
+      if (index < 0 || index >= current.children.length) {
+        return false;
+      }
+      current = current.children[index];
+    }
+    return true;
+  }
+
+  /**
+   * Builds a string representation of the DOM structure for debugging
+   */
+  buildDomStructureForDebug(element, depth = 0) {
+    const indent = '  '.repeat(depth);
+    let result = '';
+
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent.substring(0, 30);
+        result += `${indent}TEXT: "${text}"${child.textContent.length > 30 ? '...' : ''}\n`;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        const nodeId = child.getAttribute('data-node-id');
+        const nodeIdAttr = nodeId ? ` data-node-id="${nodeId}"` : '';
+        result += `${indent}<${tag}${nodeIdAttr}>\n`;
+        if (depth < 3) {
+          result += this.buildDomStructureForDebug(child, depth + 1);
+        }
+      } else if (child.nodeType === Node.COMMENT_NODE) {
+        result += `${indent}<!-- comment -->\n`;
+      }
+    }
+    return result;
   }
 
   /**
@@ -1146,13 +1691,87 @@ export class Bridge {
     }
 
     // Walk up to find the path through the Slate structure
-    const path = this.getNodePath(textNode);
+    let path = this.getNodePath(textNode);
     if (!path) {
-      console.warn('[HYDRA] serializePoint: getNodePath returned null for textNode:', textNode);
-      return null;
+      // Text node might be a Vue template artifact (whitespace text node outside data-node-id)
+      // Use getValidPositionForWhitespace to find the first/last valid text node
+      // isRangeEnd=true for end position (offset > 0), false for start (offset === 0)
+      const isEndPosition = offset > 0;
+      const validPos = this.getValidPositionForWhitespace(textNode, isEndPosition);
+      if (validPos) {
+        textNode = validPos.textNode;
+        textOffset = validPos.offset;
+        path = this.getNodePath(textNode);
+      }
+      if (!path) {
+        // getNodePath returns null for non-Slate fields (expected) or missing data-node-id (error logged there)
+        return null;
+      }
     }
 
-    return { path, offset: textOffset };
+    // Calculate offset using range.toString() for proper whitespace normalization
+    // This handles Vue/Nuxt whitespace artifacts that don't match Slate's model
+    const normalizedOffset = this.calculateNormalizedOffset(textNode, textOffset);
+
+    return { path, offset: normalizedOffset };
+  }
+
+  /**
+   * Calculate text offset using range.toString() for whitespace normalization.
+   * Finds the start of the current Slate text leaf and measures to cursor.
+   */
+  calculateNormalizedOffset(textNode, domOffset) {
+    const parent = textNode.parentNode;
+    if (!parent) return domOffset;
+
+    // Find the start point for measuring - either:
+    // 1. End of preceding element with data-node-id (text is after formatted span)
+    // 2. Start of parent element with data-node-id (text is inside formatted span)
+    // 3. Start of parent if no preceding element (first text in block)
+
+    let startNode = null;
+    let startAtEnd = false;
+
+    // First check for preceding sibling with data-node-id (e.g., text after <strong>)
+    // This takes priority over parent having data-node-id
+    const siblings = Array.from(parent.childNodes);
+    const nodeIndex = siblings.indexOf(textNode);
+
+    for (let i = nodeIndex - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+        startNode = sib;
+        startAtEnd = true; // Measure from end of preceding element
+        break;
+      }
+    }
+
+    // If no preceding sibling with data-node-id, check if parent has data-node-id
+    // (text is inside formatted element like <strong>)
+    if (!startNode && parent.hasAttribute?.('data-node-id')) {
+      startNode = parent;
+      startAtEnd = false; // Measure from start of parent
+    }
+
+    // Create range from start point to cursor
+    const range = document.createRange();
+
+    if (startNode && startAtEnd) {
+      // Measure from end of preceding element
+      range.setStartAfter(startNode);
+    } else if (startNode) {
+      // Measure from start of parent element
+      range.setStart(startNode, 0);
+    } else {
+      // No preceding element - measure from start of parent
+      range.setStart(parent, 0);
+    }
+
+    range.setEnd(textNode, domOffset);
+
+    // range.toString() normalizes whitespace as the browser renders it
+    // Strip ZWS characters since they don't exist in Slate's model
+    return this.stripZeroWidthSpaces(range.toString()).length;
   }
 
   /**
@@ -1188,28 +1807,34 @@ export class Bridge {
    * Calculate the Slate index of a node among its siblings.
    * Elements with data-node-id use their ID's last component.
    * Text nodes use the next index after the previous sibling.
+   * Empty/whitespace text nodes (Vue artifacts) map to the previous real content.
    */
   getSlateIndexAmongSiblings(node, parent) {
+    // For elements with data-node-id, use the index from the ID
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-node-id')) {
+      const nodeId = node.getAttribute('data-node-id');
+      const parts = nodeId.split(/[.-]/);
+      return parseInt(parts[parts.length - 1], 10);
+    }
+
+    // For text nodes (including whitespace), find the preceding element with data-node-id
+    // The text node's index = (preceding element's last id part) + 1
+    // This works regardless of whitespace because all text after an element
+    // belongs to the next Slate text leaf
     const siblings = Array.from(parent.childNodes);
     const nodeIndex = siblings.indexOf(node);
 
-    // Look at all siblings before this node to determine Slate index
-    let slateIndex = 0;
-    for (let i = 0; i < nodeIndex; i++) {
-      const sibling = siblings[i];
-      if (sibling.nodeType === Node.ELEMENT_NODE && sibling.hasAttribute('data-node-id')) {
-        // Element with data-node-id: parse its index from the ID
-        const nodeId = sibling.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/); // Split on . or -
-        const lastIndex = parseInt(parts[parts.length - 1], 10);
-        slateIndex = lastIndex + 1; // Next index after this element
-      } else if (sibling.nodeType === Node.TEXT_NODE) {
-        // Text node: takes the next index
-        slateIndex++;
+    for (let i = nodeIndex - 1; i >= 0; i--) {
+      const sib = siblings[i];
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+        const nodeId = sib.getAttribute('data-node-id');
+        const parts = nodeId.split(/[.-]/);
+        return parseInt(parts[parts.length - 1], 10) + 1;
       }
     }
 
-    return slateIndex;
+    // No preceding element with node-id - this is the first child (index 0)
+    return 0;
   }
 
   /**
@@ -1245,51 +1870,107 @@ export class Bridge {
     const path = [];
     let current = node;
 
+    // Inline elements that wrap text content (used to detect text leaf wrappers)
+    const INLINE_WRAPPER_ELEMENTS = [
+      'SPAN',
+      'STRONG',
+      'EM',
+      'B',
+      'I',
+      'U',
+      'S',
+      'CODE',
+      'A',
+      'SUB',
+      'SUP',
+      'MARK',
+    ];
+
+    // Helper to check if element is an inline wrapper (using CSS if available)
+    const isInlineElement = (el) => {
+      if (typeof window !== 'undefined' && window.getComputedStyle) {
+        const display = window.getComputedStyle(el).display;
+        if (display && display !== '') {
+          return display === 'inline' || display === 'inline-block';
+        }
+      }
+      // Fall back to tag name (JSDOM or no CSS)
+      return INLINE_WRAPPER_ELEMENTS.includes(el.nodeName);
+    };
 
     // If starting with a text node, calculate its Slate index
     if (node.nodeType === Node.TEXT_NODE) {
       const parent = node.parentNode;
 
-      // Check if parent has data-node-id AND is an inline element (span, strong, etc.)
+      // Check if parent has VALID data-node-id AND is an inline element (span, strong, etc.)
       // Inline elements wrap their text directly, blocks (p, div) may have multiple text children
+      // Skip empty or "undefined" nodeId values (from frontends that render undefined as string)
+      const parentNodeId = parent.hasAttribute?.('data-node-id')
+        ? parent.getAttribute('data-node-id')
+        : null;
+      const hasValidNodeId =
+        parentNodeId && parentNodeId !== '' && parentNodeId !== 'undefined';
       if (
-        parent.hasAttribute?.('data-node-id') &&
+        hasValidNodeId &&
         parent.nodeName !== 'P' &&
         parent.nodeName !== 'DIV' &&
         !parent.hasAttribute?.('data-editable-field')
       ) {
-        const nodeId = parent.getAttribute('data-node-id');
-
         // Parse the parent's path from its node ID
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
-        // Text node index within the parent element
-        const siblings = Array.from(parent.childNodes);
-        const textIndex = siblings.indexOf(node);
+        // Text node index within the parent element (filtered for Vue artifacts)
+        const textIndex = this.getSlateIndexAmongSiblings(node, parent);
 
         // Build path: parent path + text index
         path.push(...parts, textIndex);
         return path;
       } else {
-        // Parent is a block element or doesn't have data-node-id
-        // Calculate Slate index among siblings considering node IDs
-        const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
-        path.push(slateIndex);
-        current = parent;
+        // Parent doesn't have nodeId - is it a block element or inline wrapper?
+        // Inline wrappers (span, etc.) represent text leaves - don't count text inside
+        // Block elements (p, h1-h6, li, etc.) contain multiple children - count text position
+        const isWrapper =
+          isInlineElement(parent) &&
+          !parent.hasAttribute?.('data-editable-field');
+
+        if (isWrapper) {
+          // Parent is an inline wrapper without nodeId (like Nuxt spans for text leaves)
+          // Don't add textIndex - the wrapper represents the whole text leaf
+          // Let the while loop calculate the wrapper's position in the block
+          current = parent;
+        } else {
+          // Parent is a block element - calculate text's Slate index among siblings
+          const slateIndex = this.getSlateIndexAmongSiblings(node, parent);
+          path.push(slateIndex);
+          current = parent;
+        }
       }
     }
 
     // Walk up the DOM tree building the path
     let depth = 0;
+    let foundContainer = false;
+    let foundNodeIdInWalk = false;
     while (current) {
-      const hasNodeId = current.hasAttribute?.('data-node-id');
       const hasEditableField = current.hasAttribute?.('data-editable-field');
       const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
 
+      // Track if we've found an editable container
+      if (hasEditableField || hasSlateEditor) {
+        foundContainer = true;
+      }
 
-      // Process current node
-      if (hasNodeId) {
-        const nodeId = current.getAttribute('data-node-id');
+      // Check for valid nodeId (skip empty or "undefined" values from frontends)
+      const nodeId = current.hasAttribute?.('data-node-id')
+        ? current.getAttribute('data-node-id')
+        : null;
+      const hasValidNodeId =
+        nodeId && nodeId !== '' && nodeId !== 'undefined';
+
+      // Process current node if it has a valid nodeId
+      // Must process BEFORE checking editable-field since element can have both
+      if (hasValidNodeId) {
+        foundNodeIdInWalk = true;
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
         const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
 
@@ -1297,20 +1978,130 @@ export class Bridge {
         for (let i = parts.length - 1; i >= 0; i--) {
           path.unshift(parts[i]);
         }
+
+        // NodeIds are ABSOLUTE paths - stop after finding the first valid one
+        // e.g., nodeId "1-1" means [1, 1], don't continue to add parent's nodeId
+        break;
       }
 
-      // Stop if we've reached the editable field container or slate editor
+      // Stop if we've reached the editable field container or slate editor (without nodeId)
       if (hasEditableField || hasSlateEditor) {
         break;
       }
 
-      current = current.parentNode;
+      // Element without nodeId - only calculate index for inline wrapper elements
+      // that could contain text (span, strong, etc.). Skip void elements (br, img, hr).
+      const parent = current.parentNode;
+      if (
+        parent &&
+        current.nodeType === Node.ELEMENT_NODE &&
+        INLINE_WRAPPER_ELEMENTS.includes(current.nodeName)
+      ) {
+        const slateIndex = this.getSlateIndexAmongSiblings(current, parent);
+        path.unshift(slateIndex);
+      }
+
+      current = parent;
       depth++;
     }
 
+    // Verify we're within an editable container - if not found, continue walking up
+    if (!foundContainer && current) {
+      let checkNode = current.parentNode;
+      while (checkNode) {
+        if (
+          checkNode.hasAttribute?.('data-editable-field') ||
+          checkNode.hasAttribute?.('data-slate-editor')
+        ) {
+          foundContainer = true;
+          break;
+        }
+        checkNode = checkNode.parentNode;
+      }
+    }
+
     // If we didn't find the editable field or slate editor, path is invalid
-    if (!current) {
+    if (!current || !foundContainer) {
       console.warn('[HYDRA] getNodePath - no container found, returning null');
+      return null;
+    }
+
+    // If no nodeId was found, cursor may be on invalid whitespace or DOM is missing data-node-id.
+    // Log detailed debug info to help diagnose the issue.
+    if (!foundNodeIdInWalk) {
+      // Find the editable container for context
+      let container = node;
+      while (container && !container.hasAttribute?.('data-editable-field')) {
+        container = container.parentNode;
+      }
+      const blockElement = container?.closest?.('[data-block-uid]');
+      const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
+      const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+
+      // Get block type via getBlockData (handles object_list items with virtual @type)
+      const blockData = blockUid !== 'unknown' ? this.getBlockData(blockUid) : null;
+      const blockType = blockData?.['@type'] || 'unknown';
+
+      // Check if this field is supposed to be a Slate field
+      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+      const fieldType = blockTypeFields[fieldName];
+
+      // Only skip error for KNOWN non-Slate fields
+      // If fieldType is undefined (not registered), assume it could be Slate and show error
+      if (fieldType && fieldType !== 'slate') {
+        // This is a known non-Slate text field, just return null without error
+        return null;
+      }
+
+      // Check if container has ANY data-node-id elements
+      // If it does, the cursor is likely on whitespace and serializePoint will recover
+      // via getValidPositionForWhitespace - don't show warning yet
+      if (container?.querySelector('[data-node-id]')) {
+        // Container has valid slate elements - let caller try recovery
+        return null;
+      }
+
+      // Build DOM path showing which elements are missing data-node-id
+      const domPath = [];
+      let walkNode = node;
+      while (walkNode && walkNode !== current?.parentNode) {
+        if (walkNode.nodeType === Node.ELEMENT_NODE) {
+          const tag = walkNode.tagName.toLowerCase();
+          const nodeId = walkNode.getAttribute?.('data-node-id');
+          const classes = walkNode.className ? `.${walkNode.className.split(' ').join('.')}` : '';
+          if (nodeId) {
+            domPath.unshift(`<${tag}${classes} data-node-id="${nodeId}">`);
+          } else {
+            domPath.unshift(`<${tag}${classes}> ⚠️ MISSING data-node-id`);
+          }
+        } else if (walkNode.nodeType === Node.TEXT_NODE) {
+          const text = walkNode.textContent?.slice(0, 30) || '';
+          domPath.unshift(`"${text}${walkNode.textContent?.length > 30 ? '...' : ''}"`);
+        }
+        walkNode = walkNode.parentNode;
+      }
+
+      // Get container innerHTML for debugging (truncated)
+      const containerHtml = container?.innerHTML?.slice(0, 200) || 'N/A';
+
+      const errorMsg =
+        `Block: ${blockUid}, Field: ${fieldName}\n\n` +
+        'DOM path (text node → container):\n' +
+        domPath.map((p, i) => '  '.repeat(i) + p).join('\n') +
+        '\n\nContainer HTML:\n' + containerHtml + (container?.innerHTML?.length > 200 ? '...' : '');
+
+      console.error('[HYDRA] Selection sync failed - missing data-node-id\n\n' + errorMsg);
+
+      // Show visible warning overlay in iframe (only once per session)
+      if (!this._shownNodeIdWarning) {
+        this._shownNodeIdWarning = true;
+        this.showDeveloperWarning(
+          'Hydra: Missing data-node-id attributes',
+          'Selection sync disabled. Your frontend must render data-node-id on Slate elements.\n\n' +
+            errorMsg +
+            '\n\nSee browser console for details.'
+        );
+      }
       return null;
     }
 
@@ -1359,33 +2150,13 @@ export class Bridge {
    *
    * @param {HTMLElement} container - The container element to process
    */
-  ensureZeroWidthSpaces(container) {
-    // Find inline elements with data-node-id that might be empty
-    // Inline formatting elements: strong, em, span (for del/u), code, a
-    const inlineElements = container.querySelectorAll(
-      'strong[data-node-id], em[data-node-id], span[data-node-id], code[data-node-id], a[data-node-id]'
-    );
-
-    inlineElements.forEach(el => {
-      // Check if element has no text content and no child nodes
-      if (el.textContent === '' && el.childNodes.length === 0) {
-        // Insert zero-width no-break space for cursor positioning
-        el.appendChild(document.createTextNode('\uFEFF'));
-        log('Added ZWS to empty inline element:', el.tagName, el.getAttribute('data-node-id'));
-      }
-
-      // Also ensure there's a text node AFTER inline elements for cursor exit
-      // When toggling format off, cursor needs a place to go after the inline element
-      const nextSibling = el.nextSibling;
-      if (!nextSibling || (nextSibling.nodeType !== Node.TEXT_NODE)) {
-        // No text node after inline element - add ZWS so cursor can exit
-        const zws = document.createTextNode('\uFEFF');
-        el.parentNode.insertBefore(zws, el.nextSibling);
-        log('Added ZWS after inline element for cursor exit:', el.tagName, el.getAttribute('data-node-id'));
-      }
-    });
-  }
-
+  /**
+   * Find empty inline elements in Slate value that need ZWS for cursor positioning.
+   * Returns array of nodeIds that should have ZWS.
+   *
+   * An inline element is any node with a type AND children (not a text leaf).
+   * We detect empty inlines by checking if children is just [{text: ''}].
+   */
   /**
    * Strip zero-width spaces from text content.
    * ZWS characters are added for cursor positioning in empty elements and should be
@@ -1483,6 +2254,24 @@ export class Bridge {
   }
 
   /**
+   * Marks empty blocks in the DOM with a data attribute for styling.
+   * This allows hydra to style empty blocks without requiring the renderer
+   * to add special attributes.
+   */
+  markEmptyBlocks() {
+    const allBlocks = document.querySelectorAll('[data-block-uid]');
+    allBlocks.forEach((blockElement) => {
+      const blockUid = blockElement.getAttribute('data-block-uid');
+      const blockData = this.getBlockData(blockUid);
+      if (blockData?.['@type'] === 'empty') {
+        blockElement.setAttribute('data-hydra-empty', 'true');
+      } else {
+        blockElement.removeAttribute('data-hydra-empty');
+      }
+    });
+  }
+
+  /**
    * Updates block UI positions and states after form data changes.
    * Centralizes all UI updates that need to happen when blocks are re-rendered,
    * including after drag-and-drop reordering.
@@ -1494,8 +2283,7 @@ export class Bridge {
     // The renderer may have replaced DOM elements, removing contenteditable attributes
     this.restoreContentEditableOnFields(blockElement, 'FORM_DATA');
 
-    // Ensure empty inline formatting elements have ZWS for cursor positioning
-    this.ensureZeroWidthSpaces(blockElement);
+    // Note: ZWS for cursor positioning is added just-in-time in restoreSlateSelection
 
     // Determine field type for focused field (supports nested blocks via blockPathMap)
     const blockData = this.getBlockData(this.selectedBlockUid);
@@ -1506,12 +2294,18 @@ export class Bridge {
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
     // Skip focus if editing from sidebar - don't steal focus from sidebar fields
-    if (this.focusedFieldName && !skipFocus) {
-      const focusedField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+    // EXCEPTION: If we have savedClickPosition, restore cursor because the re-render
+    // may have destroyed the DOM element where cursor was positioned.
+    // Note: savedClickPosition is cleared in FORM_DATA handler when content changes (sidebar edit)
+    const hasSavedClickPosition = !!this.savedClickPosition;
+    if (this.focusedFieldName && (!skipFocus || hasSavedClickPosition)) {
+      const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
 
       if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
-        // Focus the field
-        focusedField.focus();
+        // Focus the field (only if not skipFocus, unless we need to restore click position)
+        if (!skipFocus || hasSavedClickPosition) {
+          focusedField.focus();
+        }
 
         // Position cursor at click location if we saved it
         if (this.savedClickPosition) {
@@ -1519,11 +2313,13 @@ export class Bridge {
           if (selection) {
             // Only restore click position if there's no existing non-collapsed selection
             if (!selection.rangeCount || selection.isCollapsed) {
+              // Convert relative position to screen coordinates using current element position
+              const currentRect = focusedField.getBoundingClientRect();
+              const clientX = currentRect.left + this.savedClickPosition.relativeX;
+              const clientY = currentRect.top + this.savedClickPosition.relativeY;
+
               // Position cursor at the click location using caretRangeFromPoint
-              const range = document.caretRangeFromPoint(
-                this.savedClickPosition.clientX,
-                this.savedClickPosition.clientY
-              );
+              const range = document.caretRangeFromPoint(clientX, clientY);
               if (range) {
                 selection.removeAllRanges();
                 selection.addRange(range);
@@ -1707,9 +2503,9 @@ export class Bridge {
     this.focusedFieldName = null;
 
     // Detect focused field from click location or first editable field
-    if (this.lastClickEvent) {
+    if (this.lastClickPosition?.target) {
       // Find the clicked editable field
-      const clickedElement = this.lastClickEvent.target;
+      const clickedElement = this.lastClickPosition.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
       if (clickedField) {
         this.focusedFieldName = clickedField.getAttribute('data-editable-field');
@@ -1769,28 +2565,52 @@ export class Bridge {
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
       this.selectionChangeListener = () => {
+        // Skip if we're correcting selection (prevents infinite loop)
+        if (this._isCorrectingWhitespaceSelection) return;
+
         const selection = window.getSelection();
-        const offset = selection?.rangeCount > 0 ? selection.getRangeAt(0).startOffset : -1;
-        log('selectionchange fired, cursor offset:', offset);
+        const range = selection?.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        log('selectionchange fired:', {
+          anchorOffset: selection?.anchorOffset,
+          focusOffset: selection?.focusOffset,
+          rangeStart: range?.startOffset,
+          rangeEnd: range?.endOffset,
+          collapsed: selection?.isCollapsed,
+        });
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
-          this.savedSelection = this.serializeSelection();
-
-          // Don't send SELECTION_CHANGE during external updates (FORM_DATA from Admin)
-          // The selection change was caused by Admin, not user action
-          if (this.isProcessingExternalUpdate) {
+          // Correct cursor if it's on invalid whitespace (template artifacts)
+          this._isCorrectingWhitespaceSelection = true;
+          const corrected = this.correctInvalidWhitespaceSelection();
+          this._isCorrectingWhitespaceSelection = false;
+          if (corrected) {
+            // Selection was corrected, this will trigger another selectionchange
             return;
           }
 
+          this.savedSelection = this.serializeSelection();
+
           // Check if this selection matches what Admin just sent us
           // If so, this is the result of restoring their selection - don't echo it back
-          if (this.expectedSelectionFromAdmin && this.savedSelection) {
+          if (this.expectedSelectionFromAdmin) {
+            // We're expecting a specific selection from Admin
+            if (!this.savedSelection) {
+              // Selection serialization failed (DOM might be re-rendering)
+              // Don't send anything yet - wait for stable DOM
+              log('selectionchange: expectedSelectionFromAdmin set but savedSelection null - waiting');
+              return;
+            }
             const expected = this.expectedSelectionFromAdmin;
             const current = this.savedSelection;
             // Compare anchor and focus paths and offsets
             const matches =
               JSON.stringify(expected.anchor) === JSON.stringify(current.anchor) &&
               JSON.stringify(expected.focus) === JSON.stringify(current.focus);
+            log('selectionchange: comparing selections', {
+              expected: JSON.stringify(expected),
+              current: JSON.stringify(current),
+              matches,
+            });
             if (matches) {
               // Same selection as Admin sent - this is the restore, suppress it
               log('Selection matches Admin restore - not sending back');
@@ -1800,27 +2620,16 @@ export class Bridge {
               log('Selection differs from Admin restore - user action');
               this.expectedSelectionFromAdmin = null;
             }
+          } else {
+            log('selectionchange: no expectedSelectionFromAdmin, sending new selection');
           }
 
-          // Don't send SELECTION_CHANGE during typing - selection will be included
-          // when text buffer flushes. This ensures formData and selection stay atomic.
-          // Only send standalone SELECTION_CHANGE when user moves cursor without typing
-          // (clicking, arrow keys, selecting text).
-          if (this.pendingTextUpdate || this.textUpdateTimer) {
-            // Text activity in progress - selection will be sent with the text
-            return;
-          }
-
-          // No pending text - send standalone SELECTION_CHANGE for toolbar state updates
-          if (this.savedSelection && this.selectedBlockUid) {
-            window.parent.postMessage(
-              {
-                type: 'SELECTION_CHANGE',
-                blockId: this.selectedBlockUid,
-                selection: this.savedSelection,
-              },
-              this.adminOrigin,
-            );
+          // IMPORTANT: Buffer selection changes WITH the text content.
+          // This ensures text and selection are always atomic/in-sync. If sent
+          // separately, Admin could receive stale selection that doesn't match
+          // the text content, causing formats to be applied incorrectly.
+          if (this.selectedBlockUid) {
+            this.bufferUpdate('selectionChange');
           }
         }
       };
@@ -1841,7 +2650,7 @@ export class Bridge {
           }
 
           // Check if field was already editable before we do anything
-          const editableField = currentBlockElement.querySelector('[data-editable-field]');
+          const editableField = this.getOwnFirstEditableField(currentBlockElement);
           const wasAlreadyEditable = editableField?.getAttribute('contenteditable') === 'true';
 
           // Set contenteditable on editable fields immediately (not waiting for FORM_DATA)
@@ -1850,7 +2659,7 @@ export class Bridge {
           // Focus and position cursor for editable fields (text or slate type)
           // Use focusedFieldName to find the specific field that was clicked, not just the first one
           let contentEditableField = this.focusedFieldName
-            ? currentBlockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`)
+            ? this.getEditableFieldByName(currentBlockElement, this.focusedFieldName)
             : currentBlockElement.querySelector('[contenteditable="true"]');
 
           // Verify the field belongs to THIS block, not a nested block
@@ -1884,17 +2693,34 @@ export class Bridge {
                 log('selectBlock skipping focus() - already focused');
               }
 
-              // If field was already editable, browser already handled cursor positioning
-              // on click - don't redo it (causes race with typing)
-              if (wasAlreadyEditable) {
-                log('Field already editable, trusting browser click positioning');
-                this.lastClickEvent = null;
-              } else if (this.lastClickEvent) {
-                // Field just became editable - need to position cursor
+              // If field was already editable AND already focused, browser already handled
+              // cursor positioning on click - don't redo it (causes race with typing)
+              // But if we had to call focus(), we need to restore click position because
+              // focus() moves cursor to end of text
+              if (wasAlreadyEditable && isAlreadyFocused) {
+                log('Field already editable and focused, trusting browser click positioning');
+                this.lastClickPosition = null;
+              } else if (this.lastClickPosition) {
+                // Need to position cursor at click location
+                // Convert relative position back to screen coordinates using current element position
+                const currentRect = contentEditableField.getBoundingClientRect();
+                const clientX = currentRect.left + this.lastClickPosition.relativeX;
+                const clientY = currentRect.top + this.lastClickPosition.relativeY;
+
+                log('Positioning cursor at click location:', {
+                  relativeX: this.lastClickPosition.relativeX,
+                  relativeY: this.lastClickPosition.relativeY,
+                  clientX,
+                  clientY,
+                  wasAlreadyEditable,
+                  isAlreadyFocused,
+                });
+
                 // Save click position for FORM_DATA handler to use after renderer updates
                 this.savedClickPosition = {
-                  clientX: this.lastClickEvent.clientX,
-                  clientY: this.lastClickEvent.clientY,
+                  relativeX: this.lastClickPosition.relativeX,
+                  relativeY: this.lastClickPosition.relativeY,
+                  editableField: this.lastClickPosition.editableField,
                 };
 
                 // Only restore click position if there's no existing non-collapsed selection
@@ -1906,26 +2732,41 @@ export class Bridge {
 
                 if (!hasNonCollapsedSelection) {
                   // Position cursor at the click location using caretRangeFromPoint
-                  const range = document.caretRangeFromPoint(this.lastClickEvent.clientX, this.lastClickEvent.clientY);
+                  const range = document.caretRangeFromPoint(clientX, clientY);
+                  log('caretRangeFromPoint result:', range ? {
+                    startContainer: range.startContainer.nodeName,
+                    startOffset: range.startOffset,
+                    text: range.startContainer.textContent?.substring(0, 30),
+                  } : null);
                   if (range) {
+                    // Validate position before setting (may land on invalid whitespace)
+                    const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+                    const finalRange = document.createRange();
+                    finalRange.setStart(validPos.node, validPos.offset);
+                    finalRange.collapse(true);
                     const selection = window.getSelection();
                     selection.removeAllRanges();
-                    selection.addRange(range);
+                    selection.addRange(finalRange);
+                    log('Cursor positioned at offset:', validPos.offset);
                   }
+                } else {
+                  log('Skipping cursor positioning - non-collapsed selection exists');
                 }
 
-                // Clear the stored click event
-                this.lastClickEvent = null;
+                // Clear lastClickPosition - we've used it to position cursor
+                // Keep savedClickPosition for FORM_DATA handler in case React re-renders
+                // (staleness check in updateBlockUIAfterFormData handles old positions)
+                this.lastClickPosition = null;
               }
             } else {
-              // No lastClickEvent, just log that we skipped cursor positioning
-              log('No lastClickEvent, skipping cursor positioning');
+              // No lastClickPosition, just log that we skipped cursor positioning
+              log('No lastClickPosition, skipping cursor positioning');
             }
           } else {
-            // Not an editable field type, clear click event if any
-            if (this.lastClickEvent) {
-              log('Non-editable field type, clearing lastClickEvent');
-              this.lastClickEvent = null;
+            // Not an editable field type, clear click position if any
+            if (this.lastClickPosition) {
+              log('Non-editable field type, clearing lastClickPosition');
+              this.lastClickPosition = null;
             }
           }
 
@@ -1956,78 +2797,245 @@ export class Bridge {
    */
   handleBlockSelector(selector, triggerElement) {
     log('handleBlockSelector:', selector, 'trigger:', triggerElement.className);
-    let targetUid;
 
-    if (selector === '+1' || selector === '-1') {
-      // Find sibling relative to current block or the container
-      const containerBlock = triggerElement.closest('[data-block-uid]');
-      if (!containerBlock) {
-        log('handleBlockSelector: no container found');
-        return;
-      }
-      const containerUid = containerBlock.getAttribute('data-block-uid');
-      log('handleBlockSelector: container =', containerUid);
+    // Find the container block
+    const containerBlock = triggerElement.closest('[data-block-uid]');
+    if (!containerBlock) {
+      log('handleBlockSelector: no container found');
+      return;
+    }
+    const containerUid = containerBlock.getAttribute('data-block-uid');
+    log('handleBlockSelector: container =', containerUid);
 
-      // Get all nested blocks whose immediate parent container is this one
-      // (i.e., blocks directly owned by this container, not deeply nested)
-      const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
-      log('handleBlockSelector: allNestedBlocks =', allNestedBlocks.length);
-      const childBlocks = Array.from(allNestedBlocks).filter((el) => {
-        // Check that this block's parent container is our container
-        const parentContainer = el.parentElement?.closest('[data-block-uid]');
-        return parentContainer?.getAttribute('data-block-uid') === containerUid;
-      });
-      log('handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
+    // Get all child blocks in this container
+    const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
+    const childBlocks = Array.from(allNestedBlocks).filter((el) => {
+      const parentContainer = el.parentElement?.closest('[data-block-uid]');
+      return parentContainer?.getAttribute('data-block-uid') === containerUid;
+    });
+    log('handleBlockSelector: childBlocks =', childBlocks.length, childBlocks.map(el => el.getAttribute('data-block-uid')));
 
-      if (childBlocks.length === 0) {
-        log('handleBlockSelector: no child blocks found');
-        return;
-      }
-
-      // Find current index - use currently selected block if it's in this container
-      let currentIndex = -1;
-      if (this.selectedBlockUid) {
-        currentIndex = childBlocks.findIndex(
-          el => el.getAttribute('data-block-uid') === this.selectedBlockUid
-        );
-      }
-
-      // If no block selected or selected block not in container, start from first/last
-      if (currentIndex === -1) {
-        currentIndex = selector === '+1' ? -1 : childBlocks.length;
-      }
-
-      const offset = parseInt(selector, 10);
-      const targetIndex = currentIndex + offset;
-
-      // Bounds check
-      if (targetIndex >= 0 && targetIndex < childBlocks.length) {
-        targetUid = childBlocks[targetIndex].getAttribute('data-block-uid');
-      }
-    } else {
-      // Direct UID reference
-      targetUid = selector;
+    if (childBlocks.length === 0) {
+      log('handleBlockSelector: no child blocks found');
+      return;
     }
 
-    log('handleBlockSelector: targetUid =', targetUid);
-    if (targetUid) {
-      // Wait for the frontend's click handler to show/hide slides,
-      // then select the block once it's visible
-      const waitForBlockAndSelect = (retries = 10) => {
-        const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
-        if (targetElement && targetElement.offsetParent !== null) {
-          // Block exists and is visible (offsetParent is null for hidden elements)
-          log('handleBlockSelector: selecting', targetUid);
-          this.selectBlock(targetElement);
-        } else if (retries > 0) {
-          // Wait a bit for frontend to render/show the block
-          setTimeout(() => waitForBlockAndSelect(retries - 1), 50);
-        } else {
-          log('handleBlockSelector: block not visible after retries', targetUid);
+    // For direct UID selector, target that specific block
+    if (selector !== '+1' && selector !== '-1') {
+      const targetUid = selector;
+      log('handleBlockSelector: direct selector targetUid =', targetUid);
+      this.waitForBlockVisibleAndSelect(targetUid);
+      return;
+    }
+
+    // Helper to get fresh child blocks (DOM may re-render)
+    const getFreshChildBlocks = () => {
+      const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
+      if (!container) return [];
+      const allNested = container.querySelectorAll('[data-block-uid]');
+      return Array.from(allNested).filter((el) => {
+        const parent = el.parentElement?.closest('[data-block-uid]');
+        return parent?.getAttribute('data-block-uid') === containerUid;
+      });
+    };
+
+    // Find the child block that's most centered within the container
+    // Only returns a child if it's actually visible (center within container bounds)
+    const findMostCenteredChild = (children, container) => {
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.left + containerRect.width / 2;
+
+      let best = null;
+      let bestDistance = Infinity;
+
+      for (const child of children) {
+        const rect = child.getBoundingClientRect();
+        const childCenter = rect.left + rect.width / 2;
+
+        // Only consider children whose center is within the container bounds
+        if (childCenter < containerRect.left || childCenter > containerRect.right) {
+          continue;
         }
-      };
-      // Start after a short delay to let click event propagate to frontend
-      setTimeout(waitForBlockAndSelect, 0);
+
+        const distance = Math.abs(childCenter - containerCenter);
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = child;
+        }
+      }
+      return best;
+    };
+
+    // For +1/-1, calculate the target block and wait for it to become visible
+    // Stop any existing tracking and hide the block UI immediately
+    this.stopTransitionTracking();
+    window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+
+    const currentlyVisibleElement = findMostCenteredChild(childBlocks, containerBlock);
+    const currentVisibleUid = currentlyVisibleElement?.getAttribute('data-block-uid');
+
+    // Debug: log position of all children
+    childBlocks.forEach(el => {
+      const uid = el.getAttribute('data-block-uid');
+      const rect = el.getBoundingClientRect();
+      log(`handleBlockSelector: ${uid} rect.left=${Math.round(rect.left)}`);
+    });
+    log('handleBlockSelector: currently visible =', currentVisibleUid);
+
+    // Calculate the expected target block based on +1/-1
+    let currentIndex = childBlocks.findIndex(
+      el => el.getAttribute('data-block-uid') === currentVisibleUid
+    );
+    if (currentIndex === -1) currentIndex = 0;
+
+    const offset = parseInt(selector, 10);
+    let targetIndex = currentIndex + offset;
+
+    // Handle wrapping
+    if (targetIndex < 0) {
+      targetIndex = childBlocks.length - 1;
+    } else if (targetIndex >= childBlocks.length) {
+      targetIndex = 0;
+    }
+
+    const targetUid = childBlocks[targetIndex]?.getAttribute('data-block-uid');
+    log('handleBlockSelector: target =', targetUid, '(index', currentIndex, '+', offset, '→', targetIndex, ')');
+
+    // Check if target block is visible (centered within container bounds)
+    // Also returns position for stability tracking
+    const getTargetVisibility = (container) => {
+      const targetEl = document.querySelector(`[data-block-uid="${targetUid}"]`);
+      if (!targetEl || !container) return { visible: false, x: null };
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const targetCenter = targetRect.left + targetRect.width / 2;
+
+      // Target is visible if its center is within container bounds
+      const visible = targetCenter >= containerRect.left && targetCenter <= containerRect.right;
+      return { visible, x: targetRect.left };
+    };
+
+    // Track stability - target must be visible AND position stable
+    let stableCount = 0;
+    let lastX = null;
+    const STABLE_THRESHOLD = 3;
+    const POSITION_TOLERANCE = 2; // pixels
+
+    // Get the set of child block UIDs for checking if user navigated away
+    const childUids = new Set(childBlocks.map(el => el.getAttribute('data-block-uid')));
+
+    // Wait for target to become visible AND position to stabilize
+    const waitForTarget = (retries = 40) => {
+      // Check if user has navigated away (e.g., pressed Escape, clicked different block)
+      // Cancel if the selected block is no longer one of the children we're navigating
+      if (this.selectedBlockUid && !childUids.has(this.selectedBlockUid)) {
+        log('handleBlockSelector: user navigated away, canceling child selection. selected:', this.selectedBlockUid);
+        return;
+      }
+
+      const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
+      const freshChildBlocks = getFreshChildBlocks();
+
+      const { visible, x } = getTargetVisibility(container);
+
+      if (visible) {
+        // Check if position is also stable (not animating)
+        const positionStable = lastX !== null && Math.abs(x - lastX) < POSITION_TOLERANCE;
+
+        if (positionStable) {
+          stableCount++;
+        } else {
+          stableCount = 0; // Reset if position changed
+        }
+        lastX = x;
+
+        if (retries === 40 || retries === 30 || retries === 20 || retries === 10 || retries === 1) {
+          log(`handleBlockSelector poll: retries=${retries} target=${targetUid} visible=true x=${Math.round(x)} stableCount=${stableCount}`);
+        }
+
+        if (stableCount >= STABLE_THRESHOLD) {
+          log('handleBlockSelector: target visible and position stable, selecting', targetUid);
+          const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+          if (targetElement) {
+            this.selectBlock(targetElement);
+          }
+          return;
+        }
+      } else {
+        stableCount = 0;
+        lastX = null;
+        if (retries === 40 || retries === 30 || retries === 20 || retries === 10 || retries === 1) {
+          log(`handleBlockSelector poll: retries=${retries} target=${targetUid} visible=false`);
+        }
+      }
+
+      if (retries > 0) {
+        setTimeout(() => waitForTarget(retries - 1), 50);
+      } else {
+        // Target never became visible - fall back to most centered child
+        log('handleBlockSelector: target not visible after settling, finding most centered');
+        const centeredChild = container ? findMostCenteredChild(freshChildBlocks, container) : null;
+        const centeredUid = centeredChild?.getAttribute('data-block-uid');
+        log('handleBlockSelector: fallback to most centered =', centeredUid);
+        if (centeredChild) {
+          this.selectBlock(centeredChild);
+        } else if (container) {
+          // No child found - select the parent container
+          log('handleBlockSelector: no centered child found, selecting parent container');
+          this.selectBlock(container);
+        }
+      }
+    };
+
+    // Start after a short delay to let click event propagate to frontend
+    setTimeout(waitForTarget, 50);
+  }
+
+  /**
+   * Fallback for +1/-1 selection when visibility doesn't change.
+   * Used for carousels that use transforms instead of hiding elements.
+   */
+  handleBlockSelectorFallback(selector, childBlocks, currentVisibleUid) {
+    let currentIndex = childBlocks.findIndex(
+      el => el.getAttribute('data-block-uid') === currentVisibleUid
+    );
+    if (currentIndex === -1) currentIndex = 0;
+
+    const offset = parseInt(selector, 10);
+    let targetIndex = currentIndex + offset;
+
+    // Handle wrapping
+    if (targetIndex < 0) {
+      targetIndex = childBlocks.length - 1;
+    } else if (targetIndex >= childBlocks.length) {
+      targetIndex = 0;
+    }
+
+    const targetUid = childBlocks[targetIndex]?.getAttribute('data-block-uid');
+    log('handleBlockSelector fallback: targetUid =', targetUid);
+
+    if (targetUid) {
+      const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+      if (targetElement) {
+        this.selectBlock(targetElement);
+      }
+    }
+  }
+
+  /**
+   * Wait for a specific block to become visible, then select it.
+   */
+  waitForBlockVisibleAndSelect(targetUid, retries = 10) {
+    const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+    if (targetElement && !this.isElementHidden(targetElement)) {
+      log('handleBlockSelector: selecting', targetUid);
+      this.selectBlock(targetElement);
+    } else if (retries > 0) {
+      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1), 50);
+    } else {
+      log('handleBlockSelector: block not visible after retries', targetUid);
     }
   }
 
@@ -2183,6 +3191,169 @@ export class Bridge {
     // Observe border-box to catch padding/border changes too (not just content)
     // This ensures the selection outline updates for any visual size change
     this.blockResizeObserver.observe(blockElement, { box: 'border-box' });
+
+    // Also track position during CSS transitions (e.g., carousel slide animations)
+    this.observeBlockTransition(blockElement, blockUid);
+  }
+
+  /**
+   * Stops all block position tracking immediately.
+   * Called when navigating to a new block to prevent stale position updates.
+   */
+  stopTransitionTracking() {
+    if (this._transitionAnimationFrame) {
+      cancelAnimationFrame(this._transitionAnimationFrame);
+      this._transitionAnimationFrame = null;
+    }
+    if (this._initialTrackingTimeout) {
+      clearTimeout(this._initialTrackingTimeout);
+      this._initialTrackingTimeout = null;
+    }
+    if (this._transitionMutationObserver) {
+      this._transitionMutationObserver.disconnect();
+      this._transitionMutationObserver = null;
+    }
+    // Remove transitionend listener from the tracked element
+    if (this._transitionEndHandler && this._trackedBlockElement) {
+      this._trackedBlockElement.removeEventListener(
+        'transitionend',
+        this._transitionEndHandler,
+      );
+      this._transitionEndHandler = null;
+      this._trackedBlockElement = null;
+    }
+    // Also disconnect resize observer to prevent stale updates
+    if (this.blockResizeObserver) {
+      this.blockResizeObserver.disconnect();
+      this.blockResizeObserver = null;
+    }
+    // Clear scroll timeout that might re-send position updates
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null;
+    }
+    // Clear the uid to stop any in-flight tracking loops
+    this._trackingBlockUid = null;
+  }
+
+  /**
+   * Tracks block position during CSS transitions/animations.
+   * ResizeObserver doesn't fire for transform changes, so we poll during transitions.
+   *
+   * @param {Element} blockElement - The block element to observe.
+   * @param {string} blockUid - The block's UID.
+   */
+  observeBlockTransition(blockElement, blockUid) {
+    // Clean up existing transition tracking
+    if (this._transitionAnimationFrame) {
+      cancelAnimationFrame(this._transitionAnimationFrame);
+      this._transitionAnimationFrame = null;
+    }
+    if (this._transitionEndHandler) {
+      blockElement.removeEventListener('transitionend', this._transitionEndHandler);
+    }
+    if (this._initialTrackingTimeout) {
+      clearTimeout(this._initialTrackingTimeout);
+      this._initialTrackingTimeout = null;
+    }
+
+    let isTracking = false;
+    this._trackingBlockUid = blockUid;
+
+    const trackPosition = () => {
+      // Stop if tracking was cancelled or block changed
+      if (!isTracking || this._trackingBlockUid !== blockUid) {
+        return;
+      }
+
+      const newRect = blockElement.getBoundingClientRect();
+      const lastRect = this._lastBlockRect;
+
+      if (lastRect) {
+        const topChanged = Math.abs(newRect.top - lastRect.top) > 1;
+        const leftChanged = Math.abs(newRect.left - lastRect.left) > 1;
+
+        if (topChanged || leftChanged) {
+          this._lastBlockRect = newRect;
+          this.sendBlockSelected('transitionTracker', blockElement);
+        }
+      }
+
+      this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
+    };
+
+    // Start tracking when transition starts (detected by style changes)
+    const startTracking = () => {
+      if (!isTracking) {
+        isTracking = true;
+        log('observeBlockTransition: starting position tracking for:', blockUid);
+        trackPosition();
+      }
+    };
+
+    const stopTracking = () => {
+      isTracking = false;
+      if (this._transitionAnimationFrame) {
+        cancelAnimationFrame(this._transitionAnimationFrame);
+        this._transitionAnimationFrame = null;
+      }
+      log('observeBlockTransition: stopped tracking for:', blockUid);
+
+      // Final position update
+      if (this.selectedBlockUid === blockUid) {
+        const finalRect = blockElement.getBoundingClientRect();
+        if (this._lastBlockRect) {
+          const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
+                        Math.abs(finalRect.top - this._lastBlockRect.top) > 1;
+          if (moved) {
+            this._lastBlockRect = finalRect;
+            this.sendBlockSelected('transitionEnd', blockElement);
+          }
+        }
+      }
+    };
+
+    // Stop tracking when transition ends
+    this._transitionEndHandler = stopTracking;
+    this._trackedBlockElement = blockElement;
+
+    blockElement.addEventListener('transitionend', this._transitionEndHandler);
+
+    // Use MutationObserver to detect when transform/translate classes change
+    if (this._transitionMutationObserver) {
+      this._transitionMutationObserver.disconnect();
+    }
+
+    this._transitionMutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' &&
+            (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+          const style = window.getComputedStyle(blockElement);
+          // Check if element has a transition and transform
+          if (style.transition && style.transition !== 'none' &&
+              (style.transform !== 'none' || style.translate !== 'none')) {
+            startTracking();
+          }
+        }
+      }
+    });
+
+    this._transitionMutationObserver.observe(blockElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+
+    // Always do initial position tracking for 500ms after selection
+    // This catches animations on parent elements (e.g., Flowbite carousel)
+    // where the transform is not directly on the selected block
+    startTracking();
+    this._initialTrackingTimeout = setTimeout(() => {
+      // Only stop if no ongoing transition was detected
+      // (transitionend handler will stop it if one was detected)
+      if (isTracking && this.selectedBlockUid === blockUid) {
+        stopTracking();
+      }
+    }, 500);
   }
 
   /**
@@ -2316,13 +3487,32 @@ export class Bridge {
 
         // Exclude the dragged block and its ghost from being drop targets
         const draggedBlockUid = blockElement.getAttribute('data-block-uid');
-        if (
-          closestBlock &&
-          (closestBlock === draggedBlock ||
-            closestBlock === blockElement ||
-            closestBlock.getAttribute('data-block-uid') === draggedBlockUid)
-        ) {
-          closestBlock = null;
+        const isSelfOrGhost = closestBlock &&
+          (closestBlock === draggedBlock || closestBlock === blockElement ||
+           closestBlock.getAttribute('data-block-uid') === draggedBlockUid);
+        if (isSelfOrGhost) closestBlock = null;
+
+        // Handle overshoot - find nearest block when cursor isn't over any block
+        if (!closestBlock) {
+          const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
+            .filter(el => el !== draggedBlock && el.getAttribute('data-block-uid') !== draggedBlockUid);
+
+          // Find nearest block by vertical distance to cursor
+          let nearest = { el: null, dist: Infinity, above: false };
+          for (const el of allBlocks) {
+            const rect = el.getBoundingClientRect();
+            const aboveDist = rect.top - e.clientY; // positive if cursor above block
+            const belowDist = e.clientY - rect.bottom; // positive if cursor below block
+            if (aboveDist > 0 && aboveDist < nearest.dist) {
+              nearest = { el, dist: aboveDist, above: true };
+            } else if (belowDist > 0 && belowDist < nearest.dist) {
+              nearest = { el, dist: belowDist, above: false };
+            }
+          }
+          if (nearest.el) {
+            closestBlock = nearest.el;
+            insertAt = nearest.above ? 0 : 1;
+          }
         }
 
         if (closestBlock) {
@@ -2386,108 +3576,48 @@ export class Bridge {
           if (!dropIndicator) {
             dropIndicator = document.createElement('div');
             dropIndicator.className = 'volto-hydra-drop-indicator';
-            dropIndicator.style.cssText = `
-              position: absolute;
-              background: transparent;
-              pointer-events: none;
-              z-index: 9998;
-              display: none;
-            `;
+            dropIndicator.style.cssText = 'position:absolute;background:transparent;pointer-events:none;z-index:9998;display:none;';
             document.body.appendChild(dropIndicator);
           }
 
-          const closestBlockRect = closestBlock.getBoundingClientRect();
+          const rect = closestBlock.getBoundingClientRect();
+          const isHorizontal = this.getAddDirection(closestBlock) === 'right';
 
-          // Check if this block uses horizontal layout
-          // Uses data-block-add attribute or infers from nesting depth
-          const addDirection = this.getAddDirection(closestBlock);
-          const isHorizontalLayout = addDirection === 'right';
+          // Determine insertion point based on mouse position relative to block center
+          const mousePos = isHorizontal ? e.clientX - rect.left : e.clientY - rect.top;
+          const blockSize = isHorizontal ? rect.width : rect.height;
+          insertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
 
-          if (isHorizontalLayout) {
-            // HORIZONTAL LAYOUT: Use X-axis to determine left/right insertion
-            const mouseXRelativeToBlock = e.clientX - closestBlockRect.left;
-            const isHoveringOverLeftHalf = mouseXRelativeToBlock < closestBlockRect.width / 2;
+          // Calculate indicator position in the gap between blocks
+          const sibling = insertAt === 0 ? closestBlock.previousElementSibling : closestBlock.nextElementSibling;
+          const siblingRect = sibling?.hasAttribute('data-block-uid') ? sibling.getBoundingClientRect() : null;
+          const indicatorSize = 4;
 
-            insertAt = isHoveringOverLeftHalf ? 0 : 1; // 0 = insert before (left), 1 = insert after (right)
+          let indicatorPos;
+          if (isHorizontal) {
+            const edge = insertAt === 0 ? rect.left : rect.right;
+            const siblingEdge = siblingRect ? (insertAt === 0 ? siblingRect.right : siblingRect.left) : edge;
+            const gap = insertAt === 0 ? rect.left - (siblingRect?.right || rect.left) : (siblingRect?.left || rect.right) - rect.right;
+            indicatorPos = (insertAt === 0 ? siblingRect?.right || rect.left : rect.right) + window.scrollX + gap / 2 - indicatorSize / 2;
 
-            // Position VERTICAL drop indicator
-            const indicatorWidth = 4;
-            let indicatorX;
-
-            if (insertAt === 0) {
-              // Inserting before (left of) this block - find the previous block
-              const prevBlock = closestBlock.previousElementSibling;
-              if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
-                const prevBlockRect = prevBlock.getBoundingClientRect();
-                const gap = closestBlockRect.left - prevBlockRect.right;
-                indicatorX = prevBlockRect.right + window.scrollX + (gap / 2) - (indicatorWidth / 2);
-              } else {
-                indicatorX = closestBlockRect.left + window.scrollX - (indicatorWidth / 2);
-              }
-            } else {
-              // Inserting after (right of) this block - find the next block
-              const nextBlock = closestBlock.nextElementSibling;
-              if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
-                const nextBlockRect = nextBlock.getBoundingClientRect();
-                const gap = nextBlockRect.left - closestBlockRect.right;
-                indicatorX = closestBlockRect.right + window.scrollX + (gap / 2) - (indicatorWidth / 2);
-              } else {
-                indicatorX = closestBlockRect.right + window.scrollX - (indicatorWidth / 2);
-              }
-            }
-
-            // Style as vertical indicator
-            dropIndicator.style.left = `${indicatorX}px`;
-            dropIndicator.style.top = `${closestBlockRect.top + window.scrollY}px`;
-            dropIndicator.style.width = `${indicatorWidth}px`;
-            dropIndicator.style.height = `${closestBlockRect.height}px`;
-            dropIndicator.style.borderTop = 'none';
-            dropIndicator.style.borderLeft = '3px dashed #007bff';
-            dropIndicator.style.display = 'block';
-            dropIndicatorVisible = true; // Mark indicator as visible - drop is allowed
+            Object.assign(dropIndicator.style, {
+              left: `${indicatorPos}px`, top: `${rect.top + window.scrollY}px`,
+              width: `${indicatorSize}px`, height: `${rect.height}px`,
+              borderTop: 'none', borderLeft: '3px dashed #007bff', display: 'block'
+            });
           } else {
-            // VERTICAL LAYOUT: Use Y-axis to determine top/bottom insertion (default behavior)
-            const mouseYRelativeToBlock = e.clientY - closestBlockRect.top;
-            const isHoveringOverTopHalf = mouseYRelativeToBlock < closestBlockRect.height / 2;
+            const edge = insertAt === 0 ? rect.top : rect.bottom;
+            const siblingEdge = siblingRect ? (insertAt === 0 ? siblingRect.bottom : siblingRect.top) : edge;
+            const gap = insertAt === 0 ? rect.top - (siblingRect?.bottom || rect.top) : (siblingRect?.top || rect.bottom) - rect.bottom;
+            indicatorPos = (insertAt === 0 ? siblingRect?.bottom || rect.top : rect.bottom) + window.scrollY + gap / 2 - indicatorSize / 2;
 
-            insertAt = isHoveringOverTopHalf ? 0 : 1; // 0 = insert before (top), 1 = insert after (bottom)
-
-            // Position HORIZONTAL drop indicator
-            const indicatorHeight = 4;
-            let indicatorY;
-
-            if (insertAt === 0) {
-              // Inserting before this block - find the previous block
-              const prevBlock = closestBlock.previousElementSibling;
-              if (prevBlock && prevBlock.hasAttribute('data-block-uid')) {
-                const prevBlockRect = prevBlock.getBoundingClientRect();
-                const gap = closestBlockRect.top - prevBlockRect.bottom;
-                indicatorY = prevBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-              } else {
-                indicatorY = closestBlockRect.top + window.scrollY - (indicatorHeight / 2);
-              }
-            } else {
-              // Inserting after this block - find the next block
-              const nextBlock = closestBlock.nextElementSibling;
-              if (nextBlock && nextBlock.hasAttribute('data-block-uid')) {
-                const nextBlockRect = nextBlock.getBoundingClientRect();
-                const gap = nextBlockRect.top - closestBlockRect.bottom;
-                indicatorY = closestBlockRect.bottom + window.scrollY + (gap / 2) - (indicatorHeight / 2);
-              } else {
-                indicatorY = closestBlockRect.bottom + window.scrollY - (indicatorHeight / 2);
-              }
-            }
-
-            // Style as horizontal indicator
-            dropIndicator.style.top = `${indicatorY}px`;
-            dropIndicator.style.left = `${closestBlockRect.left}px`;
-            dropIndicator.style.width = `${closestBlockRect.width}px`;
-            dropIndicator.style.height = `${indicatorHeight}px`;
-            dropIndicator.style.borderLeft = 'none';
-            dropIndicator.style.borderTop = '3px dashed #007bff';
-            dropIndicator.style.display = 'block';
-            dropIndicatorVisible = true; // Mark indicator as visible - drop is allowed
+            Object.assign(dropIndicator.style, {
+              top: `${indicatorPos}px`, left: `${rect.left}px`,
+              width: `${rect.width}px`, height: `${indicatorSize}px`,
+              borderLeft: 'none', borderTop: '3px dashed #007bff', display: 'block'
+            });
           }
+          dropIndicatorVisible = true;
         } else {
           // No valid drop target - hide indicator and mark as not droppable
           const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
@@ -2775,6 +3905,16 @@ export class Bridge {
     if (editableField) {
       // Make the field contenteditable - child inline elements inherit this
       editableField.setAttribute('contenteditable', 'true');
+
+      // Ensure minimum dimensions if element has no height (empty content)
+      // This keeps empty fields visible/clickable for user interaction
+      const rect = editableField.getBoundingClientRect();
+      if (rect.height === 0) {
+        editableField.style.minHeight = '1.5em';
+      }
+      if (rect.width === 0) {
+        editableField.style.minWidth = '1em';
+      }
     }
 
     if (editableField && blockUid) {
@@ -2964,6 +4104,11 @@ export class Bridge {
         // Handle Enter key to create new block
         if (e.key === 'Enter' && !e.shiftKey) {
           log('Enter key detected (no Shift)');
+
+          // Correct cursor if it's on invalid whitespace before checking data-node-id
+          // This handles the case where Enter is pressed before selectionchange fires
+          this.correctInvalidWhitespaceSelection();
+
           const selection = window.getSelection();
           log('Selection rangeCount:', selection.rangeCount);
           if (!selection.rangeCount) return;
@@ -2995,6 +4140,20 @@ export class Bridge {
 
         const range = selection.getRangeAt(0);
         const node = range.startContainer;
+
+        // Check if selection spans element nodes (formatted content like STRONG, EM, etc.)
+        // If so, send as transform - don't let browser handle it locally
+        if (!range.collapsed) {
+          const hasElementNodes = this.selectionContainsElementNodes(range);
+          if (hasElementNodes) {
+            e.preventDefault();
+            log('Delete selection contains element nodes, sending transform');
+            this.sendTransformRequest(blockUid, 'delete', {
+              direction: e.key === 'Backspace' ? 'backward' : 'forward',
+            });
+            return;
+          }
+        }
 
         // Check if at node boundary
         const atStart = range.startOffset === 0;
@@ -3041,13 +4200,15 @@ export class Bridge {
       mutations.forEach((mutation) => {
         if (mutation.type === 'characterData' && this.isInlineEditing) {
           // Find the editable field element (works for both Slate and non-Slate fields)
+          const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
           const targetElement = parentEl?.closest('[data-editable-field]');
 
           if (targetElement) {
             // Pass parentEl so handleTextChange can find the actual node that changed
             // (e.g., SPAN for inline formatting) rather than the whole editable field (P)
-            this.handleTextChange(targetElement, parentEl);
+            // Also pass the mutated text node so we can identify which child to update
+            this.handleTextChange(targetElement, parentEl, mutatedTextNode);
           } else {
             console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
@@ -3089,7 +4250,20 @@ export class Bridge {
       return true;
     }
     const rect = el.getBoundingClientRect();
-    return rect.width === 0 && rect.height === 0;
+    if (rect.width === 0 && rect.height === 0) {
+      return true;
+    }
+    // Check if element is translated/positioned outside its container
+    // (e.g., Flowbite carousel uses translate-x-full to hide slides)
+    const container = el.parentElement?.closest('[data-block-uid]');
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      // Element is hidden if it's completely outside the container bounds
+      if (rect.right <= containerRect.left || rect.left >= containerRect.right) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -3307,21 +4481,25 @@ export class Bridge {
       throw new Error('[HYDRA] blockPathMap is required but was not provided by admin');
     }
 
-    // Get all block IDs from blockPathMap (includes nested blocks)
-    const allBlockIds = Object.keys(this.blockPathMap);
-
-    allBlockIds.forEach((blockId) => {
-      // getBlockData returns a reference to the actual block in formData
+    Object.entries(this.blockPathMap).forEach(([blockId, pathInfo]) => {
       const block = this.getBlockData(blockId);
       if (!block) return;
 
+      // For object_list items, use itemSchema from pathMap
+      if (pathInfo.itemSchema?.properties) {
+        Object.entries(pathInfo.itemSchema.properties).forEach(([fieldName, fieldDef]) => {
+          if (fieldDef?.widget === 'slate' && block[fieldName]) {
+            block[fieldName] = this.addNodeIds(block[fieldName]);
+          }
+        });
+        return;
+      }
+
+      // For regular blocks, use blockFieldTypes
       const blockType = block['@type'];
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
-
-      // Check each field in the block
       Object.keys(fieldTypes).forEach((fieldName) => {
         if (fieldTypes[fieldName] === 'slate' && block[fieldName]) {
-          // Add nodeIds to the slate field's value
           block[fieldName] = this.addNodeIds(block[fieldName]);
         }
       });
@@ -3456,6 +4634,7 @@ export class Bridge {
    * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
    */
   restoreSlateSelection(slateSelection, formData) {
+    log('restoreSlateSelection called with:', JSON.stringify(slateSelection));
     if (!slateSelection || !slateSelection.anchor || !slateSelection.focus) {
       console.warn('[HYDRA] Invalid Slate selection:', slateSelection);
       return;
@@ -3464,6 +4643,7 @@ export class Bridge {
     try {
       // Find the selected block and determine field type
       if (!this.selectedBlockUid || !this.focusedFieldName) {
+        log('restoreSlateSelection: missing selectedBlockUid or focusedFieldName');
         return;
       }
 
@@ -3484,148 +4664,272 @@ export class Bridge {
         return;
       }
 
-      let anchorElement, focusElement;
-      let anchorTextResult = null;
-      let focusTextResult = null;
-
-      // Check if this is a slate field with complex structure (has nodeIds)
+      // Check if this is a slate field with nodeIds
       const isSlateWithNodeIds = fieldType === 'slate' && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
 
+      let anchorElement, focusElement;
+      let anchorPos = null;
+      let focusPos = null;
+
+      let anchorOffset = slateSelection.anchor.offset;
+      let focusOffset = slateSelection.focus.offset;
+
       if (isSlateWithNodeIds) {
-        // Slate field with nodeIds - use existing path-based lookup
+        // Find the parent elements by nodeId from path
         const anchorResult = this.getNodeIdFromPath(fieldValue, slateSelection.anchor.path);
         const focusResult = this.getNodeIdFromPath(fieldValue, slateSelection.focus.path);
 
         if (!anchorResult || !focusResult) {
+          console.warn('[HYDRA] Could not get nodeId from path');
           return;
         }
 
-        // Find DOM elements by nodeId
         anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
         focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
+        log('restoreSlateSelection: looking for nodeIds', {
+          anchorNodeId: anchorResult.nodeId,
+          focusNodeId: focusResult.nodeId,
+          anchorElementFound: !!anchorElement,
+          focusElementFound: !!focusElement,
+          anchorElementTag: anchorElement?.tagName,
+          focusElementTag: focusElement?.tagName,
+          anchorElementHTML: anchorElement?.outerHTML?.substring(0, 100),
+        });
+
         if (!anchorElement || !focusElement) {
-          console.warn('[HYDRA] Could not find DOM elements for nodeIds:', { anchorResult, focusResult });
+          console.warn('[HYDRA] Could not find elements by nodeId');
           return;
         }
 
-        // Find DOM children using Slate child index
-        if (anchorResult.textChildIndex !== null) {
-          const anchorChild = this.findChildBySlateIndex(anchorElement, anchorResult.textChildIndex);
-          if (anchorChild) {
-            anchorTextResult = this.findTextNodeInChild(anchorChild, slateSelection.anchor.offset);
-          } else {
-            console.warn('[HYDRA] Could not find anchor child at Slate index:', anchorResult.textChildIndex);
+        // Helper to create ZWS position for cursor placement
+        const ensureZwsPosition = (result, offset, parentChildren) => {
+          // Case 1: Cursor exit - offset 0 in text after an inline element
+          // When there's existing text after the inline element, DON'T create ZWS or position at offset 0.
+          // This avoids the browser creating a new text node when typing at offset 0.
+          // Instead, return null to let findPositionByVisibleOffset handle it naturally.
+          if (result.textChildIndex !== null && offset === 0 && result.textChildIndex > 0) {
+            const prevChild = parentChildren[result.textChildIndex - 1];
+            if (prevChild && prevChild.type && prevChild.nodeId) {
+              const inlineElement = document.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
+              if (inlineElement) {
+                // Check if there's already a text node after the inline element
+                const existingTextNode = inlineElement.nextSibling;
+                log('restoreSlateSelection: cursor exit check - inlineElement.nextSibling:', existingTextNode?.nodeType, 'text:', JSON.stringify(existingTextNode?.textContent));
+                if (existingTextNode && existingTextNode.nodeType === Node.TEXT_NODE) {
+                  const existingText = existingTextNode.textContent.replace(/[\uFEFF\u200B]/g, '');
+                  if (existingText.length > 0) {
+                    // There's existing text - prepend ZWS to it and position after the ZWS
+                    // This ensures typing modifies this text node rather than creating a new one
+                    if (!existingTextNode.textContent.startsWith('\uFEFF')) {
+                      existingTextNode.textContent = '\uFEFF' + existingTextNode.textContent;
+                    }
+                    log('restoreSlateSelection: cursor exit - prepended ZWS to existing text, positioning after ZWS');
+                    return { node: existingTextNode, offset: 1 };
+                  }
+                }
+                // No existing text or empty text - create ZWS text node right after the inline element
+                const zwsNode = document.createTextNode('\uFEFF');
+                inlineElement.parentNode.insertBefore(zwsNode, inlineElement.nextSibling);
+                log('restoreSlateSelection: cursor exit - created ZWS after inline:', prevChild.nodeId);
+                return { node: zwsNode, offset: 1 }; // Position after ZWS
+              }
+            }
           }
-        } else {
-          anchorTextResult = this.findTextNodeInChild(anchorElement, slateSelection.anchor.offset);
+
+          // Case 2: Prospective formatting - offset 0 inside an empty inline element
+          const targetElement = document.querySelector(`[data-node-id="${result.nodeId}"]`);
+          if (targetElement && offset === 0) {
+            const visibleText = targetElement.textContent.replace(/[\uFEFF\u200B]/g, '');
+            if (visibleText === '') {
+              // Empty inline - add ZWS inside and position after it
+              const zwsNode = document.createTextNode('\uFEFF');
+              targetElement.appendChild(zwsNode);
+              log('restoreSlateSelection: prospective formatting - created ZWS inside empty inline:', result.nodeId);
+              return { node: zwsNode, offset: 1 }; // Position after ZWS
+            }
+          }
+
+          return null; // Not a ZWS case, use normal positioning
+        };
+
+        // Try ZWS positioning first
+        if (anchorResult.parentChildren) {
+          anchorPos = ensureZwsPosition(anchorResult, slateSelection.anchor.offset, anchorResult.parentChildren);
+        }
+        if (focusResult.parentChildren) {
+          focusPos = ensureZwsPosition(focusResult, slateSelection.focus.offset, focusResult.parentChildren);
         }
 
-        if (focusResult.textChildIndex !== null) {
-          const focusChild = this.findChildBySlateIndex(focusElement, focusResult.textChildIndex);
-          if (focusChild) {
-            focusTextResult = this.findTextNodeInChild(focusChild, slateSelection.focus.offset);
-          } else {
-            console.warn('[HYDRA] Could not find focus child at Slate index:', focusResult.textChildIndex);
+        // Fall back to offset calculation for non-ZWS cases
+        if (!anchorPos) {
+          if (anchorResult.textChildIndex !== null && anchorResult.parentChildren) {
+            anchorOffset = this.calculateAbsoluteOffset(
+              anchorResult.parentChildren,
+              anchorResult.textChildIndex,
+              slateSelection.anchor.offset
+            );
+            log('Calculated absolute anchor offset:', anchorOffset, 'from textChildIndex:', anchorResult.textChildIndex);
           }
-        } else {
-          focusTextResult = this.findTextNodeInChild(focusElement, slateSelection.focus.offset);
+          anchorPos = this.findPositionByVisibleOffset(anchorElement, anchorOffset);
+        }
+        if (!focusPos) {
+          if (focusResult.textChildIndex !== null && focusResult.parentChildren) {
+            focusOffset = this.calculateAbsoluteOffset(
+              focusResult.parentChildren,
+              focusResult.textChildIndex,
+              slateSelection.focus.offset
+            );
+            log('Calculated absolute focus offset:', focusOffset, 'from textChildIndex:', focusResult.textChildIndex);
+          }
+          focusPos = this.findPositionByVisibleOffset(focusElement, focusOffset);
         }
       } else {
-        // String/textarea field or slate without nodeIds - degenerate case
-        // Selection path is [0] with just an offset
-        // Find the editable field directly by data-editable-field attribute
-        const editableField = blockElement.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+        // Simple field - use the editable field directly
+        const editableField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
         if (!editableField) {
           console.warn('[HYDRA] Could not find editable field:', this.focusedFieldName);
           return;
         }
-
-        // Both anchor and focus use the same element for simple text fields
         anchorElement = focusElement = editableField;
-        anchorTextResult = this.findTextNodeInChild(editableField, slateSelection.anchor.offset);
-        focusTextResult = this.findTextNodeInChild(editableField, slateSelection.focus.offset);
+        // For simple fields, use findPositionByVisibleOffset
+        anchorPos = this.findPositionByVisibleOffset(anchorElement, anchorOffset);
+        focusPos = this.findPositionByVisibleOffset(focusElement, focusOffset);
       }
 
 
-      if (!anchorTextResult || !focusTextResult) {
-        console.warn('[HYDRA] Selection restoration failed - could not find text nodes');
+      if (!anchorPos || !focusPos) {
+        console.warn('[HYDRA] Could not find positions by visible offset');
         return;
       }
 
-      // Create range
-      const range = document.createRange();
+      // Set the actual selection
       const selection = window.getSelection();
+      if (!selection) return;
 
-      range.setStart(anchorTextResult.node, anchorTextResult.offset);
-      range.setEnd(focusTextResult.node, focusTextResult.offset);
+      const range = document.createRange();
+      range.setStart(anchorPos.node, anchorPos.offset);
+      range.setEnd(focusPos.node, focusPos.offset);
 
-      selection?.removeAllRanges();
-      selection?.addRange(range);
+      selection.removeAllRanges();
+      selection.addRange(range);
 
-      log('Selection set, verifying:', {
-        anchorNode: selection?.anchorNode?.nodeName,
-        anchorOffset: selection?.anchorOffset,
-        anchorParent: selection?.anchorNode?.parentElement?.tagName,
-        rangeCount: selection?.rangeCount
-      });
     } catch (e) {
       console.error('[HYDRA] Error restoring Slate selection:', e);
     }
   }
 
   /**
-   * Find the text node and offset within an element given a character offset
-   * Walks through all text nodes in the element to find the right position
+   * Find DOM position (node + offset) by visible character offset.
+   * Uses Range.toString().length to match the browser's text model,
+   * which naturally handles empty text nodes, whitespace normalization, etc.
    *
-   * @param {HTMLElement} element - Parent element to search within
-   * @param {number} targetOffset - Character offset from start of element's text content
-   * @returns {{node: Text, offset: number}|null} Text node and offset, or null if not found
+   * @param {HTMLElement} element - Element to search within
+   * @param {number} targetOffset - Target character offset in visible text
+   * @returns {{node: Node, offset: number}|null} DOM position or null
    */
-  findTextNodeAndOffset(element, targetOffset) {
-    let currentOffset = 0;
+  findPositionByVisibleOffset(element, targetOffset) {
+    const zwsPattern = /[\uFEFF\u200B]/g;
 
-    // Walk through all child nodes recursively
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false
-    );
+    // Helper to count visible chars (excluding ZWS)
+    const visibleLength = (text) => text.replace(zwsPattern, '').length;
 
-    let textNode = walker.nextNode();
-    while (textNode) {
-      const nodeLength = textNode.textContent.length;
+    log('findPositionByVisibleOffset: element=', element.tagName, 'nodeId=', element.getAttribute('data-node-id'), 'targetOffset=', targetOffset);
 
-      // Check if the target offset falls within this text node
-      if (currentOffset + nodeLength >= targetOffset) {
-        let offset = targetOffset - currentOffset;
-        // If this is a ZWS-only text node and offset is 0, position AFTER the ZWS
-        // This helps browsers preserve the cursor inside inline elements when typing
-        const zwsPattern = /^[\uFEFF\u200B]+$/;
-        if (offset === 0 && zwsPattern.test(textNode.textContent)) {
-          offset = textNode.textContent.length;
-          log('findTextNodeAndOffset: ZWS node detected, positioning after ZWS, offset:', offset);
-        }
-        return { node: textNode, offset };
+    // Handle offset 0 - return start of first text node
+    if (targetOffset === 0) {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+      let firstText = walker.nextNode();
+      // Skip empty text nodes (Vue/Nuxt renders {{ node.text }} as empty text nodes)
+      while (firstText && firstText.textContent.length === 0) {
+        log('findPositionByVisibleOffset: offset=0, skipping empty text node');
+        firstText = walker.nextNode();
       }
-
-      currentOffset += nodeLength;
-      textNode = walker.nextNode();
+      if (firstText) {
+        // If this is a ZWS-only text node, position AFTER the ZWS
+        // This helps browsers preserve the cursor inside inline elements when typing
+        if (visibleLength(firstText.textContent) === 0) {
+          log('findPositionByVisibleOffset: offset=0, ZWS-only node, returning end:', firstText.textContent.length);
+          return { node: firstText, offset: firstText.textContent.length };
+        }
+        log('findPositionByVisibleOffset: offset=0, returning start of first text');
+        return { node: firstText, offset: 0 };
+      }
+      return null;
     }
 
-    // If we didn't find it, return the last text node with its max offset
-    // This handles the case where targetOffset is at the very end
-    walker.currentNode = element;
-    let lastTextNode = null;
-    textNode = walker.nextNode();
-    while (textNode) {
-      lastTextNode = textNode;
-      textNode = walker.nextNode();
+    // Walk through text nodes, counting visible chars (excluding ZWS)
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    let visibleOffset = 0;
+    let node;
+    let nodeIndex = 0;
+
+    while ((node = walker.nextNode())) {
+      const text = node.textContent;
+      const nodeVisibleLen = visibleLength(text);
+      log('findPositionByVisibleOffset: node[' + nodeIndex + ']:', {
+        text: JSON.stringify(text),
+        visibleLen: nodeVisibleLen,
+        visibleOffset,
+        parentTag: node.parentElement?.tagName,
+        parentNodeId: node.parentElement?.getAttribute('data-node-id'),
+      });
+      nodeIndex++;
+
+      // Count visible chars in this node
+      for (let i = 0; i <= text.length; i++) {
+        const visibleCharsUpToI = visibleLength(text.substring(0, i));
+        const totalVisible = visibleOffset + visibleCharsUpToI;
+
+        if (totalVisible === targetOffset) {
+          // If we're at the END of this text node, check if there's a next text node
+          if (i === text.length) {
+            let nextNode = walker.nextNode();
+            // Skip empty text nodes (Vue/Nuxt renders empty text nodes)
+            while (nextNode && nextNode.textContent.length === 0) {
+              log('findPositionByVisibleOffset: at end of node, skipping empty nextNode');
+              nextNode = walker.nextNode();
+            }
+            if (nextNode) {
+              // Prefer start of next text node (for cursor exit from inline elements)
+              // BUT if nextNode is ZWS-only, position AFTER the ZWS (offset = length)
+              // This ensures cursor is clearly inside the ZWS text node, not at boundary
+              const nextVisibleLen = visibleLength(nextNode.textContent);
+              if (nextVisibleLen === 0 && nextNode.textContent.length > 0) {
+                // ZWS-only node - position after the ZWS
+                log('findPositionByVisibleOffset: at end of node, nextNode is ZWS, positioning AFTER ZWS');
+                return { node: nextNode, offset: nextNode.textContent.length };
+              }
+              log('findPositionByVisibleOffset: at end of node, preferring next node');
+              return { node: nextNode, offset: 0 };
+            }
+            walker.currentNode = node;
+          }
+          log('findPositionByVisibleOffset: FOUND at node offset', i);
+          return { node, offset: i };
+        }
+
+        if (totalVisible > targetOffset) {
+          // We've passed it - return previous position
+          log('findPositionByVisibleOffset: PASSED target, returning', i - 1);
+          return i > 0 ? { node, offset: i - 1 } : null;
+        }
+      }
+      visibleOffset += nodeVisibleLen;
     }
 
-    if (lastTextNode) {
-      return { node: lastTextNode, offset: lastTextNode.textContent.length };
+    // If we exhausted all nodes, return end of last NON-EMPTY text node
+    // Vue/Nuxt creates empty text nodes ("") at the end, so we skip those
+    const lastWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    let lastNonEmptyNode = null;
+    while ((node = lastWalker.nextNode())) {
+      if (node.textContent.length > 0) {
+        lastNonEmptyNode = node;
+      }
+    }
+    if (lastNonEmptyNode) {
+      log('findPositionByVisibleOffset: exhausted nodes, returning end of last non-empty node');
+      return { node: lastNonEmptyNode, offset: lastNonEmptyNode.textContent.length };
     }
 
     return null;
@@ -3651,6 +4955,11 @@ export class Bridge {
 
     for (const child of parentElement.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
+        // Skip empty text nodes - Vue creates these from {{ node.text }} when undefined
+        // They don't correspond to any Slate children
+        if (child.textContent.length === 0) {
+          continue;
+        }
         if (slateIndex === slateChildIndex) {
           return child;
         }
@@ -3682,6 +4991,12 @@ export class Bridge {
    * @returns {{node: Text, offset: number}|null} Text node and validated offset, or null
    */
   findTextNodeInChild(child, offset) {
+    // Helper to check if a text node is empty (has no visible content)
+    // Vue/Nuxt creates empty text nodes from {{ node.text }} when text is undefined
+    const isEmptyTextNode = (textNode) => {
+      return textNode.textContent.length === 0;
+    };
+
     // Helper to adjust offset for ZWS-only text nodes
     // If offset is 0 in a ZWS-only node, position AFTER the ZWS
     // This helps browsers preserve the cursor inside inline elements when typing
@@ -3695,13 +5010,16 @@ export class Bridge {
     };
 
     if (child.nodeType === Node.TEXT_NODE) {
-      // Direct text node - use it with the offset (adjusted for ZWS)
+      // Direct text node - skip if empty
+      if (isEmptyTextNode(child)) {
+        return null;
+      }
       const validOffset = adjustOffsetForZWS(child, offset);
       return { node: child, offset: validOffset };
     }
 
     if (child.nodeType === Node.ELEMENT_NODE) {
-      // Element node - find the first text node within
+      // Element node - find the first NON-EMPTY text node within
       const walker = document.createTreeWalker(
         child,
         NodeFilter.SHOW_TEXT,
@@ -3709,7 +5027,11 @@ export class Bridge {
         false
       );
 
-      const textNode = walker.nextNode();
+      let textNode = walker.nextNode();
+      // Skip empty text nodes (Vue artifact from {{ node.text }} when undefined)
+      while (textNode && isEmptyTextNode(textNode)) {
+        textNode = walker.nextNode();
+      }
       if (textNode) {
         const validOffset = adjustOffsetForZWS(textNode, offset);
         return { node: textNode, offset: validOffset };
@@ -3830,23 +5152,78 @@ export class Bridge {
   getFormDataWithoutNodeIds() {
     const formDataCopy = JSON.parse(JSON.stringify(this.formData));
 
-    // Recursively strip nodeIds from all blocks (including nested)
-    const stripNodeIds = (obj) => {
-      if (!obj || typeof obj !== 'object') return;
-      // If this looks like a block (has @type), strip its nodeIds
-      if (obj['@type']) {
-        this.resetJsonNodeIds(obj);
-      }
-      // Recurse into all properties to find nested blocks
-      for (const value of Object.values(obj)) {
-        if (value && typeof value === 'object') {
-          stripNodeIds(value);
+    // Strip nodeIds from slate fields only (value arrays in slate blocks)
+    const stripNodeIdsFromSlateFields = (blocks) => {
+      if (!blocks || typeof blocks !== 'object') return;
+      for (const blockId of Object.keys(blocks)) {
+        const block = blocks[blockId];
+        if (block && block['@type']) {
+          // Check if this block has slate fields and strip nodeIds from them
+          const blockType = block['@type'];
+          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
+          for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
+            if (fieldType === 'slate' && block[fieldName]) {
+              this.resetJsonNodeIds(block[fieldName]);
+            }
+          }
+          // Also check nested blocks in container fields
+          if (block.blocks) {
+            stripNodeIdsFromSlateFields(block.blocks);
+          }
         }
       }
     };
 
-    stripNodeIds(formDataCopy);
+    if (formDataCopy.blocks) {
+      stripNodeIdsFromSlateFields(formDataCopy.blocks);
+    }
     return formDataCopy;
+  }
+
+  /**
+   * Compare focused field value between two formData objects
+   * @param {Object} formDataA - First formData object (old/current, may have nodeIds)
+   * @param {Object} formDataB - Second formData object (new/incoming, no nodeIds)
+   * @returns {boolean} True if values are equal (ignoring nodeIds)
+   */
+  focusedFieldValuesEqual(formDataA, formDataB) {
+    if (!this.selectedBlockUid || !this.focusedFieldName) {
+      return true; // No focused field to compare
+    }
+    // Use blockPathMap to find nested blocks (object_list items, etc.)
+    const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+    let blockA, blockB;
+    if (pathInfo?.path) {
+      // Navigate path in both formData objects
+      blockA = formDataA;
+      blockB = formDataB;
+      for (const key of pathInfo.path) {
+        blockA = blockA?.[key];
+        blockB = blockB?.[key];
+      }
+    } else {
+      // Fallback to top-level lookup
+      blockA = formDataA?.blocks?.[this.selectedBlockUid];
+      blockB = formDataB?.blocks?.[this.selectedBlockUid];
+    }
+    if (!blockA || !blockB) {
+      return false; // Can't find block - assume not equal (safe default)
+    }
+    // Deep copy and strip nodeIds before comparing (old formData has nodeIds, incoming doesn't)
+    const fieldA = blockA[this.focusedFieldName];
+    const fieldB = blockB[this.focusedFieldName];
+    if (fieldA === undefined || fieldB === undefined) {
+      return fieldA === fieldB;
+    }
+    const copyA = JSON.parse(JSON.stringify(fieldA));
+    const copyB = JSON.parse(JSON.stringify(fieldB));
+    this.resetJsonNodeIds(copyA);
+    this.resetJsonNodeIds(copyB);
+    const strA = JSON.stringify(copyA);
+    const strB = JSON.stringify(copyB);
+    const isEqual = strA === strB;
+    log('focusedFieldValuesEqual:', isEqual, 'A:', strA.substring(0, 100), 'B:', strB.substring(0, 100));
+    return isEqual;
   }
 
   /**
@@ -3921,8 +5298,9 @@ export class Bridge {
    * Handle the text changed in the block element with attr data-editable-field,
    * by getting changed text from DOM and send it to the adminUI
    * @param {HTMLElement} target
+   * @param {Node} mutatedTextNode - The actual text node that was modified (optional)
    */
-  handleTextChange(target, mutatedNodeParent = null) {
+  handleTextChange(target, mutatedNodeParent = null, mutatedTextNode = null) {
     const blockUid = target
       .closest('[data-block-uid]')
       .getAttribute('data-block-uid');
@@ -3930,13 +5308,6 @@ export class Bridge {
 
     if (!editableField) {
       console.warn('[HYDRA] handleTextChange: No data-editable-field found');
-      return;
-    }
-
-    // Don't process text changes during external updates (FORM_DATA from Admin)
-    // The DOM mutation was caused by Admin re-rendering, not user typing
-    if (this.isProcessingExternalUpdate) {
-      console.warn('[HYDRA] handleTextChange: Ignoring - external update in progress');
       return;
     }
 
@@ -3965,13 +5336,73 @@ export class Bridge {
       }
 
       const nodeId = closestNode.getAttribute('data-node-id');
-      // Strip ZWS characters before updating - they're only for cursor positioning in DOM
-      const textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
+
+      // Check if we're typing in a paragraph that has inline elements
+      // In this case, we need to update the specific text node, not the whole paragraph
+      let textContent;
+      let childIndex = null;
+
+      // Check if closestNode has mixed content (text nodes + element children like STRONG/EM)
+      // If so, we need to track which specific text node was modified, not use full innerText
+      const hasElementChildren = Array.from(closestNode.childNodes).some(n => n.nodeType === Node.ELEMENT_NODE);
+
+      if (mutatedTextNode && closestNode === mutatedNodeParent && hasElementChildren) {
+        // Text node is direct child of element with mixed content
+        // Use getNodePath to get the correct Slate path (handles Vue whitespace nodes)
+        const slatePath = this.getNodePath(mutatedTextNode);
+        if (slatePath && slatePath.length > 1) {
+          // Last element of path is the child index within the parent
+          childIndex = slatePath[slatePath.length - 1];
+
+          // Merge all adjacent text nodes at this position using Range.toString()
+          // This normalizes whitespace correctly and handles Vue/React text node splitting
+          let startNode = mutatedTextNode;
+          let endNode = mutatedTextNode;
+
+          // Walk backwards to find start of this text run (stop at element nodes)
+          while (startNode.previousSibling) {
+            const prev = startNode.previousSibling;
+            if (prev.nodeType === Node.ELEMENT_NODE) break;
+            if (prev.nodeType === Node.TEXT_NODE) {
+              startNode = prev;
+            } else {
+              break;
+            }
+          }
+
+          // Walk forward to find end of this text run (stop at element nodes)
+          while (endNode.nextSibling) {
+            const next = endNode.nextSibling;
+            if (next.nodeType === Node.ELEMENT_NODE) break;
+            if (next.nodeType === Node.TEXT_NODE) {
+              endNode = next;
+            } else {
+              break;
+            }
+          }
+
+          // Use Range to get normalized text content
+          const range = document.createRange();
+          range.setStart(startNode, 0);
+          range.setEnd(endNode, endNode.textContent.length);
+          textContent = this.stripZeroWidthSpaces(range.toString());
+          log('handleTextChange: nodeId=', nodeId, 'childIndex=', childIndex, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
+        }
+      }
+
+      if (childIndex === null) {
+        // Fallback: update using innerText of the whole node (original behavior)
+        // This handles inline elements (STRONG, EM, etc.) which have their own nodeId
+        textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
+        log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
+      }
+
       // Use blockData from getBlockData (already retrieved above) to support nested blocks
       const updatedJson = this.updateJsonNode(
         blockData,
         nodeId,
         textContent,
+        childIndex,
       );
 
       const currBlock = document.querySelector(
@@ -3982,7 +5413,9 @@ export class Bridge {
       if (block) {
         // Update the block in place (getBlockData returns a reference)
         Object.assign(block, updatedJson);
-        block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
+        // TODO: Re-enable plaintext sync once echo detection is fixed
+        // block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
+        log('handleTextChange: updated formData value:', JSON.stringify(block.value));
       }
     } else {
       // Non-Slate field - update field directly with text content
@@ -3993,28 +5426,52 @@ export class Bridge {
       }
     }
 
-    // Store the pending update - create a deep copy and strip nodeIds
-    // NodeIds are internal to hydra.js and should not be sent to Admin UI
+    // Buffer the update - text and selection are captured together
+    this.bufferUpdate(fieldType === 'slate' ? 'textChangeSlate' : 'textChange');
+  }
+
+  /**
+   * Buffer an update to be sent after debounce.
+   * Text and selection are always sent together to keep them atomic/in-sync.
+   *
+   * @param {string} [from] - Source of the update for debugging
+   */
+  bufferUpdate(from = 'unknown') {
+    // Always capture BOTH current data and current selection together
+    const data = this.getFormDataWithoutNodeIds();
+    const currentSeq = this.formData?._editSequence || 0;
+    const text = this.getBlockData(this.selectedBlockUid)?.value?.[0]?.children?.[0]?.text?.substring(0, 30);
+
+    // Check against lastReceivedFormData to avoid buffering echoes of what we just received/rendered
+    if (this.lastReceivedFormData) {
+      const isEcho = this.focusedFieldValuesEqual(data, this.lastReceivedFormData);
+      if (isEcho) {
+        // Same content as what we received - don't buffer
+        log('bufferUpdate: echo, skipping. from:', from, 'seq:', currentSeq);
+        return;
+      }
+    } else {
+      // No baseline yet - can't determine if this is an echo
+      log('bufferUpdate: no baseline, skipping. from:', from);
+      return;
+    }
+
+    log('bufferUpdate: buffering. from:', from, 'seq:', currentSeq, 'text:', JSON.stringify(text));
+
+    // Buffer the update - sequence will be assigned at SEND time, not buffer time
     this.pendingTextUpdate = {
       type: 'INLINE_EDIT_DATA',
-      data: this.getFormDataWithoutNodeIds(),
-      from: fieldType === 'slate' ? 'textChangeSlate' : 'textChange',
+      data: data,
+      selection: this.serializeSelection(),
+      from: from,
     };
 
-    // Clear existing timer and set new one - batches rapid changes
+    // Reset the debounce timer
     if (this.textUpdateTimer) {
       clearTimeout(this.textUpdateTimer);
     }
-
-    // Send update after 300ms of no typing (debounce)
     this.textUpdateTimer = setTimeout(() => {
-      if (this.pendingTextUpdate) {
-        // Add current selection at send time (not creation time)
-        this.pendingTextUpdate.selection = this.serializeSelection();
-        this.sendMessageToParent(this.pendingTextUpdate);
-        this.pendingTextUpdate = null;
-        this.textUpdateTimer = null; // Clear the timer reference
-      }
+      this.flushPendingTextUpdates();
     }, 300);
   }
 
@@ -4030,17 +5487,30 @@ export class Bridge {
       this.textUpdateTimer = null;
     }
     if (this.pendingTextUpdate) {
+      // Assign sequence number at SEND time, not buffer time
+      // This ensures monotonically increasing sequences even if FORM_DATA arrives during debounce
+      const currentSeq = this.formData?._editSequence || 0;
+      const newSeq = currentSeq + 1;
+      this.pendingTextUpdate.data._editSequence = newSeq;
+      this.formData._editSequence = newSeq;
+
       // Include requestId if provided (for FLUSH_BUFFER coordination)
       if (flushRequestId) {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
-      // Add current selection at send time (not creation time)
-      this.pendingTextUpdate.selection = this.serializeSelection();
+
+      log('flushPendingTextUpdates: sending buffered update, seq:', newSeq,
+          'anchor:', this.pendingTextUpdate.selection?.anchor,
+          'focus:', this.pendingTextUpdate.selection?.focus);
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
+
+      // Update lastReceivedFormData to the data we just sent
+      // This is needed because admin doesn't send FORM_DATA back for inline edits (echo prevention)
+      this.lastReceivedFormData = JSON.parse(JSON.stringify(this.pendingTextUpdate.data));
       this.pendingTextUpdate = null;
-      return true; // Had pending text
+      return true; // Had pending update
     }
-    return false; // No pending text
+    return false; // No pending update
   }
 
   /**
@@ -4063,24 +5533,35 @@ export class Bridge {
    * @param {JSON} json Block's data
    * @param {BigInteger} nodeId Node ID of the element
    * @param {String} newText Updated text
+   * @param {Number} childIndex Optional index of child to update (for paragraphs with inline elements)
    * @returns {JSON} Updated JSON object
    */
-  updateJsonNode(json, nodeId, newText) {
+  updateJsonNode(json, nodeId, newText, childIndex = null) {
     if (Array.isArray(json)) {
-      return json.map((item) => this.updateJsonNode(item, nodeId, newText));
+      return json.map((item) => this.updateJsonNode(item, nodeId, newText, childIndex));
     } else if (typeof json === 'object' && json !== null) {
       // Compare nodeIds as strings (path-based IDs like "0", "0.0", etc.)
       if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
         if (json.hasOwnProperty('text')) {
           json.text = newText;
+        } else if (childIndex !== null && json.children && json.children[childIndex]) {
+          // Update specific child by index (for typing in paragraphs with inline elements)
+          const child = json.children[childIndex];
+          if (child.hasOwnProperty('text')) {
+            child.text = newText;
+          } else if (child.children && child.children[0]) {
+            // Child is an inline element, update its first text child
+            child.children[0].text = newText;
+          }
         } else {
+          // Fallback: update first child (original behavior)
           json.children[0].text = newText;
         }
         return json;
       }
       for (const key in json) {
         if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-          json[key] = this.updateJsonNode(json[key], nodeId, newText);
+          json[key] = this.updateJsonNode(json[key], nodeId, newText, childIndex);
         }
       }
     }
@@ -4100,6 +5581,36 @@ export class Bridge {
   ////////////////////////////////////////////////////////////////////////////////
   // Text Formatting
   ////////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Check if a selection range involves formatted content (nested elements).
+   * Uses getNodePath to determine if selection is inside or spans inline formatting.
+   *
+   * Path length indicates nesting:
+   * - [0, 0] = text directly in paragraph (plain text)
+   * - [0, 1, 0] = text inside inline element like strong (formatted)
+   *
+   * @param {Range} range - The selection range
+   * @returns {boolean} True if selection involves formatted/structured content
+   */
+  selectionContainsElementNodes(range) {
+    // Get paths for start and end of selection
+    const startPath = this.getNodePath(range.startContainer);
+    const endPath = this.getNodePath(range.endContainer);
+
+    if (!startPath || !endPath) return false;
+
+    // Path length > 2 means inside nested element (e.g., strong inside p)
+    if (startPath.length > 2) return true;
+    if (endPath.length > 2) return true;
+
+    // If paths are identical, selection is within same text node - no structure
+    if (startPath.join('.') === endPath.join('.')) return false;
+
+    // Different paths means selection spans multiple children
+    // Could have elements between them (e.g., start [0,0], end [0,2] has [0,1] between)
+    return true;
+  }
 
   getSelectionHTML(range) {
     const div = document.createElement('div');
@@ -4441,6 +5952,11 @@ export class Bridge {
         [contenteditable] {
           outline: 0px solid transparent;
         }
+        /* Ensure empty editable fields are visible/clickable */
+        [data-editable-field]:empty {
+          min-height: 1.5em;
+          display: block;
+        }
         .volto-hydra--outline {
           position: relative !important;
         }
@@ -4657,7 +6173,8 @@ export class Bridge {
           margin: 0 1em;
         }
         /* Empty block visual indicator - always visible */
-        [data-block-type="empty"] {
+        /* Hydra adds data-hydra-empty attribute to blocks with @type: 'empty' in formData */
+        [data-hydra-empty] {
           border: 2px dashed #b8c6c8 !important;
           border-radius: 4px;
           background: rgba(200, 200, 200, 0.1);
@@ -4667,7 +6184,7 @@ export class Bridge {
           justify-content: center;
           cursor: pointer;
         }
-        [data-block-type="empty"]::after {
+        [data-hydra-empty]::after {
           content: '+';
           font-size: 24px;
           color: #b8c6c8;

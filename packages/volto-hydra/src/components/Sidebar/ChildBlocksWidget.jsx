@@ -33,10 +33,42 @@ const messages = defineMessages({
 
 /**
  * Get child blocks for a specific container field
+ * Supports both standard containers (blocks + blocks_layout) and object_list (array with @id)
+ * @param {Array|null} dataPath - Path to actual data location (e.g., ['table', 'rows'])
  */
-const getChildBlocks = (blockData, fieldName, formData) => {
-  if (!blockData || !blockData[fieldName]) return [];
+const getChildBlocks = (blockData, fieldName, formData, isObjectList = false, dataPath = null) => {
+  // Navigate to data using dataPath if provided, otherwise use fieldName
+  let data = blockData;
+  if (dataPath) {
+    for (const key of dataPath) {
+      data = data?.[key];
+    }
+  } else {
+    data = blockData?.[fieldName];
+  }
 
+  if (!data) return [];
+
+  if (isObjectList) {
+    // object_list: items stored as array with @id or custom idField
+    if (!Array.isArray(data)) return [];
+
+    return data.map((item, index) => {
+      // Use 'key' for slateTable rows/cells, fall back to '@id'
+      const blockId = item['key'] || item['@id'];
+      // object_list items don't have @type, use a generic title or item field
+      const title = item.title || item.plaintext || `Item ${index + 1}`;
+
+      return {
+        id: blockId,
+        type: 'object_list_item',
+        title: title,
+        data: item,
+      };
+    });
+  }
+
+  // Standard container: blocks object + blocks_layout
   const layoutField = `${fieldName}_layout`;
   const items = blockData[layoutField]?.items || [];
   const blocksData = blockData[fieldName] || {};
@@ -236,7 +268,7 @@ const ChildBlocksWidget = ({
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        const childBlocks = getChildBlocks(blockData, field.fieldName, formData);
+        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
         return (
           <ContainerFieldSection
             key={field.fieldName}

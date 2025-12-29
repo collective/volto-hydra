@@ -84,7 +84,8 @@ export class AdminUIHelper {
 
   /**
    * Navigate to the edit page for a piece of content.
-   * Uses pure client-side navigation to avoid SSR auth issues.
+   * If already on the page in view mode, clicks the Edit button.
+   * Otherwise uses client-side navigation to avoid SSR auth issues.
    */
   async navigateToEdit(contentPath: string): Promise<void> {
     // Ensure path starts with /
@@ -93,20 +94,28 @@ export class AdminUIHelper {
     }
 
     const editPath = `${contentPath}/edit`;
+    const currentUrl = this.page.url();
 
+    // Check if we're already on this page (view mode)
+    const isOnViewPage = currentUrl.includes(contentPath) && !currentUrl.includes('/edit');
 
-    // Use React Router to navigate client-side (avoids SSR)
-    await this.page.evaluate((path) => {
-      // @ts-ignore - window.__APP_HISTORY__ is set by Volto
-      if (window.__HISTORY__) {
-        window.__HISTORY__.push(path);
-      } else {
-        // Fallback to pushState + popstate event
-        window.history.pushState({}, '', path);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      }
-    }, editPath);
-
+    if (isOnViewPage) {
+      // Click the Edit button in the toolbar
+      const editButton = this.page.locator('#toolbar a.edit, #toolbar [aria-label="Edit"]');
+      await editButton.click({ timeout: 5000 });
+    } else {
+      // Use React Router to navigate client-side (avoids SSR)
+      await this.page.evaluate((path) => {
+        // @ts-ignore - window.__APP_HISTORY__ is set by Volto
+        if (window.__HISTORY__) {
+          window.__HISTORY__.push(path);
+        } else {
+          // Fallback to pushState + popstate event
+          window.history.pushState({}, '', path);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }, editPath);
+    }
 
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${editPath}`, { timeout: 10000 });
@@ -134,6 +143,157 @@ export class AdminUIHelper {
    */
   getIframe(): FrameLocator {
     return this.page.frameLocator('#previewIframe');
+  }
+
+  /**
+   * Check if a block is hidden in the iframe.
+   * Matches hydra.js's isElementHidden logic:
+   * - display: none or visibility: hidden
+   * - zero dimensions
+   * - translated outside container bounds (e.g., Flowbite carousel)
+   */
+  async isBlockHiddenInIframe(blockId: string): Promise<boolean> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    return await block.evaluate((el) => {
+      if (!el) return true;
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return true;
+      }
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        return true;
+      }
+      // Check if element is translated/positioned outside its container
+      const container = el.parentElement?.closest('[data-block-uid]');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        if (rect.right <= containerRect.left || rect.left >= containerRect.right) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  /**
+   * Inject the preserveWhitespaceDOM helper into the iframe.
+   * This helper creates DOM while preserving whitespace text nodes that innerHTML would collapse.
+   * Vue/Nuxt templates create these from newlines/indentation.
+   *
+   * After calling this, tests can use: (window as any).preserveWhitespaceDOM('<div>\\n  <p>text</p>\\n</div>')
+   */
+  async injectPreserveWhitespaceHelper(): Promise<void> {
+    const iframe = this.getIframe();
+    await iframe.locator('body').evaluate(() => {
+      (window as any).preserveWhitespaceDOM = function(html: string): DocumentFragment {
+        const fragment = document.createDocumentFragment();
+
+        function parseHTML(htmlStr: string, parent: Node): string {
+          let remaining = htmlStr;
+
+          while (remaining.length > 0) {
+            const tagStart = remaining.indexOf('<');
+
+            if (tagStart === -1) {
+              if (remaining.length > 0) {
+                parent.appendChild(document.createTextNode(remaining));
+              }
+              break;
+            }
+
+            if (tagStart > 0) {
+              const text = remaining.slice(0, tagStart);
+              parent.appendChild(document.createTextNode(text));
+              remaining = remaining.slice(tagStart);
+            }
+
+            if (remaining.startsWith('</')) {
+              return remaining;
+            }
+
+            const tagEnd = remaining.indexOf('>');
+            if (tagEnd === -1) break;
+
+            const tagContent = remaining.slice(1, tagEnd);
+            const selfClosing = tagContent.endsWith('/');
+            const tagParts = (selfClosing ? tagContent.slice(0, -1) : tagContent).trim().split(/\s+/);
+            const tagName = tagParts[0];
+
+            const element = document.createElement(tagName);
+
+            const attrStr = tagParts.slice(1).join(' ');
+            const attrRegex = /([a-zA-Z-]+)(?:="([^"]*)")?/g;
+            let match;
+            while ((match = attrRegex.exec(attrStr)) !== null) {
+              element.setAttribute(match[1], match[2] || '');
+            }
+
+            parent.appendChild(element);
+            remaining = remaining.slice(tagEnd + 1);
+
+            if (!selfClosing) {
+              remaining = parseHTML(remaining, element);
+              const closeTag = `</${tagName}>`;
+              if (remaining.startsWith(closeTag)) {
+                remaining = remaining.slice(closeTag.length);
+              }
+            }
+          }
+
+          return remaining;
+        }
+
+        parseHTML(html, fragment);
+        return fragment;
+      };
+
+      // Vue-style DOM helper: splits text nodes at whitespace boundaries and converts
+      // whitespace-only segments to empty text nodes, matching Vue's template interpolation behavior
+      // Vue creates: [empty ""][content][empty ""] from "<p>\n{{ text }}\n</p>"
+      (window as any).vueStyleDOM = function(html: string): DocumentFragment {
+        const fragment = (window as any).preserveWhitespaceDOM(html);
+
+        // Walk all text nodes and split at whitespace/content boundaries
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+        const nodesToProcess: Text[] = [];
+        let node;
+        while ((node = walker.nextNode())) {
+          nodesToProcess.push(node as Text);
+        }
+
+        nodesToProcess.forEach(textNode => {
+          const text = textNode.textContent || '';
+          // Match pattern: (leading whitespace)(content)(trailing whitespace)
+          const match = text.match(/^(\s*)(.*?)(\s*)$/s);
+          if (match) {
+            const [, leading, content, trailing] = match;
+            // Only split if there's actual content with surrounding whitespace
+            if (content && (leading || trailing)) {
+              const parent = textNode.parentNode;
+              if (parent) {
+                // Create replacement nodes: empty for whitespace, content as-is
+                if (leading) {
+                  parent.insertBefore(document.createTextNode(''), textNode);
+                }
+                parent.insertBefore(document.createTextNode(content), textNode);
+                if (trailing) {
+                  parent.insertBefore(document.createTextNode(''), textNode);
+                }
+                parent.removeChild(textNode);
+              }
+            } else if (!content && text) {
+              // Whitespace-only node -> convert to empty
+              textNode.textContent = '';
+            }
+          }
+        });
+
+        return fragment;
+      };
+    });
   }
 
   /**
@@ -167,6 +327,9 @@ export class AdminUIHelper {
       const toolbar = this.page.locator('.quanta-toolbar');
       await toolbar.waitFor({ state: 'visible', timeout: 5000 });
 
+      // Wait for selection to settle
+      await this.waitForBlockSelected(blockId);
+
       // Check if the correct block is selected
       const result = await this.isBlockSelectedInIframe(blockId);
       if (!result.ok) {
@@ -178,9 +341,13 @@ export class AdminUIHelper {
       }
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
-      const editableField = block.locator('[contenteditable="true"]');
+      // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
+      const childEditable = block.locator('[contenteditable="true"]');
+      const selfEditable = iframe.locator(
+        `[data-block-uid="${blockId}"][contenteditable="true"]`,
+      );
       try {
-        await editableField.waitFor({ state: 'visible', timeout: 5000 });
+        await childEditable.or(selfEditable).first().waitFor({ state: 'visible', timeout: 5000 });
       } catch (e) {
         throw new Error(`Block "${blockId}" was clicked but no contenteditable field appeared. Check that hydra.js is handling the block selection.`);
       }
@@ -193,8 +360,17 @@ export class AdminUIHelper {
   /**
    * Navigate up through parent blocks in the sidebar until reaching the target block.
    * Used when clicking on a container block selects a child instead.
+   *
+   * @param targetBlockId - The block ID we want to be selected
+   * @param expectedCurrentType - Optional: the type name of the block we expect to be currently selected
+   *                              (e.g., "Grid" if grid-1 was selected instead of the target)
+   * @param maxAttempts - Maximum navigation attempts
    */
-  async navigateToParentBlock(targetBlockId: string, maxAttempts: number = 10): Promise<void> {
+  async navigateToParentBlock(
+    targetBlockId: string,
+    expectedCurrentType?: string,
+    maxAttempts: number = 10
+  ): Promise<void> {
     // Wait for sidebar to be open
     await this.waitForSidebarOpen();
 
@@ -209,6 +385,27 @@ export class AdminUIHelper {
       );
     }
 
+    // Debug: Get all parent button texts for error messages
+    const getParentButtonTexts = async () => {
+      const buttons = await parentButtonLocator.all();
+      const texts: string[] = [];
+      for (const btn of buttons) {
+        texts.push(await btn.textContent() || '(empty)');
+      }
+      return texts;
+    };
+
+    // If expectedCurrentType is provided, verify the sidebar shows it as the current block
+    if (expectedCurrentType) {
+      const buttonTexts = await getParentButtonTexts();
+      const lastButtonText = buttonTexts[buttonTexts.length - 1] || '';
+      if (!lastButtonText.includes(expectedCurrentType)) {
+        throw new Error(
+          `Sidebar state mismatch: expected current block type "${expectedCurrentType}" but found buttons: [${buttonTexts.join(', ')}]`
+        );
+      }
+    }
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       // Check if target block is now selected
       const result = await this.isBlockSelectedInIframe(targetBlockId);
@@ -218,14 +415,15 @@ export class AdminUIHelper {
       }
 
       // Find and click the LAST "‹ BlockType" parent navigation button in sidebar
-      // (the one closest to the current block - clicking it navigates up one level)
-      // Buttons are ordered root-to-current, so last is the current block's header
+      // Clicking it closes that section and navigates up one level
       const parentButton = parentButtonLocator.last();
       const buttonExists = (await parentButton.count()) > 0;
 
       if (!buttonExists) {
+        const buttonTexts = await getParentButtonTexts();
         throw new Error(
-          `Cannot navigate to block "${targetBlockId}": parent navigation buttons disappeared from sidebar`
+          `Cannot navigate to block "${targetBlockId}": parent navigation buttons disappeared from sidebar. ` +
+          `Last known buttons: [${buttonTexts.join(', ')}]`
         );
       }
 
@@ -233,8 +431,10 @@ export class AdminUIHelper {
       await this.page.waitForTimeout(300); // Wait for selection to update
     }
 
+    const buttonTexts = await getParentButtonTexts();
     throw new Error(
-      `Failed to navigate to block "${targetBlockId}" after ${maxAttempts} attempts`
+      `Failed to navigate to block "${targetBlockId}" after ${maxAttempts} attempts. ` +
+      `Current sidebar buttons: [${buttonTexts.join(', ')}]`
     );
   }
 
@@ -268,11 +468,15 @@ export class AdminUIHelper {
       await titleElement.first().scrollIntoViewIfNeeded();
       await titleElement.first().click();
     } else {
-      // Fall back to clicking on the block's border area (top-left corner)
+      // Fall back to clicking on the block's border area
+      // Avoid data-block-selector elements (like carousel nav buttons on the sides)
       const blockBox = await block.boundingBox();
       if (blockBox) {
-        // Click 5px from left edge and 5px from top - on the border area
-        await block.click({ position: { x: 5, y: 5 } });
+        // Click at top center - avoids nav buttons (on sides) and child blocks (in middle)
+        // The top border area is typically safe for containers like carousels
+        await block.click({
+          position: { x: blockBox.width / 2, y: 3 },
+        });
       } else {
         throw new Error(
           `Cannot get bounding box for block "${blockId}" to click on border`,
@@ -293,8 +497,37 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
     await block.waitFor({ state: 'visible', timeout });
-    // Also wait a bit for the selected class to be applied
-    await this.page.waitForTimeout(300);
+
+    // Wait for drag handle to appear and be positioned at the correct block
+    // The drag handle is positioned at the selected block's left edge, typically 48px above
+    // For container blocks, positioning may vary, so we check if handle is near the block
+    const dragHandle = iframe.locator('.volto-hydra-drag-button');
+    await expect(async () => {
+      await expect(dragHandle).toBeVisible({ timeout: 100 });
+
+      // Verify drag handle is positioned near this block
+      const blockBox = await block.boundingBox();
+      const handleBox = await dragHandle.boundingBox();
+      if (!blockBox || !handleBox) {
+        throw new Error('Could not get bounding boxes');
+      }
+
+      // Drag handle should be at block's left edge (within tolerance)
+      const xDiff = Math.abs(handleBox.x - blockBox.x);
+      // Drag handle should be near the block's top (allow for above or at top)
+      // Handle is typically 48px above, but for container blocks it may be at the top
+      const minY = blockBox.y - 60; // Allow up to 60px above
+      const maxY = blockBox.y + 30; // Allow slightly below top
+      const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
+
+      if (xDiff > 30 || !inYRange) {
+        throw new Error(
+          `Drag handle not at block position. Block: (${blockBox.x.toFixed(0)}, ${blockBox.y.toFixed(0)}), ` +
+          `Handle: (${handleBox.x.toFixed(0)}, ${handleBox.y.toFixed(0)}), ` +
+          `expected y range: [${minY.toFixed(0)}, ${maxY.toFixed(0)}]`
+        );
+      }
+    }).toPass({ timeout });
 
     // Return the block locator for chaining
     return block;
@@ -320,6 +553,20 @@ export class AdminUIHelper {
         timeout,
       }
     );
+  }
+
+  /**
+   * Wait for the sidebar to show a specific block type as the current block.
+   * The current block in the sidebar has data-is-current="true" on its header.
+   *
+   * @param blockTypeTitle - The display title of the block type (e.g., "Slider", "Slide", "Text")
+   * @param timeout - Maximum time to wait in milliseconds
+   */
+  async waitForSidebarCurrentBlock(blockTypeTitle: string, timeout: number = 10000): Promise<void> {
+    const sidebar = this.page.locator('.sidebar-container');
+    // The current block header has data-is-current="true" and contains the block type title
+    const currentBlockHeader = sidebar.locator('[data-is-current="true"]').filter({ hasText: blockTypeTitle });
+    await expect(currentBlockHeader).toBeVisible({ timeout });
   }
 
   /**
@@ -361,7 +608,6 @@ export class AdminUIHelper {
 
     // Check for common block type indicators
     const selectors = [
-      '[data-block-type]',
       '.block-editor-slate',
       '.block-editor-image',
       '.block-editor h2',
@@ -370,12 +616,6 @@ export class AdminUIHelper {
     for (const selector of selectors) {
       const element = sidebar.locator(selector).first();
       if (await element.isVisible()) {
-        // Try to extract block type
-        const dataAttr = await element.getAttribute('data-block-type');
-        if (dataAttr) {
-          return dataAttr;
-        }
-
         // Try from class names
         const classAttr = await element.getAttribute('class');
         if (classAttr) {
@@ -392,6 +632,19 @@ export class AdminUIHelper {
     }
 
     return null;
+  }
+
+  /**
+   * Get a locator for the slate editable field in a block.
+   * The field may be on the block element itself (Nuxt) or a child element (mock).
+   * Use with expect().toBeVisible() to verify a block is a slate block.
+   * @param blockLocator - Locator for the block element with data-block-uid
+   */
+  getSlateField(blockLocator: Locator): Locator {
+    // Try child first (mock renderer), then self (Nuxt where attr is on root)
+    const childField = blockLocator.locator('[data-editable-field="value"]');
+    const selfField = blockLocator.and(this.page.locator('[data-editable-field="value"]'));
+    return childField.or(selfField);
   }
 
   /**
@@ -618,13 +871,15 @@ export class AdminUIHelper {
     blockId: string,
     optionText: 'Settings' | 'Remove'
   ): Promise<void> {
-    const dropdown = this.page.locator(
-      `.volto-hydra-dropdown-menu`
-    );
+    const dropdown = this.page.locator(`.volto-hydra-dropdown-menu`);
     const option = dropdown.locator(
       `.volto-hydra-dropdown-item:has-text("${optionText}")`
     );
+    // Wait for option to be visible and clickable
+    await option.waitFor({ state: 'visible', timeout: 3000 });
     await option.click();
+    // Wait for dropdown to close (confirms action was triggered)
+    await dropdown.waitFor({ state: 'hidden', timeout: 3000 });
   }
 
   /**
@@ -663,6 +918,28 @@ export class AdminUIHelper {
 
     await button.waitFor({ state: 'visible', timeout: 2000 });
     await button.click();
+  }
+
+  /**
+   * Apply a format to the currently selected text in an editor.
+   * This is a higher-level helper that:
+   * 1. Clicks the format button
+   * 2. Waits for the formatted text to appear
+   * 3. Re-selects all text (to restore selection after DOM re-render)
+   *
+   * Use this instead of clickFormatButton when you need to apply multiple
+   * formats in sequence, as the DOM re-render can lose the selection.
+   */
+  async applyFormat(
+    editor: Locator,
+    format: 'bold' | 'italic',
+    expectedText: RegExp | string,
+  ): Promise<void> {
+    await this.clickFormatButton(format);
+    await this.waitForFormattedText(editor, expectedText, format);
+    // Re-select all text to restore selection after DOM re-render
+    // There is a bug if this is not automatically done by hydra.js
+    // await this.selectAllTextInEditor(editor);
   }
 
   /**
@@ -717,33 +994,24 @@ export class AdminUIHelper {
    * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
-    await editor.evaluate((el) => {
-      // Find the first and last text nodes in the element
-      // This handles both plain text and formatted text (e.g., <span>text</span>)
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-      const firstTextNode = walker.nextNode();
-      if (!firstTextNode) {
-        throw new Error('No text nodes found in editor');
-      }
+    // Get the expected text content (visible text, trimmed)
+    const expectedText = await editor.evaluate((el) => el.textContent?.trim() || '');
 
-      // Find the last text node
-      let lastTextNode = firstTextNode;
-      let node;
-      while ((node = walker.nextNode())) {
-        lastTextNode = node;
-      }
+    // Use platform-appropriate keyboard shortcut (Cmd+A on Mac, Ctrl+A elsewhere)
+    await editor.press('ControlOrMeta+a');
 
-      const range = document.createRange();
-      range.setStart(firstTextNode, 0);
-      range.setEnd(lastTextNode, lastTextNode.textContent?.length || 0);
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    });
-    // Give the selection time to register and trigger selectionchange event
-    await this.page.waitForTimeout(100);
+    // Wait for selection to match the editor's text content
+    await expect
+      .poll(
+        async () => {
+          return editor.evaluate(() => {
+            const sel = window.getSelection();
+            return sel?.toString().trim() || '';
+          });
+        },
+        { timeout: 5000 }
+      )
+      .toBe(expectedText);
   }
 
   /**
@@ -839,6 +1107,40 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the visible text before and after the cursor position.
+   * Uses Range APIs to get accurate text regardless of DOM structure.
+   * Strips ZWS characters to return only visible text.
+   */
+  async getTextAroundCursor(editor: Locator): Promise<{
+    textBefore: string;
+    textAfter: string;
+  }> {
+    return await editor.evaluate((el) => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        return { textBefore: '', textAfter: '' };
+      }
+
+      const range = sel.getRangeAt(0);
+      const ZWS = '\u200B\uFEFF';
+
+      // Get text before cursor
+      const beforeRange = document.createRange();
+      beforeRange.selectNodeContents(el);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+      const textBefore = beforeRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+
+      // Get text after cursor
+      const afterRange = document.createRange();
+      afterRange.selectNodeContents(el);
+      afterRange.setStart(range.endContainer, range.endOffset);
+      const textAfter = afterRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+
+      return { textBefore, textAfter };
+    });
+  }
+
+  /**
    * Get the number of blocks rendered in the iframe.
    */
   async getBlockCountInIframe(): Promise<number> {
@@ -849,17 +1151,58 @@ export class AdminUIHelper {
 
   /**
    * Get the text content of a block in the iframe.
+   * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
    */
   async getBlockTextInIframe(blockId: string): Promise<string> {
     const iframe = this.getIframe();
-    // Get text from the editable field (data-editable-field), not the entire block (which includes toolbar buttons)
-    // Don't require contenteditable="true" because it's only set when the block is selected
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    // Try descendant first (mock frontend: data-block-uid > [data-editable-field])
+    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+
+    if ((await editor.count()) === 0) {
+      // Nuxt pattern: data-block-uid and data-editable-field on same element
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`).first();
+    }
 
     // Wait a moment for any pending mutations to complete
     await this.page.waitForTimeout(100);
 
     return (await editor.textContent()) || '';
+  }
+
+  /**
+   * Get the editor locator for a block.
+   * Handles both mock frontend (descendant) and Nuxt frontend (same element) patterns.
+   *
+   * @param blockId - The block UID
+   * @param fieldName - Optional field name to target a specific editable field (e.g., 'title', 'description')
+   * @returns The editor locator
+   */
+  async getEditorLocator(blockId: string, fieldName?: string): Promise<Locator> {
+    const iframe = this.getIframe();
+
+    // If field name specified, target that specific field
+    if (fieldName) {
+      return iframe.locator(
+        `[data-block-uid="${blockId}"] [data-editable-field="${fieldName}"]`,
+      );
+    }
+
+    // Try descendant first (mock frontend: data-block-uid > [contenteditable])
+    let editor = iframe
+      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
+      .first();
+
+    // Use count() instead of isVisible() - element might exist but be scrolled out of view
+    const count = await editor.count().catch(() => 0);
+
+    if (count === 0) {
+      // Try same-element selector (Nuxt: data-block-uid AND contenteditable on same element)
+      editor = iframe.locator(
+        `[data-block-uid="${blockId}"][contenteditable="true"]`,
+      );
+    }
+
+    return editor;
   }
 
   /**
@@ -869,7 +1212,8 @@ export class AdminUIHelper {
    */
   async getCleanTextContent(editor: Locator): Promise<string> {
     const text = (await editor.textContent()) || '';
-    return text.replace(/[\u200B\uFEFF]/g, '');
+    // Strip ZWS and trim whitespace (Vue/Nuxt can have template whitespace)
+    return text.replace(/[\u200B\uFEFF]/g, '').trim();
   }
 
   /**
@@ -888,13 +1232,26 @@ export class AdminUIHelper {
     let text = '';
     await expect(async () => {
       text = (await editor.textContent()) || '';
-      // Strip zero-width spaces and other invisible characters
-      // (used for cursor positioning in empty inline elements)
-      // These are invisible to users, so test what users actually see
-      text = text.replace(/[\uFEFF\u200B\u00A0\u2060]/g, ' ').replace(/\s+/g, ' ').trim();
+      // Strip only truly invisible characters (ZWS, word joiner) - don't convert to space
+      // Keep NBSP as regular space since it's a visible space character
+      // Don't collapse multiple spaces - that could hide missing space bugs
+      text = text
+        .replace(/[\uFEFF\u200B\u2060]/g, '') // Remove invisible chars
+        .replace(/\u00A0/g, ' ') // Convert NBSP to regular space
+        .trim();
       expect(text).toMatch(regex);
     }).toPass({ timeout });
     return text;
+  }
+
+  /**
+   * Get the CSS selector for a format type that works with both frontends.
+   * Mock frontend uses inline styles, Nuxt uses semantic tags.
+   */
+  getFormatSelector(format: 'bold' | 'italic'): string {
+    return format === 'bold'
+      ? 'span[style*="font-weight: bold"], strong, b'
+      : 'span[style*="font-style: italic"], em, i';
   }
 
   /**
@@ -905,15 +1262,29 @@ export class AdminUIHelper {
     editor: Locator,
     pattern: RegExp | string,
     format: 'bold' | 'italic',
-    options: { timeout?: number } = {}
+    options: { timeout?: number } = {},
   ): Promise<void> {
     const timeout = options.timeout ?? 5000;
-    const selector = format === 'bold'
-      ? 'span[style*="font-weight: bold"]'
-      : 'span[style*="font-style: italic"]';
+    const selector = this.getFormatSelector(format);
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
 
-    await expect(editor.locator(selector)).toHaveText(regex, { timeout });
+    // Use filter to find elements matching the pattern, first() handles multiple matches
+    await expect(editor.locator(selector).filter({ hasText: regex }).first()).toBeVisible({ timeout });
+  }
+
+  /**
+   * Wait for formatted text (bold/italic) to be removed from the editor.
+   * Useful for waiting until formatting has been removed after toggling off.
+   */
+  async waitForFormattingRemoved(
+    editor: Locator,
+    format: 'bold' | 'italic',
+    options: { timeout?: number } = {},
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    const selector = this.getFormatSelector(format);
+
+    await expect(editor.locator(selector)).not.toBeVisible({ timeout });
   }
 
   /**
@@ -1013,6 +1384,62 @@ export class AdminUIHelper {
   async getBlockOutlineBoundingBox(): Promise<{ x: number; y: number; width: number; height: number } | null> {
     const outline = this.page.locator('.volto-hydra-block-outline');
     return await outline.boundingBox();
+  }
+
+  /**
+   * Monitor the outline position during an action and check if it ever appears at an invalid position.
+   * Returns true if the outline was ever at a bad position (x < minX or visible when should be hidden).
+   *
+   * @param action - The async action to perform while monitoring
+   * @param minX - Minimum acceptable X position (outline going left of this is bad)
+   * @param checkInterval - How often to check position in ms
+   * @returns Object with badPositionDetected and details about what was found
+   */
+  async monitorOutlinePositionDuringAction(
+    action: () => Promise<void>,
+    minX: number = 0,
+    checkInterval: number = 16,
+  ): Promise<{ badPositionDetected: boolean; minXSeen: number | null; positions: Array<{ x: number; y: number; visible: boolean }> }> {
+    const outline = this.page.locator('.volto-hydra-block-outline');
+    const positions: Array<{ x: number; y: number; visible: boolean }> = [];
+    let badPositionDetected = false;
+    let minXSeen: number | null = null;
+    let monitoring = true;
+
+    // Start monitoring in background
+    const monitorPromise = (async () => {
+      while (monitoring) {
+        const visible = await outline.isVisible().catch(() => false);
+        if (visible) {
+          const box = await outline.boundingBox().catch(() => null);
+          if (box) {
+            positions.push({ x: box.x, y: box.y, visible: true });
+            if (minXSeen === null || box.x < minXSeen) {
+              minXSeen = box.x;
+            }
+            if (box.x < minX) {
+              badPositionDetected = true;
+              console.log(`[TEST] Bad outline position detected: x=${box.x} < minX=${minX}`);
+            }
+          }
+        } else {
+          positions.push({ x: 0, y: 0, visible: false });
+        }
+        await new Promise((r) => setTimeout(r, checkInterval));
+      }
+    })();
+
+    // Perform the action
+    await action();
+
+    // Wait a bit more after action completes to catch any delayed updates
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Stop monitoring
+    monitoring = false;
+    await monitorPromise.catch(() => {}); // Ignore any errors from the monitoring loop
+
+    return { badPositionDetected, minXSeen, positions };
   }
 
   /**
@@ -1268,14 +1695,42 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the end of the text in a contenteditable element.
-   * Uses JavaScript to avoid triggering window scroll (unlike keyboard End key).
+   * Finds the last non-whitespace text node and places cursor at the end of it.
+   * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
   async moveCursorToEnd(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(false); // Collapse to end
+
+      // Find all text nodes, keeping only ones with actual content
+      const walker = el.ownerDocument.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null,
+      );
+      let lastContentTextNode = null;
+      let node;
+      while ((node = walker.nextNode())) {
+        // Skip whitespace-only text nodes (newlines, spaces between elements)
+        if (node.textContent && node.textContent.trim().length > 0) {
+          lastContentTextNode = node;
+        }
+      }
+
+      if (lastContentTextNode) {
+        // Place cursor at end of last content text node
+        range.setStart(
+          lastContentTextNode,
+          lastContentTextNode.textContent?.length || 0,
+        );
+        range.collapse(true);
+      } else {
+        // Fallback: no text nodes, collapse to end of container
+        range.selectNodeContents(el);
+        range.collapse(false);
+      }
+
       selection.removeAllRanges();
       selection.addRange(range);
     });
@@ -1283,21 +1738,84 @@ export class AdminUIHelper {
 
   /**
    * Move cursor to the start of the text in a contenteditable element.
-   * Uses JavaScript to avoid triggering window scroll (unlike keyboard Home key).
+   * Finds the first text node and places cursor at the start of it.
+   * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
   async moveCursorToStart(editor: any): Promise<void> {
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(true); // Collapse to start
+
+      // Find the first text node in the element
+      const walker = el.ownerDocument.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null,
+      );
+      const firstTextNode = walker.nextNode();
+
+      if (firstTextNode) {
+        // Place cursor at start of first text node
+        range.setStart(firstTextNode, 0);
+        range.collapse(true);
+      } else {
+        // Fallback: no text nodes, collapse to start of container
+        range.selectNodeContents(el);
+        range.collapse(true);
+      }
+
       selection.removeAllRanges();
       selection.addRange(range);
     });
   }
 
   /**
+   * Get click coordinates for a specific character position in a text element.
+   * Uses the Range API to find the exact pixel position of a character.
+   *
+   * @param editor - The element containing the text
+   * @param charPosition - The character offset to get coordinates for (0-based)
+   * @returns Click position relative to the element, or null if not found
+   */
+  async getClickPositionForCharacter(
+    editor: Locator,
+    charPosition: number,
+  ): Promise<{ x: number; y: number } | null> {
+    return await editor.evaluate(
+      (el: HTMLElement, pos: number) => {
+        // Find the first text node with actual content (skip whitespace-only nodes)
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let textNode = walker.nextNode();
+        while (textNode && (!textNode.textContent || !textNode.textContent.trim())) {
+          textNode = walker.nextNode();
+        }
+        if (!textNode || !textNode.textContent) return null;
+
+        // Clamp position to valid range
+        const clampedPos = Math.min(pos, textNode.textContent.length);
+
+        // Create a range at the specified position
+        const range = document.createRange();
+        range.setStart(textNode, clampedPos);
+        range.collapse(true);
+
+        // Get the bounding rect of that position
+        const rect = range.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+
+        // Return position relative to element
+        return {
+          x: rect.left - elRect.left,
+          y: rect.top - elRect.top + rect.height / 2,
+        };
+      },
+      charPosition,
+    );
+  }
+
+  /**
    * Move cursor to a specific position in a contenteditable element.
+   * Uses Selection.modify() to move by visible characters, handling Vue/Nuxt empty text nodes.
    *
    * @param editor - The contenteditable element
    * @param position - The character offset position to move to (0-based)
@@ -1305,17 +1823,20 @@ export class AdminUIHelper {
   async moveCursorToPosition(editor: any, position: number): Promise<void> {
     await editor.evaluate(
       (el: any, pos: number) => {
-        const textNode = el.firstChild;
-        if (!textNode || textNode.nodeType !== 3) {
-          // Node.TEXT_NODE = 3
-          throw new Error('Expected first child to be a text node');
-        }
-        const range = el.ownerDocument.createRange();
-        const selection = el.ownerDocument.defaultView.getSelection();
-        range.setStart(textNode, pos);
-        range.collapse(true);
+        const doc = el.ownerDocument;
+        const selection = doc.defaultView.getSelection();
+
+        // First, move cursor to start of element
+        const range = doc.createRange();
+        range.selectNodeContents(el);
+        range.collapse(true); // Collapse to start
         selection.removeAllRanges();
         selection.addRange(range);
+
+        // Then move forward by visible characters using Selection.modify()
+        for (let i = 0; i < pos; i++) {
+          selection.modify('move', 'forward', 'character');
+        }
       },
       position,
     );
@@ -1394,52 +1915,43 @@ export class AdminUIHelper {
    * during format operations (e.g., waiting for iframe flush to complete).
    *
    * @param blockId - The block UID to enter edit mode on
+   * @param fieldName - Optional field name to target (e.g., 'value', 'title'). If not provided, uses first editable field.
    * @returns The editor element, ready for text input
    */
-  async enterEditMode(blockId: string): Promise<any> {
+  async enterEditMode(blockId: string, fieldName?: string): Promise<any> {
     const iframe = this.getIframe();
-    // Use [data-editable-field] to find editor regardless of contenteditable state
-    const editor = iframe
-      .locator(`[data-block-uid="${blockId}"] [data-editable-field]`)
-      .first();
 
-    // Check if the editor is already visible and focused
-    const isVisible = await editor.isVisible().catch(() => false);
-
-    if (isVisible) {
-      // Check if already editable
-      const isEditable = await editor.getAttribute('contenteditable');
-      if (isEditable === 'true') {
-        // Check if already focused
-        const focusInfo = await this.isEditorFocused(editor);
-        if (focusInfo.isFocused) {
-          // Already in edit mode, return the editor
-          return editor;
-        }
-      }
-    }
-
-    // Not in edit mode yet, need to click the block
+    // Click the block to select it
     const blockContainer = iframe.locator(`[data-block-uid="${blockId}"]`);
     await blockContainer.click();
+
+    // Wait for block selection to be confirmed by Admin UI
+    await this.waitForBlockSelected(blockId);
 
     // Wait for the Quanta toolbar to appear (indicating block is selected)
     await this.waitForQuantaToolbar(blockId, 5000);
 
-    // Wait for the editor element to appear
-    await editor.waitFor({ state: 'visible', timeout: 5000 });
+    // Now get the editor element (after block is selected and rendered)
+    const editor = await this.getEditorLocator(blockId, fieldName);
+
+    // Click the editor field to focus it
+    await editor.click();
 
     // Wait for contenteditable to become true (may be blocked briefly)
     await expect(editor).toHaveAttribute('contenteditable', 'true', {
       timeout: 5000,
     });
 
-    const focusInfo = await this.isEditorFocused(editor);
-    if (!focusInfo.isFocused) {
-      throw new Error(
-        `Block ${blockId} field is not focused. Active element: ${focusInfo.activeElement}`,
-      );
-    }
+    // Wait for focus to be established (may take a moment after re-renders)
+    // Use polling instead of single check to handle race conditions with FORM_DATA re-renders
+    await expect(async () => {
+      const focusInfo = await this.isEditorFocused(editor);
+      if (!focusInfo.isFocused) {
+        throw new Error(
+          `Block ${blockId} field${fieldName ? ` (${fieldName})` : ''} is not focused. Active element: ${focusInfo.activeElement}`,
+        );
+      }
+    }).toPass({ timeout: 5000 });
 
     return editor;
   }
@@ -1593,8 +2105,20 @@ export class AdminUIHelper {
    * Matches Cypress pattern: #sidebar-properties .field-wrapper-{fieldname}
    */
   async hasSidebarField(fieldName: string): Promise<boolean> {
-    const fieldWrapper = this.page.locator(`#sidebar-properties .field-wrapper-${fieldName}`);
+    const fieldWrapper = this.page.locator(
+      `#sidebar-properties .field-wrapper-${fieldName}`,
+    );
     return await fieldWrapper.isVisible();
+  }
+
+  /**
+   * Get the sidebar slate editor locator for a specific field.
+   * Returns the contenteditable element for the field's slate widget.
+   */
+  getSidebarSlateEditor(fieldName: string): Locator {
+    return this.page.locator(
+      `#sidebar-properties .field-wrapper-${fieldName} [contenteditable="true"]`,
+    );
   }
 
   /**
@@ -1721,11 +2245,30 @@ export class AdminUIHelper {
       return;
     }
 
-    // Try contenteditable
+    // Try contenteditable (Slate editors)
+    // Note: fill() doesn't reliably clear Slate editors, use select-all + type
     const contentEditable = fieldWrapper.locator('[contenteditable="true"]');
     if (await contentEditable.isVisible()) {
+      // Get current text to verify selection
+      const currentText = await contentEditable.textContent() || '';
+
       await contentEditable.click();
-      await contentEditable.fill(value);
+      await contentEditable.press('ControlOrMeta+a'); // Select all existing content
+
+      // Verify selection covers all text before typing
+      if (currentText.trim()) {
+        await expect(async () => {
+          const selectedText = await contentEditable.evaluate(() =>
+            window.getSelection()?.toString() || ''
+          );
+          expect(selectedText.trim()).toBe(currentText.trim());
+        }).toPass({ timeout: 2000 });
+      }
+
+      // Small wait to ensure selection is stable before typing
+      await this.page.waitForTimeout(50);
+
+      await contentEditable.pressSequentially(value, { delay: 10 }); // Type replaces selection
       await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
@@ -1786,9 +2329,7 @@ export class AdminUIHelper {
 
     // Try to find the block type button within the block chooser
     for (const name of possibleNames) {
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
-        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
-      ).first();
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         return true;
@@ -1824,9 +2365,7 @@ export class AdminUIHelper {
     // Try to find and click the block type button within the block chooser
     for (const name of possibleNames) {
       // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).or(
-        blockChooser.locator(`[data-block-type="${name.toLowerCase()}"]`)
-      ).first();
+      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
 
       if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         await blockButton.click();
@@ -1879,16 +2418,8 @@ export class AdminUIHelper {
   async waitForBlockToDisappear(blockId: string, timeout: number = 10000): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-
-    try {
-      await block.waitFor({ state: 'hidden', timeout });
-    } catch {
-      // Block might be completely removed from DOM
-      const count = await block.count();
-      if (count > 0) {
-        throw new Error(`Block ${blockId} still exists after timeout`);
-      }
-    }
+    // Use expect().not.toBeVisible() which auto-retries until element is gone
+    await expect(block).not.toBeVisible({ timeout });
   }
 
   /**
@@ -2317,9 +2848,8 @@ export class AdminUIHelper {
   ): Promise<void> {
     await expect(async () => {
       await this.verifyDragShadowVisible();
-      if (!(await this.isDropIndicatorVisible())) {
-        throw new Error('Drop indicator not visible during auto-scroll');
-      }
+      // Don't check drop indicator during scroll - it may legitimately hide when
+      // mouse is between valid drop zones. We'll verify it before drop instead.
       const newPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       const scrollAmount = Math.abs(newPos.y - prevY);
       if (scrollAmount < 5) {
@@ -2940,36 +3470,26 @@ export class AdminUIHelper {
    * @returns ElementHandle for the toolbar element
    */
   async waitForSidebarSlateToolbar(timeout: number = 5000): Promise<ElementHandle> {
-    // Wait for a .slate-inline-toolbar with opacity=1 that is NOT the quanta-toolbar
-    await this.page.waitForFunction(() => {
-      const toolbars = document.querySelectorAll('.slate-inline-toolbar:not(.quanta-toolbar)');
-      for (const toolbar of toolbars) {
-        const style = window.getComputedStyle(toolbar);
-        if (style.opacity === '1') {
-          return true;
+    // Wait for toolbar and get it in a single atomic operation
+    // This avoids race conditions where toolbar disappears between wait and get
+    const toolbarHandle = await this.page.waitForFunction(
+      () => {
+        const toolbars = document.querySelectorAll(
+          '.slate-inline-toolbar:not(.quanta-toolbar)',
+        );
+        for (const toolbar of toolbars) {
+          const style = window.getComputedStyle(toolbar);
+          if (style.opacity === '1') {
+            return toolbar; // Return the element itself
+          }
         }
-      }
-      return false;
-    }, { timeout });
-
-    // Get the visible toolbar element
-    const toolbarHandle = await this.page.evaluateHandle(() => {
-      const toolbars = document.querySelectorAll('.slate-inline-toolbar:not(.quanta-toolbar)');
-      for (const toolbar of toolbars) {
-        const style = window.getComputedStyle(toolbar);
-        if (style.opacity === '1') {
-          return toolbar;
-        }
-      }
-      return null;
-    });
-
-    if (!toolbarHandle) {
-      throw new Error('Sidebar Slate toolbar not found after waiting');
-    }
+        return null;
+      },
+      { timeout },
+    );
 
     console.log('[TEST] Sidebar Slate toolbar is visible');
-    return toolbarHandle as ElementHandle;
+    return toolbarHandle as unknown as ElementHandle;
   }
 
   /**
@@ -2984,16 +3504,21 @@ export class AdminUIHelper {
     toolbar: ElementHandle,
     format: 'bold' | 'italic' | 'strikethrough' | 'link'
   ): Promise<ElementHandle> {
-    const formatTitle = format.charAt(0).toUpperCase() + format.slice(1); // Capitalize first letter
+    const formatTitle = format.charAt(0).toUpperCase() + format.slice(1);
 
     const buttonHandle = await toolbar.evaluateHandle((tb, title) => {
       const button = tb.querySelector(`[title*="${title}" i]`);
       return button;
     }, formatTitle);
 
-    if (!buttonHandle) {
+    // Check if the handle wraps null
+    const isNull = await buttonHandle.evaluate((el) => el === null);
+    if (isNull) {
       throw new Error(`Format button "${format}" not found in sidebar toolbar`);
     }
+
+    // Scroll into view to avoid "outside of viewport" issues
+    await buttonHandle.evaluate((el) => (el as Element).scrollIntoView({ block: 'center' }));
 
     console.log(`[TEST] Found sidebar toolbar button: ${format}`);
     return buttonHandle as ElementHandle;
@@ -3036,5 +3561,47 @@ export class AdminUIHelper {
       // Wait for chooser to close
       await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
     }
+  }
+
+  /**
+   * Click a block action button (e.g., Add Row Before, Add Column Before).
+   * Handles both toolbar and overflow dropdown locations since buttons may
+   * overflow to dropdown when toolbar is narrow.
+   *
+   * @param actionTitle - The title/label of the action button (e.g., 'Add Row Before')
+   */
+  async clickBlockAction(actionTitle: string): Promise<void> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+
+    // First try to find the button directly in the toolbar
+    const toolbarButton = toolbar.locator(`button[title="${actionTitle}"]`);
+    if (await toolbarButton.isVisible().catch(() => false)) {
+      await toolbarButton.click();
+      return;
+    }
+
+    // Button not in toolbar - look in the overflow dropdown
+    const dropdownTrigger = toolbar.locator('button[title="More options"]');
+    if (!(await dropdownTrigger.isVisible().catch(() => false))) {
+      throw new Error(
+        `Block action "${actionTitle}" not found in toolbar and no dropdown available`
+      );
+    }
+
+    await dropdownTrigger.click();
+
+    // Wait for dropdown to open and find the button
+    const dropdown = this.page.locator('.volto-hydra-dropdown-menu');
+    await dropdown.waitFor({ state: 'visible', timeout: 3000 });
+
+    const dropdownButton = dropdown.locator(`button[title="${actionTitle}"]`);
+    if (!(await dropdownButton.isVisible().catch(() => false))) {
+      throw new Error(
+        `Block action "${actionTitle}" not found in toolbar or dropdown`
+      );
+    }
+
+    await dropdownButton.click();
   }
 }

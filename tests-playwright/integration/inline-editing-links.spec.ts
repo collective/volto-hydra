@@ -22,8 +22,7 @@ test.describe('Inline Editing - Links', () => {
     await helper.editBlockTextInIframe(blockId, 'Click here');
 
     // Select all the text for link button test
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click the link button - should show LinkEditor popup
@@ -85,8 +84,7 @@ test.describe('Inline Editing - Links', () => {
 
     // Edit the text and create a link
     await helper.editBlockTextInIframe(blockId, 'Click here');
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Create the link
@@ -157,8 +155,7 @@ test.describe('Inline Editing - Links', () => {
 
     // Edit the text
     await helper.editBlockTextInIframe(blockId, 'Click here');
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click the link button to open LinkEditor
@@ -248,8 +245,7 @@ test.describe('Inline Editing - Links', () => {
 
     // Create text and initial link
     await helper.editBlockTextInIframe(blockId, 'Click here');
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click link button and create link
@@ -303,10 +299,7 @@ test.describe('Inline Editing - Links', () => {
 
     // Create text and select it
     await helper.editBlockTextInIframe(blockId, 'Click here');
-    const iframe = helper.getIframe();
-    // Use [data-editable-field] instead of [contenteditable="true"] because
-    // contenteditable may be false when editor is blocked during format operations
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click link button to open LinkEditor
@@ -331,8 +324,7 @@ test.describe('Inline Editing - Links', () => {
 
     // Create text and select it
     await helper.editBlockTextInIframe(blockId, 'Test text');
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click link button to open LinkEditor
@@ -364,7 +356,7 @@ test.describe('Inline Editing - Links', () => {
     // Create text and select it
     await helper.editBlockTextInIframe(blockId, 'Test text');
     const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click link button to open LinkEditor
@@ -399,7 +391,7 @@ test.describe('Inline Editing - Links', () => {
     // Create text and select it
     await helper.editBlockTextInIframe(blockId, 'Test text');
     const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
     await helper.selectAllTextInEditor(editor);
 
     // Click link button to open LinkEditor
@@ -445,20 +437,10 @@ test.describe('Inline Editing - Links', () => {
 
     // Create text with a link in the middle
     await helper.editBlockTextInIframe(blockId, 'Before link after');
-    const iframe = helper.getIframe();
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
+    const editor = await helper.getEditorLocator(blockId);
 
     // Select "link" text (characters 7-11)
-    await editor.evaluate((el) => {
-      const textNode = el.firstChild;
-      if (!textNode) throw new Error('No text node found');
-      const range = document.createRange();
-      const selection = window.getSelection();
-      range.setStart(textNode, 7);
-      range.setEnd(textNode, 11);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
+    await helper.selectTextRange(editor, 7, 11);
 
     // Create link
     await helper.clickFormatButton('link');

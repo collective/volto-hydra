@@ -16,6 +16,9 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     await page.goto('http://localhost:8888/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+
+    // Inject helper for creating DOM with preserved whitespace (Vue/Nuxt template artifacts)
+    await helper.injectPreserveWhitespaceHelper();
   });
 
   test('plain text directly in paragraph', async () => {
@@ -579,6 +582,615 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(paths.whitespace).toEqual([0, 1]); // Slate index from previous sibling's data-node-id
     expect(paths.span2Text).toEqual([0, 1, 0]); // Path from data-node-id="0-1"
   });
+
+  test('empty paragraph with placeholder BR', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-editable-field="value" data-node-id="0"><br></p>';
+      document.body.appendChild(container);
+
+      const brElement = container.querySelector('br');
+      const result = (window as any).bridge.getNodePath(brElement);
+
+      container.remove();
+      return result;
+    });
+
+    // BR element walks up to find parent with data-node-id, returns [0]
+    expect(path).toEqual([0]);
+  });
+
+  test('deeply nested structure', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value"><div><div><p data-node-id="0">text</p></div></div></div>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('p')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Only elements with data-node-id are counted
+    expect(path).toEqual([0, 0]);
+  });
+
+  test('text wrapped in span WITHOUT nodeId inside strong', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1"><span>Disclaimer</span></strong>' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('strong span')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Span without nodeId should be skipped, path from strong is [1, 1, 0]
+    expect(path).toEqual([1, 1, 0]);
+  });
+
+  test('plain text directly in strong (no wrapper span)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="1">' +
+        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('strong')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    expect(path).toEqual([1, 1, 0]);
+  });
+
+  test('double wrapper with same node-id', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-editable-field="value" data-node-id="0">' +
+        '<strong data-node-id="0-0"><em data-node-id="0-0">styled text</em></strong>' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('em')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Both wrappers have same node-id "0-0", path should be [0, 0, 0]
+    expect(path).toEqual([0, 0, 0]);
+  });
+
+  test('double wrapper with text before and after', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-editable-field="value" data-node-id="0">' +
+        'before <strong data-node-id="0-1"><em data-node-id="0-1">bold</em></strong> after' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const p = container.querySelector('p')!;
+      const beforeText = p.firstChild;
+      const boldText = container.querySelector('em')!.firstChild;
+      const afterText = p.lastChild;
+
+      const result = {
+        before: (window as any).bridge.getNodePath(beforeText),
+        bold: (window as any).bridge.getNodePath(boldText),
+        after: (window as any).bridge.getNodePath(afterText),
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.before).toEqual([0, 0]);
+    expect(paths.bold).toEqual([0, 1, 0]);
+    expect(paths.after).toEqual([0, 2]);
+  });
+
+  test('production bug - empty text + strong + text AFTER', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1"><strong data-node-id="1-1">Disclaimer</strong>: This instance is reset every night</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const p = container.querySelectorAll('p')[1];
+      const textAfterStrong = p.lastChild;
+      const result = (window as any).bridge.getNodePath(textAfterStrong);
+
+      container.remove();
+      return result;
+    });
+
+    // Text after strong (node-id 1-1) should be at Slate index 2 (1+1)
+    expect(path).toEqual([1, 2]);
+  });
+
+  test('text wrapped in spans (Nuxt wrapper scenario)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">First paragraph</p>' +
+        '<p data-node-id="1">' +
+        '<span></span>' +
+        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '<span>: This instance is reset every night</span>' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const p = container.querySelectorAll('p')[1];
+      const lastSpan = p.lastElementChild as HTMLElement;
+      const textInSpan = lastSpan.firstChild;
+      const result = (window as any).bridge.getNodePath(textInSpan);
+
+      container.remove();
+      return result;
+    });
+
+    // Text inside wrapper span without nodeId resolves to parent's position
+    expect(path).toEqual([1, 2]);
+  });
+
+  test('list with links - li and link HAVE nodeId', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<ul class="list-disc">' +
+        '<li data-node-id="0.0"><span></span><a data-node-id="0.0.1" href="#"><span>NUXT.js Example</span></a><span></span></li>' +
+        '</ul>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const linkSpan = container.querySelector('a span')!;
+      const textNode = linkSpan.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    // Expected: [0, 0, 1, 0] - text inside link at [0, 0, 1]
+    expect(path).toEqual([0, 0, 1, 0]);
+  });
+
+  test('text BEFORE bold + bold + text AFTER (Nuxt structure)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-editable-field="value">' +
+        '<p data-node-id="0">' +
+        'This text appears after the slider. Click on ' +
+        '<strong data-node-id="0-1">bold text</strong>' +
+        ' to test getNodePath.' +
+        '</p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const p = container.querySelector('p')!;
+      const textAfterBold = p.lastChild;
+      const result = (window as any).bridge.getNodePath(textAfterBold);
+
+      container.remove();
+      return result;
+    });
+
+    // Expected path for clicking on last text: [0, 2]
+    expect(path).toEqual([0, 2]);
+  });
+
+  test('whitespace text node before p in container (Vue template artifact)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Use the injected helper that preserves whitespace text nodes
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-whitespace-container" data-editable-field="value">\n' +
+        '  <p data-node-id="0">Hello world</p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-whitespace-container')!;
+      const whitespaceNode = container.firstChild as Text;
+      const bridge = (window as any).bridge;
+
+      const isTextNode = whitespaceNode?.nodeType === Node.TEXT_NODE;
+      const textContent = whitespaceNode?.textContent;
+
+      // Test isOnInvalidWhitespace detection
+      const isInvalid = bridge.isOnInvalidWhitespace(whitespaceNode);
+
+      // Test cursor correction: set cursor on whitespace, then correct it
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(whitespaceNode, 0);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Cursor should now be on whitespace
+      const cursorBeforeCorrection = selection.anchorNode;
+
+      // Correct the selection
+      bridge.correctInvalidWhitespaceSelection();
+
+      // After correction, cursor should be in the first text node inside the p
+      const cursorAfterCorrection = selection.anchorNode;
+      const offsetAfterCorrection = selection.anchorOffset;
+      const cursorInValidNode = cursorAfterCorrection?.parentElement?.hasAttribute('data-node-id');
+
+      container.remove();
+
+      return {
+        isTextNode,
+        textContent,
+        isInvalid,
+        cursorWasOnWhitespace: cursorBeforeCorrection === whitespaceNode,
+        cursorInValidNode,
+        offsetAfterCorrection,
+      };
+    });
+
+    expect(result.isTextNode).toBe(true);
+    expect(result.textContent).toBe('\n  ');
+    expect(result.isInvalid).toBe(true);
+    expect(result.cursorWasOnWhitespace).toBe(true);
+    // After correction, cursor should be in a valid node (inside element with data-node-id)
+    expect(result.cursorInValidNode).toBe(true);
+    expect(result.offsetAfterCorrection).toBe(0); // Start of first text node
+  });
+
+  test('range selection on whitespace nodes preserves selection span', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Create DOM with whitespace before and after content (Vue template artifacts)
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-range-whitespace" data-editable-field="value">\n' +
+        '  <p data-node-id="0">Grid Cell 2</p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-range-whitespace')!;
+      const p = container.querySelector('p')!;
+      const whitespaceNodeBefore = container.firstChild as Text;
+      const whitespaceNodeAfter = container.lastChild as Text;
+      const bridge = (window as any).bridge;
+
+      // Both should be invalid whitespace
+      const beforeIsInvalid = bridge.isOnInvalidWhitespace(whitespaceNodeBefore);
+      const afterIsInvalid = bridge.isOnInvalidWhitespace(whitespaceNodeAfter);
+
+      // Set a RANGE selection from whitespace before to whitespace after
+      // This simulates "select all" when Vue has whitespace artifacts
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(whitespaceNodeBefore, 0);
+      range.setEnd(whitespaceNodeAfter, whitespaceNodeAfter.length);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const selectionBeforeCorrection = selection.toString();
+
+      // Correct the selection
+      bridge.correctInvalidWhitespaceSelection();
+
+      // After correction, selection should span the actual content
+      const selectionAfterCorrection = selection.toString();
+      const anchorNode = selection.anchorNode;
+      const focusNode = selection.focusNode;
+      const anchorOffset = selection.anchorOffset;
+      const focusOffset = selection.focusOffset;
+
+      container.remove();
+
+      return {
+        beforeIsInvalid,
+        afterIsInvalid,
+        selectionBeforeCorrection,
+        selectionAfterCorrection,
+        anchorInP: p.contains(anchorNode),
+        focusInP: p.contains(focusNode),
+        anchorOffset,
+        focusOffset,
+        expectedText: 'Grid Cell 2',
+      };
+    });
+
+    expect(result.beforeIsInvalid).toBe(true);
+    expect(result.afterIsInvalid).toBe(true);
+    // After correction, selection should contain the text content
+    expect(result.selectionAfterCorrection).toBe(result.expectedText);
+    // Anchor should be at start (offset 0), focus at end (offset 11)
+    expect(result.anchorInP).toBe(true);
+    expect(result.focusInP).toBe(true);
+    expect(result.anchorOffset).toBe(0);
+    expect(result.focusOffset).toBe(11); // "Grid Cell 2".length
+  });
+
+  test('element-based selection on editable field is not invalid whitespace', async () => {
+    // When browser's selectText() is used, it sets selection on the ELEMENT, not text nodes
+    // This is a valid "select all" selection and should NOT be flagged as invalid whitespace
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.id = 'test-element-selection';
+      container.setAttribute('data-editable-field', 'value');
+      container.innerHTML = '<p data-node-id="0">Grid Cell 2</p>';
+      document.body.appendChild(container);
+
+      const bridge = (window as any).bridge;
+
+      // Check if the editable field ELEMENT is flagged as invalid whitespace
+      // It should NOT be - element-based selections are valid
+      const elementIsInvalid = bridge.isOnInvalidWhitespace(container);
+
+      // Also check that a valid text node inside is not flagged
+      const textNode = container.querySelector('p')?.firstChild;
+      const textIsInvalid = bridge.isOnInvalidWhitespace(textNode);
+
+      container.remove();
+
+      return {
+        elementIsInvalid,
+        textIsInvalid,
+      };
+    });
+
+    // Element-based selections should NOT be flagged as invalid
+    expect(result.elementIsInvalid).toBe(false);
+    // Text inside a data-node-id element is valid
+    expect(result.textIsInvalid).toBe(false);
+  });
+
+  test('isOnInvalidWhitespace: ZWS after inline element is valid when parent has data-node-id', async () => {
+    // After cursor exit from bold (prospective formatting toggle off), a ZWS is created
+    // as a direct child of the paragraph. This ZWS should NOT be flagged as invalid
+    // whitespace, even though the paragraph is also the editable field.
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Structure after typing "Hello ", bold "world", then toggling bold off:
+      // <p data-editable-field="value" data-node-id="0">
+      //   "Hello "
+      //   <span data-node-id="0.1"><strong>world</strong></span>
+      //   "﻿"  <-- ZWS for cursor positioning after cursor exit
+      // </p>
+      const container = document.createElement('p');
+      container.id = 'test-cursor-exit-zws';
+      container.setAttribute('data-editable-field', 'value');
+      container.setAttribute('data-node-id', '0');
+
+      // Create the structure
+      const helloText = document.createTextNode('Hello ');
+      const span = document.createElement('span');
+      span.setAttribute('data-node-id', '0.1');
+      const strong = document.createElement('strong');
+      strong.textContent = 'world';
+      span.appendChild(strong);
+      const zwsText = document.createTextNode('\uFEFF'); // ZWS for cursor positioning
+
+      container.appendChild(helloText);
+      container.appendChild(span);
+      container.appendChild(zwsText);
+      document.body.appendChild(container);
+
+      const bridge = (window as any).bridge;
+
+      // The ZWS text node should NOT be flagged as invalid whitespace
+      // because its parent (the <p>) has data-node-id
+      const zwsIsInvalid = bridge.isOnInvalidWhitespace(zwsText);
+
+      // Also verify "Hello " text is valid
+      const helloIsInvalid = bridge.isOnInvalidWhitespace(helloText);
+
+      container.remove();
+
+      return {
+        zwsIsInvalid,
+        helloIsInvalid,
+      };
+    });
+
+    // ZWS after inline element should be valid (for cursor positioning)
+    expect(result.zwsIsInvalid).toBe(false);
+    // Regular text in paragraph is also valid
+    expect(result.helloIsInvalid).toBe(false);
+  });
+
+  test('serializePoint handles element-based selection with Vue empty text nodes', async () => {
+    // When selectText() is used, the selection may resolve to empty Vue text nodes
+    // serializePoint should find the valid text nodes inside data-node-id elements
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Create DOM like Nuxt renders with Vue template whitespace artifacts
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-serialize-element" data-editable-field="value">\n' +
+        '  <p data-node-id="0">Grid Cell 2</p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-serialize-element')!;
+      const bridge = (window as any).bridge;
+
+      // Set element-based selection like selectText() does
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(container, 0); // Before first child (whitespace text node)
+      range.setEnd(container, container.childNodes.length); // After last child
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Try to serialize - should find valid text nodes inside P
+      const serialized = bridge.serializeSelection();
+
+      container.remove();
+
+      return {
+        serialized,
+        hasAnchor: serialized?.anchor != null,
+        hasFocus: serialized?.focus != null,
+        anchorPath: serialized?.anchor?.path,
+        focusPath: serialized?.focus?.path,
+        anchorOffset: serialized?.anchor?.offset,
+        focusOffset: serialized?.focus?.offset,
+      };
+    });
+
+    // Serialization should succeed (not return null)
+    expect(result.serialized).not.toBeNull();
+    expect(result.hasAnchor).toBe(true);
+    expect(result.hasFocus).toBe(true);
+    // Path should be [0, 0] - first paragraph, first text child
+    expect(result.anchorPath).toEqual([0, 0]);
+    expect(result.focusPath).toEqual([0, 0]);
+    // Anchor at start (offset 0), focus at end (offset 11 = "Grid Cell 2".length)
+    expect(result.anchorOffset).toBe(0);
+    expect(result.focusOffset).toBe(11);
+  });
+
+  test('text BEFORE bold + bold + text AFTER with Vue whitespace', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const path = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-vue-whitespace" data-editable-field="value">\n' +
+        '  <p data-node-id="0">\n' +
+        '    This text appears after the slider. Click on \n' +
+        '    <strong data-node-id="0.1">bold text</strong>\n' +
+        '     to test getNodePath.\n' +
+        '  </p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-vue-whitespace')!;
+      const p = container.querySelector('p')!;
+      // Find the actual text node containing "to test" (not whitespace artifacts)
+      const textAfterBold = Array.from(p.childNodes).find(
+        (n: any) => n.nodeType === Node.TEXT_NODE && n.textContent?.includes('to test')
+      );
+
+      const result = (window as any).bridge.getNodePath(textAfterBold);
+
+      container.remove();
+
+      return result;
+    });
+
+    // With range.toString() normalization, path should be [0, 2]
+    expect(path).toEqual([0, 2]);
+  });
+
+  test('text with leading whitespace INSIDE strong returns correct path', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Two strongs with Vue template whitespace
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-leading-whitespace" data-editable-field="value">\n' +
+        '  <p data-node-id="0">\n' +
+        '    This text appears after the \n' +
+        '    <strong data-node-id="0.1">slider</strong>\n' +
+        '    . Click on \n' +
+        '    <strong data-node-id="0.3">\n      bold text\n    </strong>\n' +
+        '     to test getNodePath.\n' +
+        '  </p>\n' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-leading-whitespace')!;
+      // Find text inside the second strong - includes leading/trailing whitespace
+      const strong2 = container.querySelectorAll('strong')[1];
+      const textInStrong = strong2.firstChild;
+
+      const isTextNode = textInStrong?.nodeType === Node.TEXT_NODE;
+      const textContent = (textInStrong as Text)?.textContent;
+      const path = (window as any).bridge.getNodePath(textInStrong);
+
+      container.remove();
+
+      return { isTextNode, textContent, path };
+    });
+
+    expect(result.isTextNode).toBe(true);
+    // The text includes template whitespace
+    expect(result.textContent).toBe('\n      bold text\n    ');
+    // Even with leading whitespace, should resolve to [0, 3, 0]
+    expect(result.path).toEqual([0, 3, 0]);
+  });
 });
 
 test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real hydra.js)', () => {
@@ -591,6 +1203,9 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     await page.goto('http://localhost:8888/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+
+    // Inject helper for creating DOM with preserved whitespace
+    await helper.injectPreserveWhitespaceHelper();
   });
 
   test('path to text node returns parent nodeId', async () => {
@@ -731,7 +1346,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
       }
 
       // Now find the text node with the correct absolute offset
-      const textResult = (window as any).bridge.findTextNodeAndOffset(element, absoluteOffset);
+      const textResult = (window as any).bridge.findPositionByVisibleOffset(element, absoluteOffset);
 
       container.remove();
 
@@ -820,5 +1435,207 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     });
 
     expect(result).toBeNull();
+  });
+
+  // ZWS-specific tests for cursor exit scenarios
+  test('ZWS text node after inline element returns correct path', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-zws-after" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1">world</span>\uFEFF</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-zws-after')!;
+      const p = container.querySelector('p')!;
+      const span = p.querySelector('span')!;
+
+      const result = {
+        helloText: (window as any).bridge.getNodePath(p.childNodes[0]),
+        worldText: (window as any).bridge.getNodePath(span.firstChild),
+        zwsText: (window as any).bridge.getNodePath(p.childNodes[2]),
+        childNodesCount: p.childNodes.length,
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.childNodesCount).toBe(3);
+    expect(paths.helloText).toEqual([0, 0]);
+    expect(paths.worldText).toEqual([0, 1, 0]);
+    // ZWS after span should be at index 2 (third child of paragraph)
+    expect(paths.zwsText).toEqual([0, 2]);
+  });
+
+  test('ZWS inside empty inline element (prospective formatting)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-zws-inside" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFF</span></p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-zws-inside')!;
+      const p = container.querySelector('p')!;
+      const span = p.querySelector('span')!;
+
+      const result = {
+        helloText: (window as any).bridge.getNodePath(p.childNodes[0]),
+        zwsInsideSpan: (window as any).bridge.getNodePath(span.firstChild),
+        childNodesCount: p.childNodes.length,
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.childNodesCount).toBe(2);
+    expect(paths.helloText).toEqual([0, 0]);
+    // ZWS inside span should have path inside the span element
+    expect(paths.zwsInsideSpan).toEqual([0, 1, 0]);
+  });
+
+  test('ZWS + typed text inside span with ZWS after (cursor exit scenario)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const paths = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-zws-both" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFFworld</span>\uFEFF</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-zws-both')!;
+      const p = container.querySelector('p')!;
+      const span = p.querySelector('span')!;
+
+      const result = {
+        helloText: (window as any).bridge.getNodePath(p.childNodes[0]),
+        zwsPlusWorldText: (window as any).bridge.getNodePath(span.firstChild),
+        zwsAfterSpan: (window as any).bridge.getNodePath(p.childNodes[2]),
+        childNodesCount: p.childNodes.length,
+      };
+
+      container.remove();
+      return result;
+    });
+
+    expect(paths.childNodesCount).toBe(3);
+    expect(paths.helloText).toEqual([0, 0]);
+    // Text with ZWS prefix inside span should have path inside the span
+    expect(paths.zwsPlusWorldText).toEqual([0, 1, 0]);
+    // ZWS after span should be at index 2
+    expect(paths.zwsAfterSpan).toEqual([0, 2]);
+  });
+
+  test('isOnInvalidWhitespace: element node inside block but outside data-node-id is invalid', async () => {
+    // When clicking at the edge of a block, the cursor may land on the wrapper DIV
+    // instead of inside the P element with data-node-id. This should be flagged as
+    // invalid so correctInvalidWhitespaceSelection can fix it.
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      // Structure: block wrapper DIV containing editable P with data-node-id
+      // <div data-block-uid="test-block">
+      //   <p data-editable-field="value" data-node-id="0">Hello</p>
+      // </div>
+      const wrapper = document.createElement('div');
+      wrapper.id = 'test-element-outside-nodeid';
+      wrapper.setAttribute('data-block-uid', 'test-block');
+      wrapper.innerHTML = '<p data-editable-field="value" data-node-id="0">Hello</p>';
+      document.body.appendChild(wrapper);
+
+      const bridge = (window as any).bridge;
+      const p = wrapper.querySelector('p')!;
+
+      // Test the wrapper DIV - cursor lands here when clicking at edge of block
+      // This is inside the block but outside data-node-id, should be invalid
+      const wrapperIsInvalid = bridge.isOnInvalidWhitespace(wrapper);
+
+      // Test the P element - has data-node-id, should be valid
+      const pIsInvalid = bridge.isOnInvalidWhitespace(p);
+
+      // Test text node inside P - should be valid
+      const textNode = p.firstChild;
+      const textIsInvalid = bridge.isOnInvalidWhitespace(textNode);
+
+      wrapper.remove();
+
+      return {
+        wrapperIsInvalid,
+        pIsInvalid,
+        textIsInvalid,
+      };
+    });
+
+    // Wrapper DIV is inside block but outside data-node-id - should be INVALID
+    // so the cursor can be corrected to a valid position inside the P
+    expect(result.wrapperIsInvalid).toBe(true);
+    // P element has data-node-id - should be valid
+    expect(result.pIsInvalid).toBe(false);
+    // Text inside P is valid
+    expect(result.textIsInvalid).toBe(false);
+  });
+
+  test('serializePoint excludes ZWS from offset calculation', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Simulate cursor exit scenario: ZWS is prepended to text node after inline element
+    // DOM: "Hello " + <strong>bold</strong> + [ZWS + " normal"]
+    // Slate: "Hello " + strong + " normal" (no ZWS)
+    // When cursor is at end, offset should be 7 (length of " normal"), not 8
+    const result = await body.evaluate(() => {
+      const fragment = (window as any).preserveWhitespaceDOM(
+        '<div id="test-serialize-zws" data-block-uid="test-block" data-editable-field="value">' +
+        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong>\uFEFF normal</p>' +
+        '</div>'
+      );
+      document.body.appendChild(fragment);
+
+      const container = document.getElementById('test-serialize-zws')!;
+      const p = container.querySelector('p')!;
+      // The text node after strong: ZWS + " normal"
+      const textNodeAfterStrong = p.childNodes[2];
+
+      // Place cursor at end of this text node (after " normal", position 8 in DOM)
+      const range = document.createRange();
+      range.setStart(textNodeAfterStrong, 8); // After ZWS + " normal"
+      range.setEnd(textNodeAfterStrong, 8);
+
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const bridge = (window as any).bridge;
+      const serialized = bridge.serializeSelection();
+
+      container.remove();
+
+      return {
+        serialized,
+        domTextLength: textNodeAfterStrong.textContent?.length,
+        anchorOffset: serialized?.anchor?.offset,
+        focusOffset: serialized?.focus?.offset,
+      };
+    });
+
+    // DOM text is 8 chars (ZWS + " normal")
+    expect(result.domTextLength).toBe(8);
+    // But serialized offset should be 7 (excluding ZWS)
+    expect(result.anchorOffset).toBe(7);
+    expect(result.focusOffset).toBe(7);
   });
 });

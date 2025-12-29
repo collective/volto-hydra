@@ -22,14 +22,58 @@ import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
+import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 
 /**
  * Get the display title for a block type
+ * For object_list items, looks up the itemSchema.title from the parent's field definition
  */
-const getBlockTypeTitle = (blockType) => {
+const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
+  // Check if this is an object_list item via blockPathMap FIRST
+  // (object_list items often don't have @type, so blockType may be undefined)
+  const pathInfo = blockPathMap?.[blockId];
+  if (pathInfo?.isObjectListItem) {
+    // Try to get title from itemType (parentType:fieldName format)
+    // For nested types like slateTable:rows:cells, parentType is slateTable:rows, fieldName is cells
+    if (pathInfo.itemType) {
+      const parts = pathInfo.itemType.split(':');
+      const fieldName = parts.pop(); // Last part is the field name
+      const parentType = parts.join(':'); // Everything else is parent type
+      const parentConfig = config.blocks?.blocksConfig?.[parentType];
+      if (parentConfig?.blockSchema) {
+        const parentSchema = typeof parentConfig.blockSchema === 'function'
+          ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+          : parentConfig.blockSchema;
+        const fieldDef = parentSchema?.properties?.[fieldName];
+        // Use itemSchema.title if available
+        if (fieldDef?.schema?.title) {
+          return fieldDef.schema.title;
+        }
+        // Fallback: use singular form of field title (e.g., "Slides" -> "Slide")
+        if (fieldDef?.title) {
+          const singular = fieldDef.title.replace(/s$/, '');
+          return singular;
+        }
+        // Fallback: derive from field name (e.g., "rows" -> "Row", "cells" -> "Cell")
+        if (fieldName) {
+          const singular = fieldName.replace(/s$/, '');
+          return singular.charAt(0).toUpperCase() + singular.slice(1);
+        }
+      }
+    }
+
+    // For nested object_list items without itemType, use containerField
+    // This handles deeply nested structures like slateTable (rows > cells)
+    if (pathInfo.containerField) {
+      const singular = pathInfo.containerField.replace(/s$/, '');
+      return singular.charAt(0).toUpperCase() + singular.slice(1);
+    }
+  }
+
   if (!blockType) return 'Block';
+
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   return blockConfig?.title || blockType;
 };
@@ -59,6 +103,7 @@ const getParentChain = (blockId, blockPathMap) => {
 
 /**
  * Get block data by ID using blockPathMap
+ * For object_list items, injects the virtual @type from itemType
  */
 const getBlockData = (blockId, formData, blockPathMap) => {
   if (!blockId || !formData) return null;
@@ -74,6 +119,10 @@ const getBlockData = (blockId, formData, blockPathMap) => {
         return null;
       }
     }
+    // Inject virtual @type for object_list items
+    if (current && pathInfo.isObjectListItem && pathInfo.itemType) {
+      return { ...current, '@type': pathInfo.itemType };
+    }
     return current;
   }
 
@@ -82,32 +131,32 @@ const getBlockData = (blockId, formData, blockPathMap) => {
 };
 
 /**
- * Filter out 'blocks' type fields from schema (container fields that hold nested blocks)
+ * Filter out container fields from schema (type: 'blocks' or widget: 'object_list')
  * These fields display as [object Object] and should be managed via the block hierarchy instead
  */
 const filterBlocksFields = (schema) => {
   if (!schema) return null;
 
-  const blocksFields = new Set();
+  const containerFields = new Set();
   for (const [fieldId, fieldDef] of Object.entries(schema.properties || {})) {
-    if (fieldDef?.type === 'blocks') {
-      blocksFields.add(fieldId);
+    if (fieldDef?.type === 'blocks' || fieldDef?.widget === 'object_list') {
+      containerFields.add(fieldId);
     }
   }
 
-  // If no blocks fields, return schema as-is
-  if (blocksFields.size === 0) return schema;
+  // If no container fields, return schema as-is
+  if (containerFields.size === 0) return schema;
 
-  // Filter out blocks fields from fieldsets and properties
+  // Filter out container fields from fieldsets and properties
   return {
     ...schema,
     fieldsets: schema.fieldsets?.map((fieldset) => ({
       ...fieldset,
-      fields: fieldset.fields?.filter((f) => !blocksFields.has(f)),
+      fields: fieldset.fields?.filter((f) => !containerFields.has(f)),
     })),
     properties: Object.fromEntries(
       Object.entries(schema.properties || {}).filter(
-        ([key]) => !blocksFields.has(key),
+        ([key]) => !containerFields.has(key),
       ),
     ),
   };
@@ -116,8 +165,18 @@ const filterBlocksFields = (schema) => {
 /**
  * Get the block schema for a block type
  * Returns filtered schema (without blocks-type fields) or null
+ * For object_list items, uses itemSchema from blockPathMap
  */
-const getBlockSchema = (blockType, blockData, intl) => {
+const getBlockSchema = (blockType, blockData, intl, blockPathMap, blockId) => {
+  // For object_list items, use itemSchema directly from pathMap
+  const pathInfo = blockPathMap?.[blockId];
+  if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
+    return {
+      ...pathInfo.itemSchema,
+      required: pathInfo.itemSchema.required || [],
+    };
+  }
+
   if (!blockType) return null;
 
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
@@ -149,23 +208,28 @@ const ParentBlockSection = ({
   onSelectBlock,
   onDeleteBlock,
   onChangeBlock,
+  onBlockAction,
   formData,
   pathname,
   intl,
+  blockPathMap,
 }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
   const menuButtonRef = React.useRef(null);
 
-  const title = getBlockTypeTitle(blockType);
+  const title = getBlockTypeTitle(blockType, blockPathMap, blockId);
   // Use sidebar-properties for current block (backwards compat), parent-sidebar-{id} for parents
   const targetId = isCurrentBlock ? 'sidebar-properties' : `parent-sidebar-${blockId}`;
 
   // Get the Edit component for this block type
-  const BlockEdit = config.blocks?.blocksConfig?.[blockType]?.edit;
+  // Skip Edit component if sidebarSchemaOnly is set (e.g., slateTable's Edit expects specific data structures)
+  const blockConfig = config.blocks?.blocksConfig?.[blockType];
+  const useSchemaOnly = blockConfig?.sidebarSchemaOnly;
+  const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
 
-  // Get schema for fallback rendering (when no Edit component)
-  const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl) : null;
+  // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
+  const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl, blockPathMap, blockId) : null;
 
   const handleMenuClick = (e) => {
     e.stopPropagation();
@@ -191,7 +255,46 @@ const ParentBlockSection = ({
           <span className="nav-prefix">‹</span>
           <span>{title}</span>
         </button>
-        <div className="block-actions-menu">
+        <div className="block-actions-menu" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+          {/* Toolbar action buttons (e.g., add row/column for tables) */}
+          {(() => {
+            const pathInfo = blockPathMap?.[blockId];
+            const toolbarActions = pathInfo?.actions?.toolbar || [];
+            if (toolbarActions.length === 0 || !onBlockAction) return null;
+            const actionsRegistry = config.settings.hydraActions || {};
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                {toolbarActions.map((actionId) => {
+                  const actionDef = actionsRegistry[actionId] || { label: actionId };
+                  return (
+                    <button
+                      key={actionId}
+                      title={actionDef.label}
+                      onClick={() => onBlockAction(actionId, blockId)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '2px',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#e8e8e8')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                    >
+                      {actionDef.icon ? (
+                        <Icon name={actionDef.icon} size="18px" />
+                      ) : (
+                        actionDef.label
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <button
             ref={menuButtonRef}
             className="menu-trigger"
@@ -200,15 +303,25 @@ const ParentBlockSection = ({
           >
             •••
           </button>
-          {menuOpen && (
-            <DropdownMenu
-              selectedBlock={blockId}
-              onDeleteBlock={onDeleteBlock}
-              menuButtonRect={menuButtonRect}
-              onClose={() => setMenuOpen(false)}
-              // No onOpenSettings - we're already in sidebar/settings
-            />
-          )}
+          {menuOpen && (() => {
+            const pathInfo = blockPathMap?.[blockId];
+            return (
+              <DropdownMenu
+                selectedBlock={blockId}
+                onDeleteBlock={onDeleteBlock}
+                menuButtonRect={menuButtonRect}
+                onClose={() => setMenuOpen(false)}
+                // No onOpenSettings - we're already in sidebar/settings
+                parentId={parentId}
+                onSelectBlock={onSelectBlock}
+                tableActions={pathInfo?.actions}
+                onTableAction={onBlockAction ? (actionId) => onBlockAction(actionId, blockId) : null}
+                addMode={pathInfo?.addMode}
+                parentAddMode={pathInfo?.parentAddMode}
+                addDirection={pathInfo?.addDirection}
+              />
+            );
+          })()}
         </div>
       </div>
 
@@ -238,7 +351,11 @@ const ParentBlockSection = ({
               properties={formData}
               pathname={pathname}
               onChangeBlock={onChangeBlock}
-              onSelectBlock={onSelectBlock}
+              // For parent blocks, use no-op to prevent Edit components from changing
+              // selection when they initialize/render. This was causing parent blocks
+              // to get selected when clicking on child blocks (e.g., empty blocks).
+              // For current block, use real onSelectBlock for sub-selections.
+              onSelectBlock={isCurrentBlock ? onSelectBlock : () => {}}
               // These are needed but not used for sidebar-only rendering
               onMoveBlock={() => {}}
               onDeleteBlock={() => {}}
@@ -294,6 +411,7 @@ const ParentBlocksWidget = ({
   onSelectBlock,
   onDeleteBlock,
   onChangeBlock,
+  onBlockAction,
 }) => {
   const [isClient, setIsClient] = React.useState(false);
   const prevSelectedBlockRef = React.useRef(null);
@@ -374,6 +492,7 @@ const ParentBlocksWidget = ({
   const currentBlockData = getBlockData(selectedBlock, formData, blockPathMap);
   const currentBlockType = currentBlockData?.['@type'];
 
+
   return (
     <>
       {createPortal(
@@ -397,9 +516,11 @@ const ParentBlocksWidget = ({
                 onSelectBlock={onSelectBlock}
                 onDeleteBlock={onDeleteBlock}
                 onChangeBlock={onChangeBlock}
+                onBlockAction={onBlockAction}
                 formData={formData}
                 pathname={pathname}
                 intl={intl}
+                blockPathMap={blockPathMap}
               />
             );
           })}
@@ -416,9 +537,11 @@ const ParentBlocksWidget = ({
             onSelectBlock={onSelectBlock}
             onDeleteBlock={onDeleteBlock}
             onChangeBlock={onChangeBlock}
+            onBlockAction={onBlockAction}
             formData={formData}
             pathname={pathname}
             intl={intl}
+            blockPathMap={blockPathMap}
           />
         </>,
         parentsTarget,
@@ -434,6 +557,7 @@ ParentBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onDeleteBlock: PropTypes.func,
   onChangeBlock: PropTypes.func,
+  onBlockAction: PropTypes.func,
 };
 
 export default ParentBlocksWidget;

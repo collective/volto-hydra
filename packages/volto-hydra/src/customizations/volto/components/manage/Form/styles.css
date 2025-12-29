@@ -1,7 +1,3 @@
-.blocks-form {
-    display: none;
-}
-
 /* Stack labels above inputs in sidebar forms
    Applies to: page metadata, current block properties, and parent block settings */
 #sidebar-properties .ui.grid,

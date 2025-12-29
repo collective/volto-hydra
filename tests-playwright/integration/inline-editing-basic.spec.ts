@@ -13,7 +13,49 @@ import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Basic', () => {
-  test('cursor position remains stable while typing', async ({ page }) => {
+  test('selection is always inside element with data-node-id after block click', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Click on block to select it
+    await helper.clickBlockInIframe(blockId);
+
+    // Verify cursor is in a valid position (inside an element with data-node-id)
+    const cursorInfo = await iframe.locator(`[data-block-uid="${blockId}"]`).evaluate((block) => {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) {
+        return { hasSelection: false, inValidNode: false };
+      }
+      const anchorNode = selection.anchorNode;
+      if (!anchorNode) {
+        return { hasSelection: true, inValidNode: false };
+      }
+
+      // Walk up to find data-node-id
+      let current: Node | null = anchorNode;
+      while (current && current !== block) {
+        if (current.nodeType === Node.ELEMENT_NODE) {
+          const el = current as Element;
+          if (el.hasAttribute('data-node-id')) {
+            return { hasSelection: true, inValidNode: true, nodeId: el.getAttribute('data-node-id') };
+          }
+        }
+        current = current.parentNode;
+      }
+      return { hasSelection: true, inValidNode: false, anchorContent: anchorNode.textContent?.substring(0, 30) };
+    });
+
+    expect(cursorInfo.inValidNode, `Cursor should be inside element with data-node-id. Got: ${JSON.stringify(cursorInfo)}`).toBe(true);
+  });
+
+  // This test uses #render-counter which only exists in mock test frontend
+  test('cursor position remains stable while typing', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Uses #render-counter which only exists in mock frontend');
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -81,7 +123,9 @@ test.describe('Inline Editing - Basic', () => {
     expect(finalText).toBe('Hello Beautiful World');
   });
 
-  test('typing does not cause DOM element to be replaced (no re-render)', async ({ page }) => {
+  // This test verifies DOM element identity which may differ in Vue due to reactivity
+  test('typing does not cause DOM element to be replaced (no re-render)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Vue reactivity may replace DOM elements differently');
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -111,11 +155,10 @@ test.describe('Inline Editing - Basic', () => {
     await page.waitForTimeout(300);
 
     // Check if the element is still the same instance
-    const stillSameElement = await iframe
-      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
-      .evaluate((el, id) => {
-        return el.getAttribute('data-test-element-id') === id;
-      }, elementId);
+    const editorAfterType = await helper.getEditorLocator(blockId);
+    const stillSameElement = await editorAfterType.evaluate((el, id) => {
+      return el.getAttribute('data-test-element-id') === id;
+    }, elementId);
 
     expect(stillSameElement).toBe(true);
 
@@ -126,11 +169,10 @@ test.describe('Inline Editing - Basic', () => {
     await page.waitForTimeout(300);
 
     // Verify element is STILL the same instance
-    const stillSameAfterMoreTyping = await iframe
-      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
-      .evaluate((el, id) => {
-        return el.getAttribute('data-test-element-id') === id;
-      }, elementId);
+    const editorAfterMore = await helper.getEditorLocator(blockId);
+    const stillSameAfterMoreTyping = await editorAfterMore.evaluate((el, id) => {
+      return el.getAttribute('data-test-element-id') === id;
+    }, elementId);
 
     expect(stillSameAfterMoreTyping).toBe(true);
   });
@@ -143,9 +185,9 @@ test.describe('Inline Editing - Basic', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and type initial text
+    // Enter edit mode and type initial text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Hello World', { delay: 10 });
 
     // Move cursor to the middle of the text (between 'Hello' and 'World')
@@ -159,6 +201,140 @@ test.describe('Inline Editing - Basic', () => {
     expect(finalText).toBe('Hello Beautiful World');
   });
 
+  // BUG: Typing BEFORE an inline format element (bold) fails to sync on second keystroke
+  // Block structure: "This text appears..." + <strong>bold text</strong> + " to test..."
+  // When typing in children[0] (before bold), sidebar loses sync after first keystroke
+  //
+  // ROOT CAUSE: Slate's `editor.children = value` direct mutation doesn't trigger DOM
+  // re-renders for text nodes before inline formatting. The React data flow is correct
+  // (ParentBlocksWidget receives "12appears") but Slate's DOM doesn't update.
+  // This is a volto-slate internal issue, not a Hydra state management bug.
+  // See docs/typing-sync-bug-investigation.md for full analysis
+  test.skip('typing before bold: second keystroke fails to sync to sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // text-after block has mixed content: text + bold + text
+    const blockId = 'text-after';
+
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+
+    const editor = await helper.enterEditMode(blockId);
+
+    // Position cursor BEFORE the bold element - at offset 10 in "This text appears..."
+    await helper.moveCursorToPosition(editor, 10);
+
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+
+    // Type first character - this syncs correctly
+    await page.keyboard.type('1');
+    await page.waitForTimeout(500);
+    let iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toBe('This text 1appears after the slider. Click on bold text to test getNodePath.');
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+
+    // Type second character after waiting - THIS FAILS TO SYNC
+    await page.keyboard.type('2');
+    await page.waitForTimeout(500);
+    iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toBe('This text 12appears after the slider. Click on bold text to test getNodePath.');
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+
+    // Type third character
+    await page.keyboard.type('3');
+    await page.waitForTimeout(500);
+    iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toBe('This text 123appears after the slider. Click on bold text to test getNodePath.');
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+  });
+
+  // Typing AFTER an inline format element (bold) works correctly
+  // This test passes - contrast with "typing before bold" which fails
+  test('typing after bold: all keystrokes sync to sidebar correctly', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // text-after block has: "This text appears..." + <bold>bold text</bold> + " to test getNodePath."
+    const blockId = 'text-after';
+
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+
+    const editor = await helper.enterEditMode(blockId);
+
+    // Position cursor AFTER the bold element - at start of " to test getNodePath."
+    // "This text appears after the slider. Click on " (46 chars) + "bold text" (9 chars) = offset 55
+    await helper.moveCursorToPosition(editor, 55);
+
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+
+    // Type first character
+    await page.keyboard.type('1');
+    await page.waitForTimeout(500);
+    let iframeText = await helper.getCleanTextContent(editor);
+    // Use regex to be flexible with whitespace around the inserted "1"
+    expect(iframeText).toMatch(/bold text\s*1\s*to test/);
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+
+    // Type second character after waiting - this works!
+    await page.keyboard.type('2');
+    await page.waitForTimeout(500);
+    iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toMatch(/bold text\s*12\s*to test/);
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+
+    // Type third character
+    await page.keyboard.type('3');
+    await page.waitForTimeout(500);
+    iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).toMatch(/bold text\s*123\s*to test/);
+    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+  });
+
+  test('deleting formatted text syncs to sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const blockId = 'text-after';
+
+    await helper.clickBlockInIframe(blockId);
+    await helper.waitForSidebarOpen();
+
+    const editor = await helper.enterEditMode(blockId);
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+
+    // Verify initial content has "bold text"
+    await expect(sidebarEditor).toContainText('bold text', { timeout: 5000 });
+
+    // Select "bold text" using character offsets
+    // Text is: "This text appears after the slider. Click on bold text to test getNodePath."
+    // "This text appears after the slider. Click on " = 45 chars
+    // "bold text" = 9 chars (45-54)
+    await helper.selectTextRange(editor, 45, 54);
+
+    // Verify what was selected
+    const selectionInfo = await helper.assertTextSelection(editor, 'bold text');
+    expect(selectionInfo.selectedText).toBe('bold text');
+
+    // Delete
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(500);
+
+    // Verify iframe no longer has bold text
+    const iframeText = await helper.getCleanTextContent(editor);
+    expect(iframeText).not.toContain('bold text');
+
+    // Verify sidebar synced
+    await expect(sidebarEditor).not.toContainText('bold text', { timeout: 5000 });
+  });
+
   test.skip('can undo and redo', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -167,9 +343,9 @@ test.describe('Inline Editing - Basic', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Enter edit mode and edit text
+    // Enter edit mode and edit text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('First', { delay: 10 });
 
     // Wait for text batch to be sent (300ms debounce + buffer)
@@ -222,15 +398,20 @@ test.describe('Inline Editing - Basic', () => {
     const iframe = helper.getIframe();
     const initialBlocks = await iframe.locator('[data-block-uid]').count();
 
-    // Click the first block and type text
-    await helper.clickBlockInIframe(blockId);
-    const editor = iframe.locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`);
-    await editor.click();
-    await editor.evaluate((el) => { el.textContent = ''; });
+    // Click the first block and type text (select all to replace existing content)
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('First line', { delay: 10 });
 
-    // Move cursor to end of line
-    await helper.moveCursorToEnd(editor);
+    // Click past the end of text to position cursor on whitespace (simulates real user click)
+    // This tests the whitespace correction code path
+    const editorBox = await editor.boundingBox();
+    if (editorBox) {
+      // Click at the right edge of the editor, past the text content
+      await iframe.locator(`[data-block-uid="${blockId}"]`).click({
+        position: { x: editorBox.width - 5, y: editorBox.height / 2 },
+      });
+    }
 
     // Press Enter - in standard Volto this would create a new block
     // Must press Enter in the iframe context, not the page context
@@ -239,22 +420,23 @@ test.describe('Inline Editing - Basic', () => {
     // Wait for the correct number of blocks to be created
     await expect(iframe.locator('[data-block-uid]')).toHaveCount(initialBlocks + 1, { timeout: 3000 });
 
-    // Wait for the old block's Quanta toolbar to disappear (means new block got selected)
-    const oldBlockToolbar = iframe.locator(`[data-block-uid="${blockId}"] .volto-hydra--quanta-toolbar`);
-    await expect(oldBlockToolbar).not.toBeVisible({ timeout: 2000 });
+    // Check that no error toast appeared (Missing data-node-id)
+    const errorToast = iframe.locator('#hydra-dev-warning');
+    await expect(errorToast).not.toBeVisible({ timeout: 1000 });
 
     // Get the new block (should be right after the old block)
-    const allBlocks = await iframe.locator('[data-block-uid]').all();
-    const newBlockIndex = allBlocks.findIndex(async (block) => {
-      const uid = await block.getAttribute('data-block-uid');
-      return uid === blockId;
-    }) + 1;
-    const newBlock = allBlocks[newBlockIndex];
-    const newBlockUid = await newBlock.getAttribute('data-block-uid');
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf(blockId);
+    expect(originalBlockIndex).toBeGreaterThanOrEqual(0);
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"]`);
+
+    // Wait for the new block to be selected (visible with toolbar)
+    await helper.waitForBlockSelected(newBlockUid!);
 
     // Verify the new block is contenteditable
-    const newEditor = iframe.locator(`[data-block-uid="${newBlockUid}"] [contenteditable="true"]`);
-    await expect(newEditor).toBeVisible({ timeout: 2000 });
+    const newEditor = await helper.getEditorLocator(newBlockUid!);
     const isContentEditable = await newEditor.getAttribute('contenteditable');
     expect(isContentEditable).toBe('true');
 
@@ -284,18 +466,26 @@ test.describe('Inline Editing - Basic', () => {
     const newText = 'Make this bold';
     await helper.setSidebarFieldValue('value', newText);
 
-    // Verify the iframe updated with the new text
-    const iframeText = await helper.getBlockTextInIframe(blockId);
-    expect(iframeText).toContain(newText);
+    // Verify the iframe updated with the new text (wait for sync)
+    await expect(async () => {
+      const iframeText = await helper.getBlockTextInIframe(blockId);
+      expect(iframeText).toContain(newText);
+    }).toPass({ timeout: 5000 });
 
     // Select all text in the sidebar editor and apply bold formatting
-    const sidebarEditor = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+
+    // Wait for sidebar editor to have the correct content (sync might cause re-render)
+    await expect(sidebarEditor).toHaveText(newText, { timeout: 5000 });
+
     await sidebarEditor.click();
     await sidebarEditor.press('ControlOrMeta+a'); // Select all
 
     // Verify text is selected
-    const selectedText = await sidebarEditor.evaluate(() => window.getSelection()?.toString());
-    expect(selectedText).toBe(newText);
+    await expect(async () => {
+      const selectedText = await sidebarEditor.evaluate(() => window.getSelection()?.toString());
+      expect(selectedText).toBe(newText);
+    }).toPass({ timeout: 5000 });
 
     // Wait for the sidebar's floating toolbar to appear and click bold
     const sidebarToolbar = await helper.waitForSidebarSlateToolbar();
@@ -304,9 +494,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Verify the iframe shows bold formatting (all text should be bold)
     const editor = await helper.enterEditMode(blockId);
-    const boldSpan = editor.locator('span[style*="font-weight: bold"]');
-    await expect(boldSpan).toBeVisible({ timeout: 10000 });
-    await expect(boldSpan).toHaveText(newText);
+    await helper.waitForFormattedText(editor, newText, 'bold', { timeout: 10000 });
 
     // Click on the block in the iframe to verify selection still works after editing
     await helper.clickBlockInIframe(blockId);
@@ -334,7 +522,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Edit the value field in the sidebar (Volto Hydra feature)
     // Use the same selector as the passing test in sidebar-forms.spec.ts
-    const valueField = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const valueField = helper.getSidebarSlateEditor('value');
     await valueField.click();
     await valueField.fill('Edited from sidebar');
 
@@ -357,9 +545,9 @@ test.describe('Inline Editing - Basic', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Step 1: Enter edit mode in iframe and type some text
+    // Step 1: Enter edit mode in iframe and type some text (select all to replace)
     const editor = await helper.enterEditMode(blockId);
-    await editor.evaluate((el: HTMLElement) => { el.textContent = ''; });
+    await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Make this bold', { delay: 10 });
     await helper.waitForEditorText(editor, /Make this bold/);
     console.log('[TEST] Typed text in iframe');
@@ -377,32 +565,28 @@ test.describe('Inline Editing - Basic', () => {
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
 
-    const sidebarEditor = page.locator('#sidebar-properties .field-wrapper-value [contenteditable="true"]');
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+
+    // Wait for sidebar to sync content from iframe before applying formatting
+    await expect(sidebarEditor).toHaveText('Make this bold', { timeout: 5000 });
+
     await sidebarEditor.click();
     await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
-
-    // Wait for sidebar toolbar to appear and click bold
-    const sidebarToolbar = await helper.waitForSidebarSlateToolbar();
-    const sidebarBoldButton = await helper.getSidebarToolbarButton(sidebarToolbar, 'bold');
-    console.log('[TEST] Clicking bold in sidebar');
-    await sidebarBoldButton.click();
+    console.log('[TEST] Applying bold via Ctrl+B in sidebar');
+    await sidebarEditor.press('ControlOrMeta+b'); // Apply bold via keyboard shortcut
 
     // Wait for bold formatting to appear in iframe
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible({ timeout: 5000 });
+    await helper.waitForFormattedText(editor, /Make this bold/, 'bold');
     console.log('[TEST] Bold applied successfully');
 
-    // Step 4: Now remove bold from sidebar - select all again and click bold to toggle off
+    // Step 4: Now remove bold from sidebar - select all again and toggle bold off
     await sidebarEditor.click();
     await sidebarEditor.press('ControlOrMeta+a'); // Select all in sidebar
-
-    // Wait for sidebar toolbar again and click bold to remove formatting
-    const sidebarToolbar2 = await helper.waitForSidebarSlateToolbar();
-    const sidebarBoldButton2 = await helper.getSidebarToolbarButton(sidebarToolbar2, 'bold');
-    console.log('[TEST] Clicking bold again in sidebar to remove formatting');
-    await sidebarBoldButton2.click();
+    console.log('[TEST] Removing bold via Ctrl+B in sidebar');
+    await sidebarEditor.press('ControlOrMeta+b'); // Remove bold via keyboard shortcut
 
     // Wait for bold formatting to be removed from iframe
-    await expect(editor.locator('span[style*="font-weight: bold"]')).not.toBeVisible({ timeout: 5000 });
+    await helper.waitForFormattingRemoved(editor, 'bold');
     console.log('[TEST] Bold removed successfully');
 
     // Step 5: Click back on the iframe editor - this is where the path error may occur
@@ -633,30 +817,118 @@ test.describe('Inline Editing - Basic', () => {
     await helper.clickFormatButton('bold');
 
     // Wait for bold markup to appear
-    await expect(editor.locator('span[style*="font-weight: bold"]')).toBeVisible();
+    await helper.waitForFormattedText(editor, 'test', 'bold');
 
     // Verify "test" is still selected after applying bold
     await helper.verifySelectionMatches(editor, 'test');
     console.log('[TEST] Selection still "test" after applying bold');
 
     // Verify bold markup exists
-    const html1 = await editor.innerHTML();
-    expect(html1).toContain('style="font-weight: bold"');
-    expect(html1).toContain('test');
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(editor.locator(boldSelector)).toBeVisible();
+    expect(await editor.textContent()).toContain('test');
 
     // Click Bold button again to remove bold formatting
     await helper.clickFormatButton('bold');
 
     // Wait for bold markup to be removed
-    await expect(editor.locator('span[style*="font-weight: bold"]')).not.toBeVisible();
+    await helper.waitForFormattingRemoved(editor, 'bold');
 
     // Verify "test" is still selected after removing bold
     await helper.verifySelectionMatches(editor, 'test');
     console.log('[TEST] Selection still "test" after removing bold');
 
     // Verify bold markup is gone
-    const html2 = await editor.innerHTML();
-    expect(html2).not.toContain('style="font-weight: bold"');
-    expect(html2).toContain('test');
+    await expect(editor.locator(boldSelector)).not.toBeVisible();
+    expect(await editor.textContent()).toContain('test');
+  });
+
+  test('empty editable field is visible and clickable', async ({ page }) => {
+    // Empty editable fields should have minimum height so they're visible and clickable.
+    // This tests the CSS rule that hydra.js injects for [data-editable-field]:empty
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode and clear all content to make the block empty
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.press('Backspace');
+
+    // Wait for the content to be cleared
+    await page.waitForTimeout(200);
+
+    // Click on a different block to deselect the empty block
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForBlockSelected('block-2-uuid');
+
+    // Get the editable field locator - handles both Nuxt (attr on root) and mock (attr on child)
+    const editableField = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field="value"]`).or(
+      iframe.locator(`[data-block-uid="${blockId}"][data-editable-field="value"]`)
+    );
+
+    // The empty field should still be visible (have height > 0) even when not selected
+    await expect(editableField).toBeVisible();
+
+    // Verify it has meaningful height (at least 1em ~ 16px typically)
+    const height = await editableField.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.height;
+    });
+    expect(height).toBeGreaterThan(10); // Should have at least 10px height when empty
+
+    // Click on the empty block to select it - this should work because it has height
+    await helper.clickBlockInIframe(blockId);
+
+    // Verify the empty block is now selected
+    await helper.waitForBlockSelected(blockId);
+  });
+
+  test('deleting across node boundaries (bold to normal text)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // text-after block has: "This text appears..." + <bold>bold text</bold> + " to test getNodePath."
+    const blockId = 'text-after';
+    await helper.clickBlockInIframe(blockId);
+
+    const editor = await helper.getEditorLocator(blockId);
+
+    // Select across the boundary: from "ld" in "bold" to "to" in " to test"
+    // "This text appears after the slider. Click on " (46 chars) + "bold" = starts at 46
+    // We want to select "ld text to" which spans bold -> normal text
+    // Adjust positions based on actual text offsets
+    await helper.selectTextRange(editor, 47, 57);
+
+    // Verify the selection spans the boundary
+    const selectionInfo = await helper.assertTextSelection(editor, 'ld text to');
+    console.log('[TEST] Cross-boundary selection:', selectionInfo.selectedText);
+
+    // Press Delete to remove the selected text
+    await page.keyboard.press('Delete');
+
+    // Wait for deletion to complete
+    await expect.poll(async () => {
+      const text = await helper.getCleanTextContent(editor);
+      return !text.includes('ld text to');
+    }, { timeout: 5000 }).toBe(true);
+
+    // Verify the result - should have "bo" + " test getNodePath."
+    const finalText = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Text after delete:', finalText);
+    expect(finalText).toContain('bo');
+    expect(finalText).toContain('test getNodePath');
+    expect(finalText).not.toContain('ld text to');
+
+    // Verify cursor is collapsed at deletion point
+    const cursorInfo = await helper.getCursorInfo(editor);
+    expect(cursorInfo.isFocused).toBe(true);
+    expect(cursorInfo.selectionCollapsed).toBe(true);
   });
 });

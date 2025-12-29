@@ -527,6 +527,135 @@ Empty blocks are special blocks rendered when a container is empty or if a new s
 - if only one block type is allowed in a container then this is created instead of an empty block.
 
 
+#### Object List Containers
+
+Hydra also supports the `object_list` widget pattern used by some existing Volto blocks (like `volto-slider-block`).
+Unlike standard container blocks that use `blocks` + `blocks_layout`, object_list stores items as an array with ID fields:
+
+```json
+{
+  "@type": "slider",
+  "slides": [
+    { "@id": "slide-1", "title": "First Slide", "image": "..." },
+    { "@id": "slide-2", "title": "Second Slide", "image": "..." }
+  ]
+}
+```
+
+To enable visual editing for object_list containers:
+
+1. Define the schema with `widget: 'object_list'` and an item `schema`:
+```js
+slides: {
+  title: "Slides",
+  widget: 'object_list',
+  idField: '@id',  // Field used as unique identifier (default: '@id')
+  schema: {
+    properties: {
+      title: { title: "Title" },
+      image: { title: "Image", widget: "image" },
+      description: { title: "Description", widget: "slate" }
+    }
+  }
+}
+```
+
+2. In your frontend, render each item with `data-block-uid` set to the item's ID:
+```html
+<div class="slider" data-block-uid="slider-1">
+  <div class="slide" data-block-uid="slide-1">
+    <h2 data-editable-field="title">First Slide</h2>
+    <img data-editable-field="image" src="..."/>
+  </div>
+  <div class="slide" data-block-uid="slide-2">
+    <h2 data-editable-field="title">Second Slide</h2>
+    <img data-editable-field="image" src="..."/>
+  </div>
+</div>
+```
+
+Hydra will handle:
+- Block selection and highlighting for object_list items
+- Inline editing of item fields (text, images, etc.)
+- Adding/removing items via the sidebar
+- Drag and drop reordering of items
+
+##### Custom ID Fields
+
+Some blocks use a different field name for the unique identifier. Use `idField` to specify this:
+
+```js
+rows: {
+  widget: 'object_list',
+  idField: 'key',  // Use 'key' instead of '@id'
+  schema: { /* ... */ }
+}
+```
+
+##### Nested Data with dataPath
+
+When data is nested inside the block (e.g., `block.table.rows` instead of `block.rows`), use `dataPath`:
+
+```js
+rows: {
+  widget: 'object_list',
+  idField: 'key',
+  dataPath: ['table', 'rows'],  // Path to actual data location
+  schema: { /* ... */ }
+}
+```
+
+#### Table Mode (addMode: 'table')
+
+For table-like structures where rows contain cells, use `addMode: 'table'` to enable column-aware operations:
+
+```js
+rows: {
+  widget: 'object_list',
+  idField: 'key',
+  addMode: 'table',  // Enable table-aware behavior
+  dataPath: ['table', 'rows'],
+  schema: {
+    properties: {
+      cells: {
+        widget: 'object_list',
+        idField: 'key',
+        schema: {
+          properties: {
+            value: { title: 'Content', widget: 'slate' }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Table mode enables:
+- **Column operations**: Adding a cell adds a column (inserts cell into ALL rows at the same position)
+- **Row defaults**: New rows automatically get the same number of cells as existing rows
+- **Toolbar actions**: Add Row Before/After, Add Column Before/After, Remove Row, Remove Column
+- **Selection after delete**: Removing a row/column selects the corresponding cell in the previous row/column
+
+In your frontend, render the table structure:
+```html
+<table data-block-uid="table-1">
+  <tr data-block-uid="row-1">
+    <td data-block-uid="cell-1-1" data-editable-field="value">Header 1</td>
+    <td data-block-uid="cell-1-2" data-editable-field="value">Header 2</td>
+  </tr>
+  <tr data-block-uid="row-2">
+    <td data-block-uid="cell-2-1" data-editable-field="value">Data 1</td>
+    <td data-block-uid="cell-2-2" data-editable-field="value">Data 2</td>
+  </tr>
+</table>
+```
+
+The Quanta toolbar will show table-specific actions when a cell or row is selected:
+- For cells: formatting buttons + Add Column Before/After in toolbar, Remove Column in dropdown
+- For rows: Add Row Before/After in toolbar, Remove Row in dropdown
+
+
 ### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
 If you want to make the editing experience the most intuitive, you can enable real-time visual block editing, where an editor

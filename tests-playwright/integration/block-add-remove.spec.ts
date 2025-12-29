@@ -379,8 +379,11 @@ test.describe('Removing Blocks', () => {
     await helper.openQuantaToolbarMenu(remainingBlocks[0]);
     await helper.clickQuantaToolbarMenuOption(remainingBlocks[0], 'Remove');
 
-    const finalCount = await helper.getBlockCount();
-    expect(finalCount).toBe(initialCount - 2);
+    // Wait for the block count to reflect the removal
+    await expect(async () => {
+      const finalCount = await helper.getBlockCount();
+      expect(finalCount).toBe(initialCount - 2);
+    }).toPass({ timeout: 5000 });
   });
 });
 
@@ -454,6 +457,12 @@ test.describe('Add and Remove Combined', () => {
 });
 
 test.describe('Allowed Blocks from Frontend', () => {
+  // These tests are specific to the mock frontend's allowedBlocks configuration
+  // The nuxt frontend has a different allowedBlocks list (includes video, excludes hero)
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - tests mock frontend config');
+  });
+
   test('block chooser hides blocks not in allowedBlocks list', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

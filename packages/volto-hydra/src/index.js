@@ -4,6 +4,13 @@ import {
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
+import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
+import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
+import rowAfterSVG from '@plone/volto/icons/row-after.svg';
+import rowDeleteSVG from '@plone/volto/icons/row-delete.svg';
+import columnBeforeSVG from '@plone/volto/icons/column-before.svg';
+import columnAfterSVG from '@plone/volto/icons/column-after.svg';
+import columnDeleteSVG from '@plone/volto/icons/column-delete.svg';
 
 const applyConfig = (config) => {
   // Patch setTimeout to catch focus errors from AddLinkForm
@@ -47,20 +54,12 @@ const applyConfig = (config) => {
   // This is separate from schema (used for sidebar settings form)
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
-    // TEMPORARILY DISABLED - testing if blockSchema richtext causes slate corruption
-    // blockSchema: {
-    //   title: 'Text',
-    //   fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
-    //   properties: {
-    //     value: {
-    //       title: 'Body',
-    //       widget: 'richtext',
-    //       // Default value for new slate blocks - used by applyBlockDefaults
-    //       default: config.settings.slate.defaultValue(),
-    //     },
-    //   },
-    //   required: [],
-    // },
+    // initialValue is called by Volto's _applyBlockInitialValue when adding new blocks
+    // This ensures slate blocks get proper initial structure (hydra.js adds nodeIds)
+    initialValue: ({ id, value }) => ({
+      ...value,
+      value: value.value || config.settings.slate.defaultValue(),
+    }),
     schemaEnhancer: ({ formData, schema, intl }) => {
       // NOTE: Do NOT use blockSchema with widget: 'richtext' - it causes Slate corruption
       // because blockSchema runs during block registration, before proper isolation
@@ -89,6 +88,53 @@ const applyConfig = (config) => {
     },
   };
 
+  // Configure slateTable block schema for buildBlockPathMap traversal
+  // Structure: block.table.rows[].cells[] with 'key' as idField
+  // Sidebar titles are derived from field names: "rows" -> "Row", "cells" -> "Cell"
+  // Note: We use dataPath to tell traversal where data lives WITHOUT nesting
+  // inside widget: 'object', which would cause applySchemaDefaults to corrupt array data.
+  // sidebarSchemaOnly: TableBlockEdit expects specific data structures that don't
+  // work well when rendered in sidebar - use schema form instead.
+  config.blocks.blocksConfig.slateTable = {
+    ...config.blocks.blocksConfig.slateTable,
+    sidebarSchemaOnly: true,
+    addMode: 'table', // Double-nested structure: rows contain cells, enables column add and row cell-count copying
+    blockSchema: (props) => {
+      const baseSchema = TableBlockSchema(props);
+      return {
+        ...baseSchema,
+        properties: {
+          ...baseSchema.properties,
+          // Rows for container traversal - uses dataPath to avoid nesting inside widget: 'object'
+          rows: {
+            widget: 'object_list',
+            idField: 'key',
+            dataPath: ['table', 'rows'], // Where to find data in block
+            schema: {
+              fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+              properties: {
+                cells: {
+                  widget: 'object_list',
+                  idField: 'key',
+                  schema: {
+                    fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
+                    properties: {
+                      value: {
+                        title: 'Content',
+                        widget: 'slate',
+                        default: [{ type: 'p', children: [{ text: '' }] }],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+    },
+  };
+
   const updateAllowedBlocks = () => {
     const allowedBlocksList = getAllowedBlocksList();
     const defaultAllowedBlocks = ['slate', 'image'];
@@ -112,9 +158,21 @@ const applyConfig = (config) => {
       { '@type': 'title' },
       {
         '@type': 'slate',
-        value: [{ type: 'p', children: [{ text: '', nodeId: 2 }], nodeId: 1 }],
+        value: [{ type: 'p', children: [{ text: '' }] }],
       },
     ],
+  };
+
+  // Generic block actions registry
+  // Actions can be referenced by ID in pathMap and rendered in toolbar/dropdown
+  // Each action defines: label, icon (SVG import), and the action is dispatched by ID
+  config.settings.hydraActions = {
+    addRowBefore: { label: 'Add Row Before', icon: rowBeforeSVG },
+    addRowAfter: { label: 'Add Row After', icon: rowAfterSVG },
+    addColumnBefore: { label: 'Add Column Before', icon: columnBeforeSVG },
+    addColumnAfter: { label: 'Add Column After', icon: columnAfterSVG },
+    deleteRow: { label: 'Remove Row', icon: rowDeleteSVG },
+    deleteColumn: { label: 'Remove Column', icon: columnDeleteSVG },
   };
 
   return config;

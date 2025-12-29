@@ -75,11 +75,13 @@ export default function devProxyMiddleware() {
     },
     pathRewrite: (path, req) => {
       const { apiPathURL, instancePath } = getEnv();
+      // Default port to 443 for https, 80 for http when not explicitly specified
+      const port = apiPathURL.port || (apiPathURL.protocol === 'https:' ? 443 : 80);
       const target =
         config.settings.proxyRewriteTarget ||
         `/VirtualHostBase/${apiPathURL.protocol.slice(0, -1)}/${
           apiPathURL.hostname
-        }:${apiPathURL.port}${instancePath}/++api++/VirtualHostRoot`;
+        }:${port}${instancePath}/++api++/VirtualHostRoot`;
 
       return `${target}${path.replace('/++api++', '')}`;
     },
