@@ -425,14 +425,12 @@ test.describe('Inline Editing - Basic', () => {
     await expect(errorToast).not.toBeVisible({ timeout: 1000 });
 
     // Get the new block (should be right after the old block)
-    const allBlocks = await iframe.locator('[data-block-uid]').all();
-    const newBlockIndex = allBlocks.findIndex(async (block) => {
-      const uid = await block.getAttribute('data-block-uid');
-      return uid === blockId;
-    }) + 1;
-    const newBlock = allBlocks[newBlockIndex];
-    const newBlockUid = await newBlock.getAttribute('data-block-uid');
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf(blockId);
+    expect(originalBlockIndex).toBeGreaterThanOrEqual(0);
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
     expect(newBlockUid).toBeTruthy();
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"]`);
 
     // Wait for the new block to be selected (visible with toolbar)
     await helper.waitForBlockSelected(newBlockUid!);
