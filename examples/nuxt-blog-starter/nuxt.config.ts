@@ -160,10 +160,12 @@ export default defineNuxtConfig({
     },
   },
   devServer: {
-    https: {
-      cert: './certs/cert.pem',
-      key: './certs/dev.pem'
-    }
+    // HTTPS disabled by default - use HTTP for local development
+    // For HTTPS, generate certs with mkcert and uncomment:
+    // https: {
+    //   cert: './certs/cert.pem',
+    //   key: './certs/dev.pem'
+    // }
   },
   sourcemap: {
     server: true,

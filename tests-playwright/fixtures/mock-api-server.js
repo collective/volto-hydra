@@ -32,7 +32,7 @@ function generateAuthToken(username = 'admin') {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase limit for image uploads
 
 // Virtual Host Monster path rewriting middleware
 // Volto's proxy adds VHM paths like: /VirtualHostBase/http/localhost:8888/++api++/VirtualHostRoot/@login
@@ -118,10 +118,60 @@ function filterActionsForAuth(content, authenticated) {
 }
 
 /**
+ * Generate image_scales for Image content types
+ * Used by object browser to display thumbnails
+ */
+function getImageScales(content, baseUrl) {
+  if (content['@type'] !== 'Image' || !content.image) {
+    return null;
+  }
+
+  const { width, height } = content.image;
+  const contentPath = content['@id'].replace(baseUrl, '');
+
+  return {
+    image: [
+      {
+        download: `${baseUrl}${contentPath}/@@images/image/preview`,
+        width: Math.min(width, 400),
+        height: Math.min(height, 400),
+      }
+    ]
+  };
+}
+
+/**
+ * Format a content item for search results
+ * Includes image_field and image_scales for Image content types
+ * Includes is_folderish for folder navigation in object browser
+ */
+function formatSearchItem(content, baseUrl) {
+  const item = {
+    '@id': content['@id'],
+    '@type': content['@type'],
+    'id': content.id,
+    'title': content.title,
+    'description': content.description || '',
+    'review_state': content.review_state || 'published',
+    'UID': content.UID,
+    'is_folderish': content.is_folderish || false,
+  };
+
+  // Add image fields for Image content types (needed by object browser)
+  if (content['@type'] === 'Image') {
+    item.image_field = 'image';
+    item.image_scales = getImageScales(content, baseUrl);
+  }
+
+  return item;
+}
+
+/**
  * Get root-level navigation items from contentDB
  * Used by both @navigation component and @search endpoint
  */
 function getRootNavigationItems() {
+  const baseUrl = `http://localhost:${PORT}`;
   return Object.entries(contentDB)
     .filter(([path]) => {
       if (path === '/') return false; // Exclude site root itself
@@ -129,13 +179,7 @@ function getRootNavigationItems() {
       return pathParts.length === 1; // Only root-level items
     })
     .map(([, content]) => ({
-      '@id': content['@id'],
-      '@type': content['@type'],
-      'id': content.id,
-      'title': content.title,
-      'description': content.description || '',
-      'review_state': content.review_state || 'published',
-      'UID': content.UID,
+      ...formatSearchItem(content, baseUrl),
       'items': [],  // Child items (empty for flat structure, needed for depth=2)
     }));
 }
@@ -239,6 +283,9 @@ function enrichContent(content, urlPath, baseUrl) {
   };
 }
 
+// Mapping from URL path to content directory name (for image serving)
+const contentDirMap = {};
+
 // Load initial content from fixtures
 function loadInitialContent() {
   const baseUrl = `http://localhost:${PORT}`;
@@ -264,19 +311,28 @@ function loadInitialContent() {
   console.log('Loaded content: /');
 
   // Load all content from content/{page-id}/data.json structure
-  const contentDir = path.join(__dirname, 'content');
-  if (fs.existsSync(contentDir)) {
-    const dirs = fs.readdirSync(contentDir, { withFileTypes: true });
+  // Uses @id from content file for URL path (supports nested paths like /images/test-image-1)
+  const contentDirPath = path.join(__dirname, 'content');
+  if (fs.existsSync(contentDirPath)) {
+    const dirs = fs.readdirSync(contentDirPath, { withFileTypes: true });
     dirs.forEach((dir) => {
       // Support both real directories and symlinks to directories
       const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
-        fs.statSync(path.join(contentDir, dir.name)).isDirectory());
+        fs.statSync(path.join(contentDirPath, dir.name)).isDirectory());
       if (isDir) {
-        const dataPath = path.join(contentDir, dir.name, 'data.json');
+        const dataPath = path.join(contentDirPath, dir.name, 'data.json');
         if (fs.existsSync(dataPath)) {
           const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-          const urlPath = '/' + (content.id || dir.name);
+          // Use @id from content file if it looks like a path, otherwise use directory name
+          let urlPath;
+          if (content['@id'] && content['@id'].startsWith('/')) {
+            urlPath = content['@id'];
+          } else {
+            urlPath = '/' + (content.id || dir.name);
+          }
           contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
+          // Store mapping from URL path to directory name for image serving
+          contentDirMap[urlPath] = dir.name;
           console.log(`Loaded content: ${urlPath}`);
         }
       }
@@ -294,12 +350,13 @@ loadInitialContent();
 function getContent(urlPath) {
   const baseUrl = `http://localhost:${PORT}`;
 
-  // Check if there's a data.json file for this path in content/{page-id}/
-  const contentDir = path.join(__dirname, 'content');
-  const pageId = urlPath.replace(/^\//, ''); // Remove leading slash
+  // Check if there's a data.json file for this path in content/{dir-name}/
+  // Use contentDirMap to find actual directory for nested paths (e.g., /images/test-image-1)
+  const contentDirBase = path.join(__dirname, 'content');
+  const dirName = contentDirMap[urlPath] || urlPath.replace(/^\//, '');
 
-  if (pageId && fs.existsSync(contentDir)) {
-    const dataPath = path.join(contentDir, pageId, 'data.json');
+  if (dirName && fs.existsSync(contentDirBase)) {
+    const dataPath = path.join(contentDirBase, dirName, 'data.json');
     if (fs.existsSync(dataPath)) {
       const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
       return enrichContent(content, urlPath, baseUrl);
@@ -387,6 +444,110 @@ app.post('/@logout', (req, res) => {
   }
   // Return 204 No Content on successful logout (Plone behavior)
   res.status(204).send();
+});
+
+/**
+ * POST /:path (content creation)
+ * Create new content (e.g., Image upload)
+ * Used by ImageWidget for file uploads
+ */
+app.post('/*', (req, res, next) => {
+  // Skip special endpoints (already handled above)
+  if (req.path.startsWith('/@')) {
+    return next();
+  }
+
+  if (process.env.DEBUG) {
+    console.log(`POST content creation: path=${req.path}, @type=${req.body?.['@type']}`);
+  }
+
+  const body = req.body;
+  if (!body || !body['@type']) {
+    // No @type means this isn't a content creation request - pass to next handler
+    return next();
+  }
+
+  const parentPath = req.path || '/';
+  const contentType = body['@type'];
+
+  if (contentType === 'Image') {
+    // Return error for test trigger filename
+    if (body.image?.filename === 'trigger-error.png') {
+      return res.status(500).json({
+        error: {
+          type: 'InternalServerError',
+          message: 'Upload failed: simulated server error',
+        },
+      });
+    }
+
+    // Generate a unique ID for the uploaded image
+    const imageId = `uploaded-image-${Date.now()}`;
+    const imagePath = `${parentPath === '/' ? '' : parentPath}/${imageId}`.replace(/\/+/g, '/');
+
+    // Extract image dimensions from data if possible, otherwise use defaults
+    const width = 800;
+    const height = 600;
+
+    // Create the image content
+    const imageContent = {
+      '@id': `http://localhost:8888${imagePath}`,
+      '@type': 'Image',
+      'UID': `uid-${imageId}`,
+      'id': imageId,
+      'title': body.title || 'Uploaded Image',
+      'description': body.description || '',
+      'image': {
+        'content-type': body.image?.['content-type'] || 'image/png',
+        'download': `http://localhost:8888${imagePath}/@@images/image`,
+        'filename': body.image?.filename || 'image.png',
+        'height': height,
+        'width': width,
+        'scales': {
+          'preview': {
+            'download': `http://localhost:8888${imagePath}/@@images/image/preview`,
+            'height': 400,
+            'width': 400,
+          },
+          'large': {
+            'download': `http://localhost:8888${imagePath}/@@images/image/large`,
+            'height': 800,
+            'width': 800,
+          },
+        },
+        'size': body.image?.data?.length || 1000,
+      },
+      'image_scales': {
+        'image': [{
+          'content-type': body.image?.['content-type'] || 'image/png',
+          'download': `@@images/image-${width}-hash.${body.image?.['content-type']?.split('/')[1] || 'png'}`,
+          'filename': body.image?.filename || 'image.png',
+          'height': height,
+          'width': width,
+          'scales': {
+            'preview': {
+              'download': `@@images/image-400-hash.${body.image?.['content-type']?.split('/')[1] || 'png'}`,
+              'height': 400,
+              'width': 400,
+            },
+          },
+        }],
+      },
+      'review_state': 'published',
+    };
+
+    // Store in memory
+    contentDB[imagePath] = imageContent;
+
+    if (process.env.DEBUG) {
+      console.log(`Created Image: ${imagePath}`);
+    }
+
+    return res.status(201).json(imageContent);
+  }
+
+  // Unsupported content type - return 501 instead of passing to next
+  return res.status(501).json({ error: `Content type '${contentType}' not supported` });
 });
 
 /**
@@ -530,6 +691,7 @@ app.get('*/@breadcrumbs', (req, res) => {
 app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
+  const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
@@ -547,18 +709,11 @@ app.get('*/@search', (req, res) => {
       if (searchContent && searchContent.is_folderish) {
         // Return children if folder
         items = Object.entries(contentDB)
-          .filter(([path]) => {
-            if (path === searchPath) return false;
-            return path.startsWith(searchPath + '/');
+          .filter(([itemPath]) => {
+            if (itemPath === searchPath) return false;
+            return itemPath.startsWith(searchPath + '/');
           })
-          .map(([path, content]) => ({
-            '@id': content['@id'],
-            '@type': content['@type'],
-            'title': content.title,
-            'description': content.description || '',
-            'review_state': content.review_state || 'published',
-            'UID': content.UID,
-          }));
+          .map(([, content]) => formatSearchItem(content, baseUrl));
       } else {
         // Non-folder or not found - return empty
         items = [];
@@ -567,15 +722,8 @@ app.get('*/@search', (req, res) => {
   } else {
     // No depth filter - return all content items
     items = Object.entries(contentDB)
-      .filter(([path]) => path !== '/')
-      .map(([path, content]) => ({
-        '@id': content['@id'],
-        '@type': content['@type'],
-        'title': content.title,
-        'description': content.description || '',
-        'review_state': content.review_state || 'published',
-        'UID': content.UID,
-      }));
+      .filter(([itemPath]) => itemPath !== '/')
+      .map(([, content]) => formatSearchItem(content, baseUrl));
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
@@ -680,15 +828,44 @@ app.post('*/@lock', (req, res) => {
 
 /**
  * GET *\/@@images/*
- * Serve placeholder images for Plone image scales
- * URLs like: /test-image-1.jpg/@@images/image/preview
+ * Serve images for Plone image scales
+ * URLs like: /test-image-1/@@images/image/preview
+ * Serves actual image files from content directories if they exist,
+ * otherwise falls back to placeholder SVGs.
  */
 app.get('*/@@images/*', (req, res) => {
-  // Extract scale from URL (e.g., 'preview', 'teaser', 'large')
-  const scaleMatch = req.path.match(/@@images\/image\/(\w+)/);
-  const scale = scaleMatch ? scaleMatch[1] : 'preview';
+  // Extract content path and scale from URL
+  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, scale=preview
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/image(?:\/(\w+))?$/);
+  const contentPath = pathMatch ? pathMatch[1] : '';
+  const scale = pathMatch && pathMatch[2] ? pathMatch[2] : 'preview';
 
-  // Define dimensions for common Plone image scales
+  // Try to serve actual image file from content directory
+  // Use contentDirMap to find actual directory for nested paths
+  const dirName = contentDirMap[contentPath] || contentPath.replace(/^\//, '').replace(/\//g, '-');
+  const contentDir = path.join(__dirname, 'content', dirName, 'image');
+
+  if (dirName && fs.existsSync(contentDir)) {
+    const files = fs.readdirSync(contentDir);
+    if (files.length > 0) {
+      const imageFile = path.join(contentDir, files[0]);
+      const ext = path.extname(files[0]).toLowerCase();
+      const mimeTypes = {
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+      };
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      res.set('Content-Type', contentType);
+      res.sendFile(imageFile);
+      return;
+    }
+  }
+
+  // Fall back to placeholder SVG
   const scaleDimensions = {
     icon: { width: 32, height: 32 },
     tile: { width: 64, height: 64 },

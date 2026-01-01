@@ -3604,4 +3604,271 @@ export class AdminUIHelper {
 
     await dropdownButton.click();
   }
+
+  // =============================================================================
+  // Object Browser Helpers
+  // =============================================================================
+
+  /**
+   * Get the object browser popup locator.
+   * The object browser can be:
+   * - An aside[role="presentation"] (for link editor)
+   * - A div with h2 "Choose Image" (for image selection from toolbar)
+   *
+   * @returns Locator for the object browser popup
+   */
+  getObjectBrowserPopup(): Locator {
+    // Use last() since there may be multiple and the object browser is the newest
+    return this.page.locator('aside[role="presentation"], .object-browser-wrapper').last();
+  }
+
+  /**
+   * Wait for the object browser popup to be fully visible and ready.
+   * Handles both aside-based and div-based object browsers.
+   * Navigates to root (Home) since the browser may open at current page path.
+   *
+   * @param timeout - Maximum time to wait in milliseconds (default: 5000)
+   * @returns Locator for the object browser popup
+   */
+  async waitForObjectBrowser(timeout: number = 5000): Promise<Locator> {
+    // Wait for either type of object browser:
+    // - aside[role="presentation"] for link editor
+    // - Element with "Choose Image" heading for toolbar image selection
+
+    // Try aside first (link editor)
+    const aside = this.page.locator('aside[role="presentation"]').last();
+
+    // Also look for image browser by finding "Choose Image" heading and going to parent container
+    const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
+
+    // Wait for either to appear
+    await Promise.race([
+      aside.waitFor({ state: 'visible', timeout }).catch(() => null),
+      chooseImageHeading.waitFor({ state: 'visible', timeout }).catch(() => null),
+    ]);
+
+    // Determine which one is visible
+    let locator: Locator;
+    if (await aside.isVisible().catch(() => false)) {
+      locator = aside;
+    } else if (await chooseImageHeading.isVisible()) {
+      // Get the parent container (2 levels up from heading -> header -> container)
+      locator = chooseImageHeading.locator('xpath=ancestor::*[.//ul or .//list]').first();
+      // Fallback to just finding the list nearby
+      if (!(await locator.count())) {
+        locator = this.page.locator('ul:has(li)').filter({ hasText: /Document|Image/ }).last();
+      }
+    } else {
+      throw new Error('Object browser did not appear');
+    }
+
+    // Object browser may open at current page path (e.g., /test-page) which has no children.
+    // Check if we need to navigate to Home (list is empty or no matching items)
+    const listItems = this.page.locator('li').filter({ hasText: /Document|Image|Folder/ });
+    const hasItems = await listItems.first().isVisible({ timeout: 1000 }).catch(() => false);
+
+    if (!hasItems) {
+      const homeButton = this.page.getByRole('button', { name: 'Home' });
+      if (await homeButton.isVisible().catch(() => false)) {
+        await homeButton.click();
+        console.log('[TEST] Object browser navigated to Home');
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Wait for list items to appear
+    await expect(listItems.first()).toBeVisible({ timeout });
+
+    console.log('[TEST] Object browser is ready');
+    return locator;
+  }
+
+  /**
+   * Navigate to the root (Home) in the object browser.
+   * Clicks the Home button in the breadcrumb.
+   *
+   * @param objectBrowser - The object browser locator (from waitForObjectBrowser)
+   */
+  async objectBrowserNavigateHome(objectBrowser: Locator): Promise<void> {
+    const homeBreadcrumb = objectBrowser.getByRole('button', { name: 'Home' });
+    await homeBreadcrumb.waitFor({ state: 'visible', timeout: 2000 });
+    await homeBreadcrumb.click();
+
+    // Wait for the listing to update by checking for list items
+    await expect(objectBrowser.locator('li[role="listitem"]').first()).toBeVisible({ timeout: 5000 });
+    console.log('[TEST] Object browser navigated to Home');
+  }
+
+  /**
+   * Navigate into a folder in the object browser.
+   * Clicks the folder item to enter it.
+   *
+   * @param _objectBrowser - The object browser locator (unused, searches globally)
+   * @param folderName - The name of the folder to navigate into (e.g., "Images" or /images/i)
+   */
+  async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
+    // Find folder by text content since accessible names include full path like "/images (Document)"
+    // Search globally since the object browser container locator may vary
+    const folderItem = this.page.locator('li').filter({ hasText: folderName });
+    await folderItem.first().waitFor({ state: 'visible', timeout: 5000 });
+    await folderItem.first().click();
+
+    // Wait for the listing to update - new items should appear
+    await this.page.waitForTimeout(300);
+    await expect(this.page.locator('li').first()).toBeVisible({ timeout: 5000 });
+    console.log(`[TEST] Object browser navigated to folder: ${folderName}`);
+  }
+
+  /**
+   * Select an item in the object browser (closes the browser).
+   * This is used to select an image or content item.
+   *
+   * @param _objectBrowser - The object browser locator (unused, searches globally)
+   * @param itemName - The name of the item to select (e.g., "Test Image 1" or /test-image-1/i)
+   */
+  async objectBrowserSelectItem(_objectBrowser: Locator, itemName: string | RegExp): Promise<void> {
+    // Find item by text content since accessible names include full path
+    // Search globally since the object browser container locator may vary
+    const item = this.page.locator('li').filter({ hasText: itemName });
+    await item.first().waitFor({ state: 'visible', timeout: 5000 });
+    await item.first().click();
+
+    // Wait for the object browser to close, or close it manually if it stays open
+    const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
+    try {
+      await expect(chooseImageHeading).not.toBeVisible({ timeout: 2000 });
+    } catch {
+      // Object browser didn't auto-close, close it manually via the X button in header
+      console.log('[TEST] Object browser did not auto-close, closing manually');
+      // The X button is the last button in the header banner next to "Choose Image"
+      const banner = chooseImageHeading.locator('..');
+      const closeButton = banner.locator('button').last();
+      if (await closeButton.isVisible().catch(() => false)) {
+        await closeButton.click();
+        await this.page.waitForTimeout(500);
+      }
+      // If still visible, press Escape
+      if (await chooseImageHeading.isVisible().catch(() => false)) {
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+      }
+    }
+    console.log(`[TEST] Object browser selected item: ${itemName}`);
+  }
+
+  /**
+   * Open the object browser from a sidebar field and wait for it to be ready.
+   *
+   * @param fieldWrapper - Locator for the field wrapper (e.g., .field-wrapper-image)
+   * @returns Locator for the open object browser popup
+   */
+  async openObjectBrowserFromField(fieldWrapper: Locator): Promise<Locator> {
+    const browseButton = fieldWrapper.locator('button[aria-label="Open object browser"]');
+    await expect(browseButton).toBeVisible({ timeout: 5000 });
+    await browseButton.click();
+
+    return this.waitForObjectBrowser();
+  }
+
+  /**
+   * Open the object browser from a toolbar AddLinkForm popup.
+   * Handles clearing existing value first if needed (browse button only shows when empty).
+   *
+   * @param popup - Locator for the AddLinkForm popup (e.g., .field-image-editor)
+   * @param reopenButton - Locator for the button to reopen the popup after clearing
+   * @returns Locator for the open object browser popup
+   */
+  async openObjectBrowserFromToolbarPopup(popup: Locator, reopenButton: Locator): Promise<Locator> {
+    // Check if there's an existing value (clear button visible instead of browse)
+    const clearButton = popup.locator('button[aria-label="Clear"]');
+    const browseButton = popup.locator('button[aria-label="Open object browser"]');
+
+    if (await clearButton.isVisible().catch(() => false)) {
+      // Clear the value first
+      await clearButton.click();
+      console.log('[TEST] Cleared existing value from toolbar popup');
+
+      // Popup closes on clear, reopen it
+      await reopenButton.click();
+      await expect(popup).toBeVisible({ timeout: 5000 });
+    }
+
+    // Now browse button should be visible
+    await expect(browseButton).toBeVisible({ timeout: 5000 });
+    await browseButton.click();
+
+    return this.waitForObjectBrowser();
+  }
+
+  /**
+   * Submit the AddLinkForm popup if it's still open.
+   * The object browser selection sets the URL but doesn't auto-submit due to React async state.
+   *
+   * @param popup - Locator for the AddLinkForm popup (e.g., .field-image-editor, .field-link-editor)
+   */
+  async submitAddLinkFormIfOpen(popup: Locator): Promise<void> {
+    const submitButton = popup.locator('button[aria-label="Submit"]');
+    if (await submitButton.isVisible().catch(() => false)) {
+      await submitButton.click();
+      console.log('[TEST] Submitted AddLinkForm');
+    }
+  }
+
+  /**
+   * Simulate drag-and-drop of an image file onto a target element.
+   * Uses DataTransfer API to dispatch real drag events that react-dropzone handles.
+   *
+   * @param dropTarget - Locator for the drop zone element
+   * @param filename - Name for the test file (default: 'drag-drop-test.png')
+   */
+  async dragDropImageFile(
+    dropTarget: Locator,
+    filename: string = 'drag-drop-test.png',
+  ): Promise<void> {
+    await expect(dropTarget).toBeVisible({ timeout: 5000 });
+
+    // Scroll into view to ensure element is in viewport for elementFromPoint
+    await dropTarget.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(100); // Brief wait for scroll to settle
+
+    const box = await dropTarget.boundingBox();
+    if (!box) throw new Error('Could not get bounding box for drop target');
+    const dropX = box.x + box.width / 2;
+    const dropY = box.y + box.height / 2;
+
+    // Minimal valid 1x1 PNG as base64
+    const pngBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    await this.page.evaluate(
+      ({ dropX, dropY, pngBase64, filename }) => {
+        const byteCharacters = atob(pngBase64);
+        const byteArray = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteArray[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        const file = new File([blob], filename, { type: 'image/png' });
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+
+        const element = document.elementFromPoint(dropX, dropY);
+        if (!element) throw new Error('No element at drop coordinates');
+
+        element.dispatchEvent(
+          new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }),
+        );
+        element.dispatchEvent(
+          new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }),
+        );
+        element.dispatchEvent(
+          new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }),
+        );
+      },
+      { dropX, dropY, pngBase64, filename },
+    );
+
+    console.log(`[TEST] Drag-dropped image file: ${filename}`);
+  }
 }

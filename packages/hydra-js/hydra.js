@@ -112,7 +112,9 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.focusedFieldName = null; // Track which field within the block has focus
+    this.focusedFieldName = null; // Track which editable field within the block has focus
+    this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
+    this.focusedMediaField = null; // Track which media field has focus (for image selection)
     this.isInlineEditing = false;
     this.handleMouseUp = null;
     this.blockObserver = null;
@@ -274,6 +276,66 @@ export class Bridge {
   }
 
   /**
+   * Get linkable fields that belong directly to a block.
+   * Linkable fields use data-linkable-field attribute for URL/link editing.
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {Object} Map of field names to true
+   */
+  getLinkableFields(blockElement) {
+    const linkableFields = {};
+    // Check if block element itself has data-linkable-field
+    const selfField = blockElement.getAttribute('data-linkable-field');
+    if (selfField) {
+      linkableFields[selfField] = true;
+    }
+    // Check descendants
+    const allFields = blockElement.querySelectorAll('[data-linkable-field]');
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        const fieldName = field.getAttribute('data-linkable-field');
+        if (fieldName) {
+          linkableFields[fieldName] = true;
+        }
+      }
+    }
+    return linkableFields;
+  }
+
+  /**
+   * Get media fields that belong directly to a block.
+   * Media fields use data-media-field attribute for image/media editing.
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {Object} Map of field names to { rect: DOMRect } with element position
+   */
+  getMediaFields(blockElement) {
+    const mediaFields = {};
+    // Check if block element itself has data-media-field
+    const selfField = blockElement.getAttribute('data-media-field');
+    if (selfField) {
+      const rect = blockElement.getBoundingClientRect();
+      mediaFields[selfField] = {
+        rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+      };
+    }
+    // Check descendants
+    const allFields = blockElement.querySelectorAll('[data-media-field]');
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        const fieldName = field.getAttribute('data-media-field');
+        if (fieldName) {
+          const rect = field.getBoundingClientRect();
+          mediaFields[fieldName] = {
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+          };
+        }
+      }
+    }
+    return mediaFields;
+  }
+
+  /**
    * Get the add direction for a block element.
    * Uses data-block-add attribute if set, otherwise infers from nesting depth.
    * Even depths (0, 2, ...) → 'bottom' (vertical), odd depths (1, 3, ...) → 'right' (horizontal)
@@ -332,10 +394,18 @@ export class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
+    const linkableFields = this.getLinkableFields(blockElement);
+    const mediaFields = this.getMediaFields(blockElement);
     const addDirection = this.getAddDirection(blockElement);
     const focusedFieldName = options.focusedFieldName !== undefined
       ? options.focusedFieldName
       : this.focusedFieldName;
+    const focusedLinkableField = options.focusedLinkableField !== undefined
+      ? options.focusedLinkableField
+      : this.focusedLinkableField;
+    const focusedMediaField = options.focusedMediaField !== undefined
+      ? options.focusedMediaField
+      : this.focusedMediaField;
 
     const message = {
       type: 'BLOCK_SELECTED',
@@ -348,7 +418,11 @@ export class Bridge {
         height: rect.height,
       },
       editableFields,
+      linkableFields,
+      mediaFields,
       focusedFieldName,
+      focusedLinkableField,
+      focusedMediaField,
       addDirection,
     };
 
@@ -673,11 +747,53 @@ export class Bridge {
                     const isSidebarEdit = !event.data.transformedSelection;
                     this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, isSidebarEdit);
 
-                    // Only send BLOCK_SELECTED for toolbar format operations (has transformedSelection)
-                    // Skip for sidebar edits - rect doesn't change and sending causes toolbar redraws
-                    if (event.data.transformedSelection) {
-                      // Send updated rect to admin so toolbar follows the block
+                    // Send BLOCK_SELECTED if toolbar operation OR if block/media field rects changed
+                    // Block may resize/move after edits, media fields may change (e.g., clearing image → placeholder)
+                    const newBlockRect = blockElement.getBoundingClientRect();
+                    const newMediaFields = this.getMediaFields(blockElement);
+
+                    // Check if block rect changed (size or position)
+                    const blockRectChanged = !this.lastBlockRect ||
+                      Math.abs(newBlockRect.top - this.lastBlockRect.top) > 1 ||
+                      Math.abs(newBlockRect.left - this.lastBlockRect.left) > 1 ||
+                      Math.abs(newBlockRect.width - this.lastBlockRect.width) > 1 ||
+                      Math.abs(newBlockRect.height - this.lastBlockRect.height) > 1;
+
+                    // Check if any media field rect changed
+                    let mediaFieldsChanged = false;
+                    const newFieldNames = Object.keys(newMediaFields);
+                    const lastFieldNames = Object.keys(this.lastMediaFields || {});
+                    if (newFieldNames.length !== lastFieldNames.length) {
+                      mediaFieldsChanged = true;
+                    } else {
+                      for (const fieldName of newFieldNames) {
+                        const newRect = newMediaFields[fieldName]?.rect;
+                        const lastRect = this.lastMediaFields?.[fieldName]?.rect;
+                        if (!newRect || !lastRect ||
+                            Math.abs(newRect.top - lastRect.top) > 1 ||
+                            Math.abs(newRect.left - lastRect.left) > 1 ||
+                            Math.abs(newRect.width - lastRect.width) > 1 ||
+                            Math.abs(newRect.height - lastRect.height) > 1) {
+                          mediaFieldsChanged = true;
+                          break;
+                        }
+                      }
+                    }
+
+                    log('formDataHandler check:', {
+                      blockRectChanged,
+                      mediaFieldsChanged,
+                      newBlockRect: { top: newBlockRect.top, height: newBlockRect.height },
+                      newMediaFields,
+                      lastMediaFields: this.lastMediaFields,
+                    });
+
+                    if (event.data.transformedSelection || blockRectChanged || mediaFieldsChanged) {
+                      // Send updated rect to admin so toolbar/overlays follow the block
+                      log('formDataHandler sending BLOCK_SELECTED with mediaFields:', newMediaFields);
                       this.sendBlockSelected('formDataHandler', blockElement);
+                      this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
+                      this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
 
                       // Reposition drag button to follow the block
                       if (this.dragHandlePositioner) {
@@ -971,6 +1087,11 @@ export class Bridge {
         // Also store the target for field detection
         const clickedEditableField = event.target.closest('[data-editable-field]');
         const editableField = clickedEditableField || blockElement.querySelector('[data-editable-field]');
+
+        // Detect clicked linkable and media fields
+        const clickedLinkableField = event.target.closest('[data-linkable-field]');
+        const clickedMediaField = event.target.closest('[data-media-field]');
+
         if (editableField) {
           const rect = editableField.getBoundingClientRect();
           this.lastClickPosition = {
@@ -978,9 +1099,15 @@ export class Bridge {
             relativeY: event.clientY - rect.top,
             editableField: editableField.getAttribute('data-editable-field'),
             target: event.target, // For field detection
+            linkableField: clickedLinkableField?.getAttribute('data-linkable-field') || null,
+            mediaField: clickedMediaField?.getAttribute('data-media-field') || null,
           };
         } else {
-          this.lastClickPosition = null;
+          this.lastClickPosition = {
+            target: event.target,
+            linkableField: clickedLinkableField?.getAttribute('data-linkable-field') || null,
+            mediaField: clickedMediaField?.getAttribute('data-media-field') || null,
+          };
         }
         this.selectBlock(blockElement);
       }
@@ -2499,10 +2626,15 @@ export class Bridge {
     // Set the currently selected block (do this every time)
     this.selectedBlockUid = blockUid;
 
-    // Reset focusedFieldName for new block - don't keep stale value from previous block
+    // Reset focused fields for new block - don't keep stale values from previous block
     this.focusedFieldName = null;
+    this.focusedLinkableField = null;
+    this.focusedMediaField = null;
+    // Reset cached sizes so first FORM_DATA will send updated rects
+    this.lastBlockRect = null;
+    this.lastMediaFields = null;
 
-    // Detect focused field from click location or first editable field
+    // Detect focused fields from click location
     if (this.lastClickPosition?.target) {
       // Find the clicked editable field
       const clickedElement = this.lastClickPosition.target;
@@ -2510,6 +2642,16 @@ export class Bridge {
       if (clickedField) {
         this.focusedFieldName = clickedField.getAttribute('data-editable-field');
         log('Detected focused field from click:', this.focusedFieldName);
+      }
+
+      // Detect clicked linkable and media fields
+      this.focusedLinkableField = this.lastClickPosition.linkableField || null;
+      this.focusedMediaField = this.lastClickPosition.mediaField || null;
+      if (this.focusedLinkableField) {
+        log('Detected focused linkable field from click:', this.focusedLinkableField);
+      }
+      if (this.focusedMediaField) {
+        log('Detected focused media field from click:', this.focusedMediaField);
       }
     }
 
@@ -2528,6 +2670,8 @@ export class Bridge {
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
+    const linkableFields = this.getLinkableFields(blockElement);
+    const mediaFields = this.getMediaFields(blockElement);
     // Get add button direction (right, bottom, hidden) - uses attribute or infers from nesting depth
     const addDirection = this.getAddDirection(blockElement);
     this._pendingBlockSelected = {
@@ -2539,14 +2683,22 @@ export class Bridge {
         height: rect.height,
       },
       editableFields, // Map of fieldName -> fieldType from DOM
+      linkableFields, // Map of fieldName -> true for URL/link fields
+      mediaFields, // Map of fieldName -> true for image/media fields
       focusedFieldName: this.focusedFieldName,
+      focusedLinkableField: this.focusedLinkableField,
+      focusedMediaField: this.focusedMediaField,
       addDirection, // Direction for add button positioning
     };
 
     log('Block selected, sending UI messages:', {
       blockUid,
       focusedFieldName: this.focusedFieldName,
+      focusedLinkableField: this.focusedLinkableField,
+      focusedMediaField: this.focusedMediaField,
       editableFields,
+      linkableFields,
+      mediaFields,
     });
 
     // Create drag handle for block reordering
@@ -5956,6 +6108,32 @@ export class Bridge {
         [data-editable-field]:empty {
           min-height: 1.5em;
           display: block;
+        }
+        /* Linkable field hover styles - indicate clickable link areas */
+        [data-linkable-field] {
+          cursor: pointer;
+          position: relative;
+        }
+        [data-linkable-field]:hover::after {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          border: 2px dashed rgba(0, 126, 177, 0.5);
+          border-radius: 4px;
+          pointer-events: none;
+        }
+        /* Media field hover styles - indicate clickable image areas */
+        [data-media-field] {
+          cursor: pointer;
+          position: relative;
+        }
+        [data-media-field]:hover::after {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          border: 2px dashed rgba(120, 192, 215, 0.5);
+          border-radius: 4px;
+          pointer-events: none;
         }
         .volto-hydra--outline {
           position: relative !important;

@@ -107,7 +107,7 @@ onMounted(() => {
                             {
                                 id: 'default',
                                 title: 'Default',
-                                fields: ['heading', 'subheading', 'buttonText', 'description'],
+                                fields: ['heading', 'subheading', 'buttonText', 'buttonLink', 'image', 'description'],
                             },
                         ],
                         properties: {
@@ -123,6 +123,16 @@ onMounted(() => {
                             buttonText: {
                                 title: 'Button Text',
                                 type: 'string',
+                            },
+                            buttonLink: {
+                                title: 'Button Link',
+                                widget: 'object_browser',
+                                mode: 'link',
+                                allowExternals: true,
+                            },
+                            image: {
+                                title: 'Image',
+                                widget: 'image',
                             },
                             description: {
                                 title: 'Description',

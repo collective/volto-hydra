@@ -1,11 +1,14 @@
 export default function getUrl(href) {
+    const runtimeConfig = useRuntimeConfig();
+    const backendBaseUrl = runtimeConfig.public.backendBaseUrl;
+
     if (href === undefined) {
       return "#"
     }
     if (!href) {
       return "#"
     }
-    if (href?.Length) {
+    if (Array.isArray(href) && href.length) {
       href = href[0]
     }
     href = href?.value ? href?.value : href;
@@ -16,10 +19,11 @@ export default function getUrl(href) {
       return href.url;
     }
     else if ('@id' in href) {
-        if (href['@id'].startsWith("http")) {
-          const url = new URL(href['@id']);
-          return url.pathname;
+        // Only strip domain for internal Plone URLs (starting with backend base URL)
+        if (href['@id'].startsWith(backendBaseUrl)) {
+          return href['@id'].replace(backendBaseUrl, '');
         }
+        // Return external URLs as-is
         return href['@id'];
     }
     return href

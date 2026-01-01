@@ -463,6 +463,7 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
+  const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
 
   // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
@@ -1311,14 +1312,20 @@ const Iframe = (props) => {
           // Now update blockUI state
           setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
+            // IMPORTANT: Must compare mediaFields because they can change independently
+            // (e.g., when an image is cleared, the placeholder div has different dimensions)
+            const mediaFieldsChanged = JSON.stringify(prevBlockUI?.mediaFields) !== JSON.stringify(event.data.mediaFields);
             if (prevBlockUI &&
                 prevBlockUI.blockUid === event.data.blockUid &&
                 prevBlockUI.focusedFieldName === event.data.focusedFieldName &&
+                prevBlockUI.focusedLinkableField === event.data.focusedLinkableField &&
+                prevBlockUI.focusedMediaField === event.data.focusedMediaField &&
                 prevBlockUI.addDirection === event.data.addDirection &&
                 prevBlockUI.rect?.top === event.data.rect?.top &&
                 prevBlockUI.rect?.left === event.data.rect?.left &&
                 prevBlockUI.rect?.width === event.data.rect?.width &&
-                prevBlockUI.rect?.height === event.data.rect?.height) {
+                prevBlockUI.rect?.height === event.data.rect?.height &&
+                !mediaFieldsChanged) {
               return prevBlockUI; // Return same reference to skip re-render
             }
             // Note: Zero rect check happens earlier (before onSelectBlock) so we return before reaching here
@@ -1338,8 +1345,12 @@ const Iframe = (props) => {
             return {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
-              focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+              focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
+              focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
+              focusedMediaField: event.data.focusedMediaField, // Track which media field is focused
               editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
+              linkableFields: event.data.linkableFields, // Map of fieldName -> true for link fields
+              mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
             };
           });
@@ -1742,6 +1753,34 @@ const Iframe = (props) => {
     <div id="iframeContainer">
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
+        pendingFieldMedia={pendingFieldMedia}
+        onFieldMediaSelected={(fieldName, blockUid, imagePath) => {
+          // Update the block's field with the new image path
+          const block = properties.blocks?.[blockUid];
+          if (!block) {
+            setPendingFieldMedia(null);
+            return;
+          }
+
+          const updatedBlock = { ...block, [fieldName]: imagePath };
+          const updatedBlocks = { ...properties.blocks, [blockUid]: updatedBlock };
+          const updatedProperties = { ...properties, blocks: updatedBlocks };
+
+          // Update Redux via onChangeFormData
+          onChangeFormData(updatedProperties);
+
+          // Rebuild blockPathMap and send FORM_DATA to iframe
+          const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
+          setIframeSyncState(prev => ({
+            ...prev,
+            formData: updatedProperties,
+            blockPathMap: newBlockPathMap,
+            toolbarRequestDone: `field-media-${Date.now()}`,
+          }));
+
+          setPendingFieldMedia(null);
+        }}
+        onFieldMediaCancelled={() => setPendingFieldMedia(null)}
       />
       {addNewBlockOpened &&
         createPortal(
@@ -1978,6 +2017,31 @@ const Iframe = (props) => {
                 const action = actionId === 'addColumnBefore' ? 'before' : 'after';
                 insertAndSelectBlock(selectedBlock, null, action);
               }
+            }}
+            onFieldLinkChange={(fieldName, url) => {
+              // Update the block's field with the new URL
+              const block = properties.blocks?.[selectedBlock];
+              if (!block) return;
+
+              const updatedBlock = { ...block, [fieldName]: url };
+              const updatedBlocks = { ...properties.blocks, [selectedBlock]: updatedBlock };
+              const updatedProperties = { ...properties, blocks: updatedBlocks };
+
+              // Update Redux via onChangeFormData
+              onChangeFormData(updatedProperties);
+
+              // Rebuild blockPathMap and send FORM_DATA to iframe
+              const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: updatedProperties,
+                blockPathMap: newBlockPathMap,
+                toolbarRequestDone: `field-link-${Date.now()}`,
+              }));
+            }}
+            onOpenObjectBrowser={(fieldName, blockUid) => {
+              // Set pending state to trigger object browser via OpenObjectBrowser component
+              setPendingFieldMedia({ fieldName, blockUid });
             }}
           />
 

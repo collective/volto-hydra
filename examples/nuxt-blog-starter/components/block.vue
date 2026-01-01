@@ -17,19 +17,19 @@
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
     <a v-if="block.href" :href="block.href" class="image-link">
-      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+      <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
     </a>
-    <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+    <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
       :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
       <a v-if="block.href" :href="block.href" class="image-link">
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+        <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
           :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       </a>
-      <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+      <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       <figcaption>
         <h2>{{ block.title }}</h2>
@@ -48,14 +48,26 @@
   <!-- Hero block - simple landing page hero section -->
   <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
+    <!-- Image with data-media-field for inline image selection -->
+    <!-- Use getImageUrl to handle array/object formats and add @@images suffix for Plone paths -->
+    <img v-if="block.image" data-media-field="image"
+         :src="getImageUrl(block.image)"
+         alt="Hero image"
+         class="w-full h-auto max-h-64 object-cover mb-4 rounded" />
+    <div v-else data-media-field="image"
+         class="w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
+    </div>
     <h1 data-editable-field="heading" class="text-3xl font-bold mb-2">{{ block.heading }}</h1>
     <p data-editable-field="subheading" class="text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
     <div class="hero-description mb-4" data-editable-field="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
-    <button data-editable-field="buttonText" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+    <!-- Button with both data-editable-field and data-linkable-field -->
+    <a data-editable-field="buttonText" data-linkable-field="buttonLink"
+       :href="getUrl(block.buttonLink)"
+       class="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline">
       {{ block.buttonText }}
-    </button>
+    </a>
   </div>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
@@ -134,9 +146,11 @@
             { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
           ]"
           data-carousel-item :style="slide.preview_image?.[0] ? imageProps(slide.preview_image[0], true).class : ''">
+          <!-- Clickable overlay for preview_image editing -->
+          <div data-media-field="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
-            :class="{ 'right-0': slide.flagAlign == 'right' }">
+            :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
             <div>{{ slide.head_title }}</div>
             <h5 :id="`heading-${slide['@id']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
@@ -352,8 +366,36 @@ watch(
 // Helper to check if a slide should be visible
 const isSlideActive = (index) => index === activeSlideIndex.value;
 
+// Helper to get image URL from various formats (string, array, or object with @id)
+// Also adds @@images/image suffix for Plone internal paths
+const getImageUrl = (value) => {
+  if (!value) return '';
+  const runtimeConfig = useRuntimeConfig();
+  const backendBaseUrl = runtimeConfig.public.backendBaseUrl;
 
+  // Extract URL from array or object format (like getUrl does)
+  let url = value;
+  if (Array.isArray(value) && value.length) {
+    url = value[0];
+  }
+  if (url?.['@id']) {
+    url = url['@id'];
+  }
+  if (typeof url !== 'string') {
+    return '';
+  }
 
+  // Add @@images/image suffix for Plone internal paths
+  // Handles both relative paths (/) and full URLs with backend base URL
+  const needsImageSuffix = !url.includes('@@images');
+  const isRelativePath = url.startsWith('/');
+  const isBackendUrl = backendBaseUrl && url.startsWith(backendBaseUrl);
+
+  if (needsImageSuffix && (isRelativePath || isBackendUrl)) {
+    return url + '/@@images/image';
+  }
+  return url;
+};
 
 
 </script>
