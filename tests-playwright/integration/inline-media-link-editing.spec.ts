@@ -432,8 +432,8 @@ test.describe('Image upload and drag-drop', () => {
     await expect(emptyOverlay).toBeVisible({ timeout: 5000 });
 
     // Find the file input and upload a test image
-    // The AddLinkForm file input has accept="image/*"
-    const fileInput = emptyOverlay.locator('input[type="file"][accept="image/*"]');
+    // Use first() to get Dropzone's input (has multiple attribute), not AddLinkForm's
+    const fileInput = emptyOverlay.locator('input[type="file"][accept="image/*"]').first();
     await expect(fileInput).toBeAttached();
 
     // Create a simple 1x1 red PNG image as a Buffer
@@ -571,8 +571,8 @@ test.describe('Image upload and drag-drop', () => {
     const emptyOverlay = page.locator('.empty-image-overlay');
     await expect(emptyOverlay).toBeVisible({ timeout: 5000 });
 
-    // Find file input
-    const fileInput = emptyOverlay.locator('input[type="file"][accept="image/*"]');
+    // Find file input - use first() to get Dropzone's input
+    const fileInput = emptyOverlay.locator('input[type="file"][accept="image/*"]').first();
     await expect(fileInput).toBeAttached();
 
     // Upload with special filename that triggers mock API error
@@ -637,8 +637,8 @@ test.describe('Image upload and drag-drop', () => {
     const uploadButton = imageOverlay.locator('button[aria-label="Upload image"]');
     await expect(uploadButton).toBeVisible({ timeout: 5000 });
 
-    // Find the file input and upload
-    const fileInput = imageOverlay.locator('input[type="file"][accept="image/*"]');
+    // Find the file input and upload - use first() to get Dropzone's input
+    const fileInput = imageOverlay.locator('input[type="file"][accept="image/*"]').first();
     await expect(fileInput).toBeAttached();
 
     // Create test PNG

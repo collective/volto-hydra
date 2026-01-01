@@ -376,16 +376,9 @@ const UnconnectedImageInput = (props) => {
             {...getRootProps()}
             className="hydra-image-picker-inline"
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              paddingBottom: '20px',
+              // Don't use position:absolute - parent overlay already positions via flexbox
+              // This allows clicks to pass through empty areas of the overlay
+              pointerEvents: 'auto', // Capture events only on form content
             }}
           >
             <input {...getInputProps()} />
@@ -414,7 +407,7 @@ const UnconnectedImageInput = (props) => {
     >
       <Dropzone
         noClick
-        accept={{ 'image/*': [] }}
+        accept="image/*"
         onDrop={handleDrop}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}

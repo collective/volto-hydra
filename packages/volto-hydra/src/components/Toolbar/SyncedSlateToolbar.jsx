@@ -1182,7 +1182,7 @@ const SyncedSlateToolbar = ({
               justifyContent: showIcon ? 'center' : 'flex-end',
               paddingBottom: showIcon ? '0' : '20px',
               zIndex: 10,
-              pointerEvents: 'auto',
+              pointerEvents: 'none', // Let clicks pass through to elements behind
             }}
           >
             {/* Large circular icon - only show when empty */}
@@ -1197,6 +1197,7 @@ const SyncedSlateToolbar = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: '12px',
+                  pointerEvents: 'auto', // Icon itself captures events
                 }}
               >
                 <Icon name={imageSVG} size="40px" color="#007bff" />
