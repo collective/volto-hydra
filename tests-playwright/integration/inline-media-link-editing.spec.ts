@@ -561,6 +561,7 @@ test.describe('Image upload and drag-drop', () => {
 
     // Get hero image and clear it
     const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    await expect(heroImage).toBeVisible({ timeout: 5000 });
     await heroImage.scrollIntoViewIfNeeded();
 
     const clearButton = page.locator('button[title="Clear image"]');
@@ -697,8 +698,8 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await expect(sidebarClearButton).toBeVisible({ timeout: 5000 });
     await sidebarClearButton.click();
 
-    // Wait for sidebar to show empty image input
-    const sidebarImageInput = sidebar.locator('input[type="file"][accept="image/*"]');
+    // Wait for sidebar to show empty image input - use first() for Dropzone's input
+    const sidebarImageInput = sidebar.locator('input[type="file"][accept="image/*"]').first();
     await expect(sidebarImageInput).toBeAttached({ timeout: 5000 });
 
     // Create a test PNG image
