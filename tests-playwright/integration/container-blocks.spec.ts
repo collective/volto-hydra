@@ -2079,10 +2079,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(indicatorShown).toBe(true);
 
     // text-1a should have moved (not still in col-1)
-    const finalText1aInCol1 = await col1
-      .locator('[data-block-uid="text-1a"]')
-      .count();
-    expect(finalText1aInCol1).toBe(0);
+    // Use auto-retrying assertion to wait for DOM update after drag-drop
+    await expect(col1.locator('[data-block-uid="text-1a"]')).toHaveCount(0);
 
     // CRITICAL: text-1a should NOT be in the top_images container
     // Even though we dragged to top-img-1, slate is not allowed there
@@ -3096,8 +3094,12 @@ test.describe('slateTable Container', () => {
     // Verify the selection outline has minimum height (empty cells should still be clickable)
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
-    const box = await outline.boundingBox();
-    expect(box?.height).toBeGreaterThanOrEqual(20);
+    // Use retry loop because boundingBox() may return null while element is repositioning
+    await expect(async () => {
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(20);
+    }).toPass({ timeout: 5000 });
   });
 
   test('clicking add button on cell adds a column to ALL rows', async ({ page }) => {
@@ -3147,8 +3149,10 @@ test.describe('slateTable Container', () => {
 
     // Navigate to row using Escape, then add a new row
     await page.keyboard.press('Escape');
-    await helper.waitForSidebarCurrentBlock('Row');
-    await page.locator('.volto-hydra-add-button').click();
+    // Wait for add button to change from "Add column" to "Add row" - more reliable than sidebar check
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toHaveAttribute('title', 'Add row', { timeout: 5000 });
+    await addButton.click();
 
     // Wait for new row to appear (should have 3 rows total)
     await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
@@ -3598,5 +3602,40 @@ test.describe('Multi-Container Field Operations', () => {
 
     // Verify the image block is now selected in the iframe
     await expect(sidebar.getByText('Alt text')).toBeVisible();
+  });
+
+  test('can clear image inside container using inline toolbar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the image inside the columns container (top-img-1)
+    const imageBlock = iframe.locator('[data-block-uid="top-img-1"]');
+    await expect(imageBlock).toBeVisible({ timeout: 10000 });
+    await imageBlock.click();
+
+    // Wait for block to be selected (outline appears)
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Get initial image src
+    const imageElement = imageBlock.locator('img');
+    const initialSrc = await imageElement.getAttribute('src');
+    expect(initialSrc).toBeTruthy();
+
+    // Click the clear button in toolbar overlay (X button appears on filled images)
+    // Use iframeContainer scope to avoid matching sidebar's clear button
+    const clearButton = page.locator('#iframeContainer button[title="Clear image"]');
+    await expect(clearButton).toBeVisible({ timeout: 5000 });
+    await clearButton.click();
+
+    // Verify the image was cleared - src should change or element should become placeholder
+    await expect(imageElement).not.toHaveAttribute('src', initialSrc!, {
+      timeout: 5000,
+    });
   });
 });

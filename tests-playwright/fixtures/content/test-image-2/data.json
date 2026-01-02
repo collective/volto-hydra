@@ -1,0 +1,35 @@
+{
+  "@id": "/images/test-image-2",
+  "@type": "Image",
+  "UID": "test-image-2-uid",
+  "id": "test-image-2",
+  "title": "Test Image 2",
+  "description": "Another test image for object browser",
+  "is_folderish": false,
+  "review_state": "published",
+  "image": {
+    "content-type": "image/svg+xml",
+    "filename": "test-image-2.svg",
+    "width": 400,
+    "height": 300,
+    "size": 500,
+    "download": "@@images/image",
+    "scales": {
+      "preview": {
+        "download": "@@images/image/preview",
+        "width": 400,
+        "height": 300
+      },
+      "thumb": {
+        "download": "@@images/image/thumb",
+        "width": 128,
+        "height": 96
+      }
+    }
+  },
+  "parent": {
+    "@id": "/images",
+    "@type": "Document",
+    "title": "Images"
+  }
+}

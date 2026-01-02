@@ -58,7 +58,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -190,14 +190,26 @@ const extractBlockFieldTypes = (intl) => {
       }
       Object.keys(schema.properties).forEach((fieldName) => {
         const field = schema.properties[fieldName];
-        // Determine field type based on widget
+        // Determine field type based on widget, mirroring Volto's widget resolution logic
+        // See core/packages/volto/src/config/Widgets.jsx for the full mapping
         let fieldType = null;
+
+        // Non-text widgets that should NOT be editable inline
+        const nonTextWidgets = [
+          'object_browser', 'object', 'object_list', 'file', 'image',
+          'datetime', 'date', 'time', 'password', 'array', 'token',
+          'query', 'querystring', 'recurrence', 'color_picker', 'schema',
+          'vocabularyterms', 'select', 'autocomplete', 'hidden',
+          'align', 'buttons', 'radio_group', 'checkbox_group',
+        ];
+
+        // Non-string types that should NOT be editable inline
+        const nonStringTypes = ['boolean', 'array', 'object', 'datetime', 'date', 'number', 'integer'];
+
         if (field.widget === 'slate') {
           fieldType = 'slate';
         } else if (field.widget === 'textarea') {
           fieldType = 'textarea';
-        } else if (field.type === 'string') {
-          fieldType = 'string';
         } else if (field.widget === 'object_list' && field.schema?.properties) {
           // object_list widget: extract field types from itemSchema
           // Store under virtual type key: blockType:fieldName
@@ -256,6 +268,16 @@ const extractBlockFieldTypes = (intl) => {
               });
             }
           });
+        } else if (nonTextWidgets.includes(field.widget)) {
+          // Skip non-text widgets - they have their own editing UI
+          fieldType = null;
+        } else if (nonStringTypes.includes(field.type)) {
+          // Skip non-string types - they have their own editing UI
+          fieldType = null;
+        } else if (field.type === 'string' || !field.widget) {
+          // Default to string for explicit string type or no widget specified
+          // This matches Volto's default TextWidget behavior
+          fieldType = 'string';
         }
 
         if (fieldType) {
@@ -349,6 +371,15 @@ function deepMerge(entry, newConfig) {
           Object.assign(output, {
             [key]: newConfig[key],
           });
+        } else if (typeof entry[key] === 'function') {
+          // Special case: if existing value is a function (like blockSchema),
+          // wrap it to merge the function's result with the new object
+          const originalFn = entry[key];
+          const overrides = newConfig[key];
+          output[key] = (props) => {
+            const result = originalFn(props);
+            return deepMerge(result, overrides);
+          };
         } else {
           output[key] = deepMerge(entry[key], newConfig[key]);
         }
@@ -463,6 +494,7 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
+  const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
 
   // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
@@ -627,8 +659,7 @@ const Iframe = (props) => {
     let fieldDef;
 
     if (action === 'inside') {
-      const parentBlock = getBlockByPath(formData, blockPathMap?.[blockId]?.path)
-        || formData?.blocks?.[blockId];
+      const parentBlock = getBlockById(formData, blockPathMap, blockId);
       const parentSchema =
         typeof mergedBlocksConfig?.[parentBlock?.['@type']]?.blockSchema === 'function'
           ? mergedBlocksConfig[parentBlock['@type']].blockSchema({
@@ -697,7 +728,7 @@ const Iframe = (props) => {
       let virtualType;
       if (action === 'inside') {
         // Get parent type and append field name
-        virtualType = `${getBlockByPath(formData, blockPathMap?.[blockId]?.path)?.['@type'] || formData?.blocks?.[blockId]?.['@type']}:${fieldName}`;
+        virtualType = `${getBlockById(formData, blockPathMap, blockId)?.['@type']}:${fieldName}`;
       } else {
         // For before/after, use the existing item's virtual type
         virtualType = blockPathMap[blockId]?.itemType;
@@ -713,14 +744,13 @@ const Iframe = (props) => {
         let tableBlock;
         let dataPath;
         if (action === 'inside') {
-          tableBlock = getBlockByPath(formData, blockPathMap?.[blockId]?.path) || formData?.blocks?.[blockId];
+          tableBlock = getBlockById(formData, blockPathMap, blockId);
           dataPath = fieldDef?.dataPath || [fieldName];
         } else {
           // For before/after on a row, get the parent table
           const rowPathInfo = blockPathMap?.[blockId];
           const parentId = rowPathInfo?.parentId;
-          const parentPathInfo = blockPathMap?.[parentId];
-          tableBlock = getBlockByPath(formData, parentPathInfo?.path) || formData?.blocks?.[parentId];
+          tableBlock = getBlockById(formData, blockPathMap, parentId);
           // Get dataPath from the row's container field definition
           const tableType = tableBlock?.['@type'];
           const tableBlockSchema = typeof mergedBlocksConfig?.[tableType]?.blockSchema === 'function'
@@ -792,6 +822,8 @@ const Iframe = (props) => {
     flushSync(() => {
       setIframeSyncState((prev) => ({
         ...prev,
+        // Rebuild blockPathMap immediately so Escape handler has current parent info
+        blockPathMap: buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
         pendingSelectBlockUid: selectBlockId,
         ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
       }));
@@ -1300,10 +1332,7 @@ const Iframe = (props) => {
           // because React state updates are async and the state may be stale when BLOCK_SELECTED arrives
           // shortly after a delete operation creates an empty block
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
-          const selectedBlockData = getBlockByPath(
-            properties,
-            currentBlockPathMap?.[event.data.blockUid]?.path,
-          ) || properties?.blocks?.[event.data.blockUid];
+          const selectedBlockData = getBlockById(properties, currentBlockPathMap, event.data.blockUid);
           if (selectedBlockData?.['@type'] === 'empty') {
             setAddNewBlockOpened(true);
           }
@@ -1311,14 +1340,20 @@ const Iframe = (props) => {
           // Now update blockUI state
           setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
+            // IMPORTANT: Must compare mediaFields because they can change independently
+            // (e.g., when an image is cleared, the placeholder div has different dimensions)
+            const mediaFieldsChanged = JSON.stringify(prevBlockUI?.mediaFields) !== JSON.stringify(event.data.mediaFields);
             if (prevBlockUI &&
                 prevBlockUI.blockUid === event.data.blockUid &&
                 prevBlockUI.focusedFieldName === event.data.focusedFieldName &&
+                prevBlockUI.focusedLinkableField === event.data.focusedLinkableField &&
+                prevBlockUI.focusedMediaField === event.data.focusedMediaField &&
                 prevBlockUI.addDirection === event.data.addDirection &&
                 prevBlockUI.rect?.top === event.data.rect?.top &&
                 prevBlockUI.rect?.left === event.data.rect?.left &&
                 prevBlockUI.rect?.width === event.data.rect?.width &&
-                prevBlockUI.rect?.height === event.data.rect?.height) {
+                prevBlockUI.rect?.height === event.data.rect?.height &&
+                !mediaFieldsChanged) {
               return prevBlockUI; // Return same reference to skip re-render
             }
             // Note: Zero rect check happens earlier (before onSelectBlock) so we return before reaching here
@@ -1338,8 +1373,12 @@ const Iframe = (props) => {
             return {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
-              focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+              focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
+              focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
+              focusedMediaField: event.data.focusedMediaField, // Track which media field is focused
               editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
+              linkableFields: event.data.linkableFields, // Map of fieldName -> true for link fields
+              mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
             };
           });
@@ -1530,10 +1569,7 @@ const Iframe = (props) => {
     // Validate selection (may be stale after document structure changes)
     let newSelection = iframeSyncState.selection;
     if (selectedBlock && iframeSyncState.selection) {
-      const blockPath = newBlockPathMap[selectedBlock]?.path;
-      const block = blockPath
-        ? getBlockByPath(formToUse, blockPath)
-        : formToUse.blocks?.[selectedBlock];
+      const block = getBlockById(formToUse, newBlockPathMap, selectedBlock);
       const slateValue = block?.value;
       if (slateValue && !isSelectionValidForValue(iframeSyncState.selection, slateValue)) {
         log('Selection invalid for new form data, clearing');
@@ -1647,8 +1683,7 @@ const Iframe = (props) => {
         // Page-level
         return allowedBlocks;
       }
-      const parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentBlockId]?.path)
-        || properties?.blocks?.[parentBlockId];
+      const parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
       const parentType = parentBlockData?.['@type'];
       const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
       const resolvedSchema = typeof parentSchema === 'function'
@@ -1705,8 +1740,7 @@ const Iframe = (props) => {
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
     // Get allowed blocks for this container field
     const parentBlock = parentBlockId
-      ? (getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentBlockId]?.path)
-        || properties?.blocks?.[parentBlockId])
+      ? getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId)
       : null;
     const parentType = parentBlock?.['@type'];
     const blocksConfig = config.blocks.blocksConfig;
@@ -1742,6 +1776,33 @@ const Iframe = (props) => {
     <div id="iframeContainer">
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
+        pendingFieldMedia={pendingFieldMedia}
+        onFieldMediaSelected={(fieldName, blockUid, imagePath) => {
+          // Update the block's field with the new image path
+          const block = getBlockById(properties, iframeSyncState.blockPathMap, blockUid);
+          if (!block) {
+            setPendingFieldMedia(null);
+            return;
+          }
+
+          const updatedBlock = { ...block, [fieldName]: imagePath };
+          const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, blockUid, updatedBlock);
+
+          // Update Redux via onChangeFormData
+          onChangeFormData(updatedProperties);
+
+          // Rebuild blockPathMap and send FORM_DATA to iframe
+          const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
+          setIframeSyncState(prev => ({
+            ...prev,
+            formData: updatedProperties,
+            blockPathMap: newBlockPathMap,
+            toolbarRequestDone: `field-media-${Date.now()}`,
+          }));
+
+          setPendingFieldMedia(null);
+        }}
+        onFieldMediaCancelled={() => setPendingFieldMedia(null)}
       />
       {addNewBlockOpened &&
         createPortal(
@@ -1762,10 +1823,11 @@ const Iframe = (props) => {
               onInsertBlock={
                 // Check if selected block is empty - if so, use onMutateBlock to replace
                 (() => {
-                  const selectedBlockData = getBlockByPath(
+                  const selectedBlockData = getBlockById(
                     properties,
-                    iframeSyncState.blockPathMap?.[selectedBlock]?.path,
-                  ) || properties?.blocks?.[selectedBlock];
+                    iframeSyncState.blockPathMap,
+                    selectedBlock,
+                  );
                   const isEmptyBlock = selectedBlockData?.['@type'] === 'empty';
 
                   if (isEmptyBlock) return null;
@@ -1978,6 +2040,32 @@ const Iframe = (props) => {
                 const action = actionId === 'addColumnBefore' ? 'before' : 'after';
                 insertAndSelectBlock(selectedBlock, null, action);
               }
+            }}
+            onFieldLinkChange={(fieldName, url) => {
+              // Update the block's field with the new URL
+              // Use getBlockById to handle both top-level and container blocks
+              const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+              if (!block) return;
+
+              const updatedBlock = { ...block, [fieldName]: url };
+              // Use updateBlockById to handle both top-level and container blocks
+              const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
+
+              // Update Redux via onChangeFormData
+              onChangeFormData(updatedProperties);
+
+              // Rebuild blockPathMap and send FORM_DATA to iframe
+              const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: updatedProperties,
+                blockPathMap: newBlockPathMap,
+                toolbarRequestDone: `field-link-${Date.now()}`,
+              }));
+            }}
+            onOpenObjectBrowser={(fieldName, blockUid) => {
+              // Set pending state to trigger object browser via OpenObjectBrowser component
+              setPendingFieldMedia({ fieldName, blockUid });
             }}
           />
 
