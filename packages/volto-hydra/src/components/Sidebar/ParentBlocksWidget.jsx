@@ -25,6 +25,7 @@ import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
+import { getBlockById } from '../../utils/blockPath';
 
 /**
  * Get the display title for a block type
@@ -106,28 +107,15 @@ const getParentChain = (blockId, blockPathMap) => {
  * For object_list items, injects the virtual @type from itemType
  */
 const getBlockData = (blockId, formData, blockPathMap) => {
-  if (!blockId || !formData) return null;
+  const block = getBlockById(formData, blockPathMap, blockId);
+  if (!block) return null;
 
-  // Check blockPathMap for nested blocks
+  // Inject virtual @type for object_list items
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.path) {
-    let current = formData;
-    for (const key of pathInfo.path) {
-      if (current && typeof current === 'object') {
-        current = current[key];
-      } else {
-        return null;
-      }
-    }
-    // Inject virtual @type for object_list items
-    if (current && pathInfo.isObjectListItem && pathInfo.itemType) {
-      return { ...current, '@type': pathInfo.itemType };
-    }
-    return current;
+  if (pathInfo?.isObjectListItem && pathInfo.itemType) {
+    return { ...block, '@type': pathInfo.itemType };
   }
-
-  // Fall back to top-level blocks
-  return formData.blocks?.[blockId];
+  return block;
 };
 
 /**

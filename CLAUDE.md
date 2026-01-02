@@ -2,6 +2,27 @@
 
 Read `docs/slate-transforms-architecture.md` for understanding how Slate transforms work between hydra.js and View.jsx (Enter key, formatting, paste, delete handling).
 
+## Block Access - NEVER use formData.blocks[blockId] directly
+
+Blocks can be nested inside container blocks (columns, accordions, etc.), so they may NOT be at `formData.blocks[blockId]`. A block inside a column might be at `formData.blocks.columns-1.column_items.col-1.blocks.text-1`.
+
+**Always use:**
+```javascript
+import { getBlockById, updateBlockById } from '../../utils/blockPath';
+
+const block = getBlockById(formData, blockPathMap, blockId);
+const newFormData = updateBlockById(formData, blockPathMap, blockId, updatedBlock);
+```
+
+**Never use:**
+```javascript
+// WRONG - will silently return undefined for nested blocks
+const block = formData.blocks[blockId];
+const block = properties?.blocks?.[blockId];
+```
+
+The `blockPathMap` tracks where every block lives in the nested structure. If a block isn't in the map, `getBlockById` returns `undefined` and `updateBlockById` throws - this is intentional to surface bugs immediately rather than silently failing.
+
 # Running Playwright Tests
 
 ## Prerequisites
@@ -83,14 +104,19 @@ pnpm start:mock-api
 
 # Terminal 2: Start Volto Hydra (port 3001 SSR, port 3002 webpack)
 pnpm start:test
+
+# Terminal 3 (optional): Start Nuxt frontend for Nuxt tests (port 3003)
+pnpm start:nuxt:test
 ```
 
 Then access: http://localhost:3001/test-page/edit
 
 **Port summary:**
-- **8888**: Mock API + test frontend
+
+- **8888**: Mock API + test frontend (HTML/JS)
 - **3001**: Volto SSR server (navigate here)
 - **3002**: Webpack dev server (health check here)
+- **3003**: Nuxt frontend (for Nuxt-specific tests)
 
 ## Development Workflow
 
@@ -164,9 +190,10 @@ lsof -ti:8888,3001,3002 2>/dev/null | xargs kill -9 2>/dev/null
 ## Notes
 
 - only git commit when I ask you to
+- **NEVER** skip a test without explicit permission from the user
 - Playwright's `webServer.reuseExistingServer: true` means it will use a manually-started Volto server if available
 - The test setup skips `build:deps` to avoid parcel segfault in non-interactive shells
-- **NEVER* kill all node processes haphazardly. check if you really need to kill a process as some tests reload
+- **NEVER** kill all node processes haphazardly. check if you really need to kill a process as some tests reload
 - to check volto is compiling use http://localhost:3002/health
 - custom schemas are registered in the renderer.js on init.
 - node ids are added dynamically by hydra.js

@@ -374,7 +374,8 @@ const SyncedSlateToolbar = ({
         if (inlineEntry) {
           const [, inlinePath] = inlineEntry;
           const afterPoint = Editor.after(editor, inlinePath);
-          const formBlockValue = form?.blocks?.[selectedBlock]?.value?.[0]?.children;
+          const formBlock = getBlockById(form, blockPathMap, selectedBlock);
+          const formBlockValue = formBlock?.value?.[0]?.children;
           console.log('[TOOLBAR FORMAT] Cursor exit: inlinePath:', JSON.stringify(inlinePath), 'afterPoint:', JSON.stringify(afterPoint), 'editor.children:', JSON.stringify(editor.children?.[0]?.children), 'form.blocks.value:', JSON.stringify(formBlockValue));
           if (afterPoint) {
             Transforms.select(editor, afterPoint);

@@ -3603,4 +3603,39 @@ test.describe('Multi-Container Field Operations', () => {
     // Verify the image block is now selected in the iframe
     await expect(sidebar.getByText('Alt text')).toBeVisible();
   });
+
+  test('can clear image inside container using inline toolbar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the image inside the columns container (top-img-1)
+    const imageBlock = iframe.locator('[data-block-uid="top-img-1"]');
+    await expect(imageBlock).toBeVisible({ timeout: 10000 });
+    await imageBlock.click();
+
+    // Wait for block to be selected (outline appears)
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Get initial image src
+    const imageElement = imageBlock.locator('img');
+    const initialSrc = await imageElement.getAttribute('src');
+    expect(initialSrc).toBeTruthy();
+
+    // Click the clear button in toolbar overlay (X button appears on filled images)
+    // Use iframeContainer scope to avoid matching sidebar's clear button
+    const clearButton = page.locator('#iframeContainer button[title="Clear image"]');
+    await expect(clearButton).toBeVisible({ timeout: 5000 });
+    await clearButton.click();
+
+    // Verify the image was cleared - src should change or element should become placeholder
+    await expect(imageElement).not.toHaveAttribute('src', initialSrc!, {
+      timeout: 5000,
+    });
+  });
 });

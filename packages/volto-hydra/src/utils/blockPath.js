@@ -436,16 +436,15 @@ export function setBlockByPath(formData, path, value) {
  */
 export function getBlockById(formData, blockPathMap, blockId) {
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.path) {
-    const block = getBlockByPath(formData, pathInfo.path);
-    // Inject virtual @type for object_list items
-    if (block && pathInfo.isObjectListItem && pathInfo.itemType) {
-      return { ...block, '@type': pathInfo.itemType };
-    }
-    return block;
+  if (!pathInfo?.path) {
+    return undefined;
   }
-  // Fallback to direct lookup for page-level blocks
-  return formData?.blocks?.[blockId];
+  const block = getBlockByPath(formData, pathInfo.path);
+  // Inject virtual @type for object_list items
+  if (block && pathInfo.isObjectListItem && pathInfo.itemType) {
+    return { ...block, '@type': pathInfo.itemType };
+  }
+  return block;
 }
 
 /**
@@ -458,17 +457,10 @@ export function getBlockById(formData, blockPathMap, blockId) {
  */
 export function updateBlockById(formData, blockPathMap, blockId, newBlockData) {
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.path) {
-    return setBlockByPath(formData, pathInfo.path, newBlockData);
+  if (!pathInfo?.path) {
+    throw new Error(`Block ${blockId} not found in blockPathMap`);
   }
-  // Fallback to direct update for page-level blocks
-  return {
-    ...formData,
-    blocks: {
-      ...formData.blocks,
-      [blockId]: newBlockData,
-    },
-  };
+  return setBlockByPath(formData, pathInfo.path, newBlockData);
 }
 
 /**
