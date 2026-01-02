@@ -1263,6 +1263,47 @@ const SyncedSlateToolbar = ({
         );
       }
     })}
+
+    {/* Starter UI Overlay - for blocks with empty required fields */}
+    {blockPathMap?.[selectedBlock]?.emptyRequiredFields?.map(({ fieldName, fieldDef }) => {
+      // For now, only render for object_browser link fields
+      if (fieldDef?.widget !== 'object_browser' || fieldDef?.mode !== 'link') {
+        return null;
+      }
+
+      // Center horizontally on the block
+      const centerX = toolbarIframeRect.left + blockUI.rect.left + blockUI.rect.width / 2;
+      const centerY = toolbarIframeRect.top + blockUI.rect.top + blockUI.rect.height / 2;
+
+      return (
+        <div
+          key={`starter-${fieldName}`}
+          className="starter-ui-overlay"
+          style={{
+            position: 'fixed',
+            top: `${centerY - 20}px`,
+            left: `${centerX}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+          }}
+        >
+          <AddLinkForm
+            data={{ url: '' }}
+            theme={{}}
+            objectBrowserPickerType="link"
+            onChangeValue={(url) => {
+              if (onFieldLinkChange && url) {
+                // For object_browser link fields, convert URL to array format
+                const linkValue = [{ '@id': url }];
+                onFieldLinkChange(fieldName, linkValue);
+              }
+            }}
+            onClear={() => {}}
+            onOverrideContent={() => {}}
+          />
+        </div>
+      );
+    })}
     </>
   );
 };

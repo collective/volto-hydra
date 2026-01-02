@@ -349,6 +349,15 @@ function deepMerge(entry, newConfig) {
           Object.assign(output, {
             [key]: newConfig[key],
           });
+        } else if (typeof entry[key] === 'function') {
+          // Special case: if existing value is a function (like blockSchema),
+          // wrap it to merge the function's result with the new object
+          const originalFn = entry[key];
+          const overrides = newConfig[key];
+          output[key] = (props) => {
+            const result = originalFn(props);
+            return deepMerge(result, overrides);
+          };
         } else {
           output[key] = deepMerge(entry[key], newConfig[key]);
         }

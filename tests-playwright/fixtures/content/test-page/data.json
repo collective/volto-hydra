@@ -46,9 +46,21 @@
       "url": "https://placehold.co/600x400",
       "alt": "Linked test image",
       "href": "https://example.com"
+    },
+    "block-6-empty-teaser": {
+      "@type": "teaser",
+      "href": [],
+      "title": "",
+      "description": ""
+    },
+    "block-7-filled-teaser": {
+      "@type": "teaser",
+      "href": [{ "@id": "/target-page", "title": "Target Page" }],
+      "title": "Teaser Title",
+      "description": "Teaser description text"
     }
   },
   "blocks_layout": {
-    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image"]
+    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser"]
   }
 }

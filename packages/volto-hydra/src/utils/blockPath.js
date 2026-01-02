@@ -153,6 +153,29 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
       : blockConfig?.blockSchema;
   }
 
+  // Helper to find empty required fields for starter UI
+  // Returns array of { fieldName, fieldDef } for required fields that are empty
+  function getEmptyRequiredFields(blockData, schema) {
+    if (!schema?.required || !schema?.properties) return null;
+
+    const emptyFields = [];
+    for (const fieldName of schema.required) {
+      const fieldDef = schema.properties[fieldName];
+      if (!fieldDef) continue;
+
+      // Check if field is empty
+      const fieldValue = blockData[fieldName];
+      const isEmpty = !fieldValue ||
+        (Array.isArray(fieldValue) && fieldValue.length === 0) ||
+        (typeof fieldValue === 'string' && fieldValue === '');
+
+      if (isEmpty) {
+        emptyFields.push({ fieldName, fieldDef });
+      }
+    }
+    return emptyFields.length > 0 ? emptyFields : null;
+  }
+
   /**
    * Process container fields in an item (block or object_list item).
    * Scans schema for container fields and processes each one.
@@ -232,6 +255,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         containerField: fieldName,
         allowedSiblingTypes: fieldDef.allowedBlocks || null,
         maxSiblings: fieldDef.maxLength || null,
+        emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
       };
 
       // RECURSE: process this block's container fields
@@ -329,6 +353,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         addMode, // Table mode for this container (e.g., rows)
         parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
         actions, // Available actions for toolbar/dropdown
+        emptyRequiredFields: getEmptyRequiredFields(item, itemSchema),
       };
 
       // RECURSE: process this item's container fields (same pattern!)
@@ -354,6 +379,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
       containerField: 'blocks',
       allowedSiblingTypes: effectivePageAllowedBlocks,
       maxSiblings: null,
+      emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
     };
 
     // Process this block's container fields

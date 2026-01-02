@@ -1113,8 +1113,8 @@ export class Bridge {
       }
     };
 
-    document.removeEventListener('click', this.blockClickHandler);
-    document.addEventListener('click', this.blockClickHandler);
+    document.removeEventListener('click', this.blockClickHandler, true);
+    document.addEventListener('click', this.blockClickHandler, true);
 
     // Add global keydown handler for space on interactive elements
     // Certain elements (buttons, inputs, summary) have space key behavior that conflicts

@@ -142,6 +142,9 @@ function renderBlock(blockId, block) {
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
+        case 'teaser':
+            wrapper.innerHTML = renderTeaserBlock(block);
+            break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
@@ -392,6 +395,42 @@ function renderHeroBlock(block) {
             <p data-editable-field="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
             <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
             <a data-editable-field="buttonText" data-linkable-field="buttonLink" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+        </div>
+    `;
+}
+
+/**
+ * Render a teaser block.
+ * Shows placeholder when href is empty, content when href has value.
+ * @param {Object} block - Teaser block data
+ * @returns {string} HTML string
+ */
+function renderTeaserBlock(block) {
+    const href = getLinkUrl(block.href);
+    const title = block.title || '';
+    const description = block.description || '';
+    const imageSrc = getImageUrl(block.preview_image);
+
+    // If href is empty, show placeholder for starter UI
+    if (!href) {
+        return `
+            <div class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
+                <p style="color: #999; margin: 0;">Select a target page for this teaser</p>
+            </div>
+        `;
+    }
+
+    // Show teaser content when href has value
+    const imageHtml = imageSrc
+        ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
+        : '';
+
+    return `
+        <div class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+            ${imageHtml}
+            <h3 style="margin: 0 0 10px 0;">${title}</h3>
+            <p style="color: #666; margin: 0;">${description}</p>
+            <a href="${href}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>
     `;
 }
