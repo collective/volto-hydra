@@ -793,6 +793,8 @@ const Iframe = (props) => {
     flushSync(() => {
       setIframeSyncState((prev) => ({
         ...prev,
+        // Rebuild blockPathMap immediately so Escape handler has current parent info
+        blockPathMap: buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
         pendingSelectBlockUid: selectBlockId,
         ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
       }));

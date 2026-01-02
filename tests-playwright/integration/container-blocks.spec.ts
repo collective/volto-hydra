@@ -2079,10 +2079,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(indicatorShown).toBe(true);
 
     // text-1a should have moved (not still in col-1)
-    const finalText1aInCol1 = await col1
-      .locator('[data-block-uid="text-1a"]')
-      .count();
-    expect(finalText1aInCol1).toBe(0);
+    // Use auto-retrying assertion to wait for DOM update after drag-drop
+    await expect(col1.locator('[data-block-uid="text-1a"]')).toHaveCount(0);
 
     // CRITICAL: text-1a should NOT be in the top_images container
     // Even though we dragged to top-img-1, slate is not allowed there
@@ -3096,8 +3094,12 @@ test.describe('slateTable Container', () => {
     // Verify the selection outline has minimum height (empty cells should still be clickable)
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
-    const box = await outline.boundingBox();
-    expect(box?.height).toBeGreaterThanOrEqual(20);
+    // Use retry loop because boundingBox() may return null while element is repositioning
+    await expect(async () => {
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(20);
+    }).toPass({ timeout: 5000 });
   });
 
   test('clicking add button on cell adds a column to ALL rows', async ({ page }) => {
@@ -3147,8 +3149,10 @@ test.describe('slateTable Container', () => {
 
     // Navigate to row using Escape, then add a new row
     await page.keyboard.press('Escape');
-    await helper.waitForSidebarCurrentBlock('Row');
-    await page.locator('.volto-hydra-add-button').click();
+    // Wait for add button to change from "Add column" to "Add row" - more reliable than sidebar check
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toHaveAttribute('title', 'Add row', { timeout: 5000 });
+    await addButton.click();
 
     // Wait for new row to appear (should have 3 rows total)
     await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
