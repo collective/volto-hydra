@@ -119,13 +119,16 @@
       <!-- Title: use block.title only if overwrite, otherwise use target's title -->
       <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
       <!-- Title link is also linkable (clicking it shows link editor for href) -->
+      <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
+          :key="`title-${block.overwrite}`"
           :data-editable-field="block.overwrite ? 'title' : undefined">{{ getTeaserTitle(block) }}</h5>
       </NuxtLink>
       <!-- Description: use block.description only if overwrite, otherwise use target's description -->
       <p class="mb-3 font-normal text-gray-700 dark:text-gray-400"
+        :key="`description-${block.overwrite}`"
         :data-editable-field="block.overwrite ? 'description' : undefined"
         v-if="getTeaserDescription(block)">{{ getTeaserDescription(block) }}</p>
       <NuxtLink :to="getUrl(block.href)" data-linkable-field="href"

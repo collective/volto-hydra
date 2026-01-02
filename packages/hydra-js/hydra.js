@@ -2268,6 +2268,21 @@ export class Bridge {
         log(`  ${fieldName}: skipped (type: ${fieldType})`);
       }
     });
+
+    // Clean up stale contenteditable attributes from elements that are no longer editable
+    // This happens when a field was editable but is no longer (e.g., teaser overwrite unchecked)
+    const allContentEditable = blockElement.querySelectorAll('[contenteditable="true"]');
+    allContentEditable.forEach((el) => {
+      // Skip if this element belongs to a nested block
+      const elBlock = el.closest('[data-block-uid]');
+      if (elBlock !== blockElement) return;
+
+      // If element has no data-editable-field, remove contenteditable
+      if (!el.hasAttribute('data-editable-field')) {
+        el.removeAttribute('contenteditable');
+        log(`  Removed stale contenteditable from element without data-editable-field`);
+      }
+    });
   }
 
   /**

@@ -74,7 +74,7 @@ test.describe('Teaser Starter UI', () => {
     await expect(description).toHaveText('Target page description');
   });
 
-  test('teaser title becomes editable after clicking customize checkbox', async ({ page }) => {
+  test('teaser title becomes editable after clicking customize checkbox and reverts when unchecked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -95,8 +95,11 @@ test.describe('Teaser Starter UI', () => {
     const titleLocator = filledTeaser.locator('[data-editable-field="title"]');
     await expect(titleLocator).toHaveCount(0);
 
+    // Verify title shows target's title initially (h3 in mock, h5 in Nuxt)
+    const titleElement = filledTeaser.locator('h3, h5');
+    await expect(titleElement).toHaveText('Target Page');
+
     // Click the "Customize teaser content" checkbox in sidebar
-    // The checkbox might be rendered as a Semantic UI checkbox, not a standard label
     const customizeCheckbox = page.locator('text=Customize teaser content');
     await expect(customizeCheckbox).toBeVisible({ timeout: 5000 });
     await customizeCheckbox.click();
@@ -104,6 +107,26 @@ test.describe('Teaser Starter UI', () => {
     // After enabling customize, title SHOULD have data-editable-field and be contenteditable
     await expect(titleLocator).toHaveCount(1, { timeout: 5000 });
     await expect(titleLocator).toHaveAttribute('contenteditable', 'true');
+
+    // Edit the title to something custom
+    await titleLocator.click();
+    await titleLocator.fill('Custom Title');
+    await expect(titleLocator).toHaveText('Custom Title');
+
+    // Click the checkbox again to uncustomize
+    await customizeCheckbox.click();
+
+    // After disabling customize:
+    // 1. Title should revert to target's title
+    await expect(titleElement).toHaveText('Target Page', { timeout: 5000 });
+
+    // 2. Title should no longer have data-editable-field (not editable)
+    await expect(titleLocator).toHaveCount(0);
+
+    // 3. Click directly on the title - it should NOT become contenteditable
+    // This is the key bug: clicking on title after unchecking should not make it editable
+    await titleElement.click();
+    await expect(titleElement).not.toHaveAttribute('contenteditable', 'true');
   });
 
   test('can select target in starter UI and fill teaser href', async ({ page }) => {
