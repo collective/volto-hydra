@@ -111,14 +111,15 @@
     class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block_uid">
     <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
-    <NuxtLink :to="getUrl(block.href[0])" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage">
+    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage">
       <NuxtImg class="rounded-t-lg" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
       <NuxtImg class="rounded-t-lg" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
     <div class="p-5">
       <!-- Title: use block.title only if overwrite, otherwise use target's title -->
       <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
-      <NuxtLink :to="getUrl(block.href[0])" v-if="getTeaserTitle(block)">
+      <!-- Title link is also linkable (clicking it shows link editor for href) -->
+      <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
           :data-editable-field="block.overwrite ? 'title' : undefined">{{ getTeaserTitle(block) }}</h5>
@@ -127,7 +128,7 @@
       <p class="mb-3 font-normal text-gray-700 dark:text-gray-400"
         :data-editable-field="block.overwrite ? 'description' : undefined"
         v-if="getTeaserDescription(block)">{{ getTeaserDescription(block) }}</p>
-      <NuxtLink :to="getUrl(block.href[0])" data-linkable-field="href"
+      <NuxtLink :to="getUrl(block.href)" data-linkable-field="href"
         class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Read more
         <svg class="rtl:rotate-180 w-3.5 h-3.5 ms-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"

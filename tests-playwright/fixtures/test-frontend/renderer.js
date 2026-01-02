@@ -445,13 +445,16 @@ function renderTeaserBlock(block) {
         : '';
 
     // Only add data-editable-field when overwrite is true (field is customizable)
-    const titleAttr = block.overwrite ? 'data-editable-field="title"' : '';
+    // Title is always linkable (clicking it opens link editor for href)
+    const titleEditableAttr = block.overwrite ? 'data-editable-field="title"' : '';
     const descAttr = block.overwrite ? 'data-editable-field="description"' : '';
 
     return `
         <div class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
-            <h3 ${titleAttr} style="margin: 0 0 10px 0;">${title}</h3>
+            <a href="${href}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
+                <h3 ${titleEditableAttr} style="margin: 0;">${title}</h3>
+            </a>
             <p ${descAttr} style="color: #666; margin: 0;">${description}</p>
             <a href="${href}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>

@@ -155,11 +155,11 @@ test.describe('Teaser Starter UI', () => {
 
     const iframe = helper.getIframe();
 
-    // Find and click the filled teaser's "Read more" link
+    // Find and click the filled teaser's "Read more" link (second linkable href element)
     const filledTeaser = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
     await expect(filledTeaser).toBeVisible({ timeout: 10000 });
 
-    const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]');
+    const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]').last();
     await expect(readMoreLink).toBeVisible();
 
     // Get current URL before clicking
@@ -167,6 +167,38 @@ test.describe('Teaser Starter UI', () => {
 
     // Click the link
     await readMoreLink.click();
+
+    // URL should NOT change (navigation prevented)
+    expect(page.url()).toBe(urlBefore);
+
+    // Block should be selected
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Link icon should appear in toolbar for editing href
+    const linkIcon = page.locator('button[title="Edit link (href)"]');
+    await expect(linkIcon).toBeVisible({ timeout: 5000 });
+  });
+
+  test('clicking teaser title shows link icon for editing href', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Find the filled teaser's title link (first linkable href element wrapping h3)
+    const filledTeaser = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
+    await expect(filledTeaser).toBeVisible({ timeout: 10000 });
+
+    const titleLink = filledTeaser.locator('a[data-linkable-field="href"]').first();
+    await expect(titleLink).toBeVisible();
+
+    // Get current URL before clicking
+    const urlBefore = page.url();
+
+    // Click the title
+    await titleLink.click();
 
     // URL should NOT change (navigation prevented)
     expect(page.url()).toBe(urlBefore);
@@ -201,7 +233,7 @@ test.describe('Teaser Starter UI', () => {
 
     // Now click the "Read more" link in the teaser (which is NOT selected)
     const filledTeaser = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
-    const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]');
+    const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]').last();
     await expect(readMoreLink).toBeVisible();
     await readMoreLink.click();
 
