@@ -300,9 +300,14 @@ class AddLinkForm extends Component {
               this.props.openObjectBrowser({
                 mode: this.props.objectBrowserPickerType,
                 overlay: true,
-                onSelectItem: (url) => {
+                onSelectItem: (url, item) => {
                   this.onChange(url);
-                  this.onSubmit();
+                  // Pass full item to callback if provided (for object_browser fields needing metadata)
+                  if (this.props.onSelectItem) {
+                    this.props.onSelectItem(url, item);
+                  } else {
+                    this.onSubmit();
+                  }
                 },
               });
             }}

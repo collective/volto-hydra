@@ -6,6 +6,7 @@
   "title": "Another Page",
   "description": "Another test page for linking",
   "review_state": "published",
+  "preview_image": true,
   "parent": {
     "@id": "http://localhost:8888",
     "@type": "Plone Site",

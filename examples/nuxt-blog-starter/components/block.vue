@@ -110,18 +110,23 @@
   <div v-else-if="block['@type'] == 'teaser'"
     class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block_uid">
-    <NuxtLink :to="getUrl(block.href[0])" v-if="block.href.hasPreviewImage">
-      <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt=""
-        v-if="block.href[0].hasPreviewImage" />
+    <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
+    <NuxtLink :to="getUrl(block.href[0])" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage">
+      <NuxtImg class="rounded-t-lg" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
+      <NuxtImg class="rounded-t-lg" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
     <div class="p-5">
-      <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
+      <!-- Title: use block.title only if overwrite, otherwise use target's title -->
+      <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
+      <NuxtLink :to="getUrl(block.href[0])" v-if="getTeaserTitle(block)">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
-          data-editable-field="title">{{ block.title }}</h5>
+          :data-editable-field="block.overwrite ? 'title' : undefined">{{ getTeaserTitle(block) }}</h5>
       </NuxtLink>
-      <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description"
-        v-if="block?.description">{{ block.description }}</p>
+      <!-- Description: use block.description only if overwrite, otherwise use target's description -->
+      <p class="mb-3 font-normal text-gray-700 dark:text-gray-400"
+        :data-editable-field="block.overwrite ? 'description' : undefined"
+        v-if="getTeaserDescription(block)">{{ getTeaserDescription(block) }}</p>
       <NuxtLink :to="getUrl(block.href[0])" data-linkable-field="href"
         class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Read more
@@ -397,5 +402,19 @@ const getImageUrl = (value) => {
   return url;
 };
 
+// Teaser helpers: show target content by default, only use block values if overwrite is set
+const getTeaserTitle = (block) => {
+  if (block.overwrite && block.title) {
+    return block.title;
+  }
+  return block.href?.[0]?.title || '';
+};
+
+const getTeaserDescription = (block) => {
+  if (block.overwrite && block.description) {
+    return block.description;
+  }
+  return block.href?.[0]?.description || '';
+};
 
 </script>

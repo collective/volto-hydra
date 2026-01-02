@@ -304,6 +304,22 @@
                                         required: [],
                                     },
                                 },
+                                // Teaser block: tests required link field starter UI
+                                teaser: {
+                                    id: 'teaser',
+                                    title: 'Teaser',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
+                                    group: 'common',
+                                    // Only send properties - don't send fieldsets as arrays get replaced, not merged
+                                    // Volto's TeaserSchema handles fieldsets with overwrite checkbox
+                                    blockSchema: {
+                                        properties: {
+                                            href: { title: 'Target', widget: 'object_browser', mode: 'link' },
+                                            title: { title: 'Title', type: 'string' },
+                                            description: { title: 'Description', type: 'string' },
+                                        },
+                                    },
+                                },
                             },
                         },
                     };
@@ -311,7 +327,7 @@
                     // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge(adminOrigin, {
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser'],
                         voltoConfig: voltoConfig,
                     });
 

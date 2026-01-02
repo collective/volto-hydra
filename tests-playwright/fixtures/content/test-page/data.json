@@ -55,9 +55,7 @@
     },
     "block-7-filled-teaser": {
       "@type": "teaser",
-      "href": [{ "@id": "/target-page", "title": "Target Page" }],
-      "title": "Teaser Title",
-      "description": "Teaser description text"
+      "href": [{ "@id": "/target-page", "title": "Target Page", "description": "Target page description", "hasPreviewImage": true }]
     }
   },
   "blocks_layout": {

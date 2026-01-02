@@ -402,14 +402,33 @@ function renderHeroBlock(block) {
 /**
  * Render a teaser block.
  * Shows placeholder when href is empty, content when href has value.
+ * By default, shows target page title/description from href.
+ * Only uses block.title/description when overrideTitle/overrideDescription is true.
  * @param {Object} block - Teaser block data
  * @returns {string} HTML string
  */
 function renderTeaserBlock(block) {
     const href = getLinkUrl(block.href);
-    const title = block.title || '';
-    const description = block.description || '';
-    const imageSrc = getImageUrl(block.preview_image);
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+
+    // Get title: use block.title only if overwrite is true, otherwise use href title
+    const title = block.overwrite && block.title
+        ? block.title
+        : (hrefObj?.title || '');
+
+    // Get description: use block.description only if overwrite is true, otherwise use href description
+    const description = block.overwrite && block.description
+        ? block.description
+        : (hrefObj?.description || '');
+
+    // Get preview image: use block.preview_image if set, otherwise use target content's image
+    let imageSrc = '';
+    if (block.preview_image) {
+        imageSrc = getImageUrl(block.preview_image);
+    } else if (hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
+        // Target content has a preview image - construct URL from target path
+        imageSrc = hrefObj['@id'] + '/@@images/preview_image';
+    }
 
     // If href is empty, show placeholder for starter UI
     if (!href) {
@@ -425,11 +444,15 @@ function renderTeaserBlock(block) {
         ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
         : '';
 
+    // Only add data-editable-field when overwrite is true (field is customizable)
+    const titleAttr = block.overwrite ? 'data-editable-field="title"' : '';
+    const descAttr = block.overwrite ? 'data-editable-field="description"' : '';
+
     return `
         <div class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
-            <h3 style="margin: 0 0 10px 0;">${title}</h3>
-            <p style="color: #666; margin: 0;">${description}</p>
+            <h3 ${titleAttr} style="margin: 0 0 10px 0;">${title}</h3>
+            <p ${descAttr} style="color: #666; margin: 0;">${description}</p>
             <a href="${href}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>
     `;

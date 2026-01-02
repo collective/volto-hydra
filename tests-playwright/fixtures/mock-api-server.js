@@ -14,6 +14,31 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8888;
 
+/**
+ * Parse CONTENT_MOUNTS env variable for multiple content directories
+ * Format: "mountPath:dirPath,mountPath2:dirPath2"
+ * Example: "/:/default/content,/pretagov:/path/to/pretagov/content"
+ * Falls back to default ./content directory mounted at /
+ */
+function parseContentMounts() {
+  const mountsEnv = process.env.CONTENT_MOUNTS;
+  if (!mountsEnv) {
+    return [{ mountPath: '/', dirPath: path.join(__dirname, 'content') }];
+  }
+
+  return mountsEnv.split(',').map(mount => {
+    const [mountPath, dirPath] = mount.split(':');
+    // Resolve relative paths from current working directory
+    const resolvedDir = path.isAbsolute(dirPath) ? dirPath : path.resolve(process.cwd(), dirPath);
+    return {
+      mountPath: mountPath || '/',
+      dirPath: resolvedDir
+    };
+  });
+}
+
+const CONTENT_MOUNTS = parseContentMounts();
+
 // In-memory content database
 const contentDB = {};
 
@@ -144,8 +169,12 @@ function getImageScales(content, baseUrl) {
  * Format a content item for search results
  * Includes image_field and image_scales for Image content types
  * Includes is_folderish for folder navigation in object browser
+ * Includes hasPreviewImage for teaser blocks to show target's preview image
  */
 function formatSearchItem(content, baseUrl) {
+  // Check if content has a preview image (common for Documents, News Items, etc.)
+  const hasPreviewImage = !!(content.preview_image || content['@type'] === 'Image');
+
   const item = {
     '@id': content['@id'],
     '@type': content['@type'],
@@ -155,6 +184,7 @@ function formatSearchItem(content, baseUrl) {
     'review_state': content.review_state || 'published',
     'UID': content.UID,
     'is_folderish': content.is_folderish || false,
+    'hasPreviewImage': hasPreviewImage,
   };
 
   // Add image fields for Image content types (needed by object browser)
@@ -283,8 +313,55 @@ function enrichContent(content, urlPath, baseUrl) {
   };
 }
 
-// Mapping from URL path to content directory name (for image serving)
+// Mapping from URL path to content directory info (for image serving and reloading)
+// { urlPath: { dirPath: '/full/path/to/dir', dirName: 'dirname' } }
 const contentDirMap = {};
+
+/**
+ * Load content from a single directory with a mount prefix
+ */
+function loadContentFromDir(contentDirPath, mountPath, baseUrl) {
+  if (!fs.existsSync(contentDirPath)) {
+    console.log(`Content directory not found: ${contentDirPath}`);
+    return;
+  }
+
+  console.log(`Loading content from ${contentDirPath} mounted at ${mountPath}`);
+
+  const dirs = fs.readdirSync(contentDirPath, { withFileTypes: true });
+  dirs.forEach((dir) => {
+    // Support both real directories and symlinks to directories
+    const fullDirPath = path.join(contentDirPath, dir.name);
+    const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
+      fs.statSync(fullDirPath).isDirectory());
+    if (isDir) {
+      const dataPath = path.join(fullDirPath, 'data.json');
+      if (fs.existsSync(dataPath)) {
+        const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+        // Use @id from content file if it looks like a path, otherwise use directory name
+        let contentPath;
+        if (content['@id'] && content['@id'].startsWith('/')) {
+          contentPath = content['@id'];
+        } else {
+          contentPath = '/' + (content.id || dir.name);
+        }
+
+        // Apply mount prefix (unless mounting at root)
+        let urlPath;
+        if (mountPath === '/') {
+          urlPath = contentPath;
+        } else {
+          urlPath = mountPath + contentPath;
+        }
+
+        contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
+        // Store full directory path for image serving and reloading
+        contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
+        console.log(`Loaded content: ${urlPath}`);
+      }
+    }
+  });
+}
 
 // Load initial content from fixtures
 function loadInitialContent() {
@@ -310,34 +387,10 @@ function loadInitialContent() {
   };
   console.log('Loaded content: /');
 
-  // Load all content from content/{page-id}/data.json structure
-  // Uses @id from content file for URL path (supports nested paths like /images/test-image-1)
-  const contentDirPath = path.join(__dirname, 'content');
-  if (fs.existsSync(contentDirPath)) {
-    const dirs = fs.readdirSync(contentDirPath, { withFileTypes: true });
-    dirs.forEach((dir) => {
-      // Support both real directories and symlinks to directories
-      const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
-        fs.statSync(path.join(contentDirPath, dir.name)).isDirectory());
-      if (isDir) {
-        const dataPath = path.join(contentDirPath, dir.name, 'data.json');
-        if (fs.existsSync(dataPath)) {
-          const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-          // Use @id from content file if it looks like a path, otherwise use directory name
-          let urlPath;
-          if (content['@id'] && content['@id'].startsWith('/')) {
-            urlPath = content['@id'];
-          } else {
-            urlPath = '/' + (content.id || dir.name);
-          }
-          contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
-          // Store mapping from URL path to directory name for image serving
-          contentDirMap[urlPath] = dir.name;
-          console.log(`Loaded content: ${urlPath}`);
-        }
-      }
-    });
-  }
+  // Load content from all mount points
+  CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
+    loadContentFromDir(dirPath, mountPath, baseUrl);
+  });
 }
 
 // Initialize on startup
@@ -350,13 +403,10 @@ loadInitialContent();
 function getContent(urlPath) {
   const baseUrl = `http://localhost:${PORT}`;
 
-  // Check if there's a data.json file for this path in content/{dir-name}/
-  // Use contentDirMap to find actual directory for nested paths (e.g., /images/test-image-1)
-  const contentDirBase = path.join(__dirname, 'content');
-  const dirName = contentDirMap[urlPath] || urlPath.replace(/^\//, '');
-
-  if (dirName && fs.existsSync(contentDirBase)) {
-    const dataPath = path.join(contentDirBase, dirName, 'data.json');
+  // Check if there's a data.json file using contentDirMap
+  const dirInfo = contentDirMap[urlPath];
+  if (dirInfo) {
+    const dataPath = path.join(dirInfo.dirPath, 'data.json');
     if (fs.existsSync(dataPath)) {
       const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
       return enrichContent(content, urlPath, baseUrl);
@@ -842,13 +892,13 @@ app.get('*/@@images/*', (req, res) => {
 
   // Try to serve actual image file from content directory
   // Use contentDirMap to find actual directory for nested paths
-  const dirName = contentDirMap[contentPath] || contentPath.replace(/^\//, '').replace(/\//g, '-');
-  const contentDir = path.join(__dirname, 'content', dirName, 'image');
+  const dirInfo = contentDirMap[contentPath];
+  const imageDir = dirInfo ? path.join(dirInfo.dirPath, 'image') : null;
 
-  if (dirName && fs.existsSync(contentDir)) {
-    const files = fs.readdirSync(contentDir);
+  if (imageDir && fs.existsSync(imageDir)) {
+    const files = fs.readdirSync(imageDir);
     if (files.length > 0) {
-      const imageFile = path.join(contentDir, files[0]);
+      const imageFile = path.join(imageDir, files[0]);
       const ext = path.extname(files[0]).toLowerCase();
       const mimeTypes = {
         '.svg': 'image/svg+xml',

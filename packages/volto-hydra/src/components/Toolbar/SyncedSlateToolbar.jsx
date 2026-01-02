@@ -1097,46 +1097,64 @@ const SyncedSlateToolbar = ({
     )}
 
     {/* Field Link Editor Popup - fixed position above toolbar */}
-    {fieldLinkEditorOpen && fieldLinkEditorField && (
-      <div
-        className="add-link field-link-editor"
-        style={{
-          position: 'fixed',
-          top: `${toolbarTop - 60}px`,
-          left: `${toolbarLeft}px`,
-          background: '#fff',
-          border: '1px solid #e0e0e0',
-          borderRadius: '4px',
-          padding: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          zIndex: 100,
-          width: '350px',
-        }}
-      >
-        <AddLinkForm
-          data={{ url: getBlock(selectedBlock)?.[fieldLinkEditorField] || '' }}
-          theme={{}}
-          onChangeValue={(url) => {
-            if (onFieldLinkChange) {
-              onFieldLinkChange(fieldLinkEditorField, url);
-            }
-            setFieldLinkEditorOpen(false);
-            setFieldLinkEditorField(null);
+    {fieldLinkEditorOpen && fieldLinkEditorField && (() => {
+      const fieldDef = blockPathMap?.[selectedBlock]?.schema?.properties?.[fieldLinkEditorField];
+      const isObjectBrowserLink = fieldDef?.widget === 'object_browser' && fieldDef?.mode === 'link';
+      return (
+        <div
+          className="add-link field-link-editor"
+          style={{
+            position: 'fixed',
+            top: `${toolbarTop - 60}px`,
+            left: `${toolbarLeft}px`,
+            background: '#fff',
+            border: '1px solid #e0e0e0',
+            borderRadius: '4px',
+            padding: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 100,
+            width: '350px',
           }}
-          onClear={() => {
-            if (onFieldLinkChange) {
-              onFieldLinkChange(fieldLinkEditorField, '');
-            }
-            setFieldLinkEditorOpen(false);
-            setFieldLinkEditorField(null);
-          }}
-          onOverrideContent={() => {
-            setFieldLinkEditorOpen(false);
-            setFieldLinkEditorField(null);
-          }}
-        />
-      </div>
-    )}
+        >
+          <AddLinkForm
+            data={{ url: getBlock(selectedBlock)?.[fieldLinkEditorField] || '' }}
+            theme={{}}
+            onChangeValue={(url) => {
+              if (onFieldLinkChange) {
+                onFieldLinkChange(fieldLinkEditorField, url);
+              }
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            }}
+            onSelectItem={isObjectBrowserLink ? (url, item) => {
+              if (onFieldLinkChange) {
+                // Use full item metadata for object_browser link fields
+                const linkValue = [{
+                  '@id': item?.['@id'] || url,
+                  title: item?.title || item?.Title || '',
+                  description: item?.description || item?.Description || '',
+                  hasPreviewImage: item?.hasPreviewImage ?? false,
+                }];
+                onFieldLinkChange(fieldLinkEditorField, linkValue);
+              }
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            } : undefined}
+            onClear={() => {
+              if (onFieldLinkChange) {
+                onFieldLinkChange(fieldLinkEditorField, '');
+              }
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            }}
+            onOverrideContent={() => {
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            }}
+          />
+        </div>
+      );
+    })()}
 
     {/* Media Field Overlays - show when block is selected, for each media field */}
     {blockUI?.mediaFields && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
@@ -1295,6 +1313,18 @@ const SyncedSlateToolbar = ({
               if (onFieldLinkChange && url) {
                 // For object_browser link fields, convert URL to array format
                 const linkValue = [{ '@id': url }];
+                onFieldLinkChange(fieldName, linkValue);
+              }
+            }}
+            onSelectItem={(url, item) => {
+              if (onFieldLinkChange && url) {
+                // Use full item metadata from object browser for richer teaser display
+                const linkValue = [{
+                  '@id': item?.['@id'] || url,
+                  title: item?.title || item?.Title || '',
+                  description: item?.description || item?.Description || '',
+                  hasPreviewImage: item?.hasPreviewImage ?? false,
+                }];
                 onFieldLinkChange(fieldName, linkValue);
               }
             }}

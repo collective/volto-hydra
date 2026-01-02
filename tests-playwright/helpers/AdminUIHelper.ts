@@ -3734,21 +3734,27 @@ export class AdminUIHelper {
     await item.first().click();
 
     // Wait for the object browser to close, or close it manually if it stays open
+    // Check for both "Choose Image" and "Choose Target" headings (different browser types)
     const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
+    const chooseTargetHeading = this.page.getByRole('heading', { name: 'Choose Target' });
+    const browserHeading = await chooseImageHeading.isVisible().catch(() => false)
+      ? chooseImageHeading
+      : chooseTargetHeading;
+
     try {
-      await expect(chooseImageHeading).not.toBeVisible({ timeout: 2000 });
+      await expect(browserHeading).not.toBeVisible({ timeout: 2000 });
     } catch {
       // Object browser didn't auto-close, close it manually via the X button in header
       console.log('[TEST] Object browser did not auto-close, closing manually');
-      // The X button is the last button in the header banner next to "Choose Image"
-      const banner = chooseImageHeading.locator('..');
+      // The X button is the last button in the header banner
+      const banner = browserHeading.locator('..');
       const closeButton = banner.locator('button').last();
       if (await closeButton.isVisible().catch(() => false)) {
         await closeButton.click();
         await this.page.waitForTimeout(500);
       }
       // If still visible, press Escape
-      if (await chooseImageHeading.isVisible().catch(() => false)) {
+      if (await browserHeading.isVisible().catch(() => false)) {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);
       }
