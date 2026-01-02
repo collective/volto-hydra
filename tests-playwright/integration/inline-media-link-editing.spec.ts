@@ -236,6 +236,49 @@ test.describe('Inline link editing', () => {
     await expect(heroButton).toHaveAttribute('href', 'https://new-link.example.com', { timeout: 5000 });
   });
 
+  test('can open link in new tab from AddLinkForm', async ({ page, context }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click the hero button to select it
+    const iframe = helper.getIframe();
+    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-linkable-field="buttonLink"]');
+    await expect(heroButton).toBeVisible();
+    await heroButton.click();
+
+    // Open the link editor via toolbar
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const linkButton = toolbar.locator('button[title*="Edit link"]');
+    await linkButton.click();
+
+    // Wait for the link form
+    const linkForm = page.locator('.field-link-editor .link-form-container');
+    await expect(linkForm).toBeVisible({ timeout: 5000 });
+
+    // Enter a URL
+    const urlInput = linkForm.locator('input[name="link"]');
+    await urlInput.fill('https://example.com/test-link');
+
+    // Find the "Open in new tab" button
+    const openButton = linkForm.locator('button[aria-label="Open link in new tab"]');
+    await expect(openButton).toBeVisible({ timeout: 5000 });
+
+    // Click the button and wait for a new page to open
+    const [newPage] = await Promise.all([
+      context.waitForEvent('page'),
+      openButton.click(),
+    ]);
+
+    // Verify the new page opened with the correct URL
+    expect(newPage.url()).toBe('https://example.com/test-link');
+
+    // Close the new page
+    await newPage.close();
+  });
+
   test('link field shows in sidebar for hero block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

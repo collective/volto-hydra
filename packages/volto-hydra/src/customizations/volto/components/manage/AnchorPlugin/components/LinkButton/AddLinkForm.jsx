@@ -37,6 +37,7 @@ import clearSVG from '@plone/volto/icons/clear.svg';
 import navTreeSVG from '@plone/volto/icons/nav.svg';
 import aheadSVG from '@plone/volto/icons/ahead.svg';
 import uploadSVG from '@plone/volto/icons/upload.svg';
+import externalLinkSVG from '@plone/volto/icons/external-link.svg';
 
 import withObjectBrowser from '@plone/volto/components/manage/Sidebar/ObjectBrowser';
 import { withRouter } from 'react-router';
@@ -55,6 +56,10 @@ const messages = defineMessages({
   openObjectBrowser: {
     id: 'Open object browser',
     defaultMessage: 'Open object browser',
+  },
+  openInNewTab: {
+    id: 'Open link in new tab',
+    defaultMessage: 'Open link in new tab',
   },
   submit: {
     id: 'Submit',
@@ -383,6 +388,26 @@ class AddLinkForm extends Component {
             }}
           >
             <Icon name={clearSVG} size="20px" />
+          </Button>
+        )}
+
+        {/* Open in new tab button - when value exists */}
+        {value.length > 0 && (
+          <Button
+            type="button"
+            icon
+            style={{ margin: 0, padding: '8px', border: 'none', background: 'transparent' }}
+            aria-label={this.props.intl.formatMessage(messages.openInNewTab)}
+            title={this.props.intl.formatMessage(messages.openInNewTab)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // For internal URLs, prepend origin; for external, use as-is
+              const url = isInternalURL(value) ? addAppURL(value) : value;
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            <Icon name={externalLinkSVG} size="20px" />
           </Button>
         )}
 
