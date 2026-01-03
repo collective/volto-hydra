@@ -166,6 +166,12 @@ export class Bridge {
    * @returns {Object|undefined} The block data or undefined if not found
    */
   getBlockData(blockUid) {
+    // null blockUid means page-level data
+    if (blockUid === null) {
+      log('getBlockData: null blockUid, returning formData (page-level)');
+      return this.formData;
+    }
+
     // First try blockPathMap for nested block support
     const pathInfo = this.blockPathMap?.[blockUid];
     log('getBlockData:', blockUid, 'pathInfo:', pathInfo, 'blockPathMap keys:', Object.keys(this.blockPathMap || {}));
@@ -197,6 +203,46 @@ export class Bridge {
     const fallback = this.formData?.blocks?.[blockUid];
     log('getBlockData: fallback lookup, @type:', fallback?.['@type']);
     return fallback;
+  }
+
+  /**
+   * Resolve a field path to determine the target block and field name.
+   * Supports:
+   * - "fieldName" -> block's own field (or page if no block context)
+   * - "../fieldName" -> parent block's field (or page if at top level)
+   * - "/fieldName" -> page-level field
+   *
+   * @param {string} fieldPath - The field path from data-editable-field
+   * @param {string|null} blockId - Current block ID (null for page-level)
+   * @returns {Object} { blockId: string|null, fieldName: string }
+   */
+  resolveFieldPath(fieldPath, blockId) {
+    // Handle absolute path (page-level)
+    if (fieldPath.startsWith('/')) {
+      return { blockId: null, fieldName: fieldPath.slice(1) };
+    }
+
+    // If no block context, treat as page-level
+    if (!blockId) {
+      return { blockId: null, fieldName: fieldPath };
+    }
+
+    // Handle relative path with ../
+    let currentBlockId = blockId;
+    let remainingPath = fieldPath;
+
+    while (remainingPath.startsWith('../')) {
+      const pathInfo = this.blockPathMap?.[currentBlockId];
+      if (!pathInfo?.parentId) {
+        // Already at top level, next ../ goes to page
+        return { blockId: null, fieldName: remainingPath.slice(3) };
+      }
+      currentBlockId = pathInfo.parentId;
+      remainingPath = remainingPath.slice(3);
+    }
+
+    // Block field
+    return { blockId: currentBlockId, fieldName: remainingPath };
   }
 
   /**
@@ -344,9 +390,15 @@ export class Bridge {
    * @returns {string} 'right', 'bottom', or 'hidden'
    */
   getAddDirection(blockElement) {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // Page-level fields (no block-uid) should not have add button
+    if (!blockUid) {
+      return 'hidden';
+    }
+
     // Empty blocks should not have an add button - they are meant to be replaced
     // via block chooser, not have blocks added after them
-    const blockUid = blockElement.getAttribute('data-block-uid');
     const blockData = this.getBlockData(blockUid);
     if (blockData?.['@type'] === 'empty') {
       return 'hidden';
@@ -1110,6 +1162,21 @@ export class Bridge {
           };
         }
         this.selectBlock(blockElement);
+      } else {
+        // No block - check for page-level fields
+        const pageField = event.target.closest('[data-media-field], [data-linkable-field], [data-editable-field]');
+        if (pageField) {
+          event.preventDefault();
+          this.selectedBlockUid = null;
+
+          // Detect focused field type
+          this.focusedMediaField = pageField.getAttribute('data-media-field');
+          this.focusedLinkableField = pageField.getAttribute('data-linkable-field');
+          this.focusedFieldName = pageField.getAttribute('data-editable-field');
+
+          // Send BLOCK_SELECTED with pageField as "block" - blockUid will be null
+          this.sendBlockSelected('pageFieldClick', pageField);
+        }
       }
     };
 
@@ -5468,9 +5535,8 @@ export class Bridge {
    * @param {Node} mutatedTextNode - The actual text node that was modified (optional)
    */
   handleTextChange(target, mutatedNodeParent = null, mutatedTextNode = null) {
-    const blockUid = target
-      .closest('[data-block-uid]')
-      .getAttribute('data-block-uid');
+    const blockElement = target.closest('[data-block-uid]');
+    const blockUid = blockElement?.getAttribute('data-block-uid') || null;
     const editableField = target.getAttribute('data-editable-field');
 
     if (!editableField) {
@@ -5586,10 +5652,12 @@ export class Bridge {
       }
     } else {
       // Non-Slate field - update field directly with text content
-      // Use getBlockData to handle nested blocks
-      const block = this.getBlockData(blockUid);
-      if (block) {
-        block[editableField] = this.stripZeroWidthSpaces(target.innerText);
+      // Resolve field path to handle /fieldName (page) and ../fieldName (parent) syntax
+      const resolved = this.resolveFieldPath(editableField, blockUid);
+      const targetData = this.getBlockData(resolved.blockId);
+      if (targetData) {
+        targetData[resolved.fieldName] = this.stripZeroWidthSpaces(target.innerText);
+        log('handleTextChange: updated field:', resolved.fieldName);
       }
     }
 

@@ -143,7 +143,11 @@ const SyncedSlateToolbar = ({
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
+  // For page-level fields (blockId is null), return form itself
   const getBlock = useCallback((blockId) => {
+    if (blockId === null) {
+      return form; // Page-level fields access form directly
+    }
     return getBlockById(form, blockPathMap, blockId);
   }, [form, blockPathMap]);
 
@@ -769,7 +773,9 @@ const SyncedSlateToolbar = ({
     };
   }, [toolbarButtons, buttons]);
 
-  if (!blockUI || !selectedBlock) {
+  // Render toolbar when we have a rect (either block or page-level field)
+  // selectedBlock can be null for page-level fields
+  if (!blockUI?.rect) {
     return null;
   }
 
@@ -886,24 +892,28 @@ const SyncedSlateToolbar = ({
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
-      {/* Drag handle - visual indicator only, pointer events pass through to iframe button */}
-      <div
-        className="drag-handle"
-        style={{
-          cursor: 'move',
-          padding: '4px 6px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-          color: '#666',
-          fontSize: '14px',
-          background: '#e8e8e8',
-          borderRadius: '2px',
-        }}
-      >
-        ⠿
-      </div>
+      {/* Drag handle - only show for blocks, not page-level fields */}
+      {selectedBlock ? (
+        <div
+          className="drag-handle"
+          style={{
+            cursor: 'move',
+            padding: '4px 6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            color: '#666',
+            fontSize: '14px',
+            background: '#e8e8e8',
+            borderRadius: '2px',
+          }}
+        >
+          ⠿
+        </div>
+      ) : (
+        <div style={{ width: '8px' }} /> // Spacer for page-level fields
+      )}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
@@ -1226,9 +1236,10 @@ const SyncedSlateToolbar = ({
               id={`inline-image-${fieldName}`}
               value={null}
               showPreview={false}
-              onChange={(id, url) => {
+              onChange={(id, url, metadata) => {
                 if (onFieldLinkChange) {
-                  onFieldLinkChange(fieldName, url);
+                  // Pass url and metadata (image_scales, image_field) for NamedBlobImage fields
+                  onFieldLinkChange(fieldName, url, metadata);
                 }
                 // Close editor if it was open
                 if (fieldImageEditorOpen) {

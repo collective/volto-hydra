@@ -4,6 +4,16 @@
   "id": "test-page",
   "title": "Test Page",
   "description": "A test page with blocks",
+  "preview_image": {
+    "@type": "Image",
+    "download": "https://placehold.co/300x200",
+    "filename": "preview.jpg",
+    "scales": {
+      "preview": {
+        "download": "https://placehold.co/300x200"
+      }
+    }
+  },
   "blocks": {
     "block-1-uuid": {
       "@type": "slate",

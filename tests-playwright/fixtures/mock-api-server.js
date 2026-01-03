@@ -157,9 +157,21 @@ function getImageScales(content, baseUrl) {
   return {
     image: [
       {
-        download: `${baseUrl}${contentPath}/@@images/image/preview`,
-        width: Math.min(width, 400),
-        height: Math.min(height, 400),
+        download: `${baseUrl}${contentPath}/@@images/image`,
+        width: width,
+        height: height,
+        scales: {
+          preview: {
+            download: `${baseUrl}${contentPath}/@@images/image/preview`,
+            width: Math.min(width, 400),
+            height: Math.min(height, 400),
+          },
+          large: {
+            download: `${baseUrl}${contentPath}/@@images/image/large`,
+            width: Math.min(width, 800),
+            height: Math.min(height, 800),
+          },
+        },
       }
     ]
   };
@@ -737,15 +749,25 @@ app.get('*/@breadcrumbs', (req, res) => {
  * GET /@search or /:path/@search
  * Search for content (used by ObjectBrowser)
  * Supports path.depth parameter to get children of a specific path
+ * Supports path.query parameter to get a specific content item
  */
 app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
+  const pathQuery = req.query['path.query'];
   const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
-  if (pathDepth === '1') {
+  // Handle path.query with path.depth=0 (exact match for specific content)
+  if (pathQuery && pathDepth === '0') {
+    const content = contentDB[pathQuery];
+    if (content) {
+      items = [formatSearchItem(content, baseUrl)];
+    } else {
+      items = [];
+    }
+  } else if (pathDepth === '1') {
     // Get immediate children of the search path
     // For site root (/), return all root-level items
     // For other paths, return their children (if any)

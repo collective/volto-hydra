@@ -345,6 +345,21 @@ const UnconnectedImageInput = (props) => {
     );
   }
 
+  // Handle direct selection from object browser (with full item metadata)
+  const handleSelectItem = useCallback(
+    (url, item) => {
+      const flatUrl = flattenToAppURL(url);
+      // Use metadata directly from object browser item (no search needed)
+      onChange(id, flatUrl, {
+        title: item?.title,
+        image_field: item?.image_field || 'image',
+        image_scales: item?.image_scales,
+      });
+      onClose?.();
+    },
+    [id, onChange, onClose],
+  );
+
   // No image - show picker UI
   const pickerContent = (
     <AddLinkForm
@@ -353,6 +368,7 @@ const UnconnectedImageInput = (props) => {
       objectBrowserPickerType="image"
       placeholder={description || intl.formatMessage(messages.addImage)}
       onChangeValue={handleUrlChange}
+      onSelectItem={handleSelectItem}
       onClear={() => {}}
       onOverrideContent={() => onClose?.()}
       openObjectBrowser={openObjectBrowser}

@@ -536,9 +536,16 @@ const Iframe = (props) => {
   }, [selectedBlock]);
 
   // Clear blockUI when no block is selected
+  // BUT keep it for page-level fields (blockUI exists with rect but blockUid is null)
   useEffect(() => {
     if (!selectedBlock) {
-      setBlockUI(null);
+      setBlockUI((prev) => {
+        // Keep blockUI if it's a page-level selection (blockUid is null but has rect)
+        if (prev?.blockUid === null && prev?.rect) {
+          return prev;
+        }
+        return null;
+      });
     }
   }, [selectedBlock]);
 
@@ -2041,15 +2048,38 @@ const Iframe = (props) => {
                 insertAndSelectBlock(selectedBlock, null, action);
               }
             }}
-            onFieldLinkChange={(fieldName, url) => {
-              // Update the block's field with the new URL
-              // Use getBlockById to handle both top-level and container blocks
-              const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              if (!block) return;
+            onFieldLinkChange={(fieldName, url, metadata) => {
+              let updatedProperties;
 
-              const updatedBlock = { ...block, [fieldName]: url };
-              // Use updateBlockById to handle both top-level and container blocks
-              const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
+              if (selectedBlock === null) {
+                // Page-level field - update directly on properties
+                // For image fields with metadata, construct NamedBlobImage format
+                if (metadata?.image_scales) {
+                  const imageField = metadata.image_field || 'image';
+                  const scaleInfo = metadata.image_scales[imageField]?.[0];
+                  // Construct NamedBlobImage object format
+                  const imageValue = {
+                    '@type': 'Image',
+                    'download': `${url}/@@images/${imageField}`,
+                    'scales': scaleInfo?.scales || {},
+                  };
+                  updatedProperties = { ...properties, [fieldName]: imageValue };
+                } else {
+                  updatedProperties = { ...properties, [fieldName]: url };
+                }
+              } else {
+                // Block field - update the block's field with the new URL
+                // Use getBlockById to handle both top-level and container blocks
+                const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+                if (!block) return;
+
+                // For blocks, store url and image_scales separately (like Image block does)
+                const updatedBlock = metadata?.image_scales
+                  ? { ...block, [fieldName]: url, image_field: metadata.image_field, image_scales: metadata.image_scales }
+                  : { ...block, [fieldName]: url };
+                // Use updateBlockById to handle both top-level and container blocks
+                updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
+              }
 
               // Update Redux via onChangeFormData
               onChangeFormData(updatedProperties);
