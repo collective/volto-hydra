@@ -3750,4 +3750,35 @@ test.describe('Multi-Container Field Operations', () => {
     expect(blockBox!.width).toBeGreaterThan(100);
     expect(blockBox!.height).toBeGreaterThan(50);
   });
+
+  test('gridBlock only shows allowed block types in chooser', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on an existing grid cell (grid-cell-1 is inside grid-1)
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.waitForQuantaToolbar('grid-cell-1');
+
+    // Click the add button to open block chooser
+    await helper.clickAddBlockButton();
+
+    // Wait for block chooser to appear
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // gridBlock allowedBlocks: ['image', 'listing', 'slate', 'teaser']
+    // Image should be visible as an allowed type
+    expect(await helper.isBlockTypeVisible('image')).toBe(true);
+
+    // BUG: Grid and Hero should NOT be available inside a grid
+    // They are not in gridBlock's allowedBlocks but currently appear
+    expect(await helper.isBlockTypeVisible('gridBlock')).toBe(false);
+    expect(await helper.isBlockTypeVisible('hero')).toBe(false);
+  });
 });

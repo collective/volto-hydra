@@ -1708,14 +1708,26 @@ const Iframe = (props) => {
     if (parentId) {
       const parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
       const parentType = parentBlockData?.['@type'];
-      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
-      for (const [fieldName, fieldDef] of Object.entries(parentSchema?.properties || {})) {
+      const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
+      const parentSchema = parentBlockConfig?.blockSchema;
+      const resolvedSchema = typeof parentSchema === 'function'
+        ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+        : parentSchema;
+
+      // First check schema-defined container fields (e.g., columns, accordion)
+      for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
         if (fieldDef.type === 'blocks') {
           const layoutField = `${fieldName}_layout`;
           if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
             return fieldDef.allowedBlocks || null;
           }
         }
+      }
+
+      // Check for implicit container (uses blocks/blocks_layout directly)
+      // These have allowedBlocks on the block config, not in schema
+      if (parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
+        return parentBlockConfig?.allowedBlocks || null;
       }
     }
     return allowedBlocks;
