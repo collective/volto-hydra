@@ -70,7 +70,7 @@ function renderContent(content) {
 
     const { blocks, blocks_layout } = content;
     if (!blocks_layout) {
-        console.warn('[RENDERER] No blocks_layout in content, nothing to render');
+        // Expected for non-block content types (Image, File, etc.)
         return;
     }
     const items = blocks_layout.items || [];

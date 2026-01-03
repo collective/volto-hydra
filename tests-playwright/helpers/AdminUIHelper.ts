@@ -514,10 +514,13 @@ export class AdminUIHelper {
 
       // Drag handle should be at block's left edge (within tolerance)
       const xDiff = Math.abs(handleBox.x - blockBox.x);
-      // Drag handle should be near the block's top (allow for above or at top)
-      // Handle is typically 48px above, but for container blocks it may be at the top
-      const minY = blockBox.y - 60; // Allow up to 60px above
-      const maxY = blockBox.y + 30; // Allow slightly below top
+      // Drag handle should be near the block's top or at iframe top when clamped
+      const iframeElement = this.page.locator('iframe').first();
+      const iframeBox = await iframeElement.boundingBox();
+      const iframeTop = iframeBox?.y || 0;
+      // Handle can be anywhere from iframe top to slightly below block top
+      const minY = iframeTop;
+      const maxY = blockBox.y + 30;
       const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
 
       if (xDiff > 30 || !inYRange) {
@@ -746,9 +749,6 @@ export class AdminUIHelper {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
-      if (res && !res.ok && res.reason) {
-        console.log(`[TEST] isBlockSelectedInIframe failed: ${res.reason}`);
-      }
       return !!res && !!res.ok;
     }, { timeout }).toBeTruthy();
 
@@ -766,11 +766,7 @@ export class AdminUIHelper {
 
     // Verify toolbar is not covered by sidebar
     await expect.poll(async () => {
-      const notCovered = await this.isToolbarNotCoveredBySidebar();
-      if (!notCovered) {
-        console.log(`[TEST] Toolbar for block "${blockId}" is covered by sidebar`);
-      }
-      return notCovered;
+      return await this.isToolbarNotCoveredBySidebar();
     }, { timeout: 5000 }).toBeTruthy();
   }
 
@@ -1419,7 +1415,6 @@ export class AdminUIHelper {
             }
             if (box.x < minX) {
               badPositionDetected = true;
-              console.log(`[TEST] Bad outline position detected: x=${box.x} < minX=${minX}`);
             }
           }
         } else {
@@ -2577,7 +2572,6 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const dragShadow = iframe.locator('.dragging');
     await dragShadow.waitFor({ state: 'visible', timeout: 5000 });
-    console.log('[TEST] Drag shadow visible: true');
   }
 
   /**
@@ -2585,7 +2579,6 @@ export class AdminUIHelper {
    */
   async verifyDropIndicatorVisible(): Promise<void> {
     const isVisible = await this.isDropIndicatorVisible();
-    console.log('[TEST] Drop indicator visible during drag:', isVisible);
     if (!isVisible) {
       throw new Error('Drop indicator not visible during drag - drag may have failed');
     }
@@ -2650,15 +2643,6 @@ export class AdminUIHelper {
       isNearTarget = dropY >= targetTop - tolerance && dropY <= targetTop + tolerance;
     }
 
-    console.log(
-      `[TEST] Drop indicator check (all iframe coords):\n` +
-        `  Cursor: ${cursorIframeCoords ? `(${cursorIframeCoords.x.toFixed(0)}, ${cursorIframeCoords.y.toFixed(0)})` : 'unknown'}\n` +
-        `  Drop indicator: y=${dropY.toFixed(0)} (display: ${dropRectInIframeCoords.display})\n` +
-        `  Target block: top=${targetTop.toFixed(0)}, bottom=${targetBottom.toFixed(0)}\n` +
-        `  Expected edge: ${insertAfter ? 'bottom' : 'top'} @ ${expectedEdge.toFixed(0)} ±${tolerance}\n` +
-        `  Result: ${isNearTarget ? 'PASS' : 'FAIL'} (dropY ${dropY.toFixed(0)} ${isNearTarget ? 'is' : 'is NOT'} within ${expectedEdge - tolerance}-${expectedEdge + tolerance})`,
-    );
-
     if (!isNearTarget) {
       throw new Error(
         `Drop indicator not near target block.\n` +
@@ -2710,8 +2694,6 @@ export class AdminUIHelper {
         className: el.className,
       };
     });
-
-    console.log(`[TEST] getDropPositionInIframeCoords: blockUid=${blockUid}, element=${rect.tagName}.${rect.className}, rect=`, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
 
     return {
       x: rect.x + rect.width / 2,
@@ -2772,8 +2754,6 @@ export class AdminUIHelper {
         : iframeRect.y + rect.y + rect.height * 0.25,
     };
 
-    console.log(`[TEST] getDropPositionInPageCoords: rect.y=${rect.y.toFixed(1)}, iframeRect.y=${iframeRect.y.toFixed(1)}, result.y=${result.y.toFixed(1)}`);
-
     return result;
   }
 
@@ -2787,7 +2767,6 @@ export class AdminUIHelper {
    */
   private async startDragFromToolbar(): Promise<{ x: number; y: number }> {
     const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
-    console.log('[TEST] Drag start position (page):', startPosPage);
 
     if (!this.isInPageViewport(startPosPage.y)) {
       throw new Error(
@@ -2821,7 +2800,6 @@ export class AdminUIHelper {
       await this.verifyDragShadowVisible();
 
       const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
-      console.log(`[TEST] Attempt ${attempt}: target at page Y=${dropPosPage.y.toFixed(1)}`);
 
       const viewportSize = this.page.viewportSize();
       const isAboveViewport = dropPosPage.y < 0;
@@ -2834,7 +2812,6 @@ export class AdminUIHelper {
 
       // Target is off-screen - move to edge to trigger auto-scroll
       const scrollUp = isAboveViewport;
-      console.log(`[TEST] Target ${scrollUp ? 'above' : 'below'} viewport (Y=${dropPosPage.y.toFixed(1)}), triggering auto-scroll`);
       await this.moveToScrollEdge(scrollUp);
 
       // Wait for auto-scroll to happen (target position must change)
@@ -2862,7 +2839,6 @@ export class AdminUIHelper {
       if (scrollAmount < 5) {
         throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
       }
-      console.log(`[TEST] Auto-scroll happened, target moved by ${scrollAmount.toFixed(1)}px`);
     }).toPass({ timeout: 2000 });
   }
 
@@ -2908,7 +2884,6 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
     await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
-    console.log('[TEST] Drag complete');
   }
 
   /**
@@ -2993,7 +2968,6 @@ export class AdminUIHelper {
     const dropPosPage = await this.getHorizontalDropPosition(targetBlock, insertAfter);
 
     // Step 3: Move to drop position
-    console.log('[TEST] Moving to horizontal drop position:', dropPosPage);
     await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 10 });
 
     // Step 4: Check drop indicator visibility
@@ -3217,8 +3191,6 @@ export class AdminUIHelper {
       };
     });
 
-    console.log(`[TEST] ${message}:`, selectionInfo);
-
     if (shouldExist) {
       if (!selectionInfo.hasSelection) {
         throw new Error(`${message}: Expected selection to exist, but no selection found`);
@@ -3299,16 +3271,9 @@ export class AdminUIHelper {
     }
 
     if (!popup || !boundingBox) {
-      // Log all candidates for debugging
       const count = await popups.count();
-      for (let i = 0; i < count; i++) {
-        const box = await popups.nth(i).boundingBox();
-        console.log(`[TEST] LinkEditor popup ${i} at:`, box);
-      }
       throw new Error(`LinkEditor popup not found on-screen. Found ${count} candidates but none at valid position.`);
     }
-
-    console.log('[TEST] LinkEditor popup found at:', boundingBox);
 
     // Verify popup has dimensions (width and height > 0)
     if (boundingBox.width === 0 || boundingBox.height === 0) {
@@ -3316,11 +3281,6 @@ export class AdminUIHelper {
         `LinkEditor popup has no dimensions! Size: ${boundingBox.width}x${boundingBox.height}`
       );
     }
-
-    console.log('[TEST] LinkEditor popup is visible with dimensions:', {
-      position: `(${boundingBox.x}, ${boundingBox.y})`,
-      size: `${boundingBox.width}x${boundingBox.height}`,
-    });
 
     return { popup, boundingBox };
   }
@@ -3382,7 +3342,6 @@ export class AdminUIHelper {
       },
     });
 
-    console.log(`[TEST] Clicked ${position} ${formatSelector} at (${clickX}, ${clickY})`);
     return formattedElement;
   }
 
@@ -3407,8 +3366,6 @@ export class AdminUIHelper {
       },
       { timeout }
     );
-
-    console.log('[TEST] All LinkEditor popups are now hidden');
   }
 
   /**
@@ -3427,11 +3384,8 @@ export class AdminUIHelper {
     // Wait for input to be visible
     await input.waitFor({ state: 'visible', timeout: 2000 });
 
-    console.log('[TEST] LinkEditor URL input found');
-
     // Wait for the input to actually be focused (componentDidMount completed successfully)
     await expect(input).toBeFocused({ timeout: 2000 });
-    console.log('[TEST] LinkEditor input is focused, componentDidMount completed');
 
     return input;
   }
@@ -3447,7 +3401,6 @@ export class AdminUIHelper {
     const clearButton = this.page.locator('button[aria-label="Clear"]').first();
 
     await clearButton.waitFor({ state: 'visible', timeout: 2000 });
-    console.log('[TEST] LinkEditor Clear button found');
 
     return clearButton;
   }
@@ -3463,7 +3416,6 @@ export class AdminUIHelper {
     const browseButton = this.page.locator('button[aria-label="Open object browser"]').first();
 
     await browseButton.waitFor({ state: 'visible', timeout: 2000 });
-    console.log('[TEST] LinkEditor Browse button found');
 
     return browseButton;
   }
@@ -3495,7 +3447,6 @@ export class AdminUIHelper {
       { timeout },
     );
 
-    console.log('[TEST] Sidebar Slate toolbar is visible');
     return toolbarHandle as unknown as ElementHandle;
   }
 
@@ -3527,7 +3478,6 @@ export class AdminUIHelper {
     // Scroll into view to avoid "outside of viewport" issues
     await buttonHandle.evaluate((el) => (el as Element).scrollIntoView({ block: 'center' }));
 
-    console.log(`[TEST] Found sidebar toolbar button: ${format}`);
     return buttonHandle as ElementHandle;
   }
 
@@ -3678,7 +3628,6 @@ export class AdminUIHelper {
       const homeButton = this.page.getByRole('button', { name: 'Home' });
       if (await homeButton.isVisible().catch(() => false)) {
         await homeButton.click();
-        console.log('[TEST] Object browser navigated to Home');
         await this.page.waitForTimeout(500);
       }
     }
@@ -3686,7 +3635,6 @@ export class AdminUIHelper {
     // Wait for list items to appear
     await expect(listItems.first()).toBeVisible({ timeout });
 
-    console.log('[TEST] Object browser is ready');
     return locator;
   }
 
@@ -3703,7 +3651,6 @@ export class AdminUIHelper {
 
     // Wait for the listing to update by checking for list items
     await expect(objectBrowser.locator('li[role="listitem"]').first()).toBeVisible({ timeout: 5000 });
-    console.log('[TEST] Object browser navigated to Home');
   }
 
   /**
@@ -3723,7 +3670,6 @@ export class AdminUIHelper {
     // Wait for the listing to update - new items should appear
     await this.page.waitForTimeout(300);
     await expect(this.page.locator('li').first()).toBeVisible({ timeout: 5000 });
-    console.log(`[TEST] Object browser navigated to folder: ${folderName}`);
   }
 
   /**
@@ -3752,7 +3698,6 @@ export class AdminUIHelper {
       await expect(browserHeading).not.toBeVisible({ timeout: 2000 });
     } catch {
       // Object browser didn't auto-close, close it manually via the X button in header
-      console.log('[TEST] Object browser did not auto-close, closing manually');
       // The X button is the last button in the header banner
       const banner = browserHeading.locator('..');
       const closeButton = banner.locator('button').last();
@@ -3766,7 +3711,6 @@ export class AdminUIHelper {
         await this.page.waitForTimeout(500);
       }
     }
-    console.log(`[TEST] Object browser selected item: ${itemName}`);
   }
 
   /**
@@ -3799,7 +3743,6 @@ export class AdminUIHelper {
     if (await clearButton.isVisible().catch(() => false)) {
       // Clear the value first
       await clearButton.click();
-      console.log('[TEST] Cleared existing value from toolbar popup');
 
       // Popup closes on clear, reopen it
       await reopenButton.click();
@@ -3823,7 +3766,6 @@ export class AdminUIHelper {
     const submitButton = popup.locator('button[aria-label="Submit"]');
     if (await submitButton.isVisible().catch(() => false)) {
       await submitButton.click();
-      console.log('[TEST] Submitted AddLinkForm');
     }
   }
 
@@ -3881,7 +3823,5 @@ export class AdminUIHelper {
       },
       { dropX, dropY, pngBase64, filename },
     );
-
-    console.log(`[TEST] Drag-dropped image file: ${filename}`);
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, Component } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Component } from 'react';
 import { Slate, ReactEditor } from 'slate-react';
 import { Transforms, Node, Range, Editor, Point } from 'slate';
 import { isEqual, cloneDeep } from 'lodash';
@@ -746,33 +746,27 @@ const SyncedSlateToolbar = ({
   );
 
   // Classify buttons into block buttons (FormatDropdown) and inline buttons (toolbar)
-  // Uses isBlockButton() which inspects element type without rendering
-  const { blockButtons, allInlineButtons } = useMemo(() => {
-    const blockBtns = [];
-    const inlineBtns = [];
+  // Computed inline (not in useMemo) because isBlockButton() calls the factory
+  // function which may use hooks - calling hooks inside useMemo violates Rules of Hooks
+  const blockButtons = [];
+  const allInlineButtons = [];
 
-    toolbarButtons.forEach((name) => {
-      if (name === 'separator') return;
-      const Btn = buttons[name];
-      if (!Btn) return;
+  toolbarButtons.forEach((name) => {
+    if (name === 'separator') return;
+    const Btn = buttons[name];
+    if (!Btn) return;
 
-      // Create element for later rendering
-      const element = <Btn />;
+    // Create element for later rendering
+    const element = <Btn />;
 
-      // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
-      // isBlockButton compares element.type to imported BlockButton reference
-      if (isBlockButton(Btn, BlockButton)) {
-        blockBtns.push({ name, element });
-      } else {
-        inlineBtns.push({ name, element });
-      }
-    });
-
-    return {
-      blockButtons: blockBtns,
-      allInlineButtons: inlineBtns,
-    };
-  }, [toolbarButtons, buttons]);
+    // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
+    // isBlockButton compares element.type to imported BlockButton reference
+    if (isBlockButton(Btn, BlockButton)) {
+      blockButtons.push({ name, element });
+    } else {
+      allInlineButtons.push({ name, element });
+    }
+  });
 
   // Render toolbar when we have a rect (either block or page-level field)
   // selectedBlock can be null for page-level fields
@@ -828,10 +822,17 @@ const SyncedSlateToolbar = ({
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
-  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800 };
-  const toolbarTopRaw = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
-  // Ensure toolbar stays within viewport (min 60px from top to clear main toolbar)
-  const toolbarTop = Math.max(60, toolbarTopRaw);
+  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800, height: 600 };
+
+  // Check if block is visible in the iframe viewport
+  const blockTopInPage = toolbarIframeRect.top + blockUI.rect.top;
+  const blockBottomInPage = blockTopInPage + blockUI.rect.height;
+  const iframeBottom = toolbarIframeRect.top + toolbarIframeRect.height;
+  const isBlockVisible = blockBottomInPage > toolbarIframeRect.top && blockTopInPage < iframeBottom;
+
+  const toolbarTopRaw = blockTopInPage - 40; // 40px above block container
+  // Clamp to top of iframe if toolbar would be above it
+  const toolbarTop = Math.max(toolbarIframeRect.top, toolbarTopRaw);
   const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Always align with block's left edge
 
   // Calculate max width so toolbar doesn't extend past iframe right edge (sidebar boundary)
@@ -884,7 +885,7 @@ const SyncedSlateToolbar = ({
           left: `${toolbarLeft}px`,
           maxWidth: `${constrainedMaxWidth}px`,
           zIndex: 10,
-          display: 'flex',
+          display: isBlockVisible ? 'flex' : 'none',
           gap: '2px',
           background: '#fff',
           border: '1px solid #e0e0e0',

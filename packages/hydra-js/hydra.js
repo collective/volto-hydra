@@ -3629,15 +3629,20 @@ export class Bridge {
         return;
       }
 
-      // Position drag button to match parent toolbar position
-      // IMPORTANT: Use BLOCK CONTAINER rect (same as BLOCK_SELECTED message), NOT editable field rect
       const rect = blockElement.getBoundingClientRect();
-      const toolbarTop = rect.top - 48; // 48px above block container (matches parent toolbar height)
 
-      // Always left-align at block's left edge
+      // Hide if block is completely out of view
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        dragButton.style.display = 'none';
+        return;
+      }
+
+      // Position above block, or at top of iframe if that would be off-screen
+      const handleTop = Math.max(0, rect.top - 48);
+
       dragButton.style.right = 'auto';
       dragButton.style.left = `${rect.left}px`;
-      dragButton.style.top = `${toolbarTop}px`;
+      dragButton.style.top = `${handleTop}px`;
       dragButton.style.display = 'block';
     };
 
@@ -5680,7 +5685,13 @@ export class Bridge {
         log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
       }
 
-      // Use blockData from getBlockData (already retrieved above) to support nested blocks
+      // Get block data to support nested blocks
+      const blockData = this.getBlockData(blockUid);
+      if (!blockData) {
+        log('handleTextChange: blockData not found for', blockUid);
+        return;
+      }
+
       const updatedJson = this.updateJsonNode(
         blockData,
         nodeId,
