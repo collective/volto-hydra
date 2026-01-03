@@ -8,6 +8,7 @@ import {
   previousBlockId,
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
+import { isSlateFieldType } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -1079,7 +1080,7 @@ const Iframe = (props) => {
               }
               const blockType = currentBlock['@type'];
               const fieldType = blockFieldTypes[blockType]?.[enterFieldName];
-              if (fieldType !== 'slate') {
+              if (!isSlateFieldType(fieldType)) {
                 // Not a slate field - don't split block
                 break;
               }

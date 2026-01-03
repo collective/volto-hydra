@@ -5494,7 +5494,7 @@ export class Bridge {
    * @returns {boolean} True if the field is a slate field
    */
   fieldTypeIsSlate(fieldType) {
-    return fieldType?.includes(':slate') || fieldType?.includes(':richtext');
+    return isSlateFieldType(fieldType);
   }
 
   /**
@@ -5504,7 +5504,7 @@ export class Bridge {
    * @returns {boolean} True if the field is a textarea field
    */
   fieldTypeIsTextarea(fieldType) {
-    return fieldType?.includes(':textarea');
+    return isTextareaFieldType(fieldType);
   }
 
   /**
@@ -5515,13 +5515,7 @@ export class Bridge {
    * @returns {boolean} True if the field is a plain string field
    */
   fieldTypeIsPlainString(fieldType) {
-    if (!fieldType) return false;
-    // Must be string type and not have textarea/slate widget
-    if (this.fieldTypeIsSlate(fieldType) || this.fieldTypeIsTextarea(fieldType)) {
-      return false;
-    }
-    // "string" (no widget) or starts with "string:" but not slate/textarea
-    return fieldType === 'string' || fieldType.startsWith('string:');
+    return isPlainStringFieldType(fieldType);
   }
 
   /**
@@ -5530,10 +5524,7 @@ export class Bridge {
    * @returns {boolean} True if the field is text-editable
    */
   fieldTypeIsTextEditable(fieldType) {
-    if (!fieldType) return false;
-    return this.fieldTypeIsSlate(fieldType) ||
-           this.fieldTypeIsTextarea(fieldType) ||
-           this.fieldTypeIsPlainString(fieldType);
+    return isTextEditableFieldType(fieldType);
   }
 
   /**
@@ -6581,6 +6572,55 @@ export function onEditChange(callback) {
   if (bridgeInstance) {
     bridgeInstance.onEditChange(callback);
   }
+}
+
+// ============================================================================
+// Field Type Utilities (exported for use by volto-hydra admin side)
+// ============================================================================
+
+/**
+ * Check if a field type indicates a Slate field.
+ * Handles both old format ('slate') and new format ('array:slate', 'object:richtext').
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isSlateFieldType(fieldType) {
+  if (!fieldType) return false;
+  return fieldType === 'slate' || fieldType.includes(':slate') || fieldType.includes(':richtext');
+}
+
+/**
+ * Check if a field type indicates a textarea field.
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isTextareaFieldType(fieldType) {
+  return fieldType?.includes(':textarea') || false;
+}
+
+/**
+ * Check if a field type indicates a plain string field (single-line text).
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isPlainStringFieldType(fieldType) {
+  if (!fieldType) return false;
+  if (isSlateFieldType(fieldType) || isTextareaFieldType(fieldType)) {
+    return false;
+  }
+  return fieldType === 'string' || fieldType.startsWith('string:');
+}
+
+/**
+ * Check if a field type is text-editable (string, textarea, or slate).
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isTextEditableFieldType(fieldType) {
+  if (!fieldType) return false;
+  return isSlateFieldType(fieldType) ||
+         isTextareaFieldType(fieldType) ||
+         isPlainStringFieldType(fieldType);
 }
 
 // Make initBridge available globally

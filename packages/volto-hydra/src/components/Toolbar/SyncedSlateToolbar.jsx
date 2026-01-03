@@ -8,6 +8,7 @@ import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slat
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
+import { isSlateFieldType } from '@volto-hydra/hydra-js';
 import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -439,7 +440,7 @@ const SyncedSlateToolbar = ({
     // Only sync for slate fields
     const blockType = block?.['@type'];
     const fieldType = blockFieldTypes?.[blockType]?.[fieldName];
-    if (fieldType !== 'slate') {
+    if (!isSlateFieldType(fieldType)) {
       internalValueRef.current = null;
       return;
     }
@@ -801,7 +802,7 @@ const SyncedSlateToolbar = ({
   const blockType = block?.['@type'];
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
-  const showFormatButtons = fieldType === 'slate';
+  const showFormatButtons = isSlateFieldType(fieldType);
 
   // Debug: Check what blockFieldTypes the toolbar is receiving
   if (blockType === 'hero') {
