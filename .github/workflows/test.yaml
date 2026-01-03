@@ -10,7 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
       - name: Setup pnpm
         run: |
@@ -43,15 +42,12 @@ jobs:
       - name: Check pnpm lockfile consistency
         run: |
           pnpm install --frozen-lockfile
-      - name: Build dependencies
-        run: |
-          pnpm build:deps
       - name: Build Volto for production
         run: |
-          pnpm --filter @plone/volto build
+          pnpm build
         env:
           RAZZLE_API_PATH: http://localhost:8888
-          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888
+          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
       - name: Install Nuxt dependencies
         run: |
@@ -63,7 +59,7 @@ jobs:
 
           # Start Volto production server
           PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 \
-            pnpm --filter @plone/volto start:prod &
+            pnpm start:prod &
 
           # Start Nuxt test server
           cd examples/nuxt-blog-starter && npm run dev:test &
