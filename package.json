@@ -13,15 +13,14 @@
   ],
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "start": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start",
-    "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start",
+    "start": "VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
+    "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
     "start:mock-api": "node tests-playwright/fixtures/mock-api-server.js",
     "start:nuxt:test": "cd examples/nuxt-blog-starter && pnpm run dev:test",
-    "start:prod": "pnpm --filter @plone/volto start:prod",
-    "build": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build",
-    "build:deps": "pnpm --filter @plone/registry --filter @plone/components build",
+    "start:prod": "NODE_ENV=production node build/server.js",
+    "build": "VOLTOCONFIG=$(pwd)/volto.config.js razzle build --noninteractive",
     "i18n": "pnpm --filter volto-hydra i18n",
-    "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js pnpm --filter @plone/volto test",
+    "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js razzle test --maxWorkers=50%",
     "test:e2e": "playwright test",
     "test:e2e:coverage": "COVERAGE=1 playwright test",
     "test:e2e:headed": "playwright test --headed",
@@ -37,29 +36,31 @@
     "release": "pnpm --filter volto-hydra release",
     "release-major-alpha": "pnpm --filter volto-hydra release-major-alpha",
     "release-alpha": "pnpm --filter volto-hydra release-alpha",
-    "storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto storybook dev -p 6006 -c $(pwd)/.storybook",
-    "build-storybook": "pnpm build:deps && VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto build-storybook -c $(pwd)/.storybook",
+    "storybook": "VOLTOCONFIG=$(pwd)/volto.config.js storybook dev -p 6006 -c $(pwd)/.storybook",
+    "build-storybook": "VOLTOCONFIG=$(pwd)/volto.config.js storybook build -c $(pwd)/.storybook",
     "example:nextjs": "pnpm --filter hydra-nextjs run dev",
     "example:nuxt": "pnpm --filter nuxt-blog-starter install && pnpm --filter nuxt-blog-starter run dev"
   },
   "dependencies": {
     "@plone/client": "1.0.0-alpha.16",
-    "@plone/registry": "workspace:*",
-    "@plone/volto": "workspace:*",
+    "@plone/registry": "2.6.0",
+    "@plone/volto": "18.31.0",
     "events": "^3.3.0",
     "js-cookie": "^3.0.5",
     "volto-hydra": "workspace:*"
   },
   "peerDependencies": {
-    "@plone/volto": "volto-18.0.0-alpha.41"
+    "@plone/volto": "^18.0.0"
   },
   "devDependencies": {
     "@bgotink/playwright-coverage": "^0.3.2",
     "@playwright/test": "^1.40.0",
+    "@storybook/react": "^8.0.0",
     "@types/node": "^20.0.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "mrs-developer": "^2.2.0",
+    "razzle": "^4.2.18",
     "typescript": "^5.3.0"
   },
   "packageManager": "pnpm@9.1.1",
