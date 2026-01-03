@@ -4830,8 +4830,12 @@ export class Bridge {
     }
 
     try {
-      const startNode = document.querySelector(`[data-node-id="${savedCursor.startNodeId}"]`);
-      const endNode = document.querySelector(`[data-node-id="${savedCursor.endNodeId}"]`);
+      // Scope to current block to avoid selecting wrong element when multiple blocks visible
+      const blockElement = this.selectedBlockUid
+        ? document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`)
+        : document;
+      const startNode = blockElement?.querySelector(`[data-node-id="${savedCursor.startNodeId}"]`);
+      const endNode = blockElement?.querySelector(`[data-node-id="${savedCursor.endNodeId}"]`);
 
       if (!startNode || !endNode) {
         return;
@@ -4915,8 +4919,9 @@ export class Bridge {
           return;
         }
 
-        anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
-        focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
+        // Scope to current block to avoid selecting wrong element when multiple blocks visible
+        anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
+        focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
         log('restoreSlateSelection: looking for nodeIds', {
           anchorNodeId: anchorResult.nodeId,
@@ -4942,7 +4947,7 @@ export class Bridge {
           if (result.textChildIndex !== null && offset === 0 && result.textChildIndex > 0) {
             const prevChild = parentChildren[result.textChildIndex - 1];
             if (prevChild && prevChild.type && prevChild.nodeId) {
-              const inlineElement = document.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
+              const inlineElement = blockElement.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
               if (inlineElement) {
                 // Check if there's already a text node after the inline element
                 const existingTextNode = inlineElement.nextSibling;
@@ -4969,7 +4974,7 @@ export class Bridge {
           }
 
           // Case 2: Prospective formatting - offset 0 inside an empty inline element
-          const targetElement = document.querySelector(`[data-node-id="${result.nodeId}"]`);
+          const targetElement = blockElement.querySelector(`[data-node-id="${result.nodeId}"]`);
           if (targetElement && offset === 0) {
             const visibleText = targetElement.textContent.replace(/[\uFEFF\u200B]/g, '');
             if (visibleText === '') {
