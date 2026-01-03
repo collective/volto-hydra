@@ -1578,16 +1578,23 @@ export class AdminUIHelper {
     // Determine direction based on position
     // "bottom" = button's top is near/below block's bottom (within 20px)
     // "right" = button's top is near block's top (top-aligned, within 20px)
-    //           This includes when button is constrained to be inside the block
+    //           OR button is constrained inside block at bottom-right corner
     let addButtonDirection: 'bottom' | 'right' | 'unknown' = 'unknown';
     const addButtonTopAligned = Math.abs(addButtonBox.y - blockBox.y) < 20;
     const addButtonBottomAligned =
       addButtonBelowBlock >= -5 && addButtonBelowBlock < 20;
 
+    // Detect constrained positioning: button is inside block (negative values)
+    // but positioned near the right edge (typical for horizontal containers when space is tight)
+    const isConstrainedRight =
+      addButtonBelowBlock < -20 && // Well above block bottom (inside block)
+      addButtonRightOfBlock < 0 && // Inside block horizontally
+      addButtonRightOfBlock > -50; // But near right edge
+
     if (addButtonBottomAligned && !addButtonTopAligned) {
       addButtonDirection = 'bottom';
-    } else if (addButtonTopAligned) {
-      // Top-aligned means 'right' direction (even if constrained to be inside block)
+    } else if (addButtonTopAligned || isConstrainedRight) {
+      // Top-aligned OR constrained at bottom-right means 'right' direction
       addButtonDirection = 'right';
     }
 
