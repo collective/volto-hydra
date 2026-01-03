@@ -4,7 +4,7 @@
  * Tests the slider block rendering and editing with the Nuxt frontend.
  * Uses http://localhost:3003 (Nuxt) instead of http://localhost:8888 (mock frontend).
  */
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 // Helper to switch Volto to use Nuxt frontend

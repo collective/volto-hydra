@@ -3,7 +3,7 @@
  * Tests that nodeIds are added correctly to Slate structures
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Bridge.addNodeIds()', () => {

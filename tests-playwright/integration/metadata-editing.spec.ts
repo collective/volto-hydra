@@ -2,7 +2,7 @@
  * Tests for editing page metadata inline.
  * Uses path syntax: /fieldName to edit page-level fields.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Page Metadata Editing', () => {

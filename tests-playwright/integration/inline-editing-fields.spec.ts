@@ -11,7 +11,7 @@
  * - data-linkable-field="buttonLink" on the button
  * - data-media-field="image" on the image element
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline editing - linkable/media fields', () => {

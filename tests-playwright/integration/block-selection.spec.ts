@@ -4,7 +4,7 @@
  * These tests verify that clicking blocks in the iframe opens the correct
  * sidebar settings and toolbars appear as expected.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Block Selection', () => {

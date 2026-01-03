@@ -6,7 +6,7 @@
  * - click link without selection and then type - should create link?
  * - paste a link
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Links', () => {

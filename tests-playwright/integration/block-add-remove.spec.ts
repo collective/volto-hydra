@@ -21,7 +21,7 @@
  * - add appears in direction block will be added
  * - can add another block in a container
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Adding Blocks', () => {

@@ -10,7 +10,7 @@
  * - can DND from inside container to outside container and vice versa
  * - can't DND to container where block is not allowed (e.g. image into text-only container)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Block Drag and Drop', () => {

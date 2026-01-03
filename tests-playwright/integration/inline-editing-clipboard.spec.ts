@@ -7,7 +7,7 @@
  * - paste rich text
  * - paste multi-paragraph rich text
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Clipboard', () => {

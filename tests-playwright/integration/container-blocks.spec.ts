@@ -4,7 +4,7 @@
  * Tests nested block selection, container hierarchy detection,
  * and add/delete operations within containers.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Container Block Detection', () => {

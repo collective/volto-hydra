@@ -11,7 +11,7 @@
  * - image: media field with inline toolbar editing
  * - buttonLink: linkable field with sidebar editing
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline image editing', () => {

@@ -3,7 +3,7 @@
  * Tests that updating text in Slate structures doesn't corrupt the structure
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Bridge.updateJsonNode()', () => {

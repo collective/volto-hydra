@@ -7,7 +7,7 @@
  * IMPORTANT: Slate/Text blocks edit their content INLINE, not through sidebar fields.
  * The Slate block sidebar only shows TOC override settings on the Page tab.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Sidebar Forms - Slate Block Behavior', () => {

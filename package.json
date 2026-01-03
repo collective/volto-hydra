@@ -23,6 +23,7 @@
     "i18n": "pnpm --filter volto-hydra i18n",
     "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js pnpm --filter @plone/volto test",
     "test:e2e": "playwright test",
+    "test:e2e:coverage": "COVERAGE=1 playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
@@ -53,6 +54,7 @@
     "@plone/volto": "volto-18.0.0-alpha.41"
   },
   "devDependencies": {
+    "@bgotink/playwright-coverage": "^0.3.2",
     "@playwright/test": "^1.40.0",
     "@types/node": "^20.0.0",
     "cors": "^2.8.5",

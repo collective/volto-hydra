@@ -3,7 +3,7 @@
  * When a teaser block has an empty required 'href' field, a starter UI overlay
  * should appear with an AddLinkForm to help the user select a target page.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Teaser Starter UI', () => {

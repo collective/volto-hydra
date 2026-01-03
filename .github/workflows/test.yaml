@@ -105,12 +105,13 @@ jobs:
           done
 
           echo "All servers ready!"
-      - name: Run Playwright tests
+      - name: Run Playwright tests with coverage
         run: |
           pnpm exec playwright test
         env:
           CI: true
           USE_PREBUILT: true
+          COVERAGE: true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -118,3 +119,10 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+          verbose: true

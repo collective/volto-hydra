@@ -11,7 +11,7 @@
  * - multiple formats on same text (bold + italic, etc)
  * - paragraph formats as dropdown?
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Formatting', () => {
