@@ -19,8 +19,11 @@ test.describe('Page Metadata Editing', () => {
 
     const iframe = helper.getIframe();
 
-    // Find the page title element using the common data-editable-field attribute
-    const pageTitle = iframe.locator('[data-editable-field="/title"]');
+    // Find the page title element
+    // Mock frontend uses "title" (without slash) to test shorthand works
+    // Nuxt frontend uses "/title" (with slash) to test explicit page-level path
+    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '[data-editable-field="title"]';
+    const pageTitle = iframe.locator(titleSelector);
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await expect(pageTitle).toHaveText(expectedInitialTitle);
 
@@ -48,8 +51,12 @@ test.describe('Page Metadata Editing', () => {
     // Wait for the change to propagate
     await page.waitForTimeout(500);
 
-    // Verify the page title was updated
+    // Verify the page title was updated in the iframe
     await expect(pageTitle).toHaveText('Updated Page Title');
+
+    // Verify the sidebar title field also shows the updated value
+    const sidebarTitleField = page.locator('.field-wrapper-title input, .field-wrapper-title textarea');
+    await expect(sidebarTitleField).toHaveValue('Updated Page Title', { timeout: 5000 });
   });
 
   test('page title edit persists when selecting another block', async ({ page }, testInfo) => {
@@ -66,7 +73,9 @@ test.describe('Page Metadata Editing', () => {
     const iframe = helper.getIframe();
 
     // Find and click the page title
-    const pageTitle = iframe.locator('[data-editable-field="/title"]');
+    // Mock frontend uses "title" (without slash), Nuxt uses "/title"
+    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '[data-editable-field="title"]';
+    const pageTitle = iframe.locator(titleSelector);
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await pageTitle.click();
 
