@@ -148,7 +148,7 @@ export default defineConfig({
           // Production server (prebuilt in CI) - starts immediately, no webpack compilation
           name: 'Volto Admin UI (Production)',
           command:
-            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start:prod',
+            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 pnpm start:prod',
           url: 'http://localhost:3001', // Health check on SSR server directly
           timeout: 30 * 1000, // 30 seconds should be plenty for starting prebuilt server
           reuseExistingServer: true, // CI starts server in advance
@@ -171,11 +171,9 @@ export default defineConfig({
           // - PORT 3002: webpack-dev-server (auto-incremented from PORT) - compiles assets, health check here
           // Tests navigate to port 3001 (SSR server for content)
           // Health check on port 3002 (webpack-dev-server) waits for compilation to complete
-          // NOTE: Skips build:deps to avoid parcel segfault in non-interactive shell
-          // Dependencies must be built manually once with: pnpm build:deps
           name: 'Volto Admin UI (Dev)',
           command:
-            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto start',
+            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js razzle start',
           url: 'http://localhost:3002/health', // Health check on webpack-dev-server (returns 200 when ready)
           timeout: 300 * 1000, // 5 minutes for initial webpack compilation
           reuseExistingServer: true, // Always reuse - local dev starts manually
