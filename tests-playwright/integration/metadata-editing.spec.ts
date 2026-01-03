@@ -7,17 +7,22 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Page Metadata Editing', () => {
   test('can edit page title inline using /title path', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Nuxt uses title block instead of #page-title element');
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
+
+    // Use different pages for different frontends
+    const isNuxt = testInfo.project.name === 'nuxt';
+    const testPath = isNuxt ? '/carousel-test-page' : '/test-page';
+    const expectedInitialTitle = isNuxt ? 'Carousel Test Page' : 'Test Page';
+
+    await helper.navigateToEdit(testPath);
 
     const iframe = helper.getIframe();
 
-    // Find the page title element (outside of blocks, has data-editable-field="/title")
-    const pageTitle = iframe.locator('#page-title');
+    // Find the page title element using the common data-editable-field attribute
+    const pageTitle = iframe.locator('[data-editable-field="/title"]');
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
-    await expect(pageTitle).toHaveText('Test Page');
+    await expect(pageTitle).toHaveText(expectedInitialTitle);
 
     // Click on the title to make it editable
     await pageTitle.click();
@@ -25,33 +30,43 @@ test.describe('Page Metadata Editing', () => {
     // The title should become contenteditable
     await expect(pageTitle).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
 
+    // The slate warning popup should NOT appear - title is a plain string, not slate
+    const slateWarning = page.locator('text=Missing data-node-id attributes');
+    await expect(slateWarning).not.toBeVisible();
+
     // Clear and type new title
     await pageTitle.fill('');
     await pageTitle.pressSequentially('Updated Page Title', { delay: 50 });
 
     // Click elsewhere to trigger blur and save
-    await iframe.locator('#content').click();
+    // Use a block that exists in both frontends
+    const contentBlock = isNuxt
+      ? iframe.locator('[data-block-uid="text-after"]')
+      : iframe.locator('#content');
+    await contentBlock.click({ force: true });
 
     // Wait for the change to propagate
     await page.waitForTimeout(500);
 
     // Verify the page title was updated
     await expect(pageTitle).toHaveText('Updated Page Title');
-
-    // Verify in sidebar that the page title field also shows the new value
-    // The document title should be shown in the sidebar or form
-    // This confirms the metadata was actually updated, not just the display
   });
 
-  test('page title edit updates properties.title (not block data)', async ({ page }) => {
+  test('page title edit persists when selecting another block', async ({ page }, testInfo) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
+
+    // Use different pages for different frontends
+    const isNuxt = testInfo.project.name === 'nuxt';
+    const testPath = isNuxt ? '/carousel-test-page' : '/test-page';
+    const blockToClick = isNuxt ? 'slider-1' : 'block-1-uuid';
+
+    await helper.navigateToEdit(testPath);
 
     const iframe = helper.getIframe();
 
     // Find and click the page title
-    const pageTitle = iframe.locator('#page-title');
+    const pageTitle = iframe.locator('[data-editable-field="/title"]');
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await pageTitle.click();
 
@@ -60,75 +75,17 @@ test.describe('Page Metadata Editing', () => {
     await pageTitle.fill('');
     await pageTitle.pressSequentially('New Title', { delay: 50 });
 
-    // Trigger save
-    await iframe.locator('#content').click();
+    // Trigger save by clicking elsewhere
+    const otherBlock = iframe.locator(`[data-block-uid="${blockToClick}"]`);
+    await otherBlock.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Now click on a block to see the sidebar
-    const slateBlock = iframe.locator('[data-block-uid="block-1-uuid"]');
-    await slateBlock.click();
-
-    // The block should be selected but should NOT have a 'title' field
-    // because the page title is not part of the block
+    // The block should be selected
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible({ timeout: 5000 });
 
     // Verify page title is still the edited value
     await expect(pageTitle).toHaveText('New Title');
-  });
-
-  test('can edit page title via title block (Nuxt)', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'nuxt', 'This test is specific to Nuxt frontend');
-
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/carousel-test-page');
-
-    const iframe = helper.getIframe();
-
-    // Find the title block (has data-block-uid and data-editable-field="/title")
-    const titleBlock = iframe.locator('[data-block-uid="title-block"]');
-    await expect(titleBlock).toBeVisible({ timeout: 10000 });
-
-    // Initial title should match the page title
-    const initialText = await titleBlock.textContent();
-    expect(initialText?.trim()).toBe('Carousel Test Page');
-
-    // Click on the title block to select it
-    await titleBlock.click();
-
-    // Wait for it to become editable
-    await expect(titleBlock).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
-
-    // The block should be selected (outline visible)
-    const outline = page.locator('.volto-hydra-block-outline');
-    await expect(outline).toBeVisible({ timeout: 5000 });
-
-    // The slate warning popup should NOT appear - title is a plain string, not slate
-    const slateWarning = page.locator('text=Missing data-node-id attributes');
-    await expect(slateWarning).not.toBeVisible();
-
-    // Clear and type new title
-    await titleBlock.fill('');
-    await titleBlock.pressSequentially('New Page Title', { delay: 50 });
-
-    // Click on a text block to trigger blur and save (not slider which has its own title field)
-    const textBlock = iframe.locator('[data-block-uid="text-after"]');
-    await textBlock.click({ force: true });
-
-    // Wait for the change to propagate
-    await page.waitForTimeout(500);
-
-    // Verify the title block shows the new text
-    await expect(titleBlock).toHaveText('New Page Title');
-
-    // Verify the sidebar shows the updated page title
-    // Use first() since we clicked a text block, there should only be one title input now
-    const sidebar = page.locator('.sidebar-container');
-    const titleInput = sidebar.locator('input[name="title"], input#field-title').first();
-    if (await titleInput.isVisible()) {
-      await expect(titleInput).toHaveValue('New Page Title');
-    }
   });
 
   test('can click page-level preview_image and change it inline', async ({ page }, testInfo) => {

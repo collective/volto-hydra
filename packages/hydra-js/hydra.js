@@ -1075,32 +1075,8 @@ export class Bridge {
       return;
     }
 
-    // Set contenteditable on text and slate fields only
-    // Only set on THIS block's own fields, not nested blocks' fields
-    const editableFields = this.getOwnEditableFields(blockElement);
-    editableFields.forEach((field) => {
-      const fieldPath = field.getAttribute('data-editable-field');
-      // Use getFieldType which handles page-level fields (e.g., /title) correctly
-      const fieldType = this.getFieldType(blockUid, fieldPath);
-      // Only set contenteditable for text-editable fields (string, textarea, slate)
-      if (this.fieldTypeIsTextEditable(fieldType)) {
-        field.setAttribute('contenteditable', 'true');
-
-        // For plain string fields (single-line), prevent Enter key from creating new lines
-        if (this.fieldTypeIsPlainString(fieldType)) {
-          // Store the handler so we can remove it later if needed
-          if (!field._enterKeyHandler) {
-            field._enterKeyHandler = (e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                log('Prevented Enter key in string field');
-              }
-            };
-            field.addEventListener('keydown', field._enterKeyHandler);
-          }
-        }
-      }
-    });
+    // Set contenteditable on text and slate fields
+    this.restoreContentEditableOnFields(blockElement, 'detectFocusedFieldAndUpdateToolbar');
 
     let fieldToFocus = null;
 
@@ -1214,6 +1190,13 @@ export class Bridge {
           this.focusedMediaField = pageField.getAttribute('data-media-field');
           this.focusedLinkableField = pageField.getAttribute('data-linkable-field');
           this.focusedFieldName = pageField.getAttribute('data-editable-field');
+
+          // Make page-level text fields editable (same as selectBlock does for blocks)
+          if (this.focusedFieldName) {
+            this.isInlineEditing = true;
+            this.restoreContentEditableOnFields(pageField, 'pageFieldClick');
+            this.observeBlockTextChanges(pageField);
+          }
 
           // Send BLOCK_SELECTED with pageField as "block" - blockUid will be null
           this.sendBlockSelected('pageFieldClick', pageField);
@@ -2365,6 +2348,16 @@ export class Bridge {
       if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+
+        // For plain string fields (single-line), prevent Enter key from creating new lines
+        if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
+          field._enterKeyHandler = (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+            }
+          };
+          field.addEventListener('keydown', field._enterKeyHandler);
+        }
       } else {
         log(`  ${fieldPath}: skipped (type: ${fieldType})`);
       }
@@ -2654,38 +2647,14 @@ export class Bridge {
 
     this.isInlineEditing = true;
 
-    // Helper function to handle each element - sets contenteditable and handles string fields
-    const handleElement = (element) => {
-      const editableField = element.getAttribute('data-editable-field');
-      if (editableField === 'value') {
-        this.makeBlockContentEditable(element);
-      } else if (editableField !== null) {
-        element.setAttribute('contenteditable', 'true');
+    // Set contenteditable on all text-editable fields
+    this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
-        // Check field type to determine if this is a string field (single-line)
-        // Use getFieldType which handles page-level fields (e.g., /title) correctly
-        const fieldType = this.getFieldType(blockUid, editableField);
-
-        // For plain string fields (single-line), prevent Enter key from creating new lines
-        if (this.fieldTypeIsPlainString(fieldType) && !element._enterKeyHandler) {
-          element._enterKeyHandler = (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              log('Prevented Enter key in string field');
-            }
-          };
-          element.addEventListener('keydown', element._enterKeyHandler);
-        }
-      }
-    };
-
-    // Function to recursively handle all children
-    const handleElementAndChildren = (element) => {
-      handleElement(element);
-      Array.from(element.children).forEach((child) =>
-        handleElementAndChildren(child),
-      );
-    };
+    // For slate blocks (value field), also set up paste/keydown handlers
+    const valueField = blockElement.querySelector('[data-editable-field="value"]');
+    if (valueField) {
+      this.makeBlockContentEditable(valueField);
+    }
 
     // Remove border and button from the previously selected block
     if (
@@ -2817,8 +2786,7 @@ export class Bridge {
     // Mouse events pass through the parent's visual (which has pointerEvents: 'none') to this button
     this.createDragHandle(blockElement);
 
-    // Set contenteditable on all editable fields in the block
-    handleElementAndChildren(blockElement);
+    // Observe block text changes for inline editing
     this.observeBlockTextChanges(blockElement);
 
     // Observe block size changes (e.g., image loading, content changes)
@@ -5445,7 +5413,8 @@ export class Bridge {
    * @returns {boolean} True if values are equal (ignoring nodeIds)
    */
   focusedFieldValuesEqual(formDataA, formDataB) {
-    if (!this.selectedBlockUid || !this.focusedFieldName) {
+    // selectedBlockUid can be null for page-level fields, so only check focusedFieldName
+    if (!this.focusedFieldName) {
       return true; // No focused field to compare
     }
 
@@ -5638,12 +5607,8 @@ export class Bridge {
       return;
     }
 
-    // Determine field type from block schema metadata
-    // Use getBlockData to support nested blocks inside containers
-    const blockData = this.getBlockData(blockUid);
-    const blockType = blockData?.['@type'];
-    const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
-    const fieldType = blockFieldTypes[editableField];
+    // Determine field type (supports page-level fields via getFieldType)
+    const fieldType = this.getFieldType(blockUid, editableField);
 
 
     // Note: We intentionally do NOT strip ZWS from DOM during typing.
