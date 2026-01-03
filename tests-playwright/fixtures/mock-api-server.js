@@ -14,8 +14,32 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8888;
 
+/**
+ * Parse CONTENT_MOUNTS env variable for multiple content directories
+ * Format: "mountPath:dirPath,mountPath2:dirPath2"
+ * Example: "/:/default/content,/pretagov:/path/to/pretagov/content"
+ * Falls back to default ./content directory mounted at /
+ */
+function parseContentMounts() {
+  const mountsEnv = process.env.CONTENT_MOUNTS;
+  if (!mountsEnv) {
+    return [{ mountPath: '/', dirPath: path.join(__dirname, 'content') }];
+  }
+
+  return mountsEnv.split(',').map(mount => {
+    const [mountPath, dirPath] = mount.split(':');
+    const resolvedDir = path.isAbsolute(dirPath) ? dirPath : path.resolve(process.cwd(), dirPath);
+    return { mountPath: mountPath || '/', dirPath: resolvedDir };
+  });
+}
+
+const CONTENT_MOUNTS = parseContentMounts();
+
 // In-memory content database
 const contentDB = {};
+
+// Map URL paths to source directories (for reloading content from disk)
+const contentDirMap = {};
 
 /**
  * Generate a fresh JWT token with 24-hour expiration from now.
@@ -118,15 +142,28 @@ function filterActionsForAuth(content, authenticated) {
 }
 
 /**
- * Get root-level navigation items from contentDB
- * Used by both @navigation component and @search endpoint
+ * Get navigation items at a specific level under a base path
+ * @param {string} basePath - The base path to get navigation for (e.g., '/' or '/pretagov')
+ * @param {number} depth - How many levels deep to include (default 1)
  */
-function getRootNavigationItems() {
+function getNavigationItems(basePath = '/', depth = 1) {
+  const baseUrl = `http://localhost:${PORT}`;
+  const normalizedBase = basePath.replace(/\/$/, '') || '/';
+  const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
+
   return Object.entries(contentDB)
-    .filter(([path]) => {
-      if (path === '/') return false; // Exclude site root itself
-      const pathParts = path.split('/').filter(p => p);
-      return pathParts.length === 1; // Only root-level items
+    .filter(([itemPath]) => {
+      if (itemPath === '/') return false;
+      if (itemPath === normalizedBase) return false; // Exclude the base itself
+
+      // Check if item is under the base path
+      if (normalizedBase !== '/' && !itemPath.startsWith(normalizedBase + '/')) {
+        return false;
+      }
+
+      // Check depth - items should be at baseDepth + 1 level
+      const itemParts = itemPath.split('/').filter(p => p);
+      return itemParts.length === baseDepth + 1;
     })
     .map(([, content]) => ({
       '@id': content['@id'],
@@ -136,15 +173,26 @@ function getRootNavigationItems() {
       'description': content.description || '',
       'review_state': content.review_state || 'published',
       'UID': content.UID,
+      'is_folderish': content.is_folderish || false,
       'items': [],  // Child items (empty for flat structure, needed for depth=2)
     }));
+}
+
+/**
+ * Get root-level navigation items from contentDB (legacy wrapper)
+ * Used by @search endpoint
+ */
+function getRootNavigationItems() {
+  return getNavigationItems('/', 1);
 }
 
 /**
  * Generate @components for a content item (breadcrumbs, navigation, workflow, actions)
  */
 function generateComponents(urlPath, baseUrl) {
-  const fullUrl = `${baseUrl}${urlPath}`;
+  // Remove trailing slash for URL construction
+  const cleanPath = urlPath.replace(/\/$/, '') || '/';
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   const pathParts = urlPath.split('/').filter(Boolean);
 
   // Build breadcrumb items
@@ -180,7 +228,21 @@ function generateComponents(urlPath, baseUrl) {
     },
     'navigation': {
       '@id': `${fullUrl}/@navigation`,
-      'items': getRootNavigationItems()
+      // Determine navigation root:
+      // - If current path has children (is a folder with content), show its children
+      // - Otherwise show siblings (items at same level)
+      'items': (() => {
+        const hasChildren = Object.keys(contentDB).some(p =>
+          p !== cleanPath && p.startsWith(cleanPath + '/'));
+        if (hasChildren) {
+          return getNavigationItems(cleanPath, 1);
+        }
+        // Show siblings - items under parent path
+        const parentPath = pathParts.length > 1
+          ? '/' + pathParts.slice(0, -1).join('/')
+          : '/';
+        return getNavigationItems(parentPath, 1);
+      })()
     },
     'workflow': {
       '@id': `${fullUrl}/@workflow`
@@ -193,13 +255,9 @@ function generateComponents(urlPath, baseUrl) {
  * Content files use distribution format with relative @id paths.
  */
 function enrichContent(content, urlPath, baseUrl) {
-  // Convert relative @id to full URL if needed
-  let fullUrl = content['@id'];
-  if (fullUrl && !fullUrl.startsWith('http')) {
-    fullUrl = baseUrl + fullUrl;
-  } else {
-    fullUrl = `${baseUrl}${urlPath}`;
-  }
+  // Always use urlPath for @id (includes mount prefix), normalize trailing slash
+  const cleanPath = urlPath.replace(/\/$/, '') || '/';
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
 
   // Convert parent @id to full URL if needed
   let parent = content.parent;
@@ -239,6 +297,40 @@ function enrichContent(content, urlPath, baseUrl) {
   };
 }
 
+/**
+ * Load content from a single directory with a mount prefix
+ */
+function loadContentFromDir(contentDirPath, mountPath, baseUrl) {
+  if (!fs.existsSync(contentDirPath)) {
+    console.log(`Content directory not found: ${contentDirPath}`);
+    return;
+  }
+
+  console.log(`Loading content from ${contentDirPath} mounted at ${mountPath}`);
+
+  const dirs = fs.readdirSync(contentDirPath, { withFileTypes: true });
+  dirs.forEach((dir) => {
+    const fullDirPath = path.join(contentDirPath, dir.name);
+    const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
+      fs.statSync(fullDirPath).isDirectory());
+    if (isDir) {
+      const dataPath = path.join(fullDirPath, 'data.json');
+      if (fs.existsSync(dataPath)) {
+        const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+        // Use @id from content if it's a path, otherwise use directory name
+        let contentPath = content['@id']?.startsWith('/') ? content['@id'] : '/' + (content.id || dir.name);
+
+        // Apply mount prefix
+        const urlPath = mountPath === '/' ? contentPath : mountPath + contentPath;
+
+        contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
+        contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
+        console.log(`Loaded content: ${urlPath}`);
+      }
+    }
+  });
+}
+
 // Load initial content from fixtures
 function loadInitialContent() {
   const baseUrl = `http://localhost:${PORT}`;
@@ -263,25 +355,10 @@ function loadInitialContent() {
   };
   console.log('Loaded content: /');
 
-  // Load all content from content/{page-id}/data.json structure
-  const contentDir = path.join(__dirname, 'content');
-  if (fs.existsSync(contentDir)) {
-    const dirs = fs.readdirSync(contentDir, { withFileTypes: true });
-    dirs.forEach((dir) => {
-      // Support both real directories and symlinks to directories
-      const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
-        fs.statSync(path.join(contentDir, dir.name)).isDirectory());
-      if (isDir) {
-        const dataPath = path.join(contentDir, dir.name, 'data.json');
-        if (fs.existsSync(dataPath)) {
-          const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-          const urlPath = '/' + (content.id || dir.name);
-          contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
-          console.log(`Loaded content: ${urlPath}`);
-        }
-      }
-    });
-  }
+  // Load content from all mount points
+  CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
+    loadContentFromDir(dirPath, mountPath, baseUrl);
+  });
 }
 
 // Initialize on startup
@@ -294,12 +371,10 @@ loadInitialContent();
 function getContent(urlPath) {
   const baseUrl = `http://localhost:${PORT}`;
 
-  // Check if there's a data.json file for this path in content/{page-id}/
-  const contentDir = path.join(__dirname, 'content');
-  const pageId = urlPath.replace(/^\//, ''); // Remove leading slash
-
-  if (pageId && fs.existsSync(contentDir)) {
-    const dataPath = path.join(contentDir, pageId, 'data.json');
+  // Use contentDirMap to find the source directory for this path
+  const dirInfo = contentDirMap[urlPath];
+  if (dirInfo) {
+    const dataPath = path.join(dirInfo.dirPath, 'data.json');
     if (fs.existsSync(dataPath)) {
       const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
       return enrichContent(content, urlPath, baseUrl);
@@ -493,7 +568,7 @@ app.get('/@types/:typeName', (req, res) => {
  * GET /:path/@types/:typeName
  * Get content type schema for a specific content path
  */
-app.get('*/@types/:typeName', (req, res) => {
+app.get('{*path}/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
   res.json(getTypeSchema(typeName));
 });
@@ -502,7 +577,7 @@ app.get('*/@types/:typeName', (req, res) => {
  * GET /:path/@breadcrumbs
  * Get breadcrumb trail
  */
-app.get('*/@breadcrumbs', (req, res) => {
+app.get('{*path}/@breadcrumbs', (req, res) => {
   const fullPath = req.path.replace('/@breadcrumbs', '');
   const parts = fullPath.split('/').filter((p) => p);
   const items = [{ '@id': 'http://localhost:8888/', title: 'Home' }];
@@ -527,7 +602,7 @@ app.get('*/@breadcrumbs', (req, res) => {
  * Search for content (used by ObjectBrowser)
  * Supports path.depth parameter to get children of a specific path
  */
-app.get('*/@search', (req, res) => {
+app.get('{*path}/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
 
@@ -601,7 +676,7 @@ app.get('*/@search', (req, res) => {
  * Get folder contents for content browsing
  * Returns items at the parent folder level (siblings of current content)
  */
-app.get('*/@contents', (req, res) => {
+app.get('{*path}/@contents', (req, res) => {
   const contentPath = req.path.replace('/@contents', '') || '/';
 
   // For Documents, we return siblings (contents of parent folder)
@@ -668,7 +743,7 @@ app.get('*/@contents', (req, res) => {
  * POST /:path/@lock
  * Lock content for editing
  */
-app.post('*/@lock', (req, res) => {
+app.post('{*path}/@lock', (req, res) => {
   res.json({
     locked: true,
     stealable: true,
@@ -683,7 +758,7 @@ app.post('*/@lock', (req, res) => {
  * Serve placeholder images for Plone image scales
  * URLs like: /test-image-1.jpg/@@images/image/preview
  */
-app.get('*/@@images/*', (req, res) => {
+app.get('{*contentPath}/@@images/{*imagePath}', (req, res) => {
   // Extract scale from URL (e.g., 'preview', 'teaser', 'large')
   const scaleMatch = req.path.match(/@@images\/image\/(\w+)/);
   const scale = scaleMatch ? scaleMatch[1] : 'preview';
@@ -719,7 +794,7 @@ app.get('*/@@images/*', (req, res) => {
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
  */
-app.get('*', (req, res, next) => {
+app.get('{*path}', (req, res, next) => {
   // Only handle API requests (with ++api++ prefix)
   // Frontend requests should be handled by static file middleware
   if (!req.isApiRequest) {
@@ -757,7 +832,7 @@ app.get('*', (req, res, next) => {
  * Update content - returns merged content but does NOT persist changes
  * This ensures test isolation (each test gets fresh fixture data)
  */
-app.patch('*', (req, res) => {
+app.patch('{*path}', (req, res) => {
   const path = req.path;
   const cleanPath = path.replace('/++api++', '');
 
@@ -800,7 +875,7 @@ app.use(express.static(FRONTEND_DIR, {
 }));
 
 // Fallback to index.html for any non-API routes (SPA routing)
-app.get('*', (req, res) => {
+app.get('{*path}', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
