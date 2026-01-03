@@ -103,7 +103,7 @@ jobs:
           echo "All servers ready!"
       - name: Run Playwright tests with coverage
         run: |
-          pnpm exec playwright test
+          pnpm exec playwright test --reporter=github,list
         env:
           CI: true
           USE_PREBUILT: true
