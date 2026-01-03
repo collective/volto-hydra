@@ -313,6 +313,22 @@ const UnconnectedImageInput = (props) => {
     [props, id, onChange, isRelationChoice, intl, onClose],
   );
 
+  // Handle direct selection from object browser (with full item metadata)
+  // NOTE: This hook MUST be before any conditional returns to satisfy React's rules of hooks
+  const handleSelectItem = useCallback(
+    (url, item) => {
+      const flatUrl = flattenToAppURL(url);
+      // Use metadata directly from object browser item (no search needed)
+      onChange(id, flatUrl, {
+        title: item?.title,
+        image_field: item?.image_field || 'image',
+        image_scales: item?.image_scales,
+      });
+      onClose?.();
+    },
+    [id, onChange, onClose],
+  );
+
   // When image exists - show preview (if showPreview is true)
   if (imageValue) {
     if (!showPreview) {
@@ -344,21 +360,6 @@ const UnconnectedImageInput = (props) => {
       </div>
     );
   }
-
-  // Handle direct selection from object browser (with full item metadata)
-  const handleSelectItem = useCallback(
-    (url, item) => {
-      const flatUrl = flattenToAppURL(url);
-      // Use metadata directly from object browser item (no search needed)
-      onChange(id, flatUrl, {
-        title: item?.title,
-        image_field: item?.image_field || 'image',
-        image_scales: item?.image_scales,
-      });
-      onClose?.();
-    },
-    [id, onChange, onClose],
-  );
 
   // No image - show picker UI
   const pickerContent = (

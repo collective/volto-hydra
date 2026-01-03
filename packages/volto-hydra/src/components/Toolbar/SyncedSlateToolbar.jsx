@@ -828,7 +828,9 @@ const SyncedSlateToolbar = ({
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
   const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800 };
-  const toolbarTop = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
+  const toolbarTopRaw = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
+  // Ensure toolbar stays within viewport (min 60px from top to clear main toolbar)
+  const toolbarTop = Math.max(60, toolbarTopRaw);
   const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Always align with block's left edge
 
   // Calculate max width so toolbar doesn't extend past iframe right edge (sidebar boundary)

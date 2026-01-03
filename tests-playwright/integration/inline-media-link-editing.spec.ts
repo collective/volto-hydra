@@ -230,6 +230,7 @@ test.describe('Inline link editing', () => {
 
     // Submit the form
     const submitButton = linkForm.locator('button[aria-label="Submit"]');
+    await expect(submitButton).toBeVisible({ timeout: 5000 });
     await submitButton.click();
 
     // Verify the link was updated in the iframe
@@ -252,6 +253,7 @@ test.describe('Inline link editing', () => {
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
     const linkButton = toolbar.locator('button[title*="Edit link"]');
+    await expect(linkButton).toBeVisible({ timeout: 5000 });
     await linkButton.click();
 
     // Wait for the link form
