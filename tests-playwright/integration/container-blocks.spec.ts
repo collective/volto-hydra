@@ -2941,6 +2941,74 @@ test.describe('data-block-selector Navigation', () => {
     const slideItems = sidebar.locator('.child-block-item');
     await expect(slideItems).toHaveCount(4);
   });
+
+  test('add button is positioned correctly for slide block', async ({ page }) => {
+    // Use very wide viewport so there's enough margin for the add button
+    // Sidebar is ~486px, slider is max-w-4xl (896px), need 38px margin for button
+    // So iframe needs: 896 + 38 + some left margin = ~950px minimum
+    // With 2000px viewport and ~486px sidebar, iframe should be ~1500px
+    await page.setViewportSize({ width: 2000, height: 900 });
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+    const iframeElement = page.locator('#previewIframe');
+
+    // Wait for the slider block to be visible
+    const sliderBlock = iframe.locator('[data-block-uid="slider-1"]');
+    await expect(sliderBlock).toBeVisible({ timeout: 10000 });
+
+    // Find the first slide
+    const slide1 = iframe.locator('[data-block-uid="slide-1"]');
+    await expect(slide1).toBeVisible({ timeout: 5000 });
+
+    // Click on the slide to select it
+    await slide1.click({ force: true });
+
+    // Wait for add button to appear
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+
+    // Get bounding boxes
+    const slideBox = await slide1.boundingBox();
+    const addButtonBox = await addButton.boundingBox();
+    const iframeBox = await iframeElement.boundingBox();
+
+    expect(slideBox).not.toBeNull();
+    expect(addButtonBox).not.toBeNull();
+    expect(iframeBox).not.toBeNull();
+
+    console.log('[TEST] Slide box:', slideBox);
+    console.log('[TEST] Add button box:', addButtonBox);
+    console.log('[TEST] Iframe box:', iframeBox);
+
+    // The add button should be:
+    // - To the right of the slide (for horizontal container)
+    // - NOT constrained inside the block (there should be space to the right)
+    // Since slides use data-block-add="right", it should be positioned outside the slide
+
+    // Check add button is within iframe bounds
+    expect(addButtonBox!.x).toBeGreaterThanOrEqual(iframeBox!.x);
+    expect(addButtonBox!.x + addButtonBox!.width).toBeLessThanOrEqual(iframeBox!.x + iframeBox!.width);
+
+    // The add button should be to the RIGHT of the slide (not inside/overlapping)
+    const slideRightEdge = slideBox!.x + slideBox!.width;
+    const addButtonLeftEdge = addButtonBox!.x;
+
+    console.log('[TEST] Slide right edge:', slideRightEdge);
+    console.log('[TEST] Add button left edge:', addButtonLeftEdge);
+    console.log('[TEST] Gap between slide and add button:', addButtonLeftEdge - slideRightEdge);
+
+    // Add button should start at or after the slide's right edge (with small gap)
+    // This verifies the add button is NOT constrained inside the slide
+    expect(addButtonLeftEdge).toBeGreaterThanOrEqual(slideRightEdge);
+
+    // Check add button is top-aligned with slide (for "right" direction)
+    const topAlignTolerance = 20;
+    expect(Math.abs(addButtonBox!.y - slideBox!.y)).toBeLessThan(topAlignTolerance);
+  });
 });
 
 // ============================================================================

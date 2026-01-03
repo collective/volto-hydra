@@ -846,6 +846,56 @@ test.describe('Sidebar image upload and drag-drop', () => {
   });
 });
 
+test.describe('Add button and image overlay conflict', () => {
+  test('add button does not overlap with image clear button when add is right-aligned', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page'); // Page with images in horizontal container
+
+    const iframe = helper.getIframe();
+
+    // Find an image block on the RIGHT side of the container (no space to the right)
+    // top-img-2 is the rightmost image, so add button will be constrained inside
+    const imageBlock = iframe.locator('[data-block-uid="top-img-2"]');
+    await expect(imageBlock).toBeVisible({ timeout: 10000 });
+
+    // Click to select the image block
+    await imageBlock.click();
+
+    // Wait for both the add button and image overlay (clear button) to appear
+    const addButton = page.locator('.volto-hydra-add-button');
+    // The clear button is in the image overlay (near the iframe), not in the sidebar
+    const clearButton = page.locator('#iframeContainer').getByRole('button', { name: 'Clear image' });
+
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await expect(clearButton).toBeVisible({ timeout: 5000 });
+
+    // Get bounding boxes
+    const addButtonBox = await addButton.boundingBox();
+    const clearButtonBox = await clearButton.boundingBox();
+
+    expect(addButtonBox).not.toBeNull();
+    expect(clearButtonBox).not.toBeNull();
+
+    console.log('[TEST] Add button box:', addButtonBox);
+    console.log('[TEST] Clear button box:', clearButtonBox);
+
+    // Check that they don't overlap
+    const overlap = !(
+      addButtonBox!.x + addButtonBox!.width < clearButtonBox!.x ||
+      clearButtonBox!.x + clearButtonBox!.width < addButtonBox!.x ||
+      addButtonBox!.y + addButtonBox!.height < clearButtonBox!.y ||
+      clearButtonBox!.y + clearButtonBox!.height < addButtonBox!.y
+    );
+
+    expect(overlap).toBe(false);
+
+    // Both should be clickable
+    await expect(addButton).toBeEnabled();
+    await expect(clearButton).toBeEnabled();
+  });
+});
+
 test.describe('Slider image positioning', () => {
   test('image starter widget is positioned correctly over slide image field', async ({ page }) => {
     const helper = new AdminUIHelper(page);

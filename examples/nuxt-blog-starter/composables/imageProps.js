@@ -16,6 +16,10 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
     if (block?.preview_image) {
         block = block.preview_image;
     }
+    // Handle array format (from Plone API): [{ download: '...', scales: {...} }]
+    if (Array.isArray(block) && block.length > 0) {
+        block = block[0];
+    }
     var image_url = null;
     if (!block) {
         return {

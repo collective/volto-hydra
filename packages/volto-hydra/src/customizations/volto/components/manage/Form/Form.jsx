@@ -671,78 +671,78 @@ class Form extends Component {
           />
 
           <Container>
-            <>
-              <BlocksToolbar
-                formData={formData}
-                selectedBlock={this.props.uiState.selected}
-                selectedBlocks={this.props.uiState.multiSelected}
-                onChangeBlocks={(newBlockData) => {
-                  const newFormData = {
-                    ...formData,
-                    ...newBlockData,
-                  };
-                  this.setState({
-                    formData: newFormData,
-                  });
-                  if (this.props.global) {
-                    this.props.setFormData(newFormData);
-                  }
-                }}
-                onSetSelectedBlocks={(blockIds) =>
-                  this.props.setUIState({ multiSelected: blockIds })
+            <BlocksToolbar
+              formData={formData}
+              selectedBlock={this.props.uiState.selected}
+              selectedBlocks={this.props.uiState.multiSelected}
+              onChangeBlocks={(newBlockData) => {
+                const newFormData = {
+                  ...formData,
+                  ...newBlockData,
+                };
+                this.setState({
+                  formData: newFormData,
+                });
+                if (this.props.global) {
+                  this.props.setFormData(newFormData);
                 }
-                onSelectBlock={this.onSelectBlock}
-              />
-              <UndoToolbar
-                state={{
-                  formData,
-                  selected: this.props.uiState.selected,
-                  multiSelected: this.props.uiState.multiSelected,
-                }}
-                enableHotKeys
-                onUndoRedo={({ state }) => {
-                  if (this.props.global) {
-                    this.props.setFormData(state.formData);
-                  }
-                  return this.setState(state);
-                }}
-              />
-              <Iframe
-                formData={formData}
-                onChangeFormData={(newData) => {
-                  const newFormData = {
-                    ...formData,
-                    ...newData,
-                  };
-                  this.setState({
-                    formData: newFormData,
-                  });
-                  if (this.props.global) {
-                    this.props.setFormData(newFormData);
-                  }
-                }}
-                onChangeField={this.onChangeField}
-                onSelectBlock={this.onSelectBlock}
-                properties={formData}
-                navRoot={navRoot}
-                type={type}
-                pathname={this.props.pathname}
-                selectedBlock={this.props.uiState.selected}
-                multiSelected={this.props.uiState.multiSelected}
-                manage={this.props.isAdminForm}
-                allowedBlocks={this.props.allowedBlocks}
-                showRestricted={this.props.showRestricted}
-                editable={this.props.editable}
-                isMainForm={this.props.editable}
-                history={this.props.history}
-                location={this.props.location}
-                token={this.props.token}
-              />
-              {/* BlocksForm removed - Hydra uses Iframe for block editing */}
-              {this.state.isClient &&
-                this.state.sidebarMetadataIsAvailable &&
-                this.props.editable &&
-                createPortal(
+              }}
+              onSetSelectedBlocks={(blockIds) =>
+                this.props.setUIState({ multiSelected: blockIds })
+              }
+              onSelectBlock={this.onSelectBlock}
+            />
+            <UndoToolbar
+              state={{
+                formData,
+                selected: this.props.uiState.selected,
+                multiSelected: this.props.uiState.multiSelected,
+              }}
+              enableHotKeys
+              onUndoRedo={({ state }) => {
+                if (this.props.global) {
+                  this.props.setFormData(state.formData);
+                }
+                return this.setState(state);
+              }}
+            />
+          </Container>
+          <Iframe
+            formData={formData}
+            onChangeFormData={(newData) => {
+              const newFormData = {
+                ...formData,
+                ...newData,
+              };
+              this.setState({
+                formData: newFormData,
+              });
+              if (this.props.global) {
+                this.props.setFormData(newFormData);
+              }
+            }}
+            onChangeField={this.onChangeField}
+            onSelectBlock={this.onSelectBlock}
+            properties={formData}
+            navRoot={navRoot}
+            type={type}
+            pathname={this.props.pathname}
+            selectedBlock={this.props.uiState.selected}
+            multiSelected={this.props.uiState.multiSelected}
+            manage={this.props.isAdminForm}
+            allowedBlocks={this.props.allowedBlocks}
+            showRestricted={this.props.showRestricted}
+            editable={this.props.editable}
+            isMainForm={this.props.editable}
+            history={this.props.history}
+            location={this.props.location}
+            token={this.props.token}
+          />
+          {/* BlocksForm removed - Hydra uses Iframe for block editing */}
+          {this.state.isClient &&
+            this.state.sidebarMetadataIsAvailable &&
+            this.props.editable &&
+            createPortal(
                   <UiForm
                     method="post"
                     onSubmit={this.onSubmit}
@@ -810,13 +810,11 @@ class Form extends Component {
                   document.getElementById('sidebar-metadata'),
                 )}
 
-              <SlotRenderer
-                name="belowContent"
-                content={this.props.content}
-                navRoot={navRoot}
-              />
-            </>
-          </Container>
+          <SlotRenderer
+            name="belowContent"
+            content={this.props.content}
+            navRoot={navRoot}
+          />
         </>
       )
     ) : (

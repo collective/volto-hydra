@@ -2123,22 +2123,45 @@ const Iframe = (props) => {
 
             // Calculate ideal position
             const buttonWidth = 30;
+            const buttonHeight = 30;
             let addLeft = isRightDirection
               ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8  // Right of block
               : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth; // Bottom-right of block
 
-            // Constrain to stay within iframe bounds - stay at top-right but move inward
+            // Track if we're constrained inside the block
+            let isConstrained = false;
+
+            // Constrain to stay within iframe bounds
             const iframeRight = iframeRect.left + iframeRect.width;
+            const blockRightInIframe = blockUI.rect.left + blockUI.rect.width;
+            const availableMargin = iframeRect.width - blockRightInIframe;
+            const buttonSpace = buttonWidth + 8; // button + gap
+            log('Add button constraint check:', {
+              blockRect: { left: blockUI.rect.left, width: blockUI.rect.width, right: blockRightInIframe },
+              iframeWidth: iframeRect.width,
+              availableMargin,
+              buttonSpace,
+              wouldConstrain: availableMargin < buttonSpace,
+            });
             if (addLeft + buttonWidth > iframeRight) {
               // Move button inward to stay on screen, but keep it at top-right of block
               addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
+              isConstrained = true;
             }
 
-            // For 'right': top-right of block
+            // For 'right': top-right of block (or bottom-right if constrained to avoid image overlay)
             // For 'bottom' (default): below block
-            const addTop = isRightDirection
-              ? iframeRect.top + blockUI.rect.top  // Top-right
-              : iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+            let addTop;
+            if (isRightDirection) {
+              if (isConstrained) {
+                // When constrained inside block, position at bottom-right to avoid image overlay buttons
+                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8;
+              } else {
+                addTop = iframeRect.top + blockUI.rect.top;  // Top-right
+              }
+            } else {
+              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+            }
 
             // Check if this is a table mode block (row or cell)
             const isTableMode = pathInfo?.addMode === 'table' || pathInfo?.parentAddMode === 'table';
