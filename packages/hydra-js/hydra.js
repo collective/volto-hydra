@@ -355,14 +355,59 @@ export class Bridge {
    * @param {HTMLElement} blockElement - The block element
    * @returns {Object} Map of field names to { rect: DOMRect } with element position
    */
+  /**
+   * Get effective bounding rect for a media field element.
+   * If element has zero dimensions but uses absolute positioning with inset-0,
+   * fall back to the first ancestor with actual dimensions.
+   */
+  getEffectiveMediaRect(element, fieldName) {
+    let rect = element.getBoundingClientRect();
+
+    // If element has dimensions, use them directly
+    if (rect.width > 0 && rect.height > 0) {
+      return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+    }
+
+    // Element has zero dimensions - try to find a parent with dimensions
+    // This handles overlay elements that rely on parent for sizing (common in carousels/sliders)
+    // Walk up the DOM tree to find the first ancestor with actual dimensions
+    let current = element.parentElement;
+    let depth = 0;
+    const maxDepth = 10; // Safety limit
+
+    while (current && depth < maxDepth) {
+      const parentRect = current.getBoundingClientRect();
+
+      if (parentRect.width > 0 && parentRect.height > 0) {
+        console.log(
+          `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+          `Using parent's dimensions (${parentRect.width}x${parentRect.height}).`
+        );
+        return { top: parentRect.top, left: parentRect.left, width: parentRect.width, height: parentRect.height };
+      }
+
+      // Parent also has zero dimensions, continue up the chain
+      current = current.parentElement;
+      depth++;
+    }
+
+    // No fallback available, warn the developer
+    console.warn(
+      `[HYDRA] data-media-field="${fieldName}" has zero dimensions (${rect.width}x${rect.height}). ` +
+      `The element must have visible width and height for the image picker to position correctly. ` +
+      `Set explicit dimensions or use a different element.`,
+      element
+    );
+    return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+  }
+
   getMediaFields(blockElement) {
     const mediaFields = {};
     // Check if block element itself has data-media-field
     const selfField = blockElement.getAttribute('data-media-field');
     if (selfField) {
-      const rect = blockElement.getBoundingClientRect();
       mediaFields[selfField] = {
-        rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+        rect: this.getEffectiveMediaRect(blockElement, selfField)
       };
     }
     // Check descendants
@@ -371,9 +416,8 @@ export class Bridge {
       if (this.fieldBelongsToBlock(field, blockElement)) {
         const fieldName = field.getAttribute('data-media-field');
         if (fieldName) {
-          const rect = field.getBoundingClientRect();
           mediaFields[fieldName] = {
-            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+            rect: this.getEffectiveMediaRect(field, fieldName)
           };
         }
       }

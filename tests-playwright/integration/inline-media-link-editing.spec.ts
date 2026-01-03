@@ -845,3 +845,70 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await expect(uploadButton).toBeVisible({ timeout: 5000 });
   });
 });
+
+test.describe('Slider image positioning', () => {
+  test('image starter widget is positioned correctly over slide image field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+    const iframeElement = page.locator('#previewIframe');
+
+    // Wait for the slider block to be visible
+    const sliderBlock = iframe.locator('[data-block-uid="slider-1"]');
+    await expect(sliderBlock).toBeVisible({ timeout: 10000 });
+
+    // Find the first slide (should be visible by default)
+    const slide1 = iframe.locator('[data-block-uid="slide-1"]');
+    await expect(slide1).toBeVisible({ timeout: 5000 });
+
+    // Get the slide's bounding box as fallback reference
+    const slideBox = await slide1.boundingBox();
+    expect(slideBox).not.toBeNull();
+
+    // Try to get the media field element's box if it has dimensions
+    // Some frontends use absolute inset-0 (zero dimensions), others have explicit dimensions
+    const mediaField = slide1.locator('[data-media-field="preview_image"]');
+    const mediaFieldBox = await mediaField.boundingBox();
+
+    // Determine the expected position - use media field if it has dimensions, else slide
+    const expectedBox = (mediaFieldBox && mediaFieldBox.width > 0 && mediaFieldBox.height > 0)
+      ? mediaFieldBox
+      : slideBox;
+
+    // Get iframe position for debugging
+    const iframeBox = await iframeElement.boundingBox();
+    expect(iframeBox).not.toBeNull();
+
+    // Click on the slide to select it and show the starter widget
+    // Use force:true in case the media-field overlay intercepts clicks
+    await slide1.click({ force: true });
+
+    // Wait for the starter widget (empty image overlay) to appear
+    const starterWidget = page.locator('.empty-image-overlay');
+    await expect(starterWidget).toBeVisible({ timeout: 5000 });
+
+    // Get the starter widget's bounding box
+    const starterWidgetBox = await starterWidget.boundingBox();
+    expect(starterWidgetBox).not.toBeNull();
+
+    // Log positions for debugging
+    console.log('[TEST] Media field box:', mediaFieldBox);
+    console.log('[TEST] Slide box:', slideBox);
+    console.log('[TEST] Expected box:', expectedBox);
+    console.log('[TEST] Iframe box:', iframeBox);
+    console.log('[TEST] Starter widget box:', starterWidgetBox);
+    console.log('[TEST] Expected: left=', expectedBox!.x, 'top=', expectedBox!.y);
+    console.log('[TEST] Actual (starterWidget): left=', starterWidgetBox!.x, 'top=', starterWidgetBox!.y);
+
+    // The starter widget should be positioned to cover the media field area
+    // If media field has zero dimensions, hydra.js falls back to parent dimensions
+    // Allow some tolerance (10px) for rounding differences
+    const tolerance = 10;
+    expect(Math.abs(starterWidgetBox!.x - expectedBox!.x)).toBeLessThan(tolerance);
+    expect(Math.abs(starterWidgetBox!.y - expectedBox!.y)).toBeLessThan(tolerance);
+    expect(Math.abs(starterWidgetBox!.width - expectedBox!.width)).toBeLessThan(tolerance);
+    expect(Math.abs(starterWidgetBox!.height - expectedBox!.height)).toBeLessThan(tolerance);
+  });
+});
