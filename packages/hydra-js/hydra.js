@@ -1076,21 +1076,18 @@ export class Bridge {
     }
 
     // Set contenteditable on text and slate fields only
-    // Get blockType to look up field types (supports nested blocks via blockPathMap)
     // Only set on THIS block's own fields, not nested blocks' fields
-    const blockData = this.getBlockData(blockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     const editableFields = this.getOwnEditableFields(blockElement);
     editableFields.forEach((field) => {
-      const fieldName = field.getAttribute('data-editable-field');
-      const fieldType = blockTypeFields[fieldName];
-      // Only set contenteditable for string, textarea, and slate fields
-      if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
+      const fieldPath = field.getAttribute('data-editable-field');
+      // Use getFieldType which handles page-level fields (e.g., /title) correctly
+      const fieldType = this.getFieldType(blockUid, fieldPath);
+      // Only set contenteditable for text-editable fields (string, textarea, slate)
+      if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
 
-        // For string fields (single-line), prevent Enter key from creating new lines
-        if (fieldType === 'string') {
+        // For plain string fields (single-line), prevent Enter key from creating new lines
+        if (this.fieldTypeIsPlainString(fieldType)) {
           // Store the handler so we can remove it later if needed
           if (!field._enterKeyHandler) {
             field._enterKeyHandler = (e) => {
@@ -2276,17 +2273,13 @@ export class Bridge {
       const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
       const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
 
-      // Get block type via getBlockData (handles object_list items with virtual @type)
-      const blockData = blockUid !== 'unknown' ? this.getBlockData(blockUid) : null;
-      const blockType = blockData?.['@type'] || 'unknown';
-
       // Check if this field is supposed to be a Slate field
-      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-      const fieldType = blockTypeFields[fieldName];
+      // Use getFieldType which handles page-level fields (e.g., /title) correctly
+      const fieldType = blockUid !== 'unknown' ? this.getFieldType(blockUid, fieldName) : undefined;
 
       // Only skip error for KNOWN non-Slate fields
       // If fieldType is undefined (not registered), assume it could be Slate and show error
-      if (fieldType && fieldType !== 'slate') {
+      if (fieldType && !this.fieldTypeIsSlate(fieldType)) {
         // This is a known non-Slate text field, just return null without error
         return null;
       }
@@ -2360,23 +2353,20 @@ export class Bridge {
    * @param {string} caller - The caller for debugging (e.g., 'selectBlock', 'FORM_DATA')
    */
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
-    // Get blockType to look up field types (supports nested blocks via blockPathMap)
     // Only restore on THIS block's own fields, not nested blocks' fields
-    const blockData = this.getBlockData(this.selectedBlockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     const editableFields = this.getOwnEditableFields(blockElement);
     log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
     editableFields.forEach((field) => {
-      const fieldName = field.getAttribute('data-editable-field');
-      const fieldType = blockTypeFields[fieldName];
+      const fieldPath = field.getAttribute('data-editable-field');
+      // Use getFieldType which handles page-level fields (e.g., /title) correctly
+      const fieldType = this.getFieldType(this.selectedBlockUid, fieldPath);
       const wasEditable = field.getAttribute('contenteditable') === 'true';
-      // Only set contenteditable for string, textarea, and slate fields
-      if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
+      // Only set contenteditable for text-editable fields (string, textarea, slate)
+      if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
-        log(`  ${fieldName}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+        log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
       } else {
-        log(`  ${fieldName}: skipped (type: ${fieldType})`);
+        log(`  ${fieldPath}: skipped (type: ${fieldType})`);
       }
     });
 
@@ -2538,11 +2528,8 @@ export class Bridge {
 
     // Note: ZWS for cursor positioning is added just-in-time in restoreSlateSelection
 
-    // Determine field type for focused field (supports nested blocks via blockPathMap)
-    const blockData = this.getBlockData(this.selectedBlockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const fieldType = this.focusedFieldName ? blockTypeFields[this.focusedFieldName] : null;
+    // Determine field type for focused field (supports page-level and nested blocks)
+    const fieldType = this.focusedFieldName ? this.getFieldType(this.selectedBlockUid, this.focusedFieldName) : null;
 
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
@@ -2554,7 +2541,7 @@ export class Bridge {
     if (this.focusedFieldName && (!skipFocus || hasSavedClickPosition)) {
       const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
 
-      if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
+      if (focusedField && this.fieldTypeIsTextEditable(fieldType)) {
         // Focus the field (only if not skipFocus, unless we need to restore click position)
         if (!skipFocus || hasSavedClickPosition) {
           focusedField.focus();
@@ -2676,13 +2663,11 @@ export class Bridge {
         element.setAttribute('contenteditable', 'true');
 
         // Check field type to determine if this is a string field (single-line)
-        const blockData = this.getBlockData(blockUid);
-        const blockType = blockData?.['@type'];
-        const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-        const fieldType = blockTypeFields[editableField];
+        // Use getFieldType which handles page-level fields (e.g., /title) correctly
+        const fieldType = this.getFieldType(blockUid, editableField);
 
-        // For string fields (single-line), prevent Enter key from creating new lines
-        if (fieldType === 'string' && !element._enterKeyHandler) {
+        // For plain string fields (single-line), prevent Enter key from creating new lines
+        if (this.fieldTypeIsPlainString(fieldType) && !element._enterKeyHandler) {
           element._enterKeyHandler = (e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -2719,7 +2704,7 @@ export class Bridge {
         // Add nodeIds if this block has slate fields (only on first selection)
         const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
         const hasSlateField = Object.values(blockFieldTypes).some(
-          fieldType => fieldType === 'slate'
+          fieldType => this.fieldTypeIsSlate(fieldType)
         );
         if (hasSlateField) {
           // Use getBlockData to handle nested blocks
@@ -2727,7 +2712,7 @@ export class Bridge {
           if (block) {
             // Add nodeIds to each slate field, following the same pattern as addNodeIdsToAllSlateFields
             Object.keys(blockFieldTypes).forEach((fieldName) => {
-              if (blockFieldTypes[fieldName] === 'slate' && block[fieldName]) {
+              if (this.fieldTypeIsSlate(blockFieldTypes[fieldName]) && block[fieldName]) {
                 block[fieldName] = this.addNodeIds(block[fieldName]);
               }
             });
@@ -2951,13 +2936,11 @@ export class Bridge {
             }
           }
           if (contentEditableField) {
-            const fieldName = contentEditableField.getAttribute('data-editable-field');
-            const blockData = this.getBlockData(this.selectedBlockUid);
-            const blockType = blockData?.['@type'];
-            const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-            const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
+            const fieldPath = contentEditableField.getAttribute('data-editable-field');
+            // Use getFieldType which handles page-level fields (e.g., /title) correctly
+            const fieldType = fieldPath ? this.getFieldType(this.selectedBlockUid, fieldPath) : undefined;
 
-            if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
+            if (this.fieldTypeIsTextEditable(fieldType)) {
               // Only call focus if not already focused
               // Calling focus() on already-focused element can disrupt cursor position
               const isAlreadyFocused = document.activeElement === contentEditableField;
@@ -4694,20 +4677,16 @@ export class Bridge {
     if (!blockElement) return {};
 
     const blockUid = blockElement.getAttribute('data-block-uid');
-    const blockData = this.getBlockData(blockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-
     const editableFields = {};
     // Use getOwnEditableFields to only get THIS block's fields, not nested blocks' fields
     const fieldElements = this.getOwnEditableFields(blockElement);
 
     fieldElements.forEach((element) => {
-      const fieldName = element.getAttribute('data-editable-field');
-      if (fieldName) {
-        // Get the field type from blockFieldTypes, or infer from the element
-        const fieldType = blockTypeFields[fieldName] || 'string';
-        editableFields[fieldName] = fieldType;
+      const fieldPath = element.getAttribute('data-editable-field');
+      if (fieldPath) {
+        // Use getFieldType which handles page-level fields (e.g., /title) correctly
+        const fieldType = this.getFieldType(blockUid, fieldPath) || 'string';
+        editableFields[fieldPath] = fieldType;
       }
     });
 
@@ -4777,7 +4756,7 @@ export class Bridge {
       const blockType = block['@type'];
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
       Object.keys(fieldTypes).forEach((fieldName) => {
-        if (fieldTypes[fieldName] === 'slate' && block[fieldName]) {
+        if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
         }
       });
@@ -4931,10 +4910,11 @@ export class Bridge {
         return;
       }
 
-      const blockType = block['@type'];
-      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-      const fieldType = blockTypeFields[this.focusedFieldName];
-      const fieldValue = block[this.focusedFieldName];
+      // Resolve field path and get field type (supports page-level and nested blocks)
+      const resolved = this.resolveFieldPath(this.focusedFieldName, this.selectedBlockUid);
+      const fieldData = this.getBlockData(resolved.blockId);
+      const fieldType = this.getFieldType(this.selectedBlockUid, this.focusedFieldName);
+      const fieldValue = fieldData?.[resolved.fieldName];
 
       // Find the block element for locating editable fields
       const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
@@ -4943,7 +4923,7 @@ export class Bridge {
       }
 
       // Check if this is a slate field with nodeIds
-      const isSlateWithNodeIds = fieldType === 'slate' && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
+      const isSlateWithNodeIds = this.fieldTypeIsSlate(fieldType) && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
 
       let anchorElement, focusElement;
       let anchorPos = null;
@@ -5440,7 +5420,7 @@ export class Bridge {
           const blockType = block['@type'];
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
-            if (fieldType === 'slate' && block[fieldName]) {
+            if (this.fieldTypeIsSlate(fieldType) && block[fieldName]) {
               this.resetJsonNodeIds(block[fieldName]);
             }
           }
@@ -5468,8 +5448,21 @@ export class Bridge {
     if (!this.selectedBlockUid || !this.focusedFieldName) {
       return true; // No focused field to compare
     }
-    // Use blockPathMap to find nested blocks (object_list items, etc.)
-    const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+
+    // Resolve field path to handle page-level fields (e.g., /title)
+    const resolved = this.resolveFieldPath(this.focusedFieldName, this.selectedBlockUid);
+
+    let fieldA, fieldB;
+    if (resolved.blockId === null) {
+      // Page-level field - compare directly on formData
+      fieldA = formDataA?.[resolved.fieldName];
+      fieldB = formDataB?.[resolved.fieldName];
+      log('focusedFieldValuesEqual (page-level):', fieldA === fieldB, 'field:', resolved.fieldName, 'A:', fieldA, 'B:', fieldB);
+      return fieldA === fieldB;
+    }
+
+    // Block field - use blockPathMap to find nested blocks (object_list items, etc.)
+    const pathInfo = this.blockPathMap?.[resolved.blockId];
     let blockA, blockB;
     if (pathInfo?.path) {
       // Navigate path in both formData objects
@@ -5481,15 +5474,15 @@ export class Bridge {
       }
     } else {
       // Fallback to top-level lookup
-      blockA = formDataA?.blocks?.[this.selectedBlockUid];
-      blockB = formDataB?.blocks?.[this.selectedBlockUid];
+      blockA = formDataA?.blocks?.[resolved.blockId];
+      blockB = formDataB?.blocks?.[resolved.blockId];
     }
     if (!blockA || !blockB) {
       return false; // Can't find block - assume not equal (safe default)
     }
     // Deep copy and strip nodeIds before comparing (old formData has nodeIds, incoming doesn't)
-    const fieldA = blockA[this.focusedFieldName];
-    const fieldB = blockB[this.focusedFieldName];
+    fieldA = blockA[resolved.fieldName];
+    fieldB = blockB[resolved.fieldName];
     if (fieldA === undefined || fieldB === undefined) {
       return fieldA === fieldB;
     }
@@ -5507,14 +5500,71 @@ export class Bridge {
   /**
    * Get the field type for a given block and field name
    * @param {string} blockUid - The block UID
-   * @param {string} fieldName - The field name (e.g., 'value', 'text', 'description')
-   * @returns {string|undefined} Field type ('slate', 'string', 'textarea') or undefined
+   * @param {string} fieldName - The field name (e.g., 'value', 'text', '/title' for page-level)
+   * @returns {string|undefined} Field type in "type:widget" format (e.g., 'array:slate', 'string:textarea', 'string') or undefined
    */
   getFieldType(blockUid, fieldName) {
-    const blockData = this.getBlockData(blockUid);
+    const resolved = this.resolveFieldPath(fieldName, blockUid);
+
+    // Page-level field
+    if (resolved.blockId === null) {
+      return this.blockFieldTypes?._page?.[resolved.fieldName];
+    }
+
+    // Block field
+    const blockData = this.getBlockData(resolved.blockId);
     const blockType = blockData?.['@type'];
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    return blockTypeFields[fieldName];
+    return blockTypeFields[resolved.fieldName];
+  }
+
+  /**
+   * Check if a field type string indicates a slate field
+   * Formats: "array:slate", ":slate", "array:richtext", ":richtext"
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is a slate field
+   */
+  fieldTypeIsSlate(fieldType) {
+    return fieldType?.includes(':slate') || fieldType?.includes(':richtext');
+  }
+
+  /**
+   * Check if a field type string indicates a textarea field
+   * Formats: "string:textarea", ":textarea"
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is a textarea field
+   */
+  fieldTypeIsTextarea(fieldType) {
+    return fieldType?.includes(':textarea');
+  }
+
+  /**
+   * Check if a field type string indicates a plain string field (single-line text)
+   * This is a string field without textarea or slate widget.
+   * Formats: "string", "string:" (no widget means default TextWidget)
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is a plain string field
+   */
+  fieldTypeIsPlainString(fieldType) {
+    if (!fieldType) return false;
+    // Must be string type and not have textarea/slate widget
+    if (this.fieldTypeIsSlate(fieldType) || this.fieldTypeIsTextarea(fieldType)) {
+      return false;
+    }
+    // "string" (no widget) or starts with "string:" but not slate/textarea
+    return fieldType === 'string' || fieldType.startsWith('string:');
+  }
+
+  /**
+   * Check if a field type string indicates a text-editable field (string, textarea, or slate)
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is text-editable
+   */
+  fieldTypeIsTextEditable(fieldType) {
+    if (!fieldType) return false;
+    return this.fieldTypeIsSlate(fieldType) ||
+           this.fieldTypeIsTextarea(fieldType) ||
+           this.fieldTypeIsPlainString(fieldType);
   }
 
   /**
@@ -5524,7 +5574,7 @@ export class Bridge {
    * @returns {boolean} True if the field is a slate field
    */
   isSlateField(blockUid, fieldName) {
-    return this.getFieldType(blockUid, fieldName) === 'slate';
+    return this.fieldTypeIsSlate(this.getFieldType(blockUid, fieldName));
   }
 
   /**
@@ -5600,7 +5650,7 @@ export class Bridge {
     // Like slate-react, we let the frontend re-render (triggered by FORM_DATA) naturally remove ZWS.
     // Stripping during typing corrupts cursor position. ZWS is stripped on copy events and during serialization.
 
-    if (fieldType === 'slate') {
+    if (this.fieldTypeIsSlate(fieldType)) {
       // Slate field - update JSON structure using nodeId
       // Use the actual mutated node's parent if provided (e.g., SPAN for inline formatting)
       // This ensures we update the correct node, not the whole editable field
@@ -5706,7 +5756,7 @@ export class Bridge {
     }
 
     // Buffer the update - text and selection are captured together
-    this.bufferUpdate(fieldType === 'slate' ? 'textChangeSlate' : 'textChange');
+    this.bufferUpdate(this.fieldTypeIsSlate(fieldType) ? 'textChangeSlate' : 'textChange');
   }
 
   /**

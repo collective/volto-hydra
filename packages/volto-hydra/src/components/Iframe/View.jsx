@@ -18,6 +18,35 @@ const logExtract = (...args) =>
   debugEnabled && console.log('[EXTRACT]', ...args);
 
 /**
+ * Get field type string in "type:widget" format.
+ * Formats:
+ *   - "string:textarea" (type and widget)
+ *   - "array:slate" (type and widget)
+ *   - ":object_browser" (widget only, no type)
+ *   - "string" (type only, no widget - default text field)
+ *   - "boolean" (type only)
+ *
+ * @param {Object} field - Field definition from schema.properties
+ * @returns {string} Field type string
+ */
+const getFieldTypeString = (field) => {
+  const type = field.type;
+  const widget = field.widget;
+
+  if (type && widget) {
+    return `${type}:${widget}`;
+  }
+  if (widget) {
+    return `:${widget}`;
+  }
+  if (type) {
+    return type;
+  }
+  // No type or widget specified - defaults to string (TextWidget)
+  return 'string';
+};
+
+/**
  * Validates if a selection is valid for the given slate value.
  * Returns true if all paths in the selection exist in the document.
  */
@@ -141,13 +170,14 @@ const validateFrontendConfig = (options, mergedBlocksConfig) => {
 /**
  * Extract field types for all block types from schema registry
  * @param {Object} intl - The react-intl intl object for internationalization
+ * @param {Object} contentTypeSchema - Optional content type schema for page-level fields
  * @returns {Object} - Object mapping blockType -> fieldName -> fieldType
  *
  * We look up schemas from config.blocks.blocksConfig for each registered block type
  * and identify which fields are Slate fields (widget: 'slate') vs text fields.
  * This way it works for all blocks of that type, including ones added later.
  */
-const extractBlockFieldTypes = (intl) => {
+const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
   const blockFieldTypes = {};
 
   if (!config.blocks?.blocksConfig) {
@@ -156,8 +186,19 @@ const extractBlockFieldTypes = (intl) => {
 
   // Hardcode known block types that don't have schemas
   // Slate blocks always have a 'value' field that is a slate field
-  blockFieldTypes.slate = { value: 'slate' };
-  blockFieldTypes.detachedSlate = { value: 'slate' };
+  blockFieldTypes.slate = { value: 'array:slate' };
+  blockFieldTypes.detachedSlate = { value: 'array:slate' };
+
+  // Extract page-level field types from content type schema
+  // These are accessed via /fieldName syntax (e.g., /title, /description)
+  if (contentTypeSchema?.properties) {
+    blockFieldTypes._page = {};
+    Object.keys(contentTypeSchema.properties).forEach((fieldName) => {
+      const field = contentTypeSchema.properties[fieldName];
+      blockFieldTypes._page[fieldName] = getFieldTypeString(field);
+    });
+    logExtract('Page-level field types from content type schema:', blockFieldTypes._page);
+  }
 
   // Iterate through all registered block types
   Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
@@ -190,27 +231,10 @@ const extractBlockFieldTypes = (intl) => {
       }
       Object.keys(schema.properties).forEach((fieldName) => {
         const field = schema.properties[fieldName];
-        // Determine field type based on widget, mirroring Volto's widget resolution logic
-        // See core/packages/volto/src/config/Widgets.jsx for the full mapping
-        let fieldType = null;
+        blockFieldTypes[blockType][fieldName] = getFieldTypeString(field);
 
-        // Non-text widgets that should NOT be editable inline
-        const nonTextWidgets = [
-          'object_browser', 'object', 'object_list', 'file', 'image',
-          'datetime', 'date', 'time', 'password', 'array', 'token',
-          'query', 'querystring', 'recurrence', 'color_picker', 'schema',
-          'vocabularyterms', 'select', 'autocomplete', 'hidden',
-          'align', 'buttons', 'radio_group', 'checkbox_group',
-        ];
-
-        // Non-string types that should NOT be editable inline
-        const nonStringTypes = ['boolean', 'array', 'object', 'datetime', 'date', 'number', 'integer'];
-
-        if (field.widget === 'slate') {
-          fieldType = 'slate';
-        } else if (field.widget === 'textarea') {
-          fieldType = 'textarea';
-        } else if (field.widget === 'object_list' && field.schema?.properties) {
+        // Handle object_list widgets (e.g., slides in slider block)
+        if (field.widget === 'object_list' && field.schema?.properties) {
           // object_list widget: extract field types from itemSchema
           // Store under virtual type key: blockType:fieldName
           const itemTypeKey = `${blockType}:${fieldName}`;
@@ -226,18 +250,7 @@ const extractBlockFieldTypes = (intl) => {
 
           Object.keys(field.schema.properties).forEach((itemFieldName) => {
             const itemField = field.schema.properties[itemFieldName];
-            let itemFieldType = null;
-            if (itemField.widget === 'slate') {
-              itemFieldType = 'slate';
-            } else if (itemField.widget === 'textarea') {
-              itemFieldType = 'textarea';
-            } else if (itemField.type === 'string') {
-              itemFieldType = 'string';
-            }
-
-            if (itemFieldType) {
-              blockFieldTypes[itemTypeKey][itemFieldName] = itemFieldType;
-            }
+            blockFieldTypes[itemTypeKey][itemFieldName] = getFieldTypeString(itemField);
 
             // Handle nested object_list (e.g., rows containing cells)
             if (itemField.widget === 'object_list' && itemField.schema?.properties) {
@@ -254,39 +267,10 @@ const extractBlockFieldTypes = (intl) => {
 
               Object.keys(itemField.schema.properties).forEach((nestedFieldName) => {
                 const nestedField = itemField.schema.properties[nestedFieldName];
-                let nestedFieldType = null;
-                if (nestedField.widget === 'slate') {
-                  nestedFieldType = 'slate';
-                } else if (nestedField.widget === 'textarea') {
-                  nestedFieldType = 'textarea';
-                } else if (nestedField.type === 'string') {
-                  nestedFieldType = 'string';
-                }
-                if (nestedFieldType) {
-                  blockFieldTypes[nestedItemTypeKey][nestedFieldName] = nestedFieldType;
-                }
+                blockFieldTypes[nestedItemTypeKey][nestedFieldName] = getFieldTypeString(nestedField);
               });
             }
           });
-        } else if (nonTextWidgets.includes(field.widget)) {
-          // Skip non-text widgets - they have their own editing UI
-          fieldType = null;
-        } else if (nonStringTypes.includes(field.type)) {
-          // Skip non-string types - they have their own editing UI
-          fieldType = null;
-        } else if (field.type === 'string' || !field.widget) {
-          // Default to string for explicit string type or no widget specified
-          // This matches Volto's default TextWidget behavior
-          fieldType = 'string';
-        }
-
-        if (fieldType) {
-          blockFieldTypes[blockType][fieldName] = fieldType;
-        }
-
-        // Debug: Log hero field processing
-        if (blockType === 'hero') {
-          logExtract(`Hero field ${fieldName}: widget=${field.widget}, type=${field.type}, resolved fieldType=${fieldType}`);
         }
       });
 
@@ -484,6 +468,7 @@ const Iframe = (props) => {
     selectedBlock,
     openObjectBrowser,
     closeObjectBrowser,
+    schema, // Content type schema for page-level field types
   } = props;
 
   const dispatch = useDispatch();
@@ -619,7 +604,14 @@ const Iframe = (props) => {
 
   // Extract block field types - stored in state so it can be updated when frontend config is merged
   // Must be declared before useEffects that reference it
-  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
+  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl, schema));
+
+  // Update block field types when schema changes (includes page-level field types)
+  useEffect(() => {
+    if (schema) {
+      setBlockFieldTypes(extractBlockFieldTypes(intl, schema));
+    }
+  }, [schema, intl]);
 
   // Note: We use `properties` prop from Form.jsx as the single source of truth
   // This matches standard Volto's BlocksForm pattern (props, not Redux)
@@ -1450,8 +1442,8 @@ const Iframe = (props) => {
             setAllowedBlocksList(event.data.allowedBlocks);
           }
 
-          // 3. Extract block field types (now includes custom blocks)
-          const initialBlockFieldTypes = extractBlockFieldTypes(intl);
+          // 3. Extract block field types (now includes custom blocks and page-level fields)
+          const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
           setBlockFieldTypes(initialBlockFieldTypes);
 
           // 4. Build blockPathMap (now has complete schema knowledge)

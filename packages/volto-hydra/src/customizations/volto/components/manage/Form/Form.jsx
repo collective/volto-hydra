@@ -709,6 +709,7 @@ class Form extends Component {
           </Container>
           <Iframe
             formData={formData}
+            schema={this.props.schema}
             onChangeFormData={(newData) => {
               const newFormData = {
                 ...formData,

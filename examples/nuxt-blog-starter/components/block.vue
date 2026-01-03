@@ -9,10 +9,10 @@
     <hr />
   </div>
 
-  <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-editable-metadata="title">{{ data.title }}
+  <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-editable-field="/title">{{ data.title }}
   </h1>
 
-  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-editable-metadata="description"><i>{{
+  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-editable-field="/description"><i>{{
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
@@ -144,7 +144,7 @@
   </div>
 
   <section v-else-if="block['@type'] == 'slider'" :data-block-uid="block_uid" data-block-container="{allowed:['Slide'],add:'horizontal'}"
-    class=" w-full mx-auto" data-carousel="static" >
+    class="max-w-4xl mx-auto" data-carousel="static" >
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
@@ -154,23 +154,27 @@
             isSlideActive(index) ? 'flex' : 'hidden',
             { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
           ]"
-          data-carousel-item :style="slide.preview_image?.[0] ? imageProps(slide.preview_image[0], true).class : ''">
+          data-carousel-item :style="slide.preview_image ? imageProps(slide, true).class : ''"
+          data-block-add="right">
           <!-- Clickable overlay for preview_image editing -->
           <div data-media-field="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
             :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
-            <div>{{ slide.head_title }}</div>
+            <div data-editable-field="head_title">{{ slide.head_title }}</div>
             <h5 :id="`heading-${slide['@id']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
               {{ slide.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">
               {{ slide.description }}</p>
-              <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText"
+            <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText" data-linkable-field="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
               :aria-describedby="`heading-${slide['@id']}`">
-
               {{ slide.buttonText || 'Read More' }}</NuxtLink>
+            <a v-else href="#" data-editable-field="buttonText" data-linkable-field="href"
+              class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+              :aria-describedby="`heading-${slide['@id']}`">
+              {{ slide.buttonText || 'Read More' }}</a>
           </div>
         </div>
       </div>
