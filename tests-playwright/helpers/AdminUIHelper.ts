@@ -2346,7 +2346,8 @@ export class AdminUIHelper {
    * Block types: 'slate', 'image', 'video', 'listing', etc.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    // Wait for block chooser to be visible
+    // Wait for block chooser to be fully visible
+    await this.page.waitForSelector('.blocks-chooser', { state: 'visible', timeout: 5000 });
     await this.page.waitForTimeout(500);
 
     // Different block types have different display names
@@ -2355,6 +2356,10 @@ export class AdminUIHelper {
       image: ['Image', 'image'],
       video: ['Video', 'video'],
       listing: ['Listing', 'listing'],
+      columns: ['Columns', 'columns'],
+      accordion: ['Accordion', 'accordion'],
+      slider: ['Slider', 'slider'],
+      gridblock: ['Grid'],
     };
 
     const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
@@ -2373,6 +2378,25 @@ export class AdminUIHelper {
         await blockButton.click();
         await this.page.waitForTimeout(500); // Wait for block to be added
         return;
+      }
+    }
+
+    // Block not visible in MOST USED section, try using search
+    const searchInput = blockChooser.locator('input[placeholder="Search"]');
+    if (await searchInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+      // Use the first possible name for search
+      await searchInput.fill(possibleNames[0]);
+      await this.page.waitForTimeout(300);
+
+      // Now try to find the block button again
+      for (const name of possibleNames) {
+        const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
+
+        if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await blockButton.click();
+          await this.page.waitForTimeout(500); // Wait for block to be added
+          return;
+        }
       }
     }
 

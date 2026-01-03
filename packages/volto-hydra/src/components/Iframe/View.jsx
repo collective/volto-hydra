@@ -780,7 +780,7 @@ const Iframe = (props) => {
     }
 
     // Insert and update state
-    const newFormData = insertBlockInContainer(
+    let newFormData = insertBlockInContainer(
       formData,
       blockPathMap,
       blockId,
@@ -794,6 +794,17 @@ const Iframe = (props) => {
       console.error('[VIEW] insertAndSelectBlock failed');
       return null;
     }
+
+    // Ensure new container blocks have at least one child (for gridBlock etc.)
+    const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+    newFormData = ensureEmptyBlockIfEmpty(
+      newFormData,
+      { parentId: newBlockId },
+      newBlockPathMap,
+      uuid,
+      mergedBlocksConfig,
+      { intl, metadata, properties },
+    );
 
     // Determine which block to select
     let selectBlockId = newBlockId;

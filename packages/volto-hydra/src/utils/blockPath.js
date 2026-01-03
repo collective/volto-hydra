@@ -610,7 +610,10 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   // Check for implicit container (blocks/blocks_layout without schema definition)
   // Only if no explicit container fields found
-  if (containerFields.length === 0 && block.blocks && block.blocks_layout?.items) {
+  // Detect from blockConfig (allowedBlocks/defaultBlock) or existing blocks/blocks_layout
+  const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
+                              blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
+  if (containerFields.length === 0 && isImplicitContainer) {
     containerFields.push({
       fieldName: 'blocks',
       title: 'Blocks',
@@ -1041,6 +1044,23 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       };
     }
     return formData;
+  }
+
+  // If no fieldName, process all container fields for this block
+  if (!containerConfig.fieldName) {
+    const containerFields = getAllContainerFields(containerConfig.parentId, blockPathMap, formData, blocksConfig);
+    let result = formData;
+    for (const field of containerFields) {
+      result = ensureEmptyBlockIfEmpty(
+        result,
+        { parentId: containerConfig.parentId, ...field },
+        blockPathMap,
+        uuidGenerator,
+        blocksConfig,
+        options,
+      );
+    }
+    return result;
   }
 
   // Container-level: check container's items

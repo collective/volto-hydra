@@ -3706,4 +3706,48 @@ test.describe('Multi-Container Field Operations', () => {
       timeout: 5000,
     });
   });
+
+  test('creating a new gridBlock shows toolbar and has visible size', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a page-level block (title-block) to enable add button
+    await helper.clickBlockInIframe('title-block');
+    await helper.waitForQuantaToolbar('title-block');
+
+    // Add a new gridBlock
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('gridBlock');
+
+    // Wait for the sidebar to show Grid as the current block
+    await helper.waitForSidebarOpen();
+    await helper.waitForSidebarCurrentBlock('Grid', 10000);
+
+    // Find the new gridBlock by looking for blocks with .grid-row child
+    // Use :not([data-block-uid="grid-1"]) to exclude the original grid-1
+    const newGridBlock = iframe.locator('[data-block-uid]:has(> .grid-row):not([data-block-uid="grid-1"])');
+    await expect(newGridBlock).toBeVisible({ timeout: 5000 });
+
+    // The gridBlock should contain at least one child block (ensureEmptyBlockIfEmpty creates it)
+    const gridRow = newGridBlock.locator('> .grid-row');
+    const childBlocks = gridRow.locator('[data-block-uid]');
+    await expect(childBlocks).toHaveCount(1, { timeout: 5000 });
+
+    // The child block should be selected (toolbar visible for it)
+    // After creating a container, the child gets selected for immediate editing
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // The gridBlock should have a reasonable size (not collapsed)
+    const blockBox = await newGridBlock.boundingBox();
+    expect(blockBox).not.toBeNull();
+    expect(blockBox!.width).toBeGreaterThan(100);
+    expect(blockBox!.height).toBeGreaterThan(50);
+  });
 });
