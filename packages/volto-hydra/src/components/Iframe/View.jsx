@@ -1427,6 +1427,17 @@ const Iframe = (props) => {
           // This ensures blockPathMap is built with complete schema knowledge
           iframeOriginRef.current = event.origin;
 
+          // Check if iframe navigated to a different page (e.g., via client-side routing)
+          // If so, update admin URL to match
+          if (event.data.currentPath) {
+            const adminPath = history.location.pathname.replace(/\/edit$/, '');
+            if (event.data.currentPath !== adminPath) {
+              log('INIT: iframe path differs from admin, navigating to:', event.data.currentPath);
+              history.push(event.data.currentPath);
+              return; // Don't send INITIAL_DATA - admin will re-render with new page
+            }
+          }
+
           // 1. Merge voltoConfig (adds custom block definitions)
           if (event.data.voltoConfig) {
             const frontendConfig = event.data.voltoConfig;

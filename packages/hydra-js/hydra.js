@@ -624,6 +624,11 @@ export class Bridge {
           originalReplaceState.apply(this, args);
           checkNavigation();
         };
+
+        // Fallback: poll for URL changes every 200ms
+        // This catches navigation from frameworks that cache history.pushState
+        // before hydra.js patches it (e.g., Vue Router in Nuxt)
+        setInterval(checkNavigation, 200);
       }
 
       detectNavigation((currentUrl) => {
@@ -667,11 +672,13 @@ export class Bridge {
 
         // Send single INIT message with config - admin merges config before responding
         // This ensures blockPathMap is built with complete schema knowledge
+        // Include current path so admin can navigate if iframe URL differs (e.g., after client-side nav)
         window.parent.postMessage(
           {
             type: 'INIT',
             voltoConfig: options?.voltoConfig,
             allowedBlocks: options?.allowedBlocks,
+            currentPath: window.location.pathname,
           },
           this.adminOrigin,
         );
@@ -6542,7 +6549,8 @@ export class Bridge {
 }
 
 // Export an instance of the Bridge class
-let bridgeInstance = null;
+// Use window.__hydraBridge to survive module hot-reloading in frameworks like Nuxt/Vite
+let bridgeInstance = (typeof window !== 'undefined' && window.__hydraBridge) || null;
 
 /**
  * Initialize the bridge
@@ -6575,6 +6583,10 @@ export function initBridge(adminOrigin, options = {}) {
 
   if (!bridgeInstance) {
     bridgeInstance = new Bridge(adminOrigin, options);
+    // Store on window to survive module hot-reload
+    if (typeof window !== 'undefined') {
+      window.__hydraBridge = bridgeInstance;
+    }
   }
   return bridgeInstance;
 }

@@ -69,7 +69,18 @@ function nav(data) {
         return data?.navigation?.items;
     };
 function getUrl(item) {
-        return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '')
+        const path = item['@id'].replace(runtimeConfig.public.backendBaseUrl, '');
+        // Preserve edit mode query params when navigating
+        if (import.meta.client && window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('_edit')) {
+                const newParams = new URLSearchParams();
+                if (params.get('access_token')) newParams.set('access_token', params.get('access_token'));
+                if (params.get('_edit')) newParams.set('_edit', params.get('_edit'));
+                return path + '?' + newParams.toString();
+            }
+        }
+        return path;
     };
 function getId(item) {
         return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '')
