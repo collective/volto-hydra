@@ -6639,6 +6639,20 @@ export function isTextEditableFieldType(fieldType) {
          isPlainStringFieldType(fieldType);
 }
 
+/**
+ * Compare two formData objects for content equality, ignoring _editSequence.
+ * Used to detect if form content has actually changed vs just metadata.
+ * @param {Object} formDataA - First formData object
+ * @param {Object} formDataB - Second formData object
+ * @returns {boolean} True if content is equal (ignoring _editSequence)
+ */
+export function formDataContentEqual(formDataA, formDataB) {
+  if (!formDataA || !formDataB) return formDataA === formDataB;
+  const { _editSequence: seqA, ...contentA } = formDataA;
+  const { _editSequence: seqB, ...contentB } = formDataB;
+  return JSON.stringify(contentA) === JSON.stringify(contentB);
+}
+
 // Make initBridge available globally
 if (typeof window !== 'undefined') {
   window.initBridge = initBridge;

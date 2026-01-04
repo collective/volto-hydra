@@ -8,7 +8,7 @@ import {
   previousBlockId,
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
-import { isSlateFieldType } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -1574,6 +1574,20 @@ const Iframe = (props) => {
       return;
     }
 
+    // Skip if iframeSyncState.formData is already newer (higher sequence) than properties
+    // This happens when Case 1 just ran and Redux hasn't propagated yet
+    // (Case 1 sends FORM_DATA with selection; this stale properties echo would lose it)
+    const syncedSeq = iframeSyncState.formData?._editSequence || 0;
+    const propsSeq = formToUse?._editSequence || 0;
+    if (syncedSeq > propsSeq) {
+      return;
+    }
+
+    // Also skip if content is identical (ignoring _editSequence metadata)
+    if (formDataContentEqual(formToUse, iframeSyncState.formData)) {
+      return;
+    }
+
     // Build new blockPathMap
     const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
 
@@ -1611,7 +1625,7 @@ const Iframe = (props) => {
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
     }));
 
-    // Always send to iframe - sequence handles stale echo detection
+    // Send updated data to iframe (duplicates already filtered above)
     const message = {
       type: 'FORM_DATA',
       data: formWithSequence,
