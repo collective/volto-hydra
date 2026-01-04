@@ -206,13 +206,19 @@ test.describe('Inline link editing', () => {
 
     // Click the hero button (has data-linkable-field="buttonLink")
     const iframe = helper.getIframe();
-    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-linkable-field="buttonLink"]');
+    const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    const heroButton = heroBlock.locator('[data-linkable-field="buttonLink"]');
+
+    // Scroll hero block to center first, then click the button
+    await helper.scrollBlockIntoViewWithToolbarRoom('block-4-hero');
     await expect(heroButton).toBeVisible();
     await heroButton.click();
 
-    // Wait for toolbar with link button
+    // Wait for toolbar to appear
+    await helper.waitForQuantaToolbar('block-4-hero');
+
+    // Wait for link button in toolbar
     const toolbar = page.locator('.quanta-toolbar');
-    await expect(toolbar).toBeVisible({ timeout: 5000 });
     const linkButton = toolbar.locator('button[title*="Edit link"]');
     await expect(linkButton).toBeVisible({ timeout: 5000 });
 

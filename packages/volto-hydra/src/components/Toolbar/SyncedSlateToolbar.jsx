@@ -1111,7 +1111,7 @@ const SyncedSlateToolbar = ({
       />
     )}
 
-    {/* Field Link Editor Popup - fixed position above toolbar */}
+    {/* Field Link Editor Popup - fixed position at toolbar */}
     {fieldLinkEditorOpen && fieldLinkEditorField && (() => {
       const fieldDef = blockPathMap?.[selectedBlock]?.schema?.properties?.[fieldLinkEditorField];
       const isObjectBrowserLink = fieldDef?.widget === 'object_browser' && fieldDef?.mode === 'link';
@@ -1120,7 +1120,7 @@ const SyncedSlateToolbar = ({
           className="add-link field-link-editor"
           style={{
             position: 'fixed',
-            top: `${toolbarTop - 60}px`,
+            top: `${toolbarTop}px`,
             left: `${toolbarLeft}px`,
             background: '#fff',
             border: '1px solid #e0e0e0',

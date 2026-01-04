@@ -3005,9 +3005,13 @@ export class Bridge {
             const serializedSelection = this.serializeSelection();
             const pendingBlockUid = this._pendingBlockSelected.blockUid;
             const pendingFocusedFieldName = this._pendingBlockSelected.focusedFieldName;
+            const pendingFocusedLinkableField = this._pendingBlockSelected.focusedLinkableField;
+            const pendingFocusedMediaField = this._pendingBlockSelected.focusedMediaField;
             this._pendingBlockSelected = null;
             this.sendBlockSelected('selectionChangeListener', currentBlockElement, {
               focusedFieldName: pendingFocusedFieldName,
+              focusedLinkableField: pendingFocusedLinkableField,
+              focusedMediaField: pendingFocusedMediaField,
               selection: serializedSelection,
             });
             log('Sent BLOCK_SELECTED with selection:', { blockUid: pendingBlockUid, selection: serializedSelection });
