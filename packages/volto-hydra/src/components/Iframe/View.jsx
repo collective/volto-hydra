@@ -999,8 +999,12 @@ const Iframe = (props) => {
               selection: event.data.selection || null,
               ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
             }));
-            log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux');
-            onChangeFormData(event.data.data);
+            // Strip _editSequence when updating Redux - sequence numbers are for iframe
+            // echo detection only. Keeping them in Redux would cause sidebar edits to
+            // inherit stale sequences, breaking the "skip if propsSeq < syncedSeq" check.
+            const { _editSequence: _, ...formDataWithoutSeq } = event.data.data;
+            log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux (without _editSequence)');
+            onChangeFormData(formDataWithoutSeq);
           } else {
             // Echo or stale - only update selection and flush state
             log('INLINE_EDIT_DATA: echo/stale, only updating selection');
@@ -1565,9 +1569,12 @@ const Iframe = (props) => {
       // Use flushSync to ensure BOTH state updates commit before any pending re-renders
       // This prevents race condition where onSelectBlock's Redux update triggers Case 2
       // with stale properties before onChangeFormData's update propagates
+      // Strip _editSequence from Redux - sequences are for iframe echo detection only.
+      // Keeping them in Redux causes sidebar edits to inherit stale sequences.
+      const { _editSequence: _, ...formWithoutSeq } = formWithSequence;
       flushSync(() => {
         setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
-        onChangeFormData(formWithSequence);
+        onChangeFormData(formWithoutSeq);
       });
       return;
     }
@@ -1584,13 +1591,16 @@ const Iframe = (props) => {
     const syncedSeq = iframeSyncState.formData?._editSequence || 0;
     const propsSeq = formToUse?._editSequence;
     if (propsSeq !== undefined && syncedSeq > propsSeq) {
+      log('[SYNC SKIP] Stale sequence: propsSeq', propsSeq, '< syncedSeq', syncedSeq);
       return;
     }
 
     // Also skip if content is identical (ignoring _editSequence metadata)
     if (formDataContentEqual(formToUse, iframeSyncState.formData)) {
+      log('[SYNC SKIP] Content identical, skipping FORM_DATA');
       return;
     }
+    log('[SYNC] Content changed, will send FORM_DATA. propsSeq:', propsSeq, 'syncedSeq:', syncedSeq);
 
     // Build new blockPathMap
     const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
