@@ -938,60 +938,29 @@ export class Bridge {
 
             // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
             // For existing block, just update UI positions
-            if (needsBlockSwitch) {
-              // New block created (e.g., Enter key, sidebar add) - need full selectBlock setup
-              // Use adminSelectedBlockUid (not this.selectedBlockUid) since we haven't updated it yet
+            const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
+            const blockHandler = needsBlockSwitch
+              ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
+              : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
+
+            if (blockUidToProcess) {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  let newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
-                  // If block is hidden (e.g., new carousel slide), try to make it visible first
-                  if (newBlockElement && this.isElementHidden(newBlockElement)) {
-                    log('FORM_DATA: new block is hidden, trying to make visible:', adminSelectedBlockUid);
-                    const madeVisible = this.tryMakeBlockVisible(adminSelectedBlockUid);
-                    if (madeVisible) {
-                      // Wait for block to become visible, then select it
-                      const waitForVisible = async () => {
-                        for (let i = 0; i < 10; i++) {
-                          await new Promise((resolve) => setTimeout(resolve, 50));
-                          newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
-                          if (newBlockElement && !this.isElementHidden(newBlockElement)) {
-                            log('FORM_DATA: new block now visible, selecting');
-                            this.selectBlock(newBlockElement);
-                            return;
-                          }
-                        }
-                        log('FORM_DATA: timeout waiting for new block to become visible');
-                      };
-                      waitForVisible();
-                      this.replayBufferedEvents();
-                      return;
-                    }
-                  }
-                  if (newBlockElement) {
-                    log('Selecting new block from FORM_DATA:', adminSelectedBlockUid);
-                    this.selectBlock(newBlockElement);
-                  }
-                  // Replay any buffered keystrokes now that DOM is ready
-                  this.replayBufferedEvents();
-                });
-              });
-            } else if (this.selectedBlockUid) {
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  let blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                  // If block is hidden (e.g., carousel slide), try to make it visible
+                  let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                  // If block is hidden (e.g., carousel slide), try to make it visible first
                   if (blockElement && this.isElementHidden(blockElement)) {
-                    log('FORM_DATA: selected block is hidden, trying to make visible:', this.selectedBlockUid);
-                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
+                    const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
                     if (madeVisible) {
-                      // Wait for block to become visible, then update UI
+                      // Wait for block to become visible, then process it
                       const waitForVisible = async () => {
                         for (let i = 0; i < 10; i++) {
                           await new Promise((resolve) => setTimeout(resolve, 50));
-                          blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
                           if (blockElement && !this.isElementHidden(blockElement)) {
-                            log('FORM_DATA: block now visible, updating UI');
-                            this.updateBlockUIAfterFormData(blockElement, skipFocus);
+                            log('FORM_DATA: block now visible, processing');
+                            blockHandler(blockElement);
+                            this.ensureEditableFieldsHaveHeight();
                             return;
                           }
                         }
@@ -1003,8 +972,10 @@ export class Bridge {
                     }
                   }
                   if (blockElement) {
-                    this.updateBlockUIAfterFormData(blockElement, skipFocus);
+                    blockHandler(blockElement);
                   }
+                  // Ensure all editable fields have height (for newly added blocks)
+                  this.ensureEditableFieldsHaveHeight();
                   // Replay any buffered keystrokes now that DOM is ready
                   this.replayBufferedEvents();
                 });
@@ -2376,6 +2347,21 @@ export class Bridge {
       if (!el.hasAttribute('data-editable-field')) {
         el.removeAttribute('contenteditable');
         log(`  Removed stale contenteditable from element without data-editable-field`);
+      }
+    });
+  }
+
+  /**
+   * Ensure all editable fields on the page have minimum height so users can click them.
+   * Called after FORM_DATA to handle newly added blocks that haven't been selected yet.
+   * Only sets min-height on fields that have zero height (respects existing styling).
+   */
+  ensureEditableFieldsHaveHeight() {
+    const allEditableFields = document.querySelectorAll('[data-editable-field]');
+    allEditableFields.forEach((field) => {
+      const rect = field.getBoundingClientRect();
+      if (rect.height === 0) {
+        field.style.minHeight = '1.5em';
       }
     });
   }

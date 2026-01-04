@@ -318,6 +318,9 @@ export class AdminUIHelper {
       throw new Error(`Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`);
     }
 
+    // Wait for block to be visible (have non-zero height) - hydra.js sets min-height on editable fields
+    await block.waitFor({ state: 'visible', timeout: 5000 });
+
     // Scroll block into view inside the iframe
     await block.scrollIntoViewIfNeeded();
     await block.click();
