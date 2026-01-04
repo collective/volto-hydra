@@ -2310,11 +2310,13 @@ export class Bridge {
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
     // Only restore on THIS block's own fields, not nested blocks' fields
     const editableFields = this.getOwnEditableFields(blockElement);
-    log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
+    // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
       const fieldPath = field.getAttribute('data-editable-field');
       // Use getFieldType which handles page-level fields (e.g., /title) correctly
-      const fieldType = this.getFieldType(this.selectedBlockUid, fieldPath);
+      const fieldType = this.getFieldType(blockUid, fieldPath);
       const wasEditable = field.getAttribute('contenteditable') === 'true';
       // Only set contenteditable for text-editable fields (string, textarea, slate)
       if (this.fieldTypeIsTextEditable(fieldType)) {
@@ -2638,7 +2640,12 @@ export class Bridge {
     this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
     // For slate blocks (value field), also set up paste/keydown handlers
-    const valueField = blockElement.querySelector('[data-editable-field="value"]');
+    // Check blockElement itself first (Nuxt puts both attributes on same element)
+    // then fall back to querying for child elements
+    let valueField = blockElement.hasAttribute('data-editable-field') &&
+                     blockElement.getAttribute('data-editable-field') === 'value'
+                     ? blockElement
+                     : blockElement.querySelector('[data-editable-field="value"]');
     if (valueField) {
       this.makeBlockContentEditable(valueField);
     }
