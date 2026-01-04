@@ -4928,6 +4928,19 @@ export class Bridge {
         anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
         focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
+        // If elements not found, DOM may not be ready yet (async framework render)
+        // Retry after a short delay - but only once to avoid infinite loops
+        if ((!anchorElement || !focusElement) && !this._selectionRetryPending) {
+          log('restoreSlateSelection: nodeId elements not found, scheduling retry');
+          this._selectionRetryPending = true;
+          setTimeout(() => {
+            this._selectionRetryPending = false;
+            this.restoreSlateSelection(slateSelection, formData);
+          }, 50);
+          return;
+        }
+        this._selectionRetryPending = false;
+
         log('restoreSlateSelection: looking for nodeIds', {
           anchorNodeId: anchorResult.nodeId,
           focusNodeId: focusResult.nodeId,
