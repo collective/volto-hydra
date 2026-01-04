@@ -1577,12 +1577,13 @@ const Iframe = (props) => {
       return;
     }
 
-    // Skip if iframeSyncState.formData is already newer (higher sequence) than properties
-    // This happens when Case 1 just ran and Redux hasn't propagated yet
-    // (Case 1 sends FORM_DATA with selection; this stale properties echo would lose it)
+    // Skip if properties has an older sequence than what we've already sent
+    // This prevents stale Redux echoes after Case 1 runs.
+    // IMPORTANT: Sidebar edits come through Redux without _editSequence (it's undefined),
+    // so we must NOT skip those - only skip when properties explicitly has an older sequence.
     const syncedSeq = iframeSyncState.formData?._editSequence || 0;
-    const propsSeq = formToUse?._editSequence || 0;
-    if (syncedSeq > propsSeq) {
+    const propsSeq = formToUse?._editSequence;
+    if (propsSeq !== undefined && syncedSeq > propsSeq) {
       return;
     }
 
