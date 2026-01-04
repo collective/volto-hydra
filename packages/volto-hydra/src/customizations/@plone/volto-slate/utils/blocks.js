@@ -179,15 +179,7 @@ export const toggleInlineFormat = (editor, format) => {
       console.log('[SHADOW] rangeRef.current is null after unwrap!');
       rangeRef.unref();
     }
-    // Explicitly trigger onChange to ensure the component updates
-    console.log('[SHADOW] Triggering editor.onChange after unwrap, editor.onChange exists:', !!editor.onChange);
-    if (editor.onChange) {
-      console.log('[SHADOW] Calling editor.onChange()');
-      editor.onChange();
-      console.log('[SHADOW] editor.onChange() returned, editor.children[0]:', JSON.stringify(editor.children[0]));
-    } else {
-      console.log('[SHADOW] WARNING: editor.onChange is undefined!');
-    }
+    // Don't call editor.onChange() explicitly - Slate handles it automatically after transforms
     return;
   }
 
