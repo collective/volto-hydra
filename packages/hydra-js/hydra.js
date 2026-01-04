@@ -940,19 +940,20 @@ export class Bridge {
             // For existing block, just update UI positions
             if (needsBlockSwitch) {
               // New block created (e.g., Enter key, sidebar add) - need full selectBlock setup
+              // Use adminSelectedBlockUid (not this.selectedBlockUid) since we haven't updated it yet
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  let newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                  let newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
                   // If block is hidden (e.g., new carousel slide), try to make it visible first
                   if (newBlockElement && this.isElementHidden(newBlockElement)) {
-                    log('FORM_DATA: new block is hidden, trying to make visible:', this.selectedBlockUid);
-                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    log('FORM_DATA: new block is hidden, trying to make visible:', adminSelectedBlockUid);
+                    const madeVisible = this.tryMakeBlockVisible(adminSelectedBlockUid);
                     if (madeVisible) {
                       // Wait for block to become visible, then select it
                       const waitForVisible = async () => {
                         for (let i = 0; i < 10; i++) {
                           await new Promise((resolve) => setTimeout(resolve, 50));
-                          newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+                          newBlockElement = document.querySelector(`[data-block-uid="${adminSelectedBlockUid}"]`);
                           if (newBlockElement && !this.isElementHidden(newBlockElement)) {
                             log('FORM_DATA: new block now visible, selecting');
                             this.selectBlock(newBlockElement);
@@ -967,7 +968,7 @@ export class Bridge {
                     }
                   }
                   if (newBlockElement) {
-                    log('Selecting new block from FORM_DATA:', this.selectedBlockUid);
+                    log('Selecting new block from FORM_DATA:', adminSelectedBlockUid);
                     this.selectBlock(newBlockElement);
                   }
                   // Replay any buffered keystrokes now that DOM is ready
@@ -5858,9 +5859,17 @@ export class Bridge {
             // Child is an inline element, update its first text child
             child.children[0].text = newText;
           }
-        } else {
-          // Fallback: update first child (original behavior)
-          json.children[0].text = newText;
+        } else if (json.children) {
+          // Fallback: childIndex is null, updating whole node content
+          // Check if any child has 'type' (inline element like strong, em, link)
+          const hasInlineElements = json.children.some(child => child.type);
+          if (hasInlineElements) {
+            // DOM simplified (inline elements deleted) - collapse to single text node
+            json.children = [{ text: newText }];
+          } else {
+            // Simple paragraph - just update first child
+            json.children[0].text = newText;
+          }
         }
         return json;
       }
