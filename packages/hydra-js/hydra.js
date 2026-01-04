@@ -1348,23 +1348,30 @@ export class Bridge {
    * Replays buffered keyboard events after DOM is ready.
    * Called after selection is restored following a transform.
    */
-  replayBufferedEvents() {
+  replayBufferedEvents(retryCount = 0) {
     if (!this.pendingBufferReplay) {
       return;
     }
 
     const { blockId, buffer } = this.pendingBufferReplay;
-    this.pendingBufferReplay = null;
 
-    log('Replaying', buffer.length, 'buffered events');
+    log('Replaying', buffer.length, 'buffered events, retry:', retryCount);
 
     // Re-query editable field in case DOM was re-rendered
     const currentBlock = document.querySelector(`[data-block-uid="${blockId}"]`);
     const currentEditable = currentBlock?.querySelector('[contenteditable="true"]');
     if (!currentEditable) {
-      console.warn('[HYDRA] Cannot replay buffer - editable field not found');
+      // Retry a few times with RAF to wait for Vue/Nuxt re-render
+      if (retryCount < 5) {
+        requestAnimationFrame(() => this.replayBufferedEvents(retryCount + 1));
+        return;
+      }
+      console.warn('[HYDRA] Cannot replay buffer - editable field not found after retries');
+      this.pendingBufferReplay = null;
       return;
     }
+
+    this.pendingBufferReplay = null;
 
     // Build up text string from consecutive printable characters
     let textToInsert = '';
