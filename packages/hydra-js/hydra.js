@@ -794,12 +794,12 @@ export class Bridge {
             }
 
             // Check if Admin wants to select a different block (e.g., after Enter creates new block)
-            // Update selectedBlockUid BEFORE setFormDataFromAdmin so logging shows correct block
+            // NOTE: Don't set this.selectedBlockUid here - let selectBlock() set it so isSelectingSameBlock
+            // is calculated correctly (important for scroll-into-view behavior)
             const adminSelectedBlockUid = event.data.selectedBlockUid;
             const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
             if (needsBlockSwitch) {
               log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
-              this.selectedBlockUid = adminSelectedBlockUid;
             }
 
             // Central method for setting form data with logging (also sets blockPathMap)
