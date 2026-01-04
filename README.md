@@ -673,12 +673,27 @@ direct html changes in your frontend which are then sent back to the CMS and ref
 </div>
 ```
 
-You might also want to edit content fields, in which case use ```data-editable-metdata``` ([TODO](https://github.com/collective/volto-hydra/issues/118)).
-- Note: ```data-editable-metadata``` isn't required to be inside a block so can make fixed parts of the page editable.
+#### Path Syntax for Editing Parent or Page Fields
+
+The `data-editable-field` attribute supports Unix-style paths to edit fields outside the current block:
+
+- `fieldName` - edit the block's own field (default)
+- `../fieldName` - edit the parent block's field
+- `../../fieldName` - edit the grandparent's field
+- `/fieldName` - edit the page metadata field
 
 ``` html
-<h2 data-editable-metdata="title">My Title</h2>
+<!-- Edit the page title (not inside any block) -->
+<h1 data-editable-field="/title">My Page Title</h1>
+
+<!-- Edit the page description -->
+<p data-editable-field="/description">Page description here</p>
+
+<!-- Inside a nested block, edit the parent container's title -->
+<h3 data-editable-field="../title">Column Title</h3>
 ```
+
+This allows fixed parts of the page (like headers) to be editable without being inside a block.
 
 #### Visual Text editing
 

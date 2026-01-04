@@ -96,9 +96,9 @@
   ],
   "pnpm": {
     "overrides": {
-      "slate": "0.100.0",
-      "slate-react": "0.98.4",
-      "slate-history": "0.100.0",
+      "slate": "0.118.1",
+      "slate-react": "0.118.2",
+      "slate-history": "0.109.0",
       "react": "18.2.0",
       "react-dom": "18.2.0"
     }

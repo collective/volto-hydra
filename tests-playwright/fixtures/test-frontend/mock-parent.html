@@ -259,7 +259,7 @@
             'slate': { value: 'slate' },
             'text': { text: 'string' },  // Simple string field
             'multifield': { title: 'string', description: 'slate' },  // title is string, description is slate
-            'textarea': { content: 'textarea' }  // Multiline text field
+            'textarea': { content: 'string:textarea' }  // Multiline text field
           };
 
           const response = {
@@ -328,7 +328,7 @@
             'slate': { value: 'slate' },
             'text': { text: 'string' },
             'multifield': { title: 'string', description: 'slate' },
-            'textarea': { content: 'textarea' }
+            'textarea': { content: 'string:textarea' }
           };
 
           const response = {
@@ -432,7 +432,7 @@
               'slate': { value: 'slate' },
               'text': { text: 'string' },
               'multifield': { title: 'string', description: 'slate' },
-              'textarea': { content: 'textarea' }
+              'textarea': { content: 'string:textarea' }
             };
 
             // Send FORM_DATA with formatRequestId so hydra.js knows to unblock

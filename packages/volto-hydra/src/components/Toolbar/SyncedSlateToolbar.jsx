@@ -424,7 +424,20 @@ const SyncedSlateToolbar = ({
       }
     } else {
       // Range selection - use toggleInlineFormat to wrap/unwrap selected text
+      // Use rangeRef to track selection through the transform - wrapNodes creates
+      // the inline element, then Slate normalization adds empty text nodes before/after.
+      // Without rangeRef, the selection path becomes stale (points to empty text node).
+      const rangeRef = Editor.rangeRef(editor, editor.selection);
       toggleInlineFormat(editor, format);
+      // Restore selection from tracked range (handles path shifts from wrapping/normalization)
+      if (rangeRef.current) {
+        try {
+          Transforms.select(editor, rangeRef.current);
+        } catch (e) {
+          console.warn('[TOOLBAR FORMAT] Failed to restore selection after format:', e.message);
+        }
+        rangeRef.unref();
+      }
     }
   }, [editor, form, onChangeFormData]);
 
@@ -521,6 +534,10 @@ const SyncedSlateToolbar = ({
       lastSeenSequenceRef.current = incomingSequence;
       // Content changed from external source - sync it
       console.log('[TOOLBAR SYNC] Syncing content from iframe, incomingSeq:', incomingSequence, 'fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
+      // Debug: log full children structure to diagnose missing "w" bug
+      if (fieldValue?.[0]?.children) {
+        console.log('[TOOLBAR SYNC] Full children structure:', JSON.stringify(fieldValue[0].children));
+      }
 
       // If there's a transform, run it in the same batch
       const transformCallback = hasUnprocessedTransform ? () => {
@@ -538,6 +555,10 @@ const SyncedSlateToolbar = ({
       // Debug: check what editor.children looks like after replace
       console.log('[TOOLBAR SYNC] After replaceEditorContent, editor.children[0].children[0].text:',
         JSON.stringify(editor.children?.[0]?.children?.[0]?.text?.substring(0, 40)));
+      // Debug: show full editor children after replace to diagnose missing "w"
+      if (editor.children?.[0]?.children) {
+        console.log('[TOOLBAR SYNC] After replace, full editor.children[0].children:', JSON.stringify(editor.children[0].children));
+      }
 
       // Update internalValueRef from editor.children AFTER transform (not fieldValue)
       internalValueRef.current = editor.children;

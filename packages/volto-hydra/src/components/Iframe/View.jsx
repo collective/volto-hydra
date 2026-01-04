@@ -992,6 +992,11 @@ const Iframe = (props) => {
             // New edit from iframe - update everything
             inlineEditCounterRef.current += 1;
             editSequenceRef.current = incomingSequence; // Track the new sequence
+            // Debug: log full children structure to diagnose missing "w" bug
+            const debugBlock = event.data.data?.blocks?.['block-1-uuid'];
+            if (debugBlock?.value?.[0]?.children) {
+              log('INLINE_EDIT_DATA: full children structure:', JSON.stringify(debugBlock.value[0].children));
+            }
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
