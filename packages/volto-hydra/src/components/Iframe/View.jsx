@@ -1562,10 +1562,13 @@ const Iframe = (props) => {
         message,
         iframeOriginRef.current,
       );
+      // Use flushSync to ensure BOTH state updates commit before any pending re-renders
+      // This prevents race condition where onSelectBlock's Redux update triggers Case 2
+      // with stale properties before onChangeFormData's update propagates
       flushSync(() => {
         setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
+        onChangeFormData(formWithSequence);
       });
-      onChangeFormData(formWithSequence);
       return;
     }
 
