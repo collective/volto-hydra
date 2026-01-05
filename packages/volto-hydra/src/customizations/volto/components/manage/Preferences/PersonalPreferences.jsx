@@ -136,8 +136,14 @@ class PersonalPreferences extends Component {
         );
         return;
       }
-      // const url = new URL(data.url);
-      const url = data.url.replace(/\/$/, '');
+      // Strip trailing slash from pathname only, preserve hash-based URLs like http://host/#/
+      const urlObj = new URL(data.url);
+      if (!urlObj.hash) {
+        // No hash - safe to strip trailing slash from pathname
+        urlObj.pathname = urlObj.pathname.replace(/\/$/, '') || '/';
+      }
+      // Don't strip trailing slash from final string - it would break hash URLs like /#/
+      const url = urlObj.toString();
       this.props.setFrontendPreviewUrl(url);
       const urlList = [...new Set([this.urls, url])];
       this.props.cookies.set('saved_urls', urlList.join(','), {

@@ -985,7 +985,6 @@ const Iframe = (props) => {
       switch (type) {
         case 'PATH_CHANGE': // PATH change from the iframe
           history.push(event.data.path);
-
           break;
 
 
