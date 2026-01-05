@@ -3213,7 +3213,11 @@ test.describe('slateTable Container', () => {
     await expect(iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]')).toHaveCount(3);
 
     // Wait for the newly created cell to be selected (sidebar shows "Cell" as current)
+    // The add button auto-selects the new cell, but we need to wait for the selection
+    // to fully propagate to hydra.js before pressing Escape
     await helper.waitForSidebarCurrentBlock('Cell');
+    // Extra wait to ensure hydra.js has updated its selectedBlockUid
+    await page.waitForTimeout(200);
 
     // Navigate to row using Escape, then add a new row
     await page.keyboard.press('Escape');
