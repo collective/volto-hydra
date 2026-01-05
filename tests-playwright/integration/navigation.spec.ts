@@ -142,4 +142,48 @@ test.describe('Navigation and URL Handling', () => {
     sidebar = page.locator('#sidebar-properties');
     await expect(sidebar).not.toBeVisible();
   });
+
+  test('Root page has top-level navigation in iframe', async ({ page }, testInfo) => {
+    // Skip on Nuxt - Nuxt starter has different nav structure
+    test.skip(testInfo.project.name === 'nuxt', 'Nuxt has different navigation structure');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Navigate to root in edit mode
+    await page.goto('http://localhost:3001/edit');
+    await page.waitForLoadState('networkidle');
+
+    // Wait for iframe element to be visible
+    await page.locator('#previewIframe').waitFor({ state: 'visible', timeout: 10000 });
+
+    // Check that navigation items are visible in the iframe
+    const iframe = helper.getIframe();
+    // The mock frontend displays navigation from API's @components.navigation.items
+    const navItems = iframe.locator('nav a, header a, .navigation a');
+    await expect(navItems.first()).toBeVisible({ timeout: 10000 });
+
+    // Verify at least one known nav item exists (from mock fixtures)
+    const testPageLink = iframe.locator('a[href*="test-page"], a:has-text("Test Page")');
+    await expect(testPageLink.first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('Contents action is available on folderish pages', async ({ page }, testInfo) => {
+    // Skip on Nuxt - test-page may have different behavior
+    test.skip(testInfo.project.name === 'nuxt', 'test-page behavior differs in Nuxt');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Navigate to view mode (not edit) to see Contents action in toolbar
+    await page.goto('http://localhost:3001/test-page');
+    await page.waitForLoadState('networkidle');
+
+    // Look for the contents/folder action in the toolbar
+    // This should be visible because test-page is folderish (is_folderish: true in fixture)
+    const contentsButton = page.locator('#toolbar a[href*="contents"], #toolbar [aria-label*="Contents" i]');
+    await expect(contentsButton.first()).toBeVisible({ timeout: 5000 });
+  });
 });

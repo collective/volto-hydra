@@ -31,9 +31,25 @@
             max-width: 100%;
             height: auto;
         }
+        nav {
+            background: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        nav a {
+            margin-right: 15px;
+            color: #333;
+            text-decoration: none;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+    <header>
+        <nav id="navigation"></nav>
+    </header>
     <div id="render-counter" style="position: fixed; top: 0; right: 0; background: #333; color: #fff; padding: 4px 8px; font-size: 12px; z-index: 9999;">0</div>
     <h1 id="page-title" data-editable-field="title">Loading...</h1>
     <img id="preview-image" data-media-field="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
@@ -56,6 +72,15 @@
                 // Fetch content from mock API using ++api++ prefix
                 const response = await fetch(`/++api++${contentPath}`);
                 const content = await response.json();
+
+                // Render navigation from @components.navigation.items
+                const navItems = content['@components']?.navigation?.items || [];
+                const navElement = document.getElementById('navigation');
+                if (navItems.length > 0) {
+                    navElement.innerHTML = navItems.map(item =>
+                        `<a href="${new URL(item['@id']).pathname}">${item.title}</a>`
+                    ).join('');
+                }
 
                 // Only render initial content if NOT in edit mode
                 // In edit mode, we wait for hydra.js to provide content with nodeIds

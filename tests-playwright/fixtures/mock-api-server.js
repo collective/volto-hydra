@@ -356,10 +356,6 @@ function enrichContent(content, urlPath, baseUrl) {
   };
 }
 
-// Mapping from URL path to content directory info (for image serving and reloading)
-// { urlPath: { dirPath: '/full/path/to/dir', dirName: 'dirname' } }
-const contentDirMap = {};
-
 /**
  * Load content from a single directory with a mount prefix
  */
@@ -423,6 +419,10 @@ function loadInitialContent() {
   CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
     loadContentFromDir(dirPath, mountPath, baseUrl);
   });
+
+  // Regenerate root's @components now that all content is loaded
+  // (navigation items depend on contentDB being populated)
+  contentDB['/']['@components'] = generateComponents('/', baseUrl);
 }
 
 // Initialize on startup
@@ -736,7 +736,7 @@ app.get('/@types/:typeName', (req, res) => {
  * GET /:path/@types/:typeName
  * Get content type schema for a specific content path
  */
-app.get('{*path}/@types/:typeName', (req, res) => {
+app.get('*/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
   res.json(getTypeSchema(typeName));
 });
@@ -745,7 +745,7 @@ app.get('{*path}/@types/:typeName', (req, res) => {
  * GET /:path/@breadcrumbs
  * Get breadcrumb trail
  */
-app.get('{*path}/@breadcrumbs', (req, res) => {
+app.get('*/@breadcrumbs', (req, res) => {
   const fullPath = req.path.replace('/@breadcrumbs', '');
   const parts = fullPath.split('/').filter((p) => p);
   const items = [{ '@id': 'http://localhost:8888/', title: 'Home' }];
@@ -771,7 +771,7 @@ app.get('{*path}/@breadcrumbs', (req, res) => {
  * Supports path.depth parameter to get children of a specific path
  * Supports path.query parameter to get a specific content item
  */
-app.get('{*path}/@search', (req, res) => {
+app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
@@ -841,7 +841,7 @@ app.get('{*path}/@search', (req, res) => {
  * Get folder contents for content browsing
  * Returns items at the parent folder level (siblings of current content)
  */
-app.get('{*path}/@contents', (req, res) => {
+app.get('*/@contents', (req, res) => {
   const contentPath = req.path.replace('/@contents', '') || '/';
 
   // For Documents, we return siblings (contents of parent folder)
@@ -908,7 +908,7 @@ app.get('{*path}/@contents', (req, res) => {
  * POST /:path/@lock
  * Lock content for editing
  */
-app.post('{*path}/@lock', (req, res) => {
+app.post('*/@lock', (req, res) => {
   res.json({
     locked: true,
     stealable: true,
@@ -988,7 +988,7 @@ app.get('*/@@images/*', (req, res) => {
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
  */
-app.get('{*path}', (req, res, next) => {
+app.get('*', (req, res, next) => {
   // Only handle API requests (with ++api++ prefix)
   // Frontend requests should be handled by static file middleware
   if (!req.isApiRequest) {
@@ -1026,7 +1026,7 @@ app.get('{*path}', (req, res, next) => {
  * Update content - returns merged content but does NOT persist changes
  * This ensures test isolation (each test gets fresh fixture data)
  */
-app.patch('{*path}', (req, res) => {
+app.patch('*', (req, res) => {
   const path = req.path;
   const cleanPath = path.replace('/++api++', '');
 
@@ -1069,7 +1069,7 @@ app.use(express.static(FRONTEND_DIR, {
 }));
 
 // Fallback to index.html for any non-API routes (SPA routing)
-app.get('{*path}', (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
