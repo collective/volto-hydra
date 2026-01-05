@@ -328,9 +328,9 @@ test.describe('Inline Editing - Links', () => {
 
     // Verify typing actually works (not just contenteditable attribute present)
     // This catches the bug where contenteditable is true but iframe is blocked
-    // Click at the end of text first to position cursor
-    await editor.click();
-    await page.keyboard.type(' added');
+    // Move cursor to end first (selection may still be "select all" after Escape)
+    await editor.press('End');
+    await editor.pressSequentially(' added', { delay: 10 });
     const newText = await helper.getCleanTextContent(editor);
     expect(newText).toContain('added'); // Text was appended
   });
