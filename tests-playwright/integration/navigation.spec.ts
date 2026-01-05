@@ -3,8 +3,6 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Navigation and URL Handling', () => {
   test('External URLs do not load in iframe', async ({ page }, testInfo) => {
-    // Skip on Nuxt - test-page has hero block not supported in Nuxt
-    test.skip(testInfo.project.name === 'nuxt', 'test-page has custom hero block');
 
     const helper = new AdminUIHelper(page);
 
@@ -29,54 +27,63 @@ test.describe('Navigation and URL Handling', () => {
     expect(iframeSrc).not.toContain('example.com');
   });
 
-  test('Hash bang URLs are handled gracefully', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
+  // Test hash-based routing with different URL formats
+  const hashFormats = [
+    { name: '#/', url: 'http://localhost:8888/#/', expectedHash: '#/test-page' },
+    { name: '#!/', url: 'http://localhost:8888/#!/', expectedHash: '#!/test-page' },
+  ];
 
-    await helper.login();
+  for (const format of hashFormats) {
+    test(`Hash-based frontend routing works with ${format.name} format`, async ({ page }, testInfo) => {
+      // Skip on Nuxt - this test uses the mock frontend which supports hash URLs
+      test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
 
-    // Try navigating with hash bang style URL
-    await page.goto('http://localhost:3001/#!/test-page/edit');
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      const helper = new AdminUIHelper(page);
 
-    // Verify we can navigate normally after encountering hash bang URL
-    await helper.navigateToEdit('/test-page');
-    await helper.waitForSidebarOpen();
+      await helper.login();
 
-    // Verify the page actually loaded in the iframe
-    // Use text content check instead of 'main' element (mock frontend uses #content, Nuxt uses main)
-    const iframe = helper.getIframe();
-    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+      // Open Personal Preferences to set hash-based frontend URL
+      await page.locator('#toolbar-personal').click();
+      await page.locator('#toolbar-preferences').or(page.locator('text=Preferences')).first().click();
 
-    // Verify sidebar is showing the correct page
-    const sidebar = page.locator('#sidebar-properties');
-    await expect(sidebar).toBeVisible();
-  });
+      // Wait for preferences form to load
+      await expect(page.locator('text=Frontend URL')).toBeVisible({ timeout: 5000 });
 
-  test('Navigation between normal and hash bang URLs works', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
+      // Check "Custom URL" checkbox to enable custom URL input
+      await page.locator('label:has-text("Custom URL")').click();
 
-    await helper.login();
+      // Enter hash-based frontend URL
+      const urlInput = page.locator('input[name="url"]');
+      await urlInput.fill(format.url);
 
-    // Start with normal URL
-    await helper.navigateToEdit('/test-page');
-    await helper.waitForSidebarOpen();
+      // Submit the form
+      await page.locator('form button[type="submit"], form .ui.button.primary').click();
 
-    // Navigate to hash bang URL
-    await page.goto('http://localhost:3001/#!/');
-    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+      // Navigate to test-page in edit mode
+      await helper.navigateToEdit('/test-page');
 
-    // Navigate back to normal URL
-    await helper.navigateToEdit('/test-page');
-    await helper.waitForSidebarOpen();
+      // Wait for iframe to load
+      const iframeElement = page.locator('#previewIframe');
+      await iframeElement.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Verify we're still in functioning edit mode
-    const sidebar = page.locator('#sidebar-properties');
-    await expect(sidebar).toBeVisible();
-  });
+      // Verify iframe src uses hash-based URL format (hash comes after query params)
+      const iframeSrc = await iframeElement.getAttribute('src');
+      expect(iframeSrc, `Iframe src should contain ${format.expectedHash}`).toContain(format.expectedHash);
+      expect(iframeSrc).toContain('_edit=true');
+
+      // Verify iframe content shows the correct page
+      const iframe = helper.getIframe();
+      await expect(iframe.locator('h1:has-text("Test Page")')).toBeVisible({ timeout: 10000 });
+      await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 5000 });
+
+      // Click a block and verify sidebar shows correct page data
+      await iframe.locator('[data-block-uid]').first().click();
+      await helper.waitForSidebarOpen();
+      await expect(page.locator('.sidebar-container input[name="title"]')).toHaveValue('Test Page', { timeout: 5000 });
+    });
+  }
 
   test('Navigation links work in iframe when clicking header nav', async ({ page }, testInfo) => {
-    // Only run on Nuxt - test frontend doesn't have header navigation
-    test.skip(testInfo.project.name !== 'nuxt', 'Nuxt-only: test frontend has no header nav');
 
     const helper = new AdminUIHelper(page);
 
@@ -123,29 +130,58 @@ test.describe('Navigation and URL Handling', () => {
     await expect(page.locator('.sidebar-container input[name="title"]')).toHaveValue('Another Page', { timeout: 5000 });
   });
 
-  test('Navigating away from edit mode exits editing', async ({ page }) => {
+  test('Cancelling navigation warning stays on edit page', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
     await helper.waitForSidebarOpen();
 
-    // Verify we're in edit mode
-    let sidebar = page.locator('#sidebar-properties');
-    await expect(sidebar).toBeVisible();
+    // Set up dialog handler to dismiss (cancel) the beforeunload dialog
+    page.on('dialog', async (dialog) => {
+      expect(dialog.type()).toBe('beforeunload');
+      await dialog.dismiss(); // Cancel navigation
+    });
 
-    // Navigate to contents view
-    await page.goto('http://localhost:3001/contents');
-    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+    // Try to navigate away by clicking a link in the iframe
+    const iframe = helper.getIframe();
+    const navLink = iframe.locator('nav a, header a').first();
+    await navLink.click();
 
-    // Verify sidebar is no longer visible (exited edit mode)
-    sidebar = page.locator('#sidebar-properties');
-    await expect(sidebar).not.toBeVisible();
+    // Give time for dialog to be handled
+    await page.waitForTimeout(500);
+
+    // Verify we're still on the edit page
+    await expect(page).toHaveURL(/test-page\/edit/);
+    await expect(page.locator('#sidebar-properties')).toBeVisible();
+  });
+
+  test('Confirming navigation warning leaves edit page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForSidebarOpen();
+
+    // Set up dialog handler to accept all beforeunload dialogs
+    page.on('dialog', async (dialog) => {
+      if (dialog.type() === 'beforeunload') {
+        await dialog.accept(); // Confirm navigation
+      }
+    });
+
+    // Try to navigate away by clicking a link in the iframe
+    const iframe = helper.getIframe();
+    const navLink = iframe.locator('nav a, header a').first();
+    await navLink.click();
+
+    // The iframe navigates, sends INIT with new path, admin follows to view mode
+    // Should not be on test-page and should not be in edit mode
+    await expect(page).not.toHaveURL(/\/test-page/, { timeout: 15000 });
+    await expect(page).not.toHaveURL(/\/edit$/);
   });
 
   test('Root page has top-level navigation in iframe', async ({ page }, testInfo) => {
-    // Skip on Nuxt - Nuxt starter has different nav structure
-    test.skip(testInfo.project.name === 'nuxt', 'Nuxt has different navigation structure');
 
     const helper = new AdminUIHelper(page);
 
@@ -169,9 +205,44 @@ test.describe('Navigation and URL Handling', () => {
     await expect(testPageLink.first()).toBeVisible({ timeout: 5000 });
   });
 
+  test('Navigation works in view mode without warning', async ({ page }, testInfo) => {
+  
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Go to view mode (not edit)
+    await page.goto('http://localhost:3001/test-page');
+    await page.waitForLoadState('networkidle');
+
+    // Wait for iframe to load
+    await page.locator('#previewIframe').waitFor({ state: 'visible', timeout: 10000 });
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('nav a, header a').first()).toBeVisible({ timeout: 10000 });
+
+    // Track if beforeunload dialog appears (it shouldn't in view mode)
+    let dialogAppeared = false;
+    page.on('dialog', async (dialog) => {
+      dialogAppeared = true;
+      await dialog.accept();
+    });
+
+    // Click nav link in iframe
+    const navLink = iframe.locator('nav a, header a').first();
+    await navLink.click();
+
+    // Wait for navigation
+    await page.waitForTimeout(1000);
+
+    // Verify no warning dialog appeared
+    expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
+
+    // Verify admin URL changed to the new page (not just that it left test-page)
+    await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 10000 });
+  });
+
   test('Contents action is available on folderish pages', async ({ page }, testInfo) => {
     // Skip on Nuxt - test-page may have different behavior
-    test.skip(testInfo.project.name === 'nuxt', 'test-page behavior differs in Nuxt');
 
     const helper = new AdminUIHelper(page);
 

@@ -194,7 +194,7 @@ function formatSearchItem(content, baseUrl) {
     'description': content.description || '',
     'review_state': content.review_state || 'published',
     'UID': content.UID,
-    'is_folderish': content.is_folderish || false,
+    'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
   };
 
@@ -866,7 +866,7 @@ app.get('*/@contents', (req, res) => {
         'description': content.description || '',
         'review_state': content.review_state || 'published',
         'UID': content.UID,
-        'is_folderish': content.is_folderish || false,
+        'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
       }));
   } else {
     // Get parent folder's contents (siblings of this content)
@@ -895,7 +895,7 @@ app.get('*/@contents', (req, res) => {
         'description': content.description || '',
         'review_state': content.review_state || 'published',
         'UID': content.UID,
-        'is_folderish': content.is_folderish || false,
+        'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
       }));
   }
 
@@ -918,6 +918,14 @@ app.post('*/@lock', (req, res) => {
     time: new Date().toISOString(),
     timeout: 600
   });
+});
+
+/**
+ * DELETE /:path/@lock
+ * Unlock content after editing
+ */
+app.delete('*/@lock', (req, res) => {
+  res.json({ locked: false });
 });
 
 /**

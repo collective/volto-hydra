@@ -308,7 +308,9 @@ const addUrlParams = (url, qParams, pathname) => {
 
   const path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
   if (urlObj.hash) {
-    urlObj.hash += `/${path}`;
+    // Support both /#/ and /# - normalize by removing trailing slash before appending
+    const hashBase = urlObj.hash.replace(/\/$/, '');
+    urlObj.hash = `${hashBase}/${path}`;
   } else {
     urlObj.pathname += `${path}`;
   }
@@ -480,6 +482,15 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
+
+  // Set contentWindow.name when iframe is ready - this tells hydra.js it's in the admin iframe
+  // Must be done via useEffect because the name attribute doesn't reliably set contentWindow.name
+  // after SSR hydration (server renders null, client renders value, but iframe may have loaded already)
+  useEffect(() => {
+    if (referenceElement?.contentWindow && typeof window !== 'undefined') {
+      referenceElement.contentWindow.name = `hydra:${window.location.origin}`;
+    }
+  }, [referenceElement]);
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
 
@@ -626,14 +637,31 @@ const Iframe = (props) => {
     validateAndLog(properties, 'properties (from Form)', blockFieldTypes);
   }, [properties, blockFieldTypes]);
 
+  const history = useHistory();
+  const pathname = history.location.pathname;
+
   useEffect(() => {
     setIframeSrc(getUrlWithAdminParams(u, token));
     u && Cookies.set('iframe_url', u, { expires: 7 });
-  }, [token, u]);
+  }, [token, u, pathname]);
 
   // NOTE: Form sync and FORM_DATA sending are merged into one useEffect below (search for "UNIFIED FORM SYNC")
 
-  const history = useHistory();
+  // Warn before leaving edit mode (browser-level)
+  const isEditMode = typeof window !== 'undefined' && window.location.pathname.endsWith('/edit');
+
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // Required for Chrome
+      return ''; // Required for some browsers
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isEditMode]);
 
   /**
    * Unified block insertion: creates a block, inserts it, updates Redux, and selects it.
@@ -1431,12 +1459,12 @@ const Iframe = (props) => {
           // This ensures blockPathMap is built with complete schema knowledge
           iframeOriginRef.current = event.origin;
 
-          // Check if iframe navigated to a different page (e.g., via client-side routing)
-          // If so, update admin URL to match
+          // Check if iframe navigated to a different page (e.g., user clicked nav link)
+          // User confirmed beforeunload warning, so they're leaving edit mode
           if (event.data.currentPath) {
             const adminPath = history.location.pathname.replace(/\/edit$/, '');
             if (event.data.currentPath !== adminPath) {
-              log('INIT: iframe path differs from admin, navigating to:', event.data.currentPath);
+              log('INIT: iframe navigated to different page, following to view mode:', event.data.currentPath);
               history.push(event.data.currentPath);
               return; // Don't send INITIAL_DATA - admin will re-render with new page
             }
@@ -1490,7 +1518,17 @@ const Iframe = (props) => {
             blockPathMap: initialBlockPathMap,
           }));
 
-          // 5. Send everything to iframe
+          // 5. Send everything to iframe (only in edit mode)
+          // In view mode, frontend renders from its own API - no need to send data
+          const inEditMode = history.location.pathname.endsWith('/edit');
+          if (!inEditMode) {
+            log('INIT: view mode, skipping INITIAL_DATA');
+            break;
+          }
+          if (!form) {
+            log('INIT: form data not available yet, skipping INITIAL_DATA');
+            break;
+          }
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
           event.source.postMessage(
             {
@@ -1929,6 +1967,7 @@ const Iframe = (props) => {
         )}
       <iframe
         id="previewIframe"
+        name={typeof window !== 'undefined' ? `hydra:${window.location.origin}` : null}
         title="Preview"
         src={iframeSrc}
         ref={setReferenceElement}

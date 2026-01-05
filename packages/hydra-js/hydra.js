@@ -657,28 +657,59 @@ export class Bridge {
       // Get the access token from the URL
       const url = new URL(window.location.href);
       const access_token = url.searchParams.get('access_token');
-      const isEditMode = url.searchParams.get('_edit') === 'true';
+      // Hydra bridge is enabled via iframe name (persists across navigation)
+      // OR _edit param exists (true for edit mode, false for view mode)
+      const editParam = url.searchParams.get('_edit');
+      const hydraBridgeEnabled = window.name.startsWith('hydra:')
+                              || editParam === 'true'
+                              || editParam === 'false';
+      const isEditMode = editParam === 'true';
+
+      // Extract admin origin from iframe name if available
+      if (window.name.startsWith('hydra:') && !this.adminOrigin) {
+        this.adminOrigin = window.name.slice(6); // Remove "hydra:" prefix
+        log('Got admin origin from window.name:', this.adminOrigin);
+      }
       if (access_token) {
         this.token = access_token;
         this._setTokenCookie(access_token);
       }
 
-      if (isEditMode) {
+      if (hydraBridgeEnabled) {
         this.enableBlockClickListener();
         this.injectCSS();
         this.listenForSelectBlockMessage();
         this.setupScrollHandler();
         this.setupResizeHandler();
 
+        // Add beforeunload warning when in edit mode to prevent accidental navigation
+        if (isEditMode) {
+          window.addEventListener('beforeunload', (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+          });
+        }
+
         // Send single INIT message with config - admin merges config before responding
         // This ensures blockPathMap is built with complete schema knowledge
         // Include current path so admin can navigate if iframe URL differs (e.g., after client-side nav)
+        // Support hash-based routing variants: #/path, #!/path, #path
+        let currentPath = window.location.pathname;
+        const hash = window.location.hash;
+        if (hash) {
+          // Find where the path starts in the hash
+          const pathIndex = hash.indexOf('/');
+          if (pathIndex !== -1) {
+            currentPath = hash.slice(pathIndex); // Extract /path from #/path or #!/path
+          }
+        }
         window.parent.postMessage(
           {
             type: 'INIT',
             voltoConfig: options?.voltoConfig,
             allowedBlocks: options?.allowedBlocks,
-            currentPath: window.location.pathname,
+            currentPath: currentPath,
           },
           this.adminOrigin,
         );

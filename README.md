@@ -260,12 +260,12 @@ At this your Editor can :-
 We include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
-- During editing, initilize it with the url of Hydra and Volto settings
+- During admin, initilize it with the url of Hydra and Volto settings
   ```js
   import { initBridge } from './hydra.js';
   const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
-- To know you are in edit mode an extra url param is added to your frontend ```_edit=true``` (see [Lazy Loading](#lazy-load-the-bridge))
+- To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
 - To see private content you will need to [change your authentication token]((#authenticate-frontend-to-access-private-content))
 
 This will enable an Editor to :-
@@ -899,9 +899,14 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 #### Lazy Load the Hydra.js Bridge
 
-One way of loading the bridge lazily is by adding this function and calling the function at any point where you want to load the bridge.
-Since your application will be loaded inside an iframe in Volto Hydra, the iframe will be passed a `_edit={true/false}` parameter that we can check for.
-If this parameter is present and set to true, we should be inside the editor & are in edit mode.
+Detect the admin iframe and load the bridge only when needed:
+
+1. **`_edit` URL param**: `_edit=true` (edit mode) or `_edit=false` (view mode)
+2. **`window.name`**: Set to `hydra:<origin>` - persists across navigation within the iframe
+
+In view mode (`_edit=false`), render from your API immediately but still load the bridge for navigation tracking.
+In edit mode (`_edit=true`), wait for `onEditChange` before rendering.
+
 ```js
 function loadBridge(callback) {
     const existingScript = document.getElementById("hydraBridge");
@@ -910,21 +915,28 @@ function loadBridge(callback) {
       script.src = "your-hydra-js-path";
       script.id = "hydraBridge";
       document.body.appendChild(script);
-      script.onload = () => {
-        callback();
-      };
+      script.onload = () => callback();
     } else {
       callback();
     }
 }
 
-if (window.location.search.includes('_edit')) {
-  loadBridge(() => {
-    const { initBridge } = window
-    const hydraBridgeInstance = new initBridge()
-  })
+const editParam = new URLSearchParams(window.location.search).get('_edit');
+const inAdminIframe = window.name.startsWith('hydra:') || editParam !== null;
+const isEditMode = editParam === 'true';
+
+// View mode or not in admin: render from API
+if (!isEditMode) {
+    renderPage(await fetchContent(path));
 }
 
+// Load bridge only in admin iframe
+if (inAdminIframe) {
+    loadBridge(() => {
+        const bridge = initBridge();
+        bridge.onEditChange((formData) => renderPage(formData));
+    });
+}
 ```
 
 

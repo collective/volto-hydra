@@ -51,9 +51,11 @@
         <nav id="navigation"></nav>
     </header>
     <div id="render-counter" style="position: fixed; top: 0; right: 0; background: #333; color: #fff; padding: 4px 8px; font-size: 12px; z-index: 9999;">0</div>
-    <h1 id="page-title" data-editable-field="title">Loading...</h1>
-    <img id="preview-image" data-media-field="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
-    <div id="content"></div>
+    <main>
+        <h1 id="page-title" data-editable-field="title">Loading...</h1>
+        <img id="preview-image" data-media-field="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
+        <div id="content"></div>
+    </main>
 
     <script src="renderer.js"></script>
     <script type="module">
@@ -62,12 +64,27 @@
         // Initialize the page
         async function initializePage() {
             try {
-                // Get content path from current URL (e.g., /test-page)
-                const contentPath = window.location.pathname;
+                // Get content path from current URL
+                // Support path-based and hash-based routing variants: #/path, #!/path
+                let contentPath = window.location.pathname;
+                const hash = window.location.hash;
+                if (hash) {
+                    // Find where the path starts in the hash (handles #/, #!/, etc.)
+                    const pathIndex = hash.indexOf('/');
+                    if (pathIndex !== -1) {
+                        contentPath = hash.slice(pathIndex); // Extract /path from #/path or #!/path
+                    }
+                }
 
-                // Check if in edit mode first
+                // Check if hydra bridge should be loaded
+                // - window.name starts with "hydra:" (persists across navigation in admin iframe)
+                // - OR _edit param exists (true for edit mode, false for view mode)
                 const urlParams = new URLSearchParams(window.location.search);
-                const isEditMode = urlParams.get('_edit') === 'true';
+                const editParam = urlParams.get('_edit');
+                const loadHydraBridge = window.name.startsWith('hydra:')
+                                     || editParam === 'true'
+                                     || editParam === 'false';
+                const isEditMode = editParam === 'true';
 
                 // Fetch content from mock API using ++api++ prefix
                 const response = await fetch(`/++api++${contentPath}`);
@@ -82,22 +99,23 @@
                     ).join('');
                 }
 
-                // Only render initial content if NOT in edit mode
-                // In edit mode, we wait for hydra.js to provide content with nodeIds
-                if (!isEditMode) {
+                // In VIEW mode or no bridge: render immediately from API data
+                // In EDIT mode: wait for hydra.js to provide content with nodeIds
+                if (!loadHydraBridge || !isEditMode) {
                     document.getElementById('page-title').textContent = content.title;
                     renderContent(content);
                 }
 
-                // Initialize Hydra bridge if in edit mode
-                if (isEditMode) {
+                // Initialize Hydra bridge
+                if (loadHydraBridge) {
                     console.log('[TEST-FRONTEND] Initializing Hydra bridge');
 
-                    // Allow custom admin origin via query param (for mock parent tests)
-                    // If not provided, hydra.js will auto-detect from document.referrer
-                    const adminOrigin = urlParams.get('_admin_origin');
-
-                    if (adminOrigin) {
+                    // Get admin origin from: URL param > window.name > referrer (auto-detect)
+                    let adminOrigin = urlParams.get('_admin_origin');
+                    if (!adminOrigin && window.name.startsWith('hydra:')) {
+                        adminOrigin = window.name.slice(6); // Extract origin from "hydra:<origin>"
+                        console.log('[TEST-FRONTEND] Using admin origin from window.name:', adminOrigin);
+                    } else if (adminOrigin) {
                         console.log('[TEST-FRONTEND] Using explicit admin origin:', adminOrigin);
                     } else {
                         console.log('[TEST-FRONTEND] Admin origin will be auto-detected from referrer');
