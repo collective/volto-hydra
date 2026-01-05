@@ -405,6 +405,8 @@ function loadInitialContent() {
     'items': [],
     'items_total': 0,
     'is_folderish': true,
+    'blocks': {},
+    'blocks_layout': { 'items': [] },
     '@components': generateComponents('/', baseUrl),
     'can_manage_portlets': true,
     'can_view': true,
