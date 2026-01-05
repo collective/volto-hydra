@@ -31,6 +31,17 @@ test.describe('Inline Editing - Links', () => {
     // Wait for LinkEditor popup to appear and verify its position
     const { popup, boundingBox } = await helper.waitForLinkEditorPopup();
 
+    // Verify the LinkEditor is positioned directly on top of the toolbar, covering it
+    // This ensures it's always visible even when toolbar is clamped to top of iframe
+    const toolbar = page.locator('.quanta-toolbar');
+    const toolbarBox = await toolbar.boundingBox();
+    expect(toolbarBox).not.toBeNull();
+
+    // LinkEditor should cover the toolbar - same position (within small tolerance for borders/padding)
+    const tolerance = 10;
+    expect(Math.abs(boundingBox.x - toolbarBox!.x)).toBeLessThan(tolerance);
+    expect(Math.abs(boundingBox.y - toolbarBox!.y)).toBeLessThan(tolerance);
+
     // Get the URL input field
     const linkUrlInput = await helper.getLinkEditorUrlInput();
 
@@ -311,9 +322,17 @@ test.describe('Inline Editing - Links', () => {
     // Verify the editor is still contenteditable (not blocked)
     await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
 
-    // Verify the selection is preserved (all text still selected)
-    const selectedText = await editor.evaluate(() => window.getSelection()?.toString());
-    expect(selectedText).toBe('Test text');
+    // Verify the text content is still there
+    const textContent = await helper.getCleanTextContent(editor);
+    expect(textContent).toBe('Test text');
+
+    // Verify typing actually works (not just contenteditable attribute present)
+    // This catches the bug where contenteditable is true but iframe is blocked
+    // Click at the end of text first to position cursor
+    await editor.click();
+    await page.keyboard.type(' added');
+    const newText = await helper.getCleanTextContent(editor);
+    expect(newText).toContain('added'); // Text was appended
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {
@@ -379,7 +398,8 @@ test.describe('Inline Editing - Links', () => {
 
     // Press Escape to close the ObjectBrowser (otherwise its overlay blocks iframe clicks)
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    // Wait for ObjectBrowser animation to complete
+    await expect(objectBrowser).not.toBeVisible({ timeout: 2000 });
 
     // Click back on the block to cancel the LinkEditor
     // Note: We click on the block element, not [contenteditable="true"], because

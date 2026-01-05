@@ -572,9 +572,13 @@ const Iframe = (props) => {
       if (e.key !== 'Escape') return;
       if (!selectedBlock) return;
 
-      // Don't interfere with Escape in modals, dropdowns, etc.
-      const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"], .ui.modal');
+      // Don't interfere with Escape in modals, dropdowns, popups, etc.
+      const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"], .ui.modal, .add-link, .slate-inline-toolbar');
       if (isInPopup) return;
+
+      // Also check if LinkEditor popup is visible (focus may not be inside it)
+      const linkEditorVisible = document.querySelector('.add-link');
+      if (linkEditorVisible) return;
 
       // Don't handle if focus is in iframe - let iframe's handler do it
       const iframe = document.getElementById('previewIframe');
