@@ -2799,7 +2799,9 @@ test.describe('data-block-selector Navigation', () => {
     await expect(slideButtons.nth(2)).toBeVisible();
     await slideButtons.nth(2).click();
 
-    // Wait for slide-3 to be selected (includes waiting for carousel transition)
+    // Wait for sidebar to show Slide as current (carousel transition happening)
+    await helper.waitForSidebarCurrentBlock('Slide');
+    // Wait for slide-3 to be selected (toolbar positioned correctly)
     await helper.waitForQuantaToolbar('slide-3');
 
     // Now go back to carousel container and select slide-1
@@ -2810,7 +2812,9 @@ test.describe('data-block-selector Navigation', () => {
     // Select first slide entry
     await slideButtons.first().click();
 
-    // Wait for slide-1 to be selected
+    // Wait for sidebar to show Slide as current (carousel transition happening)
+    await helper.waitForSidebarCurrentBlock('Slide');
+    // Wait for slide-1 to be selected (toolbar positioned correctly)
     await helper.waitForQuantaToolbar('slide-1');
   });
 
