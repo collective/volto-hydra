@@ -3755,6 +3755,49 @@ test.describe('Multi-Container Field Operations', () => {
     expect(blockBox!.height).toBeGreaterThan(50);
   });
 
+  test('creating a new columns block has selectable image child blocks', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a page-level block (title-block) to enable add button
+    await helper.clickBlockInIframe('title-block');
+    await helper.waitForQuantaToolbar('title-block');
+
+    // Add a new columns block
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('columns');
+
+    // Wait for the sidebar to show Columns as the current block
+    await helper.waitForSidebarOpen();
+    await helper.waitForSidebarCurrentBlock('Columns', 10000);
+
+    // The new columns block should have an image child block in top_images
+    // Find image blocks that have data-media-field directly on them (not deeply nested)
+    // These are actual image-type blocks, not container blocks
+    const imageMediaFields = iframe.locator('[data-media-field="url"]');
+
+    // Wait for at least one image field to exist (from new columns block)
+    await expect(imageMediaFields.first()).toBeVisible({ timeout: 5000 });
+
+    // The image field should have minimum dimensions (from ensureElementsHaveMinSize)
+    const imageFieldBox = await imageMediaFields.first().boundingBox();
+    expect(imageFieldBox).not.toBeNull();
+    expect(imageFieldBox!.width).toBeGreaterThan(50);
+    expect(imageFieldBox!.height).toBeGreaterThan(50);
+
+    // Click directly on the media field element to select the image block
+    await imageMediaFields.first().click();
+
+    // Verify the sidebar now shows Image as current block
+    await helper.waitForSidebarCurrentBlock('Image', 5000);
+  });
+
   test('gridBlock only shows allowed block types in chooser', async ({
     page,
   }) => {

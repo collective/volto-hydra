@@ -973,4 +973,36 @@ test.describe('Slider image positioning', () => {
       iframeBox!.y + iframeBox!.height + tolerance
     );
   });
+
+  test('can select an empty image block added to page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on an existing block to enable add button
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForQuantaToolbar('block-1-uuid');
+
+    // Add a new image block
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('image');
+
+    // Wait for sidebar to show Image as current block (new block auto-selected)
+    await helper.waitForSidebarOpen();
+    await helper.waitForSidebarCurrentBlock('Image', 10000);
+
+    // The new empty image block should already be selected
+    // Wait for the empty-image-overlay to appear (confirms media field has size)
+    const emptyOverlay = page.locator('.empty-image-overlay');
+    await expect(emptyOverlay).toBeVisible({ timeout: 5000 });
+
+    // The overlay should have reasonable dimensions
+    const overlayBox = await emptyOverlay.boundingBox();
+    expect(overlayBox).not.toBeNull();
+    expect(overlayBox!.width).toBeGreaterThan(50);
+    expect(overlayBox!.height).toBeGreaterThan(50);
+  });
 });

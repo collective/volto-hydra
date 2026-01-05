@@ -967,7 +967,7 @@ export class Bridge {
                           if (blockElement && !this.isElementHidden(blockElement)) {
                             log('FORM_DATA: block now visible, processing');
                             blockHandler(blockElement);
-                            this.ensureEditableFieldsHaveHeight();
+                            this.ensureElementsHaveMinSize();
                             return;
                           }
                         }
@@ -982,7 +982,7 @@ export class Bridge {
                     blockHandler(blockElement);
                   }
                   // Ensure all editable fields have height (for newly added blocks)
-                  this.ensureEditableFieldsHaveHeight();
+                  this.ensureElementsHaveMinSize();
                   // Replay any buffered keystrokes now that DOM is ready
                   this.replayBufferedEvents();
                 });
@@ -2368,17 +2368,38 @@ export class Bridge {
   }
 
   /**
-   * Ensure all editable fields on the page have minimum height so users can click them.
+   * Ensure all interactive elements have minimum size so users can click/select them.
    * Called after FORM_DATA to handle newly added blocks that haven't been selected yet.
-   * Only sets min-height on fields that have zero height (respects existing styling).
+   * Only sets min dimensions on elements that have zero width or height (respects existing styling).
    */
-  ensureEditableFieldsHaveHeight() {
-    const allEditableFields = document.querySelectorAll('[data-editable-field]');
-    allEditableFields.forEach((field) => {
-      const rect = field.getBoundingClientRect();
-      if (rect.height === 0) {
-        field.style.minHeight = '1.5em';
+  ensureElementsHaveMinSize() {
+    // Helper: only set min-size if element has no size
+    const ensureSize = (el, minWidth, minHeight) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        el.style.minWidth = minWidth;
+        el.style.minHeight = minHeight;
+      } else if (rect.width === 0) {
+        el.style.minWidth = minWidth;
+      } else if (rect.height === 0) {
+        el.style.minHeight = minHeight;
       }
+      // If element already has both width and height, don't touch it
+    };
+
+    // Editable fields need min-height for text cursor
+    document.querySelectorAll('[data-editable-field]').forEach((el) => {
+      ensureSize(el, 'auto', '1.5em');
+    });
+
+    // Media fields need min dimensions for image picker overlay
+    document.querySelectorAll('[data-media-field]').forEach((el) => {
+      ensureSize(el, '100px', '100px');
+    });
+
+    // Blocks need min-height for click selection
+    document.querySelectorAll('[data-block-uid]').forEach((el) => {
+      ensureSize(el, 'auto', '2em');
     });
   }
 
