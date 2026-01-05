@@ -640,22 +640,8 @@ const SyncedSlateToolbar = ({
     }
   }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied]);
 
-  // Set editor.hydra with iframe positioning data for persistent helpers
-  // NOTE: editor is stable (created once), so we don't include it in dependencies
-  // This must be set SYNCHRONOUSLY during render, not in an effect, because
-  // persistentHelpers (like LinkEditor) may render before effects run
-  // ALSO set globally so ANY editor can access it (handles nested Slate contexts)
-  // IMPORTANT: Don't store the iframe element itself - causes circular JSON errors
-  // when Slate tries to serialize. Instead store only the rect data we need.
-  const hydraIframeRect = iframeElement?.getBoundingClientRect();
-  const hydraData = {
-    iframeRect: hydraIframeRect ? { top: hydraIframeRect.top, left: hydraIframeRect.left } : null,
-    blockUIRect: blockUI?.rect,
-  };
-  editor.hydra = hydraData;
-  if (typeof window !== 'undefined') {
-    window.voltoHydraData = hydraData;
-  }
+  // NOTE: editor.hydra is set later (after toolbar position is calculated)
+  // to include toolbarTop/toolbarLeft for LinkEditor positioning
 
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
@@ -855,6 +841,19 @@ const SyncedSlateToolbar = ({
   // Clamp to top of iframe if toolbar would be above it
   const toolbarTop = Math.max(toolbarIframeRect.top, toolbarTopRaw);
   const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Always align with block's left edge
+
+  // Update hydraData with toolbar position for LinkEditor positioning
+  // This must be set SYNCHRONOUSLY during render (not in an effect) because
+  // persistentHelpers (like LinkEditor) render after this and need the data
+  editor.hydra = {
+    iframeRect: { top: toolbarIframeRect.top, left: toolbarIframeRect.left },
+    blockUIRect: blockUI?.rect,
+    toolbarTop,
+    toolbarLeft,
+  };
+  if (typeof window !== 'undefined') {
+    window.voltoHydraData = editor.hydra;
+  }
 
   // Calculate max width so toolbar doesn't extend past iframe right edge (sidebar boundary)
   const iframeRight = toolbarIframeRect.left + toolbarIframeRect.width;
