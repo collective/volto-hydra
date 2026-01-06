@@ -662,9 +662,12 @@ export class Bridge {
 
       // Hydra bridge is enabled via iframe name (persists across navigation)
       // Format: hydra-edit:<origin> or hydra-view:<origin>
-      const isHydraEdit = window.name.startsWith('hydra-edit:');
-      const isHydraView = window.name.startsWith('hydra-view:');
-      const hydraBridgeEnabled = isHydraEdit || isHydraView;
+      // Also check _edit URL param as fallback (ensures reload on mode change)
+      const url = new URL(window.location.href);
+      const editParam = url.searchParams.get('_edit');
+      const isHydraEdit = window.name.startsWith('hydra-edit:') || editParam === 'true';
+      const isHydraView = window.name.startsWith('hydra-view:') || (editParam === 'false');
+      const hydraBridgeEnabled = isHydraEdit || isHydraView || editParam !== null;
       const isEditMode = isHydraEdit;
 
       // Extract admin origin from iframe name
@@ -675,7 +678,6 @@ export class Bridge {
       }
 
       // Get the access token from URL or sessionStorage
-      const url = new URL(window.location.href);
       let access_token = url.searchParams.get('access_token');
       const hasUrlToken = !!access_token;
 

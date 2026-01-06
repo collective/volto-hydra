@@ -768,6 +768,36 @@ app.get('*/@breadcrumbs', (req, res) => {
 });
 
 /**
+ * GET /:path/@actions
+ * Get available actions for content (Edit, View, etc.)
+ * Use regex to ensure matching with ++api++ prefix
+ */
+app.get(/.*\/@actions$/, (req, res) => {
+  // Handle ++api++ prefix
+  const cleanPath = req.path.replace('/++api++', '').replace('/@actions', '') || '/';
+  const baseUrl = 'http://localhost:8888';
+  res.json({
+    '@id': `${baseUrl}${cleanPath}/@actions`,
+    object: [
+      {
+        '@id': `${baseUrl}${cleanPath}`,
+        icon: '',
+        id: 'view',
+        title: 'View',
+      },
+      {
+        '@id': `${baseUrl}${cleanPath}/edit`,
+        icon: '',
+        id: 'edit',
+        title: 'Edit',
+      },
+    ],
+    object_buttons: [],
+    user: [],
+  });
+});
+
+/**
  * GET /@search or /:path/@search
  * Search for content (used by ObjectBrowser)
  * Supports path.depth parameter to get children of a specific path

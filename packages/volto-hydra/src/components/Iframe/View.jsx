@@ -324,22 +324,16 @@ const addUrlParams = (url, qParams, pathname) => {
  * @param {String} token
  * @returns {URL} URL with the admin params
  */
-const getUrlWithAdminParams = (url, token) => {
-  // Edit mode is now communicated via iframe name (hydra-edit: or hydra-view:)
-  // Only pass access_token in URL params
-  return typeof window !== 'undefined'
-    ? window.location.pathname.endsWith('/edit')
-      ? addUrlParams(
-          `${url}`,
-          { access_token: token },
-          `${window.location.pathname.replace('/edit', '')}`,
-        )
-      : addUrlParams(
-          `${url}`,
-          { access_token: token },
-          `${window.location.pathname}`,
-        )
-    : null;
+const getUrlWithAdminParams = (url, token, isEdit) => {
+  // Edit mode communicated via iframe name AND _edit param for reliability
+  // _edit param ensures mode change triggers URL change and iframe reload
+  if (typeof window === 'undefined') return null;
+  const contentPath = window.location.pathname.replace(/\/edit$/, '');
+  const params = { access_token: token };
+  if (isEdit) {
+    params._edit = 'true';
+  }
+  return addUrlParams(`${url}`, params, contentPath);
 };
 function _isObject(item) {
   return (
@@ -663,7 +657,7 @@ const Iframe = (props) => {
     // Update if keys don't match OR if iframeSrc is null (component just mounted)
     if (persistedKey !== adminKey || !iframeSrc) {
       log('[IFRAME_SRC] Updating iframeSrc (keys differ:', persistedKey !== adminKey, 'iframeSrc null:', !iframeSrc, ')');
-      setIframeSrc(getUrlWithAdminParams(u, token));
+      setIframeSrc(getUrlWithAdminParams(u, token, isEditMode));
       persistedIframePath = adminKey;
     } else {
       log('[IFRAME_SRC] Skipping - keys match and iframeSrc already set');
