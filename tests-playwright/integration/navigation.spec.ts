@@ -102,9 +102,10 @@ test.describe('Navigation and URL Handling', () => {
       await hamburger.click();
     }
 
-    // Find and click a navigation link
+    // Wait for nav to be fully loaded, then find and click a navigation link
+    await expect(iframe.locator('header nav a, nav a').first()).toBeVisible({ timeout: 10000 });
     const navLink = iframe.locator('header nav a').filter({ hasText: 'Another Page' }).first();
-    await expect(navLink).toBeVisible({ timeout: 5000 });
+    await expect(navLink).toBeVisible({ timeout: 10000 });
     await navLink.click();
 
     // Verify the admin URL changed to reflect the new page (view mode)
@@ -171,12 +172,16 @@ test.describe('Navigation and URL Handling', () => {
 
     // Try to navigate away by clicking a link in the iframe
     const iframe = helper.getIframe();
-    const navLink = iframe.locator('nav a, header a').first();
+    // Wait for nav to load before clicking
+    await expect(iframe.locator('nav a, header a').first()).toBeVisible({ timeout: 10000 });
+    // Click a specific nav link so we know where we're going
+    const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
+    await expect(navLink).toBeVisible({ timeout: 5000 });
     await navLink.click();
 
-    // The iframe navigates, sends INIT with new path, admin follows to view mode
-    // Should not be on test-page and should not be in edit mode
-    await expect(page).not.toHaveURL(/\/test-page/, { timeout: 15000 });
+    // Wait for navigation to complete - expect to be on the new page in view mode
+    await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 15000 });
+    // Verify not in edit mode
     await expect(page).not.toHaveURL(/\/edit$/);
   });
 
@@ -230,14 +235,11 @@ test.describe('Navigation and URL Handling', () => {
     const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.click();
 
-    // Wait for navigation
-    await page.waitForTimeout(1000);
+    // Wait for admin URL to change (instead of fixed timeout)
+    await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 15000 });
 
-    // Verify no warning dialog appeared
+    // Verify no warning dialog appeared during navigation
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
-
-    // Verify admin URL changed to the new page
-    await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 10000 });
   });
 
   test('Contents action is available on folderish pages', async ({ page }, testInfo) => {
