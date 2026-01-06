@@ -723,9 +723,13 @@ export class Bridge {
           }
         }
 
-        // Check if this is SPA navigation (window.name exists but access_token missing from URL)
-        // In this case, just send PATH_CHANGE - admin will update URL without reloading iframe
-        const isSpaNavigation = isHydraEdit && !hasUrlToken;
+        // Check if this is SPA navigation:
+        // - window.name indicates we're in admin iframe (hydra-edit:...)
+        // - No token in URL (not admin-initiated navigation)
+        // - But we DO have a token in sessionStorage (we were previously initialized)
+        // Without stored token, it's initial load even if URL has no token (e.g., mock-parent tests)
+        const hasStoredToken = !!sessionStorage.getItem('hydra_access_token');
+        const isSpaNavigation = isHydraEdit && !hasUrlToken && hasStoredToken;
         if (isSpaNavigation) {
           log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE');
           window.parent.postMessage(
