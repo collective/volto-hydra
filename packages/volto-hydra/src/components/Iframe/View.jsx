@@ -325,19 +325,18 @@ const addUrlParams = (url, qParams, pathname) => {
  * @returns {URL} URL with the admin params
  */
 const getUrlWithAdminParams = (url, token) => {
+  // Edit mode is now communicated via iframe name (hydra-edit: or hydra-view:)
+  // Only pass access_token in URL params
   return typeof window !== 'undefined'
     ? window.location.pathname.endsWith('/edit')
       ? addUrlParams(
           `${url}`,
-          { access_token: token, _edit: true },
+          { access_token: token },
           `${window.location.pathname.replace('/edit', '')}`,
         )
       : addUrlParams(
           `${url}`,
-          {
-            access_token: token,
-            _edit: false,
-          },
+          { access_token: token },
           `${window.location.pathname}`,
         )
     : null;
@@ -455,6 +454,10 @@ function recurseUpdateVoltoConfig(newConfig) {
   });
 }
 
+// Module-level variable to track iframe's current path across component remounts
+// This prevents unnecessary iframe reloads when React Router remounts the View component
+let persistedIframePath = null;
+
 const Iframe = (props) => {
   const {
     onSelectBlock,
@@ -475,6 +478,7 @@ const Iframe = (props) => {
   } = props;
 
   const dispatch = useDispatch();
+
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   // pendingAdd: { mode: 'sidebar', parentBlockId, fieldName } | { mode: 'iframe', afterBlockId }
   const [pendingAdd, setPendingAdd] = useState(null);
@@ -483,14 +487,26 @@ const Iframe = (props) => {
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
 
+  // Edit mode detection and iframe name - used for hydra.js bridge detection
+  const isEditMode = typeof window !== 'undefined' && window.location.pathname.endsWith('/edit');
+  const iframeName = typeof window !== 'undefined'
+    ? `hydra-${isEditMode ? 'edit' : 'view'}:${window.location.origin}`
+    : null;
+
   // Set contentWindow.name when iframe is ready - this tells hydra.js it's in the admin iframe
   // Must be done via useEffect because the name attribute doesn't reliably set contentWindow.name
   // after SSR hydration (server renders null, client renders value, but iframe may have loaded already)
+  // Only set when iframeSrc is set to avoid cross-origin error with about:blank
   useEffect(() => {
-    if (referenceElement?.contentWindow && typeof window !== 'undefined') {
-      referenceElement.contentWindow.name = `hydra:${window.location.origin}`;
+    if (referenceElement?.contentWindow && iframeName && iframeSrc) {
+      try {
+        referenceElement.contentWindow.name = iframeName;
+      } catch (e) {
+        // Ignore cross-origin errors - iframe hasn't loaded same-origin content yet
+        log('[IFRAME_NAME] Cross-origin error, will retry when iframe loads:', e.message);
+      }
     }
-  }, [referenceElement]);
+  }, [referenceElement, iframeName, iframeSrc]);
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
 
@@ -547,6 +563,7 @@ const Iframe = (props) => {
   }, [selectedBlock]);
 
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
+  // Note: iframePath is stored in module-level persistedIframePath to survive component remounts
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
   const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
@@ -641,14 +658,28 @@ const Iframe = (props) => {
   const pathname = history.location.pathname;
 
   useEffect(() => {
-    setIframeSrc(getUrlWithAdminParams(u, token));
+    // Only update iframeSrc if admin path or mode differs from iframe's current state
+    // This prevents reloading iframe when it already navigated via SPA
+    // Using module-level persistedIframePath to survive component remounts
+    // Include isEditMode in the key to ensure iframe reloads when switching view<->edit
+    const adminPath = pathname.replace(/\/edit$/, '');
+    const adminKey = `${adminPath}:${isEditMode ? 'edit' : 'view'}`;
+    const persistedKey = persistedIframePath;
+    log('[IFRAME_SRC] persistedKey:', persistedKey, 'adminKey:', adminKey, 'equal:', persistedKey === adminKey, 'iframeSrc:', iframeSrc ? 'set' : 'null');
+    // Update if keys don't match OR if iframeSrc is null (component just mounted)
+    if (persistedKey !== adminKey || !iframeSrc) {
+      log('[IFRAME_SRC] Updating iframeSrc (keys differ:', persistedKey !== adminKey, 'iframeSrc null:', !iframeSrc, ')');
+      setIframeSrc(getUrlWithAdminParams(u, token));
+      persistedIframePath = adminKey;
+    } else {
+      log('[IFRAME_SRC] Skipping - keys match and iframeSrc already set');
+    }
     u && Cookies.set('iframe_url', u, { expires: 7 });
-  }, [token, u, pathname]);
+  }, [token, u, pathname, isEditMode, iframeSrc]);
 
   // NOTE: Form sync and FORM_DATA sending are merged into one useEffect below (search for "UNIFIED FORM SYNC")
 
   // Warn before leaving edit mode (browser-level)
-  const isEditMode = typeof window !== 'undefined' && window.location.pathname.endsWith('/edit');
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -983,9 +1014,14 @@ const Iframe = (props) => {
       }
       const { type } = event.data;
       switch (type) {
-        case 'PATH_CHANGE': // PATH change from the iframe
+        case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
+          // Update module-level var BEFORE history.push so useEffect knows iframe already has this path
+          // Use same key format as useEffect: "path:mode"
+          const currentlyInEditMode = history.location.pathname.endsWith('/edit');
+          persistedIframePath = `${event.data.path}:${currentlyInEditMode ? 'edit' : 'view'}`;
           history.push(event.data.path);
           break;
+        }
 
 
         case 'OPEN_SETTINGS':
@@ -1461,7 +1497,7 @@ const Iframe = (props) => {
           // Check if iframe navigated to a different page (e.g., user clicked nav link)
           // User confirmed beforeunload warning, so they're leaving edit mode
           if (event.data.currentPath) {
-            const adminPath = history.location.pathname.replace(/\/edit$/, '');
+            const adminPath = history.location.pathname.replace(/\/edit$/, '') || '/';
             if (event.data.currentPath !== adminPath) {
               log('INIT: iframe navigated to different page, following to view mode:', event.data.currentPath);
               history.push(event.data.currentPath);
@@ -1966,11 +2002,12 @@ const Iframe = (props) => {
         )}
       <iframe
         id="previewIframe"
-        name={typeof window !== 'undefined' ? `hydra:${window.location.origin}` : null}
+        name={iframeName}
         title="Preview"
         src={iframeSrc}
         ref={setReferenceElement}
         allow="clipboard-read; clipboard-write"
+        suppressHydrationWarning
       />
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}

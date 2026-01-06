@@ -68,10 +68,12 @@ onMounted(() => {
     })
 
     if (import.meta.client) {
-        const url = new URL(window.location.href);
-        const isEdit = url.searchParams.get("_edit");
+        // Check window.name to detect if we're in the Hydra admin iframe
+        // Format: hydra-edit:<origin> or hydra-view:<origin>
+        const isHydraIframe = window.name.startsWith('hydra-edit:') || window.name.startsWith('hydra-view:');
+        console.log('[NUXT] window.name:', window.name, 'isHydraIframe:', isHydraIframe);
 
-        if (isEdit) {
+        if (isHydraIframe) {
             const newBlocks = {
                 hello_from_the_other_side: {
                     id: 'hello_from_the_other_side',

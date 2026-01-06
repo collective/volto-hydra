@@ -227,8 +227,8 @@ test.describe('Navigation and URL Handling', () => {
       await dialog.accept();
     });
 
-    // Click nav link in iframe
-    const navLink = iframe.locator('nav a, header a').first();
+    // Click "Accordion Test Page" link in iframe nav
+    const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.click();
 
     // Wait for navigation
@@ -237,7 +237,7 @@ test.describe('Navigation and URL Handling', () => {
     // Verify no warning dialog appeared
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
 
-    // Verify admin URL changed to the new page (not just that it left test-page)
+    // Verify admin URL changed to the new page
     await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 10000 });
   });
 

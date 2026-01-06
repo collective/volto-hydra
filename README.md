@@ -901,11 +901,14 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 Detect the admin iframe and load the bridge only when needed:
 
-1. **`_edit` URL param**: `_edit=true` (edit mode) or `_edit=false` (view mode)
-2. **`window.name`**: Set to `hydra:<origin>` - persists across navigation within the iframe
+**`window.name`** is set by Hydra to indicate mode:
+- `hydra-edit:<origin>` - edit mode (e.g., `hydra-edit:http://localhost:3001`)
+- `hydra-view:<origin>` - view mode (e.g., `hydra-view:http://localhost:3001`)
 
-In view mode (`_edit=false`), render from your API immediately but still load the bridge for navigation tracking.
-In edit mode (`_edit=true`), wait for `onEditChange` before rendering.
+This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes.
+
+In view mode, render from your API immediately but still load the bridge for navigation tracking.
+In edit mode, wait for `onEditChange` before rendering.
 
 ```js
 function loadBridge(callback) {
@@ -921,12 +924,12 @@ function loadBridge(callback) {
     }
 }
 
-const editParam = new URLSearchParams(window.location.search).get('_edit');
-const inAdminIframe = window.name.startsWith('hydra:') || editParam !== null;
-const isEditMode = editParam === 'true';
+const isHydraEdit = window.name.startsWith('hydra-edit:');
+const isHydraView = window.name.startsWith('hydra-view:');
+const inAdminIframe = isHydraEdit || isHydraView;
 
 // View mode or not in admin: render from API
-if (!isEditMode) {
+if (!isHydraEdit) {
     renderPage(await fetchContent(path));
 }
 
@@ -946,20 +949,28 @@ As soon as the editor logs into the hydra editor it will load up the frontend in
 Your frontend should now use the same auth token so the you access the restapi with the same privileges and
 can render the same content including private content.
 
-- You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
-- Or you can use it in Authorization header if you are using other methods to fetch content from plone Backend.
+The `access_token` is passed as a URL parameter on initial load and automatically stored in sessionStorage by hydra.js. This means:
+- On initial load, the token is in the URL and stored to sessionStorage
+- On SPA navigation (client-side route changes), the URL param is gone but the token persists in sessionStorage
+
+Use the `getAccessToken()` helper from hydra.js which handles both cases:
+```js
+import { getAccessToken } from '@hydra-js/hydra.js';
+
+const token = getAccessToken();
+// Returns token from URL param (if present) or sessionStorage (for SPA navigation)
+```
 
 Example using nextjs 14 and ploneClient:
 ```js
 // nextjs 14 using ploneClient
 import ploneClient from "@plone/client";
 import { useQuery } from "@tanstack/react-query";
+import { getAccessToken } from '@hydra-js/hydra.js';
 
 export default function Blog({ params }) {
-  // Extract token directly from the URL
-  const url = new URL(window.location.href);
-  const token = url.searchParams.get("access_token");
-  
+  const token = getAccessToken();
+
   const client = ploneClient.initialize({
     apiPath: "http://localhost:8080/Plone/", // Plone backend
     token: token,

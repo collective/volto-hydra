@@ -599,10 +599,12 @@ export class Bridge {
       // This will set the listners for hashchange & pushstate
       function detectNavigation(callback) {
         let currentUrl = window.location.href;
+        log('Setting up navigation detection, currentUrl:', currentUrl);
 
         function checkNavigation() {
           const newUrl = window.location.href;
           if (newUrl !== currentUrl) {
+            log('Navigation detected:', currentUrl, '->', newUrl);
             callback(currentUrl);
             currentUrl = newUrl;
           }
@@ -628,12 +630,26 @@ export class Bridge {
         // Fallback: poll for URL changes every 200ms
         // This catches navigation from frameworks that cache history.pushState
         // before hydra.js patches it (e.g., Vue Router in Nuxt)
-        setInterval(checkNavigation, 200);
+        let pollCount = 0;
+        setInterval(() => {
+          pollCount++;
+          if (pollCount <= 5 || pollCount % 25 === 0) {
+            log('[POLL]', pollCount, 'currentUrl:', currentUrl, 'actual:', window.location.href);
+          }
+          checkNavigation();
+        }, 200);
+
+        // Modern Navigation API (Chrome 102+) - more reliable than polling
+        if (typeof navigation !== 'undefined') {
+          navigation.addEventListener('navigatesuccess', checkNavigation);
+        }
       }
 
+      log('Setting up detectNavigation with adminOrigin:', this.adminOrigin);
       detectNavigation((currentUrl) => {
         const currentUrlObj = new URL(currentUrl);
         if (window.location.pathname !== currentUrlObj.pathname) {
+          log('Sending PATH_CHANGE:', window.location.pathname, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
@@ -644,6 +660,7 @@ export class Bridge {
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
+          log('Sending PATH_CHANGE (hash):', i !== -1 ? hash.slice(i) || '/' : '/', 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
@@ -654,22 +671,34 @@ export class Bridge {
         }
       });
 
-      // Get the access token from the URL
-      const url = new URL(window.location.href);
-      const access_token = url.searchParams.get('access_token');
       // Hydra bridge is enabled via iframe name (persists across navigation)
-      // OR _edit param exists (true for edit mode, false for view mode)
-      const editParam = url.searchParams.get('_edit');
-      const hydraBridgeEnabled = window.name.startsWith('hydra:')
-                              || editParam === 'true'
-                              || editParam === 'false';
-      const isEditMode = editParam === 'true';
+      // Format: hydra-edit:<origin> or hydra-view:<origin>
+      const isHydraEdit = window.name.startsWith('hydra-edit:');
+      const isHydraView = window.name.startsWith('hydra-view:');
+      const hydraBridgeEnabled = isHydraEdit || isHydraView;
+      const isEditMode = isHydraEdit;
 
-      // Extract admin origin from iframe name if available
-      if (window.name.startsWith('hydra:') && !this.adminOrigin) {
-        this.adminOrigin = window.name.slice(6); // Remove "hydra:" prefix
+      // Extract admin origin from iframe name
+      if ((isHydraEdit || isHydraView) && !this.adminOrigin) {
+        const prefix = isHydraEdit ? 'hydra-edit:' : 'hydra-view:';
+        this.adminOrigin = window.name.slice(prefix.length);
         log('Got admin origin from window.name:', this.adminOrigin);
       }
+
+      // Get the access token from URL or sessionStorage
+      const url = new URL(window.location.href);
+      let access_token = url.searchParams.get('access_token');
+      const hasUrlToken = !!access_token;
+
+      // Store token in sessionStorage if found in URL, or retrieve from sessionStorage
+      if (access_token) {
+        sessionStorage.setItem('hydra_access_token', access_token);
+        log('Stored access_token in sessionStorage');
+      } else {
+        access_token = sessionStorage.getItem('hydra_access_token');
+        log('Retrieved access_token from sessionStorage:', access_token ? 'found' : 'not found');
+      }
+
       if (access_token) {
         this.token = access_token;
         this._setTokenCookie(access_token);
@@ -704,15 +733,28 @@ export class Bridge {
             currentPath = hash.slice(pathIndex); // Extract /path from #/path or #!/path
           }
         }
-        window.parent.postMessage(
-          {
-            type: 'INIT',
-            voltoConfig: options?.voltoConfig,
-            allowedBlocks: options?.allowedBlocks,
-            currentPath: currentPath,
-          },
-          this.adminOrigin,
-        );
+
+        // Check if this is SPA navigation (window.name exists but access_token missing from URL)
+        // In this case, just send PATH_CHANGE - admin will update URL without reloading iframe
+        const isSpaNavigation = (isHydraEdit || isHydraView) && !hasUrlToken;
+        if (isSpaNavigation) {
+          log('SPA navigation detected (window.name present, _edit missing), sending PATH_CHANGE');
+          window.parent.postMessage(
+            { type: 'PATH_CHANGE', path: currentPath },
+            this.adminOrigin,
+          );
+          // Don't send INIT - admin will just update its URL
+        } else {
+          window.parent.postMessage(
+            {
+              type: 'INIT',
+              voltoConfig: options?.voltoConfig,
+              allowedBlocks: options?.allowedBlocks,
+              currentPath: currentPath,
+            },
+            this.adminOrigin,
+          );
+        }
 
         const receiveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
@@ -6642,17 +6684,54 @@ export function initBridge(adminOrigin, options = {}) {
 
   if (!bridgeInstance) {
     bridgeInstance = new Bridge(adminOrigin, options);
+    bridgeInstance.lastKnownPath = window.location.pathname;
     // Store on window to survive module hot-reload
     if (typeof window !== 'undefined') {
       window.__hydraBridge = bridgeInstance;
     }
+  } else {
+    // Bridge already exists - check if URL changed (e.g., after SPA navigation + remount)
+    const currentPath = window.location.pathname;
+    if (bridgeInstance.lastKnownPath && bridgeInstance.lastKnownPath !== currentPath) {
+      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath);
+      window.parent.postMessage(
+        { type: 'PATH_CHANGE', path: currentPath },
+        bridgeInstance.adminOrigin,
+      );
+    }
+    bridgeInstance.lastKnownPath = currentPath;
   }
   return bridgeInstance;
 }
 
 /**
- * Get the token from the admin
- * @returns {String} token
+ * Get the access token from URL (preferred), sessionStorage, or cookie (fallback)
+ * Token is stored in sessionStorage when first received from URL params
+ * @returns {String|null} token
+ */
+export function getAccessToken() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  // Try URL first (admin sends token via URL on initial load)
+  const urlToken = new URL(window.location.href).searchParams.get('access_token');
+  if (urlToken) {
+    // Store for future SPA navigations
+    sessionStorage.setItem('hydra_access_token', urlToken);
+    return urlToken;
+  }
+  // Try sessionStorage (persists across SPA navigations)
+  const sessionToken = sessionStorage.getItem('hydra_access_token');
+  if (sessionToken) {
+    return sessionToken;
+  }
+  // Fallback to cookie
+  return getTokenFromCookie();
+}
+
+/**
+ * Get the token from cookie (legacy method, prefer getAccessToken)
+ * @returns {String|null} token
  */
 export function getTokenFromCookie() {
   if (typeof document === 'undefined') {

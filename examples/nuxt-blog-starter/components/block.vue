@@ -73,9 +73,9 @@
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
     class="mt-6 mb-6"
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
-    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + block.blocks_layout.items.length]">
-      <Block v-for="uid in block.blocks_layout.items" :key="uid"
-        :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"
+    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + (block.blocks_layout?.items?.length || 1)]">
+      <Block v-for="uid in (block.blocks_layout?.items || [])" :key="uid"
+        :block_uid="uid" :block="block.blocks?.[uid]" :data="data" :contained="true"
         class="p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
     </div>
   </div>
@@ -221,28 +221,28 @@
 
 
   <div v-else-if="block['@type'] == 'accordion'" data-accordion="collapse" :data-block-uid="block_uid">
-    <template v-for="panelid in block.data.blocks_layout.items">
-      <h2 :id="panelid" :data-block-uid="panelid">
-        <button type="button"
-          class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
-          :data-accordion-target="`#accordion-collapse-body-${panelid}`" aria-expanded="true"
-          aria-controls="accordion-collapse-body-1">
-          <span data-editable-field="title">{{ block.data.blocks[panelid].title }}</span>
-          <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
-            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
-            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 5 5 1 1 5" />
-          </svg>
-        </button>
-      </h2>
-      <div :id="`accordion-collapse-body-${panelid}`" class="hidden" :aria-labelledby="panelid">
-        <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-          <div v-for="uid in block.data.blocks[panelid].blocks_layout.items">
-            <Block :block_uid="uid" :block="block.data.blocks[panelid].blocks[uid]" :data="data"></Block>
-          </div>
-        </div>
+    <h2 :id="block_uid">
+      <button type="button"
+        class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
+        :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
+        :aria-controls="`accordion-collapse-body-${block_uid}`">
+        <span data-block-field="header">
+          <Block v-for="uid in (block.header_layout?.items || [])" :key="uid"
+                 :block_uid="uid" :block="block.header?.[uid]" :data="data" />
+        </span>
+        <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5 5 1 1 5" />
+        </svg>
+      </button>
+    </h2>
+    <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
+      <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900" data-block-field="content">
+        <Block v-for="uid in (block.content_layout?.items || [])" :key="uid"
+               :block_uid="uid" :block="block.content?.[uid]" :data="data" />
       </div>
-    </template>
+    </div>
   </div>
 
 
@@ -290,9 +290,9 @@
   </div>
 
   <template v-else-if="block['@type'] == 'video'" :data-block-uid="block_uid">
-    <iframe v-if="block.url.startsWith('https://www.youtube')" width="420" height="315"
-      :src="`https://www.youtube.com/embed/${block.url.split('v=')[1]}?controls=0`"></iframe>
-    <video v-else class="w-full h-auto max-w-full" controls>
+    <iframe v-if="block.url?.startsWith('https://www.youtube')" width="420" height="315"
+      :src="`https://www.youtube.com/embed/${block.url?.split('v=')[1]}?controls=0`"></iframe>
+    <video v-else-if="block.url" class="w-full h-auto max-w-full" controls>
       <source :src="block.url" type="video/mp4">
       Your browser does not support the video tag.
     </video>
