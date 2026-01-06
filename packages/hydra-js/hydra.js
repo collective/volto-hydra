@@ -693,21 +693,21 @@ export class Bridge {
         this._setTokenCookie(access_token);
       }
 
-      if (hydraBridgeEnabled) {
+      // In view mode, we only need navigation detection (already set up above)
+      // Skip all the edit mode setup to avoid slowing down page load
+      if (isEditMode) {
         this.enableBlockClickListener();
         this.injectCSS();
         this.listenForSelectBlockMessage();
         this.setupScrollHandler();
         this.setupResizeHandler();
 
-        // Add beforeunload warning when in edit mode to prevent accidental navigation
-        if (isEditMode) {
-          window.addEventListener('beforeunload', (e) => {
-            e.preventDefault();
-            e.returnValue = '';
-            return '';
-          });
-        }
+        // Add beforeunload warning to prevent accidental navigation
+        window.addEventListener('beforeunload', (e) => {
+          e.preventDefault();
+          e.returnValue = '';
+          return '';
+        });
 
         // Send single INIT message with config - admin merges config before responding
         // This ensures blockPathMap is built with complete schema knowledge
@@ -725,7 +725,7 @@ export class Bridge {
 
         // Check if this is SPA navigation (window.name exists but access_token missing from URL)
         // In this case, just send PATH_CHANGE - admin will update URL without reloading iframe
-        const isSpaNavigation = (isHydraEdit || isHydraView) && !hasUrlToken;
+        const isSpaNavigation = isHydraEdit && !hasUrlToken;
         if (isSpaNavigation) {
           log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE');
           window.parent.postMessage(
@@ -769,39 +769,52 @@ export class Bridge {
         };
         window.removeEventListener('message', receiveInitialData);
         window.addEventListener('message', receiveInitialData);
-      }
+        // Add a single document-level focus listener to track field changes
+        // This avoids adding duplicate listeners and works for all blocks
+        if (!this.fieldFocusListenerAdded) {
+          this.fieldFocusListenerAdded = true;
+          document.addEventListener('focus', (e) => {
+            const target = e.target;
+            const editableField = target.getAttribute('data-editable-field');
 
-      // Add a single document-level focus listener to track field changes
-      // This avoids adding duplicate listeners and works for all blocks
-      if (!this.fieldFocusListenerAdded) {
-        this.fieldFocusListenerAdded = true;
-        document.addEventListener('focus', (e) => {
-          const target = e.target;
-          const editableField = target.getAttribute('data-editable-field');
+            // Only handle if it's an editable field in the currently selected block
+            if (editableField && this.selectedBlockUid) {
+              const blockElement = target.closest('[data-block-uid]');
+              const blockUid = blockElement?.getAttribute('data-block-uid');
 
-          // Only handle if it's an editable field in the currently selected block
-          if (editableField && this.selectedBlockUid) {
-            const blockElement = target.closest('[data-block-uid]');
-            const blockUid = blockElement?.getAttribute('data-block-uid');
+              if (blockUid === this.selectedBlockUid) {
+                log('Field focused:', editableField);
+                const previousFieldName = this.focusedFieldName;
+                this.focusedFieldName = editableField;
 
-            if (blockUid === this.selectedBlockUid) {
-              log('Field focused:', editableField);
-              const previousFieldName = this.focusedFieldName;
-              this.focusedFieldName = editableField;
+                // Only update toolbar if field actually changed
+                if (previousFieldName !== editableField) {
+                  log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
 
-              // Only update toolbar if field actually changed
-              if (previousFieldName !== editableField) {
-                log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
-
-                // Send BLOCK_SELECTED message to update toolbar visibility
-                const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
-                if (blockElement) {
-                  this.sendBlockSelected('fieldFocusListener', blockElement, { focusedFieldName: editableField });
+                  // Send BLOCK_SELECTED message to update toolbar visibility
+                  const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+                  if (blockElement) {
+                    this.sendBlockSelected('fieldFocusListener', blockElement, { focusedFieldName: editableField });
+                  }
                 }
               }
             }
+          }, true); // Use capture phase to catch focus events before they bubble
+        }
+      } else if (isHydraView) {
+        // View mode: just send INIT so admin knows the current path (no edit setup needed)
+        let currentPath = window.location.pathname;
+        const hash = window.location.hash;
+        if (hash) {
+          const pathIndex = hash.indexOf('/');
+          if (pathIndex !== -1) {
+            currentPath = hash.slice(pathIndex);
           }
-        }, true); // Use capture phase to catch focus events before they bubble
+        }
+        window.parent.postMessage(
+          { type: 'INIT', currentPath: currentPath },
+          this.adminOrigin,
+        );
       }
     }
   }
