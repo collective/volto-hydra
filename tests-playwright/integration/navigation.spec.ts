@@ -11,11 +11,10 @@ test.describe('Navigation and URL Handling', () => {
 
     // Wait for iframe to have content
     const iframe = helper.getIframe();
-    await iframe.locator('h1').first().waitFor();
 
     // Verify the test page loaded in the iframe (not an external URL)
-    const heading = await iframe.locator('h1').first().textContent();
-    expect(heading, 'Iframe should load test page content').toContain('Test Page');
+    // Check for content that exists on test-page in both mock and Nuxt frontends
+    await expect(iframe.locator('text=This is a test paragraph'), 'Iframe should load test page content').toBeVisible({ timeout: 10000 });
 
     // Get iframe element to check its src
     const iframeElement = page.locator('#previewIframe');
@@ -67,9 +66,9 @@ test.describe('Navigation and URL Handling', () => {
       await iframeElement.waitFor({ state: 'visible', timeout: 10000 });
 
       // Verify iframe src uses hash-based URL format (hash comes after query params)
+      // Note: _edit param is no longer used - edit mode is communicated via window.name
       const iframeSrc = await iframeElement.getAttribute('src');
       expect(iframeSrc, `Iframe src should contain ${format.expectedHash}`).toContain(format.expectedHash);
-      expect(iframeSrc).toContain('_edit=true');
 
       // Verify iframe content shows the correct page
       const iframe = helper.getIframe();

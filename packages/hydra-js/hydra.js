@@ -168,13 +168,11 @@ export class Bridge {
   getBlockData(blockUid) {
     // null blockUid means page-level data
     if (blockUid === null) {
-      log('getBlockData: null blockUid, returning formData (page-level)');
       return this.formData;
     }
 
     // First try blockPathMap for nested block support
     const pathInfo = this.blockPathMap?.[blockUid];
-    log('getBlockData:', blockUid, 'pathInfo:', pathInfo, 'blockPathMap keys:', Object.keys(this.blockPathMap || {}));
     if (pathInfo?.path && this.formData) {
       // Walk the path to get the nested block
       let current = this.formData;
@@ -192,17 +190,13 @@ export class Bridge {
         // IMPORTANT: Mutate the original object, don't return a copy, so that
         // modifications to the returned object update formData for inline editing sync
         if (pathInfo.itemType) {
-          log('getBlockData: found object_list item via path, injecting @type:', pathInfo.itemType);
           current['@type'] = pathInfo.itemType;
         }
-        log('getBlockData: found via path, @type:', current['@type']);
         return current;
       }
     }
-    // Fallback to top-level blocks lookup
-    const fallback = this.formData?.blocks?.[blockUid];
-    log('getBlockData: fallback lookup, @type:', fallback?.['@type']);
-    return fallback;
+    // No fallback - blockPathMap is the single source of truth
+    return undefined;
   }
 
   /**
@@ -630,12 +624,7 @@ export class Bridge {
         // Fallback: poll for URL changes every 200ms
         // This catches navigation from frameworks that cache history.pushState
         // before hydra.js patches it (e.g., Vue Router in Nuxt)
-        let pollCount = 0;
         setInterval(() => {
-          pollCount++;
-          if (pollCount <= 5 || pollCount % 25 === 0) {
-            log('[POLL]', pollCount, 'currentUrl:', currentUrl, 'actual:', window.location.href);
-          }
           checkNavigation();
         }, 200);
 
@@ -738,7 +727,7 @@ export class Bridge {
         // In this case, just send PATH_CHANGE - admin will update URL without reloading iframe
         const isSpaNavigation = (isHydraEdit || isHydraView) && !hasUrlToken;
         if (isSpaNavigation) {
-          log('SPA navigation detected (window.name present, _edit missing), sending PATH_CHANGE');
+          log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE');
           window.parent.postMessage(
             { type: 'PATH_CHANGE', path: currentPath },
             this.adminOrigin,
@@ -761,12 +750,9 @@ export class Bridge {
             if (e.data.type === 'INITIAL_DATA') {
               // Store block field types metadata (blockId -> fieldName -> fieldType)
               this.blockFieldTypes = e.data.blockFieldTypes || {};
-              log('Stored blockFieldTypes:', this.blockFieldTypes);
 
               // Central method sets formData, lastReceivedFormData, and blockPathMap
               this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
-              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
-              log('Stored blockPathMap keys:', Object.keys(this.blockPathMap));
 
               // Store Slate configuration for keyboard shortcuts and toolbar
               this.slateConfig = e.data.slateConfig || { hotkeys: {}, toolbarButtons: [] };

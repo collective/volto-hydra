@@ -77,14 +77,17 @@
                 }
 
                 // Check if hydra bridge should be loaded
-                // - window.name starts with "hydra:" (persists across navigation in admin iframe)
+                // - window.name starts with "hydra-edit:" or "hydra-view:" (persists across navigation in admin iframe)
                 // - OR _edit param exists (true for edit mode, false for view mode)
                 const urlParams = new URLSearchParams(window.location.search);
                 const editParam = urlParams.get('_edit');
-                const loadHydraBridge = window.name.startsWith('hydra:')
+                const isHydraEdit = window.name.startsWith('hydra-edit:');
+                const isHydraView = window.name.startsWith('hydra-view:');
+                const loadHydraBridge = isHydraEdit
+                                     || isHydraView
                                      || editParam === 'true'
                                      || editParam === 'false';
-                const isEditMode = editParam === 'true';
+                const isEditMode = isHydraEdit || editParam === 'true';
 
                 // Fetch content from mock API using ++api++ prefix
                 const response = await fetch(`/++api++${contentPath}`);
@@ -112,9 +115,12 @@
 
                     // Get admin origin from: URL param > window.name > referrer (auto-detect)
                     let adminOrigin = urlParams.get('_admin_origin');
-                    if (!adminOrigin && window.name.startsWith('hydra:')) {
-                        adminOrigin = window.name.slice(6); // Extract origin from "hydra:<origin>"
-                        console.log('[TEST-FRONTEND] Using admin origin from window.name:', adminOrigin);
+                    if (!adminOrigin && isHydraEdit) {
+                        adminOrigin = window.name.slice(11); // Extract origin from "hydra-edit:<origin>"
+                        console.log('[TEST-FRONTEND] Using admin origin from window.name (edit):', adminOrigin);
+                    } else if (!adminOrigin && isHydraView) {
+                        adminOrigin = window.name.slice(11); // Extract origin from "hydra-view:<origin>"
+                        console.log('[TEST-FRONTEND] Using admin origin from window.name (view):', adminOrigin);
                     } else if (adminOrigin) {
                         console.log('[TEST-FRONTEND] Using explicit admin origin:', adminOrigin);
                     } else {

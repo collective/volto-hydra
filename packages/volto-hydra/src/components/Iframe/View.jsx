@@ -487,26 +487,19 @@ const Iframe = (props) => {
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
 
-  // Edit mode detection and iframe name - used for hydra.js bridge detection
-  const isEditMode = typeof window !== 'undefined' && window.location.pathname.endsWith('/edit');
-  const iframeName = typeof window !== 'undefined'
-    ? `hydra-${isEditMode ? 'edit' : 'view'}:${window.location.origin}`
-    : null;
+  // History for routing - needed early for edit mode detection
+  const history = useHistory();
+  const pathname = history.location.pathname;
 
-  // Set contentWindow.name when iframe is ready - this tells hydra.js it's in the admin iframe
-  // Must be done via useEffect because the name attribute doesn't reliably set contentWindow.name
-  // after SSR hydration (server renders null, client renders value, but iframe may have loaded already)
-  // Only set when iframeSrc is set to avoid cross-origin error with about:blank
-  useEffect(() => {
-    if (referenceElement?.contentWindow && iframeName && iframeSrc) {
-      try {
-        referenceElement.contentWindow.name = iframeName;
-      } catch (e) {
-        // Ignore cross-origin errors - iframe hasn't loaded same-origin content yet
-        log('[IFRAME_NAME] Cross-origin error, will retry when iframe loads:', e.message);
-      }
-    }
-  }, [referenceElement, iframeName, iframeSrc]);
+  // Edit mode detection and iframe name - used for hydra.js bridge detection
+  // Uses history.location.pathname which works on both SSR and client
+  const isEditMode = pathname.endsWith('/edit');
+  // Origin: use publicURL from config on SSR, window.location.origin on client
+  const adminOrigin = typeof window !== 'undefined'
+    ? window.location.origin
+    : (config.settings.publicURL || '').replace(/\/$/, '');
+  const iframeName = `hydra-${isEditMode ? 'edit' : 'view'}:${adminOrigin}`;
+
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
 
@@ -635,6 +628,10 @@ const Iframe = (props) => {
   // Initialize to null to avoid SSR/client hydration mismatch (token differs)
   const [iframeSrc, setIframeSrc] = useState(null);
 
+  // Note: window.name inside iframe is set via the `name` attribute on the <iframe> element.
+  // When iframe reloads (e.g., on mode switch), it picks up the current `name` attribute value.
+  // No useEffect needed - the HTML attribute handles it.
+
   // Extract block field types - stored in state so it can be updated when frontend config is merged
   // Must be declared before useEffects that reference it
   const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl, schema));
@@ -653,9 +650,6 @@ const Iframe = (props) => {
   useEffect(() => {
     validateAndLog(properties, 'properties (from Form)', blockFieldTypes);
   }, [properties, blockFieldTypes]);
-
-  const history = useHistory();
-  const pathname = history.location.pathname;
 
   useEffect(() => {
     // Only update iframeSrc if admin path or mode differs from iframe's current state
@@ -1015,10 +1009,10 @@ const Iframe = (props) => {
       const { type } = event.data;
       switch (type) {
         case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
+          // User clicked a nav link in iframe - they want to VIEW that page, not edit it
           // Update module-level var BEFORE history.push so useEffect knows iframe already has this path
-          // Use same key format as useEffect: "path:mode"
-          const currentlyInEditMode = history.location.pathname.endsWith('/edit');
-          persistedIframePath = `${event.data.path}:${currentlyInEditMode ? 'edit' : 'view'}`;
+          // Use same key format as useEffect: "path:mode" (always view for nav link clicks)
+          persistedIframePath = `${event.data.path}:view`;
           history.push(event.data.path);
           break;
         }
@@ -2000,15 +1994,21 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
-      <iframe
-        id="previewIframe"
-        name={iframeName}
-        title="Preview"
-        src={iframeSrc}
-        ref={setReferenceElement}
-        allow="clipboard-read; clipboard-write"
-        suppressHydrationWarning
-      />
+      {/* Only render when src is ready (ensures name attribute is applied on creation).
+          Key on mode ensures iframe remounts when switching edit/view,
+          but persists during SPA navigation within the same mode */}
+      {iframeSrc && (
+        <iframe
+          key={isEditMode ? 'edit' : 'view'}
+          id="previewIframe"
+          name={iframeName}
+          title="Preview"
+          src={iframeSrc}
+          ref={setReferenceElement}
+          allow="clipboard-read; clipboard-write"
+          suppressHydrationWarning
+        />
+      )}
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
       {blockUI && blockUI.rect && referenceElement && (() => {
