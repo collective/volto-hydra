@@ -88,12 +88,10 @@ test.describe('Navigation and URL Handling', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
+    await helper.waitForSidebarOpen();
 
-    // Get the iframe
+    // Wait for iframe content to be stable
     const iframe = helper.getIframe();
-
-    // Verify the initial page loaded in iframe with its content
-    await expect(iframe.locator('main')).toBeVisible();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible();
 
     // The nav menu may be collapsed on mobile - click hamburger if needed
@@ -102,10 +100,8 @@ test.describe('Navigation and URL Handling', () => {
       await hamburger.click();
     }
 
-    // Wait for nav to be fully loaded, then find and click a navigation link
-    await expect(iframe.locator('header nav a, nav a').first()).toBeVisible({ timeout: 10000 });
-    const navLink = iframe.locator('header nav a').filter({ hasText: 'Another Page' }).first();
-    await expect(navLink).toBeVisible({ timeout: 10000 });
+    // Find and click a navigation link
+    const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
     await navLink.click();
 
     // Verify the admin URL changed to reflect the new page (view mode)
@@ -163,6 +159,10 @@ test.describe('Navigation and URL Handling', () => {
     await helper.navigateToEdit('/test-page');
     await helper.waitForSidebarOpen();
 
+    // Wait for iframe content to be stable
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible();
+
     // Set up dialog handler to accept all beforeunload dialogs
     page.on('dialog', async (dialog) => {
       if (dialog.type() === 'beforeunload') {
@@ -170,13 +170,8 @@ test.describe('Navigation and URL Handling', () => {
       }
     });
 
-    // Try to navigate away by clicking a link in the iframe
-    const iframe = helper.getIframe();
-    // Wait for nav to load before clicking
-    await expect(iframe.locator('nav a, header a').first()).toBeVisible({ timeout: 10000 });
-    // Click a specific nav link so we know where we're going
+    // Click a nav link to navigate away
     const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
-    await expect(navLink).toBeVisible({ timeout: 5000 });
     await navLink.click();
 
     // Wait for navigation to complete - expect to be on the new page in view mode
@@ -210,7 +205,7 @@ test.describe('Navigation and URL Handling', () => {
   });
 
   test('Navigation works in view mode without warning', async ({ page }, testInfo) => {
-  
+
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -219,10 +214,9 @@ test.describe('Navigation and URL Handling', () => {
     await page.goto('http://localhost:3001/test-page');
     await page.waitForLoadState('networkidle');
 
-    // Wait for iframe to load
-    await page.locator('#previewIframe').waitFor({ state: 'visible', timeout: 10000 });
+    // Wait for iframe content to load
     const iframe = helper.getIframe();
-    await expect(iframe.locator('nav a, header a').first()).toBeVisible({ timeout: 10000 });
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
 
     // Track if beforeunload dialog appears (it shouldn't in view mode)
     let dialogAppeared = false;
@@ -235,8 +229,8 @@ test.describe('Navigation and URL Handling', () => {
     const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.click();
 
-    // Wait for admin URL to change (instead of fixed timeout)
-    await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 15000 });
+    // Wait for admin URL to change
+    await expect(page).toHaveURL(/\/accordion-test-page$/, { timeout: 10000 });
 
     // Verify no warning dialog appeared during navigation
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
