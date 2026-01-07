@@ -88,6 +88,16 @@
                                      || editParam === 'true'
                                      || editParam === 'false';
                 const isEditMode = isHydraEdit || editParam === 'true';
+                console.log('[TEST-FRONTEND] Mode detection:', {
+                    url: window.location.href,
+                    windowName: window.name,
+                    editParam,
+                    isHydraEdit,
+                    isHydraView,
+                    loadHydraBridge,
+                    isEditMode,
+                    contentPath
+                });
 
                 // Fetch content from mock API using ++api++ prefix
                 const response = await fetch(`/++api++${contentPath}`);
@@ -96,10 +106,14 @@
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];
                 const navElement = document.getElementById('navigation');
+                console.log('[TEST-FRONTEND] Navigation items from API:', navItems.length, navItems.map(i => i.title));
                 if (navItems.length > 0) {
                     navElement.innerHTML = navItems.map(item =>
                         `<a href="${new URL(item['@id']).pathname}">${item.title}</a>`
                     ).join('');
+                    console.log('[TEST-FRONTEND] Navigation rendered, innerHTML length:', navElement.innerHTML.length);
+                } else {
+                    console.log('[TEST-FRONTEND] WARNING: No navigation items to render!');
                 }
 
                 // In VIEW mode or no bridge: render immediately from API data
