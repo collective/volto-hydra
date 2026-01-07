@@ -190,7 +190,6 @@ test.describe('Navigation and URL Handling', () => {
 
     // Navigate to root in edit mode
     await page.goto('http://localhost:3001/edit');
-    await page.waitForLoadState('networkidle');
 
     // Wait for iframe element to be visible
     await page.locator('#previewIframe').waitFor({ state: 'visible', timeout: 10000 });
@@ -214,7 +213,6 @@ test.describe('Navigation and URL Handling', () => {
 
     // Go to view mode (not edit)
     await page.goto('http://localhost:3001/test-page');
-    await page.waitForLoadState('networkidle');
 
     // Wait for iframe content to load
     const iframe = helper.getIframe();
@@ -248,7 +246,6 @@ test.describe('Navigation and URL Handling', () => {
 
     // Navigate to view mode (not edit) to see Contents action in toolbar
     await page.goto('http://localhost:3001/test-page');
-    await page.waitForLoadState('networkidle');
 
     // Look for the contents/folder action in the toolbar
     // This should be visible because test-page is folderish (is_folderish: true in fixture)
