@@ -100,8 +100,9 @@ test.describe('Navigation and URL Handling', () => {
       await hamburger.click();
     }
 
-    // Find and click a navigation link
+    // Find and click a navigation link (wait for it since nav loads async)
     const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
+    await navLink.waitFor({ state: 'attached' });
     await navLink.click();
 
     // Verify the admin URL changed to reflect the new page (view mode)
@@ -170,8 +171,9 @@ test.describe('Navigation and URL Handling', () => {
       }
     });
 
-    // Click a nav link to navigate away
+    // Click a nav link to navigate away (wait for it since nav loads async)
     const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'attached' });
     await navLink.click();
 
     // Wait for navigation to complete - expect to be on the new page in view mode
@@ -225,8 +227,9 @@ test.describe('Navigation and URL Handling', () => {
       await dialog.accept();
     });
 
-    // Click "Accordion Test Page" link in iframe nav
+    // Click "Accordion Test Page" link in iframe nav (wait for it since nav loads async)
     const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'attached' });
     await navLink.click();
 
     // Wait for admin URL to change
