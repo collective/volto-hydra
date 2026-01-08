@@ -328,6 +328,8 @@ test.describe('Inline Editing - Links', () => {
 
     // Verify typing actually works (not just contenteditable attribute present)
     // This catches the bug where contenteditable is true but iframe is blocked
+    // Wait for focus to return to editor after LinkEditor closes
+    await expect(editor).toBeFocused({ timeout: 5000 });
     // Move cursor to end first (selection may still be "select all" after Escape)
     await editor.press('End');
     await editor.pressSequentially(' added', { delay: 10 });

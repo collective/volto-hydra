@@ -278,10 +278,13 @@ class AddLinkForm extends Component {
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          padding: '4px',
+          padding: '2px 4px',
           background: '#fff',
           borderRadius: '4px',
           border: '1px solid #ddd',
+          height: '32px',
+          boxSizing: 'border-box',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         }}
       >
         {/* Left side: Object browser button */}
@@ -290,7 +293,7 @@ class AddLinkForm extends Component {
             type="button"
             basic
             icon
-            style={{ margin: 0, padding: '8px' }}
+            style={{ margin: 0, padding: '4px' }}
             aria-label={this.props.intl.formatMessage(
               messages.openObjectBrowser,
             )}
@@ -339,7 +342,7 @@ class AddLinkForm extends Component {
                 type="button"
                 basic
                 icon
-                style={{ margin: 0, padding: '8px' }}
+                style={{ margin: 0, padding: '4px' }}
                 aria-label="Upload image"
                 onClick={(e) => {
                   e.preventDefault();
@@ -367,11 +370,11 @@ class AddLinkForm extends Component {
           ref={this.onRef}
           style={{
             flex: 1,
-            height: '36px',
-            padding: '0 12px',
+            height: '24px',
+            padding: '0 8px',
             border: '1px solid #ddd',
             borderRadius: '4px',
-            fontSize: '14px',
+            fontSize: '13px',
             outline: 'none',
           }}
         />
@@ -381,7 +384,7 @@ class AddLinkForm extends Component {
           <Button
             type="button"
             icon
-            style={{ margin: 0, padding: '8px', border: 'none', background: 'transparent' }}
+            style={{ margin: 0, padding: '4px', border: 'none', background: 'transparent' }}
             aria-label={this.props.intl.formatMessage(messages.clear)}
             onClick={(e) => {
               e.preventDefault();
@@ -401,7 +404,7 @@ class AddLinkForm extends Component {
           <Button
             type="button"
             icon
-            style={{ margin: 0, padding: '8px', border: 'none', background: 'transparent' }}
+            style={{ margin: 0, padding: '4px', border: 'none', background: 'transparent' }}
             aria-label={this.props.intl.formatMessage(messages.openInNewTab)}
             title={this.props.intl.formatMessage(messages.openInNewTab)}
             onClick={(e) => {

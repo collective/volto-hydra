@@ -36,9 +36,9 @@ export const useSelectionPosition = () => {
     // Combined for top: final = rect.top - 6 - el.offsetHeight
     // So: rect.top = toolbarTop + el.offsetHeight + 6
     //
-    // Estimate LinkEditor dimensions
+    // Estimate LinkEditor dimensions (measured: 300x38 including wrapper padding)
     const LINK_EDITOR_WIDTH = 300;
-    const LINK_EDITOR_HEIGHT = 52;
+    const LINK_EDITOR_HEIGHT = 38;
 
     return {
       top: toolbarTop + LINK_EDITOR_HEIGHT + 6,

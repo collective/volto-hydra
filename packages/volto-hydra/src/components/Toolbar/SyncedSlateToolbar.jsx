@@ -1142,13 +1142,8 @@ const SyncedSlateToolbar = ({
             position: 'fixed',
             top: `${toolbarTop}px`,
             left: `${toolbarLeft}px`,
-            background: '#fff',
-            border: '1px solid #e0e0e0',
-            borderRadius: '4px',
-            padding: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             zIndex: 100,
-            width: '350px',
+            width: '300px',
           }}
         >
           <AddLinkForm
