@@ -109,7 +109,8 @@
       "Bash(do timeout 90 pnpm exec playwright test tests-playwright/integration/container-blocks.spec.ts:3200 --project=mock)",
       "Bash(timeout 60 pnpm exec playwright test:*)",
       "Bash(gh pr checks:*)",
-      "Bash(do sleep 3)"
+      "Bash(do sleep 3)",
+      "Bash(du:*)"
     ],
     "deny": [],
     "ask": []

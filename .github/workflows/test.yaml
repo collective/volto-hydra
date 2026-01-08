@@ -113,7 +113,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/index.html
+            test-results/**/*.png
           retention-days: 7
       - name: Upload coverage to Codecov
         if: always()
