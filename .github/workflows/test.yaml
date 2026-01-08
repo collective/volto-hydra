@@ -114,8 +114,15 @@ jobs:
         with:
           name: playwright-report
           path: |
-            playwright-report/index.html
+            playwright-report/**/*.html
+            playwright-report/**/*.js
+            playwright-report/**/*.css
+            playwright-report/**/*.png
+            playwright-report/**/*.jpg
+            playwright-report/**/*.webp
             test-results/**/*.png
+            test-results/**/*.jpg
+            test-results/**/*.webp
           retention-days: 7
       - name: Upload coverage to Codecov
         if: always()
