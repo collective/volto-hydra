@@ -63,8 +63,8 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')` */
     baseURL: 'http://localhost:3001',
 
-    /* Collect trace when retrying the failed test */
-    trace: 'on-first-retry',
+    /* Trace recording - disabled by default to save space. Enable with TRACE=1 */
+    trace: process.env.TRACE ? 'on-first-retry' : 'off',
 
     /* Screenshot on failure */
     screenshot: 'only-on-failure',

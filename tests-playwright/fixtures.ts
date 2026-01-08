@@ -11,4 +11,23 @@
  *   import { test, expect } from '../../fixtures';
  */
 
-export { test, expect } from '@bgotink/playwright-coverage';
+import { test as coverageTest, expect } from '@bgotink/playwright-coverage';
+
+// Extend test to capture console logs from page and iframe
+const test = coverageTest.extend({
+  page: async ({ page }, use) => {
+    // Capture main page console logs
+    page.on('console', (msg) => {
+      console.log(`[log] ${msg.text()}`);
+    });
+
+    // Capture page errors
+    page.on('pageerror', (error) => {
+      console.log(`[BROWSER PAGE ERROR] ${error.message}`);
+    });
+
+    await use(page);
+  },
+});
+
+export { test, expect };
