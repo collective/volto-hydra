@@ -999,14 +999,8 @@ export class Bridge {
                   }
                 }
 
-                // Unblock after selection restore - iframe state is now fully settled
-                // This ensures the next keypress sees correct DOM and selection state
-                // This MUST run even if selection restore fails, so it's outside the try/catch
-                if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
-                  log('Unblocking input for', this.pendingTransform.blockId, '- after selection restore');
-                  this.setBlockProcessing(this.pendingTransform.blockId, false);
-                }
-
+                // NOTE: Unblock happens AFTER replayBufferedEvents() below, not here.
+                // This prevents keystrokes from arriving between unblock and replay.
               });
             });
 
@@ -1053,6 +1047,11 @@ export class Bridge {
                       };
                       waitForVisible();
                       this.replayBufferedEvents();
+                      // Unblock AFTER replay to prevent keystrokes arriving in the gap
+                      if (this.pendingTransform) {
+                        log('Unblocking input for', this.pendingTransform.blockId, '- after replay (hidden block)');
+                        this.setBlockProcessing(this.pendingTransform.blockId, false);
+                      }
                       return;
                     }
                   }
@@ -1063,6 +1062,11 @@ export class Bridge {
                   this.ensureElementsHaveMinSize();
                   // Replay any buffered keystrokes now that DOM is ready
                   this.replayBufferedEvents();
+                  // Unblock AFTER replay to prevent keystrokes arriving in the gap
+                  if (this.pendingTransform) {
+                    log('Unblocking input for', this.pendingTransform.blockId, '- after replay');
+                    this.setBlockProcessing(this.pendingTransform.blockId, false);
+                  }
                 });
               });
             }
