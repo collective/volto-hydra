@@ -137,6 +137,23 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: ['flowbite', 'errx'],
     },
+    server: {
+      watch: {
+        // Reduce file watchers - prevents EMFILE errors
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/dist/**',
+          '**/.nuxt/**',
+          '**/.output/**',
+          '**/coverage/**',
+          '**/test-results/**',
+          '**/playwright-report/**',
+          '**/*.log',
+        ],
+        usePolling: false,  // Use native fs events (more efficient)
+      }
+    },
     plugins: [
       // mkcert disabled - certs already generated manually
       // mkcert({

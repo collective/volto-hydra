@@ -1022,54 +1022,40 @@ export class Bridge {
               ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
               : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
-            if (blockUidToProcess) {
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(async () => {
+                if (blockUidToProcess) {
                   let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
                   // If block is hidden (e.g., carousel slide), try to make it visible first
                   if (blockElement && this.isElementHidden(blockElement)) {
                     log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
                     const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
                     if (madeVisible) {
-                      // Wait for block to become visible, then process it
-                      const waitForVisible = async () => {
-                        for (let i = 0; i < 10; i++) {
-                          await new Promise((resolve) => setTimeout(resolve, 50));
-                          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-                          if (blockElement && !this.isElementHidden(blockElement)) {
-                            log('FORM_DATA: block now visible, processing');
-                            blockHandler(blockElement);
-                            this.ensureElementsHaveMinSize();
-                            return;
-                          }
+                      // Wait for block to become visible
+                      for (let i = 0; i < 10; i++) {
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                        blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                        if (blockElement && !this.isElementHidden(blockElement)) {
+                          log('FORM_DATA: block now visible');
+                          break;
                         }
-                        log('FORM_DATA: timeout waiting for block to become visible');
-                      };
-                      waitForVisible();
-                      this.replayBufferedEvents();
-                      // Unblock AFTER replay to prevent keystrokes arriving in the gap
-                      if (this.pendingTransform) {
-                        log('Unblocking input for', this.pendingTransform.blockId, '- after replay (hidden block)');
-                        this.setBlockProcessing(this.pendingTransform.blockId, false);
                       }
-                      return;
                     }
                   }
+
+                  // Re-query element in case it changed during wait
+                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
                   if (blockElement) {
                     blockHandler(blockElement);
                   }
-                  // Ensure all editable fields have height (for newly added blocks)
                   this.ensureElementsHaveMinSize();
-                  // Replay any buffered keystrokes now that DOM is ready
-                  this.replayBufferedEvents();
-                  // Unblock AFTER replay to prevent keystrokes arriving in the gap
-                  if (this.pendingTransform) {
-                    log('Unblocking input for', this.pendingTransform.blockId, '- after replay');
-                    this.setBlockProcessing(this.pendingTransform.blockId, false);
-                  }
-                });
+                }
+
+                // Single replay point for all paths
+                this.replayBufferAndUnblock();
               });
-            }
+            });
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
@@ -1424,6 +1410,34 @@ export class Bridge {
         log('Marked', this.pendingBufferReplay.buffer.length, 'events for replay after DOM ready');
       }
     }
+  }
+
+  /**
+   * Replays buffered events and unblocks input after a transform completes.
+   * This is the safe sequence: prepare buffer → replay → unblock
+   * Called from FORM_DATA handler after DOM is updated.
+   */
+  replayBufferAndUnblock(context = '') {
+    if (!this.pendingTransform) return;
+
+    const { blockId } = this.pendingTransform;
+
+    // Prepare buffer for replay
+    if (this.eventBuffer.length > 0) {
+      this.pendingBufferReplay = {
+        blockId,
+        buffer: [...this.eventBuffer],
+      };
+      this.eventBuffer = [];
+      log('Prepared', this.pendingBufferReplay.buffer.length, 'events for replay');
+    }
+
+    // Replay buffered events
+    this.replayBufferedEvents();
+
+    // Unblock AFTER replay to prevent keystrokes arriving in the gap
+    log('Unblocking input for', blockId, '- after replay' + (context ? ` (${context})` : ''));
+    this.setBlockProcessing(blockId, false);
   }
 
   /**
