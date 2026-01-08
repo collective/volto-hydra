@@ -332,7 +332,11 @@ test.describe('Inline link editing', () => {
     const urlInput = linkField.locator('input');
     await expect(urlInput).toBeVisible({ timeout: 5000 });
 
-    // Type an external URL
+    // Wait for the input to be cleared before typing
+    await expect(urlInput).toHaveValue('', { timeout: 5000 });
+
+    // Click to focus and type an external URL
+    await urlInput.click();
     await urlInput.fill('https://example.com/external-link');
 
     // Press Enter to confirm
