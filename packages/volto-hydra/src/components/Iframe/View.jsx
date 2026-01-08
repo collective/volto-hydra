@@ -448,9 +448,9 @@ function recurseUpdateVoltoConfig(newConfig) {
   });
 }
 
-// Module-level variable to track iframe's current path across component remounts
+// Module-level state to track iframe's current state across component remounts
 // This prevents unnecessary iframe reloads when React Router remounts the View component
-let persistedIframePath = null;
+let persistedIframe = { frontendUrl: null, path: null, isEdit: null };
 
 const Iframe = (props) => {
   const {
@@ -646,21 +646,22 @@ const Iframe = (props) => {
   }, [properties, blockFieldTypes]);
 
   useEffect(() => {
-    // Only update iframeSrc if admin path or mode differs from iframe's current state
+    // Only update iframeSrc if admin path, mode, or frontend URL differs from iframe's current state
     // This prevents reloading iframe when it already navigated via SPA
-    // Using module-level persistedIframePath to survive component remounts
-    // Include isEditMode in the key to ensure iframe reloads when switching view<->edit
+    // Using module-level persistedIframe to survive component remounts
     const adminPath = pathname.replace(/\/edit$/, '');
-    const adminKey = `${adminPath}:${isEditMode ? 'edit' : 'view'}`;
-    const persistedKey = persistedIframePath;
-    log('[IFRAME_SRC] persistedKey:', persistedKey, 'adminKey:', adminKey, 'equal:', persistedKey === adminKey, 'iframeSrc:', iframeSrc ? 'set' : 'null');
-    // Update if keys don't match OR if iframeSrc is null (component just mounted)
-    if (persistedKey !== adminKey || !iframeSrc) {
-      log('[IFRAME_SRC] Updating iframeSrc (keys differ:', persistedKey !== adminKey, 'iframeSrc null:', !iframeSrc, ')');
+    const stateMatches =
+      persistedIframe.frontendUrl === u &&
+      persistedIframe.path === adminPath &&
+      persistedIframe.isEdit === isEditMode;
+    log('[IFRAME_SRC] persisted:', persistedIframe, 'current:', { frontendUrl: u, path: adminPath, isEdit: isEditMode }, 'match:', stateMatches, 'iframeSrc:', iframeSrc ? 'set' : 'null');
+    // Update if state doesn't match OR if iframeSrc is null (component just mounted)
+    if (!stateMatches || !iframeSrc) {
+      log('[IFRAME_SRC] Updating iframeSrc (state differs:', !stateMatches, 'iframeSrc null:', !iframeSrc, ')');
       setIframeSrc(getUrlWithAdminParams(u, token, isEditMode));
-      persistedIframePath = adminKey;
+      persistedIframe = { frontendUrl: u, path: adminPath, isEdit: isEditMode };
     } else {
-      log('[IFRAME_SRC] Skipping - keys match and iframeSrc already set');
+      log('[IFRAME_SRC] Skipping - state matches and iframeSrc already set');
     }
     u && Cookies.set('iframe_url', u, { expires: 7 });
   }, [token, u, pathname, isEditMode, iframeSrc]);
@@ -1004,9 +1005,8 @@ const Iframe = (props) => {
       switch (type) {
         case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
           // User clicked a nav link in iframe - they want to VIEW that page, not edit it
-          // Update module-level var BEFORE history.push so useEffect knows iframe already has this path
-          // Use same key format as useEffect: "path:mode" (always view for nav link clicks)
-          persistedIframePath = `${event.data.path}:view`;
+          // Update module-level state BEFORE history.push so useEffect knows iframe already has this path
+          persistedIframe = { frontendUrl: u, path: event.data.path, isEdit: false };
           history.push(event.data.path);
           break;
         }
@@ -1488,6 +1488,8 @@ const Iframe = (props) => {
             const adminPath = history.location.pathname.replace(/\/edit$/, '') || '/';
             if (event.data.currentPath !== adminPath) {
               log('INIT: iframe navigated to different page, following to view mode:', event.data.currentPath);
+              // Update persistedIframe BEFORE history.push so useEffect won't reload iframe
+              persistedIframe = { frontendUrl: u, path: event.data.currentPath, isEdit: false };
               history.push(event.data.currentPath);
               return; // Don't send INITIAL_DATA - admin will re-render with new page
             }

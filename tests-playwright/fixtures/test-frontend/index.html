@@ -61,8 +61,17 @@
     <script type="module">
         import { initBridge } from './hydra.js';
 
+        // Track page loads to detect double-loading issues (persisted in sessionStorage)
+        const SESSION_KEY = 'hydra_page_load_count';
+
         // Initialize the page
         async function initializePage() {
+            // Increment and display load counter (persisted across reloads within session)
+            let pageLoadCount = parseInt(sessionStorage.getItem(SESSION_KEY) || '0', 10) + 1;
+            sessionStorage.setItem(SESSION_KEY, String(pageLoadCount));
+            document.getElementById('render-counter').textContent = pageLoadCount;
+            console.log('[TEST-FRONTEND] Page load count:', pageLoadCount);
+
             try {
                 // Get content path from current URL
                 // Support path-based and hash-based routing variants: #/path, #!/path

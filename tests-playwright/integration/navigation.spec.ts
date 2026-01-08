@@ -237,6 +237,88 @@ test.describe('Navigation and URL Handling', () => {
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
   });
 
+  test('Iframe does not double-load when clicking nav link', async ({ page }, testInfo) => {
+    // Skip on Nuxt - this test uses mock frontend's load counter
+    test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Go to view mode
+    await page.goto('http://localhost:3001/test-page');
+    await page.waitForLoadState('networkidle');
+
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+
+    // Click nav link to navigate
+    const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
+    await navLink.waitFor({ state: 'attached' });
+    await navLink.click();
+
+    // Wait for navigation to complete
+    await expect(page).toHaveURL(/another-page/, { timeout: 10000 });
+    await expect(iframe.locator('text=This is another test page')).toBeVisible({ timeout: 10000 });
+
+    // Wait a moment for any potential admin-forced reload to occur
+    await page.waitForTimeout(500);
+
+    // Verify admin didn't force an extra reload
+    // Without fix: 1 (initial) + 1 (nav) + 1 (admin reload) = 3
+    // With fix: 1 (initial) + 1 (nav) = 2
+    // Counter persists in sessionStorage across page loads within the session
+    const loadCount = parseInt(await iframe.locator('#render-counter').textContent() || '0', 10);
+    expect(loadCount, `Iframe loaded ${loadCount} times, should be 2 (not 3+ from admin reload)`).toBeLessThan(3);
+  });
+
+  test('Changing frontend URL in preferences reloads iframe', async ({ page }, testInfo) => {
+    // Skip on Nuxt - this test changes frontend URL which would conflict
+    test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Go to test-page in view mode
+    await page.goto('http://localhost:3001/test-page');
+
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+
+    // Get the current iframe src (should be path-based: localhost:8888/test-page)
+    const iframeElement = page.locator('#previewIframe');
+    const srcBefore = await iframeElement.getAttribute('src');
+    expect(srcBefore).toContain('localhost:8888/test-page');
+    expect(srcBefore).not.toContain('#');
+
+    // Open Personal Preferences
+    await page.locator('#toolbar-personal').click();
+    await page.locator('#toolbar-preferences').or(page.locator('text=Preferences')).first().click();
+    await expect(page.locator('text=Frontend URL')).toBeVisible({ timeout: 5000 });
+
+    // Enable custom URL and change to hash-based URL format
+    await page.locator('label:has-text("Custom URL")').click();
+    const urlInput = page.locator('input[name="url"]');
+    await urlInput.fill('http://localhost:8888/#/');
+
+    // Submit the form
+    await page.locator('form button[type="submit"], form .ui.button.primary').click();
+
+    // Wait for iframe src to change to hash-based format
+    await expect(async () => {
+      const src = await iframeElement.getAttribute('src');
+      expect(src).toContain('#/test-page');
+    }).toPass({ timeout: 10000 });
+
+    const srcAfter = await iframeElement.getAttribute('src');
+    expect(srcAfter, 'Iframe src should have changed to hash-based URL').toContain('#/test-page');
+
+    // Re-get iframe reference after reload and verify content still shows
+    const iframeAfter = helper.getIframe();
+    await expect(iframeAfter.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+  });
+
   test('Contents action is available on folderish pages', async ({ page }, testInfo) => {
     // Skip on Nuxt - test-page may have different behavior
 
