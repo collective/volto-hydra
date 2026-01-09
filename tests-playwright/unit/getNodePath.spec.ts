@@ -3,7 +3,7 @@
  * Tests the REAL getNodePath function from hydra.js
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', () => {

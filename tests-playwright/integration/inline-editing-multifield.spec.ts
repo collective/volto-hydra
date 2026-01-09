@@ -8,7 +8,7 @@
  * - Focus movement between fields
  * - Independent field updates
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 const HERO_BLOCK_ID = 'block-4-hero';

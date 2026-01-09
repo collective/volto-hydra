@@ -24,6 +24,38 @@ window.hydraRenderCount = window.hydraRenderCount || 0;
 const sliderSlideCount = {};
 
 /**
+ * Extract URL from various formats and construct image URL.
+ * Handles: array of objects [{@id: '/path'}], object {@id: '/path'}, or string '/path'
+ * Adds @@images/image suffix for Plone paths.
+ * @param {Array|Object|string} value - Image value in various formats
+ * @returns {string} Image URL ready for src attribute
+ */
+function getImageUrl(value) {
+    if (!value) return '';
+    // Extract @id from array or object format
+    let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
+    if (typeof url !== 'string') return '';
+    // Add @@images/image suffix for Plone paths
+    if (url.startsWith('/') && !url.includes('@@images')) {
+        url = `${url}/@@images/image`;
+    }
+    return url;
+}
+
+/**
+ * Extract URL from various formats for links.
+ * Handles: array of objects [{@id: '/path'}], object {@id: '/path'}, or string '/path'
+ * @param {Array|Object|string} value - Link value in various formats
+ * @returns {string} Link URL
+ */
+function getLinkUrl(value) {
+    if (!value) return '';
+    // Extract @id from array or object format
+    const url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
+    return typeof url === 'string' ? url : '';
+}
+
+/**
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with blocks and blocks_layout
  */
@@ -38,7 +70,7 @@ function renderContent(content) {
 
     const { blocks, blocks_layout } = content;
     if (!blocks_layout) {
-        console.warn('[RENDERER] No blocks_layout in content, nothing to render');
+        // Expected for non-block content types (Image, File, etc.)
         return;
     }
     const items = blocks_layout.items || [];
@@ -109,6 +141,9 @@ function renderBlock(blockId, block) {
             break;
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
+            break;
+        case 'teaser':
+            wrapper.innerHTML = renderTeaserBlock(block);
             break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
@@ -323,6 +358,8 @@ function renderHeroBlock(block) {
     const heading = block.heading || '';
     const subheading = block.subheading || '';
     const buttonText = block.buttonText || '';
+    const buttonLink = getLinkUrl(block.buttonLink);
+    const imageSrc = getImageUrl(block.image);
     const description = block.description || [{ type: 'p', children: [{ text: '' }] }];
 
     // Render subheading as textarea (preserve newlines)
@@ -346,12 +383,80 @@ function renderHeroBlock(block) {
         }
     });
 
+    // Image with data-media-field for inline image selection
+    const imageHtml = imageSrc
+        ? `<img data-media-field="image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
+        : `<div data-media-field="image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
+
     return `
         <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
+            ${imageHtml}
             <h1 data-editable-field="heading">${heading}</h1>
             <p data-editable-field="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
             <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
-            <button data-editable-field="buttonText" style="padding: 10px 20px; cursor: pointer;">${buttonText}</button>
+            <a data-editable-field="buttonText" data-linkable-field="buttonLink" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+        </div>
+    `;
+}
+
+/**
+ * Render a teaser block.
+ * Shows placeholder when href is empty, content when href has value.
+ * By default, shows target page title/description from href.
+ * Only uses block.title/description when overrideTitle/overrideDescription is true.
+ * @param {Object} block - Teaser block data
+ * @returns {string} HTML string
+ */
+function renderTeaserBlock(block) {
+    const href = getLinkUrl(block.href);
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+
+    // Get title: use block.title only if overwrite is true, otherwise use href title
+    const title = block.overwrite && block.title
+        ? block.title
+        : (hrefObj?.title || '');
+
+    // Get description: use block.description only if overwrite is true, otherwise use href description
+    const description = block.overwrite && block.description
+        ? block.description
+        : (hrefObj?.description || '');
+
+    // Get preview image: use block.preview_image if set, otherwise use target content's image
+    let imageSrc = '';
+    if (block.preview_image) {
+        imageSrc = getImageUrl(block.preview_image);
+    } else if (hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
+        // Target content has a preview image - construct URL from target path
+        imageSrc = hrefObj['@id'] + '/@@images/preview_image';
+    }
+
+    // If href is empty, show placeholder for starter UI
+    if (!href) {
+        return `
+            <div class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
+                <p style="color: #999; margin: 0;">Select a target page for this teaser</p>
+            </div>
+        `;
+    }
+
+    // Show teaser content when href has value
+    const imageHtml = imageSrc
+        ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
+        : '';
+
+    // Only add data-editable-field when overwrite is true (field is customizable)
+    // Title is always linkable (clicking it opens link editor for href)
+    const titleEditableAttr = block.overwrite ? 'data-editable-field="title"' : '';
+    const descAttr = block.overwrite ? 'data-editable-field="description"' : '';
+
+    return `
+        <div class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+            ${imageHtml}
+            <a href="${href}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
+                <h3 ${titleEditableAttr} style="margin: 0;">${title}</h3>
+            </a>
+            <p ${descAttr} style="color: #666; margin: 0;">${description}</p>
+            <a href="${href}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>
     `;
 }
@@ -362,11 +467,13 @@ function renderHeroBlock(block) {
  * @returns {string} HTML string
  */
 function renderImageBlock(block) {
-    const url = block.url || '';
+    const imageSrc = getImageUrl(block.url);
     const alt = block.alt || '';
-    const href = block.href;
+    const href = getLinkUrl(block.href);
 
-    const img = `<img src="${url}" alt="${alt}" />`;
+    // Add data-media-field="url" for inline image editing
+    // Add data-linkable-field="href" for inline link editing
+    const img = `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
 
     // If href is set, wrap in link - tests that click behavior is prevented in edit mode
     if (href) {
@@ -673,8 +780,17 @@ function renderSlideBlock(block) {
     // Support both old format (content) and new format (description)
     const description = block.description || block.content || '';
     const headTitle = block.head_title || '';
+    const imageSrc = getImageUrl(block.preview_image);
 
     let html = '';
+
+    // Preview image (background image area)
+    if (imageSrc) {
+        html += `<div data-media-field="preview_image" style="height: 100px; background: url('${imageSrc}') center/cover; margin-bottom: 8px; border-radius: 4px;"></div>`;
+    } else {
+        html += `<div data-media-field="preview_image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; border-radius: 4px; cursor: pointer;">Click to add image</div>`;
+    }
+
     if (headTitle) {
         html += `<div data-editable-field="head_title" style="font-size: 12px; color: #888; margin-bottom: 4px;">${headTitle}</div>`;
     }

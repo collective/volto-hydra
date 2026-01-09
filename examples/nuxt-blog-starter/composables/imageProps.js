@@ -1,6 +1,6 @@
 
 
-export default function imageProps(block, bgStyles=false) {
+export default function imageProps(block, bgStyles=false, imageField='image') {
     const { optimizeImage } = useOptimizeImage()
     const runtimeConfig = useRuntimeConfig()
 
@@ -16,6 +16,10 @@ export default function imageProps(block, bgStyles=false) {
     if (block?.preview_image) {
         block = block.preview_image;
     }
+    // Handle array format (from Plone API): [{ download: '...', scales: {...} }]
+    if (Array.isArray(block) && block.length > 0) {
+        block = block[0];
+    }
     var image_url = null;
     if (!block) {
         return {
@@ -25,6 +29,16 @@ export default function imageProps(block, bgStyles=false) {
     } else if ('@id' in block && block?.image_scales) {
         // It's an image content object
         image_url = block['@id'];
+    } else if ('@id' in block && block?.hasPreviewImage) {
+        // It's an href object with a preview image (e.g., teaser target)
+        // Return early with the constructed URL since we don't have scale info
+        image_url = block['@id'];
+        image_url = image_url.startsWith("/") ? `${runtimeConfig.public.backendBaseUrl}${image_url}`: image_url;
+        image_url = `${image_url}/@@images/preview_image`;
+        return {
+            url: image_url,
+            class: bg_class,
+        };
     } else if (block?.download) {
         image_url = block.download;
     }

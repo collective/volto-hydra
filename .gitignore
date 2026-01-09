@@ -20,4 +20,6 @@ examples/hydra-vue-f7/src/.vite-ssg-temp/
 # Test outputs
 test-results/
 playwright-report/
+coverage/
 *.txt
+cache/

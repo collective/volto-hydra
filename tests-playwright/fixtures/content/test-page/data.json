@@ -4,6 +4,16 @@
   "id": "test-page",
   "title": "Test Page",
   "description": "A test page with blocks",
+  "preview_image": {
+    "@type": "Image",
+    "download": "https://placehold.co/300x200",
+    "filename": "preview.jpg",
+    "scales": {
+      "preview": {
+        "download": "https://placehold.co/300x200"
+      }
+    }
+  },
   "blocks": {
     "block-1-uuid": {
       "@type": "slate",
@@ -35,6 +45,8 @@
       "heading": "Welcome Hero",
       "subheading": "This is the hero subtitle",
       "buttonText": "Click Me",
+      "buttonLink": [{ "@id": "/target-page", "title": "Target Page" }],
+      "image": "https://placehold.co/800x400",
       "description": [
         { "type": "p", "children": [{ "text": "Rich text description" }] }
       ]
@@ -44,9 +56,19 @@
       "url": "https://placehold.co/600x400",
       "alt": "Linked test image",
       "href": "https://example.com"
+    },
+    "block-6-empty-teaser": {
+      "@type": "teaser",
+      "href": [],
+      "title": "",
+      "description": ""
+    },
+    "block-7-filled-teaser": {
+      "@type": "teaser",
+      "href": [{ "@id": "/target-page", "title": "Target Page", "description": "Target page description", "hasPreviewImage": true }]
     }
   },
   "blocks_layout": {
-    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image"]
+    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser"]
   }
 }

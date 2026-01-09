@@ -277,7 +277,8 @@ const DropdownMenu = ({
         </>
       )}
       {/* Remove action - label changes based on table mode and add direction */}
-      {(() => {
+      {/* Hide remove for page-level fields (selectedBlock is null) */}
+      {selectedBlock && (() => {
         // Determine remove label and action based on table mode
         // Uses addDirection to determine Column vs Row (same as add button icon)
         const actionsRegistry = config.settings.hydraActions || {};

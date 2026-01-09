@@ -4,7 +4,7 @@
  * Verifies that when a block changes size (e.g., image loading),
  * the selection outline is updated to match the new dimensions.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Block Resize Detection', () => {

@@ -4,7 +4,7 @@
  * Verifies that simple text fields (not using Slate) can be edited inline
  * without formatting capabilities.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Non-Slate Text Field Editing', () => {

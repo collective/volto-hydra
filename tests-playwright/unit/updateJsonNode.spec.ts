@@ -3,7 +3,7 @@
  * Tests that updating text in Slate structures doesn't corrupt the structure
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Bridge.updateJsonNode()', () => {
@@ -476,5 +476,49 @@ test.describe('Bridge.updateJsonNode()', () => {
 
     // Third text node should have the new text
     expect(result.child2.text).toBe(' normal');
+  });
+
+  test('collapses children when inline element is deleted from DOM', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Bug scenario: User deletes "bold text" entirely
+    // Before: "Click on [bold text] to test" -> 3 Slate children
+    // After DOM: "Click on  to test" (single text node, no <strong>)
+    // Slate should collapse to 1 child, not leave stale inline element
+    const result = await body.evaluate(() => {
+      // Slate structure BEFORE deletion
+      const input = {
+        '@type': 'slate',
+        value: [
+          {
+            type: 'p',
+            nodeId: '0',
+            children: [
+              { text: 'Click on ' },
+              { type: 'strong', nodeId: '0.1', children: [{ text: 'bold text' }] },
+              { text: ' to test' },
+            ],
+          },
+        ],
+      };
+
+      // After deletion, DOM has merged text: "Click on  to test"
+      // childIndex=null because DOM no longer has element children
+      // The function should collapse all children to single text node
+      return (window as any).bridge.updateJsonNode(
+        JSON.parse(JSON.stringify(input)),
+        '0',
+        'Click on  to test',
+        null // childIndex is null - DOM simplified
+      );
+    });
+
+    // CRITICAL: Should collapse to single text child, not leave stale inline element
+    expect(result.value[0].children.length).toBe(1);
+    expect(result.value[0].children[0].text).toBe('Click on  to test');
+    // No type property on the text node
+    expect(result.value[0].children[0]).not.toHaveProperty('type');
+    expect(() => validateSlateStructure(result.value)).not.toThrow();
   });
 });

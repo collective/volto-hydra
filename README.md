@@ -260,12 +260,12 @@ At this your Editor can :-
 We include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
-- During editing, initilize it with the url of Hydra and Volto settings
+- During admin, initilize it with the url of Hydra and Volto settings
   ```js
   import { initBridge } from './hydra.js';
   const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
-- To know you are in edit mode an extra url param is added to your frontend ```_edit=true``` (see [Lazy Loading](#lazy-load-the-bridge))
+- To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
 - To see private content you will need to [change your authentication token]((#authenticate-frontend-to-access-private-content))
 
 This will enable an Editor to :-
@@ -673,12 +673,27 @@ direct html changes in your frontend which are then sent back to the CMS and ref
 </div>
 ```
 
-You might also want to edit content fields, in which case use ```data-editable-metdata``` ([TODO](https://github.com/collective/volto-hydra/issues/118)).
-- Note: ```data-editable-metadata``` isn't required to be inside a block so can make fixed parts of the page editable.
+#### Path Syntax for Editing Parent or Page Fields
+
+The `data-editable-field` attribute supports Unix-style paths to edit fields outside the current block:
+
+- `fieldName` - edit the block's own field (default)
+- `../fieldName` - edit the parent block's field
+- `../../fieldName` - edit the grandparent's field
+- `/fieldName` - edit the page metadata field
 
 ``` html
-<h2 data-editable-metdata="title">My Title</h2>
+<!-- Edit the page title (not inside any block) -->
+<h1 data-editable-field="/title">My Page Title</h1>
+
+<!-- Edit the page description -->
+<p data-editable-field="/description">Page description here</p>
+
+<!-- Inside a nested block, edit the parent container's title -->
+<h3 data-editable-field="../title">Column Title</h3>
 ```
+
+This allows fixed parts of the page (like headers) to be editable without being inside a block.
 
 #### Visual Text editing
 
@@ -884,9 +899,17 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 #### Lazy Load the Hydra.js Bridge
 
-One way of loading the bridge lazily is by adding this function and calling the function at any point where you want to load the bridge.
-Since your application will be loaded inside an iframe in Volto Hydra, the iframe will be passed a `_edit={true/false}` parameter that we can check for.
-If this parameter is present and set to true, we should be inside the editor & are in edit mode.
+Detect the admin iframe and load the bridge only when needed:
+
+**`window.name`** is set by Hydra to indicate mode:
+- `hydra-edit:<origin>` - edit mode (e.g., `hydra-edit:http://localhost:3001`)
+- `hydra-view:<origin>` - view mode (e.g., `hydra-view:http://localhost:3001`)
+
+This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes.
+
+In view mode, render from your API immediately but still load the bridge for navigation tracking.
+In edit mode, wait for `onEditChange` before rendering.
+
 ```js
 function loadBridge(callback) {
     const existingScript = document.getElementById("hydraBridge");
@@ -895,21 +918,28 @@ function loadBridge(callback) {
       script.src = "your-hydra-js-path";
       script.id = "hydraBridge";
       document.body.appendChild(script);
-      script.onload = () => {
-        callback();
-      };
+      script.onload = () => callback();
     } else {
       callback();
     }
 }
 
-if (window.location.search.includes('_edit')) {
-  loadBridge(() => {
-    const { initBridge } = window
-    const hydraBridgeInstance = new initBridge()
-  })
+const isHydraEdit = window.name.startsWith('hydra-edit:');
+const isHydraView = window.name.startsWith('hydra-view:');
+const inAdminIframe = isHydraEdit || isHydraView;
+
+// View mode or not in admin: render from API
+if (!isHydraEdit) {
+    renderPage(await fetchContent(path));
 }
 
+// Load bridge only in admin iframe
+if (inAdminIframe) {
+    loadBridge(() => {
+        const bridge = initBridge();
+        bridge.onEditChange((formData) => renderPage(formData));
+    });
+}
 ```
 
 
@@ -919,20 +949,28 @@ As soon as the editor logs into the hydra editor it will load up the frontend in
 Your frontend should now use the same auth token so the you access the restapi with the same privileges and
 can render the same content including private content.
 
-- You can extract the `access_token` parameter directly from the URL for the `ploneClient` token option. 
-- Or you can use it in Authorization header if you are using other methods to fetch content from plone Backend.
+The `access_token` is passed as a URL parameter on initial load and automatically stored in sessionStorage by hydra.js. This means:
+- On initial load, the token is in the URL and stored to sessionStorage
+- On SPA navigation (client-side route changes), the URL param is gone but the token persists in sessionStorage
+
+Use the `getAccessToken()` helper from hydra.js which handles both cases:
+```js
+import { getAccessToken } from '@hydra-js/hydra.js';
+
+const token = getAccessToken();
+// Returns token from URL param (if present) or sessionStorage (for SPA navigation)
+```
 
 Example using nextjs 14 and ploneClient:
 ```js
 // nextjs 14 using ploneClient
 import ploneClient from "@plone/client";
 import { useQuery } from "@tanstack/react-query";
+import { getAccessToken } from '@hydra-js/hydra.js';
 
 export default function Blog({ params }) {
-  // Extract token directly from the URL
-  const url = new URL(window.location.href);
-  const token = url.searchParams.get("access_token");
-  
+  const token = getAccessToken();
+
   const client = ploneClient.initialize({
     apiPath: "http://localhost:8080/Plone/", // Plone backend
     token: token,

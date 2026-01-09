@@ -153,6 +153,29 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
       : blockConfig?.blockSchema;
   }
 
+  // Helper to find empty required fields for starter UI
+  // Returns array of { fieldName, fieldDef } for required fields that are empty
+  function getEmptyRequiredFields(blockData, schema) {
+    if (!schema?.required || !schema?.properties) return null;
+
+    const emptyFields = [];
+    for (const fieldName of schema.required) {
+      const fieldDef = schema.properties[fieldName];
+      if (!fieldDef) continue;
+
+      // Check if field is empty
+      const fieldValue = blockData[fieldName];
+      const isEmpty = !fieldValue ||
+        (Array.isArray(fieldValue) && fieldValue.length === 0) ||
+        (typeof fieldValue === 'string' && fieldValue === '');
+
+      if (isEmpty) {
+        emptyFields.push({ fieldName, fieldDef });
+      }
+    }
+    return emptyFields.length > 0 ? emptyFields : null;
+  }
+
   /**
    * Process container fields in an item (block or object_list item).
    * Scans schema for container fields and processes each one.
@@ -232,6 +255,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         containerField: fieldName,
         allowedSiblingTypes: fieldDef.allowedBlocks || null,
         maxSiblings: fieldDef.maxLength || null,
+        emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
       };
 
       // RECURSE: process this block's container fields
@@ -329,6 +353,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         addMode, // Table mode for this container (e.g., rows)
         parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
         actions, // Available actions for toolbar/dropdown
+        emptyRequiredFields: getEmptyRequiredFields(item, itemSchema),
       };
 
       // RECURSE: process this item's container fields (same pattern!)
@@ -354,6 +379,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
       containerField: 'blocks',
       allowedSiblingTypes: effectivePageAllowedBlocks,
       maxSiblings: null,
+      emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
     };
 
     // Process this block's container fields
@@ -410,16 +436,15 @@ export function setBlockByPath(formData, path, value) {
  */
 export function getBlockById(formData, blockPathMap, blockId) {
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.path) {
-    const block = getBlockByPath(formData, pathInfo.path);
-    // Inject virtual @type for object_list items
-    if (block && pathInfo.isObjectListItem && pathInfo.itemType) {
-      return { ...block, '@type': pathInfo.itemType };
-    }
-    return block;
+  if (!pathInfo?.path) {
+    return undefined;
   }
-  // Fallback to direct lookup for page-level blocks
-  return formData?.blocks?.[blockId];
+  const block = getBlockByPath(formData, pathInfo.path);
+  // Inject virtual @type for object_list items
+  if (block && pathInfo.isObjectListItem && pathInfo.itemType) {
+    return { ...block, '@type': pathInfo.itemType };
+  }
+  return block;
 }
 
 /**
@@ -432,17 +457,10 @@ export function getBlockById(formData, blockPathMap, blockId) {
  */
 export function updateBlockById(formData, blockPathMap, blockId, newBlockData) {
   const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.path) {
-    return setBlockByPath(formData, pathInfo.path, newBlockData);
+  if (!pathInfo?.path) {
+    throw new Error(`Block ${blockId} not found in blockPathMap`);
   }
-  // Fallback to direct update for page-level blocks
-  return {
-    ...formData,
-    blocks: {
-      ...formData.blocks,
-      [blockId]: newBlockData,
-    },
-  };
+  return setBlockByPath(formData, pathInfo.path, newBlockData);
 }
 
 /**
@@ -592,7 +610,10 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   // Check for implicit container (blocks/blocks_layout without schema definition)
   // Only if no explicit container fields found
-  if (containerFields.length === 0 && block.blocks && block.blocks_layout?.items) {
+  // Detect from blockConfig (allowedBlocks/defaultBlock) or existing blocks/blocks_layout
+  const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
+                              blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
+  if (containerFields.length === 0 && isImplicitContainer) {
     containerFields.push({
       fieldName: 'blocks',
       title: 'Blocks',
@@ -1023,6 +1044,23 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       };
     }
     return formData;
+  }
+
+  // If no fieldName, process all container fields for this block
+  if (!containerConfig.fieldName) {
+    const containerFields = getAllContainerFields(containerConfig.parentId, blockPathMap, formData, blocksConfig);
+    let result = formData;
+    for (const field of containerFields) {
+      result = ensureEmptyBlockIfEmpty(
+        result,
+        { parentId: containerConfig.parentId, ...field },
+        blockPathMap,
+        uuidGenerator,
+        blocksConfig,
+        options,
+      );
+    }
+    return result;
   }
 
   // Container-level: check container's items

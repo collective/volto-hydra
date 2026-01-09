@@ -9,7 +9,7 @@
  * - double click to select block and word
  * - triple click to select paragraph
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Basic', () => {

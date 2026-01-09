@@ -3,7 +3,7 @@
  * Tests finding children by Slate index while skipping Vue artifact nodes
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {

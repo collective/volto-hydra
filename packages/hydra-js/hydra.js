@@ -112,7 +112,9 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.focusedFieldName = null; // Track which field within the block has focus
+    this.focusedFieldName = null; // Track which editable field within the block has focus
+    this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
+    this.focusedMediaField = null; // Track which media field has focus (for image selection)
     this.isInlineEditing = false;
     this.handleMouseUp = null;
     this.blockObserver = null;
@@ -164,9 +166,13 @@ export class Bridge {
    * @returns {Object|undefined} The block data or undefined if not found
    */
   getBlockData(blockUid) {
+    // null blockUid means page-level data
+    if (blockUid === null) {
+      return this.formData;
+    }
+
     // First try blockPathMap for nested block support
     const pathInfo = this.blockPathMap?.[blockUid];
-    log('getBlockData:', blockUid, 'pathInfo:', pathInfo, 'blockPathMap keys:', Object.keys(this.blockPathMap || {}));
     if (pathInfo?.path && this.formData) {
       // Walk the path to get the nested block
       let current = this.formData;
@@ -184,17 +190,53 @@ export class Bridge {
         // IMPORTANT: Mutate the original object, don't return a copy, so that
         // modifications to the returned object update formData for inline editing sync
         if (pathInfo.itemType) {
-          log('getBlockData: found object_list item via path, injecting @type:', pathInfo.itemType);
           current['@type'] = pathInfo.itemType;
         }
-        log('getBlockData: found via path, @type:', current['@type']);
         return current;
       }
     }
-    // Fallback to top-level blocks lookup
-    const fallback = this.formData?.blocks?.[blockUid];
-    log('getBlockData: fallback lookup, @type:', fallback?.['@type']);
-    return fallback;
+    // No fallback - blockPathMap is the single source of truth
+    return undefined;
+  }
+
+  /**
+   * Resolve a field path to determine the target block and field name.
+   * Supports:
+   * - "fieldName" -> block's own field (or page if no block context)
+   * - "../fieldName" -> parent block's field (or page if at top level)
+   * - "/fieldName" -> page-level field
+   *
+   * @param {string} fieldPath - The field path from data-editable-field
+   * @param {string|null} blockId - Current block ID (null for page-level)
+   * @returns {Object} { blockId: string|null, fieldName: string }
+   */
+  resolveFieldPath(fieldPath, blockId) {
+    // Handle absolute path (page-level)
+    if (fieldPath.startsWith('/')) {
+      return { blockId: null, fieldName: fieldPath.slice(1) };
+    }
+
+    // If no block context, treat as page-level
+    if (!blockId) {
+      return { blockId: null, fieldName: fieldPath };
+    }
+
+    // Handle relative path with ../
+    let currentBlockId = blockId;
+    let remainingPath = fieldPath;
+
+    while (remainingPath.startsWith('../')) {
+      const pathInfo = this.blockPathMap?.[currentBlockId];
+      if (!pathInfo?.parentId) {
+        // Already at top level, next ../ goes to page
+        return { blockId: null, fieldName: remainingPath.slice(3) };
+      }
+      currentBlockId = pathInfo.parentId;
+      remainingPath = remainingPath.slice(3);
+    }
+
+    // Block field
+    return { blockId: currentBlockId, fieldName: remainingPath };
   }
 
   /**
@@ -274,6 +316,110 @@ export class Bridge {
   }
 
   /**
+   * Get linkable fields that belong directly to a block.
+   * Linkable fields use data-linkable-field attribute for URL/link editing.
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {Object} Map of field names to true
+   */
+  getLinkableFields(blockElement) {
+    const linkableFields = {};
+    // Check if block element itself has data-linkable-field
+    const selfField = blockElement.getAttribute('data-linkable-field');
+    if (selfField) {
+      linkableFields[selfField] = true;
+    }
+    // Check descendants
+    const allFields = blockElement.querySelectorAll('[data-linkable-field]');
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        const fieldName = field.getAttribute('data-linkable-field');
+        if (fieldName) {
+          linkableFields[fieldName] = true;
+        }
+      }
+    }
+    return linkableFields;
+  }
+
+  /**
+   * Get media fields that belong directly to a block.
+   * Media fields use data-media-field attribute for image/media editing.
+   *
+   * @param {HTMLElement} blockElement - The block element
+   * @returns {Object} Map of field names to { rect: DOMRect } with element position
+   */
+  /**
+   * Get effective bounding rect for a media field element.
+   * If element has zero dimensions but uses absolute positioning with inset-0,
+   * fall back to the first ancestor with actual dimensions.
+   */
+  getEffectiveMediaRect(element, fieldName) {
+    let rect = element.getBoundingClientRect();
+
+    // If element has dimensions, use them directly
+    if (rect.width > 0 && rect.height > 0) {
+      return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+    }
+
+    // Element has zero dimensions - try to find a parent with dimensions
+    // This handles overlay elements that rely on parent for sizing (common in carousels/sliders)
+    // Walk up the DOM tree to find the first ancestor with actual dimensions
+    let current = element.parentElement;
+    let depth = 0;
+    const maxDepth = 10; // Safety limit
+
+    while (current && depth < maxDepth) {
+      const parentRect = current.getBoundingClientRect();
+
+      if (parentRect.width > 0 && parentRect.height > 0) {
+        console.log(
+          `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+          `Using parent's dimensions (${parentRect.width}x${parentRect.height}).`
+        );
+        return { top: parentRect.top, left: parentRect.left, width: parentRect.width, height: parentRect.height };
+      }
+
+      // Parent also has zero dimensions, continue up the chain
+      current = current.parentElement;
+      depth++;
+    }
+
+    // No fallback available, warn the developer
+    console.warn(
+      `[HYDRA] data-media-field="${fieldName}" has zero dimensions (${rect.width}x${rect.height}). ` +
+      `The element must have visible width and height for the image picker to position correctly. ` +
+      `Set explicit dimensions or use a different element.`,
+      element
+    );
+    return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+  }
+
+  getMediaFields(blockElement) {
+    const mediaFields = {};
+    // Check if block element itself has data-media-field
+    const selfField = blockElement.getAttribute('data-media-field');
+    if (selfField) {
+      mediaFields[selfField] = {
+        rect: this.getEffectiveMediaRect(blockElement, selfField)
+      };
+    }
+    // Check descendants
+    const allFields = blockElement.querySelectorAll('[data-media-field]');
+    for (const field of allFields) {
+      if (this.fieldBelongsToBlock(field, blockElement)) {
+        const fieldName = field.getAttribute('data-media-field');
+        if (fieldName) {
+          mediaFields[fieldName] = {
+            rect: this.getEffectiveMediaRect(field, fieldName)
+          };
+        }
+      }
+    }
+    return mediaFields;
+  }
+
+  /**
    * Get the add direction for a block element.
    * Uses data-block-add attribute if set, otherwise infers from nesting depth.
    * Even depths (0, 2, ...) → 'bottom' (vertical), odd depths (1, 3, ...) → 'right' (horizontal)
@@ -282,9 +428,15 @@ export class Bridge {
    * @returns {string} 'right', 'bottom', or 'hidden'
    */
   getAddDirection(blockElement) {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // Page-level fields (no block-uid) should not have add button
+    if (!blockUid) {
+      return 'hidden';
+    }
+
     // Empty blocks should not have an add button - they are meant to be replaced
     // via block chooser, not have blocks added after them
-    const blockUid = blockElement.getAttribute('data-block-uid');
     const blockData = this.getBlockData(blockUid);
     if (blockData?.['@type'] === 'empty') {
       return 'hidden';
@@ -332,10 +484,18 @@ export class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
+    const linkableFields = this.getLinkableFields(blockElement);
+    const mediaFields = this.getMediaFields(blockElement);
     const addDirection = this.getAddDirection(blockElement);
     const focusedFieldName = options.focusedFieldName !== undefined
       ? options.focusedFieldName
       : this.focusedFieldName;
+    const focusedLinkableField = options.focusedLinkableField !== undefined
+      ? options.focusedLinkableField
+      : this.focusedLinkableField;
+    const focusedMediaField = options.focusedMediaField !== undefined
+      ? options.focusedMediaField
+      : this.focusedMediaField;
 
     const message = {
       type: 'BLOCK_SELECTED',
@@ -348,7 +508,11 @@ export class Bridge {
         height: rect.height,
       },
       editableFields,
+      linkableFields,
+      mediaFields,
       focusedFieldName,
+      focusedLinkableField,
+      focusedMediaField,
       addDirection,
     };
 
@@ -429,10 +593,12 @@ export class Bridge {
       // This will set the listners for hashchange & pushstate
       function detectNavigation(callback) {
         let currentUrl = window.location.href;
+        log('Setting up navigation detection, currentUrl:', currentUrl);
 
         function checkNavigation() {
           const newUrl = window.location.href;
           if (newUrl !== currentUrl) {
+            log('Navigation detected:', currentUrl, '->', newUrl);
             callback(currentUrl);
             currentUrl = newUrl;
           }
@@ -454,11 +620,25 @@ export class Bridge {
           originalReplaceState.apply(this, args);
           checkNavigation();
         };
+
+        // Fallback: poll for URL changes every 200ms
+        // This catches navigation from frameworks that cache history.pushState
+        // before hydra.js patches it (e.g., Vue Router in Nuxt)
+        setInterval(() => {
+          checkNavigation();
+        }, 200);
+
+        // Modern Navigation API (Chrome 102+) - more reliable than polling
+        if (typeof navigation !== 'undefined') {
+          navigation.addEventListener('navigatesuccess', checkNavigation);
+        }
       }
 
+      log('Setting up detectNavigation with adminOrigin:', this.adminOrigin);
       detectNavigation((currentUrl) => {
         const currentUrlObj = new URL(currentUrl);
         if (window.location.pathname !== currentUrlObj.pathname) {
+          log('Sending PATH_CHANGE:', window.location.pathname, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
@@ -469,6 +649,7 @@ export class Bridge {
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
+          log('Sending PATH_CHANGE (hash):', i !== -1 ? hash.slice(i) || '/' : '/', 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
@@ -479,15 +660,43 @@ export class Bridge {
         }
       });
 
-      // Get the access token from the URL
+      // Hydra bridge is enabled via iframe name (persists across navigation)
+      // Format: hydra-edit:<origin> or hydra-view:<origin>
+      // Also check _edit URL param as fallback (ensures reload on mode change)
       const url = new URL(window.location.href);
-      const access_token = url.searchParams.get('access_token');
-      const isEditMode = url.searchParams.get('_edit') === 'true';
+      const editParam = url.searchParams.get('_edit');
+      const isHydraEdit = window.name.startsWith('hydra-edit:') || editParam === 'true';
+      const isHydraView = window.name.startsWith('hydra-view:') || (editParam === 'false');
+      const hydraBridgeEnabled = isHydraEdit || isHydraView || editParam !== null;
+      const isEditMode = isHydraEdit;
+
+      // Extract admin origin from iframe name
+      if ((isHydraEdit || isHydraView) && !this.adminOrigin) {
+        const prefix = isHydraEdit ? 'hydra-edit:' : 'hydra-view:';
+        this.adminOrigin = window.name.slice(prefix.length);
+        log('Got admin origin from window.name:', this.adminOrigin);
+      }
+
+      // Get the access token from URL or sessionStorage
+      let access_token = url.searchParams.get('access_token');
+      const hasUrlToken = !!access_token;
+
+      // Store token in sessionStorage if found in URL, or retrieve from sessionStorage
+      if (access_token) {
+        sessionStorage.setItem('hydra_access_token', access_token);
+        log('Stored access_token in sessionStorage');
+      } else {
+        access_token = sessionStorage.getItem('hydra_access_token');
+        log('Retrieved access_token from sessionStorage:', access_token ? 'found' : 'not found');
+      }
+
       if (access_token) {
         this.token = access_token;
         this._setTokenCookie(access_token);
       }
 
+      // In view mode, we only need navigation detection (already set up above)
+      // Skip all the edit mode setup to avoid slowing down page load
       if (isEditMode) {
         this.enableBlockClickListener();
         this.injectCSS();
@@ -495,28 +704,61 @@ export class Bridge {
         this.setupScrollHandler();
         this.setupResizeHandler();
 
+        // Add beforeunload warning to prevent accidental navigation
+        window.addEventListener('beforeunload', (e) => {
+          e.preventDefault();
+          e.returnValue = '';
+          return '';
+        });
+
         // Send single INIT message with config - admin merges config before responding
         // This ensures blockPathMap is built with complete schema knowledge
-        window.parent.postMessage(
-          {
-            type: 'INIT',
-            voltoConfig: options?.voltoConfig,
-            allowedBlocks: options?.allowedBlocks,
-          },
-          this.adminOrigin,
-        );
+        // Include current path so admin can navigate if iframe URL differs (e.g., after client-side nav)
+        // Support hash-based routing variants: #/path, #!/path, #path
+        let currentPath = window.location.pathname;
+        const hash = window.location.hash;
+        if (hash) {
+          // Find where the path starts in the hash
+          const pathIndex = hash.indexOf('/');
+          if (pathIndex !== -1) {
+            currentPath = hash.slice(pathIndex); // Extract /path from #/path or #!/path
+          }
+        }
+
+        // Check if this is SPA navigation:
+        // - window.name indicates we're in admin iframe (hydra-edit:...)
+        // - No token in URL (not admin-initiated navigation)
+        // - But we DO have a token in sessionStorage (we were previously initialized)
+        // Without stored token, it's initial load even if URL has no token (e.g., mock-parent tests)
+        const hasStoredToken = !!sessionStorage.getItem('hydra_access_token');
+        const isSpaNavigation = isHydraEdit && !hasUrlToken && hasStoredToken;
+        if (isSpaNavigation) {
+          log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE');
+          window.parent.postMessage(
+            { type: 'PATH_CHANGE', path: currentPath },
+            this.adminOrigin,
+          );
+          // Don't send INIT - admin will just update its URL
+        } else {
+          window.parent.postMessage(
+            {
+              type: 'INIT',
+              voltoConfig: options?.voltoConfig,
+              allowedBlocks: options?.allowedBlocks,
+              currentPath: currentPath,
+            },
+            this.adminOrigin,
+          );
+        }
 
         const receiveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
               // Store block field types metadata (blockId -> fieldName -> fieldType)
               this.blockFieldTypes = e.data.blockFieldTypes || {};
-              log('Stored blockFieldTypes:', this.blockFieldTypes);
 
               // Central method sets formData, lastReceivedFormData, and blockPathMap
               this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
-              log('formData has blocks:', Object.keys(this.formData?.blocks || {}));
-              log('Stored blockPathMap keys:', Object.keys(this.blockPathMap));
 
               // Store Slate configuration for keyboard shortcuts and toolbar
               this.slateConfig = e.data.slateConfig || { hotkeys: {}, toolbarButtons: [] };
@@ -533,39 +775,52 @@ export class Bridge {
         };
         window.removeEventListener('message', receiveInitialData);
         window.addEventListener('message', receiveInitialData);
-      }
+        // Add a single document-level focus listener to track field changes
+        // This avoids adding duplicate listeners and works for all blocks
+        if (!this.fieldFocusListenerAdded) {
+          this.fieldFocusListenerAdded = true;
+          document.addEventListener('focus', (e) => {
+            const target = e.target;
+            const editableField = target.getAttribute('data-editable-field');
 
-      // Add a single document-level focus listener to track field changes
-      // This avoids adding duplicate listeners and works for all blocks
-      if (!this.fieldFocusListenerAdded) {
-        this.fieldFocusListenerAdded = true;
-        document.addEventListener('focus', (e) => {
-          const target = e.target;
-          const editableField = target.getAttribute('data-editable-field');
+            // Only handle if it's an editable field in the currently selected block
+            if (editableField && this.selectedBlockUid) {
+              const blockElement = target.closest('[data-block-uid]');
+              const blockUid = blockElement?.getAttribute('data-block-uid');
 
-          // Only handle if it's an editable field in the currently selected block
-          if (editableField && this.selectedBlockUid) {
-            const blockElement = target.closest('[data-block-uid]');
-            const blockUid = blockElement?.getAttribute('data-block-uid');
+              if (blockUid === this.selectedBlockUid) {
+                log('Field focused:', editableField);
+                const previousFieldName = this.focusedFieldName;
+                this.focusedFieldName = editableField;
 
-            if (blockUid === this.selectedBlockUid) {
-              log('Field focused:', editableField);
-              const previousFieldName = this.focusedFieldName;
-              this.focusedFieldName = editableField;
+                // Only update toolbar if field actually changed
+                if (previousFieldName !== editableField) {
+                  log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
 
-              // Only update toolbar if field actually changed
-              if (previousFieldName !== editableField) {
-                log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
-
-                // Send BLOCK_SELECTED message to update toolbar visibility
-                const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
-                if (blockElement) {
-                  this.sendBlockSelected('fieldFocusListener', blockElement, { focusedFieldName: editableField });
+                  // Send BLOCK_SELECTED message to update toolbar visibility
+                  const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+                  if (blockElement) {
+                    this.sendBlockSelected('fieldFocusListener', blockElement, { focusedFieldName: editableField });
+                  }
                 }
               }
             }
+          }, true); // Use capture phase to catch focus events before they bubble
+        }
+      } else if (isHydraView) {
+        // View mode: just send INIT so admin knows the current path (no edit setup needed)
+        let currentPath = window.location.pathname;
+        const hash = window.location.hash;
+        if (hash) {
+          const pathIndex = hash.indexOf('/');
+          if (pathIndex !== -1) {
+            currentPath = hash.slice(pathIndex);
           }
-        }, true); // Use capture phase to catch focus events before they bubble
+        }
+        window.parent.postMessage(
+          { type: 'INIT', currentPath: currentPath },
+          this.adminOrigin,
+        );
       }
     }
   }
@@ -624,12 +879,12 @@ export class Bridge {
             }
 
             // Check if Admin wants to select a different block (e.g., after Enter creates new block)
-            // Update selectedBlockUid BEFORE setFormDataFromAdmin so logging shows correct block
+            // NOTE: Don't set this.selectedBlockUid here - let selectBlock() set it so isSelectingSameBlock
+            // is calculated correctly (important for scroll-into-view behavior)
             const adminSelectedBlockUid = event.data.selectedBlockUid;
             const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
             if (needsBlockSwitch) {
               log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
-              this.selectedBlockUid = adminSelectedBlockUid;
             }
 
             // Central method for setting form data with logging (also sets blockPathMap)
@@ -673,11 +928,53 @@ export class Bridge {
                     const isSidebarEdit = !event.data.transformedSelection;
                     this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, isSidebarEdit);
 
-                    // Only send BLOCK_SELECTED for toolbar format operations (has transformedSelection)
-                    // Skip for sidebar edits - rect doesn't change and sending causes toolbar redraws
-                    if (event.data.transformedSelection) {
-                      // Send updated rect to admin so toolbar follows the block
+                    // Send BLOCK_SELECTED if toolbar operation OR if block/media field rects changed
+                    // Block may resize/move after edits, media fields may change (e.g., clearing image → placeholder)
+                    const newBlockRect = blockElement.getBoundingClientRect();
+                    const newMediaFields = this.getMediaFields(blockElement);
+
+                    // Check if block rect changed (size or position)
+                    const blockRectChanged = !this.lastBlockRect ||
+                      Math.abs(newBlockRect.top - this.lastBlockRect.top) > 1 ||
+                      Math.abs(newBlockRect.left - this.lastBlockRect.left) > 1 ||
+                      Math.abs(newBlockRect.width - this.lastBlockRect.width) > 1 ||
+                      Math.abs(newBlockRect.height - this.lastBlockRect.height) > 1;
+
+                    // Check if any media field rect changed
+                    let mediaFieldsChanged = false;
+                    const newFieldNames = Object.keys(newMediaFields);
+                    const lastFieldNames = Object.keys(this.lastMediaFields || {});
+                    if (newFieldNames.length !== lastFieldNames.length) {
+                      mediaFieldsChanged = true;
+                    } else {
+                      for (const fieldName of newFieldNames) {
+                        const newRect = newMediaFields[fieldName]?.rect;
+                        const lastRect = this.lastMediaFields?.[fieldName]?.rect;
+                        if (!newRect || !lastRect ||
+                            Math.abs(newRect.top - lastRect.top) > 1 ||
+                            Math.abs(newRect.left - lastRect.left) > 1 ||
+                            Math.abs(newRect.width - lastRect.width) > 1 ||
+                            Math.abs(newRect.height - lastRect.height) > 1) {
+                          mediaFieldsChanged = true;
+                          break;
+                        }
+                      }
+                    }
+
+                    log('formDataHandler check:', {
+                      blockRectChanged,
+                      mediaFieldsChanged,
+                      newBlockRect: { top: newBlockRect.top, height: newBlockRect.height },
+                      newMediaFields,
+                      lastMediaFields: this.lastMediaFields,
+                    });
+
+                    if (event.data.transformedSelection || blockRectChanged || mediaFieldsChanged) {
+                      // Send updated rect to admin so toolbar/overlays follow the block
+                      log('formDataHandler sending BLOCK_SELECTED with mediaFields:', newMediaFields);
                       this.sendBlockSelected('formDataHandler', blockElement);
+                      this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
+                      this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
 
                       // Reposition drag button to follow the block
                       if (this.dragHandlePositioner) {
@@ -702,14 +999,8 @@ export class Bridge {
                   }
                 }
 
-                // Unblock after selection restore - iframe state is now fully settled
-                // This ensures the next keypress sees correct DOM and selection state
-                // This MUST run even if selection restore fails, so it's outside the try/catch
-                if (formatRequestId && this.pendingTransform?.requestId === formatRequestId) {
-                  log('Unblocking input for', this.pendingTransform.blockId, '- after selection restore');
-                  this.setBlockProcessing(this.pendingTransform.blockId, false);
-                }
-
+                // NOTE: Unblock happens AFTER replayBufferedEvents() below, not here.
+                // This prevents keystrokes from arriving between unblock and replay.
               });
             });
 
@@ -726,77 +1017,47 @@ export class Bridge {
 
             // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
             // For existing block, just update UI positions
-            if (needsBlockSwitch) {
-              // New block created (e.g., Enter key, sidebar add) - need full selectBlock setup
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  let newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                  // If block is hidden (e.g., new carousel slide), try to make it visible first
-                  if (newBlockElement && this.isElementHidden(newBlockElement)) {
-                    log('FORM_DATA: new block is hidden, trying to make visible:', this.selectedBlockUid);
-                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
-                    if (madeVisible) {
-                      // Wait for block to become visible, then select it
-                      const waitForVisible = async () => {
-                        for (let i = 0; i < 10; i++) {
-                          await new Promise((resolve) => setTimeout(resolve, 50));
-                          newBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                          if (newBlockElement && !this.isElementHidden(newBlockElement)) {
-                            log('FORM_DATA: new block now visible, selecting');
-                            this.selectBlock(newBlockElement);
-                            return;
-                          }
-                        }
-                        log('FORM_DATA: timeout waiting for new block to become visible');
-                      };
-                      waitForVisible();
-                      this.replayBufferedEvents();
-                      return;
-                    }
-                  }
-                  if (newBlockElement) {
-                    log('Selecting new block from FORM_DATA:', this.selectedBlockUid);
-                    this.selectBlock(newBlockElement);
-                  }
-                  // Replay any buffered keystrokes now that DOM is ready
-                  this.replayBufferedEvents();
-                });
-              });
-            } else if (this.selectedBlockUid) {
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  let blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                  // If block is hidden (e.g., carousel slide), try to make it visible
+            const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
+            const blockHandler = needsBlockSwitch
+              ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
+              : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
+
+            requestAnimationFrame(() => {
+              requestAnimationFrame(async () => {
+                if (blockUidToProcess) {
+                  let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+                  // If block is hidden (e.g., carousel slide), try to make it visible first
                   if (blockElement && this.isElementHidden(blockElement)) {
-                    log('FORM_DATA: selected block is hidden, trying to make visible:', this.selectedBlockUid);
-                    const madeVisible = this.tryMakeBlockVisible(this.selectedBlockUid);
+                    log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
+                    const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
                     if (madeVisible) {
-                      // Wait for block to become visible, then update UI
-                      const waitForVisible = async () => {
-                        for (let i = 0; i < 10; i++) {
-                          await new Promise((resolve) => setTimeout(resolve, 50));
-                          blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                          if (blockElement && !this.isElementHidden(blockElement)) {
-                            log('FORM_DATA: block now visible, updating UI');
-                            this.updateBlockUIAfterFormData(blockElement, skipFocus);
-                            return;
-                          }
+                      // Wait for block to become visible
+                      for (let i = 0; i < 10; i++) {
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                        blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                        if (blockElement && !this.isElementHidden(blockElement)) {
+                          log('FORM_DATA: block now visible');
+                          break;
                         }
-                        log('FORM_DATA: timeout waiting for block to become visible');
-                      };
-                      waitForVisible();
-                      this.replayBufferedEvents();
-                      return;
+                      }
                     }
                   }
+
+                  // Re-query element in case it changed during wait
+                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                  // Ensure elements have min size BEFORE sending BLOCK_SELECTED
+                  // so the new block has dimensions when the admin UI receives the message
+                  this.ensureElementsHaveMinSize();
                   if (blockElement) {
-                    this.updateBlockUIAfterFormData(blockElement, skipFocus);
+                    blockHandler(blockElement);
                   }
-                  // Replay any buffered keystrokes now that DOM is ready
-                  this.replayBufferedEvents();
-                });
+                }
+
+                // Single replay point for all paths
+                this.replayBufferAndUnblock();
               });
-            }
+            });
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
@@ -863,35 +1124,8 @@ export class Bridge {
       return;
     }
 
-    // Set contenteditable on text and slate fields only
-    // Get blockType to look up field types (supports nested blocks via blockPathMap)
-    // Only set on THIS block's own fields, not nested blocks' fields
-    const blockData = this.getBlockData(blockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const editableFields = this.getOwnEditableFields(blockElement);
-    editableFields.forEach((field) => {
-      const fieldName = field.getAttribute('data-editable-field');
-      const fieldType = blockTypeFields[fieldName];
-      // Only set contenteditable for string, textarea, and slate fields
-      if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
-        field.setAttribute('contenteditable', 'true');
-
-        // For string fields (single-line), prevent Enter key from creating new lines
-        if (fieldType === 'string') {
-          // Store the handler so we can remove it later if needed
-          if (!field._enterKeyHandler) {
-            field._enterKeyHandler = (e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                log('Prevented Enter key in string field');
-              }
-            };
-            field.addEventListener('keydown', field._enterKeyHandler);
-          }
-        }
-      }
-    });
+    // Set contenteditable on text and slate fields
+    this.restoreContentEditableOnFields(blockElement, 'detectFocusedFieldAndUpdateToolbar');
 
     let fieldToFocus = null;
 
@@ -971,6 +1205,11 @@ export class Bridge {
         // Also store the target for field detection
         const clickedEditableField = event.target.closest('[data-editable-field]');
         const editableField = clickedEditableField || blockElement.querySelector('[data-editable-field]');
+
+        // Detect clicked linkable and media fields
+        const clickedLinkableField = event.target.closest('[data-linkable-field]');
+        const clickedMediaField = event.target.closest('[data-media-field]');
+
         if (editableField) {
           const rect = editableField.getBoundingClientRect();
           this.lastClickPosition = {
@@ -978,16 +1217,44 @@ export class Bridge {
             relativeY: event.clientY - rect.top,
             editableField: editableField.getAttribute('data-editable-field'),
             target: event.target, // For field detection
+            linkableField: clickedLinkableField?.getAttribute('data-linkable-field') || null,
+            mediaField: clickedMediaField?.getAttribute('data-media-field') || null,
           };
         } else {
-          this.lastClickPosition = null;
+          this.lastClickPosition = {
+            target: event.target,
+            linkableField: clickedLinkableField?.getAttribute('data-linkable-field') || null,
+            mediaField: clickedMediaField?.getAttribute('data-media-field') || null,
+          };
         }
         this.selectBlock(blockElement);
+      } else {
+        // No block - check for page-level fields
+        const pageField = event.target.closest('[data-media-field], [data-linkable-field], [data-editable-field]');
+        if (pageField) {
+          event.preventDefault();
+          this.selectedBlockUid = null;
+
+          // Detect focused field type
+          this.focusedMediaField = pageField.getAttribute('data-media-field');
+          this.focusedLinkableField = pageField.getAttribute('data-linkable-field');
+          this.focusedFieldName = pageField.getAttribute('data-editable-field');
+
+          // Make page-level text fields editable (same as selectBlock does for blocks)
+          if (this.focusedFieldName) {
+            this.isInlineEditing = true;
+            this.restoreContentEditableOnFields(pageField, 'pageFieldClick');
+            this.observeBlockTextChanges(pageField);
+          }
+
+          // Send BLOCK_SELECTED with pageField as "block" - blockUid will be null
+          this.sendBlockSelected('pageFieldClick', pageField);
+        }
       }
     };
 
-    document.removeEventListener('click', this.blockClickHandler);
-    document.addEventListener('click', this.blockClickHandler);
+    document.removeEventListener('click', this.blockClickHandler, true);
+    document.addEventListener('click', this.blockClickHandler, true);
 
     // Add global keydown handler for space on interactive elements
     // Certain elements (buttons, inputs, summary) have space key behavior that conflicts
@@ -1148,26 +1415,61 @@ export class Bridge {
   }
 
   /**
+   * Replays buffered events and unblocks input after a transform completes.
+   * This is the safe sequence: prepare buffer → replay → unblock
+   * Called from FORM_DATA handler after DOM is updated.
+   */
+  replayBufferAndUnblock(context = '') {
+    if (!this.pendingTransform) return;
+
+    const { blockId } = this.pendingTransform;
+
+    // Prepare buffer for replay
+    if (this.eventBuffer.length > 0) {
+      this.pendingBufferReplay = {
+        blockId,
+        buffer: [...this.eventBuffer],
+      };
+      this.eventBuffer = [];
+      log('Prepared', this.pendingBufferReplay.buffer.length, 'events for replay');
+    }
+
+    // Replay buffered events
+    this.replayBufferedEvents();
+
+    // Unblock AFTER replay to prevent keystrokes arriving in the gap
+    log('Unblocking input for', blockId, '- after replay' + (context ? ` (${context})` : ''));
+    this.setBlockProcessing(blockId, false);
+  }
+
+  /**
    * Replays buffered keyboard events after DOM is ready.
    * Called after selection is restored following a transform.
    */
-  replayBufferedEvents() {
+  replayBufferedEvents(retryCount = 0) {
     if (!this.pendingBufferReplay) {
       return;
     }
 
     const { blockId, buffer } = this.pendingBufferReplay;
-    this.pendingBufferReplay = null;
 
-    log('Replaying', buffer.length, 'buffered events');
+    log('Replaying', buffer.length, 'buffered events, retry:', retryCount);
 
     // Re-query editable field in case DOM was re-rendered
     const currentBlock = document.querySelector(`[data-block-uid="${blockId}"]`);
     const currentEditable = currentBlock?.querySelector('[contenteditable="true"]');
     if (!currentEditable) {
-      console.warn('[HYDRA] Cannot replay buffer - editable field not found');
+      // Retry a few times with RAF to wait for Vue/Nuxt re-render
+      if (retryCount < 5) {
+        requestAnimationFrame(() => this.replayBufferedEvents(retryCount + 1));
+        return;
+      }
+      console.warn('[HYDRA] Cannot replay buffer - editable field not found after retries');
+      this.pendingBufferReplay = null;
       return;
     }
+
+    this.pendingBufferReplay = null;
 
     // Build up text string from consecutive printable characters
     let textToInsert = '';
@@ -2038,17 +2340,13 @@ export class Bridge {
       const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
       const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
 
-      // Get block type via getBlockData (handles object_list items with virtual @type)
-      const blockData = blockUid !== 'unknown' ? this.getBlockData(blockUid) : null;
-      const blockType = blockData?.['@type'] || 'unknown';
-
       // Check if this field is supposed to be a Slate field
-      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-      const fieldType = blockTypeFields[fieldName];
+      // Use getFieldType which handles page-level fields (e.g., /title) correctly
+      const fieldType = blockUid !== 'unknown' ? this.getFieldType(blockUid, fieldName) : undefined;
 
       // Only skip error for KNOWN non-Slate fields
       // If fieldType is undefined (not registered), assume it could be Slate and show error
-      if (fieldType && fieldType !== 'slate') {
+      if (fieldType && !this.fieldTypeIsSlate(fieldType)) {
         // This is a known non-Slate text field, just return null without error
         return null;
       }
@@ -2122,24 +2420,84 @@ export class Bridge {
    * @param {string} caller - The caller for debugging (e.g., 'selectBlock', 'FORM_DATA')
    */
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
-    // Get blockType to look up field types (supports nested blocks via blockPathMap)
     // Only restore on THIS block's own fields, not nested blocks' fields
-    const blockData = this.getBlockData(this.selectedBlockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     const editableFields = this.getOwnEditableFields(blockElement);
-    log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields`);
+    // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
-      const fieldName = field.getAttribute('data-editable-field');
-      const fieldType = blockTypeFields[fieldName];
+      const fieldPath = field.getAttribute('data-editable-field');
+      // Use getFieldType which handles page-level fields (e.g., /title) correctly
+      const fieldType = this.getFieldType(blockUid, fieldPath);
       const wasEditable = field.getAttribute('contenteditable') === 'true';
-      // Only set contenteditable for string, textarea, and slate fields
-      if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
+      // Only set contenteditable for text-editable fields (string, textarea, slate)
+      if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
-        log(`  ${fieldName}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+        log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+
+        // For plain string fields (single-line), prevent Enter key from creating new lines
+        if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
+          field._enterKeyHandler = (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+            }
+          };
+          field.addEventListener('keydown', field._enterKeyHandler);
+        }
       } else {
-        log(`  ${fieldName}: skipped (type: ${fieldType})`);
+        log(`  ${fieldPath}: skipped (type: ${fieldType})`);
       }
+    });
+
+    // Clean up stale contenteditable attributes from elements that are no longer editable
+    // This happens when a field was editable but is no longer (e.g., teaser overwrite unchecked)
+    const allContentEditable = blockElement.querySelectorAll('[contenteditable="true"]');
+    allContentEditable.forEach((el) => {
+      // Skip if this element belongs to a nested block
+      const elBlock = el.closest('[data-block-uid]');
+      if (elBlock !== blockElement) return;
+
+      // If element has no data-editable-field, remove contenteditable
+      if (!el.hasAttribute('data-editable-field')) {
+        el.removeAttribute('contenteditable');
+        log(`  Removed stale contenteditable from element without data-editable-field`);
+      }
+    });
+  }
+
+  /**
+   * Ensure all interactive elements have minimum size so users can click/select them.
+   * Called after FORM_DATA to handle newly added blocks that haven't been selected yet.
+   * Only sets min dimensions on elements that have zero width or height (respects existing styling).
+   */
+  ensureElementsHaveMinSize() {
+    // Helper: only set min-size if element has no size
+    const ensureSize = (el, minWidth, minHeight) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        el.style.minWidth = minWidth;
+        el.style.minHeight = minHeight;
+      } else if (rect.width === 0) {
+        el.style.minWidth = minWidth;
+      } else if (rect.height === 0) {
+        el.style.minHeight = minHeight;
+      }
+      // If element already has both width and height, don't touch it
+    };
+
+    // Editable fields need min-height for text cursor
+    document.querySelectorAll('[data-editable-field]').forEach((el) => {
+      ensureSize(el, 'auto', '1.5em');
+    });
+
+    // Media fields need min dimensions for image picker overlay
+    document.querySelectorAll('[data-media-field]').forEach((el) => {
+      ensureSize(el, '100px', '100px');
+    });
+
+    // Blocks need min-height for click selection
+    document.querySelectorAll('[data-block-uid]').forEach((el) => {
+      ensureSize(el, 'auto', '2em');
     });
   }
 
@@ -2285,11 +2643,8 @@ export class Bridge {
 
     // Note: ZWS for cursor positioning is added just-in-time in restoreSlateSelection
 
-    // Determine field type for focused field (supports nested blocks via blockPathMap)
-    const blockData = this.getBlockData(this.selectedBlockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    const fieldType = this.focusedFieldName ? blockTypeFields[this.focusedFieldName] : null;
+    // Determine field type for focused field (supports page-level and nested blocks)
+    const fieldType = this.focusedFieldName ? this.getFieldType(this.selectedBlockUid, this.focusedFieldName) : null;
 
     // Focus and position cursor in the focused field
     // This ensures clicking a field focuses it immediately (no double-click required)
@@ -2301,7 +2656,7 @@ export class Bridge {
     if (this.focusedFieldName && (!skipFocus || hasSavedClickPosition)) {
       const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
 
-      if (focusedField && (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate')) {
+      if (focusedField && this.fieldTypeIsTextEditable(fieldType)) {
         // Focus the field (only if not skipFocus, unless we need to restore click position)
         if (!skipFocus || hasSavedClickPosition) {
           focusedField.focus();
@@ -2414,40 +2769,19 @@ export class Bridge {
 
     this.isInlineEditing = true;
 
-    // Helper function to handle each element - sets contenteditable and handles string fields
-    const handleElement = (element) => {
-      const editableField = element.getAttribute('data-editable-field');
-      if (editableField === 'value') {
-        this.makeBlockContentEditable(element);
-      } else if (editableField !== null) {
-        element.setAttribute('contenteditable', 'true');
+    // Set contenteditable on all text-editable fields
+    this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
-        // Check field type to determine if this is a string field (single-line)
-        const blockData = this.getBlockData(blockUid);
-        const blockType = blockData?.['@type'];
-        const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-        const fieldType = blockTypeFields[editableField];
-
-        // For string fields (single-line), prevent Enter key from creating new lines
-        if (fieldType === 'string' && !element._enterKeyHandler) {
-          element._enterKeyHandler = (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              log('Prevented Enter key in string field');
-            }
-          };
-          element.addEventListener('keydown', element._enterKeyHandler);
-        }
-      }
-    };
-
-    // Function to recursively handle all children
-    const handleElementAndChildren = (element) => {
-      handleElement(element);
-      Array.from(element.children).forEach((child) =>
-        handleElementAndChildren(child),
-      );
-    };
+    // For slate blocks (value field), also set up paste/keydown handlers
+    // Check blockElement itself first (Nuxt puts both attributes on same element)
+    // then fall back to querying for child elements
+    let valueField = blockElement.hasAttribute('data-editable-field') &&
+                     blockElement.getAttribute('data-editable-field') === 'value'
+                     ? blockElement
+                     : blockElement.querySelector('[data-editable-field="value"]');
+    if (valueField) {
+      this.makeBlockContentEditable(valueField);
+    }
 
     // Remove border and button from the previously selected block
     if (
@@ -2466,7 +2800,7 @@ export class Bridge {
         // Add nodeIds if this block has slate fields (only on first selection)
         const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
         const hasSlateField = Object.values(blockFieldTypes).some(
-          fieldType => fieldType === 'slate'
+          fieldType => this.fieldTypeIsSlate(fieldType)
         );
         if (hasSlateField) {
           // Use getBlockData to handle nested blocks
@@ -2474,7 +2808,7 @@ export class Bridge {
           if (block) {
             // Add nodeIds to each slate field, following the same pattern as addNodeIdsToAllSlateFields
             Object.keys(blockFieldTypes).forEach((fieldName) => {
-              if (blockFieldTypes[fieldName] === 'slate' && block[fieldName]) {
+              if (this.fieldTypeIsSlate(blockFieldTypes[fieldName]) && block[fieldName]) {
                 block[fieldName] = this.addNodeIds(block[fieldName]);
               }
             });
@@ -2499,10 +2833,15 @@ export class Bridge {
     // Set the currently selected block (do this every time)
     this.selectedBlockUid = blockUid;
 
-    // Reset focusedFieldName for new block - don't keep stale value from previous block
+    // Reset focused fields for new block - don't keep stale values from previous block
     this.focusedFieldName = null;
+    this.focusedLinkableField = null;
+    this.focusedMediaField = null;
+    // Reset cached sizes so first FORM_DATA will send updated rects
+    this.lastBlockRect = null;
+    this.lastMediaFields = null;
 
-    // Detect focused field from click location or first editable field
+    // Detect focused fields from click location
     if (this.lastClickPosition?.target) {
       // Find the clicked editable field
       const clickedElement = this.lastClickPosition.target;
@@ -2510,6 +2849,16 @@ export class Bridge {
       if (clickedField) {
         this.focusedFieldName = clickedField.getAttribute('data-editable-field');
         log('Detected focused field from click:', this.focusedFieldName);
+      }
+
+      // Detect clicked linkable and media fields
+      this.focusedLinkableField = this.lastClickPosition.linkableField || null;
+      this.focusedMediaField = this.lastClickPosition.mediaField || null;
+      if (this.focusedLinkableField) {
+        log('Detected focused linkable field from click:', this.focusedLinkableField);
+      }
+      if (this.focusedMediaField) {
+        log('Detected focused media field from click:', this.focusedMediaField);
       }
     }
 
@@ -2528,6 +2877,8 @@ export class Bridge {
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
     const rect = blockElement.getBoundingClientRect();
     const editableFields = this.getEditableFields(blockElement);
+    const linkableFields = this.getLinkableFields(blockElement);
+    const mediaFields = this.getMediaFields(blockElement);
     // Get add button direction (right, bottom, hidden) - uses attribute or infers from nesting depth
     const addDirection = this.getAddDirection(blockElement);
     this._pendingBlockSelected = {
@@ -2539,14 +2890,22 @@ export class Bridge {
         height: rect.height,
       },
       editableFields, // Map of fieldName -> fieldType from DOM
+      linkableFields, // Map of fieldName -> true for URL/link fields
+      mediaFields, // Map of fieldName -> true for image/media fields
       focusedFieldName: this.focusedFieldName,
+      focusedLinkableField: this.focusedLinkableField,
+      focusedMediaField: this.focusedMediaField,
       addDirection, // Direction for add button positioning
     };
 
     log('Block selected, sending UI messages:', {
       blockUid,
       focusedFieldName: this.focusedFieldName,
+      focusedLinkableField: this.focusedLinkableField,
+      focusedMediaField: this.focusedMediaField,
       editableFields,
+      linkableFields,
+      mediaFields,
     });
 
     // Create drag handle for block reordering
@@ -2554,8 +2913,7 @@ export class Bridge {
     // Mouse events pass through the parent's visual (which has pointerEvents: 'none') to this button
     this.createDragHandle(blockElement);
 
-    // Set contenteditable on all editable fields in the block
-    handleElementAndChildren(blockElement);
+    // Observe block text changes for inline editing
     this.observeBlockTextChanges(blockElement);
 
     // Observe block size changes (e.g., image loading, content changes)
@@ -2673,13 +3031,11 @@ export class Bridge {
             }
           }
           if (contentEditableField) {
-            const fieldName = contentEditableField.getAttribute('data-editable-field');
-            const blockData = this.getBlockData(this.selectedBlockUid);
-            const blockType = blockData?.['@type'];
-            const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-            const fieldType = fieldName ? blockTypeFields[fieldName] : undefined;
+            const fieldPath = contentEditableField.getAttribute('data-editable-field');
+            // Use getFieldType which handles page-level fields (e.g., /title) correctly
+            const fieldType = fieldPath ? this.getFieldType(this.selectedBlockUid, fieldPath) : undefined;
 
-            if (fieldType === 'string' || fieldType === 'textarea' || fieldType === 'slate') {
+            if (this.fieldTypeIsTextEditable(fieldType)) {
               // Only call focus if not already focused
               // Calling focus() on already-focused element can disrupt cursor position
               const isAlreadyFocused = document.activeElement === contentEditableField;
@@ -2776,9 +3132,13 @@ export class Bridge {
             const serializedSelection = this.serializeSelection();
             const pendingBlockUid = this._pendingBlockSelected.blockUid;
             const pendingFocusedFieldName = this._pendingBlockSelected.focusedFieldName;
+            const pendingFocusedLinkableField = this._pendingBlockSelected.focusedLinkableField;
+            const pendingFocusedMediaField = this._pendingBlockSelected.focusedMediaField;
             this._pendingBlockSelected = null;
             this.sendBlockSelected('selectionChangeListener', currentBlockElement, {
               focusedFieldName: pendingFocusedFieldName,
+              focusedLinkableField: pendingFocusedLinkableField,
+              focusedMediaField: pendingFocusedMediaField,
               selection: serializedSelection,
             });
             log('Sent BLOCK_SELECTED with selection:', { blockUid: pendingBlockUid, selection: serializedSelection });
@@ -3400,15 +3760,20 @@ export class Bridge {
         return;
       }
 
-      // Position drag button to match parent toolbar position
-      // IMPORTANT: Use BLOCK CONTAINER rect (same as BLOCK_SELECTED message), NOT editable field rect
       const rect = blockElement.getBoundingClientRect();
-      const toolbarTop = rect.top - 48; // 48px above block container (matches parent toolbar height)
 
-      // Always left-align at block's left edge
+      // Hide if block is completely out of view
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        dragButton.style.display = 'none';
+        return;
+      }
+
+      // Position above block, or at top of iframe if that would be off-screen
+      const handleTop = Math.max(0, rect.top - 48);
+
       dragButton.style.right = 'auto';
       dragButton.style.left = `${rect.left}px`;
-      dragButton.style.top = `${toolbarTop}px`;
+      dragButton.style.top = `${handleTop}px`;
       dragButton.style.display = 'block';
     };
 
@@ -4416,20 +4781,16 @@ export class Bridge {
     if (!blockElement) return {};
 
     const blockUid = blockElement.getAttribute('data-block-uid');
-    const blockData = this.getBlockData(blockUid);
-    const blockType = blockData?.['@type'];
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-
     const editableFields = {};
     // Use getOwnEditableFields to only get THIS block's fields, not nested blocks' fields
     const fieldElements = this.getOwnEditableFields(blockElement);
 
     fieldElements.forEach((element) => {
-      const fieldName = element.getAttribute('data-editable-field');
-      if (fieldName) {
-        // Get the field type from blockFieldTypes, or infer from the element
-        const fieldType = blockTypeFields[fieldName] || 'string';
-        editableFields[fieldName] = fieldType;
+      const fieldPath = element.getAttribute('data-editable-field');
+      if (fieldPath) {
+        // Use getFieldType which handles page-level fields (e.g., /title) correctly
+        const fieldType = this.getFieldType(blockUid, fieldPath) || 'string';
+        editableFields[fieldPath] = fieldType;
       }
     });
 
@@ -4499,7 +4860,7 @@ export class Bridge {
       const blockType = block['@type'];
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
       Object.keys(fieldTypes).forEach((fieldName) => {
-        if (fieldTypes[fieldName] === 'slate' && block[fieldName]) {
+        if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
         }
       });
@@ -4600,8 +4961,12 @@ export class Bridge {
     }
 
     try {
-      const startNode = document.querySelector(`[data-node-id="${savedCursor.startNodeId}"]`);
-      const endNode = document.querySelector(`[data-node-id="${savedCursor.endNodeId}"]`);
+      // Scope to current block to avoid selecting wrong element when multiple blocks visible
+      const blockElement = this.selectedBlockUid
+        ? document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`)
+        : document;
+      const startNode = blockElement?.querySelector(`[data-node-id="${savedCursor.startNodeId}"]`);
+      const endNode = blockElement?.querySelector(`[data-node-id="${savedCursor.endNodeId}"]`);
 
       if (!startNode || !endNode) {
         return;
@@ -4653,10 +5018,11 @@ export class Bridge {
         return;
       }
 
-      const blockType = block['@type'];
-      const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-      const fieldType = blockTypeFields[this.focusedFieldName];
-      const fieldValue = block[this.focusedFieldName];
+      // Resolve field path and get field type (supports page-level and nested blocks)
+      const resolved = this.resolveFieldPath(this.focusedFieldName, this.selectedBlockUid);
+      const fieldData = this.getBlockData(resolved.blockId);
+      const fieldType = this.getFieldType(this.selectedBlockUid, this.focusedFieldName);
+      const fieldValue = fieldData?.[resolved.fieldName];
 
       // Find the block element for locating editable fields
       const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
@@ -4665,7 +5031,7 @@ export class Bridge {
       }
 
       // Check if this is a slate field with nodeIds
-      const isSlateWithNodeIds = fieldType === 'slate' && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
+      const isSlateWithNodeIds = this.fieldTypeIsSlate(fieldType) && Array.isArray(fieldValue) && fieldValue.length > 0 && fieldValue[0]?.nodeId !== undefined;
 
       let anchorElement, focusElement;
       let anchorPos = null;
@@ -4684,8 +5050,22 @@ export class Bridge {
           return;
         }
 
-        anchorElement = document.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
-        focusElement = document.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
+        // Scope to current block to avoid selecting wrong element when multiple blocks visible
+        anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
+        focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
+
+        // If elements not found, DOM may not be ready yet (async framework render)
+        // Retry after a short delay - but only once to avoid infinite loops
+        if ((!anchorElement || !focusElement) && !this._selectionRetryPending) {
+          log('restoreSlateSelection: nodeId elements not found, scheduling retry');
+          this._selectionRetryPending = true;
+          setTimeout(() => {
+            this._selectionRetryPending = false;
+            this.restoreSlateSelection(slateSelection, formData);
+          }, 50);
+          return;
+        }
+        this._selectionRetryPending = false;
 
         log('restoreSlateSelection: looking for nodeIds', {
           anchorNodeId: anchorResult.nodeId,
@@ -4711,7 +5091,7 @@ export class Bridge {
           if (result.textChildIndex !== null && offset === 0 && result.textChildIndex > 0) {
             const prevChild = parentChildren[result.textChildIndex - 1];
             if (prevChild && prevChild.type && prevChild.nodeId) {
-              const inlineElement = document.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
+              const inlineElement = blockElement.querySelector(`[data-node-id="${prevChild.nodeId}"]`);
               if (inlineElement) {
                 // Check if there's already a text node after the inline element
                 const existingTextNode = inlineElement.nextSibling;
@@ -4738,7 +5118,7 @@ export class Bridge {
           }
 
           // Case 2: Prospective formatting - offset 0 inside an empty inline element
-          const targetElement = document.querySelector(`[data-node-id="${result.nodeId}"]`);
+          const targetElement = blockElement.querySelector(`[data-node-id="${result.nodeId}"]`);
           if (targetElement && offset === 0) {
             const visibleText = targetElement.textContent.replace(/[\uFEFF\u200B]/g, '');
             if (visibleText === '') {
@@ -5162,7 +5542,7 @@ export class Bridge {
           const blockType = block['@type'];
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
-            if (fieldType === 'slate' && block[fieldName]) {
+            if (this.fieldTypeIsSlate(fieldType) && block[fieldName]) {
               this.resetJsonNodeIds(block[fieldName]);
             }
           }
@@ -5187,11 +5567,25 @@ export class Bridge {
    * @returns {boolean} True if values are equal (ignoring nodeIds)
    */
   focusedFieldValuesEqual(formDataA, formDataB) {
-    if (!this.selectedBlockUid || !this.focusedFieldName) {
+    // selectedBlockUid can be null for page-level fields, so only check focusedFieldName
+    if (!this.focusedFieldName) {
       return true; // No focused field to compare
     }
-    // Use blockPathMap to find nested blocks (object_list items, etc.)
-    const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+
+    // Resolve field path to handle page-level fields (e.g., /title)
+    const resolved = this.resolveFieldPath(this.focusedFieldName, this.selectedBlockUid);
+
+    let fieldA, fieldB;
+    if (resolved.blockId === null) {
+      // Page-level field - compare directly on formData
+      fieldA = formDataA?.[resolved.fieldName];
+      fieldB = formDataB?.[resolved.fieldName];
+      log('focusedFieldValuesEqual (page-level):', fieldA === fieldB, 'field:', resolved.fieldName, 'A:', fieldA, 'B:', fieldB);
+      return fieldA === fieldB;
+    }
+
+    // Block field - use blockPathMap to find nested blocks (object_list items, etc.)
+    const pathInfo = this.blockPathMap?.[resolved.blockId];
     let blockA, blockB;
     if (pathInfo?.path) {
       // Navigate path in both formData objects
@@ -5203,15 +5597,15 @@ export class Bridge {
       }
     } else {
       // Fallback to top-level lookup
-      blockA = formDataA?.blocks?.[this.selectedBlockUid];
-      blockB = formDataB?.blocks?.[this.selectedBlockUid];
+      blockA = formDataA?.blocks?.[resolved.blockId];
+      blockB = formDataB?.blocks?.[resolved.blockId];
     }
     if (!blockA || !blockB) {
       return false; // Can't find block - assume not equal (safe default)
     }
     // Deep copy and strip nodeIds before comparing (old formData has nodeIds, incoming doesn't)
-    const fieldA = blockA[this.focusedFieldName];
-    const fieldB = blockB[this.focusedFieldName];
+    fieldA = blockA[resolved.fieldName];
+    fieldB = blockB[resolved.fieldName];
     if (fieldA === undefined || fieldB === undefined) {
       return fieldA === fieldB;
     }
@@ -5229,14 +5623,62 @@ export class Bridge {
   /**
    * Get the field type for a given block and field name
    * @param {string} blockUid - The block UID
-   * @param {string} fieldName - The field name (e.g., 'value', 'text', 'description')
-   * @returns {string|undefined} Field type ('slate', 'string', 'textarea') or undefined
+   * @param {string} fieldName - The field name (e.g., 'value', 'text', '/title' for page-level)
+   * @returns {string|undefined} Field type in "type:widget" format (e.g., 'array:slate', 'string:textarea', 'string') or undefined
    */
   getFieldType(blockUid, fieldName) {
-    const blockData = this.getBlockData(blockUid);
+    const resolved = this.resolveFieldPath(fieldName, blockUid);
+
+    // Page-level field
+    if (resolved.blockId === null) {
+      return this.blockFieldTypes?._page?.[resolved.fieldName];
+    }
+
+    // Block field
+    const blockData = this.getBlockData(resolved.blockId);
     const blockType = blockData?.['@type'];
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    return blockTypeFields[fieldName];
+    return blockTypeFields[resolved.fieldName];
+  }
+
+  /**
+   * Check if a field type string indicates a slate field
+   * Formats: "array:slate", ":slate", "array:richtext", ":richtext"
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is a slate field
+   */
+  fieldTypeIsSlate(fieldType) {
+    return isSlateFieldType(fieldType);
+  }
+
+  /**
+   * Check if a field type string indicates a textarea field
+   * Formats: "string:textarea", ":textarea"
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is a textarea field
+   */
+  fieldTypeIsTextarea(fieldType) {
+    return isTextareaFieldType(fieldType);
+  }
+
+  /**
+   * Check if a field type string indicates a plain string field (single-line text)
+   * This is a string field without textarea or slate widget.
+   * Formats: "string", "string:" (no widget means default TextWidget)
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is a plain string field
+   */
+  fieldTypeIsPlainString(fieldType) {
+    return isPlainStringFieldType(fieldType);
+  }
+
+  /**
+   * Check if a field type string indicates a text-editable field (string, textarea, or slate)
+   * @param {string} fieldType - The field type string
+   * @returns {boolean} True if the field is text-editable
+   */
+  fieldTypeIsTextEditable(fieldType) {
+    return isTextEditableFieldType(fieldType);
   }
 
   /**
@@ -5246,7 +5688,7 @@ export class Bridge {
    * @returns {boolean} True if the field is a slate field
    */
   isSlateField(blockUid, fieldName) {
-    return this.getFieldType(blockUid, fieldName) === 'slate';
+    return this.fieldTypeIsSlate(this.getFieldType(blockUid, fieldName));
   }
 
   /**
@@ -5301,9 +5743,8 @@ export class Bridge {
    * @param {Node} mutatedTextNode - The actual text node that was modified (optional)
    */
   handleTextChange(target, mutatedNodeParent = null, mutatedTextNode = null) {
-    const blockUid = target
-      .closest('[data-block-uid]')
-      .getAttribute('data-block-uid');
+    const blockElement = target.closest('[data-block-uid]');
+    const blockUid = blockElement?.getAttribute('data-block-uid') || null;
     const editableField = target.getAttribute('data-editable-field');
 
     if (!editableField) {
@@ -5311,19 +5752,15 @@ export class Bridge {
       return;
     }
 
-    // Determine field type from block schema metadata
-    // Use getBlockData to support nested blocks inside containers
-    const blockData = this.getBlockData(blockUid);
-    const blockType = blockData?.['@type'];
-    const blockFieldTypes = this.blockFieldTypes?.[blockType] || {};
-    const fieldType = blockFieldTypes[editableField];
+    // Determine field type (supports page-level fields via getFieldType)
+    const fieldType = this.getFieldType(blockUid, editableField);
 
 
     // Note: We intentionally do NOT strip ZWS from DOM during typing.
     // Like slate-react, we let the frontend re-render (triggered by FORM_DATA) naturally remove ZWS.
     // Stripping during typing corrupts cursor position. ZWS is stripped on copy events and during serialization.
 
-    if (fieldType === 'slate') {
+    if (this.fieldTypeIsSlate(fieldType)) {
       // Slate field - update JSON structure using nodeId
       // Use the actual mutated node's parent if provided (e.g., SPAN for inline formatting)
       // This ensures we update the correct node, not the whole editable field
@@ -5397,7 +5834,13 @@ export class Bridge {
         log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
       }
 
-      // Use blockData from getBlockData (already retrieved above) to support nested blocks
+      // Get block data to support nested blocks
+      const blockData = this.getBlockData(blockUid);
+      if (!blockData) {
+        log('handleTextChange: blockData not found for', blockUid);
+        return;
+      }
+
       const updatedJson = this.updateJsonNode(
         blockData,
         nodeId,
@@ -5419,15 +5862,17 @@ export class Bridge {
       }
     } else {
       // Non-Slate field - update field directly with text content
-      // Use getBlockData to handle nested blocks
-      const block = this.getBlockData(blockUid);
-      if (block) {
-        block[editableField] = this.stripZeroWidthSpaces(target.innerText);
+      // Resolve field path to handle /fieldName (page) and ../fieldName (parent) syntax
+      const resolved = this.resolveFieldPath(editableField, blockUid);
+      const targetData = this.getBlockData(resolved.blockId);
+      if (targetData) {
+        targetData[resolved.fieldName] = this.stripZeroWidthSpaces(target.innerText);
+        log('handleTextChange: updated field:', resolved.fieldName);
       }
     }
 
     // Buffer the update - text and selection are captured together
-    this.bufferUpdate(fieldType === 'slate' ? 'textChangeSlate' : 'textChange');
+    this.bufferUpdate(this.fieldTypeIsSlate(fieldType) ? 'textChangeSlate' : 'textChange');
   }
 
   /**
@@ -5553,9 +5998,17 @@ export class Bridge {
             // Child is an inline element, update its first text child
             child.children[0].text = newText;
           }
-        } else {
-          // Fallback: update first child (original behavior)
-          json.children[0].text = newText;
+        } else if (json.children) {
+          // Fallback: childIndex is null, updating whole node content
+          // Check if any child has 'type' (inline element like strong, em, link)
+          const hasInlineElements = json.children.some(child => child.type);
+          if (hasInlineElements) {
+            // DOM simplified (inline elements deleted) - collapse to single text node
+            json.children = [{ text: newText }];
+          } else {
+            // Simple paragraph - just update first child
+            json.children[0].text = newText;
+          }
         }
         return json;
       }
@@ -5957,6 +6410,32 @@ export class Bridge {
           min-height: 1.5em;
           display: block;
         }
+        /* Linkable field hover styles - indicate clickable link areas */
+        [data-linkable-field] {
+          cursor: pointer;
+          position: relative;
+        }
+        [data-linkable-field]:hover::after {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          border: 2px dashed rgba(0, 126, 177, 0.5);
+          border-radius: 4px;
+          pointer-events: none;
+        }
+        /* Media field hover styles - indicate clickable image areas */
+        [data-media-field] {
+          cursor: pointer;
+          position: relative;
+        }
+        [data-media-field]:hover::after {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          border: 2px dashed rgba(120, 192, 215, 0.5);
+          border-radius: 4px;
+          pointer-events: none;
+        }
         .volto-hydra--outline {
           position: relative !important;
         }
@@ -6196,7 +6675,8 @@ export class Bridge {
 }
 
 // Export an instance of the Bridge class
-let bridgeInstance = null;
+// Use window.__hydraBridge to survive module hot-reloading in frameworks like Nuxt/Vite
+let bridgeInstance = (typeof window !== 'undefined' && window.__hydraBridge) || null;
 
 /**
  * Initialize the bridge
@@ -6229,13 +6709,54 @@ export function initBridge(adminOrigin, options = {}) {
 
   if (!bridgeInstance) {
     bridgeInstance = new Bridge(adminOrigin, options);
+    bridgeInstance.lastKnownPath = window.location.pathname;
+    // Store on window to survive module hot-reload
+    if (typeof window !== 'undefined') {
+      window.__hydraBridge = bridgeInstance;
+    }
+  } else {
+    // Bridge already exists - check if URL changed (e.g., after SPA navigation + remount)
+    const currentPath = window.location.pathname;
+    if (bridgeInstance.lastKnownPath && bridgeInstance.lastKnownPath !== currentPath) {
+      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath);
+      window.parent.postMessage(
+        { type: 'PATH_CHANGE', path: currentPath },
+        bridgeInstance.adminOrigin,
+      );
+    }
+    bridgeInstance.lastKnownPath = currentPath;
   }
   return bridgeInstance;
 }
 
 /**
- * Get the token from the admin
- * @returns {String} token
+ * Get the access token from URL (preferred), sessionStorage, or cookie (fallback)
+ * Token is stored in sessionStorage when first received from URL params
+ * @returns {String|null} token
+ */
+export function getAccessToken() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  // Try URL first (admin sends token via URL on initial load)
+  const urlToken = new URL(window.location.href).searchParams.get('access_token');
+  if (urlToken) {
+    // Store for future SPA navigations
+    sessionStorage.setItem('hydra_access_token', urlToken);
+    return urlToken;
+  }
+  // Try sessionStorage (persists across SPA navigations)
+  const sessionToken = sessionStorage.getItem('hydra_access_token');
+  if (sessionToken) {
+    return sessionToken;
+  }
+  // Fallback to cookie
+  return getTokenFromCookie();
+}
+
+/**
+ * Get the token from cookie (legacy method, prefer getAccessToken)
+ * @returns {String|null} token
  */
 export function getTokenFromCookie() {
   if (typeof document === 'undefined') {
@@ -6261,6 +6782,69 @@ export function onEditChange(callback) {
   if (bridgeInstance) {
     bridgeInstance.onEditChange(callback);
   }
+}
+
+// ============================================================================
+// Field Type Utilities (exported for use by volto-hydra admin side)
+// ============================================================================
+
+/**
+ * Check if a field type indicates a Slate field.
+ * Handles both old format ('slate') and new format ('array:slate', 'object:richtext').
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isSlateFieldType(fieldType) {
+  if (!fieldType) return false;
+  return fieldType === 'slate' || fieldType.includes(':slate') || fieldType.includes(':richtext');
+}
+
+/**
+ * Check if a field type indicates a textarea field.
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isTextareaFieldType(fieldType) {
+  return fieldType?.includes(':textarea') || false;
+}
+
+/**
+ * Check if a field type indicates a plain string field (single-line text).
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isPlainStringFieldType(fieldType) {
+  if (!fieldType) return false;
+  if (isSlateFieldType(fieldType) || isTextareaFieldType(fieldType)) {
+    return false;
+  }
+  return fieldType === 'string' || fieldType.startsWith('string:');
+}
+
+/**
+ * Check if a field type is text-editable (string, textarea, or slate).
+ * @param {string} fieldType - Field type string
+ * @returns {boolean}
+ */
+export function isTextEditableFieldType(fieldType) {
+  if (!fieldType) return false;
+  return isSlateFieldType(fieldType) ||
+         isTextareaFieldType(fieldType) ||
+         isPlainStringFieldType(fieldType);
+}
+
+/**
+ * Compare two formData objects for content equality, ignoring _editSequence.
+ * Used to detect if form content has actually changed vs just metadata.
+ * @param {Object} formDataA - First formData object
+ * @param {Object} formDataB - Second formData object
+ * @returns {boolean} True if content is equal (ignoring _editSequence)
+ */
+export function formDataContentEqual(formDataA, formDataB) {
+  if (!formDataA || !formDataB) return formDataA === formDataB;
+  const { _editSequence: seqA, ...contentA } = formDataA;
+  const { _editSequence: seqB, ...contentB } = formDataB;
+  return JSON.stringify(contentA) === JSON.stringify(contentB);
 }
 
 // Make initBridge available globally

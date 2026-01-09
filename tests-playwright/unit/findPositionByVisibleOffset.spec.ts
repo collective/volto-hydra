@@ -3,7 +3,7 @@
  * Uses real browser Range API which jsdom cannot properly simulate
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('findPositionByVisibleOffset() - Range-based position finding', () => {

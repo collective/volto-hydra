@@ -8,6 +8,11 @@
  * Uses plain JS checks (no external dependencies).
  */
 
+import { isSlateFieldType } from '@volto-hydra/hydra-js';
+
+// Re-export for convenience
+export { isSlateFieldType };
+
 /**
  * Validation error with context information
  */
@@ -135,9 +140,9 @@ export function getSlateFieldsForBlockType(blockType, blockFieldTypes) {
     return ['value'];
   }
 
-  // Return all fields with type 'slate'
+  // Return all fields with slate type (handles both 'slate' and 'array:slate' formats)
   return Object.entries(fieldTypes)
-    .filter(([_, type]) => type === 'slate')
+    .filter(([_, type]) => isSlateFieldType(type))
     .map(([fieldName]) => fieldName);
 }
 

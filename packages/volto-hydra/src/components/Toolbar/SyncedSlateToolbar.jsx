@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, Component } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Component } from 'react';
 import { Slate, ReactEditor } from 'slate-react';
 import { Transforms, Node, Range, Editor, Point } from 'slate';
 import { isEqual, cloneDeep } from 'lodash';
@@ -8,9 +8,15 @@ import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slat
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
+import { isSlateFieldType } from '@volto-hydra/hydra-js';
 import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
+import linkSVG from '@plone/volto/icons/link.svg';
+import imageSVG from '@plone/volto/icons/image.svg';
+import clearSVG from '@plone/volto/icons/clear.svg';
+import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
+import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 
 /**
  * Validates if a selection is valid for the given document structure.
@@ -132,10 +138,17 @@ const SyncedSlateToolbar = ({
   maxToolbarWidth,
   blockActions, // { toolbar: [...], dropdown: [...] } from pathMap.actions
   onBlockAction, // Handler for block actions: (actionId) => void
+  onFieldLinkChange, // Handler for link field changes: (fieldName, url) => void
+  onOpenObjectBrowser, // Handler to open object browser for media fields
+  onFileUpload, // Handler for file uploads: (fieldName, file) => void
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
+  // For page-level fields (blockId is null), return form itself
   const getBlock = useCallback((blockId) => {
+    if (blockId === null) {
+      return form; // Page-level fields access form directly
+    }
     return getBlockById(form, blockPathMap, blockId);
   }, [form, blockPathMap]);
 
@@ -239,6 +252,22 @@ const SyncedSlateToolbar = ({
   // State for dropdown menu
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuButtonRect, setMenuButtonRect] = useState(null);
+
+  // State for field link editor popup
+  const [fieldLinkEditorOpen, setFieldLinkEditorOpen] = useState(false);
+  const [fieldLinkEditorField, setFieldLinkEditorField] = useState(null);
+
+  // State for field image editor popup
+  const [fieldImageEditorOpen, setFieldImageEditorOpen] = useState(false);
+  const [fieldImageEditorField, setFieldImageEditorField] = useState(null);
+
+  // Close image editor when block is deselected or changes
+  useEffect(() => {
+    if (!selectedBlock || !blockUI) {
+      setFieldImageEditorOpen(false);
+      setFieldImageEditorField(null);
+    }
+  }, [selectedBlock, blockUI]);
 
   // Helper to replace editor content using proper Slate APIs
   // Direct assignment (editor.children = X) bypasses Slate-react's state tracking,
@@ -350,7 +379,8 @@ const SyncedSlateToolbar = ({
         if (inlineEntry) {
           const [, inlinePath] = inlineEntry;
           const afterPoint = Editor.after(editor, inlinePath);
-          const formBlockValue = form?.blocks?.[selectedBlock]?.value?.[0]?.children;
+          const formBlock = getBlockById(form, blockPathMap, selectedBlock);
+          const formBlockValue = formBlock?.value?.[0]?.children;
           console.log('[TOOLBAR FORMAT] Cursor exit: inlinePath:', JSON.stringify(inlinePath), 'afterPoint:', JSON.stringify(afterPoint), 'editor.children:', JSON.stringify(editor.children?.[0]?.children), 'form.blocks.value:', JSON.stringify(formBlockValue));
           if (afterPoint) {
             Transforms.select(editor, afterPoint);
@@ -394,7 +424,20 @@ const SyncedSlateToolbar = ({
       }
     } else {
       // Range selection - use toggleInlineFormat to wrap/unwrap selected text
+      // Use rangeRef to track selection through the transform - wrapNodes creates
+      // the inline element, then Slate normalization adds empty text nodes before/after.
+      // Without rangeRef, the selection path becomes stale (points to empty text node).
+      const rangeRef = Editor.rangeRef(editor, editor.selection);
       toggleInlineFormat(editor, format);
+      // Restore selection from tracked range (handles path shifts from wrapping/normalization)
+      if (rangeRef.current) {
+        try {
+          Transforms.select(editor, rangeRef.current);
+        } catch (e) {
+          console.warn('[TOOLBAR FORMAT] Failed to restore selection after format:', e.message);
+        }
+        rangeRef.unref();
+      }
     }
   }, [editor, form, onChangeFormData]);
 
@@ -410,7 +453,7 @@ const SyncedSlateToolbar = ({
     // Only sync for slate fields
     const blockType = block?.['@type'];
     const fieldType = blockFieldTypes?.[blockType]?.[fieldName];
-    if (fieldType !== 'slate') {
+    if (!isSlateFieldType(fieldType)) {
       internalValueRef.current = null;
       return;
     }
@@ -491,6 +534,10 @@ const SyncedSlateToolbar = ({
       lastSeenSequenceRef.current = incomingSequence;
       // Content changed from external source - sync it
       console.log('[TOOLBAR SYNC] Syncing content from iframe, incomingSeq:', incomingSequence, 'fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
+      // Debug: log full children structure to diagnose missing "w" bug
+      if (fieldValue?.[0]?.children) {
+        console.log('[TOOLBAR SYNC] Full children structure:', JSON.stringify(fieldValue[0].children));
+      }
 
       // If there's a transform, run it in the same batch
       const transformCallback = hasUnprocessedTransform ? () => {
@@ -508,6 +555,10 @@ const SyncedSlateToolbar = ({
       // Debug: check what editor.children looks like after replace
       console.log('[TOOLBAR SYNC] After replaceEditorContent, editor.children[0].children[0].text:',
         JSON.stringify(editor.children?.[0]?.children?.[0]?.text?.substring(0, 40)));
+      // Debug: show full editor children after replace to diagnose missing "w"
+      if (editor.children?.[0]?.children) {
+        console.log('[TOOLBAR SYNC] After replace, full editor.children[0].children:', JSON.stringify(editor.children[0].children));
+      }
 
       // Update internalValueRef from editor.children AFTER transform (not fieldValue)
       internalValueRef.current = editor.children;
@@ -589,22 +640,8 @@ const SyncedSlateToolbar = ({
     }
   }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied]);
 
-  // Set editor.hydra with iframe positioning data for persistent helpers
-  // NOTE: editor is stable (created once), so we don't include it in dependencies
-  // This must be set SYNCHRONOUSLY during render, not in an effect, because
-  // persistentHelpers (like LinkEditor) may render before effects run
-  // ALSO set globally so ANY editor can access it (handles nested Slate contexts)
-  // IMPORTANT: Don't store the iframe element itself - causes circular JSON errors
-  // when Slate tries to serialize. Instead store only the rect data we need.
-  const hydraIframeRect = iframeElement?.getBoundingClientRect();
-  const hydraData = {
-    iframeRect: hydraIframeRect ? { top: hydraIframeRect.top, left: hydraIframeRect.left } : null,
-    blockUIRect: blockUI?.rect,
-  };
-  editor.hydra = hydraData;
-  if (typeof window !== 'undefined') {
-    window.voltoHydraData = hydraData;
-  }
+  // NOTE: editor.hydra is set later (after toolbar position is calculated)
+  // to include toolbarTop/toolbarLeft for LinkEditor positioning
 
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
@@ -716,35 +753,31 @@ const SyncedSlateToolbar = ({
   );
 
   // Classify buttons into block buttons (FormatDropdown) and inline buttons (toolbar)
-  // Uses isBlockButton() which inspects element type without rendering
-  const { blockButtons, allInlineButtons } = useMemo(() => {
-    const blockBtns = [];
-    const inlineBtns = [];
+  // Computed inline (not in useMemo) because isBlockButton() calls the factory
+  // function which may use hooks - calling hooks inside useMemo violates Rules of Hooks
+  const blockButtons = [];
+  const allInlineButtons = [];
 
-    toolbarButtons.forEach((name) => {
-      if (name === 'separator') return;
-      const Btn = buttons[name];
-      if (!Btn) return;
+  toolbarButtons.forEach((name) => {
+    if (name === 'separator') return;
+    const Btn = buttons[name];
+    if (!Btn) return;
 
-      // Create element for later rendering
-      const element = <Btn />;
+    // Create element for later rendering
+    const element = <Btn />;
 
-      // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
-      // isBlockButton compares element.type to imported BlockButton reference
-      if (isBlockButton(Btn, BlockButton)) {
-        blockBtns.push({ name, element });
-      } else {
-        inlineBtns.push({ name, element });
-      }
-    });
+    // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
+    // isBlockButton compares element.type to imported BlockButton reference
+    if (isBlockButton(Btn, BlockButton)) {
+      blockButtons.push({ name, element });
+    } else {
+      allInlineButtons.push({ name, element });
+    }
+  });
 
-    return {
-      blockButtons: blockBtns,
-      allInlineButtons: inlineBtns,
-    };
-  }, [toolbarButtons, buttons]);
-
-  if (!blockUI || !selectedBlock) {
+  // Render toolbar when we have a rect (either block or page-level field)
+  // selectedBlock can be null for page-level fields
+  if (!blockUI?.rect) {
     return null;
   }
 
@@ -770,7 +803,7 @@ const SyncedSlateToolbar = ({
   const blockType = block?.['@type'];
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
-  const showFormatButtons = fieldType === 'slate';
+  const showFormatButtons = isSlateFieldType(fieldType);
 
   // Debug: Check what blockFieldTypes the toolbar is receiving
   if (blockType === 'hero') {
@@ -796,9 +829,31 @@ const SyncedSlateToolbar = ({
 
   // Calculate toolbar position - add iframe offset and position above the BLOCK CONTAINER
   // NOTE: blockUI.rect comes from BLOCK_SELECTED message and is the block container rect, NOT field rect
-  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800 };
-  const toolbarTop = toolbarIframeRect.top + blockUI.rect.top - 40; // 40px above block container
+  const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0, width: 800, height: 600 };
+
+  // Check if block is visible in the iframe viewport
+  const blockTopInPage = toolbarIframeRect.top + blockUI.rect.top;
+  const blockBottomInPage = blockTopInPage + blockUI.rect.height;
+  const iframeBottom = toolbarIframeRect.top + toolbarIframeRect.height;
+  const isBlockVisible = blockBottomInPage > toolbarIframeRect.top && blockTopInPage < iframeBottom;
+
+  const toolbarTopRaw = blockTopInPage - 40; // 40px above block container
+  // Clamp to top of iframe if toolbar would be above it
+  const toolbarTop = Math.max(toolbarIframeRect.top, toolbarTopRaw);
   const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Always align with block's left edge
+
+  // Update hydraData with toolbar position for LinkEditor positioning
+  // This must be set SYNCHRONOUSLY during render (not in an effect) because
+  // persistentHelpers (like LinkEditor) render after this and need the data
+  editor.hydra = {
+    iframeRect: { top: toolbarIframeRect.top, left: toolbarIframeRect.left },
+    blockUIRect: blockUI?.rect,
+    toolbarTop,
+    toolbarLeft,
+  };
+  if (typeof window !== 'undefined') {
+    window.voltoHydraData = editor.hydra;
+  }
 
   // Calculate max width so toolbar doesn't extend past iframe right edge (sidebar boundary)
   const iframeRight = toolbarIframeRect.left + toolbarIframeRect.width;
@@ -850,7 +905,7 @@ const SyncedSlateToolbar = ({
           left: `${toolbarLeft}px`,
           maxWidth: `${constrainedMaxWidth}px`,
           zIndex: 10,
-          display: 'flex',
+          display: isBlockVisible ? 'flex' : 'none',
           gap: '2px',
           background: '#fff',
           border: '1px solid #e0e0e0',
@@ -861,24 +916,28 @@ const SyncedSlateToolbar = ({
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
-      {/* Drag handle - visual indicator only, pointer events pass through to iframe button */}
-      <div
-        className="drag-handle"
-        style={{
-          cursor: 'move',
-          padding: '4px 6px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-          color: '#666',
-          fontSize: '14px',
-          background: '#e8e8e8',
-          borderRadius: '2px',
-        }}
-      >
-        ⠿
-      </div>
+      {/* Drag handle - only show for blocks, not page-level fields */}
+      {selectedBlock ? (
+        <div
+          className="drag-handle"
+          style={{
+            cursor: 'move',
+            padding: '4px 6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            color: '#666',
+            fontSize: '14px',
+            background: '#e8e8e8',
+            borderRadius: '2px',
+          }}
+        >
+          ⠿
+        </div>
+      ) : (
+        <div style={{ width: '8px' }} /> // Spacer for page-level fields
+      )}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
@@ -920,6 +979,59 @@ const SyncedSlateToolbar = ({
               </Slate>
             </SlateErrorBoundary>
           </div>
+      )}
+
+      {/* Field-specific buttons for linkable/media fields */}
+      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && (
+        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center', position: 'relative' }}>
+          {blockUI?.focusedLinkableField && (
+            <button
+              title={`Edit link (${blockUI.focusedLinkableField})`}
+              onClick={() => {
+                setFieldLinkEditorField(blockUI.focusedLinkableField);
+                setFieldLinkEditorOpen(true);
+              }}
+              style={{
+                background: fieldLinkEditorOpen ? '#e8e8e8' : 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '2px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#e8e8e8')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = fieldLinkEditorOpen ? '#e8e8e8' : 'none')}
+            >
+              <Icon name={linkSVG} size="18px" />
+            </button>
+          )}
+          {blockUI?.focusedMediaField && (
+            <button
+              title={`Select image (${blockUI.focusedMediaField})`}
+              onClick={() => {
+                setFieldImageEditorField(blockUI.focusedMediaField);
+                setFieldImageEditorOpen(true);
+              }}
+              style={{
+                background: fieldImageEditorOpen ? '#e8e8e8' : 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '2px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#e8e8e8')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = fieldImageEditorOpen ? '#e8e8e8' : 'none')}
+            >
+              <Icon name={imageSVG} size="18px" />
+            </button>
+          )}
+
+        </div>
       )}
 
       {/* Block action buttons (e.g., add row/column for tables) - only visible ones */}
@@ -1018,6 +1130,241 @@ const SyncedSlateToolbar = ({
         addDirection={blockUI?.addDirection}
       />
     )}
+
+    {/* Field Link Editor Popup - fixed position at toolbar */}
+    {fieldLinkEditorOpen && fieldLinkEditorField && (() => {
+      const fieldDef = blockPathMap?.[selectedBlock]?.schema?.properties?.[fieldLinkEditorField];
+      const isObjectBrowserLink = fieldDef?.widget === 'object_browser' && fieldDef?.mode === 'link';
+      return (
+        <div
+          className="add-link field-link-editor"
+          style={{
+            position: 'fixed',
+            top: `${toolbarTop}px`,
+            left: `${toolbarLeft}px`,
+            zIndex: 100,
+            width: '300px',
+          }}
+        >
+          <AddLinkForm
+            data={{ url: getBlock(selectedBlock)?.[fieldLinkEditorField] || '' }}
+            theme={{}}
+            onChangeValue={(url) => {
+              if (onFieldLinkChange) {
+                onFieldLinkChange(fieldLinkEditorField, url);
+              }
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            }}
+            onSelectItem={isObjectBrowserLink ? (url, item) => {
+              if (onFieldLinkChange) {
+                // Use full item metadata for object_browser link fields
+                const linkValue = [{
+                  '@id': item?.['@id'] || url,
+                  title: item?.title || item?.Title || '',
+                  description: item?.description || item?.Description || '',
+                  hasPreviewImage: item?.hasPreviewImage ?? false,
+                }];
+                onFieldLinkChange(fieldLinkEditorField, linkValue);
+              }
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            } : undefined}
+            onClear={() => {
+              if (onFieldLinkChange) {
+                onFieldLinkChange(fieldLinkEditorField, '');
+              }
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            }}
+            onOverrideContent={() => {
+              setFieldLinkEditorOpen(false);
+              setFieldLinkEditorField(null);
+            }}
+          />
+        </div>
+      );
+    })()}
+
+    {/* Media Field Overlays - show when block is selected, for each media field */}
+    {blockUI?.mediaFields && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
+      const mediaValue = getBlock(selectedBlock)?.[fieldName];
+      const hasMediaValue = mediaValue && (
+        (Array.isArray(mediaValue) && mediaValue.length > 0) ||
+        (typeof mediaValue === 'string' && mediaValue !== '')
+      );
+
+      // Get the media field element's rect from the message data
+      const mediaRect = fieldData?.rect;
+      if (!mediaRect) return null;
+
+      console.log('[TOOLBAR] Media field overlay:', fieldName, 'hasMediaValue:', hasMediaValue, 'mediaRect:', mediaRect, 'toolbarIframeRect:', toolbarIframeRect);
+
+      const fieldCenterX = toolbarIframeRect.left + mediaRect.left + mediaRect.width / 2;
+      const fieldCenterY = toolbarIframeRect.top + mediaRect.top + mediaRect.height / 2;
+      const fieldBottomY = toolbarIframeRect.top + mediaRect.top + mediaRect.height;
+      const fieldRightX = toolbarIframeRect.left + mediaRect.left + mediaRect.width - 36;
+      const fieldTopY = toolbarIframeRect.top + mediaRect.top + 8;
+      const fieldLeftX = toolbarIframeRect.left + mediaRect.left;
+
+      // Show ImageInput overlay if: no image, OR image editor is open for this field
+      const showImagePicker = !hasMediaValue || (fieldImageEditorOpen && fieldImageEditorField === fieldName);
+      // Show icon only when image is empty (not when editing existing image)
+      const showIcon = !hasMediaValue;
+
+      if (showImagePicker) {
+        // Empty image OR editing existing - use ImageInput with showPreview={false}
+        return (
+          <div
+            key={`empty-${fieldName}`}
+            className="empty-image-overlay"
+            style={{
+              position: 'fixed',
+              top: `${toolbarIframeRect.top + mediaRect.top}px`,
+              left: `${toolbarIframeRect.left + mediaRect.left}px`,
+              width: `${mediaRect.width}px`,
+              height: `${mediaRect.height}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: showIcon ? 'center' : 'flex-end',
+              paddingBottom: showIcon ? '0' : '20px',
+              zIndex: 10,
+              pointerEvents: 'none', // Let clicks pass through to elements behind
+            }}
+          >
+            {/* Large circular icon - only show when empty */}
+            {showIcon && (
+              <div
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: 'rgba(0, 123, 255, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px',
+                  pointerEvents: 'auto', // Icon itself captures events
+                }}
+              >
+                <Icon name={imageSVG} size="40px" color="#007bff" />
+              </div>
+            )}
+            <ImageInput
+              id={`inline-image-${fieldName}`}
+              value={null}
+              showPreview={false}
+              onChange={(id, url, metadata) => {
+                if (onFieldLinkChange) {
+                  // Pass url and metadata (image_scales, image_field) for NamedBlobImage fields
+                  onFieldLinkChange(fieldName, url, metadata);
+                }
+                // Close editor if it was open
+                if (fieldImageEditorOpen) {
+                  setFieldImageEditorOpen(false);
+                  setFieldImageEditorField(null);
+                }
+              }}
+              onClose={() => {
+                setFieldImageEditorOpen(false);
+                setFieldImageEditorField(null);
+              }}
+            />
+          </div>
+        );
+      } else {
+        // Filled image - show X button in top-right corner (no shadow)
+        return (
+          <button
+            key={`clear-${fieldName}`}
+            title="Clear image"
+            onClick={() => {
+              if (onFieldLinkChange) {
+                onFieldLinkChange(fieldName, '');
+              }
+            }}
+            style={{
+              position: 'fixed',
+              top: `${fieldTopY}px`,
+              left: `${fieldRightX}px`,
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255, 255, 255, 0.9)',
+              border: 'none',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              zIndex: 10,
+              padding: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+            }}
+          >
+            <Icon name={clearSVG} size="16px" color="#e40166" />
+          </button>
+        );
+      }
+    })}
+
+    {/* Starter UI Overlay - for blocks with empty required fields */}
+    {blockPathMap?.[selectedBlock]?.emptyRequiredFields?.map(({ fieldName, fieldDef }) => {
+      // For now, only render for object_browser link fields
+      if (fieldDef?.widget !== 'object_browser' || fieldDef?.mode !== 'link') {
+        return null;
+      }
+
+      // Center horizontally on the block
+      const centerX = toolbarIframeRect.left + blockUI.rect.left + blockUI.rect.width / 2;
+      const centerY = toolbarIframeRect.top + blockUI.rect.top + blockUI.rect.height / 2;
+
+      return (
+        <div
+          key={`starter-${fieldName}`}
+          className="starter-ui-overlay"
+          style={{
+            position: 'fixed',
+            top: `${centerY - 20}px`,
+            left: `${centerX}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+          }}
+        >
+          <AddLinkForm
+            data={{ url: '' }}
+            theme={{}}
+            objectBrowserPickerType="link"
+            onChangeValue={(url) => {
+              if (onFieldLinkChange && url) {
+                // For object_browser link fields, convert URL to array format
+                const linkValue = [{ '@id': url }];
+                onFieldLinkChange(fieldName, linkValue);
+              }
+            }}
+            onSelectItem={(url, item) => {
+              if (onFieldLinkChange && url) {
+                // Use full item metadata from object browser for richer teaser display
+                const linkValue = [{
+                  '@id': item?.['@id'] || url,
+                  title: item?.title || item?.Title || '',
+                  description: item?.description || item?.Description || '',
+                  hasPreviewImage: item?.hasPreviewImage ?? false,
+                }];
+                onFieldLinkChange(fieldName, linkValue);
+              }
+            }}
+            onClear={() => {}}
+            onOverrideContent={() => {}}
+          />
+        </div>
+      );
+    })}
     </>
   );
 };

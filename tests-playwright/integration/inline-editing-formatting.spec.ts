@@ -11,7 +11,7 @@
  * - multiple formats on same text (bold + italic, etc)
  * - paragraph formats as dropdown?
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Formatting', () => {
@@ -214,11 +214,13 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.clickFormatButton('bold');
     await helper.waitForFormattedText(editor, /Bold text/, 'bold');
 
-    // Move cursor to end
+    // Move cursor to end and ensure editor has focus
     await helper.moveCursorToEnd(editor);
+    await editor.click();
+    await expect(editor).toBeFocused({ timeout: 5000 });
 
-    // Type more text at the end
-    await page.keyboard.type(' more');
+    // Type more text at the end (use pressSequentially for reliable typing)
+    await editor.pressSequentially(' more', { delay: 10 });
     await helper.waitForEditorText(editor, /Bold text more/);
 
     // Check if new text inherits bold formatting

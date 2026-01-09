@@ -6,7 +6,7 @@
  * - click link without selection and then type - should create link?
  * - paste a link
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline Editing - Links', () => {
@@ -30,7 +30,17 @@ test.describe('Inline Editing - Links', () => {
 
     // Wait for LinkEditor popup to appear and verify its position
     const { popup, boundingBox } = await helper.waitForLinkEditorPopup();
-    console.log('[TEST] LinkEditor popup appeared at:', boundingBox);
+
+    // Verify the LinkEditor is positioned directly on top of the toolbar, covering it
+    // This ensures it's always visible even when toolbar is clamped to top of iframe
+    const toolbar = page.locator('.quanta-toolbar');
+    const toolbarBox = await toolbar.boundingBox();
+    expect(toolbarBox).not.toBeNull();
+
+    // LinkEditor should cover the toolbar - same position (within small tolerance for borders/padding)
+    const tolerance = 10;
+    expect(Math.abs(boundingBox.x - toolbarBox!.x)).toBeLessThan(tolerance);
+    expect(Math.abs(boundingBox.y - toolbarBox!.y)).toBeLessThan(tolerance);
 
     // Get the URL input field
     const linkUrlInput = await helper.getLinkEditorUrlInput();
@@ -39,32 +49,25 @@ test.describe('Inline Editing - Links', () => {
     await linkUrlInput.fill('https://plone.org');
 
     // Press Enter to submit
-    console.log('[TEST] Pressing Enter to submit link');
     await linkUrlInput.press('Enter');
 
     // Wait for link to be created in the iframe by checking the HTML contains the link
-    console.log('[TEST] Waiting for link to appear in iframe');
     await expect(async () => {
       const blockHtml = await editor.innerHTML();
-      console.log('[TEST] Current block HTML:', blockHtml);
       expect(blockHtml).toContain('<a ');
       expect(blockHtml).toContain('https://plone.org');
       expect(blockHtml).toContain('Click here');
     }).toPass({ timeout: 5000 });
-
-    console.log('[TEST] Link created successfully');
 
     // Verify the LinkEditor popup has disappeared (check for .add-link specifically, not the Quanta toolbar)
     const linkEditorPopup = page.locator('.add-link');
     await expect(linkEditorPopup).not.toBeVisible();
 
     // Click on another block
-    console.log('[TEST] Clicking on another block');
     await helper.clickBlockInIframe('block-2-uuid');
     await page.waitForTimeout(500);
 
     // Click back to the original block with the link
-    console.log('[TEST] Clicking back to the original block');
     await helper.clickBlockInIframe(blockId);
     await page.waitForTimeout(500);
 
@@ -101,12 +104,9 @@ test.describe('Inline Editing - Links', () => {
       expect(blockHtml).toContain('https://plone.org');
     }).toPass({ timeout: 5000 });
 
-    console.log('[TEST] Link created, now testing clear');
-
     // Click inside the link to position cursor there
     const linkElement = editor.locator('a');
     await linkElement.click();
-    console.log('[TEST] Clicked into link');
 
     // Wait for editor to be editable and have a selection
     await expect(editor).toHaveAttribute('contenteditable', 'true');
@@ -117,32 +117,25 @@ test.describe('Inline Editing - Links', () => {
       });
       expect(hasSelection).toBe(true);
     }).toPass({ timeout: 5000 });
-    console.log('[TEST] Editor is editable with cursor');
 
     // Click the link button to open LinkEditor (cursor should be inside the link)
     await helper.clickFormatButton('link');
     await helper.waitForLinkEditorPopup();
-    console.log('[TEST] LinkEditor opened');
 
     // Click the Clear (X) button - this removes the link and closes the popup
     const clearButton = await helper.getLinkEditorClearButton();
-    console.log('[TEST] Clicking Clear (X) button');
     await clearButton.click();
 
     // Wait for the LinkEditor popup to close (Clear removes link and closes popup)
     await helper.waitForLinkEditorToClose();
-    console.log('[TEST] LinkEditor closed after Clear');
 
     // Check there is no link in the HTML (text should remain but without <a> tag)
     await expect(async () => {
       const blockHtml = await editor.innerHTML();
-      console.log('[TEST] Block HTML after clearing:', blockHtml);
       expect(blockHtml).not.toContain('<a ');
       expect(blockHtml).not.toContain('href=');
       expect(blockHtml).toContain('Click here'); // Text should still be there
     }).toPass({ timeout: 5000 });
-
-    console.log('[TEST] Link cleared successfully - text remains without link');
   });
 
   test('can use browse button in link editor', async ({ page }) => {
@@ -166,14 +159,11 @@ test.describe('Inline Editing - Links', () => {
     const linkUrlInput = await helper.getLinkEditorUrlInput();
 
     // Wait for the input to actually be focused (componentDidMount completed successfully)
-    console.log('[TEST] Waiting for input to be focused...');
     await expect(linkUrlInput).toBeFocused({ timeout: 2000 });
-    console.log('[TEST] Input is focused, componentDidMount completed');
 
     // Check if input has content, and clear it if needed to show the browse button
     const inputValue = await linkUrlInput.inputValue();
     if (inputValue && inputValue.length > 0) {
-      console.log('[TEST] Input has content, clearing it to show browse button');
       await linkUrlInput.clear();
       // Wait for input to be focused again after clearing
       await expect(linkUrlInput).toBeFocused({ timeout: 1000 });
@@ -181,13 +171,11 @@ test.describe('Inline Editing - Links', () => {
 
     // Now the Browse button should be visible (only shows when input is empty)
     const browseButton = await helper.getLinkEditorBrowseButton();
-    console.log('[TEST] Browse button found, clicking it');
     await browseButton.click();
 
     // Wait for object browser to open (use last() to get the newly opened sidebar)
     const objectBrowser = page.locator('aside[role="presentation"]').last();
     await objectBrowser.waitFor({ state: 'visible', timeout: 5000 });
-    console.log('[TEST] Object browser opened successfully');
 
     // Verify the object browser is visible
     await expect(objectBrowser).toBeVisible();
@@ -199,7 +187,6 @@ test.describe('Inline Editing - Links', () => {
     // The error context shows: button "Home" with img "Home" inside
     const homeBreadcrumb = objectBrowser.getByRole('button', { name: 'Home' });
     await homeBreadcrumb.waitFor({ state: 'visible', timeout: 2000 });
-    console.log('[TEST] Clicking Home button in breadcrumb to navigate to root');
     await homeBreadcrumb.click();
 
     // Wait for the page list to populate with root-level pages
@@ -208,7 +195,6 @@ test.describe('Inline Editing - Links', () => {
     // Click on "Another Page" from the list - it's a listitem, not a button
     const anotherPageItem = objectBrowser.getByRole('listitem', { name: /Another Page/ });
     await anotherPageItem.waitFor({ state: 'visible', timeout: 2000 });
-    console.log('[TEST] Clicking "Another Page" from the list');
     await anotherPageItem.click();
 
     // Wait for ObjectBrowser to close and URL to be populated in LinkEditor
@@ -217,7 +203,6 @@ test.describe('Inline Editing - Links', () => {
     // Now click Submit button in LinkEditor to create the link
     const submitButton = page.getByRole('button', { name: 'Submit' });
     await submitButton.waitFor({ state: 'visible', timeout: 2000 });
-    console.log('[TEST] Clicking Submit button to create the link');
     await submitButton.click();
 
     // Wait for the link to be created in the editor
@@ -226,13 +211,10 @@ test.describe('Inline Editing - Links', () => {
     // Verify the link was created in the editor
     await expect(async () => {
       const blockHtml = await editor.innerHTML();
-      console.log('[TEST] Block HTML after selecting page:', blockHtml);
       expect(blockHtml).toContain('<a ');
       expect(blockHtml).toContain('/another-page');
       expect(blockHtml).toContain('Click here');
     }).toPass({ timeout: 5000 });
-
-    console.log('[TEST] Browse button test complete - link created successfully');
   });
 
   test('can edit link URL', async ({ page }) => {
@@ -340,9 +322,20 @@ test.describe('Inline Editing - Links', () => {
     // Verify the editor is still contenteditable (not blocked)
     await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
 
-    // Verify the selection is preserved (all text still selected)
-    const selectedText = await editor.evaluate(() => window.getSelection()?.toString());
-    expect(selectedText).toBe('Test text');
+    // Verify the text content is still there
+    const textContent = await helper.getCleanTextContent(editor);
+    expect(textContent).toBe('Test text');
+
+    // Verify typing actually works (not just contenteditable attribute present)
+    // This catches the bug where contenteditable is true but iframe is blocked
+    // Click to ensure focus is on editor (focus may shift after LinkEditor closes)
+    await editor.click();
+    await expect(editor).toBeFocused({ timeout: 5000 });
+    // Move cursor to end first (selection may still be "select all" after Escape)
+    await editor.press('End');
+    await editor.pressSequentially(' added', { delay: 10 });
+    const newText = await helper.getCleanTextContent(editor);
+    expect(newText).toContain('added'); // Text was appended
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {
@@ -408,7 +401,8 @@ test.describe('Inline Editing - Links', () => {
 
     // Press Escape to close the ObjectBrowser (otherwise its overlay blocks iframe clicks)
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    // Wait for ObjectBrowser animation to complete
+    await expect(objectBrowser).not.toBeVisible({ timeout: 2000 });
 
     // Click back on the block to cancel the LinkEditor
     // Note: We click on the block element, not [contenteditable="true"], because

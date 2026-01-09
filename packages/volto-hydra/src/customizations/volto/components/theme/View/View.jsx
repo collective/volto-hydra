@@ -231,14 +231,22 @@ class View extends Component {
         </div>
       );
     }
-    if (!this.props.content) {
-      return <span />;
-    }
     if (!this.props.token) {
       return (
         <Redirect to={`/login?return_url=${this.props.location.pathname}`} />
       );
     }
+
+    // Always render Iframe even when content is loading - it manages its own state
+    // and shouldn't remount during navigation (which would reload the frontend)
+    if (!this.props.content) {
+      return (
+        <div id="view">
+          <Iframe token={this.props.token} />
+        </div>
+      );
+    }
+
     const RenderedView =
       this.getViewByLayout() || this.getViewByType() || this.getViewDefault();
 
@@ -263,7 +271,7 @@ class View extends Component {
         /> */}
 
         {/* We can add Iframe Preview Component Here to Render View of the Frontend */}
-        {this.props.token && <Iframe token={this.props.token} />}
+        <Iframe token={this.props.token} />
 
         <SlotRenderer name="belowContent" content={this.props.content} />
         {config.settings.showTags &&

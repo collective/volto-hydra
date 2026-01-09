@@ -5,7 +5,7 @@
  * It provides buttons for: Drag handle, Format buttons (for Slate blocks).
  * The Add button is rendered separately in the iframe.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Quanta Toolbar - Visibility', () => {

@@ -4,7 +4,7 @@
  * Tests nested block selection, container hierarchy detection,
  * and add/delete operations within containers.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Container Block Detection', () => {
@@ -2079,10 +2079,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(indicatorShown).toBe(true);
 
     // text-1a should have moved (not still in col-1)
-    const finalText1aInCol1 = await col1
-      .locator('[data-block-uid="text-1a"]')
-      .count();
-    expect(finalText1aInCol1).toBe(0);
+    // Use auto-retrying assertion to wait for DOM update after drag-drop
+    await expect(col1.locator('[data-block-uid="text-1a"]')).toHaveCount(0);
 
     // CRITICAL: text-1a should NOT be in the top_images container
     // Even though we dragged to top-img-1, slate is not allowed there
@@ -2801,7 +2799,9 @@ test.describe('data-block-selector Navigation', () => {
     await expect(slideButtons.nth(2)).toBeVisible();
     await slideButtons.nth(2).click();
 
-    // Wait for slide-3 to be selected (includes waiting for carousel transition)
+    // Wait for sidebar to show Slide as current (carousel transition happening)
+    await helper.waitForSidebarCurrentBlock('Slide');
+    // Wait for slide-3 to be selected (toolbar positioned correctly)
     await helper.waitForQuantaToolbar('slide-3');
 
     // Now go back to carousel container and select slide-1
@@ -2812,7 +2812,9 @@ test.describe('data-block-selector Navigation', () => {
     // Select first slide entry
     await slideButtons.first().click();
 
-    // Wait for slide-1 to be selected
+    // Wait for sidebar to show Slide as current (carousel transition happening)
+    await helper.waitForSidebarCurrentBlock('Slide');
+    // Wait for slide-1 to be selected (toolbar positioned correctly)
     await helper.waitForQuantaToolbar('slide-1');
   });
 
@@ -2942,6 +2944,74 @@ test.describe('data-block-selector Navigation', () => {
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
     const slideItems = sidebar.locator('.child-block-item');
     await expect(slideItems).toHaveCount(4);
+  });
+
+  test('add button is positioned correctly for slide block', async ({ page }) => {
+    // Use very wide viewport so there's enough margin for the add button
+    // Sidebar is ~486px, slider is max-w-4xl (896px), need 38px margin for button
+    // So iframe needs: 896 + 38 + some left margin = ~950px minimum
+    // With 2000px viewport and ~486px sidebar, iframe should be ~1500px
+    await page.setViewportSize({ width: 2000, height: 900 });
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    const iframe = helper.getIframe();
+    const iframeElement = page.locator('#previewIframe');
+
+    // Wait for the slider block to be visible
+    const sliderBlock = iframe.locator('[data-block-uid="slider-1"]');
+    await expect(sliderBlock).toBeVisible({ timeout: 10000 });
+
+    // Find the first slide
+    const slide1 = iframe.locator('[data-block-uid="slide-1"]');
+    await expect(slide1).toBeVisible({ timeout: 5000 });
+
+    // Click on the slide to select it
+    await slide1.click({ force: true });
+
+    // Wait for add button to appear
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+
+    // Get bounding boxes
+    const slideBox = await slide1.boundingBox();
+    const addButtonBox = await addButton.boundingBox();
+    const iframeBox = await iframeElement.boundingBox();
+
+    expect(slideBox).not.toBeNull();
+    expect(addButtonBox).not.toBeNull();
+    expect(iframeBox).not.toBeNull();
+
+    console.log('[TEST] Slide box:', slideBox);
+    console.log('[TEST] Add button box:', addButtonBox);
+    console.log('[TEST] Iframe box:', iframeBox);
+
+    // The add button should be:
+    // - To the right of the slide (for horizontal container)
+    // - NOT constrained inside the block (there should be space to the right)
+    // Since slides use data-block-add="right", it should be positioned outside the slide
+
+    // Check add button is within iframe bounds
+    expect(addButtonBox!.x).toBeGreaterThanOrEqual(iframeBox!.x);
+    expect(addButtonBox!.x + addButtonBox!.width).toBeLessThanOrEqual(iframeBox!.x + iframeBox!.width);
+
+    // The add button should be to the RIGHT of the slide (not inside/overlapping)
+    const slideRightEdge = slideBox!.x + slideBox!.width;
+    const addButtonLeftEdge = addButtonBox!.x;
+
+    console.log('[TEST] Slide right edge:', slideRightEdge);
+    console.log('[TEST] Add button left edge:', addButtonLeftEdge);
+    console.log('[TEST] Gap between slide and add button:', addButtonLeftEdge - slideRightEdge);
+
+    // Add button should start at or after the slide's right edge (with small gap)
+    // This verifies the add button is NOT constrained inside the slide
+    expect(addButtonLeftEdge).toBeGreaterThanOrEqual(slideRightEdge);
+
+    // Check add button is top-aligned with slide (for "right" direction)
+    const topAlignTolerance = 20;
+    expect(Math.abs(addButtonBox!.y - slideBox!.y)).toBeLessThan(topAlignTolerance);
   });
 });
 
@@ -3096,8 +3166,12 @@ test.describe('slateTable Container', () => {
     // Verify the selection outline has minimum height (empty cells should still be clickable)
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
-    const box = await outline.boundingBox();
-    expect(box?.height).toBeGreaterThanOrEqual(20);
+    // Use retry loop because boundingBox() may return null while element is repositioning
+    await expect(async () => {
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(20);
+    }).toPass({ timeout: 5000 });
   });
 
   test('clicking add button on cell adds a column to ALL rows', async ({ page }) => {
@@ -3143,12 +3217,18 @@ test.describe('slateTable Container', () => {
     await expect(iframe.locator('tr[data-block-uid="row-1"] th[data-block-uid], tr[data-block-uid="row-1"] td[data-block-uid]')).toHaveCount(3);
 
     // Wait for the newly created cell to be selected (sidebar shows "Cell" as current)
+    // The add button auto-selects the new cell, but we need to wait for the selection
+    // to fully propagate to hydra.js before pressing Escape
     await helper.waitForSidebarCurrentBlock('Cell');
+    // Extra wait to ensure hydra.js has updated its selectedBlockUid
+    await page.waitForTimeout(200);
 
     // Navigate to row using Escape, then add a new row
     await page.keyboard.press('Escape');
-    await helper.waitForSidebarCurrentBlock('Row');
-    await page.locator('.volto-hydra-add-button').click();
+    // Wait for add button to change from "Add column" to "Add row" - more reliable than sidebar check
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toHaveAttribute('title', 'Add row', { timeout: 5000 });
+    await addButton.click();
 
     // Wait for new row to appear (should have 3 rows total)
     await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
@@ -3598,5 +3678,158 @@ test.describe('Multi-Container Field Operations', () => {
 
     // Verify the image block is now selected in the iframe
     await expect(sidebar.getByText('Alt text')).toBeVisible();
+  });
+
+  test('can clear image inside container using inline toolbar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the image inside the columns container (top-img-1)
+    const imageBlock = iframe.locator('[data-block-uid="top-img-1"]');
+    await expect(imageBlock).toBeVisible({ timeout: 10000 });
+    await imageBlock.click();
+
+    // Wait for block to be selected (outline appears)
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Get initial image src
+    const imageElement = imageBlock.locator('img');
+    const initialSrc = await imageElement.getAttribute('src');
+    expect(initialSrc).toBeTruthy();
+
+    // Click the clear button in toolbar overlay (X button appears on filled images)
+    // Use iframeContainer scope to avoid matching sidebar's clear button
+    const clearButton = page.locator('#iframeContainer button[title="Clear image"]');
+    await expect(clearButton).toBeVisible({ timeout: 5000 });
+    await clearButton.click();
+
+    // Verify the image was cleared - src should change or element should become placeholder
+    await expect(imageElement).not.toHaveAttribute('src', initialSrc!, {
+      timeout: 5000,
+    });
+  });
+
+  test('creating a new gridBlock shows toolbar and has visible size', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a page-level block (title-block) to enable add button
+    await helper.clickBlockInIframe('title-block');
+    await helper.waitForQuantaToolbar('title-block');
+
+    // Add a new gridBlock
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('gridBlock');
+
+    // Wait for the sidebar to show Grid as the current block
+    await helper.waitForSidebarOpen();
+    await helper.waitForSidebarCurrentBlock('Grid', 10000);
+
+    // Find the new gridBlock by looking for blocks with .grid-row child
+    // Use :not([data-block-uid="grid-1"]) to exclude the original grid-1
+    const newGridBlock = iframe.locator('[data-block-uid]:has(> .grid-row):not([data-block-uid="grid-1"])');
+    await expect(newGridBlock).toBeVisible({ timeout: 5000 });
+
+    // The gridBlock should contain at least one child block (ensureEmptyBlockIfEmpty creates it)
+    const gridRow = newGridBlock.locator('> .grid-row');
+    const childBlocks = gridRow.locator('[data-block-uid]');
+    await expect(childBlocks).toHaveCount(1, { timeout: 5000 });
+
+    // The child block should be selected (toolbar visible for it)
+    // After creating a container, the child gets selected for immediate editing
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // The gridBlock should have a reasonable size (not collapsed)
+    const blockBox = await newGridBlock.boundingBox();
+    expect(blockBox).not.toBeNull();
+    expect(blockBox!.width).toBeGreaterThan(100);
+    expect(blockBox!.height).toBeGreaterThan(50);
+  });
+
+  test('creating a new columns block has selectable image child blocks', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a page-level block (title-block) to enable add button
+    await helper.clickBlockInIframe('title-block');
+    await helper.waitForQuantaToolbar('title-block');
+
+    // Add a new columns block
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('columns');
+
+    // Wait for the sidebar to show Columns as the current block
+    await helper.waitForSidebarOpen();
+    await helper.waitForSidebarCurrentBlock('Columns', 10000);
+
+    // The new columns block should have an image child block in top_images
+    // Find image blocks that have data-media-field directly on them (not deeply nested)
+    // These are actual image-type blocks, not container blocks
+    const imageMediaFields = iframe.locator('[data-media-field="url"]');
+
+    // Wait for at least one image field to exist (from new columns block)
+    await expect(imageMediaFields.first()).toBeVisible({ timeout: 5000 });
+
+    // The image field should have minimum dimensions (from ensureElementsHaveMinSize)
+    const imageFieldBox = await imageMediaFields.first().boundingBox();
+    expect(imageFieldBox).not.toBeNull();
+    expect(imageFieldBox!.width).toBeGreaterThan(50);
+    expect(imageFieldBox!.height).toBeGreaterThan(50);
+
+    // Click directly on the media field element to select the image block
+    await imageMediaFields.first().click();
+
+    // Verify the sidebar now shows Image as current block
+    await helper.waitForSidebarCurrentBlock('Image', 5000);
+  });
+
+  test('gridBlock only shows allowed block types in chooser', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on an existing grid cell (grid-cell-1 is inside grid-1)
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.waitForQuantaToolbar('grid-cell-1');
+
+    // Click the add button to open block chooser
+    await helper.clickAddBlockButton();
+
+    // Wait for block chooser to appear
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // gridBlock allowedBlocks: ['image', 'listing', 'slate', 'teaser']
+    // Image should be visible as an allowed type
+    expect(await helper.isBlockTypeVisible('image')).toBe(true);
+
+    // BUG: Grid and Hero should NOT be available inside a grid
+    // They are not in gridBlock's allowedBlocks but currently appear
+    expect(await helper.isBlockTypeVisible('gridBlock')).toBe(false);
+    expect(await helper.isBlockTypeVisible('hero')).toBe(false);
   });
 });

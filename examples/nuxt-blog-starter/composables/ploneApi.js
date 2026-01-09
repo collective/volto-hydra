@@ -1,3 +1,5 @@
+import { getAccessToken } from '@hydra-js/hydra.js';
+
 export default async function ploneApi({
   path,
   query = null,
@@ -9,12 +11,9 @@ export default async function ploneApi({
   var headers = {
     Accept: 'application/json',
   };
-  if (window?.location) {
-    const url = new URL(window.location.href);
-    const token = url.searchParams.get('access_token');
-    if (token) {
-      headers['Authorization'] = 'Bearer ' + token;
-    }
+  const token = getAccessToken();
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token;
   }
   var api = path?.join ? path.join('/') : path;
   if (!api.startsWith('http')) {

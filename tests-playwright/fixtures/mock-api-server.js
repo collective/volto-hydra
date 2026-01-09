@@ -35,11 +35,35 @@ function parseContentMounts() {
 
 const CONTENT_MOUNTS = parseContentMounts();
 
-// In-memory content database
-const contentDB = {};
+// Session-based transient content storage for uploads
+// Uploads are stored per-session so they don't appear for other users
+// Format: { sessionId: { '/path': content, ... } }
+const sessionContent = {};
 
-// Map URL paths to source directories (for reloading content from disk)
+// Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
+
+/**
+ * Get session ID from request header
+ * @param {Object} req - Express request
+ * @returns {string} Session ID (defaults to '_default' if not provided)
+ */
+function getSessionId(req) {
+  return req.headers['x-test-session'] || '_default';
+}
+
+/**
+ * Store uploaded content in session-specific storage
+ * @param {string} sessionId - Session ID from request
+ * @param {string} urlPath - Content path
+ * @param {Object} content - Content object to store
+ */
+function setSessionContent(sessionId, urlPath, content) {
+  if (!sessionContent[sessionId]) {
+    sessionContent[sessionId] = {};
+  }
+  sessionContent[sessionId][urlPath] = content;
+}
 
 /**
  * Generate a fresh JWT token with 24-hour expiration from now.
@@ -56,7 +80,7 @@ function generateAuthToken(username = 'admin') {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase limit for image uploads
 
 // Virtual Host Monster path rewriting middleware
 // Volto's proxy adds VHM paths like: /VirtualHostBase/http/localhost:8888/++api++/VirtualHostRoot/@login
@@ -142,7 +166,122 @@ function filterActionsForAuth(content, authenticated) {
 }
 
 /**
+ * Generate image_scales for Image content types
+ * Used by object browser to display thumbnails
+ */
+function getImageScales(content, baseUrl) {
+  if (content['@type'] !== 'Image' || !content.image) {
+    return null;
+  }
+
+  const { width, height } = content.image;
+  const contentPath = content['@id'].replace(baseUrl, '');
+
+  return {
+    image: [
+      {
+        download: `${baseUrl}${contentPath}/@@images/image`,
+        width: width,
+        height: height,
+        scales: {
+          preview: {
+            download: `${baseUrl}${contentPath}/@@images/image/preview`,
+            width: Math.min(width, 400),
+            height: Math.min(height, 400),
+          },
+          large: {
+            download: `${baseUrl}${contentPath}/@@images/image/large`,
+            width: Math.min(width, 800),
+            height: Math.min(height, 800),
+          },
+        },
+      }
+    ]
+  };
+}
+
+/**
+ * Format a content item for search results
+ * Includes image_field and image_scales for Image content types
+ * Includes is_folderish for folder navigation in object browser
+ * Includes hasPreviewImage for teaser blocks to show target's preview image
+ */
+function formatSearchItem(content, baseUrl) {
+  // Check if content has a preview image (common for Documents, News Items, etc.)
+  const hasPreviewImage = !!(content.preview_image || content['@type'] === 'Image');
+
+  const item = {
+    '@id': content['@id'],
+    '@type': content['@type'],
+    'id': content.id,
+    'title': content.title,
+    'description': content.description || '',
+    'review_state': content.review_state || 'published',
+    'UID': content.UID,
+    'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
+    'hasPreviewImage': hasPreviewImage,
+  };
+
+  // Add image fields for Image content types (needed by object browser)
+  if (content['@type'] === 'Image') {
+    item.image_field = 'image';
+    item.image_scales = getImageScales(content, baseUrl);
+  }
+
+  return item;
+}
+
+/**
+ * Load raw content from disk (without enrichment, for internal use)
+ * @param {string} urlPath - The URL path to load content for
+ * @returns {Object|null} The raw content object or null if not found
+ */
+function loadRawContentFromDisk(urlPath) {
+  const dirInfo = contentDirMap[urlPath];
+  if (!dirInfo) return null;
+
+  const dataPath = path.join(dirInfo.dirPath, 'data.json');
+  if (!fs.existsSync(dataPath)) return null;
+
+  return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+}
+
+/**
+ * Load content from disk for a given URL path (with enrichment)
+ * @param {string} urlPath - The URL path to load content for
+ * @returns {Object|null} The enriched content object or null if not found
+ */
+function loadContentFromDisk(urlPath) {
+  const baseUrl = `http://localhost:${PORT}`;
+  const content = loadRawContentFromDisk(urlPath);
+  if (!content) return null;
+
+  return enrichContent(content, urlPath, baseUrl);
+}
+
+/**
+ * Format raw content for navigation (avoids enrichment to prevent circular calls)
+ */
+function formatNavItem(rawContent, urlPath, baseUrl) {
+  const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
+  return {
+    '@id': `${baseUrl}${urlPath}`,
+    '@type': rawContent['@type'],
+    'id': rawContent.id,
+    'title': rawContent.title,
+    'description': rawContent.description || '',
+    'review_state': rawContent.review_state || 'published',
+    'UID': rawContent.UID || `${rawContent.id}-uid`,
+    'is_folderish': rawContent.is_folderish !== undefined ? rawContent.is_folderish : true,
+    'hasPreviewImage': hasPreviewImage,
+    'items': [],
+  };
+}
+
+/**
  * Get navigation items at a specific level under a base path
+ * Only includes content from disk (contentDirMap), not session uploads
+ * Uses raw content to avoid circular enrichment calls
  * @param {string} basePath - The base path to get navigation for (e.g., '/' or '/pretagov')
  * @param {number} depth - How many levels deep to include (default 1)
  */
@@ -151,8 +290,8 @@ function getNavigationItems(basePath = '/', depth = 1) {
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
 
-  return Object.entries(contentDB)
-    .filter(([itemPath]) => {
+  return Object.keys(contentDirMap)
+    .filter((itemPath) => {
       if (itemPath === '/') return false;
       if (itemPath === normalizedBase) return false; // Exclude the base itself
 
@@ -165,22 +304,14 @@ function getNavigationItems(basePath = '/', depth = 1) {
       const itemParts = itemPath.split('/').filter(p => p);
       return itemParts.length === baseDepth + 1;
     })
-    .map(([, content]) => ({
-      '@id': content['@id'],
-      '@type': content['@type'],
-      'id': content.id,
-      'title': content.title,
-      'description': content.description || '',
-      'review_state': content.review_state || 'published',
-      'UID': content.UID,
-      'is_folderish': content.is_folderish || false,
-      'items': [],  // Child items (empty for flat structure, needed for depth=2)
-    }));
+    .map((itemPath) => {
+      const rawContent = loadRawContentFromDisk(itemPath);
+      return formatNavItem(rawContent, itemPath, baseUrl);
+    });
 }
 
 /**
- * Get root-level navigation items from contentDB (legacy wrapper)
- * Used by @search endpoint
+ * Get root-level navigation items (wrapper for @search endpoint)
  */
 function getRootNavigationItems() {
   return getNavigationItems('/', 1);
@@ -195,12 +326,12 @@ function generateComponents(urlPath, baseUrl) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   const pathParts = urlPath.split('/').filter(Boolean);
 
-  // Build breadcrumb items
+  // Build breadcrumb items (use raw content to avoid circular calls)
   const breadcrumbItems = [{ '@id': baseUrl, 'title': 'Home' }];
   let currentPath = '';
   for (const part of pathParts) {
     currentPath += '/' + part;
-    const partContent = contentDB[currentPath];
+    const partContent = loadRawContentFromDisk(currentPath);
     breadcrumbItems.push({
       '@id': baseUrl + currentPath,
       'title': partContent?.title || part
@@ -232,7 +363,7 @@ function generateComponents(urlPath, baseUrl) {
       // - If current path has children (is a folder with content), show its children
       // - Otherwise show siblings (items at same level)
       'items': (() => {
-        const hasChildren = Object.keys(contentDB).some(p =>
+        const hasChildren = Object.keys(contentDirMap).some(p =>
           p !== cleanPath && p.startsWith(cleanPath + '/'));
         if (hasChildren) {
           return getNavigationItems(cleanPath, 1);
@@ -298,18 +429,20 @@ function enrichContent(content, urlPath, baseUrl) {
 }
 
 /**
- * Load content from a single directory with a mount prefix
+ * Scan content directory and populate contentDirMap
+ * Content is loaded from disk on-demand, not cached
  */
-function loadContentFromDir(contentDirPath, mountPath, baseUrl) {
+function scanContentDir(contentDirPath, mountPath) {
   if (!fs.existsSync(contentDirPath)) {
     console.log(`Content directory not found: ${contentDirPath}`);
     return;
   }
 
-  console.log(`Loading content from ${contentDirPath} mounted at ${mountPath}`);
+  console.log(`Scanning content from ${contentDirPath} mounted at ${mountPath}`);
 
   const dirs = fs.readdirSync(contentDirPath, { withFileTypes: true });
   dirs.forEach((dir) => {
+    // Support both real directories and symlinks to directories
     const fullDirPath = path.join(contentDirPath, dir.name);
     const isDir = dir.isDirectory() || (dir.isSymbolicLink() &&
       fs.statSync(fullDirPath).isDirectory());
@@ -323,20 +456,20 @@ function loadContentFromDir(contentDirPath, mountPath, baseUrl) {
         // Apply mount prefix
         const urlPath = mountPath === '/' ? contentPath : mountPath + contentPath;
 
-        contentDB[urlPath] = enrichContent(content, urlPath, baseUrl);
+        // Only store the directory mapping, content loaded on-demand
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
-        console.log(`Loaded content: ${urlPath}`);
+        console.log(`Registered content: ${urlPath}`);
       }
     }
   });
 }
 
-// Load initial content from fixtures
-function loadInitialContent() {
+/**
+ * Generate site root content (not from disk)
+ */
+function getSiteRoot() {
   const baseUrl = `http://localhost:${PORT}`;
-
-  // Add site root content
-  contentDB['/'] = {
+  return {
     '@id': baseUrl + '/',
     '@type': 'Plone Site',
     'id': 'Plone',
@@ -345,6 +478,8 @@ function loadInitialContent() {
     'items': [],
     'items_total': 0,
     'is_folderish': true,
+    'blocks': {},
+    'blocks_layout': { 'items': [] },
     '@components': generateComponents('/', baseUrl),
     'can_manage_portlets': true,
     'can_view': true,
@@ -353,36 +488,38 @@ function loadInitialContent() {
     'can_add': true,
     'can_list_contents': true
   };
-  console.log('Loaded content: /');
+}
 
-  // Load content from all mount points
+// Scan content directories on startup (content loaded on-demand)
+function initContentDirMap() {
   CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
-    loadContentFromDir(dirPath, mountPath, baseUrl);
+    scanContentDir(dirPath, mountPath);
   });
+  console.log(`Registered ${Object.keys(contentDirMap).length} content paths`);
 }
 
 // Initialize on startup
-loadInitialContent();
+initContentDirMap();
 
 /**
- * Get content for a path, reloading from disk to pick up changes during development.
- * Falls back to cached contentDB if no file exists.
+ * Get content for a path
+ * Checks: session uploads -> site root -> disk content
+ * @param {string} urlPath - Content path
+ * @param {string} sessionId - Session ID for session-specific uploads
  */
-function getContent(urlPath) {
-  const baseUrl = `http://localhost:${PORT}`;
-
-  // Use contentDirMap to find the source directory for this path
-  const dirInfo = contentDirMap[urlPath];
-  if (dirInfo) {
-    const dataPath = path.join(dirInfo.dirPath, 'data.json');
-    if (fs.existsSync(dataPath)) {
-      const content = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-      return enrichContent(content, urlPath, baseUrl);
-    }
+function getContent(urlPath, sessionId) {
+  // Check session-specific storage first (for uploads created in this session)
+  if (sessionId && sessionContent[sessionId]?.[urlPath]) {
+    return sessionContent[sessionId][urlPath];
   }
 
-  // Fall back to cached contentDB
-  return contentDB[urlPath];
+  // Handle site root specially (not on disk)
+  if (urlPath === '/') {
+    return getSiteRoot();
+  }
+
+  // Load from disk
+  return loadContentFromDisk(urlPath);
 }
 
 /**
@@ -462,6 +599,111 @@ app.post('/@logout', (req, res) => {
   }
   // Return 204 No Content on successful logout (Plone behavior)
   res.status(204).send();
+});
+
+/**
+ * POST /:path (content creation)
+ * Create new content (e.g., Image upload)
+ * Used by ImageWidget for file uploads
+ */
+app.post('/*', (req, res, next) => {
+  // Skip special endpoints (already handled above)
+  if (req.path.startsWith('/@')) {
+    return next();
+  }
+
+  if (process.env.DEBUG) {
+    console.log(`POST content creation: path=${req.path}, @type=${req.body?.['@type']}`);
+  }
+
+  const body = req.body;
+  if (!body || !body['@type']) {
+    // No @type means this isn't a content creation request - pass to next handler
+    return next();
+  }
+
+  const parentPath = req.path || '/';
+  const contentType = body['@type'];
+
+  if (contentType === 'Image') {
+    // Return error for test trigger filename
+    if (body.image?.filename === 'trigger-error.png') {
+      return res.status(500).json({
+        error: {
+          type: 'InternalServerError',
+          message: 'Upload failed: simulated server error',
+        },
+      });
+    }
+
+    // Generate a unique ID for the uploaded image
+    const imageId = `uploaded-image-${Date.now()}`;
+    const imagePath = `${parentPath === '/' ? '' : parentPath}/${imageId}`.replace(/\/+/g, '/');
+
+    // Extract image dimensions from data if possible, otherwise use defaults
+    const width = 800;
+    const height = 600;
+
+    // Create the image content
+    const imageContent = {
+      '@id': `http://localhost:8888${imagePath}`,
+      '@type': 'Image',
+      'UID': `uid-${imageId}`,
+      'id': imageId,
+      'title': body.title || 'Uploaded Image',
+      'description': body.description || '',
+      'image': {
+        'content-type': body.image?.['content-type'] || 'image/png',
+        'download': `http://localhost:8888${imagePath}/@@images/image`,
+        'filename': body.image?.filename || 'image.png',
+        'height': height,
+        'width': width,
+        'scales': {
+          'preview': {
+            'download': `http://localhost:8888${imagePath}/@@images/image/preview`,
+            'height': 400,
+            'width': 400,
+          },
+          'large': {
+            'download': `http://localhost:8888${imagePath}/@@images/image/large`,
+            'height': 800,
+            'width': 800,
+          },
+        },
+        'size': body.image?.data?.length || 1000,
+      },
+      'image_scales': {
+        'image': [{
+          'content-type': body.image?.['content-type'] || 'image/png',
+          'download': `@@images/image-${width}-hash.${body.image?.['content-type']?.split('/')[1] || 'png'}`,
+          'filename': body.image?.filename || 'image.png',
+          'height': height,
+          'width': width,
+          'scales': {
+            'preview': {
+              'download': `@@images/image-400-hash.${body.image?.['content-type']?.split('/')[1] || 'png'}`,
+              'height': 400,
+              'width': 400,
+            },
+          },
+        }],
+      },
+      'review_state': 'published',
+    };
+
+    // Store in session-specific storage (or global if no session)
+    const sessionId = getSessionId(req);
+    setSessionContent(sessionId, imagePath, imageContent);
+
+    if (process.env.DEBUG) {
+      console.log(`Created Image: ${imagePath}${sessionId ? ` (session: ${sessionId})` : ''}`);
+    }
+
+    return res.status(201).json(imageContent);
+  }
+
+  // Unsupported content type - return 501 instead of passing to next
+  return res.status(501).json({ error: `Content type '${contentType}' not supported` });
 });
 
 /**
@@ -568,7 +810,7 @@ app.get('/@types/:typeName', (req, res) => {
  * GET /:path/@types/:typeName
  * Get content type schema for a specific content path
  */
-app.get('{*path}/@types/:typeName', (req, res) => {
+app.get('*/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
   res.json(getTypeSchema(typeName));
 });
@@ -577,7 +819,7 @@ app.get('{*path}/@types/:typeName', (req, res) => {
  * GET /:path/@breadcrumbs
  * Get breadcrumb trail
  */
-app.get('{*path}/@breadcrumbs', (req, res) => {
+app.get('*/@breadcrumbs', (req, res) => {
   const fullPath = req.path.replace('/@breadcrumbs', '');
   const parts = fullPath.split('/').filter((p) => p);
   const items = [{ '@id': 'http://localhost:8888/', title: 'Home' }];
@@ -598,17 +840,58 @@ app.get('{*path}/@breadcrumbs', (req, res) => {
 });
 
 /**
+ * GET /:path/@actions
+ * Get available actions for content (Edit, View, etc.)
+ * Use regex to ensure matching with ++api++ prefix
+ */
+app.get(/.*\/@actions$/, (req, res) => {
+  // Handle ++api++ prefix
+  const cleanPath = req.path.replace('/++api++', '').replace('/@actions', '') || '/';
+  const baseUrl = 'http://localhost:8888';
+  res.json({
+    '@id': `${baseUrl}${cleanPath}/@actions`,
+    object: [
+      {
+        '@id': `${baseUrl}${cleanPath}`,
+        icon: '',
+        id: 'view',
+        title: 'View',
+      },
+      {
+        '@id': `${baseUrl}${cleanPath}/edit`,
+        icon: '',
+        id: 'edit',
+        title: 'Edit',
+      },
+    ],
+    object_buttons: [],
+    user: [],
+  });
+});
+
+/**
  * GET /@search or /:path/@search
  * Search for content (used by ObjectBrowser)
  * Supports path.depth parameter to get children of a specific path
+ * Supports path.query parameter to get a specific content item
  */
-app.get('{*path}/@search', (req, res) => {
+app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
+  const pathQuery = req.query['path.query'];
+  const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
-  if (pathDepth === '1') {
+  // Handle path.query with path.depth=0 (exact match for specific content)
+  if (pathQuery && pathDepth === '0') {
+    const content = loadContentFromDisk(pathQuery);
+    if (content) {
+      items = [formatSearchItem(content, baseUrl)];
+    } else {
+      items = [];
+    }
+  } else if (pathDepth === '1') {
     // Get immediate children of the search path
     // For site root (/), return all root-level items
     // For other paths, return their children (if any)
@@ -618,39 +901,25 @@ app.get('{*path}/@search', (req, res) => {
     } else {
       // Specific path - return its children
       // For Documents (non-folderish items), this will be empty
-      const searchContent = contentDB[searchPath];
+      const searchContent = loadContentFromDisk(searchPath);
       if (searchContent && searchContent.is_folderish) {
         // Return children if folder
-        items = Object.entries(contentDB)
-          .filter(([path]) => {
-            if (path === searchPath) return false;
-            return path.startsWith(searchPath + '/');
+        items = Object.keys(contentDirMap)
+          .filter((itemPath) => {
+            if (itemPath === searchPath) return false;
+            return itemPath.startsWith(searchPath + '/');
           })
-          .map(([path, content]) => ({
-            '@id': content['@id'],
-            '@type': content['@type'],
-            'title': content.title,
-            'description': content.description || '',
-            'review_state': content.review_state || 'published',
-            'UID': content.UID,
-          }));
+          .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
       } else {
         // Non-folder or not found - return empty
         items = [];
       }
     }
   } else {
-    // No depth filter - return all content items
-    items = Object.entries(contentDB)
-      .filter(([path]) => path !== '/')
-      .map(([path, content]) => ({
-        '@id': content['@id'],
-        '@type': content['@type'],
-        'title': content.title,
-        'description': content.description || '',
-        'review_state': content.review_state || 'published',
-        'UID': content.UID,
-      }));
+    // No depth filter - return all content items from disk
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => itemPath !== '/')
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
@@ -676,8 +945,24 @@ app.get('{*path}/@search', (req, res) => {
  * Get folder contents for content browsing
  * Returns items at the parent folder level (siblings of current content)
  */
-app.get('{*path}/@contents', (req, res) => {
+app.get('*/@contents', (req, res) => {
   const contentPath = req.path.replace('/@contents', '') || '/';
+
+  // Helper to format content item for response
+  const formatItem = (itemPath) => {
+    const content = loadContentFromDisk(itemPath);
+    if (!content) return null;
+    return {
+      '@id': content['@id'],
+      '@type': content['@type'],
+      'id': content.id,
+      'title': content.title,
+      'description': content.description || '',
+      'review_state': content.review_state || 'published',
+      'UID': content.UID,
+      'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
+    };
+  };
 
   // For Documents, we return siblings (contents of parent folder)
   // For the site root, we return all root-level items
@@ -685,22 +970,14 @@ app.get('{*path}/@contents', (req, res) => {
 
   if (contentPath === '' || contentPath === '/') {
     // Root level - return all root-level items
-    items = Object.entries(contentDB)
-      .filter(([path]) => {
-        if (path === '/') return false;
-        const pathParts = path.split('/').filter(p => p);
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => {
+        if (itemPath === '/') return false;
+        const pathParts = itemPath.split('/').filter(p => p);
         return pathParts.length === 1;
       })
-      .map(([_path, content]) => ({
-        '@id': content['@id'],
-        '@type': content['@type'],
-        'id': content.id,
-        'title': content.title,
-        'description': content.description || '',
-        'review_state': content.review_state || 'published',
-        'UID': content.UID,
-        'is_folderish': content.is_folderish || false,
-      }));
+      .map(formatItem)
+      .filter(Boolean);
   } else {
     // Get parent folder's contents (siblings of this content)
     const pathParts = contentPath.split('/').filter(p => p);
@@ -708,8 +985,8 @@ app.get('{*path}/@contents', (req, res) => {
       ? '/' + pathParts.slice(0, -1).join('/')
       : '/';
 
-    items = Object.entries(contentDB)
-      .filter(([itemPath]) => {
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => {
         if (itemPath === '/') return false;
         const itemParts = itemPath.split('/').filter(p => p);
         // Same depth as current content and same parent
@@ -720,16 +997,8 @@ app.get('{*path}/@contents', (req, res) => {
                  itemParts.length === pathParts.length;
         }
       })
-      .map(([_path, content]) => ({
-        '@id': content['@id'],
-        '@type': content['@type'],
-        'id': content.id,
-        'title': content.title,
-        'description': content.description || '',
-        'review_state': content.review_state || 'published',
-        'UID': content.UID,
-        'is_folderish': content.is_folderish || false,
-      }));
+      .map(formatItem)
+      .filter(Boolean);
   }
 
   res.json({
@@ -743,7 +1012,7 @@ app.get('{*path}/@contents', (req, res) => {
  * POST /:path/@lock
  * Lock content for editing
  */
-app.post('{*path}/@lock', (req, res) => {
+app.post('*/@lock', (req, res) => {
   res.json({
     locked: true,
     stealable: true,
@@ -754,16 +1023,53 @@ app.post('{*path}/@lock', (req, res) => {
 });
 
 /**
- * GET *\/@@images/*
- * Serve placeholder images for Plone image scales
- * URLs like: /test-image-1.jpg/@@images/image/preview
+ * DELETE /:path/@lock
+ * Unlock content after editing
  */
-app.get('{*contentPath}/@@images/{*imagePath}', (req, res) => {
-  // Extract scale from URL (e.g., 'preview', 'teaser', 'large')
-  const scaleMatch = req.path.match(/@@images\/image\/(\w+)/);
-  const scale = scaleMatch ? scaleMatch[1] : 'preview';
+app.delete('*/@lock', (req, res) => {
+  res.json({ locked: false });
+});
 
-  // Define dimensions for common Plone image scales
+/**
+ * GET *\/@@images/*
+ * Serve images for Plone image scales
+ * URLs like: /test-image-1/@@images/image/preview
+ * Serves actual image files from content directories if they exist,
+ * otherwise falls back to placeholder SVGs.
+ */
+app.get('*/@@images/*', (req, res) => {
+  // Extract content path and scale from URL
+  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, scale=preview
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/image(?:\/(\w+))?$/);
+  const contentPath = pathMatch ? pathMatch[1] : '';
+  const scale = pathMatch && pathMatch[2] ? pathMatch[2] : 'preview';
+
+  // Try to serve actual image file from content directory
+  // Use contentDirMap to find actual directory for nested paths
+  const dirInfo = contentDirMap[contentPath];
+  const imageDir = dirInfo ? path.join(dirInfo.dirPath, 'image') : null;
+
+  if (imageDir && fs.existsSync(imageDir)) {
+    const files = fs.readdirSync(imageDir);
+    if (files.length > 0) {
+      const imageFile = path.join(imageDir, files[0]);
+      const ext = path.extname(files[0]).toLowerCase();
+      const mimeTypes = {
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+      };
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      res.set('Content-Type', contentType);
+      res.sendFile(imageFile);
+      return;
+    }
+  }
+
+  // Fall back to placeholder SVG
   const scaleDimensions = {
     icon: { width: 32, height: 32 },
     tile: { width: 64, height: 64 },
@@ -794,17 +1100,18 @@ app.get('{*contentPath}/@@images/{*imagePath}', (req, res) => {
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
  */
-app.get('{*path}', (req, res, next) => {
+app.get('*', (req, res, next) => {
   // Only handle API requests (with ++api++ prefix)
   // Frontend requests should be handled by static file middleware
   if (!req.isApiRequest) {
     return next();
   }
 
-  const path = req.path;
-  const cleanPath = path.replace('/++api++', '');
+  const urlPath = req.path;
+  const cleanPath = urlPath.replace('/++api++', '');
+  const sessionId = getSessionId(req);
   // Reload content from disk to pick up changes during development
-  const content = getContent(cleanPath);
+  const content = getContent(cleanPath, sessionId);
 
   if (content) {
     // Filter actions based on authentication
@@ -812,7 +1119,7 @@ app.get('{*path}', (req, res, next) => {
     const filteredContent = filterActionsForAuth(content, authenticated);
 
     if (process.env.DEBUG) {
-      console.log(`[DEBUG] Serving API content for ${cleanPath} (auth: ${authenticated})`);
+      console.log(`[DEBUG] Serving API content for ${cleanPath} (auth: ${authenticated})${sessionId ? ` (session: ${sessionId})` : ''}`);
       console.log(`[DEBUG] Query params:`, req.query);
       console.log(`[DEBUG] Response preview:`, JSON.stringify(filteredContent).substring(0, 500));
     }
@@ -832,12 +1139,13 @@ app.get('{*path}', (req, res, next) => {
  * Update content - returns merged content but does NOT persist changes
  * This ensures test isolation (each test gets fresh fixture data)
  */
-app.patch('{*path}', (req, res) => {
-  const path = req.path;
-  const cleanPath = path.replace('/++api++', '');
+app.patch('*', (req, res) => {
+  const urlPath = req.path;
+  const cleanPath = urlPath.replace('/++api++', '');
+  const sessionId = getSessionId(req);
 
   // Reload content from disk to pick up changes during development
-  const content = getContent(cleanPath);
+  const content = getContent(cleanPath, sessionId);
 
   if (content) {
     // Return merged content but don't persist - ensures test isolation
@@ -875,7 +1183,7 @@ app.use(express.static(FRONTEND_DIR, {
 }));
 
 // Fallback to index.html for any non-API routes (SPA routing)
-app.get('{*path}', (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
@@ -885,8 +1193,9 @@ const server = app.listen(PORT, () => {
   console.log(`Mock frontend server also running on http://localhost:${PORT}`);
   console.log(`Health endpoint: http://localhost:${PORT}/health`);
   console.log(`Content endpoints available:`);
-  Object.keys(contentDB).forEach((path) => {
-    console.log(`  - http://localhost:${PORT}${path}`);
+  console.log(`  - http://localhost:${PORT}/`);
+  Object.keys(contentDirMap).forEach((urlPath) => {
+    console.log(`  - http://localhost:${PORT}${urlPath}`);
   });
 });
 

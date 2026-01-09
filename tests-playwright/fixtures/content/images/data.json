@@ -1,0 +1,12 @@
+{
+  "@id": "/images",
+  "@type": "Document",
+  "UID": "images-folder-uid",
+  "id": "images",
+  "title": "Images",
+  "description": "Test images folder",
+  "is_folderish": true,
+  "review_state": "published",
+  "blocks": {},
+  "blocks_layout": {"items": []}
+}

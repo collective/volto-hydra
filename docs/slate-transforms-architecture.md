@@ -411,10 +411,12 @@ Key methods:
 `packages/volto-hydra/src/components/Iframe/View.jsx`
 
 **Unified Form Sync useEffect:** Single useEffect handles both state sync and iframe communication:
-- Triggers on `formDataFromRedux` or `toolbarRequestDone` changes
-- Updates `iframeSyncState` (formData, blockPathMap, validates selection)
-- Sends FORM_DATA to iframe when data changed or pendingSelectBlockUid set
-- Echo prevention via JSON.stringify comparison of blocks
+- Triggers on `properties` or `toolbarRequestDone` changes
+- **Case 1 (toolbar):** When `toolbarRequestDone` is set, sends FORM_DATA with `transformedSelection` from `iframeSyncState.formData`, then updates Redux via `onChangeFormData`
+- **Case 2 (properties):** When `properties` changes (sidebar edit, block add, etc.), sends FORM_DATA without selection
+- **Echo prevention:** Case 2 skips if:
+  1. `iframeSyncState.formData._editSequence > properties._editSequence` (we already sent newer data, Redux just hasn't caught up)
+  2. Content is identical via `formDataContentEqual()` (ignores `_editSequence` metadata)
 
 **Message handlers:**
 - `BLOCK_SELECTED` - Update blockUI and selection atomically

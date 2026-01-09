@@ -8,6 +8,7 @@ import {
   previousBlockId,
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
+import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -16,6 +17,35 @@ const log = (...args) => debugEnabled && console.log('[VIEW]', ...args);
 // eslint-disable-next-line no-unused-vars
 const logExtract = (...args) =>
   debugEnabled && console.log('[EXTRACT]', ...args);
+
+/**
+ * Get field type string in "type:widget" format.
+ * Formats:
+ *   - "string:textarea" (type and widget)
+ *   - "array:slate" (type and widget)
+ *   - ":object_browser" (widget only, no type)
+ *   - "string" (type only, no widget - default text field)
+ *   - "boolean" (type only)
+ *
+ * @param {Object} field - Field definition from schema.properties
+ * @returns {string} Field type string
+ */
+const getFieldTypeString = (field) => {
+  const type = field.type;
+  const widget = field.widget;
+
+  if (type && widget) {
+    return `${type}:${widget}`;
+  }
+  if (widget) {
+    return `:${widget}`;
+  }
+  if (type) {
+    return type;
+  }
+  // No type or widget specified - defaults to string (TextWidget)
+  return 'string';
+};
 
 /**
  * Validates if a selection is valid for the given slate value.
@@ -58,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -141,13 +171,14 @@ const validateFrontendConfig = (options, mergedBlocksConfig) => {
 /**
  * Extract field types for all block types from schema registry
  * @param {Object} intl - The react-intl intl object for internationalization
+ * @param {Object} contentTypeSchema - Optional content type schema for page-level fields
  * @returns {Object} - Object mapping blockType -> fieldName -> fieldType
  *
  * We look up schemas from config.blocks.blocksConfig for each registered block type
  * and identify which fields are Slate fields (widget: 'slate') vs text fields.
  * This way it works for all blocks of that type, including ones added later.
  */
-const extractBlockFieldTypes = (intl) => {
+const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
   const blockFieldTypes = {};
 
   if (!config.blocks?.blocksConfig) {
@@ -156,8 +187,19 @@ const extractBlockFieldTypes = (intl) => {
 
   // Hardcode known block types that don't have schemas
   // Slate blocks always have a 'value' field that is a slate field
-  blockFieldTypes.slate = { value: 'slate' };
-  blockFieldTypes.detachedSlate = { value: 'slate' };
+  blockFieldTypes.slate = { value: 'array:slate' };
+  blockFieldTypes.detachedSlate = { value: 'array:slate' };
+
+  // Extract page-level field types from content type schema
+  // These are accessed via /fieldName syntax (e.g., /title, /description)
+  if (contentTypeSchema?.properties) {
+    blockFieldTypes._page = {};
+    Object.keys(contentTypeSchema.properties).forEach((fieldName) => {
+      const field = contentTypeSchema.properties[fieldName];
+      blockFieldTypes._page[fieldName] = getFieldTypeString(field);
+    });
+    logExtract('Page-level field types from content type schema:', blockFieldTypes._page);
+  }
 
   // Iterate through all registered block types
   Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
@@ -190,15 +232,10 @@ const extractBlockFieldTypes = (intl) => {
       }
       Object.keys(schema.properties).forEach((fieldName) => {
         const field = schema.properties[fieldName];
-        // Determine field type based on widget
-        let fieldType = null;
-        if (field.widget === 'slate') {
-          fieldType = 'slate';
-        } else if (field.widget === 'textarea') {
-          fieldType = 'textarea';
-        } else if (field.type === 'string') {
-          fieldType = 'string';
-        } else if (field.widget === 'object_list' && field.schema?.properties) {
+        blockFieldTypes[blockType][fieldName] = getFieldTypeString(field);
+
+        // Handle object_list widgets (e.g., slides in slider block)
+        if (field.widget === 'object_list' && field.schema?.properties) {
           // object_list widget: extract field types from itemSchema
           // Store under virtual type key: blockType:fieldName
           const itemTypeKey = `${blockType}:${fieldName}`;
@@ -214,18 +251,7 @@ const extractBlockFieldTypes = (intl) => {
 
           Object.keys(field.schema.properties).forEach((itemFieldName) => {
             const itemField = field.schema.properties[itemFieldName];
-            let itemFieldType = null;
-            if (itemField.widget === 'slate') {
-              itemFieldType = 'slate';
-            } else if (itemField.widget === 'textarea') {
-              itemFieldType = 'textarea';
-            } else if (itemField.type === 'string') {
-              itemFieldType = 'string';
-            }
-
-            if (itemFieldType) {
-              blockFieldTypes[itemTypeKey][itemFieldName] = itemFieldType;
-            }
+            blockFieldTypes[itemTypeKey][itemFieldName] = getFieldTypeString(itemField);
 
             // Handle nested object_list (e.g., rows containing cells)
             if (itemField.widget === 'object_list' && itemField.schema?.properties) {
@@ -242,29 +268,10 @@ const extractBlockFieldTypes = (intl) => {
 
               Object.keys(itemField.schema.properties).forEach((nestedFieldName) => {
                 const nestedField = itemField.schema.properties[nestedFieldName];
-                let nestedFieldType = null;
-                if (nestedField.widget === 'slate') {
-                  nestedFieldType = 'slate';
-                } else if (nestedField.widget === 'textarea') {
-                  nestedFieldType = 'textarea';
-                } else if (nestedField.type === 'string') {
-                  nestedFieldType = 'string';
-                }
-                if (nestedFieldType) {
-                  blockFieldTypes[nestedItemTypeKey][nestedFieldName] = nestedFieldType;
-                }
+                blockFieldTypes[nestedItemTypeKey][nestedFieldName] = getFieldTypeString(nestedField);
               });
             }
           });
-        }
-
-        if (fieldType) {
-          blockFieldTypes[blockType][fieldName] = fieldType;
-        }
-
-        // Debug: Log hero field processing
-        if (blockType === 'hero') {
-          logExtract(`Hero field ${fieldName}: widget=${field.widget}, type=${field.type}, resolved fieldType=${fieldType}`);
         }
       });
 
@@ -301,7 +308,9 @@ const addUrlParams = (url, qParams, pathname) => {
 
   const path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
   if (urlObj.hash) {
-    urlObj.hash += `/${path}`;
+    // Support both /#/ and /# - normalize by removing trailing slash before appending
+    const hashBase = urlObj.hash.replace(/\/$/, '');
+    urlObj.hash = `${hashBase}/${path}`;
   } else {
     urlObj.pathname += `${path}`;
   }
@@ -315,23 +324,16 @@ const addUrlParams = (url, qParams, pathname) => {
  * @param {String} token
  * @returns {URL} URL with the admin params
  */
-const getUrlWithAdminParams = (url, token) => {
-  return typeof window !== 'undefined'
-    ? window.location.pathname.endsWith('/edit')
-      ? addUrlParams(
-          `${url}`,
-          { access_token: token, _edit: true },
-          `${window.location.pathname.replace('/edit', '')}`,
-        )
-      : addUrlParams(
-          `${url}`,
-          {
-            access_token: token,
-            _edit: false,
-          },
-          `${window.location.pathname}`,
-        )
-    : null;
+const getUrlWithAdminParams = (url, token, isEdit) => {
+  // Edit mode communicated via iframe name AND _edit param for reliability
+  // _edit param ensures mode change triggers URL change and iframe reload
+  if (typeof window === 'undefined') return null;
+  const contentPath = window.location.pathname.replace(/\/edit$/, '');
+  const params = { access_token: token };
+  if (isEdit) {
+    params._edit = 'true';
+  }
+  return addUrlParams(`${url}`, params, contentPath);
 };
 function _isObject(item) {
   return (
@@ -349,6 +351,15 @@ function deepMerge(entry, newConfig) {
           Object.assign(output, {
             [key]: newConfig[key],
           });
+        } else if (typeof entry[key] === 'function') {
+          // Special case: if existing value is a function (like blockSchema),
+          // wrap it to merge the function's result with the new object
+          const originalFn = entry[key];
+          const overrides = newConfig[key];
+          output[key] = (props) => {
+            const result = originalFn(props);
+            return deepMerge(result, overrides);
+          };
         } else {
           output[key] = deepMerge(entry[key], newConfig[key]);
         }
@@ -437,6 +448,10 @@ function recurseUpdateVoltoConfig(newConfig) {
   });
 }
 
+// Module-level state to track iframe's current state across component remounts
+// This prevents unnecessary iframe reloads when React Router remounts the View component
+let persistedIframe = { frontendUrl: null, path: null, isEdit: null };
+
 const Iframe = (props) => {
   const {
     onSelectBlock,
@@ -453,9 +468,11 @@ const Iframe = (props) => {
     selectedBlock,
     openObjectBrowser,
     closeObjectBrowser,
+    schema, // Content type schema for page-level field types
   } = props;
 
   const dispatch = useDispatch();
+
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   // pendingAdd: { mode: 'sidebar', parentBlockId, fieldName } | { mode: 'iframe', afterBlockId }
   const [pendingAdd, setPendingAdd] = useState(null);
@@ -463,6 +480,21 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
+
+  // History for routing - needed early for edit mode detection
+  const history = useHistory();
+  const pathname = history.location.pathname;
+
+  // Edit mode detection and iframe name - used for hydra.js bridge detection
+  // Uses history.location.pathname which works on both SSR and client
+  const isEditMode = pathname.endsWith('/edit');
+  // Origin: use publicURL from config on SSR, window.location.origin on client
+  const adminOrigin = typeof window !== 'undefined'
+    ? window.location.origin
+    : (config.settings.publicURL || '').replace(/\/$/, '');
+  const iframeName = `hydra-${isEditMode ? 'edit' : 'view'}:${adminOrigin}`;
+
+  const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
 
   // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
@@ -504,13 +536,21 @@ const Iframe = (props) => {
   }, [selectedBlock]);
 
   // Clear blockUI when no block is selected
+  // BUT keep it for page-level fields (blockUI exists with rect but blockUid is null)
   useEffect(() => {
     if (!selectedBlock) {
-      setBlockUI(null);
+      setBlockUI((prev) => {
+        // Keep blockUI if it's a page-level selection (blockUid is null but has rect)
+        if (prev?.blockUid === null && prev?.rect) {
+          return prev;
+        }
+        return null;
+      });
     }
   }, [selectedBlock]);
 
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
+  // Note: iframePath is stored in module-level persistedIframePath to survive component remounts
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
   const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
@@ -547,9 +587,13 @@ const Iframe = (props) => {
       if (e.key !== 'Escape') return;
       if (!selectedBlock) return;
 
-      // Don't interfere with Escape in modals, dropdowns, etc.
-      const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"], .ui.modal');
+      // Don't interfere with Escape in modals, dropdowns, popups, etc.
+      const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"], .ui.modal, .add-link, .slate-inline-toolbar');
       if (isInPopup) return;
+
+      // Also check if LinkEditor popup is visible (focus may not be inside it)
+      const linkEditorVisible = document.querySelector('.add-link');
+      if (linkEditorVisible) return;
 
       // Don't handle if focus is in iframe - let iframe's handler do it
       const iframe = document.getElementById('previewIframe');
@@ -578,9 +622,20 @@ const Iframe = (props) => {
   // Initialize to null to avoid SSR/client hydration mismatch (token differs)
   const [iframeSrc, setIframeSrc] = useState(null);
 
+  // Note: window.name inside iframe is set via the `name` attribute on the <iframe> element.
+  // When iframe reloads (e.g., on mode switch), it picks up the current `name` attribute value.
+  // No useEffect needed - the HTML attribute handles it.
+
   // Extract block field types - stored in state so it can be updated when frontend config is merged
   // Must be declared before useEffects that reference it
-  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl));
+  const [blockFieldTypes, setBlockFieldTypes] = useState(() => extractBlockFieldTypes(intl, schema));
+
+  // Update block field types when schema changes (includes page-level field types)
+  useEffect(() => {
+    if (schema) {
+      setBlockFieldTypes(extractBlockFieldTypes(intl, schema));
+    }
+  }, [schema, intl]);
 
   // Note: We use `properties` prop from Form.jsx as the single source of truth
   // This matches standard Volto's BlocksForm pattern (props, not Redux)
@@ -591,13 +646,42 @@ const Iframe = (props) => {
   }, [properties, blockFieldTypes]);
 
   useEffect(() => {
-    setIframeSrc(getUrlWithAdminParams(u, token));
+    // Only update iframeSrc if admin path, mode, or frontend URL differs from iframe's current state
+    // This prevents reloading iframe when it already navigated via SPA
+    // Using module-level persistedIframe to survive component remounts
+    const adminPath = pathname.replace(/\/edit$/, '');
+    const stateMatches =
+      persistedIframe.frontendUrl === u &&
+      persistedIframe.path === adminPath &&
+      persistedIframe.isEdit === isEditMode;
+    log('[IFRAME_SRC] persisted:', persistedIframe, 'current:', { frontendUrl: u, path: adminPath, isEdit: isEditMode }, 'match:', stateMatches, 'iframeSrc:', iframeSrc ? 'set' : 'null');
+    // Update if state doesn't match OR if iframeSrc is null (component just mounted)
+    if (!stateMatches || !iframeSrc) {
+      log('[IFRAME_SRC] Updating iframeSrc (state differs:', !stateMatches, 'iframeSrc null:', !iframeSrc, ')');
+      setIframeSrc(getUrlWithAdminParams(u, token, isEditMode));
+      persistedIframe = { frontendUrl: u, path: adminPath, isEdit: isEditMode };
+    } else {
+      log('[IFRAME_SRC] Skipping - state matches and iframeSrc already set');
+    }
     u && Cookies.set('iframe_url', u, { expires: 7 });
-  }, [token, u]);
+  }, [token, u, pathname, isEditMode, iframeSrc]);
 
   // NOTE: Form sync and FORM_DATA sending are merged into one useEffect below (search for "UNIFIED FORM SYNC")
 
-  const history = useHistory();
+  // Warn before leaving edit mode (browser-level)
+
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // Required for Chrome
+      return ''; // Required for some browsers
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isEditMode]);
 
   /**
    * Unified block insertion: creates a block, inserts it, updates Redux, and selects it.
@@ -627,8 +711,7 @@ const Iframe = (props) => {
     let fieldDef;
 
     if (action === 'inside') {
-      const parentBlock = getBlockByPath(formData, blockPathMap?.[blockId]?.path)
-        || formData?.blocks?.[blockId];
+      const parentBlock = getBlockById(formData, blockPathMap, blockId);
       const parentSchema =
         typeof mergedBlocksConfig?.[parentBlock?.['@type']]?.blockSchema === 'function'
           ? mergedBlocksConfig[parentBlock['@type']].blockSchema({
@@ -697,7 +780,7 @@ const Iframe = (props) => {
       let virtualType;
       if (action === 'inside') {
         // Get parent type and append field name
-        virtualType = `${getBlockByPath(formData, blockPathMap?.[blockId]?.path)?.['@type'] || formData?.blocks?.[blockId]?.['@type']}:${fieldName}`;
+        virtualType = `${getBlockById(formData, blockPathMap, blockId)?.['@type']}:${fieldName}`;
       } else {
         // For before/after, use the existing item's virtual type
         virtualType = blockPathMap[blockId]?.itemType;
@@ -713,14 +796,13 @@ const Iframe = (props) => {
         let tableBlock;
         let dataPath;
         if (action === 'inside') {
-          tableBlock = getBlockByPath(formData, blockPathMap?.[blockId]?.path) || formData?.blocks?.[blockId];
+          tableBlock = getBlockById(formData, blockPathMap, blockId);
           dataPath = fieldDef?.dataPath || [fieldName];
         } else {
           // For before/after on a row, get the parent table
           const rowPathInfo = blockPathMap?.[blockId];
           const parentId = rowPathInfo?.parentId;
-          const parentPathInfo = blockPathMap?.[parentId];
-          tableBlock = getBlockByPath(formData, parentPathInfo?.path) || formData?.blocks?.[parentId];
+          tableBlock = getBlockById(formData, blockPathMap, parentId);
           // Get dataPath from the row's container field definition
           const tableType = tableBlock?.['@type'];
           const tableBlockSchema = typeof mergedBlocksConfig?.[tableType]?.blockSchema === 'function'
@@ -750,7 +832,7 @@ const Iframe = (props) => {
     }
 
     // Insert and update state
-    const newFormData = insertBlockInContainer(
+    let newFormData = insertBlockInContainer(
       formData,
       blockPathMap,
       blockId,
@@ -764,6 +846,17 @@ const Iframe = (props) => {
       console.error('[VIEW] insertAndSelectBlock failed');
       return null;
     }
+
+    // Ensure new container blocks have at least one child (for gridBlock etc.)
+    const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+    newFormData = ensureEmptyBlockIfEmpty(
+      newFormData,
+      { parentId: newBlockId },
+      newBlockPathMap,
+      uuid,
+      mergedBlocksConfig,
+      { intl, metadata, properties },
+    );
 
     // Determine which block to select
     let selectBlockId = newBlockId;
@@ -792,6 +885,8 @@ const Iframe = (props) => {
     flushSync(() => {
       setIframeSyncState((prev) => ({
         ...prev,
+        // Rebuild blockPathMap immediately so Escape handler has current parent info
+        blockPathMap: buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
         pendingSelectBlockUid: selectBlockId,
         ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
       }));
@@ -908,10 +1003,13 @@ const Iframe = (props) => {
       }
       const { type } = event.data;
       switch (type) {
-        case 'PATH_CHANGE': // PATH change from the iframe
+        case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
+          // User clicked a nav link in iframe - they want to VIEW that page, not edit it
+          // Update module-level state BEFORE history.push so useEffect knows iframe already has this path
+          persistedIframe = { frontendUrl: u, path: event.data.path, isEdit: false };
           history.push(event.data.path);
-
           break;
+        }
 
 
         case 'OPEN_SETTINGS':
@@ -949,6 +1047,11 @@ const Iframe = (props) => {
             // New edit from iframe - update everything
             inlineEditCounterRef.current += 1;
             editSequenceRef.current = incomingSequence; // Track the new sequence
+            // Debug: log full children structure to diagnose missing "w" bug
+            const debugBlock = event.data.data?.blocks?.['block-1-uuid'];
+            if (debugBlock?.value?.[0]?.children) {
+              log('INLINE_EDIT_DATA: full children structure:', JSON.stringify(debugBlock.value[0].children));
+            }
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
@@ -956,8 +1059,12 @@ const Iframe = (props) => {
               selection: event.data.selection || null,
               ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
             }));
-            log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux');
-            onChangeFormData(event.data.data);
+            // Strip _editSequence when updating Redux - sequence numbers are for iframe
+            // echo detection only. Keeping them in Redux would cause sidebar edits to
+            // inherit stale sequences, breaking the "skip if propsSeq < syncedSeq" check.
+            const { _editSequence: _, ...formDataWithoutSeq } = event.data.data;
+            log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux (without _editSequence)');
+            onChangeFormData(formDataWithoutSeq);
           } else {
             // Echo or stale - only update selection and flush state
             log('INLINE_EDIT_DATA: echo/stale, only updating selection');
@@ -1048,7 +1155,7 @@ const Iframe = (props) => {
               }
               const blockType = currentBlock['@type'];
               const fieldType = blockFieldTypes[blockType]?.[enterFieldName];
-              if (fieldType !== 'slate') {
+              if (!isSlateFieldType(fieldType)) {
                 // Not a slate field - don't split block
                 break;
               }
@@ -1272,11 +1379,12 @@ const Iframe = (props) => {
           // it to be "re-selected" and scrolled back into view.
           const isPositionUpdateOnly = event.data.src === 'scrollHandler' ||
                                         event.data.src === 'resizeHandler';
-          // Reject BLOCK_SELECTED with zero rect early - this happens when block element is detached
-          // during frontend re-render (e.g., mock frontend's innerHTML replacement or carousel transition)
-          // Must check BEFORE calling onSelectBlock to avoid changing selectedBlock incorrectly
+          // Reject BLOCK_SELECTED with zero rect only for position updates of the SAME block
+          // (this happens when block element is detached during frontend re-render)
+          // For NEW block selection, allow zero rect - the block may be empty but we still need to select it
           const hasZeroRect = event.data.blockUid && (event.data.rect?.width === 0 || event.data.rect?.height === 0);
-          if (hasZeroRect) {
+          const isSameBlock = selectedBlock === event.data.blockUid;
+          if (hasZeroRect && isSameBlock) {
             log('[VIEW] Ignoring BLOCK_SELECTED with zero rect (element detached):', event.data.src);
             return;
           }
@@ -1300,10 +1408,7 @@ const Iframe = (props) => {
           // because React state updates are async and the state may be stale when BLOCK_SELECTED arrives
           // shortly after a delete operation creates an empty block
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
-          const selectedBlockData = getBlockByPath(
-            properties,
-            currentBlockPathMap?.[event.data.blockUid]?.path,
-          ) || properties?.blocks?.[event.data.blockUid];
+          const selectedBlockData = getBlockById(properties, currentBlockPathMap, event.data.blockUid);
           if (selectedBlockData?.['@type'] === 'empty') {
             setAddNewBlockOpened(true);
           }
@@ -1311,14 +1416,20 @@ const Iframe = (props) => {
           // Now update blockUI state
           setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
+            // IMPORTANT: Must compare mediaFields because they can change independently
+            // (e.g., when an image is cleared, the placeholder div has different dimensions)
+            const mediaFieldsChanged = JSON.stringify(prevBlockUI?.mediaFields) !== JSON.stringify(event.data.mediaFields);
             if (prevBlockUI &&
                 prevBlockUI.blockUid === event.data.blockUid &&
                 prevBlockUI.focusedFieldName === event.data.focusedFieldName &&
+                prevBlockUI.focusedLinkableField === event.data.focusedLinkableField &&
+                prevBlockUI.focusedMediaField === event.data.focusedMediaField &&
                 prevBlockUI.addDirection === event.data.addDirection &&
                 prevBlockUI.rect?.top === event.data.rect?.top &&
                 prevBlockUI.rect?.left === event.data.rect?.left &&
                 prevBlockUI.rect?.width === event.data.rect?.width &&
-                prevBlockUI.rect?.height === event.data.rect?.height) {
+                prevBlockUI.rect?.height === event.data.rect?.height &&
+                !mediaFieldsChanged) {
               return prevBlockUI; // Return same reference to skip re-render
             }
             // Note: Zero rect check happens earlier (before onSelectBlock) so we return before reaching here
@@ -1338,8 +1449,12 @@ const Iframe = (props) => {
             return {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
-              focusedFieldName: event.data.focusedFieldName, // Track which field is focused
+              focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
+              focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
+              focusedMediaField: event.data.focusedMediaField, // Track which media field is focused
               editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
+              linkableFields: event.data.linkableFields, // Map of fieldName -> true for link fields
+              mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
             };
           });
@@ -1367,6 +1482,19 @@ const Iframe = (props) => {
           // Combined initialization: merge config first, then send data
           // This ensures blockPathMap is built with complete schema knowledge
           iframeOriginRef.current = event.origin;
+
+          // Check if iframe navigated to a different page (e.g., user clicked nav link)
+          // User confirmed beforeunload warning, so they're leaving edit mode
+          if (event.data.currentPath) {
+            const adminPath = history.location.pathname.replace(/\/edit$/, '') || '/';
+            if (event.data.currentPath !== adminPath) {
+              log('INIT: iframe navigated to different page, following to view mode:', event.data.currentPath);
+              // Update persistedIframe BEFORE history.push so useEffect won't reload iframe
+              persistedIframe = { frontendUrl: u, path: event.data.currentPath, isEdit: false };
+              history.push(event.data.currentPath);
+              return; // Don't send INITIAL_DATA - admin will re-render with new page
+            }
+          }
 
           // 1. Merge voltoConfig (adds custom block definitions)
           if (event.data.voltoConfig) {
@@ -1404,8 +1532,8 @@ const Iframe = (props) => {
             setAllowedBlocksList(event.data.allowedBlocks);
           }
 
-          // 3. Extract block field types (now includes custom blocks)
-          const initialBlockFieldTypes = extractBlockFieldTypes(intl);
+          // 3. Extract block field types (now includes custom blocks and page-level fields)
+          const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
           setBlockFieldTypes(initialBlockFieldTypes);
 
           // 4. Build blockPathMap (now has complete schema knowledge)
@@ -1416,7 +1544,17 @@ const Iframe = (props) => {
             blockPathMap: initialBlockPathMap,
           }));
 
-          // 5. Send everything to iframe
+          // 5. Send everything to iframe (only in edit mode)
+          // In view mode, frontend renders from its own API - no need to send data
+          const inEditMode = history.location.pathname.endsWith('/edit');
+          if (!inEditMode) {
+            log('INIT: view mode, skipping INITIAL_DATA');
+            break;
+          }
+          if (!form) {
+            log('INIT: form data not available yet, skipping INITIAL_DATA');
+            break;
+          }
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
           event.source.postMessage(
             {
@@ -1512,10 +1650,16 @@ const Iframe = (props) => {
         message,
         iframeOriginRef.current,
       );
+      // Use flushSync to ensure BOTH state updates commit before any pending re-renders
+      // This prevents race condition where onSelectBlock's Redux update triggers Case 2
+      // with stale properties before onChangeFormData's update propagates
+      // Strip _editSequence from Redux - sequences are for iframe echo detection only.
+      // Keeping them in Redux causes sidebar edits to inherit stale sequences.
+      const { _editSequence: _, ...formWithoutSeq } = formWithSequence;
       flushSync(() => {
         setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
+        onChangeFormData(formWithoutSeq);
       });
-      onChangeFormData(formWithSequence);
       return;
     }
 
@@ -1524,16 +1668,31 @@ const Iframe = (props) => {
       return;
     }
 
+    // Skip if properties has an older sequence than what we've already sent
+    // This prevents stale Redux echoes after Case 1 runs.
+    // IMPORTANT: Sidebar edits come through Redux without _editSequence (it's undefined),
+    // so we must NOT skip those - only skip when properties explicitly has an older sequence.
+    const syncedSeq = iframeSyncState.formData?._editSequence || 0;
+    const propsSeq = formToUse?._editSequence;
+    if (propsSeq !== undefined && syncedSeq > propsSeq) {
+      log('[SYNC SKIP] Stale sequence: propsSeq', propsSeq, '< syncedSeq', syncedSeq);
+      return;
+    }
+
+    // Also skip if content is identical (ignoring _editSequence metadata)
+    if (formDataContentEqual(formToUse, iframeSyncState.formData)) {
+      log('[SYNC SKIP] Content identical, skipping FORM_DATA');
+      return;
+    }
+    log('[SYNC] Content changed, will send FORM_DATA. propsSeq:', propsSeq, 'syncedSeq:', syncedSeq);
+
     // Build new blockPathMap
     const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
 
     // Validate selection (may be stale after document structure changes)
     let newSelection = iframeSyncState.selection;
     if (selectedBlock && iframeSyncState.selection) {
-      const blockPath = newBlockPathMap[selectedBlock]?.path;
-      const block = blockPath
-        ? getBlockByPath(formToUse, blockPath)
-        : formToUse.blocks?.[selectedBlock];
+      const block = getBlockById(formToUse, newBlockPathMap, selectedBlock);
       const slateValue = block?.value;
       if (slateValue && !isSelectionValidForValue(iframeSyncState.selection, slateValue)) {
         log('Selection invalid for new form data, clearing');
@@ -1564,7 +1723,7 @@ const Iframe = (props) => {
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
     }));
 
-    // Always send to iframe - sequence handles stale echo detection
+    // Send updated data to iframe (duplicates already filtered above)
     const message = {
       type: 'FORM_DATA',
       data: formWithSequence,
@@ -1647,8 +1806,7 @@ const Iframe = (props) => {
         // Page-level
         return allowedBlocks;
       }
-      const parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentBlockId]?.path)
-        || properties?.blocks?.[parentBlockId];
+      const parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
       const parentType = parentBlockData?.['@type'];
       const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
       const resolvedSchema = typeof parentSchema === 'function'
@@ -1662,14 +1820,26 @@ const Iframe = (props) => {
     if (parentId) {
       const parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
       const parentType = parentBlockData?.['@type'];
-      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
-      for (const [fieldName, fieldDef] of Object.entries(parentSchema?.properties || {})) {
+      const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
+      const parentSchema = parentBlockConfig?.blockSchema;
+      const resolvedSchema = typeof parentSchema === 'function'
+        ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+        : parentSchema;
+
+      // First check schema-defined container fields (e.g., columns, accordion)
+      for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
         if (fieldDef.type === 'blocks') {
           const layoutField = `${fieldName}_layout`;
           if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
             return fieldDef.allowedBlocks || null;
           }
         }
+      }
+
+      // Check for implicit container (uses blocks/blocks_layout directly)
+      // These have allowedBlocks on the block config, not in schema
+      if (parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
+        return parentBlockConfig?.allowedBlocks || null;
       }
     }
     return allowedBlocks;
@@ -1705,8 +1875,7 @@ const Iframe = (props) => {
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
     // Get allowed blocks for this container field
     const parentBlock = parentBlockId
-      ? (getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentBlockId]?.path)
-        || properties?.blocks?.[parentBlockId])
+      ? getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId)
       : null;
     const parentType = parentBlock?.['@type'];
     const blocksConfig = config.blocks.blocksConfig;
@@ -1742,6 +1911,33 @@ const Iframe = (props) => {
     <div id="iframeContainer">
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
+        pendingFieldMedia={pendingFieldMedia}
+        onFieldMediaSelected={(fieldName, blockUid, imagePath) => {
+          // Update the block's field with the new image path
+          const block = getBlockById(properties, iframeSyncState.blockPathMap, blockUid);
+          if (!block) {
+            setPendingFieldMedia(null);
+            return;
+          }
+
+          const updatedBlock = { ...block, [fieldName]: imagePath };
+          const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, blockUid, updatedBlock);
+
+          // Update Redux via onChangeFormData
+          onChangeFormData(updatedProperties);
+
+          // Rebuild blockPathMap and send FORM_DATA to iframe
+          const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
+          setIframeSyncState(prev => ({
+            ...prev,
+            formData: updatedProperties,
+            blockPathMap: newBlockPathMap,
+            toolbarRequestDone: `field-media-${Date.now()}`,
+          }));
+
+          setPendingFieldMedia(null);
+        }}
+        onFieldMediaCancelled={() => setPendingFieldMedia(null)}
       />
       {addNewBlockOpened &&
         createPortal(
@@ -1762,10 +1958,11 @@ const Iframe = (props) => {
               onInsertBlock={
                 // Check if selected block is empty - if so, use onMutateBlock to replace
                 (() => {
-                  const selectedBlockData = getBlockByPath(
+                  const selectedBlockData = getBlockById(
                     properties,
-                    iframeSyncState.blockPathMap?.[selectedBlock]?.path,
-                  ) || properties?.blocks?.[selectedBlock];
+                    iframeSyncState.blockPathMap,
+                    selectedBlock,
+                  );
                   const isEmptyBlock = selectedBlockData?.['@type'] === 'empty';
 
                   if (isEmptyBlock) return null;
@@ -1794,13 +1991,21 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
-      <iframe
-        id="previewIframe"
-        title="Preview"
-        src={iframeSrc}
-        ref={setReferenceElement}
-        allow="clipboard-read; clipboard-write"
-      />
+      {/* Only render when src is ready (ensures name attribute is applied on creation).
+          Key on mode ensures iframe remounts when switching edit/view,
+          but persists during SPA navigation within the same mode */}
+      {iframeSrc && (
+        <iframe
+          key={isEditMode ? 'edit' : 'view'}
+          id="previewIframe"
+          name={iframeName}
+          title="Preview"
+          src={iframeSrc}
+          ref={setReferenceElement}
+          allow="clipboard-read; clipboard-write"
+          suppressHydrationWarning
+        />
+      )}
 
       {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
       {blockUI && blockUI.rect && referenceElement && (() => {
@@ -1979,6 +2184,55 @@ const Iframe = (props) => {
                 insertAndSelectBlock(selectedBlock, null, action);
               }
             }}
+            onFieldLinkChange={(fieldName, url, metadata) => {
+              let updatedProperties;
+
+              if (selectedBlock === null) {
+                // Page-level field - update directly on properties
+                // For image fields with metadata, construct NamedBlobImage format
+                if (metadata?.image_scales) {
+                  const imageField = metadata.image_field || 'image';
+                  const scaleInfo = metadata.image_scales[imageField]?.[0];
+                  // Construct NamedBlobImage object format
+                  const imageValue = {
+                    '@type': 'Image',
+                    'download': `${url}/@@images/${imageField}`,
+                    'scales': scaleInfo?.scales || {},
+                  };
+                  updatedProperties = { ...properties, [fieldName]: imageValue };
+                } else {
+                  updatedProperties = { ...properties, [fieldName]: url };
+                }
+              } else {
+                // Block field - update the block's field with the new URL
+                // Use getBlockById to handle both top-level and container blocks
+                const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+                if (!block) return;
+
+                // For blocks, store url and image_scales separately (like Image block does)
+                const updatedBlock = metadata?.image_scales
+                  ? { ...block, [fieldName]: url, image_field: metadata.image_field, image_scales: metadata.image_scales }
+                  : { ...block, [fieldName]: url };
+                // Use updateBlockById to handle both top-level and container blocks
+                updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
+              }
+
+              // Update Redux via onChangeFormData
+              onChangeFormData(updatedProperties);
+
+              // Rebuild blockPathMap and send FORM_DATA to iframe
+              const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: updatedProperties,
+                blockPathMap: newBlockPathMap,
+                toolbarRequestDone: `field-link-${Date.now()}`,
+              }));
+            }}
+            onOpenObjectBrowser={(fieldName, blockUid) => {
+              // Set pending state to trigger object browser via OpenObjectBrowser component
+              setPendingFieldMedia({ fieldName, blockUid });
+            }}
           />
 
           {/* Add Button - positioned based on data-block-add direction */}
@@ -2005,22 +2259,45 @@ const Iframe = (props) => {
 
             // Calculate ideal position
             const buttonWidth = 30;
+            const buttonHeight = 30;
             let addLeft = isRightDirection
               ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8  // Right of block
               : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth; // Bottom-right of block
 
-            // Constrain to stay within iframe bounds - stay at top-right but move inward
+            // Track if we're constrained inside the block
+            let isConstrained = false;
+
+            // Constrain to stay within iframe bounds
             const iframeRight = iframeRect.left + iframeRect.width;
+            const blockRightInIframe = blockUI.rect.left + blockUI.rect.width;
+            const availableMargin = iframeRect.width - blockRightInIframe;
+            const buttonSpace = buttonWidth + 8; // button + gap
+            log('Add button constraint check:', {
+              blockRect: { left: blockUI.rect.left, width: blockUI.rect.width, right: blockRightInIframe },
+              iframeWidth: iframeRect.width,
+              availableMargin,
+              buttonSpace,
+              wouldConstrain: availableMargin < buttonSpace,
+            });
             if (addLeft + buttonWidth > iframeRight) {
               // Move button inward to stay on screen, but keep it at top-right of block
               addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
+              isConstrained = true;
             }
 
-            // For 'right': top-right of block
+            // For 'right': top-right of block (or bottom-right if constrained to avoid image overlay)
             // For 'bottom' (default): below block
-            const addTop = isRightDirection
-              ? iframeRect.top + blockUI.rect.top  // Top-right
-              : iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+            let addTop;
+            if (isRightDirection) {
+              if (isConstrained) {
+                // When constrained inside block, position at bottom-right to avoid image overlay buttons
+                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8;
+              } else {
+                addTop = iframeRect.top + blockUI.rect.top;  // Top-right
+              }
+            } else {
+              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+            }
 
             // Check if this is a table mode block (row or cell)
             const isTableMode = pathInfo?.addMode === 'table' || pathInfo?.parentAddMode === 'table';

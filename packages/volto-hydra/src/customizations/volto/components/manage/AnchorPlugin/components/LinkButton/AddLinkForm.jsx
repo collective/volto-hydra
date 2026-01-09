@@ -3,9 +3,10 @@
  * @module components/manage/AnchorPlugin/components/LinkButton/AddLinkForm
  *
  * VOLTO-HYDRA SHADOW:
- * This file shadows @plone/volto's AddLinkForm to 
+ * This file shadows @plone/volto's AddLinkForm to:
  * - make the UI consistent. Both clear and submit modify the link and close immediately now
- * - fix null ref errors.
+ * - fix null ref errors
+ * - show object browser button for 'image' mode (Volto bug: only shows for 'link' mode)
  *
  * In volto-hydra's synced toolbar, the Slate component can remount when:
  * 1. The Clear button's onClear() modifies Slate nodes via unwrapElement()
@@ -20,7 +21,7 @@ import PropTypes from 'prop-types';
 import { compose } from 'redux';
 
 // import unionClassNames from 'union-class-names';
-import cx from 'classnames';
+// cx removed - using native input with inline styles
 import {
   addAppURL,
   isInternalURL,
@@ -29,13 +30,14 @@ import {
 } from '@plone/volto/helpers';
 
 import { doesNodeContainClick } from 'semantic-ui-react/dist/commonjs/lib';
-import { Input, Form, Button } from 'semantic-ui-react';
+import { Button } from 'semantic-ui-react';
 import { defineMessages, injectIntl } from 'react-intl';
 
 import clearSVG from '@plone/volto/icons/clear.svg';
 import navTreeSVG from '@plone/volto/icons/nav.svg';
 import aheadSVG from '@plone/volto/icons/ahead.svg';
-import linkSVG from '@plone/volto/icons/link.svg';
+import uploadSVG from '@plone/volto/icons/upload.svg';
+import externalLinkSVG from '@plone/volto/icons/external-link.svg';
 
 import withObjectBrowser from '@plone/volto/components/manage/Sidebar/ObjectBrowser';
 import { withRouter } from 'react-router';
@@ -54,6 +56,10 @@ const messages = defineMessages({
   openObjectBrowser: {
     id: 'Open object browser',
     defaultMessage: 'Open object browser',
+  },
+  openInNewTab: {
+    id: 'Open link in new tab',
+    defaultMessage: 'Open link in new tab',
   },
   submit: {
     id: 'Submit',
@@ -89,10 +95,19 @@ class AddLinkForm extends Component {
   constructor(props) {
     super(props);
 
+    // Extract URL string from object_browser format: [{ "@id": "/path", ... }]
+    let url = props.data.url;
+    if (Array.isArray(url) && url.length > 0) {
+      url = url[0]?.['@id'] || '';
+    } else if (url && typeof url === 'object' && url['@id']) {
+      url = url['@id'];
+    }
+    if (typeof url !== 'string') {
+      url = '';
+    }
+
     this.state = {
-      value: isInternalURL(props.data.url)
-        ? flattenToAppURL(props.data.url)
-        : props.data.url || '',
+      value: isInternalURL(url) ? flattenToAppURL(url) : url,
       isInvalid: false,
     };
     this.onRef = this.onRef.bind(this);
@@ -250,95 +265,175 @@ class AddLinkForm extends Component {
    */
   render() {
     const { value, isInvalid } = this.state;
-    const className = isInvalid
-      ? cx(
-          'ui input editor-link',
-          'input-anchorlink-theme',
-          'input-anchorlink-theme-Invalid',
-        )
-      : cx('ui input editor-link', 'input-anchorlink-theme');
+
+    const showObjectBrowser =
+      this.props.objectBrowserPickerType === 'link' ||
+      this.props.objectBrowserPickerType === 'image';
 
     return (
-      <div className="link-form-container" ref={this.linkFormContainer}>
-        <Icon name={linkSVG} color="#B8B2C8" size="20px" />
-        <Form.Field inline>
-          <div className="wrapper">
-            <Input
-              className={className}
-              name="link"
-              value={value || ''}
-              onChange={({ target }) => this.onChange(target.value)}
-              placeholder={
-                this.props.placeholder ||
-                this.props.intl.formatMessage(messages.placeholder)
-              }
-              onKeyDown={this.onKeyDown}
-              ref={this.onRef}
-            />
-            {value.length > 0 ? (
-              <Button.Group>
-                <Button
-                  basic
-                  className="cancel"
-                  aria-label={this.props.intl.formatMessage(messages.clear)}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.clear();
-                    // HYDRA FIX: Guard against null ref. this.clear() calls onClear() which
-                    // modifies Slate nodes via unwrapElement(). In volto-hydra's synced toolbar,
-                    // this can trigger a component remount, making this.input null before focus().
-                    if (this.input) {
-                      this.input.focus();
-                    }
-                  }}
-                >
-                  <Icon name={clearSVG} size="24px" />
-                </Button>
-              </Button.Group>
-            ) : this.props.objectBrowserPickerType === 'link' ? (
-              <Button.Group>
-                <Button
-                  basic
-                  icon
-                  aria-label={this.props.intl.formatMessage(
-                    messages.openObjectBrowser,
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.props.openObjectBrowser({
-                      mode: this.props.objectBrowserPickerType,
-                      overlay: true,
-                      onSelectItem: (url) => {
-                        this.onChange(url);
-                        this.onSubmit();
-                      },
-                    });
-                  }}
-                >
-                  <Icon name={navTreeSVG} size="24px" />
-                </Button>
-              </Button.Group>
-            ) : null}
+      <div
+        className="link-form-container"
+        ref={this.linkFormContainer}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '2px 4px',
+          background: '#fff',
+          borderRadius: '4px',
+          border: '1px solid #ddd',
+          height: '32px',
+          boxSizing: 'border-box',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        }}
+      >
+        {/* Left side: Object browser button */}
+        {showObjectBrowser && (
+          <Button
+            type="button"
+            basic
+            icon
+            style={{ margin: 0, padding: '4px' }}
+            aria-label={this.props.intl.formatMessage(
+              messages.openObjectBrowser,
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              this.props.openObjectBrowser({
+                mode: this.props.objectBrowserPickerType,
+                overlay: true,
+                onSelectItem: (url, item) => {
+                  this.onChange(url);
+                  // Pass full item to callback if provided (for object_browser fields needing metadata)
+                  if (this.props.onSelectItem) {
+                    this.props.onSelectItem(url, item);
+                  } else {
+                    this.onSubmit();
+                  }
+                },
+              });
+            }}
+          >
+            <Icon name={navTreeSVG} size="20px" />
+          </Button>
+        )}
 
-            <Button.Group>
+        {/* Upload button - for image mode */}
+        {this.props.objectBrowserPickerType === 'image' &&
+          this.props.onFileUpload && (
+            <>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                ref={(el) => (this.fileInput = el)}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // Start upload - ImageWidget's useEffect will call onClose after completion
+                    this.props.onFileUpload(file);
+                    // Don't call onClose here - wait for upload to complete
+                  }
+                  e.target.value = '';
+                }}
+              />
               <Button
+                type="button"
                 basic
-                primary
-                disabled={!value.length > 0}
-                aria-label={this.props.intl.formatMessage(messages.submit)}
+                icon
+                style={{ margin: 0, padding: '4px' }}
+                aria-label="Upload image"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  this.onSubmit();
+                  this.fileInput?.click();
                 }}
               >
-                <Icon name={aheadSVG} size="24px" />
+                <Icon name={uploadSVG} size="20px" />
               </Button>
-            </Button.Group>
-          </div>
-        </Form.Field>
+            </>
+          )}
+
+        {/* Center: Input field */}
+        <input
+          type="text"
+          className={isInvalid ? 'link-input invalid' : 'link-input'}
+          name="link"
+          value={value || ''}
+          onChange={(e) => this.onChange(e.target.value)}
+          placeholder={
+            this.props.placeholder ||
+            this.props.intl.formatMessage(messages.placeholder)
+          }
+          onKeyDown={this.onKeyDown}
+          ref={this.onRef}
+          style={{
+            flex: 1,
+            height: '24px',
+            padding: '0 8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '13px',
+            outline: 'none',
+          }}
+        />
+
+        {/* Clear button - when value exists */}
+        {value.length > 0 && (
+          <Button
+            type="button"
+            icon
+            style={{ margin: 0, padding: '4px', border: 'none', background: 'transparent' }}
+            aria-label={this.props.intl.formatMessage(messages.clear)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              this.clear();
+              if (this.input) {
+                this.input.focus();
+              }
+            }}
+          >
+            <Icon name={clearSVG} size="20px" />
+          </Button>
+        )}
+
+        {/* Open in new tab button - when value exists */}
+        {value.length > 0 && (
+          <Button
+            type="button"
+            icon
+            style={{ margin: 0, padding: '4px', border: 'none', background: 'transparent' }}
+            aria-label={this.props.intl.formatMessage(messages.openInNewTab)}
+            title={this.props.intl.formatMessage(messages.openInNewTab)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // For internal URLs, prepend origin; for external, use as-is
+              const url = isInternalURL(value) ? addAppURL(value) : value;
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            <Icon name={externalLinkSVG} size="20px" />
+          </Button>
+        )}
+
+        {/* Right side: Submit button */}
+        <Button
+          primary
+          icon
+          style={{ margin: 0, padding: '8px', border: 'none' }}
+          disabled={!value.length > 0}
+          aria-label={this.props.intl.formatMessage(messages.submit)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.onSubmit();
+          }}
+        >
+          <Icon name={aheadSVG} size="20px" color="#fff" />
+        </Button>
       </div>
     );
   }

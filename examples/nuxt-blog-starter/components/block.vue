@@ -9,27 +9,27 @@
     <hr />
   </div>
 
-  <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-editable-metadata="title">{{ data.title }}
+  <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-editable-field="/title">{{ data.title }}
   </h1>
 
-  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-editable-metadata="description"><i>{{
+  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-editable-field="/description"><i>{{
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
     <a v-if="block.href" :href="block.href" class="image-link">
-      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+      <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
     </a>
-    <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" :width="props.width"
+    <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
       :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
       <a v-if="block.href" :href="block.href" class="image-link">
-        <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+        <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
           :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       </a>
-      <NuxtImg v-else v-for="props in [imageProps(block)]" :src="props.url" _width="props.width"
+      <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       <figcaption>
         <h2>{{ block.title }}</h2>
@@ -48,22 +48,34 @@
   <!-- Hero block - simple landing page hero section -->
   <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
+    <!-- Image with data-media-field for inline image selection -->
+    <!-- Use getImageUrl to handle array/object formats and add @@images suffix for Plone paths -->
+    <img v-if="block.image" data-media-field="image"
+         :src="getImageUrl(block.image)"
+         alt="Hero image"
+         class="w-full h-auto max-h-64 object-cover mb-4 rounded" />
+    <div v-else data-media-field="image"
+         class="w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
+    </div>
     <h1 data-editable-field="heading" class="text-3xl font-bold mb-2">{{ block.heading }}</h1>
     <p data-editable-field="subheading" class="text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
     <div class="hero-description mb-4" data-editable-field="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
-    <button data-editable-field="buttonText" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+    <!-- Button with both data-editable-field and data-linkable-field -->
+    <a data-editable-field="buttonText" data-linkable-field="buttonLink"
+       :href="getUrl(block.buttonLink)"
+       class="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline">
       {{ block.buttonText }}
-    </button>
+    </a>
   </div>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
     class="mt-6 mb-6"
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
-    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + block.blocks_layout.items.length]">
-      <Block v-for="uid in block.blocks_layout.items" :key="uid"
-        :block_uid="uid" :block="block.blocks[uid]" :data="data" :contained="true"
+    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + (block.blocks_layout?.items?.length || 1)]">
+      <Block v-for="uid in (block.blocks_layout?.items || [])" :key="uid"
+        :block_uid="uid" :block="block.blocks?.[uid]" :data="data" :contained="true"
         class="p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
     </div>
   </div>
@@ -98,19 +110,28 @@
   <div v-else-if="block['@type'] == 'teaser'"
     class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block_uid">
-    <NuxtLink :to="getUrl(block.href[0])" v-if="block.href.hasPreviewImage">
-      <NuxtImg class="rounded-t-lg" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt=""
-        v-if="block.href[0].hasPreviewImage" />
+    <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
+    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage">
+      <NuxtImg class="rounded-t-lg" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
+      <NuxtImg class="rounded-t-lg" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
     <div class="p-5">
-      <NuxtLink :to="getUrl(block.href[0])" v-if="block?.title">
+      <!-- Title: use block.title only if overwrite, otherwise use target's title -->
+      <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
+      <!-- Title link is also linkable (clicking it shows link editor for href) -->
+      <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
+      <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
-          data-editable-field="title">{{ block.title }}</h5>
+          :key="`title-${block.overwrite}`"
+          :data-editable-field="block.overwrite ? 'title' : undefined">{{ getTeaserTitle(block) }}</h5>
       </NuxtLink>
-      <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description"
-        v-if="block?.description">{{ block.description }}</p>
-      <NuxtLink :to="getUrl(block.href[0])" data-editable-field="href"
+      <!-- Description: use block.description only if overwrite, otherwise use target's description -->
+      <p class="mb-3 font-normal text-gray-700 dark:text-gray-400"
+        :key="`description-${block.overwrite}`"
+        :data-editable-field="block.overwrite ? 'description' : undefined"
+        v-if="getTeaserDescription(block)">{{ getTeaserDescription(block) }}</p>
+      <NuxtLink :to="getUrl(block.href)" data-linkable-field="href"
         class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Read more
         <svg class="rtl:rotate-180 w-3.5 h-3.5 ms-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -123,7 +144,7 @@
   </div>
 
   <section v-else-if="block['@type'] == 'slider'" :data-block-uid="block_uid" data-block-container="{allowed:['Slide'],add:'horizontal'}"
-    class=" w-full mx-auto" data-carousel="static" >
+    class="max-w-4xl mx-auto" data-carousel="static" >
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
@@ -133,21 +154,27 @@
             isSlideActive(index) ? 'flex' : 'hidden',
             { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
           ]"
-          data-carousel-item :style="slide.preview_image?.[0] ? imageProps(slide.preview_image[0], true).class : ''">
+          data-carousel-item :style="slide.preview_image ? imageProps(slide, true).class : ''"
+          data-block-add="right">
+          <!-- Clickable overlay for preview_image editing -->
+          <div data-media-field="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
-            :class="{ 'right-0': slide.flagAlign == 'right' }">
-            <div>{{ slide.head_title }}</div>
+            :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
+            <div data-editable-field="head_title">{{ slide.head_title }}</div>
             <h5 :id="`heading-${slide['@id']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
               {{ slide.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">
               {{ slide.description }}</p>
-              <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText"
+            <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText" data-linkable-field="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
               :aria-describedby="`heading-${slide['@id']}`">
-
               {{ slide.buttonText || 'Read More' }}</NuxtLink>
+            <a v-else href="#" data-editable-field="buttonText" data-linkable-field="href"
+              class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+              :aria-describedby="`heading-${slide['@id']}`">
+              {{ slide.buttonText || 'Read More' }}</a>
           </div>
         </div>
       </div>
@@ -194,28 +221,28 @@
 
 
   <div v-else-if="block['@type'] == 'accordion'" data-accordion="collapse" :data-block-uid="block_uid">
-    <template v-for="panelid in block.data.blocks_layout.items">
-      <h2 :id="panelid" :data-block-uid="panelid">
-        <button type="button"
-          class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
-          :data-accordion-target="`#accordion-collapse-body-${panelid}`" aria-expanded="true"
-          aria-controls="accordion-collapse-body-1">
-          <span data-editable-field="title">{{ block.data.blocks[panelid].title }}</span>
-          <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
-            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
-            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 5 5 1 1 5" />
-          </svg>
-        </button>
-      </h2>
-      <div :id="`accordion-collapse-body-${panelid}`" class="hidden" :aria-labelledby="panelid">
-        <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-          <div v-for="uid in block.data.blocks[panelid].blocks_layout.items">
-            <Block :block_uid="uid" :block="block.data.blocks[panelid].blocks[uid]" :data="data"></Block>
-          </div>
-        </div>
+    <h2 :id="block_uid">
+      <button type="button"
+        class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
+        :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
+        :aria-controls="`accordion-collapse-body-${block_uid}`">
+        <span data-block-field="header">
+          <Block v-for="uid in (block.header_layout?.items || [])" :key="uid"
+                 :block_uid="uid" :block="block.header?.[uid]" :data="data" />
+        </span>
+        <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5 5 1 1 5" />
+        </svg>
+      </button>
+    </h2>
+    <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
+      <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900" data-block-field="content">
+        <Block v-for="uid in (block.content_layout?.items || [])" :key="uid"
+               :block_uid="uid" :block="block.content?.[uid]" :data="data" />
       </div>
-    </template>
+    </div>
   </div>
 
 
@@ -263,9 +290,9 @@
   </div>
 
   <template v-else-if="block['@type'] == 'video'" :data-block-uid="block_uid">
-    <iframe v-if="block.url.startsWith('https://www.youtube')" width="420" height="315"
-      :src="`https://www.youtube.com/embed/${block.url.split('v=')[1]}?controls=0`"></iframe>
-    <video v-else class="w-full h-auto max-w-full" controls>
+    <iframe v-if="block.url?.startsWith('https://www.youtube')" width="420" height="315"
+      :src="`https://www.youtube.com/embed/${block.url?.split('v=')[1]}?controls=0`"></iframe>
+    <video v-else-if="block.url" class="w-full h-auto max-w-full" controls>
       <source :src="block.url" type="video/mp4">
       Your browser does not support the video tag.
     </video>
@@ -352,8 +379,50 @@ watch(
 // Helper to check if a slide should be visible
 const isSlideActive = (index) => index === activeSlideIndex.value;
 
+// Helper to get image URL from various formats (string, array, or object with @id)
+// Also adds @@images/image suffix for Plone internal paths
+const getImageUrl = (value) => {
+  if (!value) return '';
+  const runtimeConfig = useRuntimeConfig();
+  const backendBaseUrl = runtimeConfig.public.backendBaseUrl;
 
+  // Extract URL from array or object format (like getUrl does)
+  let url = value;
+  if (Array.isArray(value) && value.length) {
+    url = value[0];
+  }
+  if (url?.['@id']) {
+    url = url['@id'];
+  }
+  if (typeof url !== 'string') {
+    return '';
+  }
 
+  // Add @@images/image suffix for Plone internal paths
+  // Handles both relative paths (/) and full URLs with backend base URL
+  const needsImageSuffix = !url.includes('@@images');
+  const isRelativePath = url.startsWith('/');
+  const isBackendUrl = backendBaseUrl && url.startsWith(backendBaseUrl);
 
+  if (needsImageSuffix && (isRelativePath || isBackendUrl)) {
+    return url + '/@@images/image';
+  }
+  return url;
+};
+
+// Teaser helpers: show target content by default, only use block values if overwrite is set
+const getTeaserTitle = (block) => {
+  if (block.overwrite && block.title) {
+    return block.title;
+  }
+  return block.href?.[0]?.title || '';
+};
+
+const getTeaserDescription = (block) => {
+  if (block.overwrite && block.description) {
+    return block.description;
+  }
+  return block.href?.[0]?.description || '';
+};
 
 </script>

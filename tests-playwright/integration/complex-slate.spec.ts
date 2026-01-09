@@ -8,7 +8,7 @@
  * But somewhere the first li gets text:"" added to it, corrupting the structure
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Complex Slate Structures', () => {
