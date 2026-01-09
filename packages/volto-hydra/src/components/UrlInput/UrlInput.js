@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Dropdown } from 'semantic-ui-react';
 import Cookies from 'js-cookie';
+import { getIframeUrlCookieName, getSavedUrlsCookieName } from '../../utils/cookieNames';
 import './styles.css';
 
 const getSavedUrls = () => {
-  const savedUrls = Cookies.get('saved_urls');
+  const savedUrls = Cookies.get(getSavedUrlsCookieName());
   return savedUrls ? savedUrls.split(',') : [];
 };
 
 const setSavedUrls = (urls) => {
-  Cookies.set('saved_urls', urls.join(','), { expires: 7 });
+  Cookies.set(getSavedUrlsCookieName(), urls.join(','), { expires: 7 });
 };
 
 const UrlInput = ({ urls, onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [value, setValue] = useState(Cookies.get('iframe_url') || '');
+  const [value, setValue] = useState(Cookies.get(getIframeUrlCookieName()) || '');
   const [urlList, setUrlList] = useState(urls);
   const handleDropdownChange = (e, { value, searchQuery }) => {
     setValue(value);

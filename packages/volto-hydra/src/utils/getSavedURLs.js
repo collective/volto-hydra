@@ -1,5 +1,6 @@
 import Cookies from 'js-cookie';
 import isValidUrl from './isValidUrl';
+import { getSavedUrlsCookieName } from './cookieNames';
 
 /**
  * Get the default URL(s) from the environment
@@ -21,8 +22,9 @@ export const getURlsFromEnv = () => {
  * @returns {Array} Saved URLs
  */
 const getSavedURLs = () => {
-  const urls = Cookies.get('saved_urls')
-    ? Cookies.get('saved_urls').split(',')
+  const cookieName = getSavedUrlsCookieName();
+  const urls = Cookies.get(cookieName)
+    ? Cookies.get(cookieName).split(',')
     : [];
   const savedUrls = [
     ...new Set([...urls, ...getURlsFromEnv()]), // Merge saved URLs with default URLs make sure they are unique

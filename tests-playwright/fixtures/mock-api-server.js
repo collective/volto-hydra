@@ -1173,6 +1173,42 @@ app.get('/hydra.js', (req, res) => {
   res.sendFile(hydraJsPath);
 });
 
+// Serve static files from content directories (for images, etc.)
+// This allows content like /pretagov/images/client-1.png to be served directly
+const STATIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.pdf'];
+app.get('*', (req, res, next) => {
+  // Skip API requests and requests without file extensions
+  if (req.isApiRequest) return next();
+
+  const ext = path.extname(req.path).toLowerCase();
+  if (!STATIC_FILE_EXTENSIONS.includes(ext)) return next();
+
+  // Find content mount that matches this path
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    if (req.path.startsWith(mountPath)) {
+      const relativePath = req.path.slice(mountPath.length);
+      const filePath = path.join(dirPath, relativePath);
+
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const mimeTypes = {
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.webp': 'image/webp',
+          '.ico': 'image/x-icon',
+          '.pdf': 'application/pdf',
+        };
+        res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+        res.sendFile(filePath);
+        return;
+      }
+    }
+  }
+  next();
+});
+
 // Serve frontend files (after all API routes)
 const FRONTEND_DIR = path.join(__dirname, 'test-frontend');
 app.use(express.static(FRONTEND_DIR, {

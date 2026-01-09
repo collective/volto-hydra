@@ -8,6 +8,7 @@ import {
   previousBlockId,
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
+import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
@@ -617,7 +618,7 @@ const Iframe = (props) => {
   const urlFromEnv = getURlsFromEnv();
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
-    Cookies.get('iframe_url') ||
+    Cookies.get(getIframeUrlCookieName()) ||
     urlFromEnv[0];
   // Initialize to null to avoid SSR/client hydration mismatch (token differs)
   const [iframeSrc, setIframeSrc] = useState(null);
@@ -663,7 +664,7 @@ const Iframe = (props) => {
     } else {
       log('[IFRAME_SRC] Skipping - state matches and iframeSrc already set');
     }
-    u && Cookies.set('iframe_url', u, { expires: 7 });
+    u && Cookies.set(getIframeUrlCookieName(), u, { expires: 7 });
   }, [token, u, pathname, isEditMode, iframeSrc]);
 
   // NOTE: Form sync and FORM_DATA sending are merged into one useEffect below (search for "UNIFIED FORM SYNC")

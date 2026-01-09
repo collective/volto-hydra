@@ -20,6 +20,7 @@ import { toGettextLang } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
 import getSavedURLs from '../../../../../utils/getSavedURLs';
 import isValidUrl from '../../../../../utils/isValidUrl';
+import { getIframeUrlCookieName, getSavedUrlsCookieName } from '../../../../../utils/cookieNames';
 import { setFrontendPreviewUrl } from '../../../../../actions';
 
 const messages = defineMessages({
@@ -146,7 +147,7 @@ class PersonalPreferences extends Component {
       const url = urlObj.toString();
       this.props.setFrontendPreviewUrl(url);
       const urlList = [...new Set([this.urls, url])];
-      this.props.cookies.set('saved_urls', urlList.join(','), {
+      this.props.cookies.set(getSavedUrlsCookieName(), urlList.join(','), {
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 Days
       });
     } else {
@@ -178,7 +179,7 @@ class PersonalPreferences extends Component {
       <Form
         formData={{
           language: cookies.get('I18N_LANGUAGE') || '',
-          urls: cookies.get('iframe_url') || '', // Set the default value to the saved URL
+          urls: cookies.get(getIframeUrlCookieName()) || '', // Set the default value to the saved URL
         }}
         schema={{
           fieldsets: [
