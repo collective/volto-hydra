@@ -34,8 +34,8 @@ const Menu = () => {
   }
 
   return (
-    <SemanticMenu>
-      <SemanticMenu.Item>
+    <SemanticMenu >
+      <SemanticMenu.Item >
         <Link href="/">Home</Link>
       </SemanticMenu.Item>
       {menuItems.map(
