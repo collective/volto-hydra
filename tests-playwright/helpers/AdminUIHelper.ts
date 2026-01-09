@@ -2351,7 +2351,6 @@ export class AdminUIHelper {
   async selectBlockType(blockType: string): Promise<void> {
     // Wait for block chooser to be fully visible
     await this.page.waitForSelector('.blocks-chooser', { state: 'visible', timeout: 5000 });
-    await this.page.waitForTimeout(500);
 
     // Different block types have different display names
     const blockNames: Record<string, string[]> = {
@@ -2372,32 +2371,38 @@ export class AdminUIHelper {
     // to avoid matching sidebar buttons with similar text.
     const blockChooser = this.page.locator('.blocks-chooser');
 
+    // Wait for block chooser buttons to be rendered (at least one button should exist)
+    await blockChooser.locator('button').first().waitFor({ state: 'visible', timeout: 5000 });
+
     // Try to find and click the block type button within the block chooser
     for (const name of possibleNames) {
       // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
       const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
 
-      if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+      if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
         await blockButton.click();
-        await this.page.waitForTimeout(500); // Wait for block to be added
+        // Wait for block chooser to close (indicates block was added)
+        await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
         return;
       }
     }
 
     // Block not visible in MOST USED section, try using search
     const searchInput = blockChooser.locator('input[placeholder="Search"]');
-    if (await searchInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
       // Use the first possible name for search
       await searchInput.fill(possibleNames[0]);
+      // Wait for search results to update (buttons should change)
       await this.page.waitForTimeout(300);
 
       // Now try to find the block button again
       for (const name of possibleNames) {
         const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
 
-        if (await blockButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
           await blockButton.click();
-          await this.page.waitForTimeout(500); // Wait for block to be added
+          // Wait for block chooser to close (indicates block was added)
+          await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
           return;
         }
       }

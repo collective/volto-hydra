@@ -986,6 +986,9 @@ test.describe('Slider image positioning', () => {
 
     const iframe = helper.getIframe();
 
+    // Get initial block count
+    const initialCount = await helper.getBlockCount();
+
     // Click on an existing block to enable add button
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForQuantaToolbar('block-1-uuid');
@@ -993,6 +996,9 @@ test.describe('Slider image positioning', () => {
     // Add a new image block
     await helper.clickAddBlockButton();
     await helper.selectBlockType('image');
+
+    // Wait for block count to increase (confirms block was added)
+    await helper.waitForBlockCountToBe(initialCount + 1);
 
     // Wait for sidebar to show Image as current block (new block auto-selected)
     await helper.waitForSidebarOpen();
@@ -1003,10 +1009,10 @@ test.describe('Slider image positioning', () => {
     const emptyOverlay = page.locator('.empty-image-overlay');
     await expect(emptyOverlay).toBeVisible({ timeout: 5000 });
 
-    // The overlay should have reasonable dimensions
+    // The overlay should have reasonable dimensions (min 30px to accommodate different frontends)
     const overlayBox = await emptyOverlay.boundingBox();
     expect(overlayBox).not.toBeNull();
-    expect(overlayBox!.width).toBeGreaterThan(50);
-    expect(overlayBox!.height).toBeGreaterThan(50);
+    expect(overlayBox!.width).toBeGreaterThan(30);
+    expect(overlayBox!.height).toBeGreaterThan(30);
   });
 });

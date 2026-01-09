@@ -1046,10 +1046,12 @@ export class Bridge {
 
                   // Re-query element in case it changed during wait
                   blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                  // Ensure elements have min size BEFORE sending BLOCK_SELECTED
+                  // so the new block has dimensions when the admin UI receives the message
+                  this.ensureElementsHaveMinSize();
                   if (blockElement) {
                     blockHandler(blockElement);
                   }
-                  this.ensureElementsHaveMinSize();
                 }
 
                 // Single replay point for all paths

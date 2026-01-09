@@ -1379,11 +1379,12 @@ const Iframe = (props) => {
           // it to be "re-selected" and scrolled back into view.
           const isPositionUpdateOnly = event.data.src === 'scrollHandler' ||
                                         event.data.src === 'resizeHandler';
-          // Reject BLOCK_SELECTED with zero rect early - this happens when block element is detached
-          // during frontend re-render (e.g., mock frontend's innerHTML replacement or carousel transition)
-          // Must check BEFORE calling onSelectBlock to avoid changing selectedBlock incorrectly
+          // Reject BLOCK_SELECTED with zero rect only for position updates of the SAME block
+          // (this happens when block element is detached during frontend re-render)
+          // For NEW block selection, allow zero rect - the block may be empty but we still need to select it
           const hasZeroRect = event.data.blockUid && (event.data.rect?.width === 0 || event.data.rect?.height === 0);
-          if (hasZeroRect) {
+          const isSameBlock = selectedBlock === event.data.blockUid;
+          if (hasZeroRect && isSameBlock) {
             log('[VIEW] Ignoring BLOCK_SELECTED with zero rect (element detached):', event.data.src);
             return;
           }
