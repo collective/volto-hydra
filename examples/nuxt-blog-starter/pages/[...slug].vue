@@ -55,11 +55,100 @@
 
 <script setup>
 
-import { initBridge } from '@hydra-js/hydra.js';
+import { initBridge, expandListingBlocks } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
 const adminUrl = runtimeConfig.public.adminUrl;
+const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
+
+// Recursively expand all listing and search blocks in a block tree
+// pages = { blockId: pageNumber } from URL
+async function expandAllListings(blocks, blocksLayout, options, pages = {}) {
+  if (!blocks || !blocksLayout) return { blocks, blocks_layout: blocksLayout };
+
+  // Normalize blocks: convert search blocks to listing format for expandListingBlocks
+  const normalizedBlocks = { ...blocks };
+  for (const blockId of blocksLayout) {
+    const block = normalizedBlocks[blockId];
+    if (block?.['@type'] === 'search' && block.query?.query) {
+      // Search block uses 'query' instead of 'querystring'
+      normalizedBlocks[blockId] = {
+        ...block,
+        '@type': 'listing',
+        querystring: block.query,
+        _originalType: 'search'
+      };
+    }
+  }
+
+  // Expand listings at this level (converts to teasers)
+  // Use large pageSize to get all items - containers handle their own paging
+  const { blocks: expandedBlocks, blocks_layout: newLayout, paging } = await expandListingBlocks(
+    normalizedBlocks, blocksLayout, {
+      ...options,
+      pageSize: 1000,  // Get all items, containers handle paging
+      page: 0
+    }
+  );
+
+  // Then recursively expand containers and add paging
+  for (const blockId of newLayout) {
+    const block = expandedBlocks[blockId];
+    if (!block) continue;
+
+    // Handle gridBlock and similar containers with blocks/blocks_layout
+    if (block.blocks && block.blocks_layout?.items) {
+      const result = await expandAllListings(block.blocks, block.blocks_layout.items, options, pages);
+
+      // Calculate paging for this container
+      const pageSize = block.pageSize || 6;
+      const currentPage = pages[blockId] || 0;
+      const allItems = result.blocks_layout;
+      const totalItems = allItems.length;
+      const totalPages = Math.ceil(totalItems / pageSize);
+      const startIdx = currentPage * pageSize;
+      const pagedItems = allItems.slice(startIdx, startIdx + pageSize);
+
+      expandedBlocks[blockId] = {
+        ...block,
+        blocks: result.blocks,
+        blocks_layout: { items: pagedItems },
+        _allItems: allItems,  // Keep full list for paging
+        _paging: {
+          currentPage,
+          totalPages,
+          totalItems,
+          pageSize,
+          prev: currentPage > 0 ? currentPage - 1 : null,
+          next: currentPage < totalPages - 1 ? currentPage + 1 : null,
+          pages: Array.from({ length: totalPages }, (_, i) => ({ page: i + 1, start: i }))
+            .slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 3))
+        }
+      };
+    }
+
+    // Handle columns container
+    if (block.columns) {
+      const expandedCols = {};
+      for (const [colId, column] of Object.entries(block.columns)) {
+        if (column.blocks && column.blocks_layout?.items) {
+          const result = await expandAllListings(column.blocks, column.blocks_layout.items, options, pages);
+          expandedCols[colId] = {
+            ...column,
+            blocks: result.blocks,
+            blocks_layout: { items: result.blocks_layout }
+          };
+        } else {
+          expandedCols[colId] = column;
+        }
+      }
+      expandedBlocks[blockId] = { ...block, columns: expandedCols };
+    }
+  }
+
+  return { blocks: expandedBlocks, blocks_layout: newLayout };
+}
 
 // initialize components based on data attribute selectors
 onMounted(() => {
@@ -270,8 +359,23 @@ onMounted(() => {
                     }
                 }
             });
-            bridge.onEditChange((page) => {
+            bridge.onEditChange(async (page) => {
                 if (page) {
+                    // Expand listings in the updated page data
+                    if (page.blocks && page.blocks_layout?.items) {
+                        let contextPath = page['@id'] || '/';
+                        if (contextPath.startsWith('http')) {
+                            contextPath = new URL(contextPath).pathname;
+                        }
+                        const expanded = await expandAllListings(
+                            page.blocks,
+                            page.blocks_layout.items,
+                            { apiUrl, contextPath },
+                            pages  // Pass page numbers from URL
+                        );
+                        page.blocks = expanded.blocks;
+                        page.blocks_layout = { items: expanded.blocks_layout };
+                    }
                     data.value.page = page;
                 }
             });
@@ -300,7 +404,21 @@ const { data, error } = await ploneApi({
   pages: pages
 });
 
-
+// Expand all listing blocks to teasers for multi-element support
+if (data.value?.page?.blocks && data.value?.page?.blocks_layout?.items) {
+  let contextPath = data.value.page['@id'] || '/';
+  if (contextPath.startsWith('http')) {
+    contextPath = new URL(contextPath).pathname;
+  }
+  const expanded = await expandAllListings(
+    data.value.page.blocks,
+    data.value.page.blocks_layout.items,
+    { apiUrl, contextPath },
+    pages  // Pass page numbers from URL
+  );
+  data.value.page.blocks = expanded.blocks;
+  data.value.page.blocks_layout = { items: expanded.blocks_layout };
+}
 
 useSeoMeta({
   ogTitle: data.page?.title,

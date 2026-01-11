@@ -1004,6 +1004,28 @@ const Iframe = (props) => {
       const { type } = event.data;
       switch (type) {
         case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
+          // Check if this is in-page navigation (e.g., paging) - just resend form data
+          if (event.data.inPage) {
+            log('PATH_CHANGE: in-page navigation (paging), resending form data');
+            // Build blockPathMap and send INITIAL_DATA (same as INIT handler)
+            const resendBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, intl);
+            const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+            event.source.postMessage(
+              {
+                type: 'INITIAL_DATA',
+                data: form,
+                blockFieldTypes,
+                blockPathMap: resendBlockPathMap,
+                selectedBlockUid: selectedBlock,
+                slateConfig: {
+                  hotkeys: config.settings.slate?.hotkeys || {},
+                  toolbarButtons,
+                },
+              },
+              event.origin,
+            );
+            break;
+          }
           // User clicked a nav link in iframe - they want to VIEW that page, not edit it
           // Update module-level state BEFORE history.push so useEffect knows iframe already has this path
           persistedIframe = { frontendUrl: u, path: event.data.path, isEdit: false };
@@ -1456,6 +1478,7 @@ const Iframe = (props) => {
               linkableFields: event.data.linkableFields, // Map of fieldName -> true for link fields
               mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
+              isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
@@ -2020,7 +2043,8 @@ const Iframe = (props) => {
           properties,
           config.blocks.blocksConfig,
         ).length > 0;
-        const showBottomLine = editableFieldCount === 1 && !isContainer;
+        // Multi-element blocks (e.g., listings) always get full border to show combined bounding box
+        const showBottomLine = editableFieldCount === 1 && !isContainer && !blockUI.isMultiElement;
         return (
         <>
           {/* Selection Outline - blue border or bottom line depending on field count */}

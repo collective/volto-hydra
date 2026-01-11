@@ -73,11 +73,40 @@
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
     class="mt-6 mb-6"
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
-    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + (block.blocks_layout?.items?.length || 1)]">
-      <Block v-for="uid in (block.blocks_layout?.items || [])" :key="uid"
-        :block_uid="uid" :block="block.blocks?.[uid]" :data="data" :contained="true"
-        class="p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+    <!-- Grid that wraps to multiple rows -->
+    <div class="grid-row grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <template v-for="uid in (block.blocks_layout?.items || [])" :key="uid">
+        <Block v-if="block.blocks?.[uid]"
+          :block_uid="block.blocks[uid]._blockUid || uid"
+          :block="block.blocks[uid]" :data="data" :contained="true"
+          class="grid-cell p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+      </template>
     </div>
+    <!-- Paging controls using URL scheme @pg_blockId_pageNumber -->
+    <!-- data-linkable-allow tells hydra.js to allow navigation without beforeunload warning -->
+    <nav v-if="block._paging?.totalPages > 1" aria-label="Grid Navigation" class="grid-paging mt-4">
+      <ul class="inline-flex -space-x-px text-sm">
+        <li v-if="block._paging.prev !== null">
+          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${block._paging.prev}`" data-linkable-allow
+            class="paging-prev flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-s-lg hover:bg-gray-100">
+            Previous
+          </NuxtLink>
+        </li>
+        <li v-for="page in block._paging.pages" :key="page.page">
+          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${page.page - 1}`" data-linkable-allow
+            :class="['paging-page', block._paging.currentPage === page.page - 1 ? 'current bg-blue-100' : 'bg-white']"
+            class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 border border-gray-300 hover:bg-gray-100">
+            {{ page.page }}
+          </NuxtLink>
+        </li>
+        <li v-if="block._paging.next !== null">
+          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${block._paging.next}`" data-linkable-allow
+            class="paging-next flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100">
+            Next
+          </NuxtLink>
+        </li>
+      </ul>
+    </nav>
   </div>
 
   <!-- Columns container block -->
@@ -108,10 +137,12 @@
   </div>
 
   <div v-else-if="block['@type'] == 'teaser'"
-    class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
-    :data-block-uid="block_uid">
+    class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
+    :data-block-uid="block._blockUid || block_uid"
+    :data-block-readonly="block._blockUid ? true : undefined">
     <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
-    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage">
+    <!-- data-linkable-field prevents navigation in edit mode -->
+    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage" data-linkable-field="href">
       <NuxtImg class="rounded-t-lg" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
       <NuxtImg class="rounded-t-lg" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
@@ -120,6 +151,7 @@
       <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
       <!-- Title link is also linkable (clicking it shows link editor for href) -->
       <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
+      <!-- Note: data-block-readonly on parent handles disabling these for listing items -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
@@ -247,17 +279,19 @@
 
 
 
-  <div v-else-if="block['@type'] == 'listing'" :data-block-uid="block_uid">
-    <h2 :is="block.headlineTag">{{ block.headline }}</h2>
-    <Listing :block_uid="block_uid" :data="data" :query="block?.querystring ? block?.querystring : {}"></Listing>
-  </div>
+  <!-- Listing: already expanded at page level, this handles static items only -->
+  <template v-else-if="block['@type'] == 'listing'">
+    <h2 v-if="block.headline" :is="block.headlineTag" :data-block-uid="block_uid">{{ block.headline }}</h2>
+    <Listing :block_uid="block_uid" :items="block.items || []" />
+  </template>
 
+  <!-- Search: already expanded at page level, this handles static results only -->
   <div v-else-if="block['@type'] == 'search'" :data-block-uid="block_uid">
     <ClientOnly fallback-tag="div" fallback="Loading search...">
       <form>
         <input name="searchableText" v-if="block.showSearchInput">
       </form>
-      <Listing :block_uid="block_uid" :data="data" :query="block?.query"></Listing>
+      <Listing :block_uid="block_uid" :items="block.items || []" />
     </ClientOnly>
   </div>
 

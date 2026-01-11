@@ -66,9 +66,53 @@
     "block-7-filled-teaser": {
       "@type": "teaser",
       "href": [{ "@id": "/target-page", "title": "Target Page", "description": "Target page description", "hasPreviewImage": true }]
+    },
+    "block-8-grid": {
+      "@type": "gridBlock",
+      "blocks": {
+        "manual-teaser": {
+          "@type": "teaser",
+          "title": "Manual Item",
+          "description": "This is a manually added teaser",
+          "href": [{ "@id": "/target-page", "title": "Target Page" }]
+        },
+        "listing-in-grid": {
+          "@type": "listing",
+          "headline": "Featured Items",
+          "querystring": {
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": ["Document"]
+              }
+            ],
+            "sort_on": "effective",
+            "sort_order": "descending"
+          }
+        }
+      },
+      "blocks_layout": {
+        "items": ["manual-teaser", "listing-in-grid"]
+      }
+    },
+    "block-9-listing": {
+      "@type": "listing",
+      "headline": "Featured Items",
+      "querystring": {
+        "query": [
+          {
+            "i": "portal_type",
+            "o": "plone.app.querystring.operation.selection.any",
+            "v": ["Document"]
+          }
+        ],
+        "sort_on": "effective",
+        "sort_order": "descending"
+      }
     }
   },
   "blocks_layout": {
-    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser"]
+    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing"]
   }
 }

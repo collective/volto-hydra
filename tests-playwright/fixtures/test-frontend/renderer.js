@@ -93,8 +93,13 @@ function renderContent(content) {
  * @returns {HTMLElement} Rendered block element
  */
 function renderBlock(blockId, block) {
+    // Use _blockUid if present (for multi-element blocks like expanded listings)
+    const uid = block._blockUid || blockId;
+    // Blocks with _blockUid are from listings and not individually editable
+    const isEditable = !block._blockUid;
+
     const wrapper = document.createElement('div');
-    wrapper.setAttribute('data-block-uid', blockId);
+    wrapper.setAttribute('data-block-uid', uid);
 
     switch (block['@type']) {
         case 'slate':
@@ -122,7 +127,7 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderColumnBlock(block);
             break;
         case 'gridBlock':
-            wrapper.innerHTML = renderGridBlock(block);
+            wrapper.innerHTML = renderGridBlock(block, blockId);
             break;
         case 'carousel':
             wrapper.classList.add('carousel-block');
@@ -143,8 +148,14 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
         case 'teaser':
-            wrapper.innerHTML = renderTeaserBlock(block);
-            break;
+            // Teaser handles its own data-block-uid, so return it directly
+            const teaserEl = document.createElement('div');
+            teaserEl.innerHTML = renderTeaserBlock(block, uid, isEditable);
+            return teaserEl.firstElementChild;
+        case 'listing':
+            // Special case: listing renders MULTIPLE elements with same block UID
+            // Return a document fragment with multiple sibling elements
+            return renderListingBlock(blockId, block);
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
@@ -405,35 +416,35 @@ function renderHeroBlock(block) {
  * By default, shows target page title/description from href.
  * Only uses block.title/description when overrideTitle/overrideDescription is true.
  * @param {Object} block - Teaser block data
- * @returns {string} HTML string
+ * @param {string} blockUid - Block UID to use for data-block-uid attribute
+ * @param {boolean} isEditable - If true, add editable/linkable attributes
+ * @returns {string} HTML string (includes wrapper with data-block-uid)
  */
-function renderTeaserBlock(block) {
+function renderTeaserBlock(block, blockUid, isEditable = true) {
     const href = getLinkUrl(block.href);
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
 
-    // Get title: use block.title only if overwrite is true, otherwise use href title
-    const title = block.overwrite && block.title
-        ? block.title
-        : (hrefObj?.title || '');
+    // Get title: use block.title if present, otherwise use href title
+    const title = block.title || hrefObj?.title || '';
 
-    // Get description: use block.description only if overwrite is true, otherwise use href description
-    const description = block.overwrite && block.description
-        ? block.description
-        : (hrefObj?.description || '');
+    // Get description: use block.description if present, otherwise use href description
+    const description = block.description || hrefObj?.description || '';
 
     // Get preview image: use block.preview_image if set, otherwise use target content's image
     let imageSrc = '';
     if (block.preview_image) {
         imageSrc = getImageUrl(block.preview_image);
     } else if (hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
-        // Target content has a preview image - construct URL from target path
         imageSrc = hrefObj['@id'] + '/@@images/preview_image';
     }
 
-    // If href is empty, show placeholder for starter UI
-    if (!href) {
+    // Only add data-block-uid if blockUid is provided (not when inside a container that already has it)
+    const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
+
+    // If href is empty, show placeholder for starter UI (only for editable teasers)
+    if (!href && isEditable) {
         return `
-            <div class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
+            <div ${blockUidAttr} class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
                 <p style="color: #999; margin: 0;">Select a target page for this teaser</p>
             </div>
         `;
@@ -444,21 +455,68 @@ function renderTeaserBlock(block) {
         ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
         : '';
 
-    // Only add data-editable-field when overwrite is true (field is customizable)
-    // Title is always linkable (clicking it opens link editor for href)
-    const titleEditableAttr = block.overwrite ? 'data-editable-field="title"' : '';
-    const descAttr = block.overwrite ? 'data-editable-field="description"' : '';
+    // Only add editable/linkable attributes when isEditable is true
+    const titleEditableAttr = isEditable && block.overwrite ? 'data-editable-field="title"' : '';
+    const descAttr = isEditable && block.overwrite ? 'data-editable-field="description"' : '';
+    const linkAttr = isEditable ? 'data-linkable-field="href"' : '';
 
     return `
-        <div class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+        <div ${blockUidAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
-            <a href="${href}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
+            <a href="${href || '#'}" ${linkAttr} style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
                 <h3 ${titleEditableAttr} style="margin: 0;">${title}</h3>
             </a>
             <p ${descAttr} style="color: #666; margin: 0;">${description}</p>
-            <a href="${href}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
+            <a href="${href || '#'}" ${linkAttr} style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>
     `;
+}
+
+/**
+ * Render a listing block as MULTIPLE sibling elements.
+ * Each item has the SAME data-block-uid - this is what makes it a multi-element block.
+ * The bounding box should encompass all items when the block is selected.
+ *
+ * @param {string} blockId - Block UUID (shared by all rendered elements)
+ * @param {Object} block - Listing block data with items array
+ * @returns {DocumentFragment} Fragment containing multiple elements
+ */
+function renderListingBlock(blockId, block) {
+    const items = block.items || [
+        { title: 'Item 1', description: 'First listing item' },
+        { title: 'Item 2', description: 'Second listing item' },
+        { title: 'Item 3', description: 'Third listing item' },
+    ];
+
+    const fragment = document.createDocumentFragment();
+
+    // Each card is a sibling with the SAME data-block-uid
+    // No wrapper container - cards are direct siblings
+    items.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.setAttribute('data-block-uid', blockId);
+        card.className = `listing-card listing-card-${index}`;
+        card.style.cssText = 'display: inline-block; width: 200px; margin-right: 20px; padding: 15px; background: #f0f8ff; border: 1px solid #4a90d9; border-radius: 8px; vertical-align: top;';
+
+        card.innerHTML = `
+            <h4 style="margin: 0 0 8px 0; color: #333;">${item.title}</h4>
+            <p style="margin: 0; color: #666; font-size: 14px;">${item.description}</p>
+        `;
+
+        fragment.appendChild(card);
+    });
+
+    // Add editable headline BELOW the cards - tests that editable field
+    // doesn't have to be in the first element of a multi-element block
+    const headline = document.createElement('h3');
+    headline.setAttribute('data-block-uid', blockId);
+    headline.setAttribute('data-editable-field', 'headline');
+    headline.className = 'listing-headline';
+    headline.style.cssText = 'display: block; width: 100%; margin-top: 20px; padding: 10px; color: #333; clear: both;';
+    headline.textContent = block.headline || 'Listing Headline';
+    fragment.appendChild(headline);
+
+    return fragment;
 }
 
 /**
@@ -596,25 +654,34 @@ function renderColumnBlock(block) {
  * Render a grid block (Volto's built-in container).
  * NO explicit data-block-add attributes - tests automatic direction inference.
  * @param {Object} block - Grid block data with blocks/blocks_layout
+ * @param {string} blockId - Block ID for paging URL
  * @returns {string} HTML string
  */
-function renderGridBlock(block) {
+function renderGridBlock(block, blockId) {
     const blocks = block.blocks || {};
     const blocksLayout = block.blocks_layout || { items: [] };
     const items = blocksLayout.items || [];
+    const paging = block._paging;
 
-    let html = '<div class="grid-row" style="display: flex; gap: 20px;">';
+    let html = '<div class="grid-row" style="display: flex; flex-wrap: wrap; gap: 20px;">';
 
-    items.forEach(blockId => {
-        const childBlock = blocks[blockId];
+    items.forEach(itemId => {
+        const childBlock = blocks[itemId];
         if (!childBlock) return;
 
-        // Render grid cell WITHOUT data-block-add attribute
-        // This tests that hydra.js correctly infers direction from nesting depth
-        html += `<div data-block-uid="${blockId}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
+        // Use _blockUid if present (for multi-element blocks like expanded listings)
+        const uid = childBlock._blockUid || itemId;
+        const isEditable = !childBlock._blockUid;
+
+        // All grid cells have data-block-uid so clicking anywhere in the cell selects the block
+        html += `<div data-block-uid="${uid}" class="grid-cell" style="flex: 0 0 calc(25% - 15px); padding: 10px; border: 1px dashed #999;">`;
 
         // Render inner content based on block type
+        // Note: Don't pass uid to teaser - grid-cell already has data-block-uid
         switch (childBlock['@type']) {
+            case 'teaser':
+                html += renderTeaserBlock(childBlock, null, isEditable);
+                break;
             case 'slate':
                 html += renderSlateBlock(childBlock);
                 break;
@@ -632,6 +699,47 @@ function renderGridBlock(block) {
     });
 
     html += '</div>';
+
+    // Render paging controls if available
+    // data-linkable-allow tells hydra.js to allow navigation without beforeunload warning
+    // Uses query params: ?pg_{blockId}={page} (preserves other params)
+    if (paging) {
+        const buildUrl = (page) => {
+            const url = new URL(window.location.href);
+            if (page > 0) {
+                url.searchParams.set(`pg_${blockId}`, page);
+            } else {
+                url.searchParams.delete(`pg_${blockId}`);
+            }
+            return url.pathname + url.search;
+        };
+
+        html += '<nav class="grid-paging" style="margin-top: 15px; text-align: center;">';
+
+        // Previous link
+        if (paging.prev !== null) {
+            html += `<a href="${buildUrl(paging.prev)}" data-linkable-allow class="paging-prev" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">← Prev</a>`;
+        }
+
+        // Page numbers (p.page is 1-indexed display, paging.currentPage is 0-indexed)
+        // URL uses 0-indexed page number, not offset
+        paging.pages.forEach(p => {
+            const pageIndex = p.page - 1; // Convert to 0-indexed
+            const isCurrent = pageIndex === paging.currentPage;
+            const style = isCurrent
+                ? 'margin: 0 3px; padding: 5px 10px; background: #007bff; color: white; border: 1px solid #007bff; text-decoration: none;'
+                : 'margin: 0 3px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;';
+            html += `<a href="${buildUrl(pageIndex)}" data-linkable-allow class="paging-page${isCurrent ? ' current' : ''}" style="${style}">${p.page}</a>`;
+        });
+
+        // Next link
+        if (paging.next !== null) {
+            html += `<a href="${buildUrl(paging.next)}" data-linkable-allow class="paging-next" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">Next →</a>`;
+        }
+
+        html += '</nav>';
+    }
+
     return html;
 }
 

@@ -310,19 +310,23 @@ export class AdminUIHelper {
   ) {
     const { waitForToolbar = true } = options;
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
     // Verify block exists before trying to click
-    const blockCount = await block.count();
+    const blockCount = await blockLocator.count();
     if (blockCount === 0) {
       throw new Error(`Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`);
     }
 
+    // Use first() for multi-element blocks (multiple elements with same UID)
+    const block = blockLocator.first();
+
+    // Scroll block into view inside the iframe first
+    await block.scrollIntoViewIfNeeded();
+
     // Wait for block to be visible (have non-zero height) - hydra.js sets min-height on editable fields
     await block.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Scroll block into view inside the iframe
-    await block.scrollIntoViewIfNeeded();
     await block.click();
 
     if (waitForToolbar) {
@@ -495,11 +499,14 @@ export class AdminUIHelper {
 
   /**
    * Wait for a block to be selected in the iframe.
+   * Handles multi-element blocks (multiple elements with same UID).
    */
   async waitForBlockSelected(blockId: string, timeout: number = 5000) {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    await block.waitFor({ state: 'visible', timeout });
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Use first() for multi-element blocks
+    await blockLocator.first().waitFor({ state: 'visible', timeout });
 
     // Wait for drag handle to appear and be positioned at the correct block
     // The drag handle is positioned at the selected block's left edge, typically 48px above
@@ -508,8 +515,29 @@ export class AdminUIHelper {
     await expect(async () => {
       await expect(dragHandle).toBeVisible({ timeout: 100 });
 
-      // Verify drag handle is positioned near this block
-      const blockBox = await block.boundingBox();
+      // For multi-element blocks, compute combined bounding box
+      const allElements = await blockLocator.all();
+      let blockBox: { x: number; y: number; width: number; height: number } | null = null;
+
+      if (allElements.length > 1) {
+        // Multi-element: compute bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const el of allElements) {
+          const rect = await el.boundingBox();
+          if (rect) {
+            minX = Math.min(minX, rect.x);
+            minY = Math.min(minY, rect.y);
+            maxX = Math.max(maxX, rect.x + rect.width);
+            maxY = Math.max(maxY, rect.y + rect.height);
+          }
+        }
+        if (minX !== Infinity) {
+          blockBox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
+      } else {
+        blockBox = await blockLocator.first().boundingBox();
+      }
+
       const handleBox = await dragHandle.boundingBox();
       if (!blockBox || !handleBox) {
         throw new Error('Could not get bounding boxes');
@@ -535,8 +563,8 @@ export class AdminUIHelper {
       }
     }).toPass({ timeout });
 
-    // Return the block locator for chaining
-    return block;
+    // Return the first element locator for chaining
+    return blockLocator.first();
   }
 
   /**
@@ -704,10 +732,11 @@ export class AdminUIHelper {
    * Scroll a block into view with room for the toolbar above it.
    * The toolbar is in the parent page, positioned based on block position.
    * Using 'center' ensures there's room above for the toolbar.
+   * For multi-element blocks, scrolls the first element into view.
    */
   async scrollBlockIntoViewWithToolbarRoom(blockId: string): Promise<void> {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`).first();
     await block.evaluate((el) => {
       el.scrollIntoView({ block: 'center', behavior: 'instant' });
     });
@@ -1463,12 +1492,35 @@ export class AdminUIHelper {
 
   /**
    * Get the bounding box of a block in the iframe, in parent window coordinates.
+   * Handles multi-element blocks (multiple elements with same UID) by computing combined bounding box.
    */
   async getBlockBoundingBoxInIframe(blockId: string): Promise<{ x: number; y: number; width: number; height: number } | null> {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    const blockBox = await block.boundingBox();
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const allElements = await blockLocator.all();
 
+    if (allElements.length === 0) return null;
+
+    // For multi-element blocks, compute combined bounding box
+    if (allElements.length > 1) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const el of allElements) {
+        const rect = await el.boundingBox();
+        if (rect) {
+          minX = Math.min(minX, rect.x);
+          minY = Math.min(minY, rect.y);
+          maxX = Math.max(maxX, rect.x + rect.width);
+          maxY = Math.max(maxY, rect.y + rect.height);
+        }
+      }
+      if (minX === Infinity) return null;
+      return await this.getBoundsInParentCoordinates({
+        x: minX, y: minY, width: maxX - minX, height: maxY - minY
+      });
+    }
+
+    // Single element
+    const blockBox = await blockLocator.first().boundingBox();
     if (!blockBox) return null;
 
     // Convert from iframe page coordinates to parent window coordinates
@@ -2887,7 +2939,8 @@ export class AdminUIHelper {
   private async moveToDropPosition(
     targetBlock: Locator,
     insertAfter: boolean,
-    _initialDropPos: { x: number; y: number }
+    _initialDropPos: { x: number; y: number },
+    skipVerification: boolean = false
   ): Promise<void> {
     // Keep moving to the target and checking until indicator is correct
     await expect(async () => {
@@ -2898,8 +2951,10 @@ export class AdminUIHelper {
       // Wait a moment for the drop indicator to update
       await this.page.waitForTimeout(50);
 
-      // Verify the indicator is in the right position
-      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+      // Verify the indicator is in the right position (unless skipped for multi-element blocks)
+      if (!skipVerification) {
+        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+      }
     }).toPass({ timeout: 5000 });
   }
 
@@ -2976,6 +3031,32 @@ export class AdminUIHelper {
 
     // Step 4: Complete the drop
     await this.completeDrop();
+  }
+
+  /**
+   * Drag a block to target position but DON'T complete the drop.
+   * Use this to inspect drop indicator position during drag.
+   * Call page.mouse.up() to release when done inspecting.
+   *
+   * @param _dragHandle - Unused, kept for API compatibility
+   * @param targetBlock - The target block locator (where to drag to)
+   * @param insertAfter - If true, position for insertion after target; if false, before
+   */
+  async dragBlockWithMouseNoDrop(
+    _dragHandle: Locator,
+    targetBlock: Locator,
+    insertAfter: boolean = true
+  ): Promise<void> {
+    // Step 1: Start drag from toolbar
+    await this.startDragFromToolbar();
+
+    // Step 2: Auto-scroll until target is in viewport
+    const dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
+
+    // Step 3: Move to drop position (skip verification - test will check indicator)
+    await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage, true);
+
+    // Don't complete drop - let test inspect indicator and release mouse
   }
 
   /**
