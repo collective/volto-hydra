@@ -536,14 +536,15 @@ function renderImageBlock(block) {
     const href = getLinkUrl(block.href);
 
     // Add data-media-field="url" for inline image editing
-    // Add data-linkable-field="href" for inline link editing
-    const img = `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
+    const img = `<img data-media-field="url" src="${imageSrc}" alt="${alt}" />`;
 
-    // If href is set, wrap in link - tests that click behavior is prevented in edit mode
+    // If href is set, wrap in link with data-linkable-field on the <a>
+    // This ensures hydra.js prevents navigation in edit mode
     if (href) {
-        return `<a href="${href}" class="image-link">${img}</a>`;
+        return `<a href="${href}" class="image-link" data-linkable-field="href">${img}</a>`;
     }
-    return img;
+    // No href yet - put data-linkable-field on img so users can add a link
+    return `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
 }
 
 /**

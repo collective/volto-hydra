@@ -334,18 +334,26 @@ export class AdminUIHelper {
       const toolbar = this.page.locator('.quanta-toolbar');
       await toolbar.waitFor({ state: 'visible', timeout: 5000 });
 
-      // Wait for selection to settle
-      await this.waitForBlockSelected(blockId);
+      // Try to wait for the target block to be selected
+      // If it times out, check if we need to navigate to parent (container case)
+      try {
+        await this.waitForBlockSelected(blockId, 3000);
+      } catch {
+        // Selection timed out - might be wrong block selected (clicked container, child selected)
+        // Check if there are parent navigation buttons (indicates we're viewing a child)
+        await this.waitForSidebarOpen();
+        const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
+        const hasParentButtons = await parentButtonLocator.count() > 0;
 
-      // Check if the correct block is selected
-      const result = await this.isBlockSelectedInIframe(blockId);
-      if (!result.ok) {
-        // Wrong block selected - likely a child. Navigate up via sidebar.
-        await this.navigateToParentBlock(blockId);
-      } else {
-        // Target is selected, wait for toolbar to be positioned correctly
-        await this.waitForQuantaToolbar(blockId);
+        if (hasParentButtons) {
+          // Navigate up to the target container block
+          await this.navigateToParentBlock(blockId);
+        }
+        // Either way, wait for the target block to be properly selected
+        await this.waitForBlockSelected(blockId);
       }
+
+      await this.waitForQuantaToolbar(blockId);
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
       // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
