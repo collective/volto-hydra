@@ -11,6 +11,9 @@
   "scripts": {
     "start": "node fixtures/mock-api-server.js"
   },
+  "bin": {
+    "mock-api-server": "fixtures/mock-api-server.js"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "4.22.1"
