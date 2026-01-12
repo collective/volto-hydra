@@ -4132,22 +4132,70 @@ export class Bridge {
       let insertAt = null; // 0 for top, 1 for bottom
       let dropIndicatorVisible = false; // Track if drop indicator is shown - drop only allowed when visible
 
+      // Auto-scroll state - uses requestAnimationFrame for continuous scrolling
+      let scrollDirection = 0; // -1 = up, 0 = none, 1 = down
+      let scrollAnimationId = null;
+      let lastMouseX = 0; // Track last cursor position for scroll updates
+      let lastMouseY = 0;
+      const scrollThreshold = 50; // pixels from edge to trigger scroll
+      const scrollSpeed = 8; // pixels per frame
+
+      // Continuous scroll loop using requestAnimationFrame
+      // Dispatches synthetic mousemove to update drop indicator while scrolling
+      const scrollLoop = () => {
+        if (scrollDirection !== 0) {
+          window.scrollBy(0, scrollDirection * scrollSpeed);
+          // Dispatch synthetic mousemove to update drop indicator position
+          // This ensures the indicator updates even when mouse is stationary
+          const syntheticEvent = new MouseEvent('mousemove', {
+            clientX: lastMouseX,
+            clientY: lastMouseY,
+            bubbles: true,
+          });
+          document.dispatchEvent(syntheticEvent);
+          scrollAnimationId = requestAnimationFrame(scrollLoop);
+        }
+      };
+
+      const startScrolling = (direction) => {
+        if (scrollDirection !== direction) {
+          scrollDirection = direction;
+          if (scrollAnimationId === null && direction !== 0) {
+            scrollAnimationId = requestAnimationFrame(scrollLoop);
+          }
+        }
+      };
+
+      const stopScrolling = () => {
+        scrollDirection = 0;
+        if (scrollAnimationId !== null) {
+          cancelAnimationFrame(scrollAnimationId);
+          scrollAnimationId = null;
+        }
+      };
+
       // Handle mouse movement
       const onMouseMove = (e) => {
+        // Track cursor position for scroll loop updates
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+
         draggedBlock.style.left = `${e.clientX}px`;
         draggedBlock.style.top = `${e.clientY}px`;
 
         // Auto-scroll when dragging near viewport edges
-        const scrollThreshold = 50; // pixels from edge to trigger scroll
-        const scrollSpeed = 10; // pixels per frame
+        // Uses continuous scrolling that works even when mouse is stationary at edge
         const viewportHeight = window.innerHeight;
 
         if (e.clientY < scrollThreshold) {
           // Near top edge - scroll up
-          window.scrollBy(0, -scrollSpeed);
+          startScrolling(-1);
         } else if (e.clientY > viewportHeight - scrollThreshold) {
           // Near bottom edge - scroll down
-          window.scrollBy(0, scrollSpeed);
+          startScrolling(1);
+        } else {
+          // Not near edge - stop scrolling
+          stopScrolling();
         }
 
         // Find element under cursor (no throttle - these operations are fast)
@@ -4328,6 +4376,9 @@ export class Bridge {
 
       // Cleanup on mouseup & update blocks layout
       const onMouseUp = () => {
+        // Stop auto-scroll
+        stopScrolling();
+
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);

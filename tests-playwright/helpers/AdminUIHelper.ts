@@ -47,6 +47,47 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get combined bounding box for a locator that may match multiple elements.
+   * For multi-element blocks (e.g., listing blocks), computes the union of all rects.
+   *
+   * @param mode - 'combined' for union of all, 'first' for first element only, 'last' for last element only
+   */
+  private async getCombinedBoundingBox(
+    locator: Locator,
+    mode: 'combined' | 'first' | 'last' = 'combined'
+  ): Promise<{ x: number; y: number; width: number; height: number }> {
+    return await locator.evaluateAll(
+      (elements, m) => {
+        if (elements.length === 0) {
+          throw new Error('No elements found');
+        }
+        if (elements.length === 1 || m === 'first') {
+          const r = elements[0].getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        }
+        if (m === 'last') {
+          const r = elements[elements.length - 1].getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        }
+        // Combined mode - compute union of all bounding boxes
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        for (const el of elements) {
+          const r = el.getBoundingClientRect();
+          minX = Math.min(minX, r.left);
+          minY = Math.min(minY, r.top);
+          maxX = Math.max(maxX, r.right);
+          maxY = Math.max(maxY, r.bottom);
+        }
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      },
+      mode
+    );
+  }
+
+  /**
    * Log in to the Volto admin UI.
    */
   async login(username: string = 'admin', password: string = 'admin'): Promise<void> {
@@ -2486,10 +2527,14 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const blocks = await iframe.locator('[data-block-uid]').all();
 
+    // Use Set to deduplicate while preserving first occurrence order
+    // (multi-element blocks like listings have multiple elements with same UID)
+    const seen = new Set<string>();
     const blockIds: string[] = [];
     for (const block of blocks) {
       const uid = await block.getAttribute('data-block-uid');
-      if (uid) {
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
         blockIds.push(uid);
       }
     }
@@ -2702,10 +2747,8 @@ export class AdminUIHelper {
       const r = el.getBoundingClientRect();
       return { x: r.x, y: r.y, width: r.width, height: r.height, display: getComputedStyle(el).display };
     });
-    const targetRectInIframeCoords = await targetBlock.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    });
+    // Use getCombinedBoundingBox to handle multi-element blocks (listing blocks)
+    const targetRectInIframeCoords = await this.getCombinedBoundingBox(targetBlock);
 
     const targetTop = targetRectInIframeCoords.y;
     const targetBottom = targetRectInIframeCoords.y + targetRectInIframeCoords.height;
@@ -2777,15 +2820,8 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockUid}"]`);
 
-    // Evaluate inside the iframe to get viewport-relative coords
-    const rect = await block.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return {
-        x: r.x, y: r.y, width: r.width, height: r.height,
-        tagName: el.tagName,
-        className: el.className,
-      };
-    });
+    // Use getCombinedBoundingBox to handle multi-element blocks (listing blocks)
+    const rect = await this.getCombinedBoundingBox(block);
 
     return {
       x: rect.x + rect.width / 2,
@@ -2825,12 +2861,11 @@ export class AdminUIHelper {
     targetBlock: Locator,
     insertAfter: boolean
   ): Promise<{ x: number; y: number }> {
-    // Use evaluate to get getBoundingClientRect - this gives coords relative
-    // to the iframe's VIEWPORT, which is what we need for mouse positioning
-    const rect = await targetBlock.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    });
+    // For multi-element blocks (listings), use first/last element depending on direction
+    // - insertAfter=true: target last element (drop below the listing)
+    // - insertAfter=false: target first element (drop above the listing)
+    const mode = insertAfter ? 'last' : 'first';
+    const rect = await this.getCombinedBoundingBox(targetBlock, mode);
 
     // Get iframe position in page coordinates
     const iframeEl = this.page.locator('#previewIframe');
@@ -2886,28 +2921,39 @@ export class AdminUIHelper {
   private async autoScrollToTarget(
     targetBlock: Locator,
     insertAfter: boolean,
-    maxAttempts: number = 40
+    maxAttempts: number = 60
   ): Promise<{ x: number; y: number }> {
+    // For multi-element blocks, use the relevant element for scroll detection:
+    // - insertAfter=true: scroll until LAST element visible (dropping below it)
+    // - insertAfter=false: scroll until FIRST element visible (dropping above it)
+    const targetElement = insertAfter ? targetBlock.last() : targetBlock.first();
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.verifyDragShadowVisible();
 
-      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      // Quick visibility check using relevant element
+      const quickRect = await this.getCombinedBoundingBox(targetElement);
+      const iframeEl = this.page.locator('#previewIframe');
+      const iframeRect = await iframeEl.boundingBox();
+      if (!iframeRect) throw new Error('Could not get iframe bounding box');
 
       const viewportSize = this.page.viewportSize();
-      const isAboveViewport = dropPosPage.y < 0;
-      const isBelowViewport = viewportSize && dropPosPage.y > viewportSize.height;
+      const targetY = iframeRect.y + quickRect.y + quickRect.height / 2;
+      const isAboveViewport = targetY < 0;
+      const isBelowViewport = viewportSize && targetY > viewportSize.height;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
 
       if (!needsAutoScroll) {
-        return dropPosPage;
+        // Target visible - get precise drop position using first/last element
+        return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
       // Target is off-screen - move to edge to trigger auto-scroll
       const scrollUp = isAboveViewport;
       await this.moveToScrollEdge(scrollUp);
 
-      // Wait for auto-scroll to happen (target position must change)
-      await this.waitForAutoScrollProgress(targetBlock, insertAfter, dropPosPage.y);
+      // Quick wait for scroll progress
+      await this.waitForAutoScrollProgress(targetElement, targetY);
     }
 
     // If we get here, we've exceeded max attempts
@@ -2918,20 +2964,22 @@ export class AdminUIHelper {
    * Wait for auto-scroll to make progress (target position changes).
    */
   private async waitForAutoScrollProgress(
-    targetBlock: Locator,
-    insertAfter: boolean,
+    targetElement: Locator,
     prevY: number
   ): Promise<void> {
     await expect(async () => {
       await this.verifyDragShadowVisible();
-      // Don't check drop indicator during scroll - it may legitimately hide when
-      // mouse is between valid drop zones. We'll verify it before drop instead.
-      const newPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
-      const scrollAmount = Math.abs(newPos.y - prevY);
+      // Quick position check using single element
+      const rect = await this.getCombinedBoundingBox(targetElement);
+      const iframeEl = this.page.locator('#previewIframe');
+      const iframeRect = await iframeEl.boundingBox();
+      if (!iframeRect) throw new Error('Could not get iframe bounding box');
+      const newY = iframeRect.y + rect.y + rect.height / 2;
+      const scrollAmount = Math.abs(newY - prevY);
       if (scrollAmount < 5) {
         throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
       }
-    }).toPass({ timeout: 2000 });
+    }).toPass({ timeout: 500, intervals: [50, 100, 150] });
   }
 
   // ============================================================================
@@ -2974,11 +3022,22 @@ export class AdminUIHelper {
    * Complete the drag operation by releasing the mouse and waiting for cleanup.
    */
   private async completeDrop(): Promise<void> {
+    // Get block order before drop
+    const orderBefore = await this.getBlockOrder();
+
     await this.page.mouse.up();
 
     const iframe = this.getIframe();
     await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
     await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
+
+    // Wait for block order to change (indicates formData update and re-render completed)
+    await expect(async () => {
+      const orderAfter = await this.getBlockOrder();
+      if (JSON.stringify(orderBefore) === JSON.stringify(orderAfter)) {
+        throw new Error('Block order has not changed yet');
+      }
+    }).toPass({ timeout: 5000 });
   }
 
   /**
