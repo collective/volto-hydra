@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #content {
+            margin-top: 20px;
+        }
+        [data-block-uid] {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+        [data-block-uid]:hover {
+            background-color: #f5f5f5;
+        }
+        [data-block-uid].selected {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        nav {
+            background: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        nav a {
+            margin-right: 15px;
+            color: #333;
+            text-decoration: none;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav id="navigation"></nav>
+    </header>
+    <div id="render-counter" style="position: fixed; top: 0; right: 0; background: #333; color: #fff; padding: 4px 8px; font-size: 12px; z-index: 9999;">0</div>
+    <main>
+        <h1 id="page-title" data-editable-field="title">Loading...</h1>
+        <img id="preview-image" data-media-field="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
+        <div id="content"></div>
+    </main>
+
+    <script src="renderer.js"></script>
+    <script type="module">
+        import { initBridge } from './hydra.js';
+
+        // Track page loads to detect double-loading issues (persisted in sessionStorage)
+        const SESSION_KEY = 'hydra_page_load_count';
+
+        // Initialize the page
+        async function initializePage() {
+            // Increment and display load counter (persisted across reloads within session)
+            let pageLoadCount = parseInt(sessionStorage.getItem(SESSION_KEY) || '0', 10) + 1;
+            sessionStorage.setItem(SESSION_KEY, String(pageLoadCount));
+            document.getElementById('render-counter').textContent = pageLoadCount;
+            console.log('[TEST-FRONTEND] Page load count:', pageLoadCount);
+
+            try {
+                // Get content path from current URL
+                // Support path-based and hash-based routing variants: #/path, #!/path
+                let contentPath = window.location.pathname;
+                const hash = window.location.hash;
+                if (hash) {
+                    // Find where the path starts in the hash (handles #/, #!/, etc.)
+                    const pathIndex = hash.indexOf('/');
+                    if (pathIndex !== -1) {
+                        contentPath = hash.slice(pathIndex); // Extract /path from #/path or #!/path
+                    }
+                }
+
+                // Check if hydra bridge should be loaded
+                // - window.name starts with "hydra-edit:" or "hydra-view:" (persists across navigation in admin iframe)
+                // - OR _edit param exists (true for edit mode, false for view mode)
+                const urlParams = new URLSearchParams(window.location.search);
+                const editParam = urlParams.get('_edit');
+                const isHydraEdit = window.name.startsWith('hydra-edit:');
+                const isHydraView = window.name.startsWith('hydra-view:');
+                const loadHydraBridge = isHydraEdit
+                                     || isHydraView
+                                     || editParam === 'true'
+                                     || editParam === 'false';
+                const isEditMode = isHydraEdit || editParam === 'true';
+                console.log('[TEST-FRONTEND] Mode detection:', {
+                    url: window.location.href,
+                    windowName: window.name,
+                    editParam,
+                    isHydraEdit,
+                    isHydraView,
+                    loadHydraBridge,
+                    isEditMode,
+                    contentPath
+                });
+
+                // Fetch content from mock API using ++api++ prefix
+                const response = await fetch(`/++api++${contentPath}`);
+                const content = await response.json();
+
+                // Render navigation from @components.navigation.items
+                const navItems = content['@components']?.navigation?.items || [];
+                const navElement = document.getElementById('navigation');
+                console.log('[TEST-FRONTEND] Navigation items from API:', navItems.length, navItems.map(i => i.title));
+                if (navItems.length > 0) {
+                    navElement.innerHTML = navItems.map(item =>
+                        `<a href="${new URL(item['@id']).pathname}">${item.title}</a>`
+                    ).join('');
+                    console.log('[TEST-FRONTEND] Navigation rendered, innerHTML length:', navElement.innerHTML.length);
+                } else {
+                    console.log('[TEST-FRONTEND] WARNING: No navigation items to render!');
+                }
+
+                // In VIEW mode or no bridge: render immediately from API data
+                // In EDIT mode: wait for hydra.js to provide content with nodeIds
+                if (!loadHydraBridge || !isEditMode) {
+                    document.getElementById('page-title').textContent = content.title;
+                    renderContent(content);
+                }
+
+                // Initialize Hydra bridge
+                if (loadHydraBridge) {
+                    console.log('[TEST-FRONTEND] Initializing Hydra bridge');
+
+                    // Get admin origin from: URL param > window.name > referrer (auto-detect)
+                    let adminOrigin = urlParams.get('_admin_origin');
+                    if (!adminOrigin && isHydraEdit) {
+                        adminOrigin = window.name.slice(11); // Extract origin from "hydra-edit:<origin>"
+                        console.log('[TEST-FRONTEND] Using admin origin from window.name (edit):', adminOrigin);
+                    } else if (!adminOrigin && isHydraView) {
+                        adminOrigin = window.name.slice(11); // Extract origin from "hydra-view:<origin>"
+                        console.log('[TEST-FRONTEND] Using admin origin from window.name (view):', adminOrigin);
+                    } else if (adminOrigin) {
+                        console.log('[TEST-FRONTEND] Using explicit admin origin:', adminOrigin);
+                    } else {
+                        console.log('[TEST-FRONTEND] Admin origin will be auto-detected from referrer');
+                    }
+
+                    // Define custom blocks via voltoConfig
+                    const voltoConfig = {
+                        blocks: {
+                            blocksConfig: {
+                                hero: {
+                                    id: 'hero',
+                                    title: 'Hero',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+                                    group: 'common',
+                                    mostUsed: true,
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['heading', 'subheading', 'buttonText', 'buttonLink', 'image', 'description'],
+                                            },
+                                        ],
+                                        properties: {
+                                            heading: {
+                                                title: 'Heading',
+                                                type: 'string',
+                                            },
+                                            subheading: {
+                                                title: 'Subheading',
+                                                type: 'string',
+                                                widget: 'textarea',
+                                            },
+                                            buttonText: {
+                                                title: 'Button Text',
+                                                type: 'string',
+                                            },
+                                            buttonLink: {
+                                                title: 'Button Link',
+                                                widget: 'object_browser',
+                                                mode: 'link',
+                                                allowExternals: true,
+                                            },
+                                            image: {
+                                                title: 'Image',
+                                                widget: 'image',
+                                            },
+                                            description: {
+                                                title: 'Description',
+                                                type: 'array',
+                                                widget: 'slate',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Container block: columns contains column children AND top_images
+                                // Tests multi-container field routing
+                                columns: {
+                                    id: 'columns',
+                                    title: 'Columns',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="18" rx="1"/><rect x="14" y="3" width="8" height="18" rx="1"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['title', 'top_images', 'columns'],
+                                            },
+                                        ],
+                                        properties: {
+                                            title: {
+                                                title: 'Title',
+                                                type: 'string',
+                                            },
+                                            top_images: {
+                                                title: 'Top Images',
+                                                type: 'blocks',
+                                                allowedBlocks: ['image'],
+                                                defaultBlock: 'image',
+                                            },
+                                            columns: {
+                                                title: 'Columns',
+                                                type: 'blocks',
+                                                allowedBlocks: ['column'],
+                                                // No defaultBlock - tests single allowedBlock path
+                                                maxLength: 4,
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Nested container: column contains content blocks
+                                column: {
+                                    id: 'column',
+                                    title: 'Column',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['title', 'blocks'],
+                                            },
+                                        ],
+                                        properties: {
+                                            title: {
+                                                title: 'Title',
+                                                type: 'string',
+                                            },
+                                            blocks: {
+                                                title: 'Content',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slate', 'image'],
+                                                defaultBlock: 'slate',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Slider container: uses object_list widget (volto-slider-block format)
+                                // Slides are stored as array with @id instead of blocks/blocks_layout
+                                slider: {
+                                    id: 'slider',
+                                    title: 'Slider',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['slides', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                                            },
+                                        ],
+                                        properties: {
+                                            slides: {
+                                                title: 'Slides',
+                                                widget: 'object_list',
+                                                schema: {
+                                                    title: 'Slide',
+                                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+                                                    properties: {
+                                                        head_title: { title: 'Kicker', type: 'string' },
+                                                        title: { title: 'Title', type: 'string' },
+                                                        description: { title: 'Description', type: 'string', widget: 'textarea' },
+                                                        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                                                        buttonText: { title: 'Button Text', type: 'string' },
+                                                        hideButton: { title: 'Hide Button', type: 'boolean' },
+                                                    },
+                                                },
+                                            },
+                                            autoplayEnabled: {
+                                                title: 'Autoplay Enabled',
+                                                type: 'boolean',
+                                                default: false,
+                                            },
+                                            autoplayDelay: {
+                                                title: 'Autoplay Delay',
+                                                type: 'integer',
+                                                default: 4000,
+                                            },
+                                            autoplayJump: {
+                                                title: 'Autoplay Jump',
+                                                type: 'boolean',
+                                                default: false,
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Slide block: child of carousel
+                                slide: {
+                                    id: 'slide',
+                                    title: 'Slide',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['title', 'content'],
+                                            },
+                                        ],
+                                        properties: {
+                                            title: {
+                                                title: 'Title',
+                                                type: 'string',
+                                            },
+                                            content: {
+                                                title: 'Content',
+                                                type: 'string',
+                                                widget: 'textarea',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Accordion block: demonstrates data-block-field for multi-container targeting
+                                accordion: {
+                                    id: 'accordion',
+                                    title: 'Accordion',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>',
+                                    group: 'common',
+                                    blockSchema: {
+                                        fieldsets: [
+                                            {
+                                                id: 'default',
+                                                title: 'Default',
+                                                fields: ['header', 'content'],
+                                            },
+                                        ],
+                                        properties: {
+                                            header: {
+                                                title: 'Header',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slate'],
+                                                defaultBlock: 'slate',
+                                            },
+                                            content: {
+                                                title: 'Content',
+                                                type: 'blocks',
+                                                allowedBlocks: ['slate', 'image'],
+                                                defaultBlock: 'slate',
+                                            },
+                                        },
+                                        required: [],
+                                    },
+                                },
+                                // Teaser block: tests required link field starter UI
+                                teaser: {
+                                    id: 'teaser',
+                                    title: 'Teaser',
+                                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
+                                    group: 'common',
+                                    // Only send properties - don't send fieldsets as arrays get replaced, not merged
+                                    // Volto's TeaserSchema handles fieldsets with overwrite checkbox
+                                    blockSchema: {
+                                        properties: {
+                                            href: { title: 'Target', widget: 'object_browser', mode: 'link' },
+                                            title: { title: 'Title', type: 'string' },
+                                            description: { title: 'Description', type: 'string' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    };
+
+                    // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
+                    // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
+                    window.bridge = initBridge(adminOrigin, {
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock'],
+                        voltoConfig: voltoConfig,
+                    });
+
+                    console.log('[TEST-FRONTEND] Bridge initialized, setting up change listener');
+
+                    // Listen for changes from the admin UI and update blocks
+                    window.bridge.onEditChange((formData) => {
+                        console.log('[TEST-FRONTEND] Bridge connected! Received form data:', formData);
+
+                        // Update page title if provided
+                        if (formData.title) {
+                            document.getElementById('page-title').textContent = formData.title;
+                        }
+
+                        // Update preview image if provided
+                        const previewImg = document.getElementById('preview-image');
+                        if (formData.preview_image?.scales?.preview?.download) {
+                            previewImg.src = formData.preview_image.scales.preview.download;
+                            previewImg.style.display = 'block';
+                        } else if (formData.preview_image?.download) {
+                            previewImg.src = formData.preview_image.download;
+                            previewImg.style.display = 'block';
+                        } else {
+                            previewImg.style.display = 'none';
+                        }
+
+                        // Re-render content with updated data
+                        if (formData.blocks && formData.blocks_layout) {
+                            console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');
+                            renderContent(formData);
+                        }
+                    });
+
+                    console.log('[TEST-FRONTEND] Bridge setup complete, waiting for connection');
+                }
+            } catch (error) {
+                console.error('Failed to initialize page:', error);
+                document.getElementById('content').innerHTML = '<p>Error loading content</p>';
+            }
+        }
+
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializePage);
+        } else {
+            initializePage();
+        }
+    </script>
+</body>
+</html>

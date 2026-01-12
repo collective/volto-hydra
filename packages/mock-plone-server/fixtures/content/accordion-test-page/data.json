@@ -1,0 +1,91 @@
+{
+  "@id": "http://localhost:8888/accordion-test-page",
+  "@type": "Document",
+  "UID": "accordion-test-page-uid",
+  "id": "accordion-test-page",
+  "title": "Accordion Test Page",
+  "description": "A test page with accordion block for data-block-field testing",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "accordion-1": {
+      "@type": "accordion",
+      "header": {
+        "header-text-1": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Accordion Header Text"}]}],
+          "plaintext": "Accordion Header Text"
+        }
+      },
+      "header_layout": {"items": ["header-text-1"]},
+      "content": {
+        "content-text-1": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Accordion Content Text"}]}],
+          "plaintext": "Accordion Content Text"
+        },
+        "content-text-2": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "More content"}]}],
+          "plaintext": "More content"
+        }
+      },
+      "content_layout": {"items": ["content-text-1", "content-text-2"]}
+    },
+    "text-after": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Text after accordion"}]}],
+      "plaintext": "Text after accordion"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "accordion-1", "text-after"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-01T12:00:00+00:00",
+  "modified": "2025-01-01T12:00:00+00:00",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "@components": {
+    "actions": {
+      "@id": "http://localhost:8888/accordion-test-page/@actions",
+      "document_actions": [],
+      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
+      "object_buttons": [],
+      "portal_tabs": [],
+      "site_actions": [],
+      "user": []
+    },
+    "breadcrumbs": {
+      "@id": "http://localhost:8888/accordion-test-page/@breadcrumbs",
+      "items": [
+        {"@id": "http://localhost:8888", "title": "Home"},
+        {"@id": "http://localhost:8888/accordion-test-page", "title": "Accordion Test Page"}
+      ],
+      "root": "http://localhost:8888"
+    },
+    "navigation": {
+      "@id": "http://localhost:8888/accordion-test-page/@navigation",
+      "items": []
+    },
+    "workflow": {
+      "@id": "http://localhost:8888/accordion-test-page/@workflow"
+    }
+  },
+  "can_manage_portlets": true,
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_add": true
+}
