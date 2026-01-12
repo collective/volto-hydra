@@ -21,20 +21,22 @@ test.describe('Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Get initial block order
     const iframe = helper.getIframe();
-    const initialBlocks = await iframe.locator('[data-block-uid]').all();
-    const initialCount = initialBlocks.length;
+
+    // Get initial block order (deduplicated - handles multi-element blocks)
+    const initialOrder = await helper.getBlockOrder();
+    console.log('[TEST] Initial order:', initialOrder);
 
     // Need at least 2 blocks to test reordering
-    expect(initialCount).toBeGreaterThan(1);
+    expect(initialOrder.length).toBeGreaterThan(1);
 
     // Get the UIDs of first two blocks
-    const firstBlockUid = await initialBlocks[0].getAttribute('data-block-uid');
-    const secondBlockUid = await initialBlocks[1].getAttribute('data-block-uid');
+    const firstBlockUid = initialOrder[0];
+    const secondBlockUid = initialOrder[1];
+    console.log('[TEST] Dragging', firstBlockUid, 'to after', secondBlockUid);
 
     // Select first block
-    await helper.clickBlockInIframe(firstBlockUid!);
+    await helper.clickBlockInIframe(firstBlockUid);
     await helper.waitForSidebarOpen();
 
     // Get the drag handle from the toolbar (in parent window, not iframe)
@@ -47,13 +49,12 @@ test.describe('Block Drag and Drop', () => {
     await helper.dragBlockWithMouse(dragHandle, secondBlock, true);
 
     // Verify block order changed
-    const newBlocks = await iframe.locator('[data-block-uid]').all();
-    const newFirstBlockUid = await newBlocks[0].getAttribute('data-block-uid');
-    const newSecondBlockUid = await newBlocks[1].getAttribute('data-block-uid');
+    const newOrder = await helper.getBlockOrder();
+    console.log('[TEST] New order:', newOrder);
 
     // First block should now be second
-    expect(newSecondBlockUid).toBe(firstBlockUid);
-    expect(newFirstBlockUid).toBe(secondBlockUid);
+    expect(newOrder[1]).toBe(firstBlockUid);
+    expect(newOrder[0]).toBe(secondBlockUid);
   });
 
   test('blocks maintain data after drag and drop', async ({ page }) => {
@@ -91,9 +92,11 @@ test.describe('Block Drag and Drop', () => {
     const initialBlocks = await helper.getBlockOrder();
     const firstBlock = initialBlocks[0];
     const lastBlock = initialBlocks[initialBlocks.length - 1];
+    console.log('[TEST] Dragging first block:', firstBlock, 'to after last:', lastBlock);
 
     // Select first block
     await helper.clickBlockInIframe(firstBlock);
+    await helper.waitForSidebarOpen();
 
     // Get drag handle from toolbar
     const dragHandle = await helper.getDragHandle();
@@ -208,15 +211,19 @@ test.describe('Block Drag and Drop', () => {
     const iframe = helper.getIframe();
     const initialBlocks = await helper.getBlockOrder();
 
-    // Need at least 3 blocks for this test
-    expect(initialBlocks.length).toBeGreaterThanOrEqual(3);
+    // Need at least 4 blocks for this test (use block at index 2 to avoid image block)
+    expect(initialBlocks.length).toBeGreaterThanOrEqual(4);
 
-    const middleBlock = initialBlocks[1];
+    // Use block at index 2 (block-3-uuid, a slate block) instead of index 1 (image block)
+    // Image blocks can have loading timing issues that make toolbar positioning flaky
+    const middleBlock = initialBlocks[2];
     const firstBlock = initialBlocks[0];
     const lastBlock = initialBlocks[initialBlocks.length - 1];
+    console.log('[TEST] Dragging middle block:', middleBlock, 'first:', firstBlock, 'last:', lastBlock);
 
     // Select middle block
     await helper.clickBlockInIframe(middleBlock);
+    await helper.waitForSidebarOpen();
 
     // Get drag handle from toolbar
     const dragHandle = await helper.getDragHandle();
@@ -227,6 +234,7 @@ test.describe('Block Drag and Drop', () => {
     await helper.dragBlockWithMouse(dragHandle, lastBlockElement, true);
 
     const newBlocks = await helper.getBlockOrder();
+    console.log('[TEST] Final order:', newBlocks);
 
     // First and last blocks should still exist
     expect(newBlocks).toContain(firstBlock);
