@@ -90,10 +90,14 @@ test.describe('Teaser Starter UI', () => {
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible({ timeout: 5000 });
 
-    // Title element should NOT have data-editable-field initially (overwrite is false)
-    // When overwrite is false, we show the target's title which isn't editable
+    // Initially overwrite is false, so block should have data-block-readonly
+    // hydra.js ignores editable fields inside readonly blocks
+    await expect(filledTeaser).toHaveAttribute('data-block-readonly');
+
+    // Title element should have data-editable-field but NOT be contenteditable (readonly)
     const titleLocator = filledTeaser.locator('[data-editable-field="title"]');
-    await expect(titleLocator).toHaveCount(0);
+    await expect(titleLocator).toHaveCount(1);
+    await expect(titleLocator).not.toHaveAttribute('contenteditable', 'true');
 
     // Verify title shows target's title initially (h3 in mock, h5 in Nuxt)
     const titleElement = filledTeaser.locator('h3, h5');
@@ -104,9 +108,11 @@ test.describe('Teaser Starter UI', () => {
     await expect(customizeCheckbox).toBeVisible({ timeout: 5000 });
     await customizeCheckbox.click();
 
-    // After enabling customize, title SHOULD have data-editable-field and be contenteditable
-    await expect(titleLocator).toHaveCount(1, { timeout: 5000 });
-    await expect(titleLocator).toHaveAttribute('contenteditable', 'true');
+    // After enabling customize, block should NOT have data-block-readonly
+    // and title should be contenteditable
+    // Wait for async render to complete (test frontend uses async expandAllListings)
+    await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 5000 });
+    await expect(titleLocator).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
 
     // Edit the title to something custom
     await titleLocator.click();
@@ -120,8 +126,8 @@ test.describe('Teaser Starter UI', () => {
     // 1. Title should revert to target's title
     await expect(titleElement).toHaveText('Target Page', { timeout: 5000 });
 
-    // 2. Title should no longer have data-editable-field (not editable)
-    await expect(titleLocator).toHaveCount(0);
+    // 2. Block should have data-block-readonly again
+    await expect(filledTeaser).toHaveAttribute('data-block-readonly');
 
     // 3. Click directly on the title - it should NOT become contenteditable
     // This is the key bug: clicking on title after unchecking should not make it editable
@@ -178,10 +184,24 @@ test.describe('Teaser Starter UI', () => {
 
     const iframe = helper.getIframe();
 
-    // Find and click the filled teaser's "Read more" link (second linkable href element)
+    // Find and click the filled teaser to select it first
     const filledTeaser = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
     await expect(filledTeaser).toBeVisible({ timeout: 10000 });
+    await filledTeaser.click();
 
+    // Wait for block to be selected
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Enable customize mode so linkable fields become editable
+    const customizeCheckbox = page.locator('text=Customize teaser content');
+    await expect(customizeCheckbox).toBeVisible({ timeout: 5000 });
+    await customizeCheckbox.click();
+
+    // Wait for overwrite to be enabled (data-block-readonly removed)
+    await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 5000 });
+
+    // Now click the "Read more" link
     const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]').last();
     await expect(readMoreLink).toBeVisible();
 
@@ -193,10 +213,6 @@ test.describe('Teaser Starter UI', () => {
 
     // URL should NOT change (navigation prevented)
     expect(page.url()).toBe(urlBefore);
-
-    // Block should be selected
-    const outline = page.locator('.volto-hydra-block-outline');
-    await expect(outline).toBeVisible({ timeout: 5000 });
 
     // Link icon should appear in toolbar for editing href
     const linkIcon = page.locator('button[title="Edit link (href)"]');
@@ -210,10 +226,24 @@ test.describe('Teaser Starter UI', () => {
 
     const iframe = helper.getIframe();
 
-    // Find the filled teaser's title link (first linkable href element wrapping h3)
+    // Find and click the filled teaser to select it first
     const filledTeaser = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
     await expect(filledTeaser).toBeVisible({ timeout: 10000 });
+    await filledTeaser.click();
 
+    // Wait for block to be selected
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Enable customize mode so linkable fields become editable
+    const customizeCheckbox = page.locator('text=Customize teaser content');
+    await expect(customizeCheckbox).toBeVisible({ timeout: 5000 });
+    await customizeCheckbox.click();
+
+    // Wait for overwrite to be enabled (data-block-readonly removed)
+    await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 5000 });
+
+    // Now click the title link
     const titleLink = filledTeaser.locator('a[data-linkable-field="href"]').first();
     await expect(titleLink).toBeVisible();
 
@@ -225,10 +255,6 @@ test.describe('Teaser Starter UI', () => {
 
     // URL should NOT change (navigation prevented)
     expect(page.url()).toBe(urlBefore);
-
-    // Block should be selected
-    const outline = page.locator('.volto-hydra-block-outline');
-    await expect(outline).toBeVisible({ timeout: 5000 });
 
     // Link icon should appear in toolbar for editing href
     const linkIcon = page.locator('button[title="Edit link (href)"]');

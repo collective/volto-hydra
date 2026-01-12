@@ -323,6 +323,12 @@ export class Bridge {
     const results = {};
 
     for (const element of allElements) {
+      // Skip if this element has data-block-readonly
+      // Readonly blocks ignore editable/linkable/media fields
+      if (element.hasAttribute('data-block-readonly')) {
+        continue;
+      }
+
       // Check if element itself has the attribute
       const selfField = element.getAttribute(attrName);
       if (selfField) {
@@ -330,6 +336,10 @@ export class Bridge {
       }
       // Check descendants
       for (const field of element.querySelectorAll(`[${attrName}]`)) {
+        // Skip fields inside a readonly ancestor
+        if (field.closest('[data-block-readonly]')) {
+          continue;
+        }
         if (this.fieldBelongsToBlock(field, element)) {
           const fieldName = field.getAttribute(attrName);
           if (fieldName) {
@@ -3795,6 +3805,9 @@ export class Bridge {
         if (newRect && (newRect.width > 0 || newRect.height > 0)) {
           const firstElement = currentElements[0];
           if (firstElement) {
+            // Restore contenteditable on fields - DOM elements may have been replaced
+            // This is needed when the renderer re-renders (e.g., after checkbox toggle)
+            this.restoreContentEditableOnFields(firstElement, 'domChange');
             this.sendBlockSelected('domChange', firstElement);
           }
         }
@@ -6723,11 +6736,12 @@ export class Bridge {
           display: block;
         }
         /* Linkable field hover styles - indicate clickable link areas */
-        [data-linkable-field] {
+        /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
+        [data-linkable-field]:not([data-block-readonly] [data-linkable-field]):not([data-block-readonly][data-linkable-field]) {
           cursor: pointer;
           position: relative;
         }
-        [data-linkable-field]:hover::after {
+        [data-linkable-field]:not([data-block-readonly] [data-linkable-field]):not([data-block-readonly][data-linkable-field]):hover::after {
           content: "";
           position: absolute;
           inset: -2px;
@@ -6736,11 +6750,12 @@ export class Bridge {
           pointer-events: none;
         }
         /* Media field hover styles - indicate clickable image areas */
-        [data-media-field] {
+        /* Exclude fields inside readonly blocks */
+        [data-media-field]:not([data-block-readonly] [data-media-field]):not([data-block-readonly][data-media-field]) {
           cursor: pointer;
           position: relative;
         }
-        [data-media-field]:hover::after {
+        [data-media-field]:not([data-block-readonly] [data-media-field]):not([data-block-readonly][data-media-field]):hover::after {
           content: "";
           position: absolute;
           inset: -2px;

@@ -95,8 +95,6 @@ function renderContent(content) {
 function renderBlock(blockId, block) {
     // Use _blockUid if present (for multi-element blocks like expanded listings)
     const uid = block._blockUid || blockId;
-    // Blocks with _blockUid are from listings and not individually editable
-    const isEditable = !block._blockUid;
 
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', uid);
@@ -150,7 +148,7 @@ function renderBlock(blockId, block) {
         case 'teaser':
             // Teaser handles its own data-block-uid, so return it directly
             const teaserEl = document.createElement('div');
-            teaserEl.innerHTML = renderTeaserBlock(block, uid, isEditable);
+            teaserEl.innerHTML = renderTeaserBlock(block, uid);
             return teaserEl.firstElementChild;
         case 'listing':
             // Special case: listing renders MULTIPLE elements with same block UID
@@ -414,21 +412,26 @@ function renderHeroBlock(block) {
  * Render a teaser block.
  * Shows placeholder when href is empty, content when href has value.
  * By default, shows target page title/description from href.
- * Only uses block.title/description when overrideTitle/overrideDescription is true.
+ * Only uses block.title/description when overwrite is true.
+ *
+ * Uses data-block-readonly for listing items (like Nuxt) instead of isEditable parameter.
+ * hydra.js ignores editable/linkable fields inside readonly blocks.
+ *
  * @param {Object} block - Teaser block data
- * @param {string} blockUid - Block UID to use for data-block-uid attribute
- * @param {boolean} isEditable - If true, add editable/linkable attributes
+ * @param {string|null} blockUid - Block UID (null if inside a container with its own UID)
  * @returns {string} HTML string (includes wrapper with data-block-uid)
  */
-function renderTeaserBlock(block, blockUid, isEditable = true) {
+function renderTeaserBlock(block, blockUid) {
     const href = getLinkUrl(block.href);
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
 
-    // Get title: use block.title if present, otherwise use href title
-    const title = block.title || hrefObj?.title || '';
+    // Get title: only use block.title when overwrite is true
+    // When overwrite is false, show target's title (ignore any stored block.title)
+    const title = block.overwrite ? (block.title || hrefObj?.title || '') : (hrefObj?.title || '');
 
-    // Get description: use block.description if present, otherwise use href description
-    const description = block.description || hrefObj?.description || '';
+    // Get description: only use block.description when overwrite is true
+    // When overwrite is false, show target's description
+    const description = block.overwrite ? (block.description || hrefObj?.description || '') : (hrefObj?.description || '');
 
     // Get preview image: use block.preview_image if set, otherwise use target content's image
     let imageSrc = '';
@@ -441,8 +444,15 @@ function renderTeaserBlock(block, blockUid, isEditable = true) {
     // Only add data-block-uid if blockUid is provided (not when inside a container that already has it)
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
-    // If href is empty, show placeholder for starter UI (only for editable teasers)
-    if (!href && isEditable) {
+    // Add data-block-readonly when:
+    // - block._blockUid is set (listing item), OR
+    // - block.overwrite is false/undefined (fields not customizable)
+    // hydra.js ignores editable/linkable fields inside readonly blocks
+    const isReadonly = block._blockUid || !block.overwrite;
+    const readonlyAttr = isReadonly ? 'data-block-readonly' : '';
+
+    // If href is empty, show placeholder for starter UI (only for standalone teasers)
+    if (!href && blockUid) {
         return `
             <div ${blockUidAttr} class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
                 <p style="color: #999; margin: 0;">Select a target page for this teaser</p>
@@ -455,19 +465,15 @@ function renderTeaserBlock(block, blockUid, isEditable = true) {
         ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
         : '';
 
-    // Only add editable/linkable attributes when isEditable is true
-    const titleEditableAttr = isEditable && block.overwrite ? 'data-editable-field="title"' : '';
-    const descAttr = isEditable && block.overwrite ? 'data-editable-field="description"' : '';
-    const linkAttr = isEditable ? 'data-linkable-field="href"' : '';
-
+    // Always include editable/linkable attributes - hydra.js respects data-block-readonly
     return `
-        <div ${blockUidAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+        <div ${blockUidAttr} ${readonlyAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
-            <a href="${href || '#'}" ${linkAttr} style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
-                <h3 ${titleEditableAttr} style="margin: 0;">${title}</h3>
+            <a href="${href || '#'}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
+                <h3 data-editable-field="title" style="margin: 0;">${title}</h3>
             </a>
-            <p ${descAttr} style="color: #666; margin: 0;">${description}</p>
-            <a href="${href || '#'}" ${linkAttr} style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
+            <p data-editable-field="description" style="color: #666; margin: 0;">${description}</p>
+            <a href="${href || '#'}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>
     `;
 }
@@ -671,7 +677,6 @@ function renderGridBlock(block, blockId) {
 
         // Use _blockUid if present (for multi-element blocks like expanded listings)
         const uid = childBlock._blockUid || itemId;
-        const isEditable = !childBlock._blockUid;
 
         // All grid cells have data-block-uid so clicking anywhere in the cell selects the block
         html += `<div data-block-uid="${uid}" class="grid-cell" style="flex: 0 0 calc(25% - 15px); padding: 10px; border: 1px dashed #999;">`;
@@ -680,7 +685,7 @@ function renderGridBlock(block, blockId) {
         // Note: Don't pass uid to teaser - grid-cell already has data-block-uid
         switch (childBlock['@type']) {
             case 'teaser':
-                html += renderTeaserBlock(childBlock, null, isEditable);
+                html += renderTeaserBlock(childBlock, null);
                 break;
             case 'slate':
                 html += renderSlateBlock(childBlock);
@@ -1030,6 +1035,14 @@ function updateBlock(blockId, newData) {
 
     const newBlock = renderBlock(blockId, newData);
     blockElement.innerHTML = newBlock.innerHTML;
+
+    // Sync data-block-readonly attribute from new block to existing element
+    // This is needed because innerHTML only updates children, not the element's own attributes
+    if (newBlock.hasAttribute('data-block-readonly')) {
+        blockElement.setAttribute('data-block-readonly', '');
+    } else {
+        blockElement.removeAttribute('data-block-readonly');
+    }
 }
 
 /**
