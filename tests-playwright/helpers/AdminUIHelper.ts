@@ -2874,11 +2874,13 @@ export class AdminUIHelper {
       throw new Error('Could not get iframe bounding box');
     }
 
+    // Position cursor at center of bottom/top half (62.5%/37.5%) rather than near edges (75%/25%)
+    // This keeps cursor well within the target block, avoiding detection of adjacent blocks
     const result = {
       x: iframeRect.x + rect.x + rect.width / 2,
       y: insertAfter
-        ? iframeRect.y + rect.y + rect.height * 0.75
-        : iframeRect.y + rect.y + rect.height * 0.25,
+        ? iframeRect.y + rect.y + rect.height * 0.625
+        : iframeRect.y + rect.y + rect.height * 0.375,
     };
 
     return result;
@@ -2916,7 +2918,10 @@ export class AdminUIHelper {
 
   /**
    * Auto-scroll the iframe until the target block is visible in the viewport.
-   * Returns when the target is in the viewport and ready for drop.
+   *
+   * IMPORTANT: We scroll PAST the target, then move the cursor back to the drop position.
+   * This ensures the cursor isn't at the scroll edge when we drop, which would cause
+   * auto-scroll to continue and change the detected target block.
    */
   private async autoScrollToTarget(
     targetBlock: Locator,
@@ -2927,6 +2932,11 @@ export class AdminUIHelper {
     // - insertAfter=true: scroll until LAST element visible (dropping below it)
     // - insertAfter=false: scroll until FIRST element visible (dropping above it)
     const targetElement = insertAfter ? targetBlock.last() : targetBlock.first();
+    const viewportSize = this.page.viewportSize();
+    if (!viewportSize) throw new Error('Could not get viewport size');
+
+    // Margin from viewport edge - target should be this far from edge before we stop scrolling
+    const edgeMargin = 100;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.verifyDragShadowVisible();
@@ -2937,18 +2947,17 @@ export class AdminUIHelper {
       const iframeRect = await iframeEl.boundingBox();
       if (!iframeRect) throw new Error('Could not get iframe bounding box');
 
-      const viewportSize = this.page.viewportSize();
       const targetY = iframeRect.y + quickRect.y + quickRect.height / 2;
-      const isAboveViewport = targetY < 0;
-      const isBelowViewport = viewportSize && targetY > viewportSize.height;
+      const isAboveViewport = targetY < edgeMargin;
+      const isBelowViewport = targetY > viewportSize.height - edgeMargin;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
 
       if (!needsAutoScroll) {
-        // Target visible - get precise drop position using first/last element
+        // Target is well within viewport (not near edges) - safe to drop
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
-      // Target is off-screen - move to edge to trigger auto-scroll
+      // Target is near edge or off-screen - move to edge to trigger auto-scroll
       const scrollUp = isAboveViewport;
       await this.moveToScrollEdge(scrollUp);
 
