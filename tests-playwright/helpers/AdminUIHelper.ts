@@ -2881,13 +2881,13 @@ export class AdminUIHelper {
       throw new Error('Could not get iframe bounding box');
     }
 
-    // Position cursor at center of bottom/top half (62.5%/37.5%) rather than near edges (75%/25%)
-    // This keeps cursor well within the target block, avoiding detection of adjacent blocks
+    // Position cursor at center of bottom/top half (55%/45%) - closer to center to avoid
+    // edge detection issues where hydra.js might detect the adjacent block instead
     const result = {
       x: iframeRect.x + rect.x + rect.width / 2,
       y: insertAfter
-        ? iframeRect.y + rect.y + rect.height * 0.625
-        : iframeRect.y + rect.y + rect.height * 0.375,
+        ? iframeRect.y + rect.y + rect.height * 0.55
+        : iframeRect.y + rect.y + rect.height * 0.45,
     };
 
     return result;
@@ -2975,6 +2975,10 @@ export class AdminUIHelper {
       if (!needsAutoScroll) {
         // Target is well within viewport (not near edges) - safe to drop
         console.log(`[SCROLL] Target in range! targetY=${targetY.toFixed(0)}`);
+        // CRITICAL: Move cursor to safe zone BEFORE returning, to stop auto-scroll.
+        // Otherwise, as cursor moves from edge to target, it passes through scroll zone
+        // and auto-scroll continues, causing the target to move away.
+        await this.moveToSafeZone();
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
@@ -2984,6 +2988,7 @@ export class AdminUIHelper {
         // If target is visible and hasn't moved for 3 iterations, accept it
         if (stuckCount >= 3 && isVisibleInViewport) {
           console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
+          await this.moveToSafeZone();
           return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
         }
       } else {
@@ -3122,6 +3127,29 @@ export class AdminUIHelper {
       await this.page.mouse.move(edgeX, edgeY + (i % 2), { steps: 2 });
       await this.page.waitForTimeout(50);
     }
+  }
+
+  /**
+   * Move cursor to a "safe zone" in the center of the viewport to stop auto-scroll.
+   * This prevents race conditions where auto-scroll continues while cursor moves to target.
+   */
+  private async moveToSafeZone(): Promise<void> {
+    const viewportSize = this.page.viewportSize();
+    if (!viewportSize) throw new Error('Could not get viewport size');
+
+    const iframeElement = this.page.locator('#previewIframe');
+    const iframeRect = await iframeElement.boundingBox();
+    if (!iframeRect) throw new Error('Could not get iframe bounds');
+
+    // Move to center of viewport (well away from scroll edges)
+    const safeX = iframeRect.x + iframeRect.width / 2;
+    const safeY = viewportSize.height / 2;
+
+    console.log(`[SCROLL] Moving to safe zone: (${safeX.toFixed(0)}, ${safeY.toFixed(0)})`);
+    await this.page.mouse.move(safeX, safeY, { steps: 3 });
+
+    // Wait for any residual scroll to settle
+    await this.page.waitForTimeout(150);
   }
 
   /**

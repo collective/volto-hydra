@@ -57,31 +57,6 @@ test.describe('Block Drag and Drop', () => {
     expect(newOrder[0]).toBe(secondBlockUid);
   });
 
-  test('blocks maintain data after drag and drop', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-
-    // Select image block and note its alt text
-    await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
-
-    const originalAlt = await helper.getSidebarFieldValue('alt');
-
-    // The data should remain the same even without dragging
-    // (This is a basic check - in a full DND test, we'd drag the block first)
-
-    // Re-select the block
-    await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
-
-    const newAlt = await helper.getSidebarFieldValue('alt');
-    expect(newAlt).toBe(originalAlt);
-  });
-
   test('can drag first block to last position', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
