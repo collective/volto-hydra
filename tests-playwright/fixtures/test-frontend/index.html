@@ -59,7 +59,116 @@
 
     <script src="renderer.js"></script>
     <script type="module">
-        import { initBridge } from './hydra.js';
+        import { initBridge, expandListingBlocks } from './hydra.js';
+
+        // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
+        function getPagesFromUrl() {
+            const pages = {};
+            const params = new URLSearchParams(window.location.search);
+            for (const [key, value] of params) {
+                if (key.startsWith('pg_')) {
+                    const blockId = key.substring(3); // Remove 'pg_' prefix
+                    pages[blockId] = parseInt(value, 10);
+                }
+            }
+            return pages;
+        }
+
+        // Recursively expand all listing blocks in a block tree
+        // Returns { blocks, blocks_layout } with listings converted to teasers
+        // pages = { blockId: pageNumber } from URL
+        async function expandAllListings(blocks, blocksLayout, options, pages = {}) {
+            if (!blocks || !blocksLayout) return { blocks, blocks_layout: blocksLayout };
+
+            // First expand listings at this level
+            const { blocks: expandedBlocks, blocks_layout: newLayout } = await expandListingBlocks(
+                blocks, blocksLayout, { ...options, pageSize: 1000, page: 0 }
+            );
+
+            // Then recursively expand containers and add paging
+            for (const blockId of newLayout) {
+                const block = expandedBlocks[blockId];
+                if (!block) continue;
+
+                // Handle gridBlock and similar containers with blocks/blocks_layout
+                if (block.blocks && block.blocks_layout?.items) {
+                    // Expand nested listings first
+                    const nestedResult = await expandAllListings(
+                        block.blocks, block.blocks_layout.items, options, pages
+                    );
+
+                    // Now apply paging to this container's layout
+                    const pageSize = 6;  // Small for testing
+                    const currentPage = pages[blockId] || 0;
+                    const { blocks: pagedBlocks, blocks_layout: pagedLayout, paging } = await expandListingBlocks(
+                        nestedResult.blocks,
+                        nestedResult.blocks_layout,
+                        { ...options, pageSize, page: currentPage }
+                    );
+
+                    expandedBlocks[blockId] = {
+                        ...block,
+                        blocks: pagedBlocks,
+                        blocks_layout: { items: pagedLayout },
+                        _paging: paging?.totalPages > 1 ? paging : null
+                    };
+                }
+
+                // Handle columns container
+                if (block.columns) {
+                    const expandedCols = {};
+                    for (const [colId, column] of Object.entries(block.columns)) {
+                        if (column.blocks && column.blocks_layout?.items) {
+                            const result = await expandAllListings(
+                                column.blocks, column.blocks_layout.items, options, pages
+                            );
+                            expandedCols[colId] = {
+                                ...column,
+                                blocks: result.blocks,
+                                blocks_layout: { items: result.blocks_layout }
+                            };
+                        } else {
+                            expandedCols[colId] = column;
+                        }
+                    }
+                    expandedBlocks[blockId] = { ...block, columns: expandedCols };
+                }
+            }
+
+            return { blocks: expandedBlocks, blocks_layout: newLayout };
+        }
+
+        // Helper to render content with listing expansion
+        async function renderContentWithListings(content) {
+            // Extract path from @id (could be full URL or path)
+            let contextPath = content['@id'] || '/';
+            if (contextPath.startsWith('http')) {
+                contextPath = new URL(contextPath).pathname;
+            }
+
+            const options = {
+                apiUrl: window.location.origin,
+                contextPath,
+            };
+
+            // Get page numbers from URL
+            const pages = getPagesFromUrl();
+
+            // Recursively expand all listings (converts to teasers)
+            const { blocks, blocks_layout } = await expandAllListings(
+                content.blocks,
+                content.blocks_layout?.items || [],
+                options,
+                pages
+            );
+
+            // Render with expanded blocks and updated layout
+            renderContent({
+                ...content,
+                blocks,
+                blocks_layout: { items: blocks_layout }
+            });
+        }
 
         // Track page loads to detect double-loading issues (persisted in sessionStorage)
         const SESSION_KEY = 'hydra_page_load_count';
@@ -129,7 +238,7 @@
                 // In EDIT mode: wait for hydra.js to provide content with nodeIds
                 if (!loadHydraBridge || !isEditMode) {
                     document.getElementById('page-title').textContent = content.title;
-                    renderContent(content);
+                    await renderContentWithListings(content);
                 }
 
                 // Initialize Hydra bridge
@@ -400,7 +509,7 @@
                     // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge(adminOrigin, {
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing'],
                         voltoConfig: voltoConfig,
                     });
 
@@ -430,7 +539,7 @@
                         // Re-render content with updated data
                         if (formData.blocks && formData.blocks_layout) {
                             console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');
-                            renderContent(formData);
+                            renderContentWithListings(formData);
                         }
                     });
 
