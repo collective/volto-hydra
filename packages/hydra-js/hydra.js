@@ -2799,6 +2799,17 @@ export class Bridge {
       }
     }
 
+    // Scroll to block if not visible - BUT skip if we just finished a drag-drop
+    // After drag-drop, the block should be visible where we dropped it.
+    // If it's "not visible", the async renderer may not have completed yet and
+    // we'd be scrolling to the OLD position. Wait for domChange to handle it.
+    let didScroll = false;
+    if (!this.elementIsVisibleInViewport(blockElement) && !this._justFinishedDrag) {
+      log('updateBlockUIAfterFormData: scrolling to block', this.selectedBlockUid);
+      blockElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+      didScroll = true;
+    }
+
     // Send updated block position to Admin UI for toolbar/overlay positioning
     // For multi-element blocks, use combined bounding box
     const allElements = this.getAllBlockElements(this.selectedBlockUid);
@@ -2811,9 +2822,10 @@ export class Bridge {
 
     // For skipFocus (sidebar edits): only send if position actually changed (e.g., after drag-and-drop)
     // For !skipFocus (format operations): always send
-    let shouldSendBlockSelected = !skipFocus;
+    // IMPORTANT: Always send if we just scrolled to the block - Admin needs the new rect
+    let shouldSendBlockSelected = !skipFocus || didScroll;
 
-    if (skipFocus && this._lastBlockRect) {
+    if (skipFocus && !didScroll && this._lastBlockRect) {
       const topChanged = Math.abs(currentRect.top - this._lastBlockRect.top) > 1;
       const leftChanged = Math.abs(currentRect.left - this._lastBlockRect.left) > 1;
 
@@ -3809,6 +3821,11 @@ export class Bridge {
             // This is needed when the renderer re-renders (e.g., after checkbox toggle)
             this.restoreContentEditableOnFields(firstElement, 'domChange');
             this.sendBlockSelected('domChange', firstElement);
+
+            // Reposition drag button - block may have moved (e.g., after drag-drop re-render)
+            if (this.dragHandlePositioner) {
+              this.dragHandlePositioner();
+            }
           }
         }
       }
@@ -4075,6 +4092,9 @@ export class Bridge {
     const dragHandler = (e) => {
       e.preventDefault();
 
+      // Set flag to suppress scrollHandler during drag
+      this._isDragging = true;
+
       // Get all elements for this block (multi-element blocks like listings)
       const allElements = this.getAllBlockElements(this.selectedBlockUid);
       if (allElements.length === 0) return;
@@ -4137,14 +4157,16 @@ export class Bridge {
       let scrollAnimationId = null;
       let lastMouseX = 0; // Track last cursor position for scroll updates
       let lastMouseY = 0;
+      let currentScrollSpeed = 0; // Variable speed based on edge proximity
       const scrollThreshold = 50; // pixels from edge to trigger scroll
-      const scrollSpeed = 8; // pixels per frame
+      const minScrollSpeed = 8; // slowest scroll (at threshold edge)
+      const maxScrollSpeed = 40; // fastest scroll (at viewport edge)
 
       // Continuous scroll loop using requestAnimationFrame
       // Dispatches synthetic mousemove to update drop indicator while scrolling
       const scrollLoop = () => {
         if (scrollDirection !== 0) {
-          window.scrollBy(0, scrollDirection * scrollSpeed);
+          window.scrollBy(0, scrollDirection * currentScrollSpeed);
           // Dispatch synthetic mousemove to update drop indicator position
           // This ensures the indicator updates even when mouse is stationary
           const syntheticEvent = new MouseEvent('mousemove', {
@@ -4189,9 +4211,16 @@ export class Bridge {
 
         if (e.clientY < scrollThreshold) {
           // Near top edge - scroll up
+          // Speed increases as cursor gets closer to edge (0 = fastest, threshold = slowest)
+          const distanceFromEdge = e.clientY;
+          const speedFactor = 1 - (distanceFromEdge / scrollThreshold); // 1 at edge, 0 at threshold
+          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
           startScrolling(-1);
         } else if (e.clientY > viewportHeight - scrollThreshold) {
           // Near bottom edge - scroll down
+          const distanceFromEdge = viewportHeight - e.clientY;
+          const speedFactor = 1 - (distanceFromEdge / scrollThreshold);
+          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
           startScrolling(1);
         } else {
           // Not near edge - stop scrolling
@@ -4376,6 +4405,23 @@ export class Bridge {
 
       // Cleanup on mouseup & update blocks layout
       const onMouseUp = () => {
+        // Clear drag flag
+        this._isDragging = false;
+
+        // Mark that we just finished a drag - prevents scrollIntoView race condition
+        // with async renderers. Clear after a delay to allow render to complete.
+        this._justFinishedDrag = true;
+        setTimeout(() => {
+          this._justFinishedDrag = false;
+        }, 500);
+
+        // Clear any pending scroll timeout from auto-scroll
+        // This prevents stale BLOCK_SELECTED from firing after drop
+        if (this.scrollTimeout) {
+          clearTimeout(this.scrollTimeout);
+          this.scrollTimeout = null;
+        }
+
         // Stop auto-scroll
         stopScrolling();
 
@@ -4588,7 +4634,11 @@ export class Bridge {
       }
 
       // After scroll stops, re-send BLOCK_SELECTED with updated positions
+      // Skip during drag - auto-scroll causes misleading position updates
       this.scrollTimeout = setTimeout(() => {
+        if (this._isDragging) {
+          return; // Don't send BLOCK_SELECTED during drag
+        }
         if (this.selectedBlockUid) {
           const blockElement = document.querySelector(
             `[data-block-uid="${this.selectedBlockUid}"]`,

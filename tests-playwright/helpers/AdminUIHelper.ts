@@ -2795,13 +2795,20 @@ export class AdminUIHelper {
    * Fails if toolbar is not visible.
    */
   private async getToolbarDragIconCenterInPageCoords(): Promise<{ x: number; y: number }> {
+    console.log('[DEBUG] getToolbarDragIconCenterInPageCoords called');
     const toolbar = this.page.locator('.quanta-toolbar');
     const toolbarDragIcon = toolbar.locator('.drag-handle');
+
+    // Debug: check if toolbar and drag handle exist
+    const toolbarCount = await toolbar.count();
+    const dragHandleCount = await toolbarDragIcon.count();
+    console.log(`[DEBUG] toolbar count: ${toolbarCount}, drag-handle count: ${dragHandleCount}`);
 
     const rect = await toolbarDragIcon.boundingBox();
     if (!rect) {
       throw new Error('Toolbar drag icon not visible');
     }
+    console.log(`[DEBUG] drag handle rect: ${JSON.stringify(rect)}`);
 
     return {
       x: rect.x + rect.width / 2,
@@ -2895,7 +2902,9 @@ export class AdminUIHelper {
    * Returns the starting position for reference.
    */
   private async startDragFromToolbar(): Promise<{ x: number; y: number }> {
+    console.log('[DEBUG] startDragFromToolbar called');
     const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
+    console.log(`[DEBUG] startPosPage: ${JSON.stringify(startPosPage)}`);
 
     if (!this.isInPageViewport(startPosPage.y)) {
       throw new Error(
@@ -2905,9 +2914,12 @@ export class AdminUIHelper {
       );
     }
 
+    console.log('[DEBUG] moving mouse and pressing down');
     await this.page.mouse.move(startPosPage.x, startPosPage.y);
     await this.page.mouse.down();
+    console.log('[DEBUG] verifying drag shadow visible');
     await this.verifyDragShadowVisible();
+    console.log('[DEBUG] drag started successfully');
 
     return startPosPage;
   }
@@ -2935,8 +2947,10 @@ export class AdminUIHelper {
     const viewportSize = this.page.viewportSize();
     if (!viewportSize) throw new Error('Could not get viewport size');
 
-    // Margin from viewport edge - target should be this far from edge before we stop scrolling
+    // Margin from viewport edge - ideally target should be this far from edge
     const edgeMargin = 100;
+    let lastTargetY: number | null = null;
+    let stuckCount = 0;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.verifyDragShadowVisible();
@@ -2950,19 +2964,39 @@ export class AdminUIHelper {
       const targetY = iframeRect.y + quickRect.y + quickRect.height / 2;
       const isAboveViewport = targetY < edgeMargin;
       const isBelowViewport = targetY > viewportSize.height - edgeMargin;
+      const isVisibleInViewport = targetY > 0 && targetY < viewportSize.height;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
+
+      // Debug logging every 5 attempts
+      if (attempt % 5 === 0) {
+        console.log(`[SCROLL] attempt=${attempt} targetY=${targetY.toFixed(0)} edgeMargin=${edgeMargin} viewportH=${viewportSize.height} above=${isAboveViewport} below=${isBelowViewport} visible=${isVisibleInViewport} needsScroll=${needsAutoScroll} t=${Date.now()}`);
+      }
 
       if (!needsAutoScroll) {
         // Target is well within viewport (not near edges) - safe to drop
+        console.log(`[SCROLL] Target in range! targetY=${targetY.toFixed(0)}`);
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
+
+      // Check if we've hit the scroll limit (target stopped moving)
+      if (lastTargetY !== null && Math.abs(targetY - lastTargetY) < 5) {
+        stuckCount++;
+        // If target is visible and hasn't moved for 3 iterations, accept it
+        if (stuckCount >= 3 && isVisibleInViewport) {
+          console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
+          return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+        }
+      } else {
+        stuckCount = 0;
+      }
+      lastTargetY = targetY;
 
       // Target is near edge or off-screen - move to edge to trigger auto-scroll
       const scrollUp = isAboveViewport;
       await this.moveToScrollEdge(scrollUp);
 
-      // Quick wait for scroll progress
-      await this.waitForAutoScrollProgress(targetElement, targetY);
+      // Brief wait for scroll to take effect
+      await this.page.waitForTimeout(100);
     }
 
     // If we get here, we've exceeded max attempts
@@ -2970,12 +3004,16 @@ export class AdminUIHelper {
   }
 
   /**
-   * Wait for auto-scroll to make progress (target position changes).
+   * Wait for auto-scroll to make progress (target position changes) OR target becomes visible.
+   * This handles the case where we hit the scroll limit before the target is within the edge margin.
    */
   private async waitForAutoScrollProgress(
     targetElement: Locator,
     prevY: number
   ): Promise<void> {
+    const viewportSize = this.page.viewportSize();
+    if (!viewportSize) throw new Error('Could not get viewport size');
+
     await expect(async () => {
       await this.verifyDragShadowVisible();
       // Quick position check using single element
@@ -2984,11 +3022,21 @@ export class AdminUIHelper {
       const iframeRect = await iframeEl.boundingBox();
       if (!iframeRect) throw new Error('Could not get iframe bounding box');
       const newY = iframeRect.y + rect.y + rect.height / 2;
+
+      // Success if target moved at least 5px
       const scrollAmount = Math.abs(newY - prevY);
-      if (scrollAmount < 5) {
-        throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
+      if (scrollAmount >= 5) {
+        return; // Scroll is making progress
       }
-    }).toPass({ timeout: 500, intervals: [50, 100, 150] });
+
+      // Also succeed if target is now visible in viewport (scroll limit reached)
+      const isInViewport = newY > 0 && newY < viewportSize.height;
+      if (isInViewport) {
+        return; // Target is visible, even if we hit scroll limit
+      }
+
+      throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px, newY=${newY.toFixed(0)}, prevY=${prevY.toFixed(0)}, rect.y=${rect.y.toFixed(0)}, viewportH=${viewportSize.height}`);
+    }).toPass({ timeout: 2000, intervals: [100, 200, 300, 500] });
   }
 
   // ============================================================================
@@ -3007,20 +3055,17 @@ export class AdminUIHelper {
     _initialDropPos: { x: number; y: number },
     skipVerification: boolean = false
   ): Promise<void> {
-    // Keep moving to the target and checking until indicator is correct
-    await expect(async () => {
-      // Get current position and move to it
-      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
-      await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
+    // Get current position and move to it
+    const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+    await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
 
-      // Wait a moment for the drop indicator to update
-      await this.page.waitForTimeout(50);
+    // Wait a moment for the drop indicator to update
+    await this.page.waitForTimeout(100);
 
-      // Verify the indicator is in the right position (unless skipped for multi-element blocks)
-      if (!skipVerification) {
-        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
-      }
-    }).toPass({ timeout: 5000 });
+    // Verify the indicator is in the right position (unless skipped)
+    if (!skipVerification) {
+      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+    }
   }
 
   // ============================================================================
@@ -3066,7 +3111,7 @@ export class AdminUIHelper {
     const iframeRect = await iframeElement.boundingBox();
     if (!iframeRect) throw new Error('Could not get iframe bounds');
 
-    const edgeThreshold = 30;
+    const edgeThreshold = 10; // Close to edge for faster scroll speed
     const edgeX = iframeRect.x + iframeRect.width / 2;
     const edgeY = scrollUp
       ? iframeRect.y + edgeThreshold

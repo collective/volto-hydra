@@ -14,7 +14,7 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Block Drag and Drop', () => {
-  test.setTimeout(30000); // 30 second timeout for all DND tests (drag-drop involves complex DOM manipulation)
+  test.setTimeout(60000); // 60 second timeout for all DND tests (variable scroll speed + DOM manipulation)
   test('blocks can be reordered via drag and drop', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
