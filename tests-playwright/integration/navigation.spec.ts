@@ -127,6 +127,43 @@ test.describe('Navigation and URL Handling', () => {
     await expect(page.locator('.sidebar-container input[name="title"]')).toHaveValue('Another Page', { timeout: 5000 });
   });
 
+  test('Clicking linked image block in edit mode does not navigate', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForSidebarOpen();
+
+    const iframe = helper.getIframe();
+
+    // Track if beforeunload dialog appears (it shouldn't - link should be prevented)
+    let dialogAppeared = false;
+    page.on('dialog', async (dialog) => {
+      dialogAppeared = true;
+      await dialog.accept();
+    });
+
+    // Find and click the linked image block (block-5-linked-image has href="https://example.com")
+    const linkedImageBlock = iframe.locator('[data-block-uid="block-5-linked-image"]');
+    await linkedImageBlock.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Click the image/link inside the block
+    const imageOrLink = linkedImageBlock.locator('a, img').first();
+    await imageOrLink.click();
+
+    // Wait a moment to ensure no navigation occurs
+    await page.waitForTimeout(500);
+
+    // Verify we're still on the edit page - no navigation happened
+    await expect(page).toHaveURL(/test-page\/edit/);
+
+    // Verify no beforeunload warning appeared (link was prevented at click level)
+    expect(dialogAppeared, 'No beforeunload warning should appear - link click should be prevented').toBe(false);
+
+    // Verify the block got selected (Quanta toolbar should appear)
+    await helper.waitForQuantaToolbar('block-5-linked-image');
+  });
+
   test('Cancelling navigation warning stays on edit page', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
