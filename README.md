@@ -274,8 +274,22 @@ This will enable an Editor to :-
    - now the frontend has the same editor authentication it can see private content
 - edit a page the content still won't change until after save
 
-- You can pass in a function to map plone url paths to frontend paths if there is not a one to one mapping
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
+
+#### Path Transformation (pathToApiPath)
+
+If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
+
+```js
+const bridge = initBridge("https://hydra.pretagov.com", {
+  allowedBlocks: ['slate', 'image', 'video'],
+  // Transform frontend path to API path by stripping paging segments
+  // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
+  pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
+});
+```
+
+The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
 
 ### Level 2: Custom Blocks
 

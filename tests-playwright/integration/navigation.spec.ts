@@ -274,10 +274,7 @@ test.describe('Navigation and URL Handling', () => {
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
   });
 
-  test('Grid block paging works in view mode', async ({ page }, testInfo) => {
-    // Skip on Nuxt - this test uses mock frontend's grid paging
-    test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
-
+  test('Grid block paging works in view mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -311,7 +308,8 @@ test.describe('Navigation and URL Handling', () => {
     // After navigation, the "Prev" link should become visible (indicating we're on page 2)
     // Re-get iframe reference since navigation may have invalidated it
     const iframeAfter = helper.getIframe();
-    await expect(iframeAfter.locator('a:has-text("← Prev")')).toBeVisible({ timeout: 10000 });
+    // Mock frontend uses "← Prev", Nuxt uses "Previous"
+    await expect(iframeAfter.locator('a.paging-prev')).toBeVisible({ timeout: 10000 });
 
     // Verify no warning dialog appeared during navigation
     expect(dialogAppeared, 'No beforeunload warning should appear for paging in view mode').toBe(false);

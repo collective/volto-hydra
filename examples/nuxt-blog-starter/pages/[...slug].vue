@@ -357,7 +357,10 @@ onMounted(() => {
                     blocks: {
                         blocksConfig: newBlocks,
                     }
-                }
+                },
+                // Transform frontend path to API path by stripping paging segments
+                // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
+                pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
             });
             bridge.onEditChange(async (page) => {
                 if (page) {

@@ -93,6 +93,9 @@ export class Bridge {
    * @param {Object} options - Options for the bridge initialization:
    *   - allowedBlocks: Array of allowed block types (e.g., ['title', 'text', 'image', ...])
    *   - debug: Enable verbose logging (default: false)
+   *   - pathToApiPath: Function to transform frontend path to API/admin path
+   *                    e.g., (path) => path.replace(/\/@pg\/[^/]+\/\d+/, '')
+   *                    Used when frontend embeds paging/state in URL path
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
@@ -129,6 +132,8 @@ export class Bridge {
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
+    // Path transformer for frontends that embed state in URL (e.g., paging)
+    this.pathToApiPath = options.pathToApiPath || ((path) => path);
     this.init(options); // Initialize the bridge
   }
 
@@ -698,22 +703,25 @@ export class Bridge {
       detectNavigation((currentUrl) => {
         const currentUrlObj = new URL(currentUrl);
         if (window.location.pathname !== currentUrlObj.pathname) {
-          log('Sending PATH_CHANGE:', window.location.pathname, 'to', this.adminOrigin);
+          const apiPath = this.pathToApiPath(window.location.pathname);
+          log('Sending PATH_CHANGE:', window.location.pathname, '-> apiPath:', apiPath, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
-              path: window.location.pathname,
+              path: apiPath,
             },
             this.adminOrigin,
           );
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
-          log('Sending PATH_CHANGE (hash):', i !== -1 ? hash.slice(i) || '/' : '/', 'to', this.adminOrigin);
+          const rawPath = i !== -1 ? hash.slice(i) || '/' : '/';
+          const apiPath = this.pathToApiPath(rawPath);
+          log('Sending PATH_CHANGE (hash):', rawPath, '-> apiPath:', apiPath, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
-              path: i !== -1 ? hash.slice(i) || '/' : '/',
+              path: apiPath,
             },
             this.adminOrigin,
           );
@@ -803,16 +811,18 @@ export class Bridge {
         const isInPageNavigation = inPageNavTime && (Date.now() - parseInt(inPageNavTime, 10)) < 5000;
         if (isInPageNavigation) {
           sessionStorage.removeItem('hydra_in_page_nav_time');
-          log('In-page navigation detected (paging), sending PATH_CHANGE with inPage flag');
+          const apiPath = this.pathToApiPath(currentPath);
+          log('In-page navigation detected (paging), sending PATH_CHANGE with inPage flag, apiPath:', apiPath);
           window.parent.postMessage(
-            { type: 'PATH_CHANGE', path: currentPath, inPage: true },
+            { type: 'PATH_CHANGE', path: apiPath, inPage: true },
             this.adminOrigin,
           );
           // Admin will resend form data without changing URL
         } else if (isSpaNavigation) {
-          log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE');
+          const apiPath = this.pathToApiPath(currentPath);
+          log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE, apiPath:', apiPath);
           window.parent.postMessage(
-            { type: 'PATH_CHANGE', path: currentPath },
+            { type: 'PATH_CHANGE', path: apiPath },
             this.adminOrigin,
           );
           // Don't send INIT - admin will just update its URL
@@ -7158,10 +7168,15 @@ export function initBridge(adminOrigin, options = {}) {
   } else {
     // Bridge already exists - check if URL changed (e.g., after SPA navigation + remount)
     const currentPath = window.location.pathname;
+    // Update pathToApiPath if provided in new options
+    if (options.pathToApiPath) {
+      bridgeInstance.pathToApiPath = options.pathToApiPath;
+    }
     if (bridgeInstance.lastKnownPath && bridgeInstance.lastKnownPath !== currentPath) {
-      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath);
+      const apiPath = bridgeInstance.pathToApiPath(currentPath);
+      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath, '-> apiPath:', apiPath);
       window.parent.postMessage(
-        { type: 'PATH_CHANGE', path: currentPath },
+        { type: 'PATH_CHANGE', path: apiPath },
         bridgeInstance.adminOrigin,
       );
     }
