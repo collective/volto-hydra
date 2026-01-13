@@ -2514,32 +2514,32 @@ export class AdminUIHelper {
 
   /**
    * Get the current number of blocks in the iframe.
+   * Deduplicates multi-element blocks (e.g., listings with multiple items sharing same UID).
    */
   async getBlockCount(): Promise<number> {
-    return this.getBlockCountInIframe();
+    const blockOrder = await this.getBlockOrder();
+    return blockOrder.length;
   }
 
   /**
    * Get all block IDs in order.
-   * Returns an array of block UIDs.
+   * Returns an array of block UIDs, deduplicated (multi-element blocks count as one).
+   * Uses evaluateAll for single browser round-trip instead of N sequential getAttribute calls.
    */
   async getBlockOrder(): Promise<string[]> {
     const iframe = this.getIframe();
-    const blocks = await iframe.locator('[data-block-uid]').all();
-
-    // Use Set to deduplicate while preserving first occurrence order
-    // (multi-element blocks like listings have multiple elements with same UID)
-    const seen = new Set<string>();
-    const blockIds: string[] = [];
-    for (const block of blocks) {
-      const uid = await block.getAttribute('data-block-uid');
-      if (uid && !seen.has(uid)) {
-        seen.add(uid);
-        blockIds.push(uid);
+    return await iframe.locator('[data-block-uid]').evaluateAll((elements) => {
+      const seen = new Set<string>();
+      const blockIds: string[] = [];
+      for (const el of elements) {
+        const uid = el.getAttribute('data-block-uid');
+        if (uid && !seen.has(uid)) {
+          seen.add(uid);
+          blockIds.push(uid);
+        }
       }
-    }
-
-    return blockIds;
+      return blockIds;
+    });
   }
 
   /**
