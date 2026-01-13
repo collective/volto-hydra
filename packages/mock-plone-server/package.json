@@ -12,7 +12,7 @@
     "start": "node fixtures/mock-api-server.js"
   },
   "bin": {
-    "mock-api-server": "fixtures/mock-api-server.js"
+    "mock-plone-server": "fixtures/mock-api-server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
