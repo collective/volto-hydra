@@ -274,6 +274,52 @@ test.describe('Navigation and URL Handling', () => {
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
   });
 
+  test('Grid block paging works in view mode', async ({ page }, testInfo) => {
+    // Skip on Nuxt - this test uses mock frontend's grid paging
+    test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Go to view mode (not edit)
+    await page.goto('http://localhost:3001/test-page');
+
+    // Wait for iframe content to load
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+
+    // Grid block (block-8-grid) should have paging since it has >6 elements
+    // (1 manual teaser + query results from listing-in-grid)
+    // Wait for paging controls to appear
+    const pagingNav = iframe.locator('.grid-paging');
+    await expect(pagingNav).toBeVisible({ timeout: 10000 });
+
+    // Track if beforeunload dialog appears (it shouldn't in view mode)
+    let dialogAppeared = false;
+    page.on('dialog', async (dialog) => {
+      dialogAppeared = true;
+      await dialog.accept();
+    });
+
+    // Click the "Next" or page 2 paging link
+    const pagingLink = iframe.locator('.grid-paging a').filter({ hasText: /Next|2/ }).first();
+    await pagingLink.click();
+
+    // Wait for the iframe to reload with page 2 content
+    // The paging link has data-linkable-allow so navigation should work without warning
+    // After navigation, the "Prev" link should become visible (indicating we're on page 2)
+    // Re-get iframe reference since navigation may have invalidated it
+    const iframeAfter = helper.getIframe();
+    await expect(iframeAfter.locator('a:has-text("← Prev")')).toBeVisible({ timeout: 10000 });
+
+    // Verify no warning dialog appeared during navigation
+    expect(dialogAppeared, 'No beforeunload warning should appear for paging in view mode').toBe(false);
+
+    // Verify the iframe still shows the page content (didn't break)
+    await expect(iframeAfter.locator('main')).toBeVisible({ timeout: 5000 });
+  });
+
   test('Iframe does not double-load when clicking nav link', async ({ page }, testInfo) => {
     // Skip on Nuxt - this test uses mock frontend's load counter
     test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
