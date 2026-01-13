@@ -2815,6 +2815,7 @@ test.describe('data-block-selector Navigation', () => {
     // Wait for sidebar to show Slide as current (carousel transition happening)
     await helper.waitForSidebarCurrentBlock('Slide');
     // Wait for slide-1 to be selected (toolbar positioned correctly)
+    // Note: hydra.js debounces BLOCK_SELECTED during animations, so this waits for stable position
     await helper.waitForQuantaToolbar('slide-1');
   });
 

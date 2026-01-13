@@ -3813,14 +3813,27 @@ export class Bridge {
           this.blockResizeObserver.observe(element, { box: 'border-box' });
         }
 
-        // Send updated selection
+        // Send updated selection (debounced to wait for animations to settle)
         if (newRect && (newRect.width > 0 || newRect.height > 0)) {
           const firstElement = currentElements[0];
           if (firstElement) {
             // Restore contenteditable on fields - DOM elements may have been replaced
             // This is needed when the renderer re-renders (e.g., after checkbox toggle)
             this.restoreContentEditableOnFields(firstElement, 'domChange');
-            this.sendBlockSelected('domChange', firstElement);
+
+            // Debounce BLOCK_SELECTED to wait for animations (carousel transitions, etc.)
+            // This prevents sending intermediate positions during animation
+            if (this._domChangeDebounce) {
+              clearTimeout(this._domChangeDebounce);
+            }
+            this._domChangeDebounce = setTimeout(() => {
+              this._domChangeDebounce = null;
+              // Re-check element is still valid and get fresh rect
+              const freshElements = this.getAllBlockElements(blockUid);
+              if (freshElements.length > 0) {
+                this.sendBlockSelected('domChange', freshElements[0]);
+              }
+            }, 150); // Wait for animation to settle
 
             // Reposition drag button - block may have moved (e.g., after drag-drop re-render)
             if (this.dragHandlePositioner) {
