@@ -453,6 +453,22 @@ e.g.
 - This will also support nested blocks (TODO)
 
 
+#### Readonly Regions (data-block-readonly)
+
+Add `data-block-readonly` to any element to disable inline editing for all fields inside it. Editable, linkable, and media fields within are ignored, and link clicks are prevented.
+
+``` html
+<div class="teaser" data-block-uid="teaser-1">
+  <div data-block-readonly>
+    <!-- Fields from linked target - not editable here -->
+    <h2 data-editable-field="title">Target Page Title</h2>
+  </div>
+  <!-- Teaser's own field - still editable -->
+  <a data-linkable-field="href" href="/target">Read more</a>
+</div>
+```
+
+
 ### Level 4: Enable Realtime changes while editing and preview Block controls
 
 The `onEditChange` callback can be registered with the hydra.js bridge at initialisation.
