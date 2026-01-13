@@ -1,4 +1,4 @@
-import { getAccessToken } from '@hydra-js/hydra.js';
+import { getAccessToken } from '@volto-hydra/hydra-js';
 
 export default async function ploneApi({
   path,

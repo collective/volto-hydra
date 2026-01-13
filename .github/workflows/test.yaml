@@ -49,9 +49,9 @@ jobs:
           RAZZLE_API_PATH: http://localhost:8888
           RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
-      - name: Install Nuxt dependencies
-        run: |
-          cd examples/nuxt-blog-starter && npm install
+      # - name: Install Nuxt dependencies
+      #   run: |
+      #     cd examples/nuxt-blog-starter && pnpm install
       - name: Start servers in background
         run: |
           # Start mock API server
@@ -62,7 +62,7 @@ jobs:
             pnpm start:prod &
 
           # Start Nuxt test server
-          cd examples/nuxt-blog-starter && npm run dev:test &
+          pnpm --filter nuxt-blog-starter dev:test &
 
           # Give servers a moment to start their processes
           sleep 5
