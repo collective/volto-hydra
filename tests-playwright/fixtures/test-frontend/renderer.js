@@ -145,6 +145,9 @@ async function renderBlock(blockId, block) {
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
+        case 'search':
+            wrapper.innerHTML = await renderSearchBlock(block, blockId);
+            break;
         case 'teaser':
             // Teaser handles its own data-block-uid, so return it directly
             const teaserEl = document.createElement('div');
@@ -963,6 +966,177 @@ async function renderAccordionBlock(block, blockId) {
 }
 
 /**
+ * Known facet field options for rendering widgets.
+ * Maps field name to array of { value, title } options.
+ * Matches the options from @querystring endpoint in mock API.
+ */
+const FACET_FIELD_OPTIONS = {
+    'review_state': [
+        { value: 'private', title: 'Private' },
+        { value: 'pending', title: 'Pending' },
+        { value: 'published', title: 'Published' },
+    ],
+    'portal_type': [
+        { value: 'Document', title: 'Page' },
+        { value: 'News Item', title: 'News Item' },
+        { value: 'Event', title: 'Event' },
+        { value: 'Image', title: 'Image' },
+        { value: 'File', title: 'File' },
+        { value: 'Link', title: 'Link' },
+    ],
+};
+
+/**
+ * Render the appropriate widget for a facet based on its type.
+ * @param {Object} facet - Facet configuration
+ * @returns {string} HTML string for the facet widget
+ */
+function renderFacetWidget(facet) {
+    const facetType = facet.type || 'checkboxFacet';
+    // Field can be an object { label, value } from Volto's select widget, or a plain string
+    const field = typeof facet.field === 'object' ? facet.field?.value : facet.field || '';
+    const options = FACET_FIELD_OPTIONS[field] || [];
+
+    if (options.length === 0) {
+        return '<div class="facet-widget" style="font-size: 11px; color: #999;">No options available</div>';
+    }
+
+    if (facetType === 'selectFacet') {
+        // Render as dropdown select
+        let optionsHtml = '<option value="">Select...</option>';
+        optionsHtml += options.map(opt =>
+            `<option value="${opt.value}">${opt.title}</option>`
+        ).join('');
+        return `<select class="facet-widget facet-select" data-field="${field}" style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px;">
+            ${optionsHtml}
+        </select>`;
+    } else if (facetType === 'checkboxFacet') {
+        // Get current facet values from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentValues = urlParams.getAll(`facet.${field}`);
+
+        // Render as checkboxes with checked state from URL
+        const checkboxesHtml = options.map(opt => {
+            const isChecked = currentValues.includes(opt.value) ? 'checked' : '';
+            return `<label style="display: block; margin-top: 4px;">
+                <input type="checkbox" class="facet-checkbox" data-field="${field}" value="${opt.value}" ${isChecked} />
+                ${opt.title}
+            </label>`;
+        }).join('');
+        return `<div class="facet-widget facet-checkboxes" style="margin-top: 4px;">
+            ${checkboxesHtml}
+        </div>`;
+    }
+
+    // Default: just show field name
+    return '<div class="facet-widget" style="font-size: 11px; color: #999;">Widget not implemented</div>';
+}
+
+/**
+ * Render a search block with facets and listing container.
+ * The listing child is expanded via expandListingBlocks before rendering.
+ *
+ * @param {Object} block - Search block data with facets and listing/listing_layout
+ * @param {string} blockId - Search block ID
+ * @returns {Promise<string>} HTML string
+ */
+async function renderSearchBlock(block, blockId) {
+    const headline = block.headline || '';
+    const showSearchInput = block.showSearchInput;
+    const showSortOn = block.showSortOn;
+    const facets = block.facets || [];
+    const sortOnOptions = block.sortOnOptions || [];
+    const listing = block.listing || {};
+    const listingLayout = block.listing_layout?.items || [];
+
+    let html = '<div class="search-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
+
+    // Headline
+    if (headline) {
+        html += `<h2 data-editable-field="headline" style="margin-bottom: 15px;">${headline}</h2>`;
+    }
+
+    // Search input
+    if (showSearchInput) {
+        // Get current search text from URL criteria (if available)
+        const currentSearchText = window._searchCriteria?.SearchableText || '';
+        html += `<div class="search-input" style="margin-bottom: 15px;">
+            <form class="search-form" data-search-block="${blockId}" style="display: flex; gap: 10px;">
+                <input type="text" name="SearchableText" placeholder="Search..." value="${currentSearchText}"
+                    class="search-input-field"
+                    style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
+                <button type="submit" class="search-submit-button" style="padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px;">
+                    Search
+                </button>
+            </form>
+        </div>`;
+    }
+
+    // Sort options
+    if (showSortOn && sortOnOptions.length > 0) {
+        html += `<div class="search-sort" style="margin-bottom: 15px;">
+            <label style="margin-right: 8px;">Sort by:</label>
+            <select style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+                ${sortOnOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+            </select>
+        </div>`;
+    }
+
+    // Facets (rendered from object_list - each has data-block-uid for selection)
+    if (facets.length > 0) {
+        html += '<div class="search-facets" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">FACETS</div>';
+        for (const facet of facets) {
+            const facetId = facet['@id'] || facet.id || '';
+            html += `<div class="facet-item" data-block-uid="${facetId}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                <div data-editable-field="title" style="font-weight: bold;">${facet.title || ''}</div>
+                <div style="font-size: 12px; color: #666;">Field: ${typeof facet.field === 'object' ? facet.field?.value : facet.field || ''}</div>
+                ${renderFacetWidget(facet)}
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    // Listing container - expand and render child blocks
+    html += '<div class="search-results" style="display: grid; gap: 15px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">';
+
+    // Expand listing blocks if we have the helper
+    if (window._expandListingBlocks && listingLayout.length > 0) {
+        const result = await window._expandListingBlocks(listing, listingLayout, `${blockId}-listing`);
+        const expandedBlocks = result.blocks;
+        const expandedLayout = result.blocks_layout;
+
+        for (const childId of expandedLayout) {
+            const childBlock = expandedBlocks[childId];
+            if (!childBlock) continue;
+
+            const uid = childBlock._blockUid || childId;
+            html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+
+            switch (childBlock['@type']) {
+                case 'teaser':
+                    html += renderTeaserBlock(childBlock, null);
+                    break;
+                case 'image':
+                    html += renderImageBlock(childBlock);
+                    break;
+                default:
+                    html += `<p>Unknown item type: ${childBlock['@type']}</p>`;
+            }
+
+            html += '</div>';
+        }
+    } else {
+        html += '<p style="color: #999;">No results</p>';
+    }
+
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+/**
  * Render a nested slate block (simple paragraph rendering).
  * Used for accordion's nested text blocks.
  *
@@ -1156,9 +1330,96 @@ function initCarouselNavigation() {
     });
 }
 
+/**
+ * Initialize search form submission handling.
+ * Uses event delegation to handle all search forms.
+ * Updates the URL with SearchableText param and reloads the page.
+ */
+function initSearchFormHandling() {
+    document.addEventListener('submit', function(event) {
+        const form = event.target.closest('.search-form');
+        if (!form) return;
+
+        event.preventDefault();
+
+        const searchInput = form.querySelector('input[name="SearchableText"]');
+        const searchText = searchInput?.value?.trim() || '';
+
+        // Build new URL with search criteria
+        const url = new URL(window.location.href);
+
+        if (searchText) {
+            url.searchParams.set('SearchableText', searchText);
+        } else {
+            url.searchParams.delete('SearchableText');
+        }
+
+        // Reload page with new search criteria
+        console.log('[RENDERER] Search form submitted, navigating to:', url.toString());
+        window.location.href = url.toString();
+    });
+}
+
+/**
+ * Initialize facet checkbox/select handling.
+ * Uses event delegation to handle all facet widgets.
+ * Updates the URL with facet.{field}={value} params and reloads the page.
+ */
+function initFacetHandling() {
+    document.addEventListener('change', function(event) {
+        const checkbox = event.target.closest('.facet-checkbox');
+        const select = event.target.closest('.facet-select');
+
+        if (!checkbox && !select) return;
+
+        const url = new URL(window.location.href);
+
+        if (checkbox) {
+            const field = checkbox.dataset.field;
+            const value = checkbox.value;
+            const paramKey = `facet.${field}`;
+
+            // Get current values for this facet (may be multiple)
+            const currentValues = url.searchParams.getAll(paramKey);
+
+            if (checkbox.checked) {
+                // Add value if not already present
+                if (!currentValues.includes(value)) {
+                    url.searchParams.append(paramKey, value);
+                }
+            } else {
+                // Remove this specific value
+                url.searchParams.delete(paramKey);
+                currentValues.filter(v => v !== value).forEach(v => {
+                    url.searchParams.append(paramKey, v);
+                });
+            }
+        } else if (select) {
+            const field = select.dataset.field;
+            const value = select.value;
+            const paramKey = `facet.${field}`;
+
+            if (value) {
+                url.searchParams.set(paramKey, value);
+            } else {
+                url.searchParams.delete(paramKey);
+            }
+        }
+
+        console.log('[RENDERER] Facet changed, navigating to:', url.toString());
+        window.location.href = url.toString();
+    });
+}
+
 // Initialize carousel navigation when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCarouselNavigation);
+    document.addEventListener('DOMContentLoaded', () => {
+        initCarouselNavigation();
+        initSearchFormHandling();
+        initFacetHandling();
+    });
 } else {
     initCarouselNavigation();
+    initSearchFormHandling();
+    initFacetHandling();
 }

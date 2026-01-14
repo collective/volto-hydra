@@ -1198,11 +1198,23 @@ export class Bridge {
 
                   // Re-query element in case it changed during wait
                   blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+                  // If element not found yet, retry a few times (frontend may still be rendering)
+                  if (!blockElement && needsBlockSwitch) {
+                    for (let retry = 0; retry < 10 && !blockElement; retry++) {
+                      await new Promise(r => setTimeout(r, 100));
+                      blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                      log('FORM_DATA: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
+                    }
+                  }
+
                   // Ensure elements have min size BEFORE sending BLOCK_SELECTED
                   // so the new block has dimensions when the admin UI receives the message
                   this.ensureElementsHaveMinSize();
                   if (blockElement) {
                     blockHandler(blockElement);
+                  } else if (needsBlockSwitch) {
+                    log('FORM_DATA: block element not found after retries:', blockUidToProcess);
                   }
                 }
 

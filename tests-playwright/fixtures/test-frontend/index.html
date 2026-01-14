@@ -74,6 +74,35 @@
             return pages;
         }
 
+        // Parse search criteria from URL query params
+        // Supports: SearchableText, sort_on, sort_order, facet.*
+        function getSearchCriteriaFromUrl() {
+            const criteria = {};
+            const params = new URLSearchParams(window.location.search);
+
+            if (params.get('SearchableText')) {
+                criteria.SearchableText = params.get('SearchableText');
+            }
+            if (params.get('sort_on')) {
+                criteria.sort_on = params.get('sort_on');
+            }
+            if (params.get('sort_order')) {
+                criteria.sort_order = params.get('sort_order');
+            }
+
+            // Collect facet.* params
+            for (const [key, value] of params) {
+                if (key.startsWith('facet.')) {
+                    criteria[key] = value;
+                }
+            }
+
+            return criteria;
+        }
+
+        // Make search criteria available globally for form handlers
+        window._searchCriteria = {};
+
         // Render content, expanding top-level listings
         // Container renderers (like renderGridBlock) call window._expandListingBlocks for nested content
         async function renderContentWithListings(content) {
@@ -84,7 +113,10 @@
             }
 
             const pages = getPagesFromUrl();
-            const baseOptions = { apiUrl: window.location.origin, contextPath };
+            const extraCriteria = getSearchCriteriaFromUrl();
+            console.log('[TEST-FRONTEND] extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
+            window._searchCriteria = extraCriteria; // Store for form handlers
+            const baseOptions = { apiUrl: window.location.origin, contextPath, extraCriteria };
 
             // Set up expansion helper for container renderers
             window._expandListingBlocks = async (blocks, layout, containerId) => {
@@ -447,7 +479,7 @@
                     // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge(adminOrigin, {
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search'],
                         voltoConfig: voltoConfig,
                     });
 

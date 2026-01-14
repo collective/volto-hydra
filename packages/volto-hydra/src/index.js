@@ -4,6 +4,7 @@ import {
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
+import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
 import BlockTypeWidget from './components/Widgets/BlockTypeWidget';
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
@@ -57,6 +58,9 @@ const applyConfig = (config) => {
 
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.type.blocks = HiddenBlocksWidget;
+
+  // Hide object_list fields - items are edited via iframe selection
+  config.widgets.widget.object_list = HiddenObjectListWidget;
 
   // Block type selector widget - for selecting child block types in containers
   config.widgets.widget.block_type = BlockTypeWidget;
@@ -223,6 +227,69 @@ const applyConfig = (config) => {
   config.blocks.blocksConfig.image = {
     ...config.blocks.blocksConfig.image,
     blockSchema: ImageSchema,
+  };
+
+  // Configure search block to add listing container field
+  // Volto's search block already has facets with widget: 'object_list'
+  // We add listing/listing_layout so search can contain a listing block child
+  const existingSearchSchemaEnhancer =
+    config.blocks.blocksConfig.search?.schemaEnhancer;
+  config.blocks.blocksConfig.search = {
+    ...config.blocks.blocksConfig.search,
+    schemaEnhancer: (args) => {
+      let { schema } = args;
+
+      // Defensive check - schema must exist
+      if (!schema || !schema.properties) {
+        return schema;
+      }
+
+      // Run existing schemaEnhancer first
+      if (existingSearchSchemaEnhancer) {
+        schema = existingSearchSchemaEnhancer(args);
+      }
+
+      // Add listing container field for child listing block
+      if (schema.properties && !schema.properties.listing) {
+        schema.properties.listing = {
+          title: 'Results Listing',
+          type: 'blocks', // Required for blockPathMap traversal
+          description: 'Listing block to render search results',
+          allowedBlocks: ['listing', 'teaser'],
+          maxItems: 1,
+          defaultBlockType: 'listing',
+        };
+        schema.properties.listing_layout = {
+          title: 'Results Layout',
+          type: 'blocks_layout',
+        };
+      }
+
+      // Remove fields not needed for Hydra (query handled by child listing, no views selector)
+      // Facets are edited via iframe selection, not the accordion widget
+      // Keep showSortOn/sortOnOptions (sort dropdown controls), facetsTitle, and controls fieldset
+      const fieldsToRemove = [
+        'query',
+        'availableViews', // Results template - not needed, handled by listing child
+      ];
+      // Keep 'facets' fieldset - facetsTitle shows, facets object_list hidden by HiddenObjectListWidget
+      const fieldsetsToRemove = ['searchquery', 'views'];
+
+      // Remove from fieldsets
+      schema.fieldsets = (schema.fieldsets || [])
+        .filter((fs) => !fieldsetsToRemove.includes(fs.id))
+        .map((fs) => ({
+          ...fs,
+          fields: fs.fields.filter((f) => !fieldsToRemove.includes(f)),
+        }));
+
+      // Remove from properties
+      fieldsToRemove.forEach((field) => {
+        delete schema.properties[field];
+      });
+
+      return schema;
+    },
   };
 
   const updateAllowedBlocks = () => {

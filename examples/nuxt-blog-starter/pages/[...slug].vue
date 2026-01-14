@@ -62,88 +62,104 @@ const runtimeConfig = useRuntimeConfig();
 const adminUrl = runtimeConfig.public.adminUrl;
 const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
 
+// Container field definitions by block type
+// Each entry defines which fields contain child blocks or object_list items
+const CONTAINER_FIELDS = {
+  gridBlock: [{ field: 'blocks', layout: 'blocks_layout', paged: true }],
+  columns: [
+    { field: 'top_images', layout: 'top_images_layout' },
+    { field: 'columns', layout: 'columns_layout', nestedContainers: true }
+  ],
+  column: [{ field: 'blocks', layout: 'blocks_layout' }],
+  accordion: [{ field: 'content', layout: 'content_layout' }],
+  search: [
+    { field: 'listing', layout: 'listing_layout', useSearchCriteria: true },
+    { field: 'facets', objectList: true }
+  ],
+  slider: [{ field: 'slides', objectList: true }],
+  slateTable: [{ field: 'table.rows', objectList: true }],
+  table: [{ field: 'table.rows', objectList: true }],
+};
+
 // Recursively expand all listing and search blocks in a block tree
-// pages = { blockId: pageNumber } from URL
-async function expandAllListings(blocks, blocksLayout, options, pages = {}) {
+// Uses `pages` and `searchCriteria` from outer scope (parsed from URL)
+async function expandAllListings(blocks, blocksLayout, options) {
   if (!blocks || !blocksLayout) return { blocks, blocks_layout: blocksLayout };
 
-  // Normalize blocks: convert search blocks to listing format for expandListingBlocks
-  const normalizedBlocks = { ...blocks };
-  for (const blockId of blocksLayout) {
-    const block = normalizedBlocks[blockId];
-    if (block?.['@type'] === 'search' && block.query?.query) {
-      // Search block uses 'query' instead of 'querystring'
-      normalizedBlocks[blockId] = {
-        ...block,
-        '@type': 'listing',
-        querystring: block.query,
-        _originalType: 'search'
-      };
-    }
-  }
-
   // Expand listings at this level (converts to teasers)
-  // Use large pageSize to get all items - containers handle their own paging
-  const { blocks: expandedBlocks, blocks_layout: newLayout, paging } = await expandListingBlocks(
-    normalizedBlocks, blocksLayout, {
-      ...options,
-      pageSize: 1000,  // Get all items, containers handle paging
-      page: 0
-    }
+  const { blocks: expandedBlocks, blocks_layout: newLayout } = await expandListingBlocks(
+    blocks, blocksLayout, { ...options, pageSize: 1000, page: 0 }
   );
 
-  // Then recursively expand containers and add paging
+  // Process each block's container fields based on its type
   for (const blockId of newLayout) {
     const block = expandedBlocks[blockId];
     if (!block) continue;
 
-    // Handle gridBlock and similar containers with blocks/blocks_layout
-    if (block.blocks && block.blocks_layout?.items) {
-      const result = await expandAllListings(block.blocks, block.blocks_layout.items, options, pages);
+    const blockType = block['@type'];
+    const containerDefs = CONTAINER_FIELDS[blockType];
+    if (!containerDefs) continue;
 
-      // Calculate paging for this container
-      const pageSize = block.pageSize || 6;
-      const currentPage = pages[blockId] || 0;
-      const allItems = result.blocks_layout;
-      const totalItems = allItems.length;
-      const totalPages = Math.ceil(totalItems / pageSize);
-      const startIdx = currentPage * pageSize;
-      const pagedItems = allItems.slice(startIdx, startIdx + pageSize);
+    for (const def of containerDefs) {
+      const childBlocks = block[def.field];
+      const childLayout = block[def.layout]?.items;
+      if (!childBlocks || !childLayout?.length) continue;
 
-      expandedBlocks[blockId] = {
-        ...block,
-        blocks: result.blocks,
-        blocks_layout: { items: pagedItems },
-        _allItems: allItems,  // Keep full list for paging
-        _paging: {
-          currentPage,
-          totalPages,
-          totalItems,
-          pageSize,
-          prev: currentPage > 0 ? currentPage - 1 : null,
-          next: currentPage < totalPages - 1 ? currentPage + 1 : null,
-          pages: Array.from({ length: totalPages }, (_, i) => ({ page: i + 1, start: i }))
-            .slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 3))
+      if (def.nestedContainers) {
+        // Each child is itself a container (e.g., columns -> column)
+        const expandedChildren = {};
+        for (const [childId, child] of Object.entries(childBlocks)) {
+          if (child.blocks && child.blocks_layout?.items) {
+            const result = await expandAllListings(child.blocks, child.blocks_layout.items, options);
+            expandedChildren[childId] = {
+              ...child,
+              blocks: result.blocks,
+              blocks_layout: { items: result.blocks_layout }
+            };
+          } else {
+            expandedChildren[childId] = child;
+          }
         }
-      };
-    }
+        expandedBlocks[blockId] = { ...expandedBlocks[blockId], [def.field]: expandedChildren };
+      } else {
+        // Expand child blocks, optionally with search criteria
+        const expandOptions = def.useSearchCriteria
+          ? { ...options, extraCriteria: searchCriteria, pageSize: 1000, page: 0 }
+          : { ...options, pageSize: 1000, page: 0 };
 
-    // Handle columns container
-    if (block.columns) {
-      const expandedCols = {};
-      for (const [colId, column] of Object.entries(block.columns)) {
-        if (column.blocks && column.blocks_layout?.items) {
-          const result = await expandAllListings(column.blocks, column.blocks_layout.items, options, pages);
-          expandedCols[colId] = {
-            ...column,
-            blocks: result.blocks,
-            blocks_layout: { items: result.blocks_layout }
-          };
-        } else {
-          expandedCols[colId] = column;
+        const { blocks: expanded, blocks_layout: layout, paging } = def.useSearchCriteria
+          ? await expandListingBlocks(childBlocks, childLayout, expandOptions)
+          : await expandAllListings(childBlocks, childLayout, options);
+
+        // Apply paging if configured
+        let finalLayout = def.useSearchCriteria ? layout : expanded.blocks_layout || layout;
+        let pagingInfo = null;
+
+        if (def.paged) {
+          const pageSize = block.pageSize || 6;
+          const currentPage = pages[blockId] || 0;
+          const allItems = finalLayout;
+          const totalItems = allItems.length;
+          const totalPages = Math.ceil(totalItems / pageSize);
+          const startIdx = currentPage * pageSize;
+          finalLayout = allItems.slice(startIdx, startIdx + pageSize);
+          pagingInfo = totalPages > 1 ? {
+            currentPage, totalPages, totalItems, pageSize,
+            prev: currentPage > 0 ? currentPage - 1 : null,
+            next: currentPage < totalPages - 1 ? currentPage + 1 : null,
+            pages: Array.from({ length: totalPages }, (_, i) => ({ page: i + 1, start: i }))
+              .slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 3))
+          } : null;
         }
+
+        expandedBlocks[blockId] = {
+          ...expandedBlocks[blockId],
+          [def.field]: def.useSearchCriteria ? expanded : expanded.blocks || expanded,
+          [def.layout]: { items: finalLayout },
+          ...(pagingInfo && { _paging: pagingInfo }),
+          ...(def.useSearchCriteria && paging?.totalPages > 1 && { _paging: paging })
+        };
       }
-      expandedBlocks[blockId] = { ...block, columns: expandedCols };
     }
   }
 
@@ -399,6 +415,33 @@ for (var part of route.params.slug) {
         path.push(part);
     }
 }
+
+// Parse search criteria from URL query params
+// Supports: SearchableText, sort_on, sort_order, facet.* (e.g., facet.portal_type)
+function getSearchCriteriaFromUrl() {
+  const criteria = {};
+  const query = route.query;
+
+  if (query.SearchableText) {
+    criteria.SearchableText = query.SearchableText;
+  }
+  if (query.sort_on) {
+    criteria.sort_on = query.sort_on;
+  }
+  if (query.sort_order) {
+    criteria.sort_order = query.sort_order;
+  }
+  // Collect facet.* params
+  for (const [key, value] of Object.entries(query)) {
+    if (key.startsWith('facet.')) {
+      criteria[key] = value;
+    }
+  }
+
+  return criteria;
+}
+
+const searchCriteria = getSearchCriteriaFromUrl();
 
 // retrieve the data associated with an article
 // based on its slug

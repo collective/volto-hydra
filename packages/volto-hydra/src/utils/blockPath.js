@@ -8,6 +8,36 @@ import { applyBlockDefaults } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
 
 /**
+ * Strip functions from a schema object for postMessage serialization.
+ * Widget callbacks like filterOptions can't be cloned for postMessage.
+ * @param {any} obj - Schema object to strip functions from
+ * @param {WeakSet} seen - Set of already-seen objects (circular reference detection)
+ * @returns {any} - Schema with functions removed
+ */
+function stripFunctionsFromSchema(obj, seen = new WeakSet()) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'function') return undefined;
+  if (typeof obj !== 'object') return obj;
+
+  // Handle circular references
+  if (seen.has(obj)) return undefined;
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => stripFunctionsFromSchema(item, seen)).filter((item) => item !== undefined);
+  }
+
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const stripped = stripFunctionsFromSchema(value, seen);
+    if (stripped !== undefined) {
+      result[key] = stripped;
+    }
+  }
+  return result;
+}
+
+/**
  * Get the schema for a block type, including schemaEnhancer modifications.
  * Also handles object_list items (like table rows/cells) which have itemSchema in blockPathMap.
  *
@@ -234,7 +264,8 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         (typeof fieldValue === 'string' && fieldValue === '');
 
       if (isEmpty) {
-        emptyFields.push({ fieldName, fieldDef });
+        // Strip functions from fieldDef for postMessage serialization
+        emptyFields.push({ fieldName, fieldDef: stripFunctionsFromSchema(fieldDef) });
       }
     }
     return emptyFields.length > 0 ? emptyFields : null;
@@ -410,7 +441,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         containerField: fieldName,
         isObjectListItem: true,
         idField,
-        itemSchema, // For sidebar form rendering
+        itemSchema: stripFunctionsFromSchema(itemSchema), // For sidebar form rendering (stripped for postMessage)
         dataPath: effectiveDataPath, // Store for later use
         itemType, // Virtual type like 'slateTable:rows' or 'slateTable:rows:cells'
         allowedSiblingTypes: [itemType], // Only allow same type as siblings
@@ -564,7 +595,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       defaultBlock: pathInfo.itemType,
       maxLength: pathInfo.maxSiblings,
       isObjectList: true,
-      itemSchema: fieldDef?.schema,
+      itemSchema: stripFunctionsFromSchema(fieldDef?.schema),
       itemIndex: pathInfo.path[pathInfo.path.length - 1], // Last element is index
       idField: pathInfo.idField,
       dataPath: pathInfo.dataPath || fieldDef?.dataPath || null, // Path to actual data location
@@ -658,7 +689,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           defaultBlock: itemType,
           maxLength: null,
           isObjectList: true,
-          itemSchema: fieldDef.schema, // Store itemSchema for editing
+          itemSchema: stripFunctionsFromSchema(fieldDef.schema), // Store itemSchema for editing (stripped for postMessage)
           idField: fieldDef.idField || '@id', // ID field name for items
           dataPath: fieldDef.dataPath || null, // Path to actual data location
         });

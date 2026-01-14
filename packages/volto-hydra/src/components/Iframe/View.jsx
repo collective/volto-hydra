@@ -1780,14 +1780,16 @@ const Iframe = (props) => {
     }));
 
     // Send updated data to iframe (duplicates already filtered above)
+    // Only include selectedBlockUid when there's a pending selection to avoid
+    // clearing the iframe's selection with a null value from subsequent FORM_DATA
     const message = {
       type: 'FORM_DATA',
       data: formWithSequence,
       blockPathMap: newBlockPathMap,
-      selectedBlockUid: iframeSyncState.pendingSelectBlockUid,
-      ...(iframeSyncState.pendingFormatRequestId ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
+      ...(hasPendingSelect ? { selectedBlockUid: iframeSyncState.pendingSelectBlockUid } : {}),
+      ...(hasPendingFormatRequest ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
     };
-    log('Sending FORM_DATA to iframe. blockPathMap keys:', Object.keys(newBlockPathMap), 'selectedBlockUid:', iframeSyncState.pendingSelectBlockUid, '_editSequence:', editSequenceRef.current);
+    log('Sending FORM_DATA to iframe. blockPathMap keys:', Object.keys(newBlockPathMap), 'selectedBlockUid:', hasPendingSelect ? iframeSyncState.pendingSelectBlockUid : '(not sent)', '_editSequence:', editSequenceRef.current);
     document.getElementById('previewIframe')?.contentWindow?.postMessage(
       message,
       iframeOriginRef.current,

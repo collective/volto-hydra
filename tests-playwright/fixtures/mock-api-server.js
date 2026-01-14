@@ -1199,6 +1199,7 @@ app.post('*/@querystring-search', (req, res) => {
   const baseUrl = `http://localhost:${PORT}`;
 
   const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
+  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
 
   // Get all content items
   let allItems = Object.keys(contentDirMap)
@@ -1226,8 +1227,22 @@ app.post('*/@querystring-search', (req, res) => {
       if (fullPath !== '/') {
         allItems = allItems.filter((item) => item['@id'].startsWith(fullPath));
       }
+    } else if (index === 'SearchableText' && operation.includes('string.contains')) {
+      // Full-text search - search in title, description, and text content
+      const searchTerm = (value || '').toLowerCase();
+      if (searchTerm) {
+        allItems = allItems.filter((item) => {
+          const title = (item.title || '').toLowerCase();
+          const description = (item.description || '').toLowerCase();
+          const id = (item.id || '').toLowerCase();
+          return title.includes(searchTerm) || description.includes(searchTerm) || id.includes(searchTerm);
+        });
+      }
+    } else if (index === 'review_state' && operation.includes('selection')) {
+      // Filter by review state
+      const states = Array.isArray(value) ? value : [value];
+      allItems = allItems.filter((item) => states.includes(item.review_state || 'published'));
     }
-    // Add more query operations as needed
   }
 
   // Sort items

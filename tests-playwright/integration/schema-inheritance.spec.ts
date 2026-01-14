@@ -398,3 +398,269 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     await expect(imageButton).not.toBeVisible();
   });
 });
+
+test.describe('Schema Inheritance - Search Block with Listing Container', () => {
+  test('can select search block, facet, and listing block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for search block to be visible
+    const searchBlock = iframe.locator('[data-block-uid="search-block-1"]');
+    await expect(searchBlock).toBeVisible({ timeout: 10000 });
+
+    // Click on the search block headline (not on the listing results area)
+    const searchHeadline = searchBlock.locator('h2[data-editable-field="headline"]');
+    await expect(searchHeadline).toBeVisible();
+    await searchHeadline.click();
+
+    // Verify the search block is selected (toolbar visible)
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // Click on a facet item (facet-type is "Content Type" facet)
+    const facetItem = iframe.locator('[data-block-uid="facet-type"]');
+    await expect(facetItem).toBeVisible({ timeout: 5000 });
+    await facetItem.click();
+
+    // Toolbar should be visible for the facet
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // Verify sidebar shows facet settings (title field)
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Facet should have title field in sidebar
+    const titleField = page.locator('#sidebar-properties .field-wrapper-title');
+    await expect(titleField).toBeVisible({ timeout: 5000 });
+
+    // Now click on the listing child block inside search
+    const listingItems = iframe.locator('[data-block-uid="results-listing"]');
+    await expect(listingItems.first()).toBeVisible({ timeout: 10000 });
+    await listingItems.first().click();
+
+    // Toolbar should still be visible for the listing block
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+  });
+
+  test('search block listing container has no add buttons when at maxItems', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the listing child block to be visible
+    const listingItems = iframe.locator('[data-block-uid="results-listing"]');
+    await expect(listingItems.first()).toBeVisible({ timeout: 10000 });
+
+    // Click on the listing block
+    await listingItems.first().click();
+
+    // Toolbar should be visible
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // Since maxItems=1 and there's already 1 listing block,
+    // there should be no add block buttons (data-block-add markers should be hidden)
+    // The listing items should NOT have visible add buttons
+    const addButtons = iframe.locator('[data-block-uid="results-listing"] [data-block-add]');
+
+    // If add buttons exist, they should not trigger the add block UI
+    // Check that no "+" buttons are visible in the listing container area
+    const plusButtons = page.locator('.volto-hydra-add-button');
+    await expect(plusButtons).toHaveCount(0);
+  });
+
+  test('search block filters results when user submits search form', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    // Use view mode - search is a frontend feature, not an editing feature
+    await helper.navigateToView('/search-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for search block and initial results to be visible
+    const searchBlock = iframe.locator('[data-block-uid="search-block-1"]');
+    await expect(searchBlock).toBeVisible({ timeout: 10000 });
+
+    // Get initial results count (listing items inside search results)
+    const searchResults = searchBlock.locator('.search-results [data-block-uid]');
+    await expect(searchResults.first()).toBeVisible({ timeout: 10000 });
+    const initialCount = await searchResults.count();
+    expect(initialCount).toBeGreaterThan(0);
+
+    // Find the search input and enter a search term
+    const searchInput = searchBlock.locator('input[name="SearchableText"]');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('accordion');
+
+    // Submit the search form - this navigates iframe to ?SearchableText=accordion
+    const searchButton = searchBlock.locator('button.search-submit-button');
+    await searchButton.click();
+
+    // Wait for iframe to reload by waiting for the search input to have the value
+    // (indicates the page reloaded and read the URL param)
+    const searchInputAfter = iframe.locator('[data-block-uid="search-block-1"] input[name="SearchableText"]');
+    await expect(searchInputAfter).toHaveValue('accordion', { timeout: 10000 });
+
+    // Check filtered results
+    const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
+
+    // Should have at least one result (accordion-test-page matches "accordion")
+    await expect(filteredResults.first()).toBeVisible({ timeout: 10000 });
+    const filteredCount = await filteredResults.count();
+    expect(filteredCount).toBeGreaterThan(0);
+
+    // Should have fewer results than initial (search filtered them)
+    expect(filteredCount).toBeLessThan(initialCount);
+  });
+
+  test('search block filters results when user clicks facet checkbox', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Navigate to search page in VIEW mode (search is frontend-driven)
+    await helper.navigateToView('/search-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the search block to be visible
+    const searchBlock = iframe.locator('[data-block-uid="search-block-1"]');
+    await expect(searchBlock).toBeVisible({ timeout: 10000 });
+
+    // Wait for initial results to load (all Documents)
+    // Use data-block-uid selector which works across mock and Nuxt frontends
+    const initialResults = iframe.locator('[data-block-uid="results-listing"]');
+    await expect(initialResults.first()).toBeVisible({ timeout: 10000 });
+    const initialCount = await initialResults.count();
+    expect(initialCount).toBeGreaterThan(0);
+
+    // Find the portal_type facet checkbox for "Image" (base query returns Documents, adding Image filter should return 0)
+    const imageCheckbox = iframe.locator('.facet-checkbox[data-field="portal_type"][value="Image"]');
+    await expect(imageCheckbox).toBeVisible({ timeout: 5000 });
+
+    // Click the checkbox to filter by Image
+    await imageCheckbox.click();
+
+    // Wait for page to reload with facet filter
+    // The checkbox should now be checked after reload
+    const imageCheckboxAfter = iframe.locator('.facet-checkbox[data-field="portal_type"][value="Image"]');
+    await expect(imageCheckboxAfter).toBeChecked({ timeout: 10000 });
+
+    // Should have 0 results (base query filters to Documents, facet adds Image filter = no matches)
+    const filteredResults = iframe.locator('[data-block-uid="results-listing"]');
+    const filteredCount = await filteredResults.count();
+    expect(filteredCount).toBe(0);
+  });
+
+  test('can add a facet using add button', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for facets to be visible
+    const facetItem = iframe.locator('[data-block-uid="facet-type"]');
+    await expect(facetItem).toBeVisible({ timeout: 10000 });
+
+    // Count initial facets
+    const initialFacets = iframe.locator('.facet-item[data-block-uid]');
+    const initialCount = await initialFacets.count();
+    expect(initialCount).toBe(2); // facet-type and facet-state
+
+    // Click on a facet to select it
+    await facetItem.click();
+
+    // Toolbar should appear
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // Click the add button (should appear below the facet since data-block-add="bottom")
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
+    // Wait for the new facet to be added (count goes from 2 to 3)
+    const allFacets = iframe.locator('.facet-item[data-block-uid]');
+    await expect(allFacets).toHaveCount(3, { timeout: 10000 });
+
+    // Find the new facet ID (not facet-type or facet-state)
+    const knownIds = ['facet-type', 'facet-state'];
+    let newFacetId: string | null = null;
+    for (let i = 0; i < 3; i++) {
+      const uid = await allFacets.nth(i).getAttribute('data-block-uid');
+      if (uid && !knownIds.includes(uid)) {
+        newFacetId = uid;
+        break;
+      }
+    }
+    expect(newFacetId).not.toBeNull();
+
+    // Wait for the new facet to be selected (should happen automatically after add)
+    const newFacet = iframe.locator(`[data-block-uid="${newFacetId}"]`);
+    await helper.waitForBlockSelected(newFacetId!, 10000);
+
+    // Find and select the field (review_state)
+    const fieldWrapper = page.locator('#sidebar-properties .field-wrapper-field');
+    await expect(fieldWrapper).toBeVisible({ timeout: 5000 });
+
+    const fieldSelect = fieldWrapper.locator('.react-select__control');
+    await fieldSelect.click();
+
+    // Wait for dropdown menu to appear and select review_state
+    const fieldMenu = page.locator('.react-select__menu');
+    await fieldMenu.waitFor({ state: 'visible', timeout: 3000 });
+
+    const reviewStateOption = fieldMenu.locator('.react-select__option', {
+      hasText: /Review state|review_state/i,
+    });
+    await reviewStateOption.click();
+
+    // Now find and set the facet type to selectFacet
+    const typeWrapper = page.locator('#sidebar-properties .field-wrapper-type');
+    await expect(typeWrapper).toBeVisible({ timeout: 5000 });
+
+    const typeSelect = typeWrapper.locator('.react-select__control');
+    await typeSelect.click();
+
+    // Wait for type dropdown and select selectFacet
+    const typeMenu = page.locator('.react-select__menu');
+    await typeMenu.waitFor({ state: 'visible', timeout: 3000 });
+
+    const selectFacetOption = typeMenu.locator('.react-select__option', {
+      hasText: /Select/i,
+    });
+    await selectFacetOption.click();
+
+    // Wait for frontend to re-render with the new facet settings
+    await page.waitForTimeout(1000);
+
+    // Verify the facet now renders as a dropdown (select element)
+    const facetDropdown = newFacet.locator('select.facet-select');
+    await expect(facetDropdown).toBeVisible({ timeout: 5000 });
+
+    // Verify the dropdown has the correct options for review_state
+    const options = facetDropdown.locator('option');
+    const optionCount = await options.count();
+    expect(optionCount).toBe(4); // Select..., Private, Pending, Published
+
+    // Check specific option values
+    await expect(options.nth(0)).toHaveText('Select...');
+    await expect(options.nth(1)).toHaveText('Private');
+    await expect(options.nth(2)).toHaveText('Pending');
+    await expect(options.nth(3)).toHaveText('Published');
+
+    // Verify the dropdown has the correct data-field attribute
+    const dataField = await facetDropdown.getAttribute('data-field');
+    expect(dataField).toBe('review_state');
+  });
+});

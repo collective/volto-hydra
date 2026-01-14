@@ -15,7 +15,7 @@
     "preinstall": "npx only-allow pnpm",
     "start": "VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
     "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
-    "start:mock-api": "node tests-playwright/fixtures/mock-api-server.js",
+    "start:mock-api": "node --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js tests-playwright/fixtures/mock-api-server.js",
     "start:nuxt:test": "cd examples/nuxt-blog-starter && pnpm run dev:test",
     "start:prod": "NODE_ENV=production node build/server.js",
     "build": "VOLTOCONFIG=$(pwd)/volto.config.js razzle build --noninteractive",

@@ -320,6 +320,7 @@ const ParentBlockSection = ({
               index={index}
               properties={formData}
               pathname={pathname}
+              intl={intl}
               onChangeBlock={onChangeBlock}
               // For parent blocks, use no-op to prevent Edit components from changing
               // selection when they initialize/render. This was causing parent blocks

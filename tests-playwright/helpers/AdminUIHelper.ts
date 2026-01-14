@@ -166,6 +166,34 @@ export class AdminUIHelper {
   }
 
   /**
+   * Navigate to a content page in view mode (not editing).
+   * Uses client-side navigation to avoid SSR auth issues.
+   */
+  async navigateToView(contentPath: string): Promise<void> {
+    // Ensure path starts with /
+    if (!contentPath.startsWith('/')) {
+      contentPath = '/' + contentPath;
+    }
+
+    // Use React Router to navigate client-side
+    await this.page.evaluate((path) => {
+      // @ts-ignore - window.__HISTORY__ is set by Volto
+      if (window.__HISTORY__) {
+        window.__HISTORY__.push(path);
+      } else {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    }, contentPath);
+
+    // Wait for the URL to change
+    await this.page.waitForURL(`${this.adminUrl}${contentPath}`, { timeout: 10000 });
+
+    // Wait for iframe to load
+    await this.waitForIframeReady();
+  }
+
+  /**
    * Wait for the preview iframe to load.
    */
   async waitForIframeReady(timeout: number = 30000): Promise<void> {
