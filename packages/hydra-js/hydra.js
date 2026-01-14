@@ -134,7 +134,51 @@ export class Bridge {
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
     // Path transformer for frontends that embed state in URL (e.g., paging)
     this.pathToApiPath = options.pathToApiPath || ((path) => path);
+    // Readonly registry - blocks marked readonly won't have fields collected
+    // Set by expandListingBlocks() or frontend code, not persisted to backend
+    this._readonlyBlocks = new Set();
     this.init(options); // Initialize the bridge
+  }
+
+  /**
+   * Mark a block as readonly (or not). Readonly blocks won't have editable/linkable/media
+   * fields collected - they're display-only. Used by expandListingBlocks() for listing items.
+   * This is transient state, not persisted to the backend.
+   *
+   * @param {string} blockUid - The block UID to mark
+   * @param {boolean} readonly - Whether the block is readonly (default: true)
+   */
+  setBlockReadonly(blockUid, readonly = true) {
+    if (readonly) {
+      this._readonlyBlocks.add(blockUid);
+    } else {
+      this._readonlyBlocks.delete(blockUid);
+    }
+  }
+
+  /**
+   * Check if a block is readonly. Checks in order:
+   * 1. Readonly registry (set by setBlockReadonly)
+   * 2. Block data property (block.readOnly)
+   * DOM attribute (data-block-readonly) is checked separately in collectBlockFields.
+   *
+   * @param {string} blockUid - The block UID to check
+   * @returns {boolean} Whether the block is readonly
+   */
+  isBlockReadonly(blockUid) {
+    // 1. Check registry first (set by expander or frontend)
+    if (this._readonlyBlocks.has(blockUid)) {
+      log('isBlockReadonly: TRUE (registry) for:', blockUid);
+      return true;
+    }
+    // 2. Fall back to block data property
+    const blockData = this.getBlockData(blockUid);
+    if (blockData?.readOnly) {
+      log('isBlockReadonly: TRUE (blockData) for:', blockUid);
+      return true;
+    }
+    log('isBlockReadonly: FALSE for:', blockUid, 'registry:', [...this._readonlyBlocks]);
+    return false;
   }
 
   /**
@@ -152,6 +196,11 @@ export class Bridge {
     }
 
     this.blockPathMap = blockPathMap;
+
+    // Clear readonly registry - new data means fresh state
+    // Frontend will re-register readonly blocks after expansion
+    log('setFormDataFromAdmin: clearing readonly registry, was:', [...this._readonlyBlocks]);
+    this._readonlyBlocks.clear();
 
     const seq = data?._editSequence || 0;
     // Use simple direct lookup for logging - getBlockData uses this.formData which isn't set yet
@@ -324,6 +373,12 @@ export class Bridge {
    */
   collectBlockFields(blockElement, attrName, processor) {
     const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // Check if block is marked readonly (registry, block data, or DOM attribute)
+    if (this.isBlockReadonly(blockUid)) {
+      return {};
+    }
+
     const allElements = this.getAllBlockElements(blockUid);
     const results = {};
 
@@ -1293,7 +1348,9 @@ export class Bridge {
 
         // Check if we're inside a readonly block (e.g., listing items with _blockUid)
         // Readonly blocks ignore editable/linkable/media fields and prevent link navigation
-        const isInsideReadonly = event.target.closest('[data-block-readonly]');
+        // Check both DOM attribute and readonly registry
+        const blockUid = blockElement.getAttribute('data-block-uid');
+        const isInsideReadonly = event.target.closest('[data-block-readonly]') || this.isBlockReadonly(blockUid);
 
         // Handle link clicks in edit mode
         const linkElement = event.target.closest('a');
@@ -7274,9 +7331,14 @@ export function getAuthHeaders() {
  * @param {Object} [paging] - Paging options
  * @param {number} [paging.b_start=0] - Starting index
  * @param {number} [paging.b_size=10] - Number of items per page
+ * @param {Object} [extraCriteria={}] - Additional query criteria (for search blocks)
+ * @param {string} [extraCriteria.SearchableText] - Text search term
+ * @param {string} [extraCriteria.sort_on] - Override sort field
+ * @param {string} [extraCriteria.sort_order] - Override sort order
+ * @param {string|string[]} [extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
  * @returns {Object} Request body for POST to @querystring-search
  */
-export function buildQuerystringSearchBody(queryConfig, paging = {}) {
+export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriteria = {}) {
   const { b_start = 0, b_size = 10 } = paging;
 
   // Ensure query array exists with default if empty
@@ -7290,12 +7352,36 @@ export function buildQuerystringSearchBody(queryConfig, paging = {}) {
         v: '/',
       },
     ];
+  } else {
+    // Clone to avoid mutations
+    query = [...query];
+  }
+
+  // Merge extraCriteria into query
+  if (extraCriteria.SearchableText) {
+    query.push({
+      i: 'SearchableText',
+      o: 'plone.app.querystring.operation.string.contains',
+      v: extraCriteria.SearchableText,
+    });
+  }
+
+  // Add facet filters from extraCriteria (keys starting with 'facet.')
+  for (const [key, value] of Object.entries(extraCriteria)) {
+    if (key.startsWith('facet.')) {
+      const field = key.replace('facet.', '');
+      query.push({
+        i: field,
+        o: 'plone.app.querystring.operation.selection.any',
+        v: Array.isArray(value) ? value : [value],
+      });
+    }
   }
 
   const body = {
     query,
-    sort_on: queryConfig?.sort_on || 'effective',
-    sort_order: queryConfig?.sort_order || 'descending',
+    sort_on: extraCriteria.sort_on || queryConfig?.sort_on || 'effective',
+    sort_order: extraCriteria.sort_order || queryConfig?.sort_order || 'descending',
     b_start,
     b_size,
     metadata_fields: '_all',
@@ -7345,8 +7431,9 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
 }
 
 /**
- * Expand listing blocks by fetching query results and converting items to teaser blocks.
- * Each listing is replaced by multiple teaser blocks in the layout.
+ * Expand listing blocks by fetching query results and converting items to blocks.
+ * Uses itemType and fieldMapping from each listing block to determine output format.
+ * Each listing is replaced by multiple blocks of the specified itemType in the layout.
  * Works with any fetch library (Nuxt $fetch, React Query, SWR, etc.)
  *
  * @param {Object} blocks - Block data keyed by block ID
@@ -7357,13 +7444,29 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * @param {number} [options.page=0] - Current page number (0-indexed)
  * @param {number} [options.pageSize=10] - Number of elements per page
  * @param {Function} [options.fetcher] - Custom fetch function(path, body, headers) => Promise<response>
+ * @param {Object} [options.extraCriteria={}] - Additional query criteria (for search blocks)
+ * @param {string} [options.extraCriteria.SearchableText] - Text search term
+ * @param {string} [options.extraCriteria.sort_on] - Override sort field
+ * @param {string} [options.extraCriteria.sort_order] - Override sort order ('ascending'|'descending')
+ * @param {string|string[]} [options.extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
  * @returns {Promise<{blocks: Object, blocks_layout: Array, paging: Object}>}
- *   - blocks: Blocks with listings expanded to teasers
- *   - blocks_layout: Updated layout with listing replaced by teaser IDs
+ *   - blocks: Blocks with listings expanded to itemType blocks
+ *   - blocks_layout: Updated layout with listing replaced by item block IDs
  *   - paging: { currentPage, totalPages, totalItems, prev, next, pages }
+ *
+ * @example
+ * // Listing block with itemType and fieldMapping:
+ * // {
+ * //   '@type': 'listing',
+ * //   'itemType': 'teaser',
+ * //   'fieldMapping': { 'title': 'headline', '@id': 'href' },
+ * //   'itemDefaults': { 'showImage': true }
+ * // }
+ * // Query result: { title: 'My Page', '@id': '/my-page', description: '...' }
+ * // Output block: { '@type': 'teaser', headline: 'My Page', href: '/my-page', showImage: true }
  */
 export async function expandListingBlocks(blocks, blocksLayout, options) {
-  const { apiUrl, contextPath = '/', page = 0, pageSize = 10, fetcher } = options;
+  const { apiUrl, contextPath = '/', page = 0, pageSize = 10, fetcher, extraCriteria = {} } = options;
   const headers = getAuthHeaders();
   headers['Content-Type'] = 'application/json';
 
@@ -7381,13 +7484,24 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     (blockId) => blocks[blockId]?.['@type'] === 'listing' && blocks[blockId]?.querystring?.query
   );
 
+  // Register listing blocks as readonly on bridge (if editing)
+  // Expanded items share these UIDs and shouldn't have editable fields
+  if (bridgeInstance) {
+    for (const blockId of listingBlockIds) {
+      bridgeInstance.setBlockReadonly(blockId, true);
+      log('expandListingBlocks: registered readonly block:', blockId);
+    }
+  } else {
+    log('expandListingBlocks: no bridgeInstance, skipping readonly registration for:', listingBlockIds);
+  }
+
   await Promise.all(
     listingBlockIds.map(async (blockId) => {
       const block = blocks[blockId];
       const body = buildQuerystringSearchBody(block.querystring, {
         b_start: 0,
         b_size: 1000,
-      });
+      }, extraCriteria);
 
       const path = `${contextPath}/++api++/@querystring-search`;
 
@@ -7411,27 +7525,70 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     })
   );
 
-  // Build new layout, replacing listings with teaser blocks
-  // Each teaser has unique key but shares _blockUid for multi-element selection
+  // Build new layout, replacing listings with item blocks
+  // Each item has unique key but shares _blockUid for multi-element selection
   for (const blockId of blocksLayout) {
     const block = blocks[blockId];
 
     if (block?.['@type'] === 'listing' && listingResults[blockId]) {
       const items = listingResults[blockId];
+      const itemType = block.itemType || 'teaser';
+      const fieldMapping = block.fieldMapping || {};
 
-      // Convert each item to a teaser block with unique key but shared _blockUid
+      // Extract itemDefaults from flat keys (e.g., itemDefaults_overwrite -> overwrite)
+      // Volto stores these as flat keys because forms don't handle nested paths
+      const itemDefaults = {};
+      const defaultsPrefix = 'itemDefaults_';
+      for (const [key, value] of Object.entries(block)) {
+        if (key.startsWith(defaultsPrefix)) {
+          const fieldName = key.slice(defaultsPrefix.length);
+          itemDefaults[fieldName] = value;
+        }
+      }
+      console.log('[HYDRA] expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: items.length });
+
+      // Convert each query result to a block of itemType
       items.forEach((item, index) => {
-        const teaserKey = `${blockId}-${index}`;
-        expandedBlocks[teaserKey] = {
-          '@type': 'teaser',
-          title: item.title || '',
-          description: item.description || '',
-          href: [{ '@id': item['@id'], title: item.title }],
-          ...(item.image_scales && { image: item.image_scales }),
+        const itemKey = `${blockId}-${index}`;
+
+        // Start with defaults, then apply mapped fields
+        const itemBlock = {
+          '@type': itemType,
+          ...itemDefaults,
           // _blockUid tells renderer what data-block-uid to use (multi-element)
           _blockUid: blockId,
+          // readOnly: Volto standard property - disables inline editing
+          // hydra.js checks this in collectBlockFields() to skip all fields
+          readOnly: true,
         };
-        newLayout.push(teaserKey);
+
+        // Apply field mapping: source field -> target field
+        // e.g., { 'title': 'headline', '@id': 'href', 'image': 'preview_image' }
+        for (const [sourceField, targetField] of Object.entries(fieldMapping)) {
+          if (!targetField) continue;
+
+          // Special handling for 'image' source - copy as catalog brain format
+          // Volto's Image component uses: item['@id'], item.image_field, item.image_scales[field][0]
+          if (sourceField === 'image' && item.image_scales) {
+            // Set target field (e.g., preview_image) with catalog brain structure
+            itemBlock[targetField] = {
+              '@id': item['@id'],
+              image_field: item.image_field || 'image',
+              image_scales: item.image_scales,
+            };
+          }
+          // Special handling for href field - wrap in array format expected by link fields
+          else if (targetField === 'href' && item[sourceField] !== undefined) {
+            itemBlock[targetField] = [{ '@id': item[sourceField] }];
+          }
+          // Default: copy value as-is
+          else if (item[sourceField] !== undefined) {
+            itemBlock[targetField] = item[sourceField];
+          }
+        }
+
+        expandedBlocks[itemKey] = itemBlock;
+        newLayout.push(itemKey);
       });
 
       // Remove the original listing block
