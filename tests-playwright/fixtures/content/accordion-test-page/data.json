@@ -4,7 +4,7 @@
   "UID": "accordion-test-page-uid",
   "id": "accordion-test-page",
   "title": "Accordion Test Page",
-  "description": "A test page with accordion block for data-block-field testing",
+  "description": "A test page with accordion block testing",
   "review_state": "published",
   "parent": {
     "@id": "http://localhost:8888",
