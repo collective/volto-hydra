@@ -4,7 +4,16 @@ import {
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
+import BlockTypeWidget from './components/Widgets/BlockTypeWidget';
+import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
+import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema';
+import {
+  inheritSchemaFrom,
+  QUERY_RESULT_FIELDS,
+  computeSmartDefaults,
+  getBlockSchema,
+} from './utils/schemaInheritance';
 import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
 import rowAfterSVG from '@plone/volto/icons/row-after.svg';
 import rowDeleteSVG from '@plone/volto/icons/row-delete.svg';
@@ -48,6 +57,12 @@ const applyConfig = (config) => {
 
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.type.blocks = HiddenBlocksWidget;
+
+  // Block type selector widget - for selecting child block types in containers
+  config.widgets.widget.block_type = BlockTypeWidget;
+
+  // Field mapping widget - for mapping source fields to target block fields
+  config.widgets.widget.field_mapping = FieldMappingWidget;
 
   // Add the slate block in the sidebar with proper initialization
   // blockSchema is used by applyBlockDefaults to set initial values for new blocks
@@ -133,6 +148,81 @@ const applyConfig = (config) => {
         },
       };
     },
+  };
+
+  // Configure listing block with itemType selector and field mapping
+  // Use schemaEnhancer to ADD our fields without breaking the existing schema
+  const existingListingSchemaEnhancer =
+    config.blocks.blocksConfig.listing?.schemaEnhancer;
+  config.blocks.blocksConfig.listing = {
+    ...config.blocks.blocksConfig.listing,
+    schemaEnhancer: (args) => {
+      let { schema, formData } = args;
+
+      // Run existing schemaEnhancer first (handles variations, etc.)
+      if (existingListingSchemaEnhancer) {
+        schema = existingListingSchemaEnhancer(args);
+      }
+
+      // Add itemType field to default fieldset (at the beginning)
+      if (!schema.properties.itemType) {
+        schema.properties.itemType = {
+          title: 'Item Type',
+          widget: 'block_type',
+          description: 'Block type used to render each item',
+          allowedTypes: ['teaser', 'image', 'card'],
+          default: 'teaser',
+        };
+        // Add to beginning of default fieldset fields
+        const defaultFieldset = schema.fieldsets.find((fs) => fs.id === 'default');
+        if (defaultFieldset && !defaultFieldset.fields.includes('itemType')) {
+          defaultFieldset.fields.unshift('itemType');
+        }
+      }
+
+      // Add fieldMapping field
+      if (!schema.properties.fieldMapping) {
+        schema.properties.fieldMapping = {
+          title: 'Field Mapping',
+          widget: 'field_mapping',
+          sourceFields: QUERY_RESULT_FIELDS,
+          targetTypeField: 'itemType',
+          description: 'Map query result fields to item block fields',
+        };
+        // Add fieldMapping fieldset
+        if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
+          schema.fieldsets.push({
+            id: 'mapping',
+            title: 'Field Mapping',
+            fields: ['fieldMapping'],
+          });
+        }
+      }
+
+      // Inject current itemType into fieldMapping widget props
+      // Use default if itemType isn't set yet (e.g., new block)
+      const itemType =
+        formData?.itemType || schema.properties.itemType?.default || 'teaser';
+      if (schema.properties.fieldMapping && itemType) {
+        schema.properties.fieldMapping = {
+          ...schema.properties.fieldMapping,
+          targetType: itemType,
+        };
+      }
+
+      // Run schema inheritance for the referenced block type
+      return inheritSchemaFrom('itemType', 'fieldMapping', 'itemDefaults')({
+        ...args,
+        schema,
+      });
+    },
+  };
+
+  // Configure image block with blockSchema for schema inheritance
+  // The default image block only has 'schema' (settings), not 'blockSchema' (data schema)
+  config.blocks.blocksConfig.image = {
+    ...config.blocks.blocksConfig.image,
+    blockSchema: ImageSchema,
   };
 
   const updateAllowedBlocks = () => {
