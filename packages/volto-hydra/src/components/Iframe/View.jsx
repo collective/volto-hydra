@@ -89,6 +89,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
+import { applySchemaDefaultsToFormData } from '../../utils/schemaInheritance';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -723,7 +724,7 @@ const Iframe = (props) => {
       isObjectList = fieldDef?.widget === 'object_list';
       containerConfig = { parentId: blockId, fieldName, isObjectList };
     } else {
-      containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig);
+      containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig, intl);
       // For before/after, get isObjectList from containerConfig
       isObjectList = containerConfig?.isObjectList || false;
     }
@@ -930,6 +931,7 @@ const Iframe = (props) => {
       iframeSyncState.blockPathMap,
       properties,
       mergedBlocksConfig,
+      intl,
     );
 
     // Use container-aware mutation for nested blocks
@@ -954,6 +956,7 @@ const Iframe = (props) => {
       iframeSyncState.blockPathMap,
       properties,
       mergedBlocksConfig,
+      intl,
     );
 
     // Get previous block for selection (within same container or page)
@@ -1007,13 +1010,19 @@ const Iframe = (props) => {
           // Check if this is in-page navigation (e.g., paging) - just resend form data
           if (event.data.inPage) {
             log('PATH_CHANGE: in-page navigation (paging), resending form data');
-            // Build blockPathMap and send INITIAL_DATA (same as INIT handler)
+            // Build blockPathMap and apply defaults (same as INIT handler)
             const resendBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, intl);
+            const resendFormWithDefaults = applySchemaDefaultsToFormData(
+              form,
+              resendBlockPathMap,
+              config.blocks.blocksConfig,
+              intl,
+            );
             const toolbarButtons = config.settings.slate?.toolbarButtons || [];
             event.source.postMessage(
               {
                 type: 'INITIAL_DATA',
-                data: form,
+                data: resendFormWithDefaults,
                 blockFieldTypes,
                 blockPathMap: resendBlockPathMap,
                 selectedBlockUid: selectedBlock,
@@ -1200,6 +1209,7 @@ const Iframe = (props) => {
                 enterBlockPathMap,
                 formToUseForEnter,
                 config.blocks.blocksConfig,
+                intl,
               );
 
               // Update current block with content before cursor
@@ -1308,7 +1318,7 @@ const Iframe = (props) => {
             }
           } else if (action === 'deleteRow' && pathInfo?.addMode === 'table') {
             // Delete row: use standard block deletion
-            const containerConfig = getContainerFieldConfig(actionBlockId, iframeSyncState.blockPathMap, properties, blocksConfig);
+            const containerConfig = getContainerFieldConfig(actionBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
             let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, actionBlockId, containerConfig);
             if (newFormData && containerConfig) {
               // Ensure container has at least one row
@@ -1341,7 +1351,7 @@ const Iframe = (props) => {
           // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
           // Only needed when moving to a different container
           const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
-            ? getContainerFieldConfig(blockId, iframeSyncState.blockPathMap, properties, blocksConfig)
+            ? getContainerFieldConfig(blockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl)
             : null;
 
           // Use moveBlockBetweenContainers utility to handle all cases:
@@ -1357,6 +1367,7 @@ const Iframe = (props) => {
             sourceParentId,
             targetParentId,
             blocksConfig,
+            intl,
           );
 
           if (newFormData) {
@@ -1562,12 +1573,22 @@ const Iframe = (props) => {
           // 4. Build blockPathMap (now has complete schema knowledge)
           // No need to pass allowedBlocks - it's now derived from blocksConfig.restricted
           const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, intl);
+
+          // 5. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
+          const formWithDefaults = applySchemaDefaultsToFormData(
+            form,
+            initialBlockPathMap,
+            config.blocks.blocksConfig,
+            intl,
+          );
+
           setIframeSyncState(prev => ({
             ...prev,
+            formData: formWithDefaults,
             blockPathMap: initialBlockPathMap,
           }));
 
-          // 5. Send everything to iframe (only in edit mode)
+          // 6. Send everything to iframe (only in edit mode)
           // In view mode, frontend renders from its own API - no need to send data
           const inEditMode = history.location.pathname.endsWith('/edit');
           if (!inEditMode) {
@@ -1582,7 +1603,7 @@ const Iframe = (props) => {
           event.source.postMessage(
             {
               type: 'INITIAL_DATA',
-              data: form,
+              data: formWithDefaults,
               blockFieldTypes: initialBlockFieldTypes,
               blockPathMap: initialBlockPathMap,
               slateConfig: {
@@ -1702,15 +1723,27 @@ const Iframe = (props) => {
       return;
     }
 
+    // Build blockPathMap first - needed for applying defaults to nested blocks
+    const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+
+    // Apply schema defaults BEFORE equality check (handles schemaEnhancer-computed defaults)
+    // This ensures fields like fieldMapping get smart defaults even on initial load.
+    // IMPORTANT: Must apply before equality check so we compare apples-to-apples
+    // (both formWithDefaults and iframeSyncState.formData have defaults applied)
+    const formWithDefaults = applySchemaDefaultsToFormData(
+      formToUse,
+      newBlockPathMap,
+      config.blocks.blocksConfig,
+      intl,
+    );
+
     // Also skip if content is identical (ignoring _editSequence metadata)
-    if (formDataContentEqual(formToUse, iframeSyncState.formData)) {
+    // Compare defaults-applied versions to avoid infinite loops
+    if (formDataContentEqual(formWithDefaults, iframeSyncState.formData)) {
       log('[SYNC SKIP] Content identical, skipping FORM_DATA');
       return;
     }
     log('[SYNC] Content changed, will send FORM_DATA. propsSeq:', propsSeq, 'syncedSeq:', syncedSeq);
-
-    // Build new blockPathMap
-    const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
 
     // Validate selection (may be stale after document structure changes)
     let newSelection = iframeSyncState.selection;
@@ -1732,7 +1765,7 @@ const Iframe = (props) => {
 
     // Add _editSequence to form data for round-trip tracking
     const formWithSequence = {
-      ...formToUse,
+      ...formWithDefaults,
       _editSequence: editSequenceRef.current,
     };
 
@@ -1808,8 +1841,9 @@ const Iframe = (props) => {
       iframeSyncState.blockPathMap,
       iframeSyncState.formData,
       mergedBlocksConfig,
+      intl,
     );
-  }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData]);
+  }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData, intl]);
 
   // Iframe add: adds AFTER the selected block (as sibling)
   // Uses parentContainerConfig.allowedBlocks, or page-level allowedBlocks
@@ -2042,6 +2076,7 @@ const Iframe = (props) => {
           iframeSyncState.blockPathMap,
           properties,
           config.blocks.blocksConfig,
+          intl,
         ).length > 0;
         // Multi-element blocks (e.g., listings) always get full border to show combined bounding box
         const showBottomLine = editableFieldCount === 1 && !isContainer && !blockUI.isMultiElement;
@@ -2149,7 +2184,7 @@ const Iframe = (props) => {
                 }
 
                 if (rowPathInfo?.addMode === 'table') {
-                  const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig);
+                  const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
                   const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
 
                   let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
@@ -2415,7 +2450,7 @@ const Iframe = (props) => {
               rowPathInfo = iframeSyncState.blockPathMap?.[rowId];
             }
             if (rowPathInfo?.addMode === 'table') {
-              const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig);
+              const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
               const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
               let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
               if (newFormData && containerConfig) {
@@ -2470,6 +2505,7 @@ const Iframe = (props) => {
                 currentBlockPathMap,
                 properties,
                 blocksConfig,
+                intl,
               )
             : null;
 
@@ -2502,6 +2538,7 @@ const Iframe = (props) => {
             fieldName,
             newOrder,
             config.blocks?.blocksConfig,
+            intl,
           );
           onChangeFormData(newFormData);
         }}

@@ -5,6 +5,78 @@
 
 import { produce } from 'immer';
 import { applyBlockDefaults } from '@plone/volto/helpers';
+import config from '@plone/volto/registry';
+
+/**
+ * Get the schema for a block type, including schemaEnhancer modifications.
+ * Also handles object_list items (like table rows/cells) which have itemSchema in blockPathMap.
+ *
+ * @param {string} blockType - The block type ID
+ * @param {Object} intl - The intl object from react-intl (required for i18n schemas)
+ * @param {Object} blocksConfig - Optional blocksConfig override (defaults to config.blocks.blocksConfig)
+ * @param {Object} blockPathMap - Optional blockPathMap for object_list item lookup
+ * @param {string} blockId - Optional block ID for object_list item lookup
+ * @returns {Object|null} - The block schema or null
+ */
+export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMap = null, blockId = null) {
+  // For object_list items (like table rows/cells), use itemSchema from blockPathMap
+  if (blockPathMap && blockId) {
+    const pathInfo = blockPathMap[blockId];
+    if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
+      return {
+        ...pathInfo.itemSchema,
+        required: pathInfo.itemSchema.required || [],
+      };
+    }
+  }
+
+  if (!blockType) return null;
+
+  const effectiveBlocksConfig = blocksConfig || config.blocks?.blocksConfig;
+  const blockConfig = effectiveBlocksConfig?.[blockType];
+  if (!blockConfig) return null;
+
+  // Get base schema from blockSchema or schema property
+  const schemaSource = blockConfig.blockSchema || blockConfig.schema;
+  let schema = null;
+
+  if (schemaSource) {
+    try {
+      schema = typeof schemaSource === 'function'
+        ? schemaSource({ formData: {}, data: {}, intl })
+        : schemaSource;
+    } catch {
+      schema = null;
+    }
+  }
+
+  // If no base schema, start with empty schema
+  if (!schema) {
+    schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      properties: {},
+      required: [],
+    };
+  }
+
+  // Run schemaEnhancer on top of base schema (if it exists)
+  if (blockConfig.schemaEnhancer) {
+    try {
+      schema = blockConfig.schemaEnhancer({
+        schema,
+        formData: {},
+        intl,
+      });
+    } catch {
+      // Keep the base schema if enhancer fails
+    }
+  }
+
+  // Only return if we have properties
+  return schema?.properties && Object.keys(schema.properties).length > 0
+    ? schema
+    : null;
+}
 
 /**
  * Get items array from a container (works for both object_list and blocks containers).
@@ -145,14 +217,6 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
   const effectivePageAllowedBlocks = pageAllowedBlocks ??
     getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
-  // Helper to get block schema from blocksConfig
-  function getBlockSchema(blockType) {
-    const blockConfig = blocksConfig?.[blockType];
-    return typeof blockConfig?.blockSchema === 'function'
-      ? blockConfig.blockSchema({ formData: {}, intl })
-      : blockConfig?.blockSchema;
-  }
-
   // Helper to find empty required fields for starter UI
   // Returns array of { fieldName, fieldDef } for required fields that are empty
   function getEmptyRequiredFields(blockData, schema) {
@@ -247,7 +311,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
 
       const blockPath = [...parentPath, fieldName, blockId];
       const blockType = block['@type'];
-      const blockSchema = getBlockSchema(blockType);
+      const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
 
       pathMap[blockId] = {
         path: blockPath,
@@ -371,7 +435,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
 
     const blockPath = ['blocks', blockId];
     const blockType = block['@type'];
-    const blockSchema = getBlockSchema(blockType);
+    const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
 
     pathMap[blockId] = {
       path: blockPath,
@@ -471,9 +535,10 @@ export function updateBlockById(formData, blockPathMap, blockId, newBlockData) {
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
  * @returns {Object|null} Container field config { fieldName, allowedBlocks, defaultBlock, maxLength, parentId } or null if page-level
  */
-export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig) {
+export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig, intl) {
   const pathInfo = blockPathMap?.[blockId];
 
   // No parent means page-level block
@@ -489,10 +554,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     // Get itemSchema and dataPath from parent's schema definition
     const parentBlock = getBlockById(formData, blockPathMap, parentId);
     const parentType = parentBlock?.['@type'];
-    const parentConfig = blocksConfig?.[parentType];
-    const schema = typeof parentConfig?.blockSchema === 'function'
-      ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-      : parentConfig?.blockSchema;
+    const schema = getBlockSchema(parentType, intl, blocksConfig);
     const fieldDef = schema?.properties?.[fieldName];
 
     return {
@@ -521,9 +583,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
 
   const parentType = parentBlock['@type'];
   const parentConfig = blocksConfig?.[parentType];
-  const schema = typeof parentConfig?.blockSchema === 'function'
-    ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-    : parentConfig?.blockSchema;
+  const schema = getBlockSchema(parentType, intl, blocksConfig);
 
   // Check schema-defined container field
   if (schema?.properties && fieldName) {
@@ -565,17 +625,15 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
  * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, defaultBlock, maxLength }]
  */
-export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig) {
+export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl) {
   const block = getBlockById(formData, blockPathMap, blockId);
   if (!block) return [];
 
   const blockType = block['@type'];
-  const blockConfig = blocksConfig?.[blockType];
-  const schema = typeof blockConfig?.blockSchema === 'function'
-    ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-    : blockConfig?.blockSchema;
+  const schema = getBlockSchema(blockType, intl, blocksConfig);
 
   const containerFields = [];
 
@@ -611,6 +669,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   // Check for implicit container (blocks/blocks_layout without schema definition)
   // Only if no explicit container fields found
   // Detect from blockConfig (allowedBlocks/defaultBlock) or existing blocks/blocks_layout
+  const blockConfig = blocksConfig?.[blockType];
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
   if (containerFields.length === 0 && isImplicitContainer) {
@@ -1048,7 +1107,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 
   // If no fieldName, process all container fields for this block
   if (!containerConfig.fieldName) {
-    const containerFields = getAllContainerFields(containerConfig.parentId, blockPathMap, formData, blocksConfig);
+    const containerFields = getAllContainerFields(containerConfig.parentId, blockPathMap, formData, blocksConfig, intl);
     let result = formData;
     for (const field of containerFields) {
       result = ensureEmptyBlockIfEmpty(
@@ -1127,12 +1186,9 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}) {
   const { intl, metadata, properties, siblingData } = options;
   const blockType = blockData['@type'];
-  const blockConfig = blocksConfig?.[blockType];
 
   // Get schema to find container fields
-  const schema = typeof blockConfig?.blockSchema === 'function'
-    ? blockConfig.blockSchema({ formData: {}, intl: intl || { formatMessage: (m) => m.defaultMessage } })
-    : blockConfig?.blockSchema;
+  const schema = getBlockSchema(blockType, intl, blocksConfig);
 
   if (!schema?.properties) {
     return blockData;
@@ -1254,6 +1310,8 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
  * @param {string|null} parentBlockId - Parent block ID (null for page-level)
  * @param {string} fieldName - Container field name (e.g., 'blocks', 'columns')
  * @param {Array<string>} newOrder - New order of block IDs
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
  * @returns {Object} New formData with blocks reordered
  */
 export function reorderBlocksInContainer(
@@ -1263,6 +1321,7 @@ export function reorderBlocksInContainer(
   fieldName,
   newOrder,
   blocksConfig = null,
+  intl = null,
 ) {
   if (!parentBlockId) {
     // Page-level reorder
@@ -1287,10 +1346,7 @@ export function reorderBlocksInContainer(
 
   // Detect if this is an object_list field
   const parentType = parentBlock['@type'];
-  const parentConfig = blocksConfig?.[parentType];
-  const schema = typeof parentConfig?.blockSchema === 'function'
-    ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-    : parentConfig?.blockSchema;
+  const schema = getBlockSchema(parentType, intl, blocksConfig);
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';
 
@@ -1323,6 +1379,7 @@ export function reorderBlocksInContainer(
  * @param {string|null} sourceParentId - Parent of source block (null for page-level)
  * @param {string|null} targetParentId - Parent of target block (null for page-level)
  * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
  * @returns {Object|null} New formData with block moved, or null if invalid move
  */
 export function moveBlockBetweenContainers(
@@ -1334,6 +1391,7 @@ export function moveBlockBetweenContainers(
   sourceParentId,
   targetParentId,
   blocksConfig,
+  intl,
 ) {
   // Get block data to move
   const sourcePath = blockPathMap[blockId]?.path;
@@ -1354,6 +1412,7 @@ export function moveBlockBetweenContainers(
       insertAfter,
       sourceParentId,
       blocksConfig,
+      intl,
     );
   }
 
@@ -1361,7 +1420,7 @@ export function moveBlockBetweenContainers(
   // First, delete from source
   // getContainerFieldConfig takes the block ID and finds its container
   const sourceContainerConfig = sourceParentId
-    ? getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig)
+    ? getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig, intl)
     : null;
 
   let newFormData = deleteBlockFromContainer(
@@ -1373,7 +1432,7 @@ export function moveBlockBetweenContainers(
 
   // Get target container config by looking up target block's container
   const targetContainerConfig = targetParentId
-    ? getContainerFieldConfig(targetBlockId, blockPathMap, formData, blocksConfig)
+    ? getContainerFieldConfig(targetBlockId, blockPathMap, formData, blocksConfig, intl)
     : null;
 
   // Validate that block type is allowed in target container
@@ -1448,11 +1507,12 @@ function reorderBlockInContainer(
   insertAfter,
   parentId,
   blocksConfig,
+  intl,
 ) {
   if (parentId) {
     // Container-level reorder
     // getContainerFieldConfig takes a block ID and finds its container
-    const containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig);
+    const containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig, intl);
     if (!containerConfig) {
       console.error('[MOVE_BLOCK] Could not find container config for block:', blockId, 'parent:', parentId);
       return null;

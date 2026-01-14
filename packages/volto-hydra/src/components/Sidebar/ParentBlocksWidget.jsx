@@ -20,12 +20,13 @@ import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
+import { set, cloneDeep } from 'lodash';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { getBlockById } from '../../utils/blockPath';
+import { getBlockById, getBlockSchema } from '../../utils/blockPath';
 
 /**
  * Get the display title for a block type
@@ -151,34 +152,15 @@ const filterBlocksFields = (schema) => {
 };
 
 /**
- * Get the block schema for a block type
- * Returns filtered schema (without blocks-type fields) or null
- * For object_list items, uses itemSchema from blockPathMap
+ * Get the block schema for a block type, filtered for sidebar display.
+ * Returns filtered schema (without blocks-type fields) or null.
+ * Uses the central getBlockSchema which handles object_list items.
  */
-const getBlockSchema = (blockType, blockData, intl, blockPathMap, blockId) => {
-  // For object_list items, use itemSchema directly from pathMap
-  const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
-    return {
-      ...pathInfo.itemSchema,
-      required: pathInfo.itemSchema.required || [],
-    };
-  }
+const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId) => {
+  const schema = getBlockSchema(blockType, intl, config.blocks?.blocksConfig, blockPathMap, blockId);
+  if (!schema) return null;
 
-  if (!blockType) return null;
-
-  const blockConfig = config.blocks?.blocksConfig?.[blockType];
-  if (!blockConfig?.blockSchema) return null;
-
-  // Schema can be a function or object
-  let schema;
-  if (typeof blockConfig.blockSchema === 'function') {
-    schema = blockConfig.blockSchema({ formData: blockData || {}, intl });
-  } else {
-    schema = blockConfig.blockSchema;
-  }
-
-  // Filter out blocks-type fields (container fields)
+  // Filter out blocks-type fields (container fields) for sidebar display
   return filterBlocksFields(schema);
 };
 
@@ -217,7 +199,7 @@ const ParentBlockSection = ({
   const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
 
   // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
-  const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl, blockPathMap, blockId) : null;
+  const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId) : null;
 
   const handleMenuClick = (e) => {
     e.stopPropagation();
@@ -366,10 +348,9 @@ const ParentBlockSection = ({
           <BlockDataForm
             schema={schema}
             onChangeField={(fieldId, value) => {
-              const newBlockData = {
-                ...blockData,
-                [fieldId]: value,
-              };
+              // Use lodash set for nested paths like 'itemDefaults.overwrite'
+              const newBlockData = cloneDeep(blockData);
+              set(newBlockData, fieldId, value);
               onChangeBlock(blockId, newBlockData);
             }}
             onChangeBlock={(id, data) => {
@@ -445,15 +426,32 @@ const ParentBlocksWidget = ({
       const containerRect = scrollContainer.getBoundingClientRect();
       const propertiesRect = sidebarProperties.getBoundingClientRect();
 
-      // Check if bottom of settings is below visible area
+      // Calculate scroll needed to show settings from the top
+      // We want: as much of settings visible as possible, but top must always be visible
+      const propertiesTop = propertiesRect.top;
       const propertiesBottom = propertiesRect.bottom;
+      const containerTop = containerRect.top;
       const containerBottom = containerRect.bottom;
+      const containerHeight = containerRect.height;
+      const propertiesHeight = propertiesRect.height;
 
-      if (propertiesBottom > containerBottom) {
-        // Scroll the container to show the bottom of settings
-        // Add 30px padding to ensure settings are comfortably visible
-        const scrollAmount = propertiesBottom - containerBottom + 30;
+      // First, ensure the TOP of settings is visible (scroll up if needed)
+      if (propertiesTop < containerTop) {
+        // Settings top is above viewport - scroll up to show it
+        const scrollAmount = propertiesTop - containerTop;
         scrollContainer.scrollTop += scrollAmount;
+      } else if (propertiesTop > containerTop && propertiesHeight <= containerHeight) {
+        // Settings fit entirely - scroll to show from top with some padding
+        const scrollAmount = propertiesTop - containerTop - 10;
+        if (scrollAmount > 0) {
+          scrollContainer.scrollTop += scrollAmount;
+        }
+      } else if (propertiesTop > containerTop && propertiesHeight > containerHeight) {
+        // Settings are taller than viewport - scroll to show top
+        const scrollAmount = propertiesTop - containerTop - 10;
+        if (scrollAmount > 0) {
+          scrollContainer.scrollTop += scrollAmount;
+        }
       }
     };
 
