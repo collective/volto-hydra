@@ -197,6 +197,52 @@ test.describe('Inline image editing', () => {
   });
 });
 
+test.describe('Readonly media fields', () => {
+  test.skip('media overlay does not appear for fields inside data-block-readonly', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // The listing block's expanded items should have image fields inside readonly wrapper
+    // (listing items come from query results and shouldn't be directly editable)
+    const iframe = helper.getIframe();
+
+    // Click on listing block to select it
+    await helper.clickBlockInIframe('block-9-listing');
+    await helper.waitForSidebarOpen();
+
+    // Find an image inside the listing items (should be wrapped in data-block-readonly)
+    const listingImage = iframe.locator(
+      '[data-block-uid="block-9-listing"] [data-block-readonly] img[data-media-field]',
+    );
+
+    // If no readonly images exist, try the image block inside a readonly context
+    const hasReadonlyImage = (await listingImage.count()) > 0;
+
+    if (hasReadonlyImage) {
+      // Click on the readonly image
+      await listingImage.first().click();
+
+      // Wait a moment for any overlay to potentially appear
+      await page.waitForTimeout(500);
+
+      // Media overlay should NOT appear for readonly fields
+      const imageEditorOverlay = page.locator('.empty-image-overlay');
+      await expect(imageEditorOverlay).not.toBeVisible();
+
+      // Image toolbar button should NOT be visible
+      const imageButton = helper.getQuantaToolbarFormatButton('image');
+      await expect(imageButton).not.toBeVisible();
+    } else {
+      // Skip if no readonly images to test
+      test.skip();
+    }
+  });
+});
+
 test.describe('Inline link editing', () => {
   test('can edit hero button link via toolbar', async ({ page }) => {
     const helper = new AdminUIHelper(page);

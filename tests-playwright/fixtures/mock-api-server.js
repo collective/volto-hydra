@@ -201,8 +201,44 @@ function getImageScales(content, baseUrl) {
 }
 
 /**
+ * Generate placeholder image_scales for search results
+ * Mimics Plone's image_scales structure - uses relative @@images paths
+ * The mock server's @@images/* endpoint serves SVG placeholders
+ */
+function getPlaceholderImageScales(title, fieldName = 'image') {
+  // Use a hash based on title for consistent URLs
+  const hash = (title || 'item').split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0).toString(16);
+  return {
+    [fieldName]: [{
+      'content-type': 'image/svg+xml',
+      'download': `@@images/image-800-${hash}.svg`,
+      'filename': 'placeholder.svg',
+      'height': 600,
+      'width': 800,
+      'scales': {
+        'preview': {
+          'download': `@@images/image/preview`,
+          'height': 300,
+          'width': 400,
+        },
+        'mini': {
+          'download': `@@images/image/mini`,
+          'height': 150,
+          'width': 200,
+        },
+        'thumb': {
+          'download': `@@images/image/thumb`,
+          'height': 96,
+          'width': 128,
+        },
+      },
+    }],
+  };
+}
+
+/**
  * Format a content item for search results
- * Includes image_field and image_scales for Image content types
+ * Includes image_field and image_scales matching real Plone API structure
  * Includes is_folderish for folder navigation in object browser
  * Includes hasPreviewImage for teaser blocks to show target's preview image
  */
@@ -220,12 +256,17 @@ function formatSearchItem(content, baseUrl) {
     'UID': content.UID,
     'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
+    // Match real Plone API: image_field and image_scales for all items
+    'image_field': 'image',
+    'image_scales': getPlaceholderImageScales(content.title),
   };
 
-  // Add image fields for Image content types (needed by object browser)
+  // For Image content types, use actual image data if available
   if (content['@type'] === 'Image') {
-    item.image_field = 'image';
-    item.image_scales = getImageScales(content, baseUrl);
+    const scales = getImageScales(content, baseUrl);
+    if (scales) {
+      item.image_scales = scales;
+    }
   }
 
   return item;

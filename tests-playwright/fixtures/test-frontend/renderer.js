@@ -59,7 +59,7 @@ function getLinkUrl(value) {
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with blocks and blocks_layout
  */
-function renderContent(content) {
+async function renderContent(content) {
     // Increment render counter
     window.hydraRenderCount++;
     const counterEl = document.getElementById('render-counter');
@@ -75,24 +75,24 @@ function renderContent(content) {
     }
     const items = blocks_layout.items || [];
 
-    items.forEach(blockId => {
+    for (const blockId of items) {
         const block = blocks[blockId];
-        if (!block) return;
+        if (!block) continue;
 
-        const blockElement = renderBlock(blockId, block);
+        const blockElement = await renderBlock(blockId, block);
         if (blockElement) {
             container.appendChild(blockElement);
         }
-    });
+    }
 }
 
 /**
  * Render a single block.
  * @param {string} blockId - Block UUID
  * @param {Object} block - Block data
- * @returns {HTMLElement} Rendered block element
+ * @returns {Promise<HTMLElement>} Rendered block element
  */
-function renderBlock(blockId, block) {
+async function renderBlock(blockId, block) {
     // Use _blockUid if present (for multi-element blocks like expanded listings)
     const uid = block._blockUid || blockId;
 
@@ -119,13 +119,13 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderHeroBlock(block);
             break;
         case 'columns':
-            wrapper.innerHTML = renderColumnsBlock(block);
+            wrapper.innerHTML = await renderColumnsBlock(block);
             break;
         case 'column':
             wrapper.innerHTML = renderColumnBlock(block);
             break;
         case 'gridBlock':
-            wrapper.innerHTML = renderGridBlock(block, blockId);
+            wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
         case 'carousel':
             wrapper.classList.add('carousel-block');
@@ -140,7 +140,7 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderSlideBlock(block);
             break;
         case 'accordion':
-            wrapper.innerHTML = renderAccordionBlock(block);
+            wrapper.innerHTML = await renderAccordionBlock(block, blockId);
             break;
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
@@ -150,10 +150,8 @@ function renderBlock(blockId, block) {
             const teaserEl = document.createElement('div');
             teaserEl.innerHTML = renderTeaserBlock(block, uid);
             return teaserEl.firstElementChild;
-        case 'listing':
-            // Special case: listing renders MULTIPLE elements with same block UID
-            // Return a document fragment with multiple sibling elements
-            return renderListingBlock(blockId, block);
+        // Note: listing blocks are expanded by expandListingBlocks() into individual
+        // teaser/image blocks BEFORE rendering, so 'listing' case should never be hit
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
@@ -422,22 +420,26 @@ function renderHeroBlock(block) {
  * @returns {string} HTML string (includes wrapper with data-block-uid)
  */
 function renderTeaserBlock(block, blockUid) {
-    const href = getLinkUrl(block.href);
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
 
-    // Get title: only use block.title when overwrite is true
-    // When overwrite is false, show target's title (ignore any stored block.title)
-    const title = block.overwrite ? (block.title || hrefObj?.title || '') : (hrefObj?.title || '');
+    // Determine whether to use block data or hrefObj data for ALL fields (no mixing)
+    // - overwrite=true: user wants custom data → use block data
+    // - overwrite=false but hrefObj has no content data: use block data (e.g., listing items)
+    // - overwrite=false and hrefObj has content data: use hrefObj data (object browser selection)
+    const hrefObjHasContentData = hrefObj?.title !== undefined;
+    const useBlockData = block.overwrite || !hrefObjHasContentData;
 
-    // Get description: only use block.description when overwrite is true
-    // When overwrite is false, show target's description
-    const description = block.overwrite ? (block.description || hrefObj?.description || '') : (hrefObj?.description || '');
+    // Get href: always from hrefObj @id (link destination)
+    const href = hrefObj?.['@id'] || '';
 
-    // Get preview image: use block.preview_image if set, otherwise use target content's image
+    // Get title/description/image based on useBlockData (all or nothing, no mixing)
+    const title = useBlockData ? (block.title || '') : (hrefObj?.title || '');
+    const description = useBlockData ? (block.description || '') : (hrefObj?.description || '');
+
     let imageSrc = '';
-    if (block.preview_image) {
+    if (useBlockData && block.preview_image) {
         imageSrc = getImageUrl(block.preview_image);
-    } else if (hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
+    } else if (!useBlockData && hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
         imageSrc = hrefObj['@id'] + '/@@images/preview_image';
     }
 
@@ -479,60 +481,14 @@ function renderTeaserBlock(block, blockUid) {
 }
 
 /**
- * Render a listing block as MULTIPLE sibling elements.
- * Each item has the SAME data-block-uid - this is what makes it a multi-element block.
- * The bounding box should encompass all items when the block is selected.
- *
- * @param {string} blockId - Block UUID (shared by all rendered elements)
- * @param {Object} block - Listing block data with items array
- * @returns {DocumentFragment} Fragment containing multiple elements
- */
-function renderListingBlock(blockId, block) {
-    const items = block.items || [
-        { title: 'Item 1', description: 'First listing item' },
-        { title: 'Item 2', description: 'Second listing item' },
-        { title: 'Item 3', description: 'Third listing item' },
-    ];
-
-    const fragment = document.createDocumentFragment();
-
-    // Each card is a sibling with the SAME data-block-uid
-    // No wrapper container - cards are direct siblings
-    items.forEach((item, index) => {
-        const card = document.createElement('div');
-        card.setAttribute('data-block-uid', blockId);
-        card.className = `listing-card listing-card-${index}`;
-        card.style.cssText = 'display: inline-block; width: 200px; margin-right: 20px; padding: 15px; background: #f0f8ff; border: 1px solid #4a90d9; border-radius: 8px; vertical-align: top;';
-
-        card.innerHTML = `
-            <h4 style="margin: 0 0 8px 0; color: #333;">${item.title}</h4>
-            <p style="margin: 0; color: #666; font-size: 14px;">${item.description}</p>
-        `;
-
-        fragment.appendChild(card);
-    });
-
-    // Add editable headline BELOW the cards - tests that editable field
-    // doesn't have to be in the first element of a multi-element block
-    const headline = document.createElement('h3');
-    headline.setAttribute('data-block-uid', blockId);
-    headline.setAttribute('data-editable-field', 'headline');
-    headline.className = 'listing-headline';
-    headline.style.cssText = 'display: block; width: 100%; margin-top: 20px; padding: 10px; color: #333; clear: both;';
-    headline.textContent = block.headline || 'Listing Headline';
-    fragment.appendChild(headline);
-
-    return fragment;
-}
-
-/**
  * Render an image block.
  * @param {Object} block - Image block data
  * @returns {string} HTML string
  */
 function renderImageBlock(block) {
     const imageSrc = getImageUrl(block.url);
-    const alt = block.alt || '';
+    // Volto's image block uses 'placeholder' for alt text, not 'alt'
+    const alt = block.placeholder || block.alt || '';
     const href = getLinkUrl(block.href);
 
     // Add data-media-field="url" for inline image editing
@@ -550,10 +506,11 @@ function renderImageBlock(block) {
 /**
  * Render a columns container block.
  * Has TWO container fields: top_images and columns (tests multi-field routing)
+ * Calls window._expandListingBlocks for nested listings in columns.
  * @param {Object} block - Columns block data with top_images/top_images_layout and columns/columns_layout
- * @returns {string} HTML string
+ * @returns {Promise<string>} HTML string
  */
-function renderColumnsBlock(block) {
+async function renderColumnsBlock(block) {
     const topImages = block.top_images || {};
     const topImagesLayout = block.top_images_layout || { items: [] };
     const topImagesItems = topImagesLayout.items || [];
@@ -571,34 +528,34 @@ function renderColumnsBlock(block) {
 
     // Render top_images container field (images go right)
     if (topImagesItems.length > 0) {
-        html += '<div class="top-images-row" data-block-field="top_images" style="display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">';
+        html += '<div class="top-images-row" style="display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">';
         html += '<div class="field-label" style="font-weight: bold; color: #666; font-size: 12px; writing-mode: vertical-rl; text-orientation: mixed;">TOP IMAGES</div>';
 
-        topImagesItems.forEach(imgId => {
+        for (const imgId of topImagesItems) {
             const img = topImages[imgId];
-            if (!img) return;
+            if (!img) continue;
 
             // Render image as a nested block with data-block-uid and data-block-add="right"
             html += `<div data-block-uid="${imgId}" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
             html += renderImageBlock(img);
             html += '</div>';
-        });
+        }
 
         html += '</div>';
     }
 
-    // Render columns container field (columns go right)
-    html += '<div class="columns-row" data-block-field="columns" style="display: flex; gap: 20px;">';
+    // Render columns container (columns go right)
+    html += '<div class="columns-row" style="display: flex; gap: 20px;">';
 
-    columnsItems.forEach(columnId => {
+    for (const columnId of columnsItems) {
         const column = columns[columnId];
-        if (!column) return;
+        if (!column) continue;
 
         // Render column as a nested block with data-block-uid and data-block-add="right"
         html += `<div data-block-uid="${columnId}" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
-        html += renderColumnContent(column);
+        html += await renderColumnContent(column, columnId);
         html += '</div>';
-    });
+    }
 
     html += '</div>';
     return html;
@@ -607,14 +564,22 @@ function renderColumnsBlock(block) {
 /**
  * Render a column block content (the content blocks inside a column).
  * Content blocks go down (data-block-add="bottom").
+ * Calls window._expandListingBlocks for nested listings.
  * @param {Object} column - Column block data with blocks/blocks_layout
- * @returns {string} HTML string
+ * @param {string} columnId - Column ID for expansion
+ * @returns {Promise<string>} HTML string
  */
-function renderColumnContent(column) {
-    const blocks = column.blocks || {};
-    const blocksLayout = column.blocks_layout || { items: [] };
-    const items = blocksLayout.items || [];
+async function renderColumnContent(column, columnId) {
+    let blocks = column.blocks || {};
+    let items = column.blocks_layout?.items || [];
     const title = column.title || '';
+
+    // Expand nested listings if expansion function is available
+    if (window._expandListingBlocks && items.length > 0) {
+        const result = await window._expandListingBlocks(blocks, items, columnId);
+        blocks = result.blocks;
+        items = result.blocks_layout;
+    }
 
     let html = '';
 
@@ -623,12 +588,14 @@ function renderColumnContent(column) {
         html += `<h4 data-editable-field="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
     }
 
-    items.forEach(blockId => {
+    for (const blockId of items) {
         const block = blocks[blockId];
-        if (!block) return;
+        if (!block) continue;
+
+        const uid = block._blockUid || blockId;
 
         // Render nested content block with data-block-uid and data-block-add="bottom"
-        html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
+        html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
 
         // Render inner content based on block type
         switch (block['@type']) {
@@ -638,12 +605,15 @@ function renderColumnContent(column) {
             case 'image':
                 html += renderImageBlock(block);
                 break;
+            case 'teaser':
+                html += renderTeaserBlock(block, null);
+                break;
             default:
                 html += `<p>Unknown block type: ${block['@type']}</p>`;
         }
 
         html += '</div>';
-    });
+    }
 
     return html || '<p style="color: #999;">Empty column</p>';
 }
@@ -660,21 +630,29 @@ function renderColumnBlock(block) {
 /**
  * Render a grid block (Volto's built-in container).
  * NO explicit data-block-add attributes - tests automatic direction inference.
+ * Calls window._expandListingBlocks for nested listings (set by index.html).
  * @param {Object} block - Grid block data with blocks/blocks_layout
  * @param {string} blockId - Block ID for paging URL
- * @returns {string} HTML string
+ * @returns {Promise<string>} HTML string
  */
-function renderGridBlock(block, blockId) {
-    const blocks = block.blocks || {};
-    const blocksLayout = block.blocks_layout || { items: [] };
-    const items = blocksLayout.items || [];
-    const paging = block._paging;
+async function renderGridBlock(block, blockId) {
+    let blocks = block.blocks || {};
+    let items = block.blocks_layout?.items || [];
+    let paging = block._paging;
+
+    // Expand nested listings if expansion function is available
+    if (window._expandListingBlocks) {
+        const result = await window._expandListingBlocks(blocks, items, blockId);
+        blocks = result.blocks;
+        items = result.blocks_layout;
+        paging = result.paging?.totalPages > 1 ? result.paging : null;
+    }
 
     let html = '<div class="grid-row" style="display: flex; flex-wrap: wrap; gap: 20px;">';
 
-    items.forEach(itemId => {
+    for (const itemId of items) {
         const childBlock = blocks[itemId];
-        if (!childBlock) return;
+        if (!childBlock) continue;
 
         // Use _blockUid if present (for multi-element blocks like expanded listings)
         const uid = childBlock._blockUid || itemId;
@@ -702,7 +680,7 @@ function renderGridBlock(block, blockId) {
         }
 
         html += '</div>';
-    });
+    }
 
     html += '</div>';
 
@@ -915,47 +893,68 @@ function renderSlideBlock(block) {
 }
 
 /**
- * Render an accordion block with separate header and content container fields.
- * This demonstrates data-block-field for multi-container targeting.
+ * Render an accordion block with separate header and content containers.
+ * Calls window._expandListingBlocks for nested listings in content.
  *
  * @param {Object} block - Accordion block data with header/header_layout and content/content_layout
- * @returns {string} HTML string
+ * @param {string} blockId - Accordion block ID
+ * @returns {Promise<string>} HTML string
  */
-function renderAccordionBlock(block) {
-    const header = block.header || {};
-    const headerLayout = block.header_layout?.items || [];
-    const content = block.content || {};
-    const contentLayout = block.content_layout?.items || [];
+async function renderAccordionBlock(block, blockId) {
+    let header = block.header || {};
+    let headerItems = block.header_layout?.items || [];
+    let content = block.content || {};
+    let contentItems = block.content_layout?.items || [];
+
+    // Expand nested listings in content (header usually doesn't have listings)
+    if (window._expandListingBlocks && contentItems.length > 0) {
+        const result = await window._expandListingBlocks(content, contentItems, `${blockId}-content`);
+        content = result.blocks;
+        contentItems = result.blocks_layout;
+    }
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
-    // Header section - uses 'header' container field
-    html += '<div class="accordion-header" data-block-field="header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">';
+    // Header section
+    html += '<div class="accordion-header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">';
     html += '<div class="header-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">HEADER</div>';
 
-    headerLayout.forEach(blockId => {
-        const childBlock = header[blockId];
+    for (const childId of headerItems) {
+        const childBlock = header[childId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
             html += '</div>';
         }
-    });
+    }
 
     html += '</div>';
 
-    // Content section - uses 'content' container field
-    html += '<div class="accordion-content" data-block-field="content" style="padding: 15px;">';
+    // Content section
+    html += '<div class="accordion-content" style="padding: 15px;">';
     html += '<div class="content-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">CONTENT</div>';
 
-    contentLayout.forEach(blockId => {
-        const childBlock = content[blockId];
+    for (const childId of contentItems) {
+        const childBlock = content[childId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
-            html += renderNestedSlateBlock(childBlock);
+            const uid = childBlock._blockUid || childId;
+            html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+            switch (childBlock['@type']) {
+                case 'slate':
+                    html += renderNestedSlateBlock(childBlock);
+                    break;
+                case 'image':
+                    html += renderImageBlock(childBlock);
+                    break;
+                case 'teaser':
+                    html += renderTeaserBlock(childBlock, null);
+                    break;
+                default:
+                    html += renderNestedSlateBlock(childBlock);
+            }
             html += '</div>';
         }
-    });
+    }
 
     html += '</div>';
 

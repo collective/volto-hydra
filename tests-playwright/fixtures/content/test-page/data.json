@@ -79,6 +79,13 @@
         "listing-in-grid": {
           "@type": "listing",
           "headline": "Featured Items",
+          "itemType": "teaser",
+          "fieldMapping": {
+            "@id": "href",
+            "title": "title",
+            "description": "description",
+            "image": "preview_image"
+          },
           "querystring": {
             "query": [
               {
@@ -99,6 +106,7 @@
     "block-9-listing": {
       "@type": "listing",
       "headline": "Featured Items",
+      "itemType": "teaser",
       "querystring": {
         "query": [
           {

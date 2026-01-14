@@ -74,96 +74,34 @@
             return pages;
         }
 
-        // Recursively expand all listing blocks in a block tree
-        // Returns { blocks, blocks_layout } with listings converted to teasers
-        // pages = { blockId: pageNumber } from URL
-        async function expandAllListings(blocks, blocksLayout, options, pages = {}) {
-            if (!blocks || !blocksLayout) return { blocks, blocks_layout: blocksLayout };
-
-            // First expand listings at this level
-            const { blocks: expandedBlocks, blocks_layout: newLayout } = await expandListingBlocks(
-                blocks, blocksLayout, { ...options, pageSize: 1000, page: 0 }
-            );
-
-            // Then recursively expand containers and add paging
-            for (const blockId of newLayout) {
-                const block = expandedBlocks[blockId];
-                if (!block) continue;
-
-                // Handle gridBlock and similar containers with blocks/blocks_layout
-                if (block.blocks && block.blocks_layout?.items) {
-                    // Expand nested listings first
-                    const nestedResult = await expandAllListings(
-                        block.blocks, block.blocks_layout.items, options, pages
-                    );
-
-                    // Now apply paging to this container's layout
-                    const pageSize = 6;  // Small for testing
-                    const currentPage = pages[blockId] || 0;
-                    const { blocks: pagedBlocks, blocks_layout: pagedLayout, paging } = await expandListingBlocks(
-                        nestedResult.blocks,
-                        nestedResult.blocks_layout,
-                        { ...options, pageSize, page: currentPage }
-                    );
-
-                    expandedBlocks[blockId] = {
-                        ...block,
-                        blocks: pagedBlocks,
-                        blocks_layout: { items: pagedLayout },
-                        _paging: paging?.totalPages > 1 ? paging : null
-                    };
-                }
-
-                // Handle columns container
-                if (block.columns) {
-                    const expandedCols = {};
-                    for (const [colId, column] of Object.entries(block.columns)) {
-                        if (column.blocks && column.blocks_layout?.items) {
-                            const result = await expandAllListings(
-                                column.blocks, column.blocks_layout.items, options, pages
-                            );
-                            expandedCols[colId] = {
-                                ...column,
-                                blocks: result.blocks,
-                                blocks_layout: { items: result.blocks_layout }
-                            };
-                        } else {
-                            expandedCols[colId] = column;
-                        }
-                    }
-                    expandedBlocks[blockId] = { ...block, columns: expandedCols };
-                }
-            }
-
-            return { blocks: expandedBlocks, blocks_layout: newLayout };
-        }
-
-        // Helper to render content with listing expansion
+        // Render content, expanding top-level listings
+        // Container renderers (like renderGridBlock) call window._expandListingBlocks for nested content
         async function renderContentWithListings(content) {
-            // Extract path from @id (could be full URL or path)
+            // Extract path from @id
             let contextPath = content['@id'] || '/';
             if (contextPath.startsWith('http')) {
                 contextPath = new URL(contextPath).pathname;
             }
 
-            const options = {
-                apiUrl: window.location.origin,
-                contextPath,
+            const pages = getPagesFromUrl();
+            const baseOptions = { apiUrl: window.location.origin, contextPath };
+
+            // Set up expansion helper for container renderers
+            window._expandListingBlocks = async (blocks, layout, containerId) => {
+                const pageSize = 6;
+                const page = pages[containerId] || 0;
+                return await expandListingBlocks(blocks, layout, { ...baseOptions, pageSize, page });
             };
 
-            // Get page numbers from URL
-            const pages = getPagesFromUrl();
-
-            // Recursively expand all listings (converts to teasers)
-            const { blocks, blocks_layout } = await expandAllListings(
+            // Expand top-level listings only (containers handle their own)
+            const { blocks, blocks_layout } = await expandListingBlocks(
                 content.blocks,
                 content.blocks_layout?.items || [],
-                options,
-                pages
+                { ...baseOptions, pageSize: 1000, page: 0 }
             );
 
-            // Render with expanded blocks and updated layout
-            renderContent({
+            // Render with expanded blocks
+            await renderContent({
                 ...content,
                 blocks,
                 blocks_layout: { items: blocks_layout }
@@ -455,7 +393,7 @@
                                         required: [],
                                     },
                                 },
-                                // Accordion block: demonstrates data-block-field for multi-container targeting
+                                // Accordion block with header and content containers
                                 accordion: {
                                     id: 'accordion',
                                     title: 'Accordion',

@@ -328,6 +328,47 @@ test.describe('Block Selection', () => {
     expect(scrollAfter).toBe(scrollBefore);
   });
 
+  test('selecting block shows sidebar settings from top, not scrolled down', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select listing block which has multiple settings (itemType, headline, querystring, fieldMapping)
+    await helper.clickBlockInIframe('block-9-listing');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Get the sidebar scroll container and block settings
+    const sidebarScroller = page.locator('.sidebar-content-wrapper');
+    const blockSettings = page.locator('#sidebar-properties');
+    await expect(sidebarScroller).toBeVisible();
+    await expect(blockSettings).toBeVisible({ timeout: 5000 });
+
+    // Wait for any scroll animation to complete
+    await page.waitForTimeout(500);
+
+    // Verify the TOP of block settings is visible (not scrolled past)
+    // Get bounding boxes to compare positions
+    const scrollerBox = await sidebarScroller.boundingBox();
+    const settingsBox = await blockSettings.boundingBox();
+
+    expect(scrollerBox).toBeTruthy();
+    expect(settingsBox).toBeTruthy();
+
+    // The top of settings should be at or below the top of the scroller viewport
+    // (i.e., not scrolled so far that the top of settings is above the viewport)
+    const settingsTopIsVisible = settingsBox!.y >= scrollerBox!.y - 20; // Allow 20px tolerance
+    expect(
+      settingsTopIsVisible,
+      `Top of block settings should be visible. Settings top: ${settingsBox!.y}, Scroller top: ${scrollerBox!.y}`,
+    ).toBe(true);
+
+    // Also verify the first field is visible (itemType for listing block)
+    const firstField = page.locator('#sidebar-properties .field-wrapper-itemType');
+    await expect(firstField).toBeVisible({ timeout: 5000 });
+  });
+
   test('sidebar block header menu has same items as toolbar menu except settings', async ({
     page,
   }) => {
