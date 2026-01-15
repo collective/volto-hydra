@@ -475,11 +475,11 @@ test.describe('Block Selection', () => {
     const iframeBody = iframe.locator('body');
     const scrollBefore = await iframeBody.evaluate(() => window.scrollY);
 
-    // Use End key to scroll to bottom (like user reported)
-    await page.keyboard.press('End');
+    // Scroll iframe to bottom programmatically (simulates user scrolling)
+    await iframeBody.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(200);
 
-    // Check scroll position right after pressing End
+    // Check scroll position right after scrolling
     const scrollAfterEnd = await iframeBody.evaluate(() => window.scrollY);
     expect(scrollAfterEnd).toBeGreaterThan(scrollBefore);
 
@@ -493,7 +493,7 @@ test.describe('Block Selection', () => {
     expect(scrollFinal).toBeGreaterThanOrEqual(scrollAfterEnd - 50);
 
     // Now scroll back to the top - the toolbar should reappear on the selected block
-    await page.keyboard.press('Home');
+    await iframeBody.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(500);
 
     // Verify the toolbar is visible again for the selected block

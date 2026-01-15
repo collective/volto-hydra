@@ -646,10 +646,11 @@ async function renderColumnContent(column, columnId) {
     const title = column.title || '';
 
     // Expand nested listings if expansion function is available
+    // expandListingBlocks returns { items: [...], paging: {...} } where each item is a full block object
+    let expandedItems = null;
     if (window._expandListingBlocks && items.length > 0) {
         const result = await window._expandListingBlocks(blocks, items, columnId);
-        blocks = result.blocks;
-        items = result.blocks_layout;
+        expandedItems = result.items;
     }
 
     let html = '';
@@ -659,9 +660,12 @@ async function renderColumnContent(column, columnId) {
         html += `<h4 data-editable-field="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
     }
 
-    for (const blockId of items) {
-        const block = blocks[blockId];
-        if (!block) continue;
+    // Use expanded items if available, otherwise use original blocks/items
+    const itemsToRender = expandedItems || items.map(id => ({ ...blocks[id], '@uid': id }));
+    for (const item of itemsToRender) {
+        const blockId = item['@uid'];
+        const block = item;
+        if (!block || !block['@type']) continue;
 
         // Render nested content block with data-block-uid and data-block-add="bottom"
         html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
