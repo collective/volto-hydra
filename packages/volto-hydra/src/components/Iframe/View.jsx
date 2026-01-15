@@ -738,7 +738,7 @@ const Iframe = (props) => {
       // Create cell template with defaults
       const virtualType = blockPathMap[blockId]?.itemType; // e.g., 'slateTable:rows:cells'
       let cellData = { '@type': virtualType };
-      cellData = applyBlockDefaults({ data: cellData, intl, metadata, properties }, mergedBlocksConfig);
+      cellData = applyBlockDefaults({ data: cellData, formData: cellData, intl, metadata, properties }, mergedBlocksConfig);
       cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties });
       delete cellData['@type'];
 
@@ -828,7 +828,7 @@ const Iframe = (props) => {
       if (blockType === 'slate') {
         blockData.value = [{ type: 'p', children: [{ text: '' }] }];
       }
-      blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties });
+      blockData = applyBlockDefaults({ data: blockData, formData: blockData, intl, metadata, properties });
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties });
     }
 
@@ -911,8 +911,10 @@ const Iframe = (props) => {
     }
 
     // Apply block defaults
+    // Pass formData alongside data - some Volto schemas expect formData (e.g., ImageSchema)
     blockData = applyBlockDefaults({
       data: blockData,
+      formData: blockData,
       intl,
       metadata,
       properties,
