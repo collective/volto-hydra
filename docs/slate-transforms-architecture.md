@@ -205,6 +205,45 @@ After formatting, iframe restores user's selection using `data-node-id` attribut
 
 ---
 
+## Data Sent to Iframe
+
+Before sending data to the iframe, View.jsx processes and augments it:
+
+### Schema Defaults
+
+`applySchemaDefaultsToFormData()` iterates all blocks and applies schema defaults to fields that are empty or null. This ensures the frontend receives complete data even when the user hasn't explicitly set all fields.
+
+### Block Path Map
+
+The `blockPathMap` maps each block ID to its location in the nested data structure:
+
+```javascript
+{
+  "block-1": { path: ["blocks", "block-1"], parentId: null },
+  "nested-1": { path: ["blocks", "block-1", "items", "nested-1"], parentId: "block-1" }
+}
+```
+
+### Block Field Types
+
+The `blockFieldTypes` maps block IDs to their field widget types, so hydra.js knows which fields are editable and how:
+
+```javascript
+{
+  "block-1": { title: "string", description: "slate", image: "image" }
+}
+```
+
+### Slate Config
+
+`slateConfig` contains hotkey mappings and toolbar button configuration for rich text editing.
+
+### Function Stripping
+
+Schema enhancers run first to compute the final schema (including dynamic defaults), then functions are stripped from the result before sending since functions can't be serialized via postMessage.
+
+---
+
 ## Bridge Protocol
 
 ### Messages: Iframe → Admin UI

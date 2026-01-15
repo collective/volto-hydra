@@ -45,30 +45,28 @@
       :class="['image-size-' + props.size, 'image-align-' + props.align]" loading="lazy" decoding="async" />
   </div>
 
-  <!-- Hero block - simple landing page hero section -->
+  <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
+  <!-- hydra editable-field=heading(.hero-heading) editable-field=subheading(.hero-subheading) media-field=image(.hero-image) editable-field=buttonText(.hero-button) linkable-field=buttonLink(.hero-button) -->
   <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
-    <!-- Image with data-media-field for inline image selection -->
-    <!-- Use getImageUrl to handle array/object formats and add @@images suffix for Plone paths -->
-    <img v-if="block.image" data-media-field="image"
+    <!-- Image - uses class for selector, no data-media-field -->
+    <img v-if="block.image" class="hero-image w-full h-auto max-h-64 object-cover mb-4 rounded"
          :src="getImageUrl(block.image)"
-         alt="Hero image"
-         class="w-full h-auto max-h-64 object-cover mb-4 rounded" />
-    <div v-else data-media-field="image"
-         class="w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
+         alt="Hero image" />
+    <div v-else class="hero-image w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
     </div>
-    <h1 data-editable-field="heading" class="text-3xl font-bold mb-2">{{ block.heading }}</h1>
-    <p data-editable-field="subheading" class="text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
+    <h1 class="hero-heading text-3xl font-bold mb-2">{{ block.heading }}</h1>
+    <p class="hero-subheading text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
     <div class="hero-description mb-4" data-editable-field="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
-    <!-- Button with both data-editable-field and data-linkable-field -->
-    <a data-editable-field="buttonText" data-linkable-field="buttonLink"
-       :href="getUrl(block.buttonLink)"
-       class="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline">
+    <!-- Button - uses class for selectors -->
+    <a class="hero-button inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline"
+       :href="getUrl(block.buttonLink)">
       {{ block.buttonText }}
     </a>
   </div>
+  <!-- /hydra -->
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
     class="mt-6 mb-6"
@@ -138,8 +136,7 @@
 
   <div v-else-if="block['@type'] == 'teaser'"
     class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
-    :data-block-uid="block._blockUid || block_uid"
-    :data-block-readonly="block._blockUid ? true : undefined">
+    :data-block-uid="block._blockUid || block_uid">
     <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
     <!-- data-linkable-field prevents navigation in edit mode -->
     <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage" data-linkable-field="href">
@@ -151,7 +148,7 @@
       <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
       <!-- Title link is also linkable (clicking it shows link editor for href) -->
       <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
-      <!-- Note: data-block-readonly on parent handles disabling these for listing items -->
+      <!-- Note: listing items are marked readonly via comment syntax in AsyncListingBlock -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
@@ -425,7 +422,6 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue';
 import RichText from './richtext.vue';
-import Listing from './listing.vue'; // Used by search block
 
 const { block_uid, block, data, contained } = defineProps({
   block_uid: {

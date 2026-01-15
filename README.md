@@ -266,7 +266,7 @@ We include the hydra iframe bridge which creates a two way link between the hydr
   const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
   ```
 - To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
-- To see private content you will need to [change your authentication token]((#authenticate-frontend-to-access-private-content))
+- To see private content you will need to [change your authentication token]((#authenticatitee-frontend-to-access-private-content))
 
 This will enable an Editor to :-
 - browse in your frontend and Hydra will change context so AdminUI actions are on the current page you are seeing.
@@ -435,37 +435,45 @@ This will enable an Editor to :-
 - selecting a block in the sidebar will highlight that block on the frontend
 
 
-#### Alternative Comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113))
+#### Comment Syntax
 
-If you can't easily modify the markup (for example using a 3rd party component library) you can use the alternative comment syntax to specify which elements are editable.
-Use css selectors to specify which elements are editable. The selectors are applied just to the following element.
+If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
 
-e.g.
 ``` html
-<!-- hydra_block_uid:...; img:image; h2:title; .description:desc_field; div a:url  -->
-<div class="slide">
-  <img src="/big_news.jpg"/>
-  <h2>Big News</h2>
-  <div class="desciption">Check out <b>hydra</b>, it will change everything</div>
-  <div><a href="/big_news">Read more</a></div>
+<!-- hydra block-uid=block-123 editable-field=title(.card-title) media-field=url(img) linkable-field=href(a.link) -->
+<div class="third-party-card">
+  <h3 class="card-title">Title</h3>
+  <img src="image.jpg">
+  <a class="link" href="...">Read more</a>
 </div>
+<!-- /hydra -->
 ```
-- This will also support nested blocks (TODO)
+
+- Attributes without selectors apply to the root element: `block-uid=xxx`
+- Attributes with selectors target child elements: `editable-field=title(.card-title)`
+- Closing `<!-- /hydra -->` marks end of scope
+- Self-closing `<!-- hydra block-uid=xxx /-->` applies only to next sibling element
+
+Supported attributes: `block-uid`, `block-readonly`, `editable-field`, `linkable-field`, `media-field`, `block-add`
 
 
-#### Readonly Regions (data-block-readonly)
+#### Readonly Regions
 
-Add `data-block-readonly` to any element to disable inline editing for all fields inside it. Editable, linkable, and media fields within are ignored, and link clicks are prevented.
+Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
 
 ``` html
 <div class="teaser" data-block-uid="teaser-1">
   <div data-block-readonly>
-    <!-- Fields from linked target - not editable here -->
     <h2 data-editable-field="title">Target Page Title</h2>
   </div>
-  <!-- Teaser's own field - still editable -->
   <a data-linkable-field="href" href="/target">Read more</a>
 </div>
+```
+
+Or using comment syntax:
+``` html
+<!-- hydra block-readonly -->
+<div class="listing-item" data-block-uid="item-1">...</div>
 ```
 
 

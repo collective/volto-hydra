@@ -487,7 +487,8 @@
                     console.log('[TEST-FRONTEND] Bridge initialized, setting up change listener');
 
                     // Listen for changes from the admin UI and update blocks
-                    window.bridge.onEditChange((formData) => {
+                    // Return promise from async render so hydra.js can wait for DOM updates
+                    window.bridge.onEditChange(async (formData) => {
                         console.log('[TEST-FRONTEND] Bridge connected! Received form data:', formData);
 
                         // Update page title if provided
@@ -508,9 +509,10 @@
                         }
 
                         // Re-render content with updated data
+                        // Return promise so hydra.js can materialize comments after DOM is ready
                         if (formData.blocks && formData.blocks_layout) {
                             console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');
-                            renderContentWithListings(formData);
+                            return await renderContentWithListings(formData);
                         }
                     });
 

@@ -390,6 +390,10 @@ export class AdminUIHelper {
     // Use first() for multi-element blocks (multiple elements with same UID)
     const block = blockLocator.first();
 
+    // Wait for the element to be stable (not re-rendering) by checking it's attached
+    // Vue/Nuxt may re-render after hydration, causing element references to become stale
+    await expect(block).toBeAttached({ timeout: 5000 });
+
     // Scroll block into view inside the iframe first
     await block.scrollIntoViewIfNeeded();
 

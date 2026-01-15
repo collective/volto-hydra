@@ -182,6 +182,124 @@ export class Bridge {
   }
 
   /**
+   * Parse a hydra comment string into attributes and selectors.
+   * Format: "hydra attr=value attr attr=value(selector) /"
+   *
+   * @param {string} commentText - The comment text (without <!-- and -->)
+   * @returns {Object|null} Parsed attributes or null if not a hydra comment
+   */
+  parseHydraComment(commentText) {
+    const text = commentText.trim();
+    if (!text.startsWith('hydra ') && text !== 'hydra' && !text.startsWith('hydra/')) {
+      return null;
+    }
+
+    const isSelfClosing = text.endsWith('/');
+    const content = text.replace(/^hydra\s*/, '').replace(/\/$/, '').trim();
+
+    // Parse attribute=value or attribute=value(selector) patterns
+    // Supports multiple values for the same attribute (e.g., multiple editable-field)
+    const attrs = {};
+    // Match: word-name=value(selector) or word-name=value or word-name (boolean)
+    // Value can contain paths like /page-name
+    const attrRegex = /([\w-]+)(?:=([^(\s]+)(?:\(([^)]+)\))?)?/g;
+    let match;
+    while ((match = attrRegex.exec(content)) !== null) {
+      const [, name, value, selector] = match;
+      const entry = { value: value || true, selector: selector || null };
+      // Support multiple entries for the same attribute name
+      if (!attrs[name]) {
+        attrs[name] = [];
+      }
+      attrs[name].push(entry);
+    }
+
+    return { attrs, selfClosing: isSelfClosing };
+  }
+
+  /**
+   * Scan DOM for hydra comments and materialize attributes to elements.
+   * Converts comment-based hydra attributes to actual DOM attributes.
+   *
+   * Called after content changes to support comment syntax for third-party components.
+   */
+  materializeHydraComments() {
+    if (typeof document === 'undefined') return;
+
+    const treeWalker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_COMMENT,
+      null,
+      false
+    );
+
+    while (treeWalker.nextNode()) {
+      const comment = treeWalker.currentNode;
+      const text = comment.textContent.trim();
+
+      // Skip closing comments
+      if (text === '/hydra') continue;
+
+      // Check for hydra comment
+      const parsed = this.parseHydraComment(text);
+      if (!parsed) continue;
+
+      // Find the next element sibling (skip text nodes)
+      let nextElement = comment.nextSibling;
+      while (nextElement && nextElement.nodeType !== Node.ELEMENT_NODE) {
+        nextElement = nextElement.nextSibling;
+      }
+
+      if (!nextElement) continue;
+
+      // Apply attributes to the element
+      this.applyHydraAttributes(nextElement, parsed.attrs);
+    }
+
+    log('materializeHydraComments: completed');
+  }
+
+  /**
+   * Apply hydra attributes to an element and its children based on selectors.
+   *
+   * @param {HTMLElement} element - The root element
+   * @param {Object} attrs - Parsed attributes { name: [{ value, selector }, ...] }
+   */
+  applyHydraAttributes(element, attrs) {
+    const attrMap = {
+      'block-uid': 'data-block-uid',
+      'block-readonly': 'data-block-readonly',
+      'editable-field': 'data-editable-field',
+      'linkable-field': 'data-linkable-field',
+      'media-field': 'data-media-field',
+      'block-add': 'data-block-add',
+      'block-selector': 'data-block-selector',
+      'block-container': 'data-block-container',
+    };
+
+    for (const [name, entries] of Object.entries(attrs)) {
+      const domAttr = attrMap[name];
+      if (!domAttr) continue;
+
+      // Each attribute can have multiple entries (e.g., multiple editable-field)
+      for (const { value, selector } of entries) {
+        // Determine target element(s)
+        const targets = selector
+          ? element.querySelectorAll(selector)
+          : [element];
+
+        for (const target of targets) {
+          // Don't overwrite existing attributes
+          if (!target.hasAttribute(domAttr)) {
+            target.setAttribute(domAttr, value === true ? '' : value);
+            log('applyHydraAttributes:', domAttr, '=', value, 'to', target.tagName, selector ? `(${selector})` : '');
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Central method for receiving form data from Admin UI.
    * Sets both formData and lastReceivedFormData for echo detection.
    * All incoming data (INITIAL_DATA, FORM_DATA) should use this.
@@ -909,8 +1027,16 @@ export class Bridge {
               this.addNodeIdsToAllSlateFields();
 
               // Call onContentChange callback directly to trigger initial render
+              // Support async callbacks (e.g., renderContentWithListings)
               if (this.onContentChangeCallback) {
-                this.onContentChangeCallback(this.formData);
+                const result = this.onContentChangeCallback(this.formData);
+                // If callback is async, wait for it before materializing comments
+                const materialize = () => requestAnimationFrame(() => this.materializeHydraComments());
+                if (result && typeof result.then === 'function') {
+                  result.then(materialize);
+                } else {
+                  materialize();
+                }
               }
 
               // Restore block selection if provided (e.g., after in-page navigation)
@@ -1050,15 +1176,21 @@ export class Bridge {
             const formatRequestId = event.data.formatRequestId;
 
             // Call the callback first to trigger the re-render
+            // Support async callbacks (e.g., renderContentWithListings)
             log('Calling onEditChange callback to trigger re-render');
-            callback(this.formData);
+            const callbackResult = callback(this.formData);
 
+            // Run post-render code after callback completes (async or sync)
+            const afterRender = () => {
             // Restore cursor position after re-render (use requestAnimationFrame to ensure DOM is updated)
             // If the message includes a transformed Slate selection, use that
             // Otherwise fall back to the old DOM-based cursor saving approach
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                // Materialize hydra comments after DOM renders
+                this.materializeHydraComments();
+
                 // Mark empty blocks so they can be styled (must run on every render)
                 this.markEmptyBlocks();
 
@@ -1222,6 +1354,14 @@ export class Bridge {
                 this.replayBufferAndUnblock();
               });
             });
+            }; // End of afterRender function
+
+            // Call afterRender after callback completes (async or sync)
+            if (callbackResult && typeof callbackResult.then === 'function') {
+              callbackResult.then(afterRender);
+            } else {
+              afterRender();
+            }
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }

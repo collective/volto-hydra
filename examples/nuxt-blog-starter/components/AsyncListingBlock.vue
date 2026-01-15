@@ -21,9 +21,11 @@
             <template #default="{ items, paging: pagingResult, buildPagingUrl }">
               <!-- display:contents: children flow as grid items in parent grid -->
               <div style="display: contents">
-                <Block v-for="item in items" :key="item['@uid']"
-                       :block_uid="item['@uid']" :block="item" :data="data" :contained="true"
-                       class="grid-cell p-4" :class="gridCellClass" />
+                <template v-for="item in items" :key="item['@uid']">
+                  <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
+                  <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true"
+                         class="grid-cell p-4" :class="gridCellClass" />
+                </template>
               </div>
               <!-- Paging spans full width -->
               <nav v-if="pagingResult.totalPages > 1" aria-label="Grid Navigation" class="grid-paging mt-4 col-span-full">
@@ -82,8 +84,10 @@
           :paging-key="block_uid">
           <template #default="{ items, paging: pagingResult, buildPagingUrl }">
             <div class="expanded-items">
-              <Block v-for="item in items" :key="item['@uid']"
-                     :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+              <template v-for="item in items" :key="item['@uid']">
+                <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
+                <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+              </template>
             </div>
             <!-- Paging controls -->
             <nav v-if="pagingResult.totalPages > 1" aria-label="Listing Navigation" class="listing-paging mt-4">

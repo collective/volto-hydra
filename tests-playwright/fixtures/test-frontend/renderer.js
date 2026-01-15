@@ -127,8 +127,18 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
         case 'hero':
-            wrapper.innerHTML = renderHeroBlock(block);
-            break;
+            // Hero uses comment syntax instead of data attributes
+            // This tests the hydra comment parser with selectors
+            const heroFragment = document.createDocumentFragment();
+            // Comment specifies block-uid and field selectors
+            const heroComment = document.createComment(` hydra block-uid=${blockId} editable-field=heading(.hero-heading) editable-field=subheading(.hero-subheading) media-field=image(.hero-image) editable-field=buttonText(.hero-button) linkable-field=buttonLink(.hero-button) `);
+            heroFragment.appendChild(heroComment);
+            const heroEl = document.createElement('div');
+            heroEl.innerHTML = renderHeroBlockClean(block);
+            heroFragment.appendChild(heroEl.firstElementChild);
+            heroFragment.appendChild(document.createComment(' /hydra '));
+            return heroFragment;
+
         case 'columns':
             wrapper.innerHTML = await renderColumnsBlock(block);
             break;
@@ -421,13 +431,65 @@ function renderHeroBlock(block) {
 }
 
 /**
+ * Render a hero block WITHOUT data attributes (for comment syntax testing).
+ * Uses CSS classes instead of data-* attributes - hydra comment will add them.
+ * @param {Object} block - Hero block data
+ * @returns {string} HTML string
+ */
+function renderHeroBlockClean(block) {
+    const heading = block.heading || '';
+    const subheading = block.subheading || '';
+    const buttonText = block.buttonText || '';
+    const buttonLink = getLinkUrl(block.buttonLink);
+    const imageSrc = getImageUrl(block.image);
+    const description = block.description || [{ type: 'p', children: [{ text: '' }] }];
+
+    // Render subheading as textarea (preserve newlines)
+    const subheadingHtml = subheading.replace(/\n/g, '<br>');
+
+    // Render description - still needs node IDs for slate editing
+    let descriptionHtml = '';
+    description.forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        switch (node.type) {
+            case 'h1':
+                descriptionHtml += `<h1 class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</h1>`;
+                break;
+            case 'h2':
+                descriptionHtml += `<h2 class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</h2>`;
+                break;
+            case 'p':
+            default:
+                descriptionHtml += `<p class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</p>`;
+        }
+    });
+
+    // Image - uses class instead of data-media-field
+    const imageHtml = imageSrc
+        ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
+        : `<div class="hero-image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
+
+    // No data-* attributes on fields - comment syntax will add them via selectors
+    return `
+        <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
+            ${imageHtml}
+            <h1 class="hero-heading">${heading}</h1>
+            <p class="hero-subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
+            <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
+            <a class="hero-button" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+        </div>
+    `;
+}
+
+/**
  * Render a teaser block.
  * Shows placeholder when href is empty, content when href has value.
  * By default, shows target page title/description from href.
  * Only uses block.title/description when overwrite is true.
  *
- * Uses data-block-readonly for listing items (like Nuxt) instead of isEditable parameter.
- * hydra.js ignores editable/linkable fields inside readonly blocks.
+ * For listing items, hydra.js uses the readonly registry (set by expandListingBlocks)
+ * to determine if fields should be editable.
  *
  * @param {Object} block - Teaser block data
  * @param {string|null} blockUid - Block UID (null if inside a container with its own UID)
