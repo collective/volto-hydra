@@ -34,7 +34,7 @@
       "listing": {
         "results-listing": {
           "@type": "listing",
-          "itemType": "teaser",
+          "variation": "teaser",
           "fieldMapping": {
             "@id": "href",
             "title": "title",

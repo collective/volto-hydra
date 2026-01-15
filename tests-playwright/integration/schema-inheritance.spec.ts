@@ -10,7 +10,7 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Schema Inheritance - Listing Block Item Type', () => {
-  test('listing block shows itemType selector in sidebar', async ({ page }) => {
+  test('listing block shows variation selector in sidebar', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -23,12 +23,12 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     // Open Block tab
     await helper.openSidebarTab('Block');
 
-    // Verify itemType field exists
-    const hasItemTypeField = await helper.hasSidebarField('itemType');
+    // Verify variation field exists
+    const hasItemTypeField = await helper.hasSidebarField('variation');
     expect(hasItemTypeField).toBe(true);
   });
 
-  test('changing itemType from teaser to image updates frontend rendering', async ({ page }) => {
+  test('changing variation from teaser to image updates frontend rendering', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -52,26 +52,28 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const firstTeaser = teaserItems.first();
 
     // Check teaser has a title (from title field mapping)
-    const teaserTitle = firstTeaser.locator('h3');
+    // Test frontend uses h3, Nuxt uses h5
+    const teaserTitle = firstTeaser.locator(':is(h3, h4, h5, h6)').first();
     await expect(teaserTitle).toBeVisible();
     const titleText = await teaserTitle.textContent();
     expect(titleText).toBeTruthy();
 
     // Check teaser has a link with href (from @id field mapping)
+    // Test frontend uses absolute URLs, Nuxt uses relative
     const teaserLink = firstTeaser.locator('a').first();
     const teaserHref = await teaserLink.getAttribute('href');
     expect(teaserHref).toBeTruthy();
-    expect(teaserHref).toContain('http');
+    expect(teaserHref.length).toBeGreaterThan(1);
 
-    // Find the itemType field's React Select
-    const itemTypeField = page.locator('#sidebar-properties .field-wrapper-itemType');
-    await expect(itemTypeField).toBeVisible();
+    // Find the variation field's React Select
+    const variationField = page.locator('#sidebar-properties .field-wrapper-variation');
+    await expect(variationField).toBeVisible();
 
     // Verify current value is "Teaser"
-    await expect(itemTypeField.locator('.react-select__single-value')).toContainText('Teaser');
+    await expect(variationField.locator('.react-select__single-value')).toContainText('Teaser');
 
     // Click on the React Select control to open dropdown
-    const selectControl = itemTypeField.locator('.react-select__control');
+    const selectControl = variationField.locator('.react-select__control');
     await selectControl.click();
 
     // Wait for dropdown menu to appear
@@ -82,10 +84,18 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const imageOption = menu.locator('.react-select__option', { hasText: 'Image' });
     await imageOption.click();
 
-    // Wait for frontend to re-render with image type
+    // Wait for teasers to disappear first (confirms variation change is taking effect)
+    await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
+
+    // Then wait for image blocks to appear
     // Image blocks: element with data-block-uid contains <img data-media-field="url">
     const imageItems = iframe.locator(`[data-block-uid="${blockId}"] img[data-media-field="url"]`);
     await expect(imageItems.first()).toBeVisible({ timeout: 5000 });
+
+    // Verify no image editing overlay appears (listing items are readonly)
+    // The image-upload-widget-toolbar is the inline editing UI that shouldn't appear on readonly blocks
+    const imageOverlay = page.locator('.image-upload-widget-toolbar, .hydra-image-picker-inline');
+    await expect(imageOverlay).toHaveCount(0);
 
     // Verify field mapping worked - check that rendered images have correct data:
     // - Image src should have a URL (from image field mapping)
@@ -105,10 +115,8 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const imageLink = iframe.locator(`[data-block-uid="${blockId}"] a`).first();
     const linkHref = await imageLink.getAttribute('href');
     expect(linkHref).toBeTruthy();
-    expect(linkHref).toContain('http');
-
-    // Teaser blocks should no longer be visible (same element selector, no matches)
-    await expect(teaserItems).toHaveCount(0);
+    // Test frontend uses absolute URLs, Nuxt uses relative paths
+    expect(linkHref.length).toBeGreaterThan(1);
 
     // Verify toolbar doesn't show link/media buttons for readonly listing items
     // Click on one of the rendered image items to select it
@@ -176,20 +184,20 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     await mappingTable.locator('th', { hasText: 'Source' }).click();
     await menu.waitFor({ state: 'hidden', timeout: 1000 });
 
-    // Now change itemType to "image" and verify dropdown options change
-    const itemTypeField = page.locator('#sidebar-properties .field-wrapper-itemType');
-    const itemTypeSelect = itemTypeField.locator('.react-select__control');
-    await itemTypeSelect.click();
+    // Now change variation to "image" and verify dropdown options change
+    const variationField = page.locator('#sidebar-properties .field-wrapper-variation');
+    const variationSelect = variationField.locator('.react-select__control');
+    await variationSelect.click();
 
-    // Wait for itemType dropdown menu
-    const itemTypeMenu = page.locator('.react-select__menu');
-    await itemTypeMenu.waitFor({ state: 'visible', timeout: 3000 });
+    // Wait for variation dropdown menu
+    const variationMenu = page.locator('.react-select__menu');
+    await variationMenu.waitFor({ state: 'visible', timeout: 3000 });
 
     // Select "Image" option
-    await itemTypeMenu.locator('.react-select__option', { hasText: 'Image' }).click();
+    await variationMenu.locator('.react-select__option', { hasText: 'Image' }).click();
 
-    // Wait for itemType menu to close (confirms selection was made)
-    await itemTypeMenu.waitFor({ state: 'hidden', timeout: 3000 });
+    // Wait for variation menu to close (confirms selection was made)
+    await variationMenu.waitFor({ state: 'hidden', timeout: 3000 });
 
     // Verify smart defaults are recalculated for image block
     // The "Image" row should now show a mapped value (smart defaults for image type)

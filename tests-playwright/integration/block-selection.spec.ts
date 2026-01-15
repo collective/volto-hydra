@@ -334,7 +334,7 @@ test.describe('Block Selection', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Select listing block which has multiple settings (itemType, headline, querystring, fieldMapping)
+    // Select listing block which has multiple settings (variation, headline, querystring, fieldMapping)
     await helper.clickBlockInIframe('block-9-listing');
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
@@ -364,8 +364,8 @@ test.describe('Block Selection', () => {
       `Top of block settings should be visible. Settings top: ${settingsBox!.y}, Scroller top: ${scrollerBox!.y}`,
     ).toBe(true);
 
-    // Also verify the first field is visible (itemType for listing block)
-    const firstField = page.locator('#sidebar-properties .field-wrapper-itemType');
+    // Also verify the first field is visible (variation for listing block)
+    const firstField = page.locator('#sidebar-properties .field-wrapper-variation');
     await expect(firstField).toBeVisible({ timeout: 5000 });
   });
 

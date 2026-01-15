@@ -41,12 +41,12 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
     // We set this as the schema default so the form applies it when value is empty/invalid
     let effectiveMapping = formData?.[mappingField] || {};
     if (mappingField && schema.properties[mappingField]?.sourceFields) {
-      const validTargetFields = new Set(Object.keys(referencedSchema.properties));
+      const validTargetFields = Object.keys(referencedSchema.properties);
 
       // Check if current mapping is empty or has invalid target fields
       const hasMapping = Object.keys(effectiveMapping).length > 0;
       const hasInvalidTargets = Object.values(effectiveMapping).some(
-        (targetField) => targetField && !validTargetFields.has(targetField),
+        (targetField) => targetField && !new Set(validTargetFields).has(targetField),
       );
 
       if (!hasMapping || hasInvalidTargets) {
@@ -55,18 +55,27 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
           schema.properties[mappingField].sourceFields,
           referencedSchema,
         );
-        // Set as default on schema - form will apply this when rendering
-        schema = {
-          ...schema,
-          properties: {
-            ...schema.properties,
-            [mappingField]: {
-              ...schema.properties[mappingField],
-              default: effectiveMapping,
+      }
+
+      // Set propertyNames.enum (source fields) and additionalProperties.enum (target fields)
+      // This enables isValidValue to detect when mapping becomes invalid
+      const sourceFields = Object.keys(schema.properties[mappingField].sourceFields || {});
+      schema = {
+        ...schema,
+        properties: {
+          ...schema.properties,
+          [mappingField]: {
+            ...schema.properties[mappingField],
+            default: effectiveMapping,
+            propertyNames: {
+              enum: sourceFields,
+            },
+            additionalProperties: {
+              enum: validTargetFields,
             },
           },
-        };
-      }
+        },
+      };
     }
 
     // Get mapped fields (these won't be shown - they come from external data)
@@ -96,11 +105,15 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
         properties: { ...schema.properties },
       };
 
-      // Add fieldset for inherited fields
+      // Add fieldset for inherited fields (includes typeField at the start)
+      const inheritedFieldsetFields = inheritedFields.map((f) => f.name);
+      if (schema.properties[typeField]) {
+        inheritedFieldsetFields.unshift(typeField);
+      }
       newSchema.fieldsets.push({
         id: 'inherited_fields',
         title: `${referencedTitle} Defaults`,
-        fields: inheritedFields.map((f) => f.name),
+        fields: inheritedFieldsetFields,
       });
 
       // Add field definitions
@@ -353,6 +366,22 @@ function isValidValue(value, fieldDef) {
   // For allowedTypes (used by block_type widget)
   if (fieldDef.allowedTypes) {
     return fieldDef.allowedTypes.includes(value);
+  }
+
+  // For objects with propertyNames.enum - validate each property key
+  if (fieldDef.propertyNames?.enum && typeof value === 'object' && value !== null) {
+    const validKeys = new Set(fieldDef.propertyNames.enum);
+    if (!Object.keys(value).every((k) => validKeys.has(k))) {
+      return false;
+    }
+  }
+
+  // For objects with additionalProperties.enum - validate each property value
+  if (fieldDef.additionalProperties?.enum && typeof value === 'object' && value !== null) {
+    const validValues = new Set(fieldDef.additionalProperties.enum);
+    if (!Object.values(value).every((v) => !v || validValues.has(v))) {
+      return false;
+    }
   }
 
   // No validation constraints - value is valid

@@ -16,7 +16,7 @@
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <a v-if="block.href" :href="block.href" class="image-link" data-linkable-field="href">
+    <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-linkable-field="href">
       <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" :src="props.url" :width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
     </a>
@@ -25,7 +25,7 @@
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
-      <a v-if="block.href" :href="block.href" class="image-link" data-linkable-field="href">
+      <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-linkable-field="href">
         <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" :src="props.url" _width="props.width"
           :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       </a>
@@ -427,7 +427,7 @@ import { ref, watch, nextTick, computed } from 'vue';
 import RichText from './richtext.vue';
 import Listing from './listing.vue'; // Used by search block
 
-const { block_uid, block, data } = defineProps({
+const { block_uid, block, data, contained } = defineProps({
   block_uid: {
     type: String,
     required: true

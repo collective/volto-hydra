@@ -154,8 +154,9 @@ const applyConfig = (config) => {
     },
   };
 
-  // Configure listing block with itemType selector and field mapping
-  // Use schemaEnhancer to ADD our fields without breaking the existing schema
+  // Configure listing block to use variation as item type selector
+  // The existing variation field is repurposed to select the block type for rendering items
+  // expandListingBlocks reads from 'variation' field via itemTypeField option
   const existingListingSchemaEnhancer =
     config.blocks.blocksConfig.listing?.schemaEnhancer;
   config.blocks.blocksConfig.listing = {
@@ -168,45 +169,52 @@ const applyConfig = (config) => {
         schema = existingListingSchemaEnhancer(args);
       }
 
-      // Add itemType field to default fieldset (at the beginning)
-      if (!schema.properties.itemType) {
-        schema.properties.itemType = {
-          title: 'Item Type',
-          widget: 'block_type',
-          description: 'Block type used to render each item',
-          allowedTypes: ['teaser', 'image', 'card'],
-          default: 'teaser',
+      // Override variation field to use block_type widget with our allowed types
+      // This repurposes Volto's variation selector for item type selection
+      schema.properties.variation = {
+        ...schema.properties.variation,
+        title: 'Item Type',
+        widget: 'block_type',
+        description: 'Block type used to render each item',
+        allowedTypes: ['teaser', 'image', 'card'],
+        default: 'teaser',
+      };
+
+      // Remove variation from all fieldsets (moved to inherited_fields)
+      schema.fieldsets = schema.fieldsets.map((fs) => ({
+        ...fs,
+        fields: fs.fields.filter((f) => f !== 'variation'),
+      }));
+
+      // Remove b_size from querystring widget (paging handled by frontend)
+      if (schema.properties.querystring) {
+        schema.properties.querystring = {
+          ...schema.properties.querystring,
+          schemaEnhancer: ({ schema: qsSchema }) => ({
+            ...qsSchema,
+            fieldsets: qsSchema.fieldsets.map((fs) => ({
+              ...fs,
+              fields: fs.fields.filter((f) => f !== 'b_size'),
+            })),
+          }),
         };
-        // Add to beginning of default fieldset fields
-        const defaultFieldset = schema.fieldsets.find((fs) => fs.id === 'default');
-        if (defaultFieldset && !defaultFieldset.fields.includes('itemType')) {
-          defaultFieldset.fields.unshift('itemType');
-        }
       }
 
-      // Add fieldMapping field
+      // Add fieldMapping field (fieldset added after inheritSchemaFrom runs)
       if (!schema.properties.fieldMapping) {
         schema.properties.fieldMapping = {
           title: 'Field Mapping',
           widget: 'field_mapping',
           sourceFields: QUERY_RESULT_FIELDS,
-          targetTypeField: 'itemType',
+          targetTypeField: 'variation',
           description: 'Map query result fields to item block fields',
         };
-        // Add fieldMapping fieldset
-        if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
-          schema.fieldsets.push({
-            id: 'mapping',
-            title: 'Field Mapping',
-            fields: ['fieldMapping'],
-          });
-        }
       }
 
-      // Inject current itemType into fieldMapping widget props
-      // Use default if itemType isn't set yet (e.g., new block)
+      // Inject current variation (item type) into fieldMapping widget props
+      // Use default if variation isn't set yet (e.g., new block)
       const itemType =
-        formData?.itemType || schema.properties.itemType?.default || 'teaser';
+        formData?.variation || schema.properties.variation?.default || 'teaser';
       if (schema.properties.fieldMapping && itemType) {
         schema.properties.fieldMapping = {
           ...schema.properties.fieldMapping,
@@ -214,11 +222,23 @@ const applyConfig = (config) => {
         };
       }
 
-      // Run schema inheritance for the referenced block type
-      return inheritSchemaFrom('itemType', 'fieldMapping', 'itemDefaults')({
+      // Run schema inheritance for the referenced block type (uses variation field)
+      // This adds the inherited_fields fieldset (teaser defaults, etc.)
+      schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults')({
         ...args,
         schema,
       });
+
+      // Add fieldMapping fieldset AFTER inherited fields (so order is: variation, defaults, mapping)
+      if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
+        schema.fieldsets.push({
+          id: 'mapping',
+          title: 'Field Mapping',
+          fields: ['fieldMapping'],
+        });
+      }
+
+      return schema;
     },
   };
 
