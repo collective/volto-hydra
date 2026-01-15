@@ -7461,9 +7461,9 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * @param {string} [options.extraCriteria.sort_on] - Override sort field
  * @param {string} [options.extraCriteria.sort_order] - Override sort order ('ascending'|'descending')
  * @param {string|string[]} [options.extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
- * @returns {Promise<{blocks: Object, blocks_layout: Array, paging: Object}>}
- *   - blocks: Blocks with listings expanded to itemType blocks
- *   - blocks_layout: Updated layout with listing replaced by item block IDs
+ * @param {string} [options.itemTypeField='itemType'] - Field name to read item block type from (e.g., 'variation')
+ * @returns {Promise<{items: Array, paging: Object}>}
+ *   - items: Array of blocks, each with @uid (block ID for data-block-uid) and @type
  *   - paging: { currentPage, totalPages, totalItems, prev, next, pages }
  *
  * @example
@@ -7477,8 +7477,77 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * // Query result: { title: 'My Page', '@id': '/my-page', description: '...' }
  * // Output block: { '@type': 'teaser', headline: 'My Page', href: '/my-page', showImage: true }
  */
+
+/**
+ * Synchronous helper to pass through static blocks with @uid.
+ * Use for blocks without listings that render outside Suspense.
+ * Shares paging object with expandBlocks for combined paging.
+ *
+ * @param {Object} blocks - Map of blockId -> block data
+ * @param {Array} blocksLayout - Array of blockIds in order
+ * @param {Object} paging - Paging object { start, size, total, _seen } - mutated
+ * @returns {{ items: Array, paging: Object }} Items on current page + updated paging
+ */
+export function staticBlocks(blocks, blocksLayout, paging) {
+  const items = [];
+  const startingSeen = paging._seen;
+
+  for (const blockId of blocksLayout) {
+    const block = blocks[blockId];
+    if (block) {
+      paging._seen++;
+      // Only include items on current page
+      if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
+        items.push({ ...block, '@uid': blockId });
+      }
+    }
+  }
+
+  // Update total
+  paging.total += paging._seen - startingSeen;
+
+  // Compute paging UI values
+  computePagingUI(paging);
+
+  return { items, paging };
+}
+
+/**
+ * Internal helper to compute paging UI values.
+ */
+function computePagingUI(paging) {
+  const { start, size, total } = paging;
+  if (size && total) {
+    paging.currentPage = Math.floor(start / size);
+    paging.totalPages = Math.ceil(total / size);
+    paging.totalItems = total;
+
+    // Page number window (show ~5 pages centered on current)
+    const windowStart = Math.max(0, paging.currentPage - 2);
+    const windowEnd = Math.min(paging.totalPages, paging.currentPage + 3);
+    paging.pages = [];
+    for (let i = windowStart; i < windowEnd; i++) {
+      paging.pages.push({ start: i * size, page: i + 1 });
+    }
+
+    paging.prev = paging.currentPage > 0 ? paging.currentPage - 1 : null;
+    paging.next = paging.currentPage < paging.totalPages - 1 ? paging.currentPage + 1 : null;
+  }
+}
+
 export async function expandListingBlocks(blocks, blocksLayout, options) {
-  const { apiUrl, contextPath = '/', page = 0, pageSize = 10, fetcher, extraCriteria = {} } = options;
+  const {
+    apiUrl,
+    contextPath = '/',
+    paging: pagingIn,  // { start, size, total, _seen } - mutated to track position across calls
+    fetcher,
+    extraCriteria = {},
+    itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
+  } = options;
+
+  // Create default paging if not provided
+  const paging = pagingIn || { start: 0, size: 1000, total: 0, _seen: 0 };
+
   const headers = getAuthHeaders();
   headers['Content-Type'] = 'application/json';
 
@@ -7487,8 +7556,6 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     throw new Error('expandListingBlocks requires either apiUrl or fetcher option');
   }
 
-  const expandedBlocks = { ...blocks };
-  const newLayout = [];
   const listingResults = {}; // Store fetched results per listing
 
   // Find all listing blocks that need expansion and fetch in parallel
@@ -7537,14 +7604,24 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     })
   );
 
-  // Build new layout, replacing listings with item blocks
-  // Each item has unique key but shares _blockUid for multi-element selection
+  // Build items array - each item has @uid for the block_uid to use when rendering
+  const items = [];
+  const startingSeen = paging._seen;  // Track for updating total
+
+  // Helper to process an item through paging
+  const processItem = (item) => {
+    paging._seen++;
+    if (paging._seen <= paging.start) return;  // Before current page
+    if ((paging._seen - paging.start) > paging.size) return;  // Page is full
+    items.push(item);
+  };
+
   for (const blockId of blocksLayout) {
     const block = blocks[blockId];
 
     if (block?.['@type'] === 'listing' && listingResults[blockId]) {
-      const items = listingResults[blockId];
-      const itemType = block.itemType || 'teaser';
+      const queryResults = listingResults[blockId];
+      const itemType = block[itemTypeField] || 'teaser';
       const fieldMapping = block.fieldMapping || {};
 
       // Extract itemDefaults from flat keys (e.g., itemDefaults_overwrite -> overwrite)
@@ -7557,18 +7634,15 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
           itemDefaults[fieldName] = value;
         }
       }
-      console.log('[HYDRA] expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: items.length });
+      console.log('[HYDRA] expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
 
       // Convert each query result to a block of itemType
-      items.forEach((item, index) => {
-        const itemKey = `${blockId}-${index}`;
-
-        // Start with defaults, then apply mapped fields
+      // All expanded items share the same @uid (the listing block's ID)
+      for (const result of queryResults) {
         const itemBlock = {
+          '@uid': blockId,  // Block UID for data-block-uid attribute
           '@type': itemType,
           ...itemDefaults,
-          // _blockUid tells renderer what data-block-uid to use (multi-element)
-          _blockUid: blockId,
           // readOnly: Volto standard property - disables inline editing
           // hydra.js checks this in collectBlockFields() to skip all fields
           readOnly: true,
@@ -7581,51 +7655,39 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
 
           // Special handling for 'image' source - copy as catalog brain format
           // Volto's Image component uses: item['@id'], item.image_field, item.image_scales[field][0]
-          if (sourceField === 'image' && item.image_scales) {
+          if (sourceField === 'image' && result.image_scales) {
             // Set target field (e.g., preview_image) with catalog brain structure
             itemBlock[targetField] = {
-              '@id': item['@id'],
-              image_field: item.image_field || 'image',
-              image_scales: item.image_scales,
+              '@id': result['@id'],
+              image_field: result.image_field || 'image',
+              image_scales: result.image_scales,
             };
           }
           // Special handling for href field - wrap in array format expected by link fields
-          else if (targetField === 'href' && item[sourceField] !== undefined) {
-            itemBlock[targetField] = [{ '@id': item[sourceField] }];
+          else if (targetField === 'href' && result[sourceField] !== undefined) {
+            itemBlock[targetField] = [{ '@id': result[sourceField] }];
           }
           // Default: copy value as-is
-          else if (item[sourceField] !== undefined) {
-            itemBlock[targetField] = item[sourceField];
+          else if (result[sourceField] !== undefined) {
+            itemBlock[targetField] = result[sourceField];
           }
         }
 
-        expandedBlocks[itemKey] = itemBlock;
-        newLayout.push(itemKey);
-      });
-
-      // Remove the original listing block
-      delete expandedBlocks[blockId];
-    } else {
-      // Keep non-listing blocks as-is
-      newLayout.push(blockId);
+        processItem(itemBlock);
+      }
+    } else if (block) {
+      // Non-listing blocks: add with their own @uid
+      processItem({ ...block, '@uid': blockId });
     }
   }
 
-  // Calculate paging for the expanded layout
-  const totalElements = newLayout.length;
-  const startIdx = page * pageSize;
-  const endIdx = startIdx + pageSize;
-  const pagedLayout = newLayout.slice(startIdx, endIdx);
+  // Update paging total with items from this call
+  paging.total += paging._seen - startingSeen;
 
-  // Only include blocks that are in the paged layout
-  const pagedBlocks = {};
-  for (const blockId of pagedLayout) {
-    pagedBlocks[blockId] = expandedBlocks[blockId];
-  }
+  // Compute paging UI values
+  computePagingUI(paging);
 
-  const paging = calculatePaging(totalElements, pageSize, page);
-
-  return { blocks: pagedBlocks, blocks_layout: pagedLayout, paging };
+  return { items, paging };
 }
 
 // ============================================================================

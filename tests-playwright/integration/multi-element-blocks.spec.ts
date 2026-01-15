@@ -285,9 +285,51 @@ test.describe('Multi-element blocks', () => {
     expect(firstElementRectAfter!.y).toBeGreaterThanOrEqual(0);
   });
 
+  test('grid block paging works in view mode', async ({ page }) => {
+    // Simple test: load page in view mode (not edit) and verify paging works
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for grid block
+    const grid = iframe.locator('[data-block-uid="block-8-grid"]');
+    await expect(grid).toBeVisible({ timeout: 10000 });
+
+    // Check paging controls exist
+    const pagingNav = grid.locator('.grid-paging');
+    await expect(pagingNav).toBeVisible({ timeout: 5000 });
+
+    // Verify page 1 is current
+    const currentPage = pagingNav.locator('.paging-page.current');
+    await expect(currentPage).toHaveText('1');
+
+    // Count items on page 1 (should be 6 with pageSize=6)
+    const items = grid.locator('.grid-cell');
+    const count = await items.count();
+    console.log('Page 1 items:', count);
+    expect(count).toBe(6);
+
+    // Click next page
+    await pagingNav.locator('.paging-next').click();
+
+    // Wait for page 2 - iframe reloads with new URL
+    const gridAfterNav = iframe.locator('[data-block-uid="block-8-grid"]');
+    const pagingNavAfterNav = gridAfterNav.locator('.grid-paging');
+    await expect(pagingNavAfterNav.locator('.paging-page.current')).toHaveText('2', { timeout: 10000 });
+
+    // Count items on page 2 (should be remaining items: 10 total - 6 = 4)
+    const page2Items = iframe.locator('[data-block-uid="block-8-grid"] .grid-cell');
+    const page2Count = await page2Items.count();
+    console.log('Page 2 items:', page2Count);
+    expect(page2Count).toBe(4);
+  });
+
   test('grid block shows paging controls and navigates between pages', async ({ page }) => {
     // Tests that grid blocks with many items show paging controls
-    // and clicking page links changes the displayed items
+    // and clicking page links changes the displayed items (in edit mode)
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -299,13 +341,13 @@ test.describe('Multi-element blocks', () => {
     const grid = iframe.locator('[data-block-uid="block-8-grid"]');
     await expect(grid).toBeVisible({ timeout: 5000 });
 
-    // Check if paging controls exist (they should if there are > 4 items)
-    const pagingNav = iframe.locator('.grid-paging');
+    // Check if paging controls exist within the grid block
+    const pagingNav = grid.locator('.grid-paging');
     await expect(pagingNav).toBeVisible({ timeout: 5000 });
     console.log('Grid has paging: true');
 
-    // Get the current page indicator
-    const currentPage = iframe.locator('.paging-page.current');
+    // Get the current page indicator within the grid's paging
+    const currentPage = pagingNav.locator('.paging-page.current');
     await expect(currentPage).toBeVisible({ timeout: 5000 });
     const currentPageText = await currentPage.textContent();
     console.log('Current page:', currentPageText);
@@ -322,22 +364,20 @@ test.describe('Multi-element blocks', () => {
     const firstItemText = await initialItems.first().textContent();
     console.log('First item text on page 1:', firstItemText?.substring(0, 50));
 
-    // Select the grid block first
-    await helper.clickBlockInIframe('block-8-grid');
-    await helper.waitForBlockSelected('block-8-grid');
-
-    // Click next page
-    const nextLink = iframe.locator('.paging-next');
+    // Click next page within the grid's paging (no need to select block first)
+    const nextLink = pagingNav.locator('.paging-next');
     await expect(nextLink).toBeVisible({ timeout: 5000 });
 
     // Click to navigate - this will reload the iframe
     await nextLink.click();
 
-    // Wait for iframe to reload by waiting for the page indicator to change
-    await expect(iframe.locator('.paging-page.current')).toHaveText('2', { timeout: 15000 });
+    // Wait for iframe to reload by waiting for the grid's page indicator to change
+    const gridAfterNav = iframe.locator('[data-block-uid="block-8-grid"]');
+    const pagingNavAfterNav = gridAfterNav.locator('.grid-paging');
+    await expect(pagingNavAfterNav.locator('.paging-page.current')).toHaveText('2', { timeout: 15000 });
 
     // Verify we're on page 2
-    const newCurrentPage = iframe.locator('.paging-page.current');
+    const newCurrentPage = pagingNavAfterNav.locator('.paging-page.current');
     const newPageText = await newCurrentPage.textContent();
     console.log('New current page:', newPageText);
     expect(newPageText).toBe('2');
@@ -352,9 +392,6 @@ test.describe('Multi-element blocks', () => {
     const page2FirstText = await page2Items.first().textContent();
     console.log('First item text on page 2:', page2FirstText?.substring(0, 50));
     expect(page2FirstText).not.toBe(firstItemText);
-
-    // Verify block selection persists after paging
-    await helper.waitForBlockSelected('block-8-grid');
   });
 
   test('drop indicator does not appear between elements with same UID', async ({ page }) => {

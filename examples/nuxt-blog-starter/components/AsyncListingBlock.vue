@@ -1,0 +1,209 @@
+<template>
+  <!-- Grid blocks: single grid container, static + dynamic items flow together -->
+  <div v-if="isGridBlock" :data-block-uid="block_uid" :class="containerClass">
+    <div class="grid-row grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <!-- Static items render immediately (already processed through staticBlocks) -->
+      <Block v-for="item in staticItems" :key="item['@uid']"
+             :block_uid="item['@uid']" :block="item" :data="data" :contained="true"
+             class="grid-cell p-4" :class="gridCellClass" />
+
+      <!-- Dynamic blocks stream in via Suspense, display:contents makes them grid items -->
+      <!-- :key forces remount on page change for client-side navigation -->
+      <Suspense v-if="dynamicBlocksList.length" :key="`grid-${pageFromUrl}`">
+        <template #default>
+          <AsyncExpandedItems
+            :blocks="dynamicBlocksMap"
+            :layout="dynamicLayout"
+            :paging="makePaging()"
+            :api-url="apiUrl"
+            :context-path="contextPath"
+            :paging-key="block_uid">
+            <template #default="{ items, paging: pagingResult, buildPagingUrl }">
+              <!-- display:contents: children flow as grid items in parent grid -->
+              <div style="display: contents">
+                <Block v-for="item in items" :key="item['@uid']"
+                       :block_uid="item['@uid']" :block="item" :data="data" :contained="true"
+                       class="grid-cell p-4" :class="gridCellClass" />
+              </div>
+              <!-- Paging spans full width -->
+              <nav v-if="pagingResult.totalPages > 1" aria-label="Grid Navigation" class="grid-paging mt-4 col-span-full">
+                <ul class="inline-flex -space-x-px text-sm">
+                  <li v-if="pagingResult.prev !== null">
+                    <NuxtLink :to="buildPagingUrl(pagingResult.prev)" data-linkable-allow
+                      class="paging-prev flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-s-lg hover:bg-gray-100">
+                      Previous
+                    </NuxtLink>
+                  </li>
+                  <li v-for="page in pagingResult.pages" :key="page.page">
+                    <NuxtLink :to="buildPagingUrl(page.page - 1)" data-linkable-allow
+                      :class="['paging-page', pagingResult.currentPage === page.page - 1 ? 'current bg-blue-100' : 'bg-white']"
+                      class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 border border-gray-300 hover:bg-gray-100">
+                      {{ page.page }}
+                    </NuxtLink>
+                  </li>
+                  <li v-if="pagingResult.next !== null">
+                    <NuxtLink :to="buildPagingUrl(pagingResult.next)" data-linkable-allow
+                      class="paging-next flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100">
+                      Next
+                    </NuxtLink>
+                  </li>
+                </ul>
+              </nav>
+            </template>
+          </AsyncExpandedItems>
+        </template>
+        <template #fallback>
+          <!-- Skeleton items also use display:contents to flow in grid -->
+          <div style="display: contents" class="animate-pulse">
+            <div v-for="i in 3" :key="i" class="bg-gray-200 dark:bg-gray-700 h-48 rounded grid-cell"></div>
+          </div>
+        </template>
+      </Suspense>
+    </div>
+  </div>
+
+  <!-- Non-grid: sequential layout with streaming -->
+  <div v-else :data-block-uid="block_uid">
+    <!-- Static items render immediately -->
+    <Block v-for="item in staticItems" :key="item['@uid']"
+           :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+
+    <!-- Dynamic blocks stream in -->
+    <!-- :key forces remount on page change for client-side navigation -->
+    <Suspense v-if="dynamicBlocksList.length" :key="`listing-${pageFromUrl}`">
+      <template #default>
+        <AsyncExpandedItems
+          :blocks="dynamicBlocksMap"
+          :layout="dynamicLayout"
+          :paging="makePaging()"
+          :api-url="apiUrl"
+          :context-path="contextPath"
+          :paging-key="block_uid">
+          <template #default="{ items, paging: pagingResult, buildPagingUrl }">
+            <div class="expanded-items">
+              <Block v-for="item in items" :key="item['@uid']"
+                     :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+            </div>
+            <!-- Paging controls -->
+            <nav v-if="pagingResult.totalPages > 1" aria-label="Listing Navigation" class="listing-paging mt-4">
+              <ul class="inline-flex -space-x-px text-sm">
+                <li v-if="pagingResult.prev !== null">
+                  <NuxtLink :to="buildPagingUrl(pagingResult.prev)" data-linkable-allow
+                    class="paging-prev flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-s-lg hover:bg-gray-100">
+                    Previous
+                  </NuxtLink>
+                </li>
+                <li v-for="page in pagingResult.pages" :key="page.page">
+                  <NuxtLink :to="buildPagingUrl(page.page - 1)" data-linkable-allow
+                    :class="['paging-page', pagingResult.currentPage === page.page - 1 ? 'current bg-blue-100' : 'bg-white']"
+                    class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 border border-gray-300 hover:bg-gray-100">
+                    {{ page.page }}
+                  </NuxtLink>
+                </li>
+                <li v-if="pagingResult.next !== null">
+                  <NuxtLink :to="buildPagingUrl(pagingResult.next)" data-linkable-allow
+                    class="paging-next flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100">
+                    Next
+                  </NuxtLink>
+                </li>
+              </ul>
+            </nav>
+          </template>
+        </AsyncExpandedItems>
+      </template>
+      <template #fallback>
+        <div class="animate-pulse">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div v-for="i in 3" :key="i" class="bg-gray-200 dark:bg-gray-700 h-48 rounded"></div>
+          </div>
+        </div>
+      </template>
+    </Suspense>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import { staticBlocks } from '@hydra-js/hydra.js';
+
+const props = defineProps({
+  block_uid: { type: String, required: true },
+  block: { type: Object, required: true },
+  data: { type: Object, required: true },
+  apiUrl: { type: String, required: true },
+});
+
+// Block types that need async expansion
+const LISTING_TYPES = ['listing', 'gridBlock', 'search'];
+
+// Get context path from page data
+let contextPath = props.data['@id'] || '/';
+if (contextPath.startsWith('http')) {
+  contextPath = new URL(contextPath).pathname;
+}
+
+// Layout helpers
+const isGridBlock = props.block['@type'] === 'gridBlock';
+const containerClass = isGridBlock ? `mt-6 mb-6 bg-${props.block.styles?.backgroundColor || 'white'}-700` : '';
+const gridCellClass = isGridBlock ? `bg-${!props.block.styles?.backgroundColor ? 'grey' : 'white'}-700` : '';
+
+// Determine blocks and layout based on block type
+// For standalone listing: treat the block itself as the only item
+// For containers: use their children
+const isStandaloneListing = props.block['@type'] === 'listing';
+
+let allBlocks;
+if (isStandaloneListing) {
+  // Standalone listing - the block itself needs expansion
+  allBlocks = [{ id: props.block_uid, block: props.block }];
+} else {
+  // Container - get children
+  const blocks = props.block.blocks || props.block.listing || {};
+  const layout = props.block.blocks_layout?.items || props.block.listing_layout?.items || [];
+  allBlocks = layout.map(id => ({ id, block: blocks[id] })).filter(item => item.block);
+}
+
+// Split into static (before first listing) and dynamic (listing + after)
+let foundListing = false;
+const staticBlocksList = [];
+const dynamicBlocksList = [];
+
+for (const item of allBlocks) {
+  if (!foundListing && LISTING_TYPES.includes(item.block['@type'])) {
+    foundListing = true;
+  }
+  if (foundListing) {
+    dynamicBlocksList.push(item);
+  } else {
+    staticBlocksList.push(item);
+  }
+}
+
+// Convert to maps for the helpers
+const staticBlocksMap = Object.fromEntries(staticBlocksList.map(({ id, block }) => [id, block]));
+const staticLayout = staticBlocksList.map(({ id }) => id);
+const dynamicBlocksMap = Object.fromEntries(dynamicBlocksList.map(({ id, block }) => [id, block]));
+const dynamicLayout = dynamicBlocksList.map(({ id }) => id);
+
+// Reactive paging based on route query - enables client-side navigation
+const route = useRoute();
+const pageSize = 6;
+
+// Computed page number from URL - reacts to client-side navigation
+const pageFromUrl = computed(() => parseInt(route.query[`pg_${props.block_uid}`] || '0', 10));
+
+// Computed static items - recomputed when page changes
+const staticItems = computed(() => {
+  const paging = { start: pageFromUrl.value * pageSize, size: pageSize, total: 0, _seen: 0 };
+  const { items } = staticBlocks(staticBlocksMap, staticLayout, paging);
+  return items;
+});
+
+// Create fresh paging object for async component (called when component mounts/remounts)
+const makePaging = () => ({
+  start: pageFromUrl.value * pageSize,
+  size: pageSize,
+  total: 0,
+  _seen: staticBlocksList.length, // Account for static blocks already processed
+});
+</script>

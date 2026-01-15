@@ -119,25 +119,26 @@
             const baseOptions = { apiUrl: window.location.origin, contextPath, extraCriteria };
 
             // Set up expansion helper for container renderers
+            // Use 'variation' field for item type (matches Volto listing block schema)
+            // Returns { items, paging } where each item has @uid
+            // paging object: { start, size, total, _seen }
             window._expandListingBlocks = async (blocks, layout, containerId) => {
-                const pageSize = 6;
-                const page = pages[containerId] || 0;
-                return await expandListingBlocks(blocks, layout, { ...baseOptions, pageSize, page });
+                const size = 6;
+                const pageNum = pages[containerId] || 0;
+                const paging = { start: pageNum * size, size, total: 0, _seen: 0 };
+                return await expandListingBlocks(blocks, layout, { ...baseOptions, paging, itemTypeField: 'variation' });
             };
 
-            // Expand top-level listings only (containers handle their own)
-            const { blocks, blocks_layout } = await expandListingBlocks(
+            // Expand top-level listings - returns { items, paging }
+            // Each item has @uid (block ID to use for data-block-uid)
+            const { items } = await expandListingBlocks(
                 content.blocks,
                 content.blocks_layout?.items || [],
-                { ...baseOptions, pageSize: 1000, page: 0 }
+                { ...baseOptions, itemTypeField: 'variation' }
             );
 
-            // Render with expanded blocks
-            await renderContent({
-                ...content,
-                blocks,
-                blocks_layout: { items: blocks_layout }
-            });
+            // Render with expanded items
+            await renderContent({ ...content, items });
         }
 
         // Track page loads to detect double-loading issues (persisted in sessionStorage)

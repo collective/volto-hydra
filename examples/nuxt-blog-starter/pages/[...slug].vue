@@ -11,15 +11,26 @@
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
-                <section v-if="data.page?.blocks_layout" v-for="section in getSections(data.page)" :class="section.style">
-                    <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
-                        <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                            <div class="mx-auto" :class="{'max-w-4xl':block.block['@type'] != 'slider'}" v-for="block in section.blocks">
-                                <Block  :block_uid="block.id" :block="block.block" :data="data.page"></Block>
+
+                <!-- Render blocks - listing-type blocks use AsyncListingBlock which handles its own Suspense -->
+                <template v-if="data.page?.blocks_layout">
+                    <section v-for="section in getSections(data.page)" :class="section.style">
+                        <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
+                            <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
+                                <template v-for="block in section.blocks" :key="block.id">
+                                    <!-- Listing-type blocks: use AsyncListingBlock (handles its own Suspense internally) -->
+                                    <div v-if="isListingType(block.block['@type'])" class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
+                                        <AsyncListingBlock :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl" />
+                                    </div>
+                                    <!-- Static blocks: render immediately -->
+                                    <div v-else class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
+                                        <Block :block_uid="block.id" :block="block.block" :data="data.page"></Block>
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
+                </template>
 
                 <div v-else-if="data?.page">
                     <h1>{{ data.page?.title }}</h1>
@@ -55,115 +66,24 @@
 
 <script setup>
 
-import { initBridge, expandListingBlocks } from '@hydra-js/hydra.js';
+import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
 const adminUrl = runtimeConfig.public.adminUrl;
 const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
 
-// Container field definitions by block type
-// Each entry defines which fields contain child blocks or object_list items
-const CONTAINER_FIELDS = {
-  gridBlock: [{ field: 'blocks', layout: 'blocks_layout', paged: true }],
-  columns: [
-    { field: 'top_images', layout: 'top_images_layout' },
-    { field: 'columns', layout: 'columns_layout', nestedContainers: true }
-  ],
-  column: [{ field: 'blocks', layout: 'blocks_layout' }],
-  accordion: [{ field: 'content', layout: 'content_layout' }],
-  search: [
-    { field: 'listing', layout: 'listing_layout', useSearchCriteria: true },
-    { field: 'facets', objectList: true }
-  ],
-  slider: [{ field: 'slides', objectList: true }],
-  slateTable: [{ field: 'table.rows', objectList: true }],
-  table: [{ field: 'table.rows', objectList: true }],
-};
+// Block types that require async expansion (contain listings or queries)
+// Each gets its own Suspense at page level; inside containers they share paging
+const LISTING_BLOCK_TYPES = ['listing', 'gridBlock', 'search'];
 
-// Recursively expand all listing and search blocks in a block tree
-// Uses `pages` and `searchCriteria` from outer scope (parsed from URL)
-async function expandAllListings(blocks, blocksLayout, options) {
-  if (!blocks || !blocksLayout) return { blocks, blocks_layout: blocksLayout };
-
-  // Expand listings at this level (converts to teasers)
-  const { blocks: expandedBlocks, blocks_layout: newLayout } = await expandListingBlocks(
-    blocks, blocksLayout, { ...options, pageSize: 1000, page: 0 }
-  );
-
-  // Process each block's container fields based on its type
-  for (const blockId of newLayout) {
-    const block = expandedBlocks[blockId];
-    if (!block) continue;
-
-    const blockType = block['@type'];
-    const containerDefs = CONTAINER_FIELDS[blockType];
-    if (!containerDefs) continue;
-
-    for (const def of containerDefs) {
-      const childBlocks = block[def.field];
-      const childLayout = block[def.layout]?.items;
-      if (!childBlocks || !childLayout?.length) continue;
-
-      if (def.nestedContainers) {
-        // Each child is itself a container (e.g., columns -> column)
-        const expandedChildren = {};
-        for (const [childId, child] of Object.entries(childBlocks)) {
-          if (child.blocks && child.blocks_layout?.items) {
-            const result = await expandAllListings(child.blocks, child.blocks_layout.items, options);
-            expandedChildren[childId] = {
-              ...child,
-              blocks: result.blocks,
-              blocks_layout: { items: result.blocks_layout }
-            };
-          } else {
-            expandedChildren[childId] = child;
-          }
-        }
-        expandedBlocks[blockId] = { ...expandedBlocks[blockId], [def.field]: expandedChildren };
-      } else {
-        // Expand child blocks, optionally with search criteria
-        const expandOptions = def.useSearchCriteria
-          ? { ...options, extraCriteria: searchCriteria, pageSize: 1000, page: 0 }
-          : { ...options, pageSize: 1000, page: 0 };
-
-        const { blocks: expanded, blocks_layout: layout, paging } = def.useSearchCriteria
-          ? await expandListingBlocks(childBlocks, childLayout, expandOptions)
-          : await expandAllListings(childBlocks, childLayout, options);
-
-        // Apply paging if configured
-        let finalLayout = def.useSearchCriteria ? layout : expanded.blocks_layout || layout;
-        let pagingInfo = null;
-
-        if (def.paged) {
-          const pageSize = block.pageSize || 6;
-          const currentPage = pages[blockId] || 0;
-          const allItems = finalLayout;
-          const totalItems = allItems.length;
-          const totalPages = Math.ceil(totalItems / pageSize);
-          const startIdx = currentPage * pageSize;
-          finalLayout = allItems.slice(startIdx, startIdx + pageSize);
-          pagingInfo = totalPages > 1 ? {
-            currentPage, totalPages, totalItems, pageSize,
-            prev: currentPage > 0 ? currentPage - 1 : null,
-            next: currentPage < totalPages - 1 ? currentPage + 1 : null,
-            pages: Array.from({ length: totalPages }, (_, i) => ({ page: i + 1, start: i }))
-              .slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 3))
-          } : null;
-        }
-
-        expandedBlocks[blockId] = {
-          ...expandedBlocks[blockId],
-          [def.field]: def.useSearchCriteria ? expanded : expanded.blocks || expanded,
-          [def.layout]: { items: finalLayout },
-          ...(pagingInfo && { _paging: pagingInfo }),
-          ...(def.useSearchCriteria && paging?.totalPages > 1 && { _paging: paging })
-        };
-      }
-    }
-  }
-
-  return { blocks: expandedBlocks, blocks_layout: newLayout };
+/**
+ * Check if a block type requires async expansion.
+ * @param {string} blockType - The @type of the block
+ * @returns {boolean}
+ */
+function isListingType(blockType) {
+  return LISTING_BLOCK_TYPES.includes(blockType);
 }
 
 // initialize components based on data attribute selectors
@@ -378,23 +298,10 @@ onMounted(() => {
                 // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
                 pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
             });
-            bridge.onEditChange(async (page) => {
+            bridge.onEditChange((page) => {
                 if (page) {
-                    // Expand listings in the updated page data
-                    if (page.blocks && page.blocks_layout?.items) {
-                        let contextPath = page['@id'] || '/';
-                        if (contextPath.startsWith('http')) {
-                            contextPath = new URL(contextPath).pathname;
-                        }
-                        const expanded = await expandAllListings(
-                            page.blocks,
-                            page.blocks_layout.items,
-                            { apiUrl, contextPath },
-                            pages  // Pass page numbers from URL
-                        );
-                        page.blocks = expanded.blocks;
-                        page.blocks_layout = { items: expanded.blocks_layout };
-                    }
+                    // Update page data - AsyncListingBlock components will
+                    // re-render and expand listings via their own Suspense
                     data.value.page = page;
                 }
             });
@@ -416,33 +323,6 @@ for (var part of route.params.slug) {
     }
 }
 
-// Parse search criteria from URL query params
-// Supports: SearchableText, sort_on, sort_order, facet.* (e.g., facet.portal_type)
-function getSearchCriteriaFromUrl() {
-  const criteria = {};
-  const query = route.query;
-
-  if (query.SearchableText) {
-    criteria.SearchableText = query.SearchableText;
-  }
-  if (query.sort_on) {
-    criteria.sort_on = query.sort_on;
-  }
-  if (query.sort_order) {
-    criteria.sort_order = query.sort_order;
-  }
-  // Collect facet.* params
-  for (const [key, value] of Object.entries(query)) {
-    if (key.startsWith('facet.')) {
-      criteria[key] = value;
-    }
-  }
-
-  return criteria;
-}
-
-const searchCriteria = getSearchCriteriaFromUrl();
-
 // retrieve the data associated with an article
 // based on its slug
 const { data, error } = await ploneApi({
@@ -450,21 +330,8 @@ const { data, error } = await ploneApi({
   pages: pages
 });
 
-// Expand all listing blocks to teasers for multi-element support
-if (data.value?.page?.blocks && data.value?.page?.blocks_layout?.items) {
-  let contextPath = data.value.page['@id'] || '/';
-  if (contextPath.startsWith('http')) {
-    contextPath = new URL(contextPath).pathname;
-  }
-  const expanded = await expandAllListings(
-    data.value.page.blocks,
-    data.value.page.blocks_layout.items,
-    { apiUrl, contextPath },
-    pages  // Pass page numbers from URL
-  );
-  data.value.page.blocks = expanded.blocks;
-  data.value.page.blocks_layout = { items: expanded.blocks_layout };
-}
+// Note: Listing expansion is now handled by AsyncListingBlock component
+// which uses Suspense for streaming SSR
 
 useSeoMeta({
   ogTitle: data.page?.title,

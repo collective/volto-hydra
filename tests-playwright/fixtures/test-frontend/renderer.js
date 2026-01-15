@@ -25,13 +25,30 @@ const sliderSlideCount = {};
 
 /**
  * Extract URL from various formats and construct image URL.
- * Handles: array of objects [{@id: '/path'}], object {@id: '/path'}, or string '/path'
- * Adds @@images/image suffix for Plone paths.
+ * Handles:
+ * - Catalog brain: { '@id': '/path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
+ * - Array: [{ '@id': '/path' }]
+ * - Object: { '@id': '/path' }
+ * - String: '/path'
  * @param {Array|Object|string} value - Image value in various formats
  * @returns {string} Image URL ready for src attribute
  */
 function getImageUrl(value) {
     if (!value) return '';
+
+    // Handle catalog brain format from expandListingBlocks
+    // { '@id': '/content-path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
+    if (value.image_scales && value.image_field) {
+        const field = value.image_field;
+        const scales = value.image_scales[field];
+        if (scales?.[0]?.download) {
+            // download is relative like "@@images/image-800-hash.svg"
+            // Prepend the content @id to make it absolute
+            const baseUrl = value['@id'] || '';
+            return `${baseUrl}/${scales[0].download}`;
+        }
+    }
+
     // Extract @id from array or object format
     let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
     if (typeof url !== 'string') return '';
@@ -57,7 +74,7 @@ function getLinkUrl(value) {
 
 /**
  * Render content blocks to the DOM.
- * @param {Object} content - Content object with blocks and blocks_layout
+ * @param {Object} content - Content object with items array (each item has @uid and @type)
  */
 async function renderContent(content) {
     // Increment render counter
@@ -68,18 +85,15 @@ async function renderContent(content) {
     const container = document.getElementById('content');
     container.innerHTML = '';
 
-    const { blocks, blocks_layout } = content;
-    if (!blocks_layout) {
+    const { items } = content;
+    if (!items) {
         // Expected for non-block content types (Image, File, etc.)
         return;
     }
-    const items = blocks_layout.items || [];
 
-    for (const blockId of items) {
-        const block = blocks[blockId];
-        if (!block) continue;
-
-        const blockElement = await renderBlock(blockId, block);
+    for (const item of items) {
+        // Pass @uid as blockId - this becomes data-block-uid
+        const blockElement = await renderBlock(item['@uid'], item);
         if (blockElement) {
             container.appendChild(blockElement);
         }
@@ -88,16 +102,13 @@ async function renderContent(content) {
 
 /**
  * Render a single block.
- * @param {string} blockId - Block UUID
+ * @param {string} blockId - Block UID (used for data-block-uid attribute)
  * @param {Object} block - Block data
  * @returns {Promise<HTMLElement>} Rendered block element
  */
 async function renderBlock(blockId, block) {
-    // Use _blockUid if present (for multi-element blocks like expanded listings)
-    const uid = block._blockUid || blockId;
-
     const wrapper = document.createElement('div');
-    wrapper.setAttribute('data-block-uid', uid);
+    wrapper.setAttribute('data-block-uid', blockId);
 
     switch (block['@type']) {
         case 'slate':
@@ -151,7 +162,7 @@ async function renderBlock(blockId, block) {
         case 'teaser':
             // Teaser handles its own data-block-uid, so return it directly
             const teaserEl = document.createElement('div');
-            teaserEl.innerHTML = renderTeaserBlock(block, uid);
+            teaserEl.innerHTML = renderTeaserBlock(block, blockId);
             return teaserEl.firstElementChild;
         // Note: listing blocks are expanded by expandListingBlocks() into individual
         // teaser/image blocks BEFORE rendering, so 'listing' case should never be hit
@@ -449,12 +460,6 @@ function renderTeaserBlock(block, blockUid) {
     // Only add data-block-uid if blockUid is provided (not when inside a container that already has it)
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
-    // Add data-block-readonly when:
-    // - block._blockUid is set (listing item), OR
-    // - block.overwrite is false/undefined (fields not customizable)
-    // hydra.js ignores editable/linkable fields inside readonly blocks
-    const isReadonly = block._blockUid || !block.overwrite;
-    const readonlyAttr = isReadonly ? 'data-block-readonly' : '';
 
     // If href is empty, show placeholder for starter UI (only for standalone teasers)
     if (!href && blockUid) {
@@ -472,7 +477,7 @@ function renderTeaserBlock(block, blockUid) {
 
     // Always include editable/linkable attributes - hydra.js respects data-block-readonly
     return `
-        <div ${blockUidAttr} ${readonlyAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+        <div ${blockUidAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
             <a href="${href || '#'}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
                 <h3 data-editable-field="title" style="margin: 0;">${title}</h3>
@@ -489,6 +494,7 @@ function renderTeaserBlock(block, blockUid) {
  * @returns {string} HTML string
  */
 function renderImageBlock(block) {
+    console.log('[TEST-FRONTEND] renderImageBlock:', { url: block.url, type: typeof block.url, hasImageScales: !!block.url?.image_scales });
     const imageSrc = getImageUrl(block.url);
     // Volto's image block uses 'placeholder' for alt text, not 'alt'
     const alt = block.placeholder || block.alt || '';
@@ -595,10 +601,8 @@ async function renderColumnContent(column, columnId) {
         const block = blocks[blockId];
         if (!block) continue;
 
-        const uid = block._blockUid || blockId;
-
         // Render nested content block with data-block-uid and data-block-add="bottom"
-        html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+        html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
 
         // Render inner content based on block type
         switch (block['@type']) {
@@ -644,21 +648,25 @@ async function renderGridBlock(block, blockId) {
     let paging = block._paging;
 
     // Expand nested listings if expansion function is available
+    // expandListingBlocks returns { items, paging } where each item has @uid
+    // paging includes computed UI values: currentPage, totalPages, pages, prev, next
+    let expandedItems = null;
     if (window._expandListingBlocks) {
         const result = await window._expandListingBlocks(blocks, items, blockId);
-        blocks = result.blocks;
-        items = result.blocks_layout;
+        expandedItems = result.items;
         paging = result.paging?.totalPages > 1 ? result.paging : null;
     }
 
     let html = '<div class="grid-row" style="display: flex; flex-wrap: wrap; gap: 20px;">';
 
-    for (const itemId of items) {
-        const childBlock = blocks[itemId];
+    // Use expanded items if available, otherwise fall back to original blocks
+    const itemsToRender = expandedItems || items.map(id => ({ ...blocks[id], '@uid': id }));
+
+    for (const childBlock of itemsToRender) {
         if (!childBlock) continue;
 
-        // Use _blockUid if present (for multi-element blocks like expanded listings)
-        const uid = childBlock._blockUid || itemId;
+        // Use @uid from block for data-block-uid
+        const uid = childBlock['@uid'];
 
         // All grid cells have data-block-uid so clicking anywhere in the cell selects the block
         html += `<div data-block-uid="${uid}" class="grid-cell" style="flex: 0 0 calc(25% - 15px); padding: 10px; border: 1px dashed #999;">`;
@@ -940,8 +948,7 @@ async function renderAccordionBlock(block, blockId) {
     for (const childId of contentItems) {
         const childBlock = content[childId];
         if (childBlock) {
-            const uid = childBlock._blockUid || childId;
-            html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
             switch (childBlock['@type']) {
                 case 'slate':
                     html += renderNestedSlateBlock(childBlock);
@@ -1101,16 +1108,16 @@ async function renderSearchBlock(block, blockId) {
     html += '<div class="search-results" style="display: grid; gap: 15px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">';
 
     // Expand listing blocks if we have the helper
+    // expandListingBlocks returns { items, paging } where each item has @uid
     if (window._expandListingBlocks && listingLayout.length > 0) {
         const result = await window._expandListingBlocks(listing, listingLayout, `${blockId}-listing`);
-        const expandedBlocks = result.blocks;
-        const expandedLayout = result.blocks_layout;
+        const expandedItems = result.items;
 
-        for (const childId of expandedLayout) {
-            const childBlock = expandedBlocks[childId];
+        for (const childBlock of expandedItems) {
             if (!childBlock) continue;
 
-            const uid = childBlock._blockUid || childId;
+            // Use @uid from block for data-block-uid
+            const uid = childBlock['@uid'];
             html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
 
             switch (childBlock['@type']) {
