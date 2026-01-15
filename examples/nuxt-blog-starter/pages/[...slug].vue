@@ -23,8 +23,9 @@
                                         <AsyncListingBlock :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl" />
                                     </div>
                                     <!-- Static blocks: render immediately -->
+                                    <!-- Pass apiUrl for search blocks that contain async listing children -->
                                     <div v-else class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
-                                        <Block :block_uid="block.id" :block="block.block" :data="data.page"></Block>
+                                        <Block :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl"></Block>
                                     </div>
                                 </template>
                             </div>
@@ -75,7 +76,9 @@ const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUr
 
 // Block types that require async expansion (contain listings or queries)
 // Each gets its own Suspense at page level; inside containers they share paging
-const LISTING_BLOCK_TYPES = ['listing', 'gridBlock', 'search'];
+// Note: 'search' blocks render via Block.vue which has the proper search UI (headline, facets)
+// The listing child inside search will be rendered by Block recursively
+const LISTING_BLOCK_TYPES = ['listing', 'gridBlock'];
 
 /**
  * Check if a block type requires async expansion.

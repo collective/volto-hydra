@@ -139,7 +139,7 @@ const props = defineProps({
 });
 
 // Block types that need async expansion
-const LISTING_TYPES = ['listing', 'gridBlock', 'search'];
+const LISTING_TYPES = ['listing', 'gridBlock'];
 
 // Get context path from page data
 let contextPath = props.data['@id'] || '/';

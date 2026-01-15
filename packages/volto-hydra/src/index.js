@@ -276,7 +276,7 @@ const applyConfig = (config) => {
           type: 'blocks', // Required for blockPathMap traversal
           description: 'Listing block to render search results',
           allowedBlocks: ['listing', 'teaser'],
-          maxItems: 1,
+          maxLength: 1,
           defaultBlockType: 'listing',
         };
         schema.properties.listing_layout = {

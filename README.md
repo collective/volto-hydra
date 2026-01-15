@@ -476,6 +476,14 @@ Or using comment syntax:
 <div class="listing-item" data-block-uid="item-1">...</div>
 ```
 
+#### Allowed Navigation (data-linkable-allow)
+
+Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
+
+``` html
+<a href="/page?pg=2" data-linkable-allow>Next</a>
+<select data-linkable-allow @change="handleFilter">...</select>
+```
 
 ### Level 4: Enable Realtime changes while editing and preview Block controls
 

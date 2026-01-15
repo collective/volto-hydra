@@ -280,6 +280,7 @@
        teaser/image blocks BEFORE rendering, so 'listing' case should never be hit -->
 
   <!-- Search block: container with facets (object_list) and listing child -->
+  <!-- Variations: facetsLeftSide, facetsRightSide, facetsTopSide (default) -->
   <div v-else-if="block['@type'] == 'search'" :data-block-uid="block_uid" class="search-block">
     <!-- Headline -->
     <h2 v-if="block.headline" data-editable-field="headline" class="text-2xl font-bold mb-4">{{ block.headline }}</h2>
@@ -296,62 +297,108 @@
       </form>
     </div>
 
-    <!-- Sort options -->
-    <div v-if="block.showSortOn && block.sortOnOptions?.length" class="search-sort mb-4">
-      <label class="text-sm text-gray-600 mr-2">Sort by:</label>
-      <select class="px-3 py-1 border border-gray-300 rounded" @change="handleSortChange">
-        <option v-for="opt in block.sortOnOptions" :key="opt" :value="opt">{{ opt }}</option>
-      </select>
-    </div>
-
-    <!-- Facets (rendered from object_list - each has data-block-uid for selection) -->
-    <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg">
-      <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
-           :data-block-uid="facet['@id']" data-block-add="bottom"
-           class="facet-item mb-3 p-3 border border-gray-200 rounded cursor-pointer hover:bg-gray-100">
-        <div data-editable-field="title" class="facet-label font-medium">{{ facet.title }}</div>
-        <div class="facet-field text-sm text-gray-500">Field: {{ getFacetField(facet) }}</div>
-        <!-- Render facet widget based on type -->
-        <template v-if="facet.type === 'selectFacet'">
-          <select class="facet-select w-full mt-2 px-3 py-2 border border-gray-300 rounded"
-                  :data-field="getFacetField(facet)" @change="handleFacetSelectChange">
-            <option value="">Select...</option>
-            <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">
-              {{ opt.title }}
-            </option>
-          </select>
-        </template>
-        <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
-          <div class="facet-checkboxes mt-2">
-            <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 mb-1">
-              <input type="checkbox" :value="opt.value"
-                     class="facet-checkbox rounded border-gray-300"
-                     :data-field="getFacetField(facet)"
-                     :checked="isFacetChecked(facet, opt.value)"
-                     @change="handleFacetCheckboxChange" />
-              {{ opt.title }}
-            </label>
-          </div>
-        </template>
-        <div v-else class="text-xs text-gray-400 mt-1">No options available</div>
+    <!-- Facets on top (default or facetsTopSide) -->
+    <template v-if="!block.variation || block.variation === 'facetsTopSide'">
+      <!-- Facets horizontal -->
+      <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
+        <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
+             :data-block-uid="facet['@id']" data-block-add="right"
+             class="facet-item p-3 border border-gray-200 rounded min-w-48">
+          <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+          <template v-if="facet.type === 'selectFacet'">
+            <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                    :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
+              <option value="">Select...</option>
+              <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
+            </select>
+          </template>
+          <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
+            <div class="facet-checkboxes space-y-1" data-linkable-allow>
+              <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
+                <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
+                       :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
+                       @change="handleFacetCheckboxChange" />
+                {{ opt.title }}
+              </label>
+            </div>
+          </template>
+        </div>
       </div>
-    </div>
 
-    <!-- Total results (from listing child's expanded results) -->
-    <p v-if="block.showTotalResults && getListingTotalResults(block)" class="text-gray-600 mb-4">
-      {{ getListingTotalResults(block) }} results
-    </p>
+      <!-- Sort and results count -->
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <p v-if="block.showTotalResults && getListingTotalResults(block)" class="text-gray-600">
+          {{ getListingTotalResults(block) }} results
+        </p>
+        <div v-if="block.showSortOn && block.sortOnOptions?.length" class="search-sort">
+          <label class="text-sm text-gray-600 mr-2">Sort by:</label>
+          <select class="px-3 py-1 border border-gray-300 rounded text-sm" @change="handleSortChange" data-linkable-allow>
+            <option v-for="opt in block.sortOnOptions" :key="opt" :value="opt">{{ opt }}</option>
+          </select>
+        </div>
+      </div>
 
-    <!-- Listing container - renders via existing listing/teaser logic -->
-    <div class="search-results">
-      <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
-        <Block v-if="block.listing?.[uid]"
-          :block_uid="uid"
-          :block="block.listing[uid]"
-          :data="data"
-          :contained="true" />
-      </template>
-    </div>
+      <!-- Results -->
+      <div class="search-results">
+        <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
+          <AsyncListingBlock v-if="block.listing?.[uid]" :block_uid="uid" :block="block.listing[uid]"
+            :data="data" :api-url="apiUrl" />
+        </template>
+      </div>
+    </template>
+
+    <!-- Facets on left or right side -->
+    <template v-else-if="block.variation === 'facetsLeftSide' || block.variation === 'facetsRightSide'">
+      <div class="flex flex-col md:flex-row gap-6" :class="{ 'md:flex-row-reverse': block.variation === 'facetsRightSide' }">
+        <!-- Sidebar: facets -->
+        <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
+          <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
+            <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
+            <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
+                 :data-block-uid="facet['@id']" data-block-add="bottom"
+                 class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+              <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+              <template v-if="facet.type === 'selectFacet'">
+                <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
+                  <option value="">Select...</option>
+                  <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
+                </select>
+              </template>
+              <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
+                <div class="facet-checkboxes space-y-1" data-linkable-allow>
+                  <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
+                           :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
+                           @change="handleFacetCheckboxChange" />
+                    {{ opt.title }}
+                  </label>
+                </div>
+              </template>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main: results -->
+        <div class="search-results flex-1">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <p v-if="block.showTotalResults && getListingTotalResults(block)" class="text-gray-600">
+              {{ getListingTotalResults(block) }} results
+            </p>
+            <div v-if="block.showSortOn && block.sortOnOptions?.length" class="search-sort">
+              <label class="text-sm text-gray-600 mr-2">Sort by:</label>
+              <select class="px-3 py-1 border border-gray-300 rounded text-sm" @change="handleSortChange" data-linkable-allow>
+                <option v-for="opt in block.sortOnOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+          </div>
+          <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
+            <AsyncListingBlock v-if="block.listing?.[uid]" :block_uid="uid" :block="block.listing[uid]"
+              :data="data" :api-url="apiUrl" />
+          </template>
+        </div>
+      </div>
+    </template>
   </div>
 
   <template v-else-if="block['@type'] == 'heading'" :data-block-uid="block_uid">
@@ -423,7 +470,7 @@
 import { ref, watch, nextTick, computed } from 'vue';
 import RichText from './richtext.vue';
 
-const { block_uid, block, data, contained } = defineProps({
+const { block_uid, block, data, contained, apiUrl } = defineProps({
   block_uid: {
     type: String,
     required: true
@@ -438,6 +485,10 @@ const { block_uid, block, data, contained } = defineProps({
   },
   contained: {
     type: Boolean,
+    required: false,
+  },
+  apiUrl: {
+    type: String,
     required: false,
     default: false
   }

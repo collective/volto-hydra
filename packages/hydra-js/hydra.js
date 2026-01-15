@@ -1504,18 +1504,22 @@ export class Bridge {
         const blockUid = blockElement.getAttribute('data-block-uid');
         const isInsideReadonly = event.target.closest('[data-block-readonly]') || this.isBlockReadonly(blockUid);
 
+        // Check if clicked element (or ancestor) has data-linkable-allow - allows navigation
+        // Works for any element: links, checkboxes, selects, etc.
+        // Note: Don't return early - still need block selection to happen
+        const allowedElement = event.target.closest('[data-linkable-allow]');
+        if (allowedElement) {
+          this._allowLinkNavigation = true;
+          // Reset flag after short delay if navigation didn't happen
+          setTimeout(() => { this._allowLinkNavigation = false; }, 100);
+          // Store timestamp for in-page navigation - checked on reload to skip PATH_CHANGE
+          sessionStorage.setItem('hydra_in_page_nav_time', String(Date.now()));
+          // Don't return - continue with block selection
+        }
+
         // Handle link clicks in edit mode
         const linkElement = event.target.closest('a');
         if (linkElement) {
-          // Check if this link is explicitly allowed to navigate (e.g., paging links)
-          if (linkElement.hasAttribute('data-linkable-allow')) {
-            this._allowLinkNavigation = true;
-            // Reset flag after short delay if navigation didn't happen
-            setTimeout(() => { this._allowLinkNavigation = false; }, 100);
-            // Store timestamp for in-page navigation (e.g., paging) - checked on reload to skip PATH_CHANGE
-            sessionStorage.setItem('hydra_in_page_nav_time', String(Date.now()));
-            return; // Allow navigation
-          }
           // Prevent link navigation inside readonly blocks
           if (isInsideReadonly) {
             event.preventDefault();

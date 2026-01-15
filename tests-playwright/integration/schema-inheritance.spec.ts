@@ -454,7 +454,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await expect(toolbar).toBeVisible({ timeout: 5000 });
   });
 
-  test('search block listing container has no add buttons when at maxItems', async ({ page }) => {
+  test('search block listing container has no add buttons when at maxLength', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -473,7 +473,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
-    // Since maxItems=1 and there's already 1 listing block,
+    // Since maxLength=1 and there's already 1 listing block,
     // there should be no add block buttons (data-block-add markers should be hidden)
     // The listing items should NOT have visible add buttons
     const addButtons = iframe.locator('[data-block-uid="results-listing"] [data-block-add]');
@@ -561,6 +561,10 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     // The checkbox should now be checked after reload
     const imageCheckboxAfter = iframe.locator('.facet-checkbox[data-field="portal_type"][value="Image"]');
     await expect(imageCheckboxAfter).toBeChecked({ timeout: 10000 });
+
+    // Wait for async loading to complete (skeleton to disappear)
+    const skeleton = iframe.locator('.animate-pulse');
+    await expect(skeleton).not.toBeVisible({ timeout: 10000 });
 
     // Should have 0 results (base query filters to Documents, facet adds Image filter = no matches)
     const filteredResults = iframe.locator('[data-block-uid="results-listing"]');

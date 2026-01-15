@@ -15,11 +15,22 @@ const props = defineProps({
   pagingKey: { type: String, required: true },
 });
 
+// Read facet/search params from URL to pass as extraCriteria
+const route = useRoute();
+const extraCriteria = {};
+
+// Pass through SearchableText, sort_on, and facet.* params
+for (const [key, value] of Object.entries(route.query)) {
+  if (key === 'SearchableText' || key === 'sort_on' || key.startsWith('facet.')) {
+    extraCriteria[key] = value;
+  }
+}
+
 // Expand dynamic blocks - uses shared paging object
 const { items: expandedItems, paging } = await expandListingBlocks(
   props.blocks,
   props.layout,
-  { apiUrl: props.apiUrl, contextPath: props.contextPath, paging: props.paging, itemTypeField: 'variation' }
+  { apiUrl: props.apiUrl, contextPath: props.contextPath, paging: props.paging, itemTypeField: 'variation', extraCriteria }
 );
 
 // Build paging URL
