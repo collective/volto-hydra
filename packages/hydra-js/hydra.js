@@ -3997,6 +3997,9 @@ export class Bridge {
 
       log('observeBlockDomChanges: detected relevant DOM change for', blockUid);
 
+      // Materialize any new hydra comments (e.g., from async Suspense content)
+      this.materializeHydraComments();
+
       // Check if our observed elements are still in the DOM
       if (!this._observedElements?.length) return;
 
