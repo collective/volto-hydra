@@ -1,6 +1,7 @@
 .*project
 .settings/
 .vscode
+.claude/settings.local.json
 *~
 acceptance/cypress/videos/
 acceptance/node_modules

@@ -7348,11 +7348,28 @@ let bridgeInstance = (typeof window !== 'undefined' && window.__hydraBridge) || 
 /**
  * Initialize the bridge
  *
- * @param {URL} adminOrigin
- * @param {Object} options
- * @returns new Bridge()
+ * @param {Object|string} [adminOriginOrOptions] - Options object or admin origin URL
+ * @param {Object} [options] - Options (if first param is adminOrigin)
+ * @returns {Bridge} The bridge instance
  */
-export function initBridge(adminOrigin, options = {}) {
+export function initBridge(adminOriginOrOptions, options = {}) {
+  let adminOrigin;
+
+  // Support both calling conventions:
+  // - initBridge({ options }) - just options, no adminOrigin
+  // - initBridge(adminOrigin, { options }) - with explicit adminOrigin
+  if (
+    typeof adminOriginOrOptions === 'object' &&
+    adminOriginOrOptions !== null
+  ) {
+    // First argument is options object
+    options = adminOriginOrOptions;
+    adminOrigin = options.adminOrigin; // Can optionally include adminOrigin in options
+  } else {
+    // First argument is adminOrigin (string or null/undefined)
+    adminOrigin = adminOriginOrOptions;
+  }
+
   // 1. Explicit parameter (highest priority)
   if (adminOrigin) {
     log('Using explicit admin origin:', adminOrigin);

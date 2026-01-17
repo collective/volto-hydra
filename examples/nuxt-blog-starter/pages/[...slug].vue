@@ -71,7 +71,6 @@ import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
-const adminUrl = runtimeConfig.public.adminUrl;
 const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
 
 // Block types that require async expansion (contain listings or queries)
@@ -329,7 +328,7 @@ onMounted(() => {
             };
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
-            const bridge = initBridge(adminUrl, {
+            const bridge = initBridge({
                 allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...pageLevelBlocks],
                 voltoConfig: {
                     blocks: {

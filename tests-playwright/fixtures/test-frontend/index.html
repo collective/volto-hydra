@@ -216,20 +216,6 @@
                 if (loadHydraBridge) {
                     console.log('[TEST-FRONTEND] Initializing Hydra bridge');
 
-                    // Get admin origin from: URL param > window.name > referrer (auto-detect)
-                    let adminOrigin = urlParams.get('_admin_origin');
-                    if (!adminOrigin && isHydraEdit) {
-                        adminOrigin = window.name.slice(11); // Extract origin from "hydra-edit:<origin>"
-                        console.log('[TEST-FRONTEND] Using admin origin from window.name (edit):', adminOrigin);
-                    } else if (!adminOrigin && isHydraView) {
-                        adminOrigin = window.name.slice(11); // Extract origin from "hydra-view:<origin>"
-                        console.log('[TEST-FRONTEND] Using admin origin from window.name (view):', adminOrigin);
-                    } else if (adminOrigin) {
-                        console.log('[TEST-FRONTEND] Using explicit admin origin:', adminOrigin);
-                    } else {
-                        console.log('[TEST-FRONTEND] Admin origin will be auto-detected from referrer');
-                    }
-
                     // Define custom blocks via voltoConfig
                     const voltoConfig = {
                         blocks: {
@@ -508,9 +494,9 @@
                         },
                     };
 
-                    // Initialize bridge - adminOrigin is optional, will auto-detect from referrer
+                    // Initialize bridge - admin origin auto-detected from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
-                    window.bridge = initBridge(adminOrigin, {
+                    window.bridge = initBridge({
                         allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search'],
                         voltoConfig: voltoConfig,
                     });

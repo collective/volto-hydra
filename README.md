@@ -47,6 +47,75 @@ You can try out the editing experience now by logging into https://hydra.pretago
 Note that the default is a Nuxt.js frontend, deployed as a [SSG](https://hydra-nuxt-flowbrite.netlify.app/) 
 to demonstrate scale-to-zero editing (free hosting) see [SSG/SSR with Hydra](./ssg_ssr_with_hydra)
 
+## Quick Start
+
+To make a site editable with hydra you will need to break up your page into
+- slots - areas of the page that contain a list of blocks that make up your page content
+- blocks - a discrete visual element of the page with a schema and settings that can be moved around and edited
+   -  fields - string, image, link etc each with their own sidebar widget
+   -  container fields/slots - areas on the block where more blocks can be added
+   -  rich text - container field that contains slate blocks each being one paragraph or heading.
+
+With a hydra instance running, go to user preferences and enter the url of your frontend.
+
+Modify your front end to work with the editor by loading the hydra bridge.
+
+
+```js
+let bridge;
+
+if (window.name.startsWith('hydra')) {
+    bridge = initBridge({
+      // which blocks can be added in the main content area
+      allowedBlocks: ['slate', 'grid', 'myimage'],
+      voltoConfig: {
+        blocks: {
+          blocksConfig: {
+            // we can add custom blocks (or alter builtin ones)
+            myimage: {
+              blockSchema: {
+                properties: {
+                  image: { widget: 'image' },
+                  url: { widget: 'url' },
+                  caption: { type: 'string' },
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+}
+
+if (window.name.startsWith('hydra-edit')) {
+    // When the user edits the page we take the content directly from the editor
+    bridge.onEditChange((formData) => renderPage(formData));
+} else {
+    // Otherwise we render from the server api
+    renderPage(await fetchContent(path));
+}
+```
+
+Finally augment the frontend's rendered html telling hydra where your blocks are and where
+the fields are.
+
+```html
+<!-- hydra editable-field=title -->
+<div>Page Title</div>
+
+<div id=content>
+  <!-- hydra block-uid="1234" editable-field=title(p) media-field=image(img) linkable-field=url -->
+  <a href="http://go.to">
+    <img src="http://my.img"/>
+    <p>A caption</p>
+  </a>
+</div>
+```
+
+Note you can just embed the hydra tags directly if you want,
+e.g. `<p data-editable-field="title">A caption</p>`
+
+
 ## Run locally
 
 Clone the Volto-Hydra repository from GitHub:
@@ -67,13 +136,13 @@ cd examples/nuxt-blog-starter
 pnpm install
 NUXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080/Plone pnpm run dev
 ```
-The frontend is at https://localhost:3000
+The frontend is at http://localhost:3000
 
 To Edit, start the Hydra Admin interface
 ```bash
 cd ../..
 make install
-RAZZLE_API_PATH="http://localhost:8080/Plone" RAZZLE_DEFAULT_IFRAME_URL=https://localhost:3000 pnpm start
+RAZZLE_API_PATH="http://localhost:8080/Plone" RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3000 pnpm start
 ```
 
 Now you can login to Hydra to edit
@@ -229,7 +298,7 @@ You can use whatever frontend technology you want but a basic vue.js example mig
 </template>
 <script setup>
 const { data, error } = await ploneApi({});
-</sscript>
+</script>
 ```
 
 
@@ -260,10 +329,10 @@ At this your Editor can :-
 We include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
-- During admin, initilize it with the url of Hydra and Volto settings
+- During admin, initilize it with Volto settings
   ```js
   import { initBridge } from './hydra.js';
-  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
+  const bridge = initBridge({allowedBlocks: ['slate', 'image', 'video']});
   ```
 - To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
 - To see private content you will need to [change your authentication token]((#authenticatitee-frontend-to-access-private-content))
@@ -281,7 +350,7 @@ This will enable an Editor to :-
 If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
 
 ```js
-const bridge = initBridge("https://hydra.pretagov.com", {
+const bridge = initBridge({
   allowedBlocks: ['slate', 'image', 'video'],
   // Transform frontend path to API path by stripping paging segments
   // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
@@ -302,7 +371,7 @@ For our slider example, we can configure this new block directly in the frontend
 ```js
 import { initBridge } from './hydra.js';
 
-const bridge = initBridge("https://hydra.pretagov.com", {
+const bridge = initBridge({
   allowedBlocks: ['slate', 'image', 'video', 'slider'],
   voltoConfig: {
     blocks: {
@@ -494,7 +563,7 @@ follows the same format as you get from the
 
 e.g.
 ```js
-const bridge = initBridge('https://hydra.pretagov.com');
+const bridge = initBridge();
 bridge.onEditChange(handleEditChange);
 ```
 Since the data structure is that same as returned by the contents [RESTApi](https://6.docs.plone.org/plone.restapi/docs/source/index.html) it's normally easy to rerender your page dynamically using the same

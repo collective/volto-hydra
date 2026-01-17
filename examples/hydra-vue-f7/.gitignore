@@ -40,3 +40,6 @@ Thumbs.db
 
 # Production build
 www/
+
+# Copied from packages/hydra-js at build time
+src/js/hydra.js

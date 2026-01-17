@@ -6,7 +6,7 @@ import { fetchContent } from "#utils/api";
 import BlocksList from "@/components/BlocksList";
 
 export default function Home() {
-  const bridge = initBridge(process.env.NEXT_PUBLIC_ADMINUI_ORIGIN, {allowedBlocks: [ "slate", "image", "video", "teaser"]});
+  const bridge = initBridge({allowedBlocks: [ "slate", "image", "video", "teaser"]});
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
