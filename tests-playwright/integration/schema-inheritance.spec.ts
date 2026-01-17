@@ -946,4 +946,109 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     // Verify the Grid section still shows "Image Defaults" (parent owns the defaults)
     await expect(gridSection.locator('text=Image Defaults')).toBeVisible();
   });
+
+  test('unselecting grid variation clears type constraint', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a child teaser inside gridBlock
+    const manualTeaser = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(manualTeaser).toBeVisible({ timeout: 10000 });
+    await manualTeaser.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Scroll to top of sidebar
+    const sidebarWrapper = page.locator('.sidebar-content-wrapper');
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, 0));
+
+    // Find the Grid section in sidebar
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    }).first();
+    await expect(gridSection).toBeVisible({ timeout: 5000 });
+
+    // First set a variation to 'Teaser'
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await variationSelect.click();
+    let menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Teaser' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Verify Teaser Defaults fieldset appeared
+    await expect(gridSection.locator('text=Teaser Defaults')).toBeVisible({ timeout: 5000 });
+
+    // Now clear the selection by clicking the clear button (x)
+    const clearButton = variationSelect.locator('.react-select__clear-indicator');
+    await expect(clearButton).toBeVisible({ timeout: 3000 });
+    await clearButton.click();
+
+    // Verify the defaults fieldset is gone (no type selected)
+    await expect(gridSection.locator('text=Teaser Defaults')).not.toBeVisible({ timeout: 5000 });
+    await expect(gridSection.locator('text=Image Defaults')).not.toBeVisible();
+
+    // Verify the placeholder is shown again (no value selected)
+    await expect(variationSelect.locator('.react-select__placeholder')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('adding different block type inside grid with variation syncs to item type', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a child block inside gridBlock
+    const manualTeaser = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(manualTeaser).toBeVisible({ timeout: 10000 });
+    await manualTeaser.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Scroll to top of sidebar to see parent's settings
+    const sidebarWrapper = page.locator('.sidebar-content-wrapper');
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, 0));
+
+    // Find the Grid section in sidebar
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    }).first();
+    await expect(gridSection).toBeVisible({ timeout: 5000 });
+
+    // Set the variation to 'Teaser'
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await variationSelect.click();
+    let menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Teaser' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Click the add button in the iframe (appears near selected block)
+    await helper.clickAddBlockButton();
+
+    // Block chooser should appear - select Image (a different type than Teaser)
+    const blockChooser = page.locator('.blocks-chooser');
+    await blockChooser.waitFor({ state: 'visible', timeout: 3000 });
+    const imageButton = blockChooser.getByRole('button', { name: /^Image$/i });
+    await imageButton.click();
+
+    // Wait for block chooser to close and new block to be selected
+    await blockChooser.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // The new block should have been transformed to Teaser (synced to grid's variation)
+    // Check the sidebar - the selected block's breadcrumb should show Teaser, not Image
+    await helper.waitForSidebarOpen();
+    const childBreadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(childBreadcrumb).toContainText('Teaser', { timeout: 5000 });
+  });
 });
