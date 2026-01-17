@@ -318,6 +318,56 @@ onMounted(() => {
                         },
                     },
                 },
+                // Skiplogic test block: demonstrates conditional field visibility
+                skiplogicTest: {
+                    id: 'skiplogicTest',
+                    title: 'Skiplogic Test',
+                    group: 'common',
+                    blockSchema: {
+                        properties: {
+                            mode: {
+                                title: 'Mode',
+                                widget: 'select',
+                                choices: [['simple', 'Simple'], ['advanced', 'Advanced']],
+                            },
+                            columns: {
+                                title: 'Columns',
+                                type: 'integer',
+                                default: 1,
+                            },
+                            basicTitle: {
+                                title: 'Basic Title',
+                                type: 'string',
+                            },
+                            advancedOptions: {
+                                title: 'Advanced Options',
+                                type: 'string',
+                            },
+                            simpleWarning: {
+                                title: 'Simple Warning',
+                                type: 'string',
+                            },
+                            columnLayout: {
+                                title: 'Column Layout',
+                                widget: 'select',
+                                choices: [['equal', 'Equal'], ['weighted', 'Weighted']],
+                            },
+                            pageNotice: {
+                                title: 'Page Notice',
+                                type: 'string',
+                                description: 'Only visible when page has a description',
+                            },
+                        },
+                    },
+                    schemaEnhancer: {
+                        skiplogic: {
+                            advancedOptions: { field: 'mode', is: 'advanced' },
+                            simpleWarning: { field: 'mode', isNot: 'advanced' },
+                            columnLayout: { field: 'columns', gte: 2 },
+                            pageNotice: { field: '../description', isSet: true },
+                        },
+                    },
+                },
             };
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
