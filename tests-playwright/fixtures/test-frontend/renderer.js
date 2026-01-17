@@ -1073,10 +1073,11 @@ async function renderAccordionBlock(block, blockId) {
     let contentItems = block.content_layout?.items || [];
 
     // Expand nested listings in content (header usually doesn't have listings)
+    // expandListingBlocks returns { items, paging } where each item has @uid
+    let expandedItems = null;
     if (window._expandListingBlocks && contentItems.length > 0) {
         const result = await window._expandListingBlocks(content, contentItems, `${blockId}-content`);
-        content = result.blocks;
-        contentItems = result.blocks_layout;
+        expandedItems = result.items;
     }
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
@@ -1100,25 +1101,30 @@ async function renderAccordionBlock(block, blockId) {
     html += '<div class="accordion-content" style="padding: 15px;">';
     html += '<div class="content-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">CONTENT</div>';
 
-    for (const childId of contentItems) {
-        const childBlock = content[childId];
-        if (childBlock) {
-            html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
-            switch (childBlock['@type']) {
-                case 'slate':
-                    html += renderNestedSlateBlock(childBlock);
-                    break;
-                case 'image':
-                    html += renderImageBlock(childBlock);
-                    break;
-                case 'teaser':
-                    html += renderTeaserBlock(childBlock, null);
-                    break;
-                default:
-                    html += renderNestedSlateBlock(childBlock);
-            }
-            html += '</div>';
+    // Use expanded items if available, otherwise fall back to original blocks
+    const itemsToRender = expandedItems || contentItems.map(id => ({ ...content[id], '@uid': id }));
+
+    for (const childBlock of itemsToRender) {
+        if (!childBlock) continue;
+        const uid = childBlock['@uid'];
+        html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+        switch (childBlock['@type']) {
+            case 'slate':
+                html += renderNestedSlateBlock(childBlock);
+                break;
+            case 'image':
+                html += renderImageBlock(childBlock);
+                break;
+            case 'teaser':
+                html += renderTeaserBlock(childBlock, null);
+                break;
+            case 'summaryItem':
+                html += renderSummaryItemBlock(childBlock, null);
+                break;
+            default:
+                html += renderNestedSlateBlock(childBlock);
         }
+        html += '</div>';
     }
 
     html += '</div>';

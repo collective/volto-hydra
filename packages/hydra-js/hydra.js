@@ -100,7 +100,6 @@ export class Bridge {
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
     if (options.debug) debugEnabled = true;
-    this.learnOriginFromFirstMessage = options._learnOriginFromFirstMessage || false;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
     this.realTimeDataHandler = null; // Handler for message events
@@ -1131,13 +1130,6 @@ export class Bridge {
     // Store callback so INITIAL_DATA handler can use it
     this.onContentChangeCallback = callback;
     this.realTimeDataHandler = (event) => {
-      // Learn admin origin from first message if needed
-      if (this.learnOriginFromFirstMessage && !this.adminOrigin) {
-        this.adminOrigin = event.origin;
-        this.learnOriginFromFirstMessage = false;
-        log('Learned admin origin from first postMessage:', this.adminOrigin);
-      }
-
       if (
         event.origin === this.adminOrigin ||
         event.origin === window.location.origin
@@ -7379,21 +7371,16 @@ export function initBridge(adminOriginOrOptions, options = {}) {
   if (adminOrigin) {
     log('Using explicit admin origin:', adminOrigin);
   }
-  // 2. Auto-detect from referrer (most secure)
-  else if (document.referrer) {
-    try {
-      adminOrigin = new URL(document.referrer).origin;
-      log('Auto-detected admin origin from referrer:', adminOrigin);
-    } catch (e) {
-      console.error('[HYDRA] Failed to parse referrer URL:', e);
-    }
+  // 2. Extract from window.name (set by Volto, persists across iframe navigation)
+  else if (window.name.startsWith('hydra-edit:') || window.name.startsWith('hydra-view:')) {
+    const prefix = window.name.startsWith('hydra-edit:') ? 'hydra-edit:' : 'hydra-view:';
+    adminOrigin = window.name.slice(prefix.length);
+    log('Got admin origin from window.name:', adminOrigin);
   }
-  // 3. Learn from first postMessage (fallback, less secure)
+  // 3. No window.name means we're not in a Volto iframe - nothing to communicate with
   else {
-    console.warn('[HYDRA] No referrer available, will learn origin from first postMessage (less secure)');
-    // Set a flag to learn from first message
-    options._learnOriginFromFirstMessage = true;
-    adminOrigin = null; // Will be set when first message is received
+    log('No hydra window.name set - not in Volto iframe, skipping bridge setup');
+    adminOrigin = null;
   }
 
   if (!bridgeInstance) {
