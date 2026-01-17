@@ -2673,6 +2673,11 @@ export class Bridge {
       const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
       const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
 
+      // Skip error for readonly blocks - they don't need selection sync
+      if (blockUid !== 'unknown' && this.isBlockReadonly(blockUid)) {
+        return null;
+      }
+
       // Check if this field is supposed to be a Slate field
       // Use getFieldType which handles page-level fields (e.g., /title) correctly
       const fieldType = blockUid !== 'unknown' ? this.getFieldType(blockUid, fieldName) : undefined;
