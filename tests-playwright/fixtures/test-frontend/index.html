@@ -457,8 +457,7 @@
                                         },
                                     },
                                     schemaEnhancer: {
-                                        type: 'inheritSchemaFrom',
-                                        config: { typeField: 'variation', defaultsField: 'itemDefaults' },
+                                        inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
                                     },
                                 },
                                 // Teaser block: use Volto's TeaserSchema (has href with object_browser)
@@ -468,11 +467,8 @@
                                     title: 'Teaser',
                                     icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
                                     group: 'common',
-                                    // Don't send blockSchema - Volto's TeaserSchema has all fields including
-                                    // href (object_browser), overwrite, head_title, description, preview_image
                                     schemaEnhancer: {
-                                        type: 'hideParentOwnedFields',
-                                        config: {
+                                        hideParentOwnedFields: {
                                             defaultsField: 'itemDefaults',
                                             editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
                                         },
@@ -483,10 +479,59 @@
                                     // editableFields: url, alt, and href (Link to) stay on child
                                     // alignment, size, openLinkInNewTab go to parent
                                     schemaEnhancer: {
-                                        type: 'hideParentOwnedFields',
-                                        config: {
+                                        hideParentOwnedFields: {
                                             defaultsField: 'itemDefaults',
                                             editableFields: ['url', 'alt', 'href'],
+                                        },
+                                    },
+                                },
+                                // Skiplogic test block: demonstrates conditional field visibility
+                                skiplogicTest: {
+                                    id: 'skiplogicTest',
+                                    title: 'Skiplogic Test',
+                                    group: 'common',
+                                    blockSchema: {
+                                        properties: {
+                                            mode: {
+                                                title: 'Mode',
+                                                widget: 'select',
+                                                choices: [['simple', 'Simple'], ['advanced', 'Advanced']],
+                                            },
+                                            columns: {
+                                                title: 'Columns',
+                                                type: 'integer',
+                                                default: 1,
+                                            },
+                                            basicTitle: {
+                                                title: 'Basic Title',
+                                                type: 'string',
+                                            },
+                                            advancedOptions: {
+                                                title: 'Advanced Options',
+                                                type: 'string',
+                                            },
+                                            simpleWarning: {
+                                                title: 'Simple Warning',
+                                                type: 'string',
+                                            },
+                                            columnLayout: {
+                                                title: 'Column Layout',
+                                                widget: 'select',
+                                                choices: [['equal', 'Equal'], ['weighted', 'Weighted']],
+                                            },
+                                            pageNotice: {
+                                                title: 'Page Notice',
+                                                type: 'string',
+                                                description: 'Only visible when page has a description',
+                                            },
+                                        },
+                                    },
+                                    schemaEnhancer: {
+                                        skiplogic: {
+                                            advancedOptions: { field: 'mode', is: 'advanced' },
+                                            simpleWarning: { field: 'mode', isNot: 'advanced' },
+                                            columnLayout: { field: 'columns', gte: 2 },
+                                            pageNotice: { field: '../description', isSet: true },
                                         },
                                     },
                                 },
@@ -497,7 +542,7 @@
                     // Initialize bridge - admin origin auto-detected from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge({
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search'],
+                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
                         voltoConfig: voltoConfig,
                     });
 

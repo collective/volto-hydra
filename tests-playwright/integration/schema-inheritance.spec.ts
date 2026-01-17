@@ -1052,3 +1052,157 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     await expect(childBreadcrumb).toContainText('Teaser', { timeout: 5000 });
   });
 });
+
+test.describe('Skiplogic - Conditional Field Visibility', () => {
+  test('field with skiplogic is hidden when condition not met', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on skiplogic-test block
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Initially mode is not set, so 'Advanced Options' should be hidden
+    const advancedField = page.locator('text=Advanced Options');
+    await expect(advancedField).not.toBeVisible();
+
+    // 'Basic Title' should always be visible
+    const basicField = page.locator('text=Basic Title');
+    await expect(basicField).toBeVisible();
+  });
+
+  test('field with skiplogic is shown when condition is met', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on skiplogic-test block
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Find mode dropdown and select 'advanced'
+    const modeSelect = page.locator('.react-select__control').first();
+    await expect(modeSelect).toBeVisible({ timeout: 5000 });
+    await modeSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Advanced' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Now 'Advanced Options' should be visible
+    const advancedField = page.locator('text=Advanced Options');
+    await expect(advancedField).toBeVisible({ timeout: 5000 });
+  });
+
+  test('skiplogic with isNot operator', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on skiplogic-test block
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // 'Simple Warning' has skiplogic: { field: 'mode', isNot: 'advanced' }
+    // Initially mode is not set, so isNot: 'advanced' is true -> should be visible
+    const warningField = page.locator('text=Simple Warning');
+    await expect(warningField).toBeVisible({ timeout: 5000 });
+
+    // Select 'advanced' mode
+    const modeSelect = page.locator('.react-select__control').first();
+    await modeSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Advanced' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Now 'Simple Warning' should be hidden (mode IS 'advanced')
+    await expect(warningField).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('skiplogic with numeric comparison', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on skiplogic-test block
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // 'Column Layout' has skiplogic: { field: 'columns', gte: 2 }
+    // Initially columns is not set or 1, so should be hidden
+    const columnLayoutField = page.locator('text=Column Layout');
+    await expect(columnLayoutField).not.toBeVisible();
+
+    // Find columns number input and set to 3
+    const columnsInput = page.locator('input[type="number"]').first();
+    await columnsInput.fill('3');
+    await columnsInput.blur();
+
+    // Now 'Column Layout' should be visible (columns >= 2)
+    await expect(columnLayoutField).toBeVisible({ timeout: 5000 });
+  });
+
+  test('skiplogic with parent path reference', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the skiplogic-test block
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Page has description "A test page with blocks", so pageNotice should be visible
+    // skiplogic: { field: '../description', isSet: true }
+    let pageNoticeField = page.locator('text=Page Notice');
+    await expect(pageNoticeField).toBeVisible({ timeout: 5000 });
+
+    // Go to Page tab and clear the description
+    await helper.openSidebarTab('Page');
+    const summaryField = page.locator('textarea[name="description"]');
+    await summaryField.clear();
+
+    // Go back to Block tab
+    await helper.openSidebarTab('Block');
+
+    // Now description is empty, so pageNotice should be hidden
+    pageNoticeField = page.locator('text=Page Notice');
+    await expect(pageNoticeField).not.toBeVisible({ timeout: 5000 });
+  });
+});

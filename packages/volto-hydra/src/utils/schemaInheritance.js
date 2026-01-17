@@ -642,73 +642,254 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
 
 /**
  * Create a schemaEnhancer function from a declarative recipe.
- * Supports single recipe object or array of recipes.
  *
- * Recipe format:
- *   { type: 'inheritSchemaFrom', config: { typeField, defaultsField, mappingField? } }
- *   { type: 'hideParentOwnedFields', config: { defaultsField, editableFields?, parentControlledFields? } }
+ * New format (supports combining multiple enhancers):
+ *   { inheritSchemaFrom: { typeField, defaultsField, mappingField? } }
+ *   { hideParentOwnedFields: { defaultsField, editableFields?, parentControlledFields? } }
+ *   { skiplogic: { fieldName: { field, is?, isNot?, gt?, gte?, lt?, lte?, isSet?, isNotSet? } } }
  *
- * Array format (multiple enhancers applied in order):
- *   [{ type: '...', config: {...} }, { type: '...', config: {...} }]
+ * Combined example:
+ *   {
+ *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
+ *     skiplogic: { advancedOptions: { field: 'mode', is: 'advanced' } },
+ *   }
+ *
+ * Legacy format (still supported):
+ *   { type: 'inheritSchemaFrom', config: { ... } }
  *
  * The returned function has a `config` property attached with the original config,
  * so parent blocks can read child's editableFields/parentControlledFields.
  *
- * @param {Object|Array} recipe - Single recipe or array of recipes
+ * @param {Object|Array} recipe - Recipe object or array of recipes
  * @returns {Function|null} - schemaEnhancer function or null if invalid
  */
 export function createSchemaEnhancerFromRecipe(recipe) {
+  if (!recipe || typeof recipe !== 'object') return null;
+
   // Handle array of recipes - compose them
   if (Array.isArray(recipe)) {
-    const enhancers = recipe.map((r) => createSingleEnhancer(r)).filter(Boolean);
+    const enhancers = recipe.map((r) => createSchemaEnhancerFromRecipe(r)).filter(Boolean);
     if (enhancers.length === 0) return null;
-    // Compose: each enhancer receives output of previous
-    // Merge configs from all enhancers
     const composedFn = (args) =>
       enhancers.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
-    // Merge configs - later configs override earlier ones
     composedFn.config = enhancers.reduce((acc, fn) => ({ ...acc, ...fn.config }), {});
     return composedFn;
   }
 
-  return createSingleEnhancer(recipe);
+  // Legacy format: { type: 'x', config: {...} }
+  if (recipe.type && recipe.config) {
+    return createSingleEnhancerLegacy(recipe);
+  }
+
+  // New format: { inheritSchemaFrom: {...}, skiplogic: {...}, ... }
+  const enhancerTypes = ['inheritSchemaFrom', 'hideParentOwnedFields', 'skiplogic'];
+  const enhancers = [];
+  let mergedConfig = {};
+
+  for (const type of enhancerTypes) {
+    if (recipe[type]) {
+      const enhancer = createEnhancerByType(type, recipe[type]);
+      if (enhancer) {
+        enhancers.push(enhancer);
+        if (enhancer.config) {
+          mergedConfig = { ...mergedConfig, ...enhancer.config };
+        }
+      }
+    }
+  }
+
+  if (enhancers.length === 0) return null;
+
+  if (enhancers.length === 1) {
+    return enhancers[0];
+  }
+
+  // Compose multiple enhancers
+  const composedFn = (args) =>
+    enhancers.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+  composedFn.config = mergedConfig;
+  return composedFn;
 }
 
 /**
- * Create a single schemaEnhancer from a recipe object.
+ * Create an enhancer by type name and config.
+ * @private
+ */
+function createEnhancerByType(type, config) {
+  let enhancer = null;
+
+  switch (type) {
+    case 'inheritSchemaFrom': {
+      const { typeField, mappingField, defaultsField } = config;
+      if (!typeField || !defaultsField) return null;
+      enhancer = inheritSchemaFrom(typeField, mappingField || null, defaultsField);
+      enhancer.config = config;
+      break;
+    }
+    case 'hideParentOwnedFields': {
+      const { defaultsField, editableFields, parentControlledFields } = config;
+      if (!defaultsField) return null;
+      enhancer = hideParentOwnedFields([defaultsField], { editableFields, parentControlledFields });
+      enhancer.config = config;
+      break;
+    }
+    case 'skiplogic': {
+      enhancer = createSkiplogicEnhancer(config);
+      break;
+    }
+    default:
+      console.warn(`Unknown schemaEnhancer type: ${type}`);
+      return null;
+  }
+
+  return enhancer;
+}
+
+/**
+ * Create a skiplogic schemaEnhancer that conditionally hides fields.
+ *
+ * Config format: { fieldName: { field, is?, isNot?, gt?, gte?, lt?, lte?, isSet?, isNotSet? } }
+ *
+ * Field path syntax:
+ *   - 'field' - current block's field
+ *   - '../field' - parent block's field
+ *   - '/field' - root formData field
+ *
+ * @private
+ */
+function createSkiplogicEnhancer(config) {
+  const enhancer = (args) => {
+    const { schema, formData } = args;
+    if (!schema?.properties) return schema;
+
+    const fieldsToHide = new Set();
+
+    for (const [fieldName, condition] of Object.entries(config)) {
+      if (!schema.properties[fieldName]) continue;
+
+      const shouldShow = evaluateSkiplogicCondition(condition, formData, args);
+      if (!shouldShow) {
+        fieldsToHide.add(fieldName);
+      }
+    }
+
+    if (fieldsToHide.size === 0) return schema;
+
+    // Clone and filter schema
+    const newSchema = {
+      ...schema,
+      fieldsets: schema.fieldsets
+        ?.map((fieldset) => ({
+          ...fieldset,
+          fields: fieldset.fields?.filter((f) => !fieldsToHide.has(f)) || [],
+        }))
+        .filter((fieldset) => fieldset.fields.length > 0 || fieldset.id === 'default'),
+      properties: { ...schema.properties },
+      required: schema.required || [],
+    };
+
+    for (const fieldName of fieldsToHide) {
+      delete newSchema.properties[fieldName];
+    }
+
+    return newSchema;
+  };
+
+  enhancer.config = { skiplogic: config };
+  return enhancer;
+}
+
+/**
+ * Evaluate a skiplogic condition against form data.
+ * Returns true if field should be shown, false if hidden.
+ * @private
+ */
+function evaluateSkiplogicCondition(condition, formData, args) {
+  const { field: fieldPath, is, isNot, gt, gte, lt, lte, isSet, isNotSet } = condition;
+
+  // Resolve field value based on path
+  const value = resolveFieldPath(fieldPath, formData, args);
+
+  // isSet / isNotSet operators
+  if (isSet !== undefined) {
+    const hasValue = value !== undefined && value !== null && value !== '';
+    return isSet ? hasValue : !hasValue;
+  }
+  if (isNotSet !== undefined) {
+    const hasValue = value !== undefined && value !== null && value !== '';
+    return isNotSet ? !hasValue : hasValue;
+  }
+
+  // Equality operators
+  if (is !== undefined) {
+    return value === is;
+  }
+  if (isNot !== undefined) {
+    return value !== isNot;
+  }
+
+  // Numeric comparison operators
+  const numValue = typeof value === 'number' ? value : parseFloat(value);
+  if (!isNaN(numValue)) {
+    if (gt !== undefined && !(numValue > gt)) return false;
+    if (gte !== undefined && !(numValue >= gte)) return false;
+    if (lt !== undefined && !(numValue < lt)) return false;
+    if (lte !== undefined && !(numValue <= lte)) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Resolve a field path to its value.
+ * Supports: 'field' (current), '../field' (parent), '/field' (root)
+ * @private
+ */
+function resolveFieldPath(fieldPath, formData, args) {
+  if (!fieldPath) return undefined;
+
+  // Root path: /field
+  if (fieldPath.startsWith('/')) {
+    const rootField = fieldPath.slice(1);
+    // args may have rootFormData for accessing page-level fields
+    const rootData = args.rootFormData || formData;
+    return rootData?.[rootField];
+  }
+
+  // Parent path: ../field
+  if (fieldPath.startsWith('../')) {
+    const parentField = fieldPath.slice(3);
+    // Get parent data from hydra context
+    const hydraContext = getHydraSchemaContext?.();
+    if (hydraContext?.blockPathMap && hydraContext?.currentBlockId) {
+      const pathInfo = hydraContext.blockPathMap[hydraContext.currentBlockId];
+      if (pathInfo?.parentId) {
+        // Nested block - get parent block data
+        const parentBlock = getLiveBlockData?.(pathInfo.parentId);
+        return parentBlock?.[parentField];
+      } else {
+        // Top-level block - parent is the page, use hydraContext.formData
+        return hydraContext.formData?.[parentField];
+      }
+    }
+    return undefined;
+  }
+
+  // Current block path: field
+  return formData?.[fieldPath];
+}
+
+/**
+ * Create a single schemaEnhancer from legacy recipe format.
  * Attaches config to the function for parent blocks to read.
  * @private
  */
-function createSingleEnhancer(recipe) {
+function createSingleEnhancerLegacy(recipe) {
   if (!recipe || typeof recipe !== 'object' || !recipe.type) {
     return null;
   }
 
-  let enhancer = null;
-
-  switch (recipe.type) {
-    case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField } = recipe.config || {};
-      if (!typeField || !defaultsField) return null;
-      enhancer = inheritSchemaFrom(typeField, mappingField || null, defaultsField);
-      break;
-    }
-    case 'hideParentOwnedFields': {
-      const { defaultsField, editableFields, parentControlledFields } = recipe.config || {};
-      if (!defaultsField) return null;
-      enhancer = hideParentOwnedFields([defaultsField], { editableFields, parentControlledFields });
-      break;
-    }
-    default:
-      console.warn(`Unknown schemaEnhancer recipe type: ${recipe.type}`);
-      return null;
-  }
-
-  // Attach config to the enhancer function so parent blocks can read it
-  if (enhancer && recipe.config) {
-    enhancer.config = recipe.config;
-  }
-  return enhancer;
+  return createEnhancerByType(recipe.type, recipe.config || {});
 }
 
 /**

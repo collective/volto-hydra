@@ -123,6 +123,9 @@ async function renderBlock(blockId, block) {
         case 'image':
             wrapper.innerHTML = renderImageBlock(block);
             break;
+        case 'video':
+            wrapper.innerHTML = renderVideoBlock(block);
+            break;
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
@@ -176,6 +179,9 @@ async function renderBlock(blockId, block) {
             return teaserEl.firstElementChild;
         // Note: listing blocks are expanded by expandListingBlocks() into individual
         // teaser/image blocks BEFORE rendering, so 'listing' case should never be hit
+        case 'skiplogicTest':
+            wrapper.innerHTML = renderSkiplogicTestBlock(block);
+            break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
@@ -572,6 +578,18 @@ function renderImageBlock(block) {
     }
     // No href yet - put data-linkable-field on img so users can add a link
     return `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
+}
+
+/**
+ * Render a video block.
+ * @param {Object} block - Video block data with url
+ * @returns {string} HTML string
+ */
+function renderVideoBlock(block) {
+    const url = block.url || '';
+    return `<div class="video-block">
+        <p>Video: ${url || 'No URL set'}</p>
+    </div>`;
 }
 
 /**
@@ -1259,6 +1277,25 @@ function renderSlateTableBlock(block) {
 
     html += '</table>';
     return html;
+}
+
+/**
+ * Render a Skiplogic Test block.
+ * @param {Object} block - Skiplogic test block data
+ * @returns {string} HTML string
+ */
+function renderSkiplogicTestBlock(block) {
+    const mode = block.mode || 'not set';
+    const columns = block.columns || 1;
+    const title = block.basicTitle || 'Untitled';
+    return `
+        <div class="skiplogic-test-block" style="padding: 16px; border: 1px solid #ccc; background: #f9f9f9;">
+            <h4>Skiplogic Test Block</h4>
+            <p>Mode: ${mode}</p>
+            <p>Columns: ${columns}</p>
+            <p>Title: ${title}</p>
+        </div>
+    `;
 }
 
 /**

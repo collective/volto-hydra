@@ -472,6 +472,67 @@ You can configure any Volto settings during init. Such as:
    - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
    - determine which shortcuts appear on the quanta toolbar for a given block (TODO)
 
+#### Schema Enhancers
+
+Schema enhancers modify block schemas dynamically:
+
+```js
+const bridge = initBridge({
+  voltoConfig: {
+    blocks: {
+      blocksConfig: {
+        // Parent container: controls child type via 'variation' field
+        gridBlock: {
+          blockSchema: {
+            properties: {
+              variation: {
+                title: 'Item Type',
+                widget: 'block_type',
+                allowedTypes: ['teaser', 'image'],
+              },
+            },
+          },
+          schemaEnhancer: {
+            inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
+          },
+        },
+        // Child block: hides fields that parent controls
+        teaser: {
+          schemaEnhancer: {
+            hideParentOwnedFields: {
+              defaultsField: 'itemDefaults',
+              editableFields: ['href', 'title', 'description'],
+            },
+          },
+        },
+        // Conditional field visibility
+        myBlock: {
+          blockSchema: {
+            properties: {
+              mode: { title: 'Mode', widget: 'select', choices: [['simple', 'Simple'], ['advanced', 'Advanced']] },
+              advancedOptions: { title: 'Advanced Options', type: 'string' },
+            },
+          },
+          schemaEnhancer: {
+            skiplogic: {
+              advancedOptions: { field: 'mode', is: 'advanced' },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+```
+
+**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
+
+**`hideParentOwnedFields`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+
+**`skiplogic`**: Conditionally show/hide fields based on other field values.
+- `field`: Field to check (use `../field` for parent/page fields)
+- Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
+
 ### Level 3: Enable Frontend block selection and Quanta Toolbar
 
 In your frontend insert the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most html element of the rendered block html.

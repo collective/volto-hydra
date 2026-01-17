@@ -1492,33 +1492,55 @@ const Iframe = (props) => {
           if (event.data.voltoConfig) {
             const frontendConfig = event.data.voltoConfig;
             // Inject NoPreview view for frontend blocks that don't have one
+            // Also ensure blockSchema has fieldsets if properties exist (for new blocks only)
             if (frontendConfig?.blocks?.blocksConfig) {
               Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
                 const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
                 if (blockConfig && !blockConfig.view) {
                   blockConfig.view = NoPreview;
                 }
+                // Auto-generate default fieldset if missing (only for new blocks, not overrides)
+                // Also ensure required is an array (Volto expects this)
+                const schema = blockConfig?.blockSchema;
+                const isNewBlock = !config.blocks.blocksConfig[blockType];
+                if (isNewBlock && schema?.properties && !schema.fieldsets) {
+                  schema.fieldsets = [{
+                    id: 'default',
+                    title: 'Default',
+                    fields: Object.keys(schema.properties),
+                  }];
+                }
+                if (schema && !schema.required) {
+                  schema.required = [];
+                }
               });
             }
             recurseUpdateVoltoConfig(frontendConfig);
 
             // 1b. Create schemaEnhancers from frontend recipes
-            // Recipe format: { type: 'inheritSchemaFrom', config: {...} } or array of recipes
+            // New format: { inheritSchemaFrom: {...}, skiplogic: {...} }
+            // Legacy format: { type: 'inheritSchemaFrom', config: {...} }
             if (frontendConfig?.blocks?.blocksConfig) {
+              const recipeKeys = ['inheritSchemaFrom', 'hideParentOwnedFields', 'skiplogic'];
               for (const [blockType, blockConfig] of Object.entries(
                 frontendConfig.blocks.blocksConfig,
               )) {
                 const recipe = blockConfig.schemaEnhancer;
-                // Check if it's a recipe (object with type) or array of recipes
+                // Check if it's a recipe (has known enhancer keys, type property, or is array)
                 const isRecipe =
                   recipe &&
-                  ((typeof recipe === 'object' && recipe.type) ||
-                    Array.isArray(recipe));
+                  typeof recipe === 'object' &&
+                  (recipe.type || // legacy format
+                    Array.isArray(recipe) || // array of recipes
+                    recipeKeys.some((key) => key in recipe)); // new format
                 if (isRecipe) {
                   const enhancer = createSchemaEnhancerFromRecipe(recipe);
                   if (enhancer) {
                     config.blocks.blocksConfig[blockType].schemaEnhancer =
                       enhancer;
+                  } else {
+                    // Remove invalid recipe to prevent Volto from trying to use it
+                    delete config.blocks.blocksConfig[blockType].schemaEnhancer;
                   }
                 }
               }
