@@ -141,6 +141,8 @@ const SyncedSlateToolbar = ({
   onFieldLinkChange, // Handler for link field changes: (fieldName, url) => void
   onOpenObjectBrowser, // Handler to open object browser for media fields
   onFileUpload, // Handler for file uploads: (fieldName, file) => void
+  convertibleTypes = [], // Array of { type, title } for block type conversion
+  onConvertBlock, // Handler for block conversion: (newType) => void
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -1128,6 +1130,8 @@ const SyncedSlateToolbar = ({
         addMode={blockPathMap?.[selectedBlock]?.addMode}
         parentAddMode={blockPathMap?.[selectedBlock]?.parentAddMode}
         addDirection={blockUI?.addDirection}
+        convertibleTypes={convertibleTypes}
+        onConvertBlock={onConvertBlock}
       />
     )}
 

@@ -499,7 +499,7 @@ const bridge = initBridge({
         // Child block: hides fields that parent controls
         teaser: {
           schemaEnhancer: {
-            hideParentOwnedFields: {
+            childBlockConfig: {
               defaultsField: 'itemDefaults',
               editableFields: ['href', 'title', 'description'],
             },
@@ -527,11 +527,36 @@ const bridge = initBridge({
 
 **`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
 
-**`hideParentOwnedFields`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
 
 **`skiplogic`**: Conditionally show/hide fields based on other field values.
 - `field`: Field to check (use `../field` for parent/page fields)
 - Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
+
+#### Field Mappings
+
+`fieldMappings` is a top-level block config that defines how fields map when converting between block types:
+
+```js
+teaser: {
+  fieldMappings: {
+    default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+    image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
+  },
+},
+image: {
+  fieldMappings: {
+    default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+    teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
+  },
+},
+```
+
+- **`default`**: Used for listings (query results → block fields) and as fallback for conversions
+- **`[sourceType]`**: Specific mapping when converting FROM that type (e.g., `image:` means "when converting from image")
+- **"Convert to" dropdown**: Shows only types with valid mappings from current type
+- **Transitive conversion**: Finds paths through intermediate types (hero → teaser → image)
+- **Roundtrip preservation**: Unmapped fields persist through conversions back to original type
 
 ### Level 3: Enable Frontend block selection and Quanta Toolbar
 

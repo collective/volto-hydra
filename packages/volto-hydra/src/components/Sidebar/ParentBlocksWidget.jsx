@@ -26,8 +26,9 @@ import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { getBlockById, getBlockSchema } from '../../utils/blockPath';
+import { getBlockById, getBlockSchema, updateBlockById } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
+import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
 
 /**
  * Get the display title for a block type
@@ -296,6 +297,14 @@ const ParentBlockSection = ({
           </button>
           {menuOpen && (() => {
             const pathInfo = blockPathMap?.[blockId];
+            const blocksConfig = config.blocks?.blocksConfig;
+            const convertibleTypes = getConvertibleTypes(blockType, blocksConfig);
+            const handleConvertBlock = (newType) => {
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig);
+              // Preserve the block ID
+              newBlockData['@uid'] = blockId;
+              onChangeBlock(blockId, newBlockData);
+            };
             return (
               <DropdownMenu
                 selectedBlock={blockId}
@@ -310,6 +319,8 @@ const ParentBlockSection = ({
                 addMode={pathInfo?.addMode}
                 parentAddMode={pathInfo?.parentAddMode}
                 addDirection={pathInfo?.addDirection}
+                convertibleTypes={convertibleTypes}
+                onConvertBlock={handleConvertBlock}
               />
             );
           })()}

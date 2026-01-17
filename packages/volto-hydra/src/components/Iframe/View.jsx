@@ -93,6 +93,8 @@ import {
   applySchemaDefaultsToFormData,
   createSchemaEnhancerFromRecipe,
   syncChildBlockTypes,
+  getConvertibleTypes,
+  convertBlockType,
 } from '../../utils/schemaInheritance';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
@@ -1521,7 +1523,7 @@ const Iframe = (props) => {
             // New format: { inheritSchemaFrom: {...}, skiplogic: {...} }
             // Legacy format: { type: 'inheritSchemaFrom', config: {...} }
             if (frontendConfig?.blocks?.blocksConfig) {
-              const recipeKeys = ['inheritSchemaFrom', 'hideParentOwnedFields', 'skiplogic'];
+              const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
               for (const [blockType, blockConfig] of Object.entries(
                 frontendConfig.blocks.blocksConfig,
               )) {
@@ -2295,6 +2297,26 @@ const Iframe = (props) => {
             onOpenObjectBrowser={(fieldName, blockUid) => {
               // Set pending state to trigger object browser via OpenObjectBrowser component
               setPendingFieldMedia({ fieldName, blockUid });
+            }}
+            convertibleTypes={(() => {
+              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+              const blockType = blockData?.['@type'];
+              return getConvertibleTypes(blockType, blocksConfig);
+            })()}
+            onConvertBlock={(newType) => {
+              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+              if (!blockData) return;
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig);
+              const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, newBlockData);
+              onChangeFormData(updatedProperties);
+              // Rebuild blockPathMap and update state
+              const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: updatedProperties,
+                blockPathMap: newBlockPathMap,
+                toolbarRequestDone: `convert-block-${Date.now()}`,
+              }));
             }}
           />
 

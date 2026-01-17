@@ -403,10 +403,6 @@ export class AdminUIHelper {
     await block.click();
 
     if (waitForToolbar) {
-      // Wait for any block to be selected (toolbar visible)
-      const toolbar = this.page.locator('.quanta-toolbar');
-      await toolbar.waitFor({ state: 'visible', timeout: 5000 });
-
       // Try to wait for the target block to be selected
       // If it times out, check if we need to navigate to parent (container case)
       try {
@@ -856,17 +852,22 @@ export class AdminUIHelper {
    * Also verifies the toolbar is not covered by the sidebar.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
+    // Scroll block into view FIRST - toolbar is hidden when block is out of viewport
+    await this.scrollBlockIntoViewWithToolbarRoom(blockId);
+
     // Wait until toolbar is positioned correctly relative to the block
     // (isBlockSelectedInIframe checks visibility AND positioning)
+    let lastReason = '';
     await expect.poll(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
+      if (res?.reason && res.reason !== lastReason) {
+        console.log(`[waitForQuantaToolbar] ${blockId}: ${res.reason}`);
+        lastReason = res.reason;
+      }
       return !!res && !!res.ok;
     }, { timeout }).toBeTruthy();
-
-    // Scroll block into view with room for toolbar
-    await this.scrollBlockIntoViewWithToolbarRoom(blockId);
 
     // After scrolling, the viewport position changed, so poll again to ensure
     // the toolbar has re-adjusted its position correctly

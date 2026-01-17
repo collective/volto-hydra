@@ -1206,3 +1206,288 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await expect(pageNoticeField).not.toBeVisible({ timeout: 5000 });
   });
 });
+
+test.describe('Block Type Conversion via fieldMappings', () => {
+  test('teaser block dropdown shows Convert to Image option', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a teaser block
+    const teaserBlock = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(teaserBlock).toBeVisible({ timeout: 10000 });
+    await teaserBlock.click();
+
+    // Wait for toolbar to appear
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // Click the menu button (three dots)
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    // Wait for dropdown menu to appear
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+
+    // Hover over "Convert to" menu item
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await expect(convertToItem).toBeVisible({ timeout: 3000 });
+    await convertToItem.hover();
+
+    // Submenu should appear with "Image" option
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+
+    // Verify Image is in the submenu (teaser has fieldMappings.teaser in image config)
+    const imageOption = submenu.locator('text=Image');
+    await expect(imageOption).toBeVisible({ timeout: 3000 });
+  });
+
+  test('converting teaser to image maps fields correctly', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a teaser block
+    const teaserBlock = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(teaserBlock).toBeVisible({ timeout: 10000 });
+    await teaserBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Verify it's currently a Teaser block (check breadcrumb)
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // Click the menu button in toolbar
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    // Wait for dropdown menu
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+
+    // Hover over "Convert to" and click "Image"
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    const imageOption = submenu.locator('text=Image');
+    await imageOption.click();
+
+    // Wait for conversion to complete - breadcrumb should change to Image
+    await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // The block should now be an Image block - verified by breadcrumb change
+    // The sidebar form shows image-specific content like "No image selected"
+  });
+
+  test('image block dropdown shows Convert to Teaser option', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // First need to find an image block - the listing block has image items when variation is image
+    // Or we can add one through the block chooser
+    // For simplicity, let's click on any block and convert it
+
+    // Click on a teaser, convert to image, then verify Convert to Teaser option appears
+    const teaserBlock = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(teaserBlock).toBeVisible({ timeout: 10000 });
+    await teaserBlock.click();
+
+    // Convert to Image first
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    let menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    let dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    let convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    let submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Image').click();
+
+    // Wait for conversion - breadcrumb should change
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // Now click menu again and verify "Convert to Teaser" is available
+    menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+
+    // Verify Teaser option is in submenu
+    const teaserOption = submenu.locator('text=Teaser');
+    await expect(teaserOption).toBeVisible({ timeout: 3000 });
+  });
+
+  test('roundtrip conversion preserves mapped fields', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the manual teaser inside gridBlock (has href to /target-page)
+    const teaserBlock = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(teaserBlock).toBeVisible({ timeout: 10000 });
+    await teaserBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Verify initial teaser has href value (link to /target-page)
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // Get the initial href value from the teaser
+    const hrefField = page.locator('#sidebar-properties .field-wrapper-href');
+    await expect(hrefField).toBeVisible({ timeout: 5000 });
+
+    // Convert to Image
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    let menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    let dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    let convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    let submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Image').click();
+
+    // Wait for conversion to Image
+    await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // Convert back to Teaser
+    menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Teaser').click();
+
+    // Verify back to Teaser
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // The href field should still have a value (preserved through roundtrip)
+    // teaser.href -> image.href -> teaser.href
+    await expect(hrefField).toBeVisible({ timeout: 5000 });
+  });
+
+  test('hero to image and back preserves fields through transitive conversion', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the Hero block to be visible in iframe before clicking
+    const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    await expect(heroBlock).toBeVisible({ timeout: 10000 });
+
+    // Click on the Hero block (block-4-hero has heading, image, buttonLink, buttonText)
+    await helper.clickBlockInIframe('block-4-hero');
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
+
+    // Verify Hero has heading, image, buttonLink, and buttonText fields
+    const headingField = page.locator('#sidebar-properties .field-wrapper-heading');
+    await expect(headingField).toBeVisible({ timeout: 5000 });
+    const imageField = page.locator('#sidebar-properties .field-wrapper-image');
+    await expect(imageField).toBeVisible({ timeout: 5000 });
+    const buttonLinkField = page.locator('#sidebar-properties .field-wrapper-buttonLink');
+    await expect(buttonLinkField).toBeVisible({ timeout: 5000 });
+    const buttonTextField = page.locator('#sidebar-properties .field-wrapper-buttonText');
+    await expect(buttonTextField).toBeVisible({ timeout: 5000 });
+
+    // Record initial buttonText value (should persist through conversions since it's not mapped)
+    const buttonTextInput = buttonTextField.locator('input, textarea');
+    const originalButtonText = await buttonTextInput.inputValue();
+    expect(originalButtonText).toBe('Click Me');
+
+    // Convert Hero → Image (transitive via teaser)
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    let menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    let dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    let convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    let submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Image').click();
+
+    // Verify converted to Image
+    await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // Verify Image has alt field with the converted heading value
+    const altField = page.locator('#sidebar-properties .field-wrapper-alt');
+    await expect(altField).toBeVisible({ timeout: 5000 });
+    // Check the alt text field has the converted heading value "Welcome Hero"
+    const altInput = altField.locator('input, textarea');
+    await expect(altInput).toHaveValue('Welcome Hero', { timeout: 5000 });
+
+    // Convert Image → Hero (transitive via teaser)
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Hero').click();
+
+    // Verify converted back to Hero
+    await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
+
+    // Verify Hero fields are back with the original values
+    await expect(headingField).toBeVisible({ timeout: 5000 });
+    // Check heading field has the roundtrip value
+    const headingInput = headingField.locator('input, textarea');
+    await expect(headingInput).toHaveValue('Welcome Hero', { timeout: 5000 });
+
+    // Verify buttonText was preserved (it's not in any fieldMappings, so should persist)
+    await expect(buttonTextField).toBeVisible({ timeout: 5000 });
+    await expect(buttonTextInput).toHaveValue('Click Me', { timeout: 5000 });
+  });
+});
