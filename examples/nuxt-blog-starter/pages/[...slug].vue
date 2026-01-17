@@ -287,6 +287,45 @@ onMounted(() => {
                         required: [],
                     },
                 },
+                // Grid block: add schema inheritance recipe
+                // variation field is added by schemaEnhancer, don't put it in fieldsets
+                // NO DEFAULT - children are independent until a type is selected
+                gridBlock: {
+                    blockSchema: {
+                        properties: {
+                            variation: {
+                                title: 'Item Type',
+                                widget: 'block_type',
+                                allowedTypes: ['teaser', 'image'],
+                            },
+                        },
+                    },
+                    schemaEnhancer: {
+                        type: 'inheritSchemaFrom',
+                        config: { typeField: 'variation', defaultsField: 'itemDefaults' },
+                    },
+                },
+                // Teaser block: use Volto's TeaserSchema (has href with object_browser)
+                // Only send schemaEnhancer for hideParentOwnedFields when inside a grid
+                teaser: {
+                    schemaEnhancer: {
+                        type: 'hideParentOwnedFields',
+                        config: {
+                            defaultsField: 'itemDefaults',
+                            editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
+                        },
+                    },
+                },
+                // Image block: configure which fields are editable on child vs parent
+                image: {
+                    schemaEnhancer: {
+                        type: 'hideParentOwnedFields',
+                        config: {
+                            defaultsField: 'itemDefaults',
+                            editableFields: ['url', 'alt', 'href'],
+                        },
+                    },
+                },
             };
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');

@@ -84,6 +84,10 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const imageOption = menu.locator('.react-select__option', { hasText: 'Image' });
     await imageOption.click();
 
+    // Wait for schema to update - "Image Defaults" fieldset appears when variation changes
+    const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
+    await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
+
     // Wait for teasers to disappear first (confirms variation change is taking effect)
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
@@ -199,23 +203,34 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     // Wait for variation menu to close (confirms selection was made)
     await variationMenu.waitFor({ state: 'hidden', timeout: 3000 });
 
+    // Wait for schema to update - fieldset title changes to "Image Defaults"
+    const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
+    await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
+
     // Verify smart defaults are recalculated for image block
-    // The "Image" row should now show a mapped value (smart defaults for image type)
-    const imageRow = mappingTable.locator('tr').filter({ has: page.locator('td:first-child', { hasText: 'Image' }) });
+    // The "Lead Image" row should now show a mapped value (smart defaults for image type)
+    const imageRow = mappingTable.locator('tr').filter({ has: page.locator('td:first-child', { hasText: 'Lead Image' }) });
     const imageRowSelect = imageRow.locator('.react-select__single-value');
     // Image block's url field should be mapped (it's an image type field)
-    await expect(imageRowSelect).toContainText('Image Src');
+    await expect(imageRowSelect).toContainText('Image URL');
 
-    // Open the URL row's dropdown to verify image block fields are available
-    await urlRowDropdown.click();
+    // Scroll to show the fieldMapping table after variation change
+    const sidebarWrapper = page.locator('.sidebar-content-wrapper');
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+
+    // Re-query the URL row dropdown (use first-child filter to avoid matching "Image URL" text)
+    const urlRowAfterChange = mappingTable.locator('tr').filter({ has: page.locator('td:first-child', { hasText: 'URL' }) });
+    const urlRowDropdownAfterChange = urlRowAfterChange.locator('.react-select__control');
+    await urlRowDropdownAfterChange.scrollIntoViewIfNeeded();
+    await urlRowDropdownAfterChange.click();
     await menu.waitFor({ state: 'visible', timeout: 3000 });
 
     // Image block should have different fields than teaser
     // Verify "Target" (teaser-specific) is NOT present
     await expect(menu.locator('.react-select__option:has-text("Target")')).not.toBeVisible();
 
-    // Verify image block has "Image Src" field (url with widget: 'image')
-    await expect(menu.locator('.react-select__option:has-text("Image Src")')).toBeVisible();
+    // Verify image block has "Image URL" field (url with widget: 'image')
+    await expect(menu.locator('.react-select__option:has-text("Image URL")')).toBeVisible();
 
     // Close dropdown by clicking elsewhere
     await mappingTable.locator('th', { hasText: 'Source' }).click();
@@ -292,66 +307,11 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     await expect(teaserDefaultsContent.locator('.field-wrapper-itemDefaults_href')).not.toBeVisible();
     await expect(teaserDefaultsContent.locator('.field-wrapper-itemDefaults_preview_image')).not.toBeVisible();
 
-    // Non-mapped fields SHOULD appear
-    await expect(teaserDefaultsContent.locator('.field-wrapper-itemDefaults_overwrite')).toBeVisible();
+    // Non-mapped AND non-editable fields SHOULD appear in parent defaults
+    // editableFields stay on child: ['href', 'title', 'description', 'preview_image', 'overwrite']
+    // So head_title and openLinkInNewTab go to parent defaults
     await expect(teaserDefaultsContent.locator('.field-wrapper-itemDefaults_head_title')).toBeVisible();
-  });
-
-  test('enabling overwrite in Teaser Defaults shows title in rendered teaser', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-
-    const blockId = 'block-9-listing';
-    const iframe = helper.getIframe();
-
-    // Click on listing block
-    await helper.clickBlockInIframe(blockId);
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
-
-    // Scroll to the "Teaser Defaults" fieldset (it's expanded by default)
-    // First wait for element to be in DOM, then scroll the sidebar container
-    const teaserDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
-    await expect(teaserDefaultsFieldset).toBeAttached({ timeout: 10000 });
-
-    // Scroll the sidebar container to bring fieldset into view
-    await page.evaluate(() => {
-      const fieldset = document.querySelector('#blockform-fieldset-inherited_fields');
-      if (fieldset) {
-        fieldset.scrollIntoView({ block: 'center', behavior: 'instant' });
-      }
-    });
-    await expect(teaserDefaultsFieldset).toBeVisible();
-
-    // Find and check the "overwrite" checkbox (field is itemDefaults_overwrite)
-    const overwriteField = page.locator('#sidebar-properties .field-wrapper-itemDefaults_overwrite');
-    const overwriteCheckbox = overwriteField.locator('input[type="checkbox"]');
-    await overwriteField.scrollIntoViewIfNeeded();
-    await expect(overwriteCheckbox).toBeVisible();
-
-    // Check if it's already checked, if not, click it (click label to toggle)
-    const isChecked = await overwriteCheckbox.isChecked();
-    if (!isChecked) {
-      await overwriteField.locator('label').click();
-    }
-
-    // Wait for frontend to re-render
-    await page.waitForTimeout(500);
-
-    // Now the teaser should render with title from the mapped field
-    // because overwrite enables the block.title to be used
-    const teaserItems = iframe.locator(`[data-block-uid="${blockId}"].teaser-block`);
-    await expect(teaserItems.first()).toBeVisible({ timeout: 5000 });
-
-    // First teaser should now have a title (h3 or h5 element with text)
-    const firstTeaser = teaserItems.first();
-    const teaserTitle = firstTeaser.locator('h3, h5');
-    await expect(teaserTitle).toBeVisible();
-    const titleText = await teaserTitle.textContent();
-    expect(titleText).toBeTruthy();
-    expect(titleText?.length).toBeGreaterThan(0);
+    await expect(teaserDefaultsContent.locator('.field-wrapper-itemDefaults_openLinkInNewTab')).toBeVisible();
   });
 
   test('listing inside grid has valid titles on initial render', async ({ page }) => {
@@ -429,10 +389,12 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
-    // Click on a facet item (facet-type is "Content Type" facet)
+    // Click on a facet item's title (avoid clicking checkboxes which filter results)
     const facetItem = iframe.locator('[data-block-uid="facet-type"]');
     await expect(facetItem).toBeVisible({ timeout: 5000 });
-    await facetItem.click();
+    // Click on the title, not the checkbox area
+    const facetTitle = facetItem.locator('[data-editable-field="title"]');
+    await facetTitle.click();
 
     // Toolbar should be visible for the facet
     await expect(toolbar).toBeVisible({ timeout: 5000 });
@@ -589,8 +551,9 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const initialCount = await initialFacets.count();
     expect(initialCount).toBe(2); // facet-type and facet-state
 
-    // Click on a facet to select it
-    await facetItem.click();
+    // Click on a facet title to select it (avoid clicking checkboxes)
+    const facetTitle = facetItem.locator('[data-editable-field="title"]');
+    await facetTitle.click();
 
     // Toolbar should appear
     const toolbar = page.locator('.quanta-toolbar');
@@ -653,10 +616,8 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     });
     await selectFacetOption.click();
 
-    // Wait for frontend to re-render with the new facet settings
-    await page.waitForTimeout(1000);
-
     // Verify the facet now renders as a dropdown (select element)
+    // This waits for frontend to re-render with the new facet settings
     const facetDropdown = newFacet.locator('select.facet-select');
     await expect(facetDropdown).toBeVisible({ timeout: 5000 });
 
@@ -674,5 +635,315 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     // Verify the dropdown has the correct data-field attribute
     const dataField = await facetDropdown.getAttribute('data-field');
     expect(dataField).toBe('review_state');
+  });
+});
+
+test.describe('Frontend-Driven Schema Enhancers', () => {
+  test('gridBlock with schemaEnhancer recipe shows inherited defaults fieldset', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a teaser inside gridBlock (this is inside the grid container)
+    const gridCell = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(gridCell).toBeVisible({ timeout: 10000 });
+    await gridCell.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Scroll to top of sidebar to see parent's settings
+    const sidebarWrapper = page.locator('.sidebar-content-wrapper');
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, 0));
+
+    // Find the Grid section in sidebar (parent block settings)
+    // Look for section with "‹ Grid" nav button
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    }).first();
+    await expect(gridSection).toBeVisible({ timeout: 5000 });
+
+    // Type widget should start empty (no default) - verify placeholder is shown
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await expect(variationSelect.locator('.react-select__placeholder')).toBeVisible();
+
+    // No defaults fieldset should be visible yet (no type selected)
+    await expect(gridSection.locator('text=Teaser Defaults')).not.toBeVisible();
+    await expect(gridSection.locator('text=Image Defaults')).not.toBeVisible();
+
+    // Select Teaser from the dropdown
+    await variationSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Teaser' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Verify inherited fields are present in Grid section (from teaser schema)
+    // These fields are NOT in teaser's editableFields, so they get inherited to parent
+    // head_title -> "Head title", openLinkInNewTab -> "Open in a new tab", align -> "Alignment"
+    const headTitleField = gridSection.locator('text=Head title');
+    await expect(headTitleField).toBeVisible({ timeout: 5000 });
+
+    const alignmentField = gridSection.locator('text=Alignment');
+    await expect(alignmentField).toBeVisible({ timeout: 3000 });
+
+    // Verify "Customize teaser content" (overwrite) is NOT in Grid section
+    // It's in editableFields so it stays on the child teaser
+    await expect(gridSection.locator('text=Customize teaser content')).not.toBeVisible();
+  });
+
+  test('child teaser inside grid hides parent-owned fields', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a child teaser inside gridBlock
+    const manualTeaser = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(manualTeaser).toBeVisible();
+    await manualTeaser.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // PHASE 1: No type selected - children are independent, all fields visible
+    // Grid has no default for variation, so hideParentOwnedFields should NOT apply
+
+    // All teaser fields should be visible (no hiding)
+    expect(await helper.hasSidebarField('href')).toBe(true);
+    expect(await helper.hasSidebarField('overwrite')).toBe(true);
+    // align might be in a styling fieldset - check it exists somewhere
+    const alignVisibleInitially = await helper.hasSidebarField('align');
+
+    // Grid section should NOT show "Teaser Defaults" since no type selected
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    });
+    await expect(gridSection.getByText('Teaser Defaults')).not.toBeVisible();
+
+    // PHASE 2: Select a type - children become controlled, fields hidden
+    // Find the variation dropdown and select "teaser"
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await variationSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.locator('text=Teaser').click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Wait for schema to update after type selection
+    await expect(gridSection.getByText('Teaser Defaults')).toBeVisible({ timeout: 5000 });
+
+    // Now parent-owned fields should be hidden on the child teaser
+    // editableFields for teaser are: href, title, description, preview_image, overwrite
+    expect(await helper.hasSidebarField('href')).toBe(true);
+    expect(await helper.hasSidebarField('overwrite')).toBe(true);
+
+    // If align was visible before, it should now be hidden (moved to parent)
+    if (alignVisibleInitially) {
+      expect(await helper.hasSidebarField('align')).toBe(false);
+    }
+
+    // Verify alignment IS visible in Grid's parent section (inherited fields)
+    expect(await helper.hasSidebarField('align-0-itemDefaults_styles', 'Grid')).toBe(true);
+  });
+
+  test('nested listing inside grid hides parent-owned fields when type selected', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the listing block inside the grid (first match - the container)
+    const listingInGrid = iframe.locator('[data-block-uid="listing-in-grid"]').first();
+    await expect(listingInGrid).toBeVisible();
+    await listingInGrid.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Find Grid section and select "teaser" as the item type
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    });
+    await expect(gridSection).toBeVisible({ timeout: 5000 });
+
+    // Select "teaser" in Grid's variation dropdown
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await variationSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.locator('text=Teaser').click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Wait for Teaser Defaults to appear in Grid section
+    await expect(gridSection.getByText('Teaser Defaults')).toBeVisible({ timeout: 5000 });
+
+    // Now the listing block should hide parent-owned fields
+    // The listing's "variation" field should NOT be visible (it's controlled by Grid)
+    expect(await helper.hasSidebarField('variation')).toBe(false);
+
+    // Parent-owned fields like openLinkInNewTab should NOT be visible
+    expect(await helper.hasSidebarField('openLinkInNewTab')).toBe(false);
+
+    // But the listing should still show its own fields like headline
+    expect(await helper.hasSidebarField('headline')).toBe(true);
+  });
+
+  test('nested listing fieldMapping updates when parent type changes', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the listing block inside the grid
+    const listingInGrid = iframe.locator('[data-block-uid="listing-in-grid"]').first();
+    await expect(listingInGrid).toBeVisible();
+    await listingInGrid.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Find Grid section and select "teaser" as the item type
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    });
+    await expect(gridSection).toBeVisible({ timeout: 5000 });
+
+    // Select "teaser" in Grid's variation dropdown
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await variationSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.locator('text=Teaser').click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Wait for Teaser Defaults to appear in Grid section
+    await expect(gridSection.getByText('Teaser Defaults')).toBeVisible({ timeout: 5000 });
+
+    // Scroll sidebar to show Field Mapping section
+    const sidebarWrapper = page.locator('.sidebar-content-wrapper');
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+
+    // Verify fieldMapping widget shows teaser target fields
+    const fieldMappingWidget = page.locator('#sidebar-properties .field-wrapper-fieldMapping');
+    const fieldMappingTable = fieldMappingWidget.locator('.field-mapping-table');
+    await expect(fieldMappingTable).toBeVisible({ timeout: 5000 });
+
+    // The fieldMapping should show teaser's target fields in the dropdowns
+    // Check that "Target" (teaser's href field) is available as an option
+    const urlRow = fieldMappingTable.locator('tr').filter({ has: page.locator('td:first-child', { hasText: 'URL' }) });
+    await expect(urlRow.locator('.react-select__single-value')).toContainText('Target');
+
+    // Now change Grid's variation to "image" and verify fieldMapping updates
+    // First scroll back up to access the Grid section
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, 0));
+    await variationSelect.click();
+    const menu2 = page.locator('.react-select__menu');
+    await menu2.locator('text=Image').click();
+    await menu2.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Wait for Image Defaults to appear in Grid section
+    await expect(gridSection.getByText('Image Defaults')).toBeVisible({ timeout: 5000 });
+
+    // Scroll down again to check fieldMapping
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+
+    // The fieldMapping should now show image's target fields (Image URL, Alt text)
+    // Wait for the fieldMapping to update with image fields
+    await expect(fieldMappingTable).toBeVisible({ timeout: 5000 });
+    // The Lead Image row should map to "Image URL" (image's url field for src)
+    const imageRow = fieldMappingTable.locator('tr').filter({ has: page.locator('td:first-child', { hasText: 'Lead Image' }) });
+    await expect(imageRow.locator('.react-select__single-value')).toContainText('Image URL', { timeout: 5000 });
+  });
+
+  test('changing variation transforms child block types', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a child teaser inside gridBlock (manual-teaser is a teaser)
+    const manualTeaser = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(manualTeaser).toBeVisible({ timeout: 10000 });
+    await manualTeaser.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Scroll to top of sidebar to see parent's settings
+    const sidebarWrapper = page.locator('.sidebar-content-wrapper');
+    await sidebarWrapper.evaluate((el) => el.scrollTo(0, 0));
+
+    // Verify initial state - child is Teaser type (check breadcrumb)
+    const childBreadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(childBreadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // Find the Grid section in sidebar
+    const gridSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Grid/ }),
+    }).first();
+    await expect(gridSection).toBeVisible({ timeout: 5000 });
+
+    // Find the variation dropdown (block_type widget) and change to Image
+    // The widget renders as a react-select or similar dropdown
+    const variationSelect = gridSection.locator('.react-select__control').first();
+    await expect(variationSelect).toBeVisible({ timeout: 5000 });
+    await variationSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Image' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Verify defaults fieldset changed to Image
+    const imageDefaultsFieldset = gridSection.locator('text=Image Defaults');
+    await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
+
+    // Verify child block type changed - breadcrumb should now say Image
+    await expect(childBreadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // Verify the grid has 6 items total (1 transformed teaser + 5 listing items)
+    // If the listing's @type was wrongly changed to image, we'd only see 2 items
+    // (the listing would be an image block, not expanding to 5 items)
+    const gridItems = iframe.locator('[data-block-uid="block-8-grid"] [data-block-uid]');
+    const itemCount = await gridItems.count();
+    expect(itemCount).toBeGreaterThanOrEqual(6);
+
+    // Click on the listing block to verify it's still a listing (not transformed to image)
+    const listingBlock = iframe.locator('[data-block-uid="listing-in-grid"]').first();
+    await listingBlock.click();
+
+    // Verify listing-in-grid was selected
+    await helper.waitForBlockSelected('listing-in-grid');
+
+    // Verify the listing block sidebar still shows listing settings
+    // The listing's @type should still be "listing", only its variation changed to "image"
+    // Look for the Listing section in parent blocks
+    const listingSection = page.locator('.parent-block-section').filter({
+      has: page.locator('.parent-nav', { hasText: /Listing/ }),
+    }).first();
+    await expect(listingSection).toBeVisible();
+
+    // Verify that the Listing does NOT show "Image Defaults" - since the parent (Grid)
+    // controls the type, only the Grid should show the defaults fieldset
+    // The Listing's variation field should be hidden and it should not duplicate defaults
+    const listingForm = listingSection.locator('form');
+    await expect(listingForm.locator('text=Image Defaults')).not.toBeVisible();
+
+    // Verify the Grid section still shows "Image Defaults" (parent owns the defaults)
+    await expect(gridSection.locator('text=Image Defaults')).toBeVisible();
   });
 });

@@ -27,6 +27,7 @@ import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, getBlockSchema } from '../../utils/blockPath';
+import { HydraSchemaProvider } from '../../context';
 
 /**
  * Get the display title for a block type
@@ -156,8 +157,8 @@ const filterBlocksFields = (schema) => {
  * Returns filtered schema (without blocks-type fields) or null.
  * Uses the central getBlockSchema which handles object_list items.
  */
-const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId) => {
-  const schema = getBlockSchema(blockType, intl, config.blocks?.blocksConfig, blockPathMap, blockId);
+const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockData) => {
+  const schema = getBlockSchema(blockType, intl, config.blocks?.blocksConfig, blockPathMap, blockId, blockData);
   if (!schema) return null;
 
   // Filter out blocks-type fields (container fields) for sidebar display
@@ -183,7 +184,14 @@ const ParentBlockSection = ({
   pathname,
   intl,
   blockPathMap,
+  liveBlockDataRef,
 }) => {
+  // Store current block data in liveBlockDataRef on every render
+  // This ensures child schemaEnhancers can see parent's current data
+  if (liveBlockDataRef && blockData) {
+    liveBlockDataRef.current[blockId] = blockData;
+  }
+
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
   const menuButtonRef = React.useRef(null);
@@ -199,7 +207,20 @@ const ParentBlockSection = ({
   const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
 
   // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
-  const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId) : null;
+  const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
+
+  // Compute a key suffix that changes when parent's schema inheritance state changes.
+  // This forces BlockEdit to remount when parent's typeField changes, ensuring child gets fresh schema.
+  // Without this, Volto's BlockEdit caches its internal form and doesn't re-render with new schema.
+  const parentSchemaKey = React.useMemo(() => {
+    if (!parentId || !liveBlockDataRef?.current) return '';
+    const parentBlock = liveBlockDataRef.current[parentId];
+    if (!parentBlock) return '';
+    const parentConfig = config.blocks?.blocksConfig?.[parentBlock['@type']];
+    const parentTypeField = parentConfig?.schemaEnhancer?.config?.typeField;
+    if (!parentTypeField) return '';
+    return `-parent-${parentTypeField}:${parentBlock[parentTypeField] || 'none'}`;
+  }, [parentId, liveBlockDataRef?.current?.[parentId]]);
 
   const handleMenuClick = (e) => {
     e.stopPropagation();
@@ -309,58 +330,63 @@ const ParentBlockSection = ({
           Parent blocks: render to their own target div
           Current block: render to sidebar-properties */}
       {BlockEdit && (
-        <SidebarPortalTargetContext.Provider value={targetId}>
-          {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
-          <div style={{ display: 'none' }}>
-            <BlockEdit
-              type={blockType}
-              id={blockId}
-              data={blockData}
-              selected={true}
-              index={index}
-              properties={formData}
-              pathname={pathname}
-              intl={intl}
-              onChangeBlock={onChangeBlock}
-              // For parent blocks, use no-op to prevent Edit components from changing
-              // selection when they initialize/render. This was causing parent blocks
-              // to get selected when clicking on child blocks (e.g., empty blocks).
-              // For current block, use real onSelectBlock for sub-selections.
-              onSelectBlock={isCurrentBlock ? onSelectBlock : () => {}}
-              // These are needed but not used for sidebar-only rendering
-              onMoveBlock={() => {}}
-              onDeleteBlock={() => {}}
-              onAddBlock={() => {}}
-              onFocusPreviousBlock={() => {}}
-              onFocusNextBlock={() => {}}
-              handleKeyDown={() => {}}
-              block={blockId}
-              blocksConfig={config.blocks?.blocksConfig}
-              navRoot={{}}
-              contentType={formData?.['@type']}
-            />
-          </div>
-        </SidebarPortalTargetContext.Provider>
+        <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+          <SidebarPortalTargetContext.Provider value={targetId}>
+            {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
+            {/* Key includes parentSchemaKey to force remount when parent's schema inheritance changes */}
+            <div key={`${blockId}${parentSchemaKey}`} style={{ display: 'none' }}>
+              <BlockEdit
+                type={blockType}
+                id={blockId}
+                data={blockData}
+                selected={true}
+                index={index}
+                properties={formData}
+                pathname={pathname}
+                intl={intl}
+                onChangeBlock={onChangeBlock}
+                // For parent blocks, use no-op to prevent Edit components from changing
+                // selection when they initialize/render. This was causing parent blocks
+                // to get selected when clicking on child blocks (e.g., empty blocks).
+                // For current block, use real onSelectBlock for sub-selections.
+                onSelectBlock={isCurrentBlock ? onSelectBlock : () => {}}
+                // These are needed but not used for sidebar-only rendering
+                onMoveBlock={() => {}}
+                onDeleteBlock={() => {}}
+                onAddBlock={() => {}}
+                onFocusPreviousBlock={() => {}}
+                onFocusNextBlock={() => {}}
+                handleKeyDown={() => {}}
+                block={blockId}
+                blocksConfig={config.blocks?.blocksConfig}
+                navRoot={{}}
+                contentType={formData?.['@type']}
+              />
+            </div>
+          </SidebarPortalTargetContext.Provider>
+        </HydraSchemaProvider>
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
       {!BlockEdit && schema && (() => {
         const formContent = (
-          <BlockDataForm
-            schema={schema}
-            onChangeField={(fieldId, value) => {
-              // Use lodash set for nested paths like 'itemDefaults.overwrite'
-              const newBlockData = cloneDeep(blockData);
-              set(newBlockData, fieldId, value);
-              onChangeBlock(blockId, newBlockData);
-            }}
-            onChangeBlock={(id, data) => {
-              onChangeBlock(id, data);
-            }}
-            formData={blockData}
-            block={blockId}
-            applySchemaEnhancers={true}
-          />
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+            <BlockDataForm
+              schema={schema}
+              onChangeField={(fieldId, value) => {
+                // Use lodash set for nested paths like 'itemDefaults.overwrite'
+                const newBlockData = cloneDeep(blockData);
+                set(newBlockData, fieldId, value);
+                onChangeBlock(blockId, newBlockData);
+              }}
+              onChangeBlock={(id, data) => {
+                onChangeBlock(id, data);
+              }}
+              formData={blockData}
+              block={blockId}
+              applySchemaEnhancers={true}
+            />
+          </HydraSchemaProvider>
         );
         // Portal to the target element (sidebar-properties for current, parent-sidebar-{id} for parents)
         const targetElement = document.getElementById(targetId);
@@ -388,6 +414,19 @@ const ParentBlocksWidget = ({
   const intl = useIntl();
   const location = useLocation();
   const pathname = location?.pathname || '';
+
+  // Track live block data from each form's internal state
+  // This ref is updated synchronously when any block's form changes,
+  // so child schemaEnhancers see fresh parent data immediately
+  const liveBlockDataRef = React.useRef({});
+
+  // Wrapper that captures block data changes before propagating to parent
+  const handleBlockChange = React.useCallback((blockId, newBlockData) => {
+    // Update ref immediately (synchronous, no React batching)
+    liveBlockDataRef.current = { ...liveBlockDataRef.current, [blockId]: newBlockData };
+    // Propagate to parent
+    onChangeBlock(blockId, newBlockData);
+  }, [onChangeBlock]);
 
   React.useEffect(() => {
     setIsClient(true);
@@ -502,12 +541,13 @@ const ParentBlocksWidget = ({
                 isCurrentBlock={false}
                 onSelectBlock={onSelectBlock}
                 onDeleteBlock={onDeleteBlock}
-                onChangeBlock={onChangeBlock}
+                onChangeBlock={handleBlockChange}
                 onBlockAction={onBlockAction}
                 formData={formData}
                 pathname={pathname}
                 intl={intl}
                 blockPathMap={blockPathMap}
+                liveBlockDataRef={liveBlockDataRef}
               />
             );
           })}
@@ -523,12 +563,13 @@ const ParentBlocksWidget = ({
             isCurrentBlock={true}
             onSelectBlock={onSelectBlock}
             onDeleteBlock={onDeleteBlock}
-            onChangeBlock={onChangeBlock}
+            onChangeBlock={handleBlockChange}
             onBlockAction={onBlockAction}
             formData={formData}
             pathname={pathname}
             intl={intl}
             blockPathMap={blockPathMap}
+            liveBlockDataRef={liveBlockDataRef}
           />
         </>,
         parentsTarget,

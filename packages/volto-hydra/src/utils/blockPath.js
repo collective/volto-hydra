@@ -46,9 +46,10 @@ function stripFunctionsFromSchema(obj, seen = new WeakSet()) {
  * @param {Object} blocksConfig - Optional blocksConfig override (defaults to config.blocks.blocksConfig)
  * @param {Object} blockPathMap - Optional blockPathMap for object_list item lookup
  * @param {string} blockId - Optional block ID for object_list item lookup
+ * @param {Object} formData - Optional block data to pass to schemaEnhancer (required for dynamic enhancers like inheritSchemaFrom)
  * @returns {Object|null} - The block schema or null
  */
-export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMap = null, blockId = null) {
+export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMap = null, blockId = null, formData = null) {
   // For object_list items (like table rows/cells), use itemSchema from blockPathMap
   if (blockPathMap && blockId) {
     const pathInfo = blockPathMap[blockId];
@@ -70,31 +71,43 @@ export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMa
   const schemaSource = blockConfig.blockSchema || blockConfig.schema;
   let schema = null;
 
+  // Use provided formData or empty object
+  const effectiveFormData = formData || {};
+
   if (schemaSource) {
     try {
       schema = typeof schemaSource === 'function'
-        ? schemaSource({ formData: {}, data: {}, intl })
+        ? schemaSource({ formData: effectiveFormData, data: effectiveFormData, intl })
         : schemaSource;
     } catch {
       schema = null;
     }
   }
 
-  // If no base schema, start with empty schema
+  // Ensure schema has required structure
   if (!schema) {
     schema = {
       fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
       properties: {},
       required: [],
     };
+  } else {
+    // Ensure fieldsets exists (frontend blockSchema may only define properties)
+    if (!schema.fieldsets) {
+      schema = {
+        ...schema,
+        fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      };
+    }
   }
 
   // Run schemaEnhancer on top of base schema (if it exists)
+  // Note: hideParentOwnedFields reads blockPathMap/blockId from HydraSchemaContext
   if (blockConfig.schemaEnhancer) {
     try {
       schema = blockConfig.schemaEnhancer({
         schema,
-        formData: {},
+        formData: effectiveFormData,
         intl,
       });
     } catch {
@@ -556,6 +569,24 @@ export function updateBlockById(formData, blockPathMap, blockId, newBlockData) {
     throw new Error(`Block ${blockId} not found in blockPathMap`);
   }
   return setBlockByPath(formData, pathInfo.path, newBlockData);
+}
+
+/**
+ * Get all child block IDs whose parent is the given block.
+ * Uses blockPathMap's parentId tracking to find direct children.
+ *
+ * @param {string} parentId - The parent block ID
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId, ... }
+ * @returns {string[]} Array of child block IDs
+ */
+export function getChildBlockIds(parentId, blockPathMap) {
+  const childIds = [];
+  for (const [blockId, pathInfo] of Object.entries(blockPathMap || {})) {
+    if (pathInfo.parentId === parentId) {
+      childIds.push(blockId);
+    }
+  }
+  return childIds;
 }
 
 /**

@@ -94,18 +94,9 @@ const applyConfig = (config) => {
     mostUsed: true,
   };
 
-  // Add image from sidebar
-  config.blocks.blocksConfig.image = {
-    ...config.blocks.blocksConfig.image,
-    schemaEnhancer: ({ formData, schema, intl }) => {
-      schema.properties.url = {
-        title: 'Image Src',
-        widget: 'image',
-      };
-      schema.fieldsets[0].fields.push('url');
-      return schema;
-    },
-  };
+  // Image block: url field is added to blockSchema (not schemaEnhancer) so that
+  // frontend's hideParentOwnedFields recipe doesn't overwrite it.
+  // The schemaEnhancer from frontend config adds hideParentOwnedFields behavior.
 
   // Configure slateTable block schema for buildBlockPathMap traversal
   // Structure: block.table.rows[].cells[] with 'key' as idField
@@ -159,94 +150,119 @@ const applyConfig = (config) => {
   // expandListingBlocks reads from 'variation' field via itemTypeField option
   const existingListingSchemaEnhancer =
     config.blocks.blocksConfig.listing?.schemaEnhancer;
+  const listingSchemaEnhancer = (args) => {
+    let { schema, formData } = args;
+
+    // Run existing schemaEnhancer first (handles variations, etc.)
+    if (existingListingSchemaEnhancer) {
+      schema = existingListingSchemaEnhancer(args);
+    }
+
+    // Override variation field to use block_type widget with our allowed types
+    // This repurposes Volto's variation selector for item type selection
+    schema.properties.variation = {
+      ...schema.properties.variation,
+      title: 'Item Type',
+      widget: 'block_type',
+      description: 'Block type used to render each item',
+      allowedTypes: ['teaser', 'image', 'card'],
+      default: 'teaser',
+    };
+
+    // Remove variation from all fieldsets (moved to inherited_fields)
+    schema.fieldsets = schema.fieldsets.map((fs) => ({
+      ...fs,
+      fields: fs.fields.filter((f) => f !== 'variation'),
+    }));
+
+    // Remove b_size from querystring widget (paging handled by frontend)
+    if (schema.properties.querystring) {
+      schema.properties.querystring = {
+        ...schema.properties.querystring,
+        schemaEnhancer: ({ schema: qsSchema }) => ({
+          ...qsSchema,
+          fieldsets: qsSchema.fieldsets.map((fs) => ({
+            ...fs,
+            fields: fs.fields.filter((f) => f !== 'b_size'),
+          })),
+        }),
+      };
+    }
+
+    // Add fieldMapping field (fieldset added after inheritSchemaFrom runs)
+    if (!schema.properties.fieldMapping) {
+      schema.properties.fieldMapping = {
+        title: 'Field Mapping',
+        widget: 'field_mapping',
+        sourceFields: QUERY_RESULT_FIELDS,
+        targetTypeField: 'variation',
+        description: 'Map query result fields to item block fields',
+      };
+    }
+
+    // Inject current variation (item type) into fieldMapping widget props
+    // Use default if variation isn't set yet (e.g., new block)
+    const itemType =
+      formData?.variation || schema.properties.variation?.default || 'teaser';
+    console.log('[listingSchemaEnhancer] formData.variation:', formData?.variation, 'itemType:', itemType, 'blockId:', formData?.['@uid'] || 'unknown');
+    if (schema.properties.fieldMapping && itemType) {
+      schema.properties.fieldMapping = {
+        ...schema.properties.fieldMapping,
+        targetType: itemType,
+      };
+    }
+
+    // Run schema inheritance for the referenced block type (uses variation field)
+    // This adds the inherited_fields fieldset (teaser defaults, etc.)
+    schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults')({
+      ...args,
+      schema,
+    });
+
+    // Add fieldMapping fieldset AFTER inherited fields (so order is: variation, defaults, mapping)
+    if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
+      schema.fieldsets.push({
+        id: 'mapping',
+        title: 'Field Mapping',
+        fields: ['fieldMapping'],
+      });
+    }
+
+    return schema;
+  };
+  // Attach config so syncChildBlockTypes can detect this uses inheritSchemaFrom
+  listingSchemaEnhancer.config = { typeField: 'variation', defaultsField: 'itemDefaults' };
   config.blocks.blocksConfig.listing = {
     ...config.blocks.blocksConfig.listing,
-    schemaEnhancer: (args) => {
-      let { schema, formData } = args;
-
-      // Run existing schemaEnhancer first (handles variations, etc.)
-      if (existingListingSchemaEnhancer) {
-        schema = existingListingSchemaEnhancer(args);
-      }
-
-      // Override variation field to use block_type widget with our allowed types
-      // This repurposes Volto's variation selector for item type selection
-      schema.properties.variation = {
-        ...schema.properties.variation,
-        title: 'Item Type',
-        widget: 'block_type',
-        description: 'Block type used to render each item',
-        allowedTypes: ['teaser', 'image', 'card'],
-        default: 'teaser',
-      };
-
-      // Remove variation from all fieldsets (moved to inherited_fields)
-      schema.fieldsets = schema.fieldsets.map((fs) => ({
-        ...fs,
-        fields: fs.fields.filter((f) => f !== 'variation'),
-      }));
-
-      // Remove b_size from querystring widget (paging handled by frontend)
-      if (schema.properties.querystring) {
-        schema.properties.querystring = {
-          ...schema.properties.querystring,
-          schemaEnhancer: ({ schema: qsSchema }) => ({
-            ...qsSchema,
-            fieldsets: qsSchema.fieldsets.map((fs) => ({
-              ...fs,
-              fields: fs.fields.filter((f) => f !== 'b_size'),
-            })),
-          }),
-        };
-      }
-
-      // Add fieldMapping field (fieldset added after inheritSchemaFrom runs)
-      if (!schema.properties.fieldMapping) {
-        schema.properties.fieldMapping = {
-          title: 'Field Mapping',
-          widget: 'field_mapping',
-          sourceFields: QUERY_RESULT_FIELDS,
-          targetTypeField: 'variation',
-          description: 'Map query result fields to item block fields',
-        };
-      }
-
-      // Inject current variation (item type) into fieldMapping widget props
-      // Use default if variation isn't set yet (e.g., new block)
-      const itemType =
-        formData?.variation || schema.properties.variation?.default || 'teaser';
-      if (schema.properties.fieldMapping && itemType) {
-        schema.properties.fieldMapping = {
-          ...schema.properties.fieldMapping,
-          targetType: itemType,
-        };
-      }
-
-      // Run schema inheritance for the referenced block type (uses variation field)
-      // This adds the inherited_fields fieldset (teaser defaults, etc.)
-      schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults')({
-        ...args,
-        schema,
-      });
-
-      // Add fieldMapping fieldset AFTER inherited fields (so order is: variation, defaults, mapping)
-      if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
-        schema.fieldsets.push({
-          id: 'mapping',
-          title: 'Field Mapping',
-          fields: ['fieldMapping'],
-        });
-      }
-
-      return schema;
-    },
+    schemaEnhancer: listingSchemaEnhancer,
   };
 
   // Configure image block with blockSchema for schema inheritance
   // The default image block only has 'schema' (settings), not 'blockSchema' (data schema)
+  // We add 'url' field here (not in schemaEnhancer) so frontend's hideParentOwnedFields
+  // recipe doesn't lose it when it replaces the schemaEnhancer.
   config.blocks.blocksConfig.image = {
     ...config.blocks.blocksConfig.image,
-    blockSchema: ImageSchema,
+    blockSchema: (props) => {
+      const baseSchema = ImageSchema(props);
+      return {
+        ...baseSchema,
+        fieldsets: [
+          {
+            ...baseSchema.fieldsets[0],
+            fields: ['url', ...(baseSchema.fieldsets[0]?.fields || [])],
+          },
+          ...(baseSchema.fieldsets.slice(1) || []),
+        ],
+        properties: {
+          ...baseSchema.properties,
+          url: {
+            title: 'Image URL',
+            widget: 'image',
+          },
+        },
+      };
+    },
   };
 
   // Configure search block to add listing container field

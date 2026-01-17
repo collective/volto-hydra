@@ -89,7 +89,11 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
-import { applySchemaDefaultsToFormData } from '../../utils/schemaInheritance';
+import {
+  applySchemaDefaultsToFormData,
+  createSchemaEnhancerFromRecipe,
+  syncChildBlockTypes,
+} from '../../utils/schemaInheritance';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -112,57 +116,9 @@ const NoPreview = () => null;
  */
 const validateFrontendConfig = (options, mergedBlocksConfig) => {
   const errors = [];
-  const { allowedBlocks, voltoConfig } = options;
-  const frontendBlocksConfig = voltoConfig?.blocks?.blocksConfig;
 
-  if (!allowedBlocks || !mergedBlocksConfig || !frontendBlocksConfig) return;
-
-  // Validation 1: Check for container-only blocks in page-level allowedBlocks
-  const customBlockTypes = new Set(Object.keys(frontendBlocksConfig));
-  const containerChildBlocks = new Set();
-
-  Object.values(mergedBlocksConfig).forEach((blockConfig) => {
-    const schema = typeof blockConfig?.blockSchema === 'function'
-      ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-      : blockConfig?.blockSchema;
-
-    if (schema?.properties) {
-      Object.values(schema.properties).forEach((fieldDef) => {
-        if (fieldDef.type === 'blocks' && fieldDef.allowedBlocks) {
-          fieldDef.allowedBlocks.forEach((childType) => {
-            if (customBlockTypes.has(childType)) {
-              containerChildBlocks.add(childType);
-            }
-          });
-        }
-      });
-    }
-  });
-
-  const containerOnlyBlocks = allowedBlocks.filter((blockType) => {
-    if (!containerChildBlocks.has(blockType)) return false;
-    const blockConfig = mergedBlocksConfig[blockType];
-    if (!blockConfig) return false;
-    const schema = typeof blockConfig.blockSchema === 'function'
-      ? blockConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-      : blockConfig.blockSchema;
-    const hasEditableFields = schema?.fieldsets?.some(
-      (fs) => fs.fields?.some((f) => schema.properties?.[f]?.type !== 'blocks')
-    );
-    return !hasEditableFields;
-  });
-
-  if (containerOnlyBlocks.length > 0) {
-    errors.push(
-      `allowedBlocks contains container-only block types: [${containerOnlyBlocks.join(', ')}]. ` +
-      `These blocks are only valid inside container blocks. Remove them from the page-level allowedBlocks array.`
-    );
-  }
-
-  // Future validations can be added here:
-  // - Validation 2: Check for missing block renderers
-  // - Validation 3: Check for invalid schema definitions
-  // - etc.
+  // Future validations can be added here as needed
+  // Frontend developers control what's allowed where via allowedBlocks
 
   if (errors.length > 0) {
     throw new Error(`[HYDRA] initBridge config error:\n- ${errors.join('\n- ')}`);
@@ -1545,6 +1501,28 @@ const Iframe = (props) => {
               });
             }
             recurseUpdateVoltoConfig(frontendConfig);
+
+            // 1b. Create schemaEnhancers from frontend recipes
+            // Recipe format: { type: 'inheritSchemaFrom', config: {...} } or array of recipes
+            if (frontendConfig?.blocks?.blocksConfig) {
+              for (const [blockType, blockConfig] of Object.entries(
+                frontendConfig.blocks.blocksConfig,
+              )) {
+                const recipe = blockConfig.schemaEnhancer;
+                // Check if it's a recipe (object with type) or array of recipes
+                const isRecipe =
+                  recipe &&
+                  ((typeof recipe === 'object' && recipe.type) ||
+                    Array.isArray(recipe));
+                if (isRecipe) {
+                  const enhancer = createSchemaEnhancerFromRecipe(recipe);
+                  if (enhancer) {
+                    config.blocks.blocksConfig[blockType].schemaEnhancer =
+                      enhancer;
+                  }
+                }
+              }
+            }
           }
 
           // 2. Apply allowedBlocks by setting `restricted: true` on blocks not in the list
@@ -2501,6 +2479,10 @@ const Iframe = (props) => {
           // Rebuild blockPathMap from current properties to ensure it's up to date
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
 
+          // Get old block data before the update (for sync detection)
+          const oldBlockData = getBlockById(properties, currentBlockPathMap, blockId);
+          console.log('[View onChangeBlock] blockId:', blockId, 'oldVariation:', oldBlockData?.variation, 'newVariation:', newBlockData?.variation);
+
           // Find container config for nested blocks
           const pathInfo = currentBlockPathMap[blockId];
           const containerConfig = pathInfo?.parentId
@@ -2513,12 +2495,22 @@ const Iframe = (props) => {
               )
             : null;
 
-          const newFormData = mutateBlockInContainer(
+          let newFormData = mutateBlockInContainer(
             properties,
             currentBlockPathMap,
             blockId,
             newBlockData,
             containerConfig,
+          );
+
+          // Sync child @type if parent has inheritSchemaFrom and typeField changed
+          newFormData = syncChildBlockTypes(
+            newFormData,
+            currentBlockPathMap,
+            blockId,
+            oldBlockData,
+            newBlockData,
+            config.blocks.blocksConfig,
           );
 
           // Validate data from sidebar before using it

@@ -2240,12 +2240,22 @@ export class AdminUIHelper {
 
   /**
    * Check if a specific field exists in the sidebar form.
-   * Matches Cypress pattern: #sidebar-properties .field-wrapper-{fieldname}
+   * @param fieldName - The field name to check for
+   * @param blockTitle - Optional block title to scope to a parent section (e.g., 'Grid', 'Listing').
+   *                     If not provided, checks the current block's form (#sidebar-properties).
    */
-  async hasSidebarField(fieldName: string): Promise<boolean> {
-    const fieldWrapper = this.page.locator(
-      `#sidebar-properties .field-wrapper-${fieldName}`,
-    );
+  async hasSidebarField(fieldName: string, blockTitle?: string): Promise<boolean> {
+    let container;
+    if (blockTitle) {
+      // Scope to a specific parent block section by title
+      container = this.page.locator('.parent-block-section').filter({
+        has: this.page.locator('.parent-nav', { hasText: new RegExp(blockTitle) }),
+      });
+    } else {
+      // Default: current block's form
+      container = this.page.locator('#sidebar-properties');
+    }
+    const fieldWrapper = container.locator(`.field-wrapper-${fieldName}`);
     return await fieldWrapper.isVisible();
   }
 
