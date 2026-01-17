@@ -482,18 +482,15 @@ const bridge = initBridge({
     blocks: {
       blocksConfig: {
         // Parent container: controls child type via 'variation' field
+        // inheritSchemaFrom creates the typeField with computed choices
         gridBlock: {
-          blockSchema: {
-            properties: {
-              variation: {
-                title: 'Item Type',
-                widget: 'block_type',
-                allowedTypes: ['teaser', 'image'],
-              },
-            },
-          },
           schemaEnhancer: {
-            inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
+            inheritSchemaFrom: {
+              typeField: 'variation',
+              defaultsField: 'itemDefaults',
+              allowedBlocks: ['teaser', 'image'],
+              title: 'Item Type',
+            },
           },
         },
         // Child block: hides fields that parent controls

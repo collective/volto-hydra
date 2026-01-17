@@ -287,29 +287,23 @@ onMounted(() => {
                     },
                 },
                 // Grid block: add schema inheritance recipe
-                // variation field is added by schemaEnhancer, don't put it in fieldsets
+                // variation field is created by inheritSchemaFrom with computed choices
                 // NO DEFAULT - children are independent until a type is selected
                 gridBlock: {
-                    blockSchema: {
-                        properties: {
-                            variation: {
-                                title: 'Item Type',
-                                widget: 'block_type',
-                                allowedTypes: ['teaser', 'image'],
-                            },
-                        },
-                    },
                     schemaEnhancer: {
-                        type: 'inheritSchemaFrom',
-                        config: { typeField: 'variation', defaultsField: 'itemDefaults' },
+                        inheritSchemaFrom: {
+                            typeField: 'variation',
+                            defaultsField: 'itemDefaults',
+                            allowedBlocks: ['teaser', 'image'],
+                            title: 'Item Type',
+                        },
                     },
                 },
                 // Teaser block: use Volto's TeaserSchema (has href with object_browser)
-                // Only send schemaEnhancer for hideParentOwnedFields when inside a grid
+                // childBlockConfig hides fields that parent controls when inside a grid
                 teaser: {
                     schemaEnhancer: {
-                        type: 'hideParentOwnedFields',
-                        config: {
+                        childBlockConfig: {
                             defaultsField: 'itemDefaults',
                             editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
                         },
@@ -318,8 +312,7 @@ onMounted(() => {
                 // Image block: configure which fields are editable on child vs parent
                 image: {
                     schemaEnhancer: {
-                        type: 'hideParentOwnedFields',
-                        config: {
+                        childBlockConfig: {
                             defaultsField: 'itemDefaults',
                             editableFields: ['url', 'alt', 'href'],
                         },

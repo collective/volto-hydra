@@ -102,7 +102,7 @@ export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMa
   }
 
   // Run schemaEnhancer on top of base schema (if it exists)
-  // Note: hideParentOwnedFields reads blockPathMap/blockId from HydraSchemaContext
+  // Note: childBlockConfig reads blockPathMap/blockId from HydraSchemaContext
   if (blockConfig.schemaEnhancer) {
     try {
       schema = blockConfig.schemaEnhancer({

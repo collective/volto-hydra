@@ -459,20 +459,16 @@
                                     },
                                 },
                                 // Grid block: add schema inheritance recipe
-                                // variation field is added by schemaEnhancer, don't put it in fieldsets
+                                // variation field is created by inheritSchemaFrom with computed choices
                                 // NO DEFAULT - children are independent until a type is selected
                                 gridBlock: {
-                                    blockSchema: {
-                                        properties: {
-                                            variation: {
-                                                title: 'Item Type',
-                                                widget: 'block_type',
-                                                allowedTypes: ['teaser', 'image'],
-                                            },
-                                        },
-                                    },
                                     schemaEnhancer: {
-                                        inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
+                                        inheritSchemaFrom: {
+                                            typeField: 'variation',
+                                            defaultsField: 'itemDefaults',
+                                            allowedBlocks: ['teaser', 'image'],
+                                            title: 'Item Type',
+                                        },
                                     },
                                 },
                                 // Teaser block: use Volto's TeaserSchema (has href with object_browser)

@@ -1,8 +1,8 @@
 /**
- * Tests for schema inheritance and block type widgets.
+ * Tests for schema inheritance and type selection.
  *
  * Tests the Phase 2 features:
- * - BlockTypeWidget: selecting block types for container items
+ * - Type selection: choosing block types for container items (via inheritSchemaFrom)
  * - FieldMappingWidget: mapping source fields to target block fields
  * - Schema inheritance: inheriting non-mapped fields from referenced type
  */
@@ -37,15 +37,20 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const blockId = 'block-9-listing';
     const iframe = helper.getIframe();
 
-    // Click on listing block first (scrolls to it)
+    // Initially (BEFORE clicking) should have teaser items - verify data has variation="teaser"
+    // Expanded items have data-block-uid="block-9-listing" AND class="teaser-block" on same element
+    const teaserItems = iframe.locator(`[data-block-uid="${blockId}"].teaser-block`);
+    await expect(teaserItems.first()).toBeVisible({ timeout: 10000 });
+
+    // Verify it's NOT showing summaryItem layout (which has image on the side with flexbox)
+    // Teaser layout has image on top (no flex display)
+    const summaryItems = iframe.locator(`[data-block-uid="${blockId}"].summary-item-block`);
+    await expect(summaryItems).toHaveCount(0);
+
+    // Now click on listing block (scrolls to it)
     await helper.clickBlockInIframe(blockId);
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
-
-    // Initially should have teaser items (expanded from listing -> teaser blocks)
-    // Expanded items have data-block-uid="block-9-listing" AND class="teaser-block" on same element
-    const teaserItems = iframe.locator(`[data-block-uid="${blockId}"].teaser-block`);
-    await expect(teaserItems.first()).toBeVisible();
 
     // Verify teaser blocks render with correct field-mapped data
     // Field mapping for teaser: @id->href, title->title, description->description, image->preview_image
@@ -416,6 +421,40 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await expect(toolbar).toBeVisible({ timeout: 5000 });
   });
 
+  test('can change search listing item type to summary', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on the listing block inside search
+    await helper.clickBlockInIframe('results-listing');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Find the variation field's React Select
+    const variationField = page.locator('#sidebar-properties .field-wrapper-variation');
+    await expect(variationField).toBeVisible({ timeout: 5000 });
+
+    // Click on the React Select control to open dropdown
+    const selectControl = variationField.locator('.react-select__control');
+    await selectControl.click();
+
+    // Wait for dropdown menu to appear
+    const menu = page.locator('.react-select__menu');
+    await expect(menu).toBeVisible({ timeout: 5000 });
+
+    // Verify Summary option exists and click it
+    const summaryOption = menu.locator('.react-select__option', { hasText: 'Summary' });
+    await expect(summaryOption).toBeVisible();
+    await summaryOption.click();
+
+    // Verify the value changed
+    await expect(variationField.locator('.react-select__single-value')).toContainText('Summary');
+  });
+
   test('search block listing container has no add buttons when at maxLength', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -715,7 +754,7 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     await helper.openSidebarTab('Block');
 
     // PHASE 1: No type selected - children are independent, all fields visible
-    // Grid has no default for variation, so hideParentOwnedFields should NOT apply
+    // Grid has no default for variation, so childBlockConfig should NOT apply
 
     // All teaser fields should be visible (no hiding)
     expect(await helper.hasSidebarField('href')).toBe(true);
@@ -898,8 +937,8 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     }).first();
     await expect(gridSection).toBeVisible({ timeout: 5000 });
 
-    // Find the variation dropdown (block_type widget) and change to Image
-    // The widget renders as a react-select or similar dropdown
+    // Find the variation dropdown (type selector) and change to Image
+    // The field renders as a react-select dropdown with computed choices
     const variationSelect = gridSection.locator('.react-select__control').first();
     await expect(variationSelect).toBeVisible({ timeout: 5000 });
     await variationSelect.click();

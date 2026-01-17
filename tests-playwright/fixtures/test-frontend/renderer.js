@@ -177,6 +177,14 @@ async function renderBlock(blockId, block) {
             const teaserEl = document.createElement('div');
             teaserEl.innerHTML = renderTeaserBlock(block, blockId);
             return teaserEl.firstElementChild;
+        case 'defaultItem':
+            const defaultEl = document.createElement('div');
+            defaultEl.innerHTML = renderDefaultItemBlock(block, blockId);
+            return defaultEl.firstElementChild;
+        case 'summaryItem':
+            const summaryEl = document.createElement('div');
+            summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
+            return summaryEl.firstElementChild;
         // Note: listing blocks are expanded by expandListingBlocks() into individual
         // teaser/image blocks BEFORE rendering, so 'listing' case should never be hit
         case 'skiplogicTest':
@@ -393,7 +401,8 @@ function renderMultiFieldBlock(block) {
  */
 function renderHeroBlock(block) {
     const heading = block.heading || '';
-    const subheading = block.subheading || '';
+    // Ensure subheading is a string (might be object from conversion)
+    const subheading = typeof block.subheading === 'string' ? block.subheading : '';
     const buttonText = block.buttonText || '';
     const buttonLink = getLinkUrl(block.buttonLink);
     const imageSrc = getImageUrl(block.image);
@@ -444,7 +453,8 @@ function renderHeroBlock(block) {
  */
 function renderHeroBlockClean(block) {
     const heading = block.heading || '';
-    const subheading = block.subheading || '';
+    // Ensure subheading is a string (might be object from conversion)
+    const subheading = typeof block.subheading === 'string' ? block.subheading : '';
     const buttonText = block.buttonText || '';
     const buttonLink = getLinkUrl(block.buttonLink);
     const imageSrc = getImageUrl(block.image);
@@ -552,6 +562,61 @@ function renderTeaserBlock(block, blockUid) {
             </a>
             <p data-editable-field="description" style="color: #666; margin: 0;">${description}</p>
             <a href="${href || '#'}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
+        </div>
+    `;
+}
+
+/**
+ * Render a default result item (simple title + description).
+ * @param {Object} block - Block data
+ * @param {string} blockUid - Block UID
+ * @returns {string} HTML string
+ */
+function renderDefaultItemBlock(block, blockUid) {
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+    const href = hrefObj?.['@id'] || '';
+    const title = block.title || hrefObj?.title || '';
+    const description = block.description || hrefObj?.description || '';
+    const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
+
+    return `
+        <div ${blockUidAttr} class="default-item-block" style="padding: 15px; border-bottom: 1px solid #eee;">
+            <a href="${href || '#'}" data-linkable-field="href" style="text-decoration: none; color: inherit;">
+                <h4 data-editable-field="title" style="margin: 0 0 5px 0;">${title}</h4>
+            </a>
+            <p data-editable-field="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
+        </div>
+    `;
+}
+
+/**
+ * Render a summary result item (title + description + image).
+ * @param {Object} block - Block data
+ * @param {string} blockUid - Block UID
+ * @returns {string} HTML string
+ */
+function renderSummaryItemBlock(block, blockUid) {
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+    const href = hrefObj?.['@id'] || '';
+    const title = block.title || hrefObj?.title || '';
+    const description = block.description || hrefObj?.description || '';
+    const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
+
+    const imageSrc = block.image ? getImageUrl(block.image) : '';
+
+    const imageHtml = imageSrc
+        ? `<img src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
+        : '';
+
+    return `
+        <div ${blockUidAttr} class="summary-item-block" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start;">
+            ${imageHtml}
+            <div style="flex: 1;">
+                <a href="${href || '#'}" data-linkable-field="href" style="text-decoration: none; color: inherit;">
+                    <h4 data-editable-field="title" style="margin: 0 0 5px 0;">${title}</h4>
+                </a>
+                <p data-editable-field="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
+            </div>
         </div>
     `;
 }
@@ -756,7 +821,7 @@ async function renderGridBlock(block, blockId) {
         html += `<div data-block-uid="${uid}" class="grid-cell" style="flex: 0 0 calc(25% - 15px); padding: 10px; border: 1px dashed #999;">`;
 
         // Render inner content based on block type
-        // Note: Don't pass uid to teaser - grid-cell already has data-block-uid
+        // Note: Don't pass uid to render functions - grid-cell already has data-block-uid
         switch (childBlock['@type']) {
             case 'teaser':
                 html += renderTeaserBlock(childBlock, null);
@@ -766,6 +831,12 @@ async function renderGridBlock(block, blockId) {
                 break;
             case 'image':
                 html += renderImageBlock(childBlock);
+                break;
+            case 'summaryItem':
+                html += renderSummaryItemBlock(childBlock, null);
+                break;
+            case 'defaultItem':
+                html += renderDefaultItemBlock(childBlock, null);
                 break;
             case 'empty':
                 html += renderEmptyBlock(childBlock);
@@ -1200,22 +1271,21 @@ async function renderSearchBlock(block, blockId) {
         for (const childBlock of expandedItems) {
             if (!childBlock) continue;
 
-            // Use @uid from block for data-block-uid
+            // Use general block renderer - it handles all block types
             const uid = childBlock['@uid'];
-            html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
-
-            switch (childBlock['@type']) {
-                case 'teaser':
-                    html += renderTeaserBlock(childBlock, null);
-                    break;
-                case 'image':
-                    html += renderImageBlock(childBlock);
-                    break;
-                default:
-                    html += `<p>Unknown item type: ${childBlock['@type']}</p>`;
+            const blockElement = await renderBlock(uid, childBlock);
+            if (blockElement) {
+                // Add data-block-add attribute for direction
+                if (blockElement instanceof DocumentFragment) {
+                    // For fragments (like hero), find the actual block element
+                    const actualElement = blockElement.querySelector('[data-block-uid]');
+                    if (actualElement) actualElement.setAttribute('data-block-add', 'bottom');
+                    html += Array.from(blockElement.childNodes).map(n => n.outerHTML || n.textContent).join('');
+                } else {
+                    blockElement.setAttribute('data-block-add', 'bottom');
+                    html += blockElement.outerHTML;
+                }
             }
-
-            html += '</div>';
         }
     } else {
         html += '<p style="color: #999;">No results</p>';

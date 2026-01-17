@@ -7,7 +7,7 @@
  */
 import config from '@plone/volto/registry';
 import { getBlockSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
-import { getHydraSchemaContext, getLiveBlockData } from '../context';
+import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 
 // Re-export getBlockSchema from blockPath for convenience
 export { getBlockSchema };
@@ -23,25 +23,61 @@ export { getBlockSchema };
  * @param {string} mappingField - Field name containing field mappings (e.g., 'fieldMapping')
  *                                Can be null if no mapping is used
  * @param {string} defaultsField - Field name to store inherited values (e.g., 'itemDefaults')
+ * @param {Object} typeFieldOptions - Options for the typeField (optional)
+ * @param {string} typeFieldOptions.title - Title for the typeField (default: 'Item Type')
+ * @param {string} typeFieldOptions.filterConvertibleFrom - Only show types with fieldMappings[this]
+ * @param {string[]} typeFieldOptions.allowedBlocks - Static list of allowed types
+ * @param {string} typeFieldOptions.default - Default value for the typeField
  * @returns {Function} - A schemaEnhancer function
  *
  * @example
  * // In block config:
- * schemaEnhancer: inheritSchemaFrom('itemType', 'fieldMapping', 'itemDefaults')
+ * schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
+ *   filterConvertibleFrom: 'default',
+ *   title: 'Item Type',
+ *   default: 'summaryItem',
+ * })
  */
-export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
+export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFieldOptions = {}) {
   return (args) => {
     let { formData, schema, intl } = args;
-
-    // Use formData value, falling back to schema default for the typeField
-    const referencedType = formData?.[typeField] ?? schema.properties?.[typeField]?.default;
     const blocksConfig = config.blocks.blocksConfig;
 
-    // Check if parent controls our type (parent has inheritSchemaFrom with typeField selected)
-    // If so, hide our typeField and defaults fieldset since parent controls those
+    // Get context for computing choices
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = hydraContext?.blockPathMap;
     const blockId = hydraContext?.currentBlockId;
+
+    // Create or update typeField with computed choices
+    const { filterConvertibleFrom, allowedBlocks, title, default: defaultValue } = typeFieldOptions;
+    if (filterConvertibleFrom || allowedBlocks) {
+      const choices = getBlockTypeChoices(
+        { filterConvertibleFrom, allowedBlocks },
+        blocksConfig,
+        blockPathMap,
+        blockId,
+      );
+
+      // Create or update the typeField
+      schema = {
+        ...schema,
+        properties: {
+          ...schema.properties,
+          [typeField]: {
+            ...(schema.properties?.[typeField] || {}),
+            title: title || schema.properties?.[typeField]?.title || 'Item Type',
+            choices,
+            ...(defaultValue ? { default: defaultValue } : {}),
+          },
+        },
+      };
+    }
+
+    // Use formData value, falling back to schema default for the typeField
+    const referencedType = formData?.[typeField] ?? schema.properties?.[typeField]?.default;
+
+    // Check if parent controls our type (parent has inheritSchemaFrom with typeField selected)
+    // If so, hide our typeField and defaults fieldset since parent controls those
 
     let parentControlsType = false;
     if (blockPathMap && blockId) {
@@ -237,6 +273,12 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
         def: { ...fieldDef, title: fieldDef.title || fieldName },
       }));
 
+    // Check if typeField needs to be added to a fieldset
+    const typeFieldHasChoices = schema.properties[typeField]?.choices?.length > 0;
+    const typeFieldInFieldset = schema.fieldsets?.some(
+      (fs) => fs.fields?.includes(typeField),
+    );
+
     // Add fieldset for inherited fields if there are any
     if (inheritedFields.length > 0) {
       const referencedTitle =
@@ -268,6 +310,24 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
       return newSchema;
     }
 
+    // Even without inherited fields, ensure typeField is visible if it has choices
+    if (typeFieldHasChoices && !typeFieldInFieldset) {
+      const referencedTitle =
+        blocksConfig[referencedType]?.title || referencedType;
+
+      return {
+        ...schema,
+        fieldsets: [
+          ...(schema.fieldsets || []),
+          {
+            id: 'inherited_fields',
+            title: `${referencedTitle} Defaults`,
+            fields: [typeField],
+          },
+        ],
+      };
+    }
+
     return schema;
   };
 }
@@ -287,10 +347,9 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField) {
  * @returns {Function} - A schemaEnhancer function
  *
  * @example
- * // In schemaEnhancer config:
+ * // In schemaEnhancer config (preferred format):
  * schemaEnhancer: {
- *   type: 'hideParentOwnedFields',
- *   config: {
+ *   childBlockConfig: {
  *     defaultsField: 'itemDefaults',
  *     editableFields: ['href', 'title', 'description']
  *   }
@@ -579,10 +638,6 @@ function isValidValue(value, fieldDef) {
     return fieldDef.enum.includes(value);
   }
 
-  // For allowedTypes (used by block_type widget)
-  if (fieldDef.allowedTypes) {
-    return fieldDef.allowedTypes.includes(value);
-  }
 
   // For objects with propertyNames.enum - validate each property key
   if (fieldDef.propertyNames?.enum && typeof value === 'object' && value !== null) {
@@ -595,7 +650,9 @@ function isValidValue(value, fieldDef) {
   // For objects with additionalProperties.enum - validate each property value
   if (fieldDef.additionalProperties?.enum && typeof value === 'object' && value !== null) {
     const validValues = new Set(fieldDef.additionalProperties.enum);
-    if (!Object.values(value).every((v) => !v || validValues.has(v))) {
+    const invalidValues = Object.entries(value).filter(([k, v]) => v && !validValues.has(v));
+    if (invalidValues.length > 0) {
+      console.log('[isValidValue] Invalid values found:', invalidValues, 'validValues:', [...validValues]);
       return false;
     }
   }
@@ -654,11 +711,22 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
         enhancer = createSchemaEnhancerFromRecipe(enhancer);
       }
       if (enhancer) {
-        schema = enhancer({
-          formData: blockData,
-          schema: { ...schema, properties: { ...schema.properties } },
-          intl,
+        // Set context so schemaEnhancer can access currentBlockId and blockPathMap
+        const restoreContext = setHydraSchemaContext({
+          blockPathMap,
+          currentBlockId: blockId,
+          blocksConfig,
+          formData: result,
         });
+        try {
+          schema = enhancer({
+            formData: blockData,
+            schema: { ...schema, properties: { ...schema.properties } },
+            intl,
+          });
+        } finally {
+          restoreContext();
+        }
       }
     }
 
@@ -676,13 +744,13 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  * Create a schemaEnhancer function from a declarative recipe.
  *
  * New format (supports combining multiple enhancers):
- *   { inheritSchemaFrom: { typeField, defaultsField, mappingField? } }
- *   { hideParentOwnedFields: { defaultsField, editableFields?, parentControlledFields? } }
+ *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, filterConvertibleFrom?, allowedBlocks?, title?, default? } }
+ *   { childBlockConfig: { defaultsField, editableFields?, parentControlledFields? } }
  *   { skiplogic: { fieldName: { field, is?, isNot?, gt?, gte?, lt?, lte?, isSet?, isNotSet? } } }
  *
  * Combined example:
  *   {
- *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
+ *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults', filterConvertibleFrom: 'default' },
  *     skiplogic: { advancedOptions: { field: 'mode', is: 'advanced' } },
  *   }
  *
@@ -752,9 +820,13 @@ function createEnhancerByType(type, config) {
 
   switch (type) {
     case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField } = config;
+      const { typeField, mappingField, defaultsField, filterConvertibleFrom, allowedBlocks, title, default: defaultValue } = config;
       if (!typeField || !defaultsField) return null;
-      enhancer = inheritSchemaFrom(typeField, mappingField || null, defaultsField);
+      // Pass typeFieldOptions if any type field config is provided
+      const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || title || defaultValue)
+        ? { filterConvertibleFrom, allowedBlocks, title, default: defaultValue }
+        : {};
+      enhancer = inheritSchemaFrom(typeField, mappingField || null, defaultsField, typeFieldOptions);
       enhancer.config = config;
       break;
     }
@@ -922,6 +994,60 @@ function createSingleEnhancerLegacy(recipe) {
   }
 
   return createEnhancerByType(recipe.type, recipe.config || {});
+}
+
+/**
+ * Get valid block types for a type selection field.
+ *
+ * Used by inheritSchemaFrom to compute choices for the typeField.
+ * Logic:
+ * 1. Start with allowedBlocks (if provided) or parent's allowedSiblingTypes
+ * 2. Fall back to all non-restricted blocks (or all if filtering)
+ * 3. Filter by filterConvertibleFrom (types with fieldMappings[source])
+ *
+ * @param {Object} options - Configuration options
+ * @param {string[]} options.allowedBlocks - Static list of allowed types
+ * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., 'default')
+ * @param {Object} blocksConfig - Block configuration registry
+ * @param {Object} blockPathMap - Block path map (optional, for allowedSiblingTypes)
+ * @param {string} blockId - Current block ID (optional, for allowedSiblingTypes)
+ * @returns {Array} - Array of [value, label] tuples for choices
+ */
+export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId) {
+  if (!blocksConfig) return [];
+
+  const { allowedBlocks, filterConvertibleFrom } = options || {};
+
+  // Determine base types in order of precedence
+  let types = allowedBlocks;
+
+  // Try parent's allowedSiblingTypes from pathMap
+  if (!types && blockPathMap && blockId) {
+    const pathInfo = blockPathMap[blockId];
+    if (pathInfo?.allowedSiblingTypes) {
+      types = pathInfo.allowedSiblingTypes;
+    }
+  }
+
+  // Fall back to all non-restricted blocks (or all if filtering)
+  if (!types) {
+    types = Object.keys(blocksConfig).filter(
+      (type) => blocksConfig[type] && (filterConvertibleFrom || !blocksConfig[type].restricted),
+    );
+  }
+
+  // Filter by filterConvertibleFrom (types with fieldMappings[source])
+  if (filterConvertibleFrom) {
+    types = types.filter((type) => {
+      const blockConfig = blocksConfig[type];
+      return blockConfig?.fieldMappings?.[filterConvertibleFrom];
+    });
+  }
+
+  // Return as choices array [[value, label], ...]
+  return types
+    .filter((type) => blocksConfig[type])
+    .map((type) => [type, blocksConfig[type]?.title || type]);
 }
 
 /**
@@ -1136,13 +1262,28 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   console.log('[syncChildBlockTypes] oldType:', oldType, 'newType:', newType);
   if (oldType === newType || !newType) return formData;
 
+  let result = formData;
+
+  // Reset fieldMapping to the new type's default when variation changes
+  // The new type's fieldMappings.default provides the correct source→target mapping
+  const newTypeConfig = blocksConfig?.[newType];
+  const defaultFieldMapping = newTypeConfig?.fieldMappings?.default;
+  if (defaultFieldMapping) {
+    // Get the current block with the new variation and reset its fieldMapping
+    const currentBlock = getBlockById(result, blockPathMap, blockId);
+    if (currentBlock) {
+      console.log('[syncChildBlockTypes] Resetting fieldMapping from', currentBlock.fieldMapping, 'to', defaultFieldMapping);
+      const updatedBlock = { ...currentBlock, fieldMapping: defaultFieldMapping };
+      result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
+    }
+  }
+
   // Get all child block IDs
   const childIds = getChildBlockIds(blockId, blockPathMap);
   console.log('[syncChildBlockTypes] childIds:', childIds);
-  if (childIds.length === 0) return formData;
+  if (childIds.length === 0) return result;
 
   // Transform each child
-  let result = formData;
   for (const childId of childIds) {
     const childBlock = getBlockById(result, blockPathMap, childId);
     if (!childBlock) continue;

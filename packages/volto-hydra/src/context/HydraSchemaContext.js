@@ -2,7 +2,7 @@
  * HydraSchemaContext
  *
  * Provides blockPathMap, currentBlockId, formData, blocksConfig, and liveBlockDataRef
- * to schemaEnhancers. This allows hideParentOwnedFields to determine if a block is inside
+ * to schemaEnhancers. This allows childBlockConfig to determine if a block is inside
  * a parent container and whether the parent has a type selected.
  *
  * liveBlockDataRef contains the most recent data from each block's form,
@@ -47,6 +47,19 @@ export const useHydraSchemaContext = () => {
  */
 export const getHydraSchemaContext = () => {
   return currentContextValue;
+};
+
+/**
+ * Temporarily set context value for non-React code.
+ * Used by applySchemaDefaultsToFormData to set currentBlockId for each block.
+ * Returns a function to restore the previous value.
+ */
+export const setHydraSchemaContext = (value) => {
+  const previousValue = currentContextValue;
+  currentContextValue = value;
+  return () => {
+    currentContextValue = previousValue;
+  };
 };
 
 /**

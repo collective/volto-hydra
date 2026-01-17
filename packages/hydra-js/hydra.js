@@ -7626,6 +7626,7 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * @param {string} [options.extraCriteria.sort_order] - Override sort order ('ascending'|'descending')
  * @param {string|string[]} [options.extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
  * @param {string} [options.itemTypeField='itemType'] - Field name to read item block type from (e.g., 'variation')
+ * @param {string} [options.defaultItemType='summaryItem'] - Default item type when field is not set
  * @returns {Promise<{items: Array, paging: Object}>}
  *   - items: Array of blocks, each with @uid (block ID for data-block-uid) and @type
  *   - paging: { currentPage, totalPages, totalItems, prev, next, pages }
@@ -7707,6 +7708,7 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     fetcher,
     extraCriteria = {},
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
+    defaultItemType = 'summaryItem',  // Default item type when field is not set
   } = options;
 
   // Create default paging if not provided
@@ -7785,7 +7787,7 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
 
     if (block?.['@type'] === 'listing' && listingResults[blockId]) {
       const queryResults = listingResults[blockId];
-      const itemType = block[itemTypeField] || 'teaser';
+      const itemType = block[itemTypeField] || defaultItemType;
       const fieldMapping = block.fieldMapping || {};
 
       // Extract itemDefaults from flat keys (e.g., itemDefaults_overwrite -> overwrite)
