@@ -171,6 +171,21 @@ onMounted(() => {
                         },
                         required: [],
                     },
+                    // fieldMappings for transitive conversion: image → teaser → hero
+                    fieldMappings: {
+                        default: {
+                            'title': 'heading',
+                            'description': 'subheading',
+                            '@id': 'buttonLink',
+                            'image': 'image',
+                        },
+                        teaser: {
+                            'title': 'heading',
+                            'description': 'subheading',
+                            'href': 'buttonLink',
+                            'preview_image': 'image',
+                        },
+                    },
                 },
                 // Container block: columns contains column children AND top_images
                 columns: {

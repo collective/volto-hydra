@@ -254,6 +254,8 @@ const applyConfig = (config) => {
     },
     fieldMappings: {
       default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+      // Converting from teaser block
+      teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
     },
   };
 
@@ -307,6 +309,8 @@ const applyConfig = (config) => {
     ...config.blocks.blocksConfig.teaser,
     fieldMappings: {
       default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+      // Converting from image block
+      image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
     },
   };
 
