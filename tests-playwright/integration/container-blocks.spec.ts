@@ -277,9 +277,10 @@ test.describe('Adding Blocks to Containers', () => {
       .count();
 
     // Select grid-cell-1 and add a new block after it
+    // gridBlock only allows ['teaser', 'image'] blocks
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.clickAddBlockButton();
-    await helper.selectBlockType('slate');
+    await helper.selectBlockType('teaser');
 
     // grid-1 should now have 3 blocks
     const finalGridBlocks = await iframe
