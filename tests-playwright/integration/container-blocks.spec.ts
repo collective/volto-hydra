@@ -2472,8 +2472,8 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     const iframe = helper.getIframe();
 
     // Select col-1 (a container with 2 child blocks: text-1a, text-1b)
-    await helper.clickBlockInIframe('col-1');
-    await helper.waitForSidebarOpen();
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Verify initial order in iframe: text-1a comes before text-1b
     const col1 = iframe.locator('[data-block-uid="col-1"]');
@@ -2512,15 +2512,16 @@ test.describe('Sidebar Child Blocks Reordering', () => {
       secondBox!.y + secondBox!.height + 10,
       { steps: 10 },
     );
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(100); // Small delay for drag library to register position
     await page.mouse.up();
-    await page.waitForTimeout(500);
 
     // Verify order changed in iframe: text-1b now comes before text-1a
-    const newOrder = await col1
-      .locator(':scope > [data-block-uid]')
-      .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
-    expect(newOrder).toEqual(['text-1b', 'text-1a']);
+    await expect(async () => {
+      const newOrder = await col1
+        .locator(':scope > [data-block-uid]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+      expect(newOrder).toEqual(['text-1b', 'text-1a']);
+    }).toPass({ timeout: 5000 });
   });
 
   test('implicit container (gridBlock) shows child blocks in Order tab', async ({
@@ -3593,11 +3594,8 @@ test.describe('Multi-Container Field Operations', () => {
     await iframe.locator('[data-block-uid="col-1"]').waitFor();
 
     // Click the first column block
-    await helper.clickBlockInIframe('col-1');
-
-    // Wait for sidebar to show Column block settings (includes nav chevron "‹ Column")
-    const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Column').first()).toBeVisible();
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
   });
 
   test('Escape from top_images block navigates to columns parent', async ({
@@ -3635,16 +3633,14 @@ test.describe('Multi-Container Field Operations', () => {
     await iframe.locator('[data-block-uid="col-1"]').waitFor();
 
     // Click the first column to select it
-    await helper.clickBlockInIframe('col-1');
-
-    // Wait for Column sidebar to appear
-    const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Column').first()).toBeVisible();
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Press Escape to navigate to parent (columns)
     await page.keyboard.press('Escape');
 
     // Verify the columns block is now selected - Title field should be editable
+    const sidebar = page.locator('.sidebar-container');
     await expect(sidebar.getByLabel('Title')).toBeVisible();
   });
 

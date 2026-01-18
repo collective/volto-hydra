@@ -138,8 +138,11 @@ test.describe('Block Drag and Drop', () => {
     // Drag using mouse events to place after second block
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
 
-    const newCount = await helper.getBlockCount();
-    expect(newCount).toBe(initialCount);
+    // Wait for count to stabilize after re-render
+    await expect(async () => {
+      const newCount = await helper.getBlockCount();
+      expect(newCount).toBe(initialCount);
+    }).toPass({ timeout: 5000 });
   });
 
   test('dragging does not duplicate blocks', async ({ page }) => {
