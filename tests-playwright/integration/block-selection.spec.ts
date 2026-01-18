@@ -126,25 +126,19 @@ test.describe('Block Selection', () => {
 
     // Test selecting an image block
     await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
+    await helper.waitForSidebarCurrentBlock('Image');
 
-    // Verify sidebar shows image-specific fields (url, alt)
-    const hasUrlField = await helper.hasSidebarField('url');
-    const hasAltField = await helper.hasSidebarField('alt');
-    expect(hasUrlField).toBe(true);
-    expect(hasAltField).toBe(true);
+    // Verify sidebar shows image-specific fields (alt, size)
+    await expect(page.locator('#sidebar-properties .field-wrapper-alt')).toBeVisible();
+    await expect(page.locator('#sidebar-properties .field-wrapper-size')).toBeVisible();
 
     // Test selecting a slate/text block
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
+    await helper.waitForSidebarCurrentBlock('Text');
 
     // Verify sidebar no longer shows image-specific fields
-    const stillHasUrlField = await helper.hasSidebarField('url');
-    const stillHasAltField = await helper.hasSidebarField('alt');
-    expect(stillHasUrlField).toBe(false);
-    expect(stillHasAltField).toBe(false);
+    await expect(page.locator('#sidebar-properties .field-wrapper-alt')).not.toBeVisible();
+    await expect(page.locator('#sidebar-properties .field-wrapper-size')).not.toBeVisible();
   });
 
   test('clicking block in ChildBlocksWidget selects it in iframe', async ({ page }) => {

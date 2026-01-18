@@ -359,36 +359,37 @@ test.describe('Removing Blocks', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const initialCount = await helper.getBlockCount();
     const initialBlocks = await helper.getBlockOrder();
+    const firstBlockToRemove = initialBlocks[0]; // block-1-uuid (slate)
 
-    // Remove first block (block-1-uuid, a slate block)
-    await helper.clickBlockInIframe(initialBlocks[0]);
-    await helper.openQuantaToolbarMenu(initialBlocks[0]);
-    await helper.clickQuantaToolbarMenuOption(initialBlocks[0], 'Remove');
+    // Remove first block
+    await helper.clickBlockInIframe(firstBlockToRemove);
+    await helper.openQuantaToolbarMenu(firstBlockToRemove);
+    await helper.clickQuantaToolbarMenuOption(firstBlockToRemove, 'Remove');
 
     // Wait for the block to actually disappear
-    await helper.waitForBlockToDisappear(initialBlocks[0]);
+    await helper.waitForBlockToDisappear(firstBlockToRemove);
 
-    const countAfterFirst = await helper.getBlockCount();
-    expect(countAfterFirst).toBe(initialCount - 1);
-
-    // Wait for iframe to stabilize after removing block
-    await page.waitForTimeout(500);
+    // Verify block is gone from the order
+    await expect(async () => {
+      const blocks = await helper.getBlockOrder();
+      expect(blocks).not.toContain(firstBlockToRemove);
+    }).toPass({ timeout: 5000 });
 
     // Remove another block - use index 1 to skip block-2-uuid (image block has timing issues)
     // After removing block-1-uuid: [block-2-uuid, block-3-uuid, ...]
     // So remainingBlocks[1] = block-3-uuid (slate block)
     const remainingBlocks = await helper.getBlockOrder();
-    const blockToRemove = remainingBlocks[1]; // Skip image block at index 0
-    await helper.clickBlockInIframe(blockToRemove);
-    await helper.openQuantaToolbarMenu(blockToRemove);
-    await helper.clickQuantaToolbarMenuOption(blockToRemove, 'Remove');
+    const secondBlockToRemove = remainingBlocks[1]; // Skip image block at index 0
+    await helper.clickBlockInIframe(secondBlockToRemove);
+    await helper.openQuantaToolbarMenu(secondBlockToRemove);
+    await helper.clickQuantaToolbarMenuOption(secondBlockToRemove, 'Remove');
 
-    // Wait for the block count to reflect the removal
+    // Verify second block is gone
+    await helper.waitForBlockToDisappear(secondBlockToRemove);
     await expect(async () => {
-      const finalCount = await helper.getBlockCount();
-      expect(finalCount).toBe(initialCount - 2);
+      const blocks = await helper.getBlockOrder();
+      expect(blocks).not.toContain(secondBlockToRemove);
     }).toPass({ timeout: 5000 });
   });
 });

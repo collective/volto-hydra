@@ -666,12 +666,17 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    // Select a container block (col-1 is a column with child blocks)
-    await helper.clickBlockInIframe('col-1');
-    await helper.waitForSidebarOpen();
+    // Click a child block first (text-1a is inside col-1)
+    // Clicking directly on a container is unreliable as you often click a child inside
+    await helper.clickBlockInIframe('text-1a', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Text');
 
-    // Wait for sidebar to fully render
-    await page.waitForTimeout(300);
+    // Navigate up to the parent container (col-1) by clicking the parent nav
+    const parentNav = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
+    );
+    await parentNav.click();
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // The child blocks widget should be visible for container blocks
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
@@ -679,8 +684,7 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Should show the child blocks (text-1a, text-1b)
     const childItems = page.locator('#sidebar-order .child-block-item');
-    const itemCount = await childItems.count();
-    expect(itemCount).toBe(2);
+    await expect(childItems).toHaveCount(2);
   });
 
   test('clicking arrow on headers navigates up to parent', async ({
@@ -1250,29 +1254,17 @@ test.describe('Empty Block Behavior', () => {
     // Click on a page-level block (text-after) to get add button at page level
     await helper.clickBlockInIframe('text-after');
 
-    // Click the add button
+    // Click the add button and select Columns block type
     await helper.clickAddBlockButton();
+    await helper.selectBlockType('columns');
 
-    // Wait for block chooser
-    const blockChooser = page.locator('.blocks-chooser');
-    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+    // Wait for sidebar to show the new Columns block is selected
+    await helper.waitForSidebarCurrentBlock('Columns', 10000);
 
-    // Expand the Common section to find Columns (it's folded by default)
-    const commonSection = blockChooser.locator('text=Common');
-    await commonSection.click();
-
-    // Select Columns block type (this is a container that only allows 'column')
-    await blockChooser.getByRole('button', { name: 'Columns' }).click();
-
-    // Wait for re-render
-    await page.waitForTimeout(1000);
-
-    // Find the newly added columns block (should be after text-after)
-    // The page layout should now have: title-block, columns-1, text-after, NEW-COLUMNS, grid-1
+    // Wait for the new columns block to appear in iframe (should be 2 total: original columns-1 + new one)
     // Columns blocks have a .columns-row child - find all blocks with this structure
     const allColumnsBlocks = iframe.locator('[data-block-uid]:has(> .columns-row)');
-    const columnsCount = await allColumnsBlocks.count();
-    expect(columnsCount).toBe(2); // Original columns-1 + new one
+    await expect(allColumnsBlocks).toHaveCount(2, { timeout: 10000 });
 
     // Get the new columns block (the last one)
     const newColumnsBlock = allColumnsBlocks.last();

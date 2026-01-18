@@ -241,7 +241,9 @@ const applyConfig = (config) => {
   config.blocks.blocksConfig.image = {
     ...config.blocks.blocksConfig.image,
     blockSchema: (props) => {
-      const baseSchema = ImageSchema(props);
+      // applyBlockDefaults passes 'data', but ImageSchema expects 'formData'
+      const formData = props.formData || props.data || {};
+      const baseSchema = ImageSchema({ ...props, formData });
       return {
         ...baseSchema,
         fieldsets: [
