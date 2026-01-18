@@ -361,6 +361,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         path: blockPath,
         parentId,
         containerField: fieldName,
+        blockType, // Block type for uniform lookups (single source of truth)
         allowedSiblingTypes: fieldDef.allowedBlocks || null,
         maxSiblings: fieldDef.maxLength || null,
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
@@ -401,10 +402,10 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
     const itemSchema = fieldDef.schema;
 
     // Compute virtual type for items in this container
-    // Parent type is either a real block type (from @type) or a virtual type (for nested object_list)
+    // Parent type is either a real block type or a virtual type (for nested object_list)
     const parentPathInfo = pathMap[parentId];
-    const parentType = parentPathInfo?.itemType || parent['@type'];
-    const itemType = `${parentType}:${fieldName}`;
+    const parentType = parentPathInfo?.blockType || parent['@type'];
+    const blockType = `${parentType}:${fieldName}`;
 
     // Track addMode for table-aware behavior
     // addMode comes from block config (e.g., blocksConfig.slateTable.addMode = 'table')
@@ -452,12 +453,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
         path: itemPath,
         parentId,
         containerField: fieldName,
+        blockType, // Virtual type like 'slateTable:rows' or 'slateTable:rows:cells'
         isObjectListItem: true,
         idField,
         itemSchema: stripFunctionsFromSchema(itemSchema), // For sidebar form rendering (stripped for postMessage)
         dataPath: effectiveDataPath, // Store for later use
-        itemType, // Virtual type like 'slateTable:rows' or 'slateTable:rows:cells'
-        allowedSiblingTypes: [itemType], // Only allow same type as siblings
+        allowedSiblingTypes: [blockType], // Only allow same type as siblings
         addMode, // Table mode for this container (e.g., rows)
         parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
         actions, // Available actions for toolbar/dropdown
@@ -485,6 +486,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
       path: blockPath,
       parentId: null,
       containerField: 'blocks',
+      blockType, // Block type for uniform lookups (single source of truth)
       allowedSiblingTypes: effectivePageAllowedBlocks,
       maxSiblings: null,
       emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
@@ -547,12 +549,9 @@ export function getBlockById(formData, blockPathMap, blockId) {
   if (!pathInfo?.path) {
     return undefined;
   }
-  const block = getBlockByPath(formData, pathInfo.path);
-  // Inject virtual @type for object_list items
-  if (block && pathInfo.isObjectListItem && pathInfo.itemType) {
-    return { ...block, '@type': pathInfo.itemType };
-  }
-  return block;
+  // Return the raw block data - no @type injection
+  // Callers should use blockPathMap[blockId].blockType for the block type
+  return getBlockByPath(formData, pathInfo.path);
 }
 
 /**
@@ -615,7 +614,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   if (pathInfo.isObjectListItem) {
     // Get itemSchema and dataPath from parent's schema definition
     const parentBlock = getBlockById(formData, blockPathMap, parentId);
-    const parentType = parentBlock?.['@type'];
+    const parentType = blockPathMap[parentId]?.blockType;
     const schema = getBlockSchema(parentType, intl, blocksConfig);
     const fieldDef = schema?.properties?.[fieldName];
 
@@ -623,7 +622,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       fieldName,
       parentId,
       allowedBlocks: pathInfo.allowedSiblingTypes,
-      defaultBlock: pathInfo.itemType,
+      defaultBlock: pathInfo.blockType,
       maxLength: pathInfo.maxSiblings,
       isObjectList: true,
       itemSchema: stripFunctionsFromSchema(fieldDef?.schema),
@@ -643,7 +642,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     return null;
   }
 
-  const parentType = parentBlock['@type'];
+  const parentType = blockPathMap[parentId]?.blockType;
   const parentConfig = blocksConfig?.[parentType];
   const schema = getBlockSchema(parentType, intl, blocksConfig);
 
@@ -694,7 +693,10 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const block = getBlockById(formData, blockPathMap, blockId);
   if (!block) return [];
 
-  const blockType = block['@type'];
+  // Use blockPathMap for type lookup (single source of truth)
+  // Don't use block['@type'] as object_list items don't store @type
+  const blockType = blockPathMap[blockId]?.blockType;
+  if (!blockType) return [];
   const schema = getBlockSchema(blockType, intl, blocksConfig);
 
   const containerFields = [];
@@ -1458,6 +1460,7 @@ export function moveBlockBetweenContainers(
   // Get block data to move
   const sourcePath = blockPathMap[blockId]?.path;
   const blockData = getBlockByPath(formData, sourcePath);
+  console.log('[MOVE_BLOCK] sourcePath:', sourcePath, 'blockData:', blockData ? 'found' : 'null', 'blockType:', blockData?.['@type']);
 
   if (!blockData) {
     console.error('[MOVE_BLOCK] Could not find block data for:', blockId);

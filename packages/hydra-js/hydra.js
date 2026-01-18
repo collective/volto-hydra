@@ -356,18 +356,23 @@ export class Bridge {
         }
       }
       if (current) {
-        // Inject virtual @type for object_list items (e.g., 'slider:slides')
-        // This allows field type lookup to work without items having actual @type
-        // IMPORTANT: Mutate the original object, don't return a copy, so that
-        // modifications to the returned object update formData for inline editing sync
-        if (pathInfo.itemType) {
-          current['@type'] = pathInfo.itemType;
-        }
+        // Return the block data directly - no @type mutation needed
+        // Block types are looked up via blockPathMap.blockType (single source of truth)
         return current;
       }
     }
     // No fallback - blockPathMap is the single source of truth
     return undefined;
+  }
+
+  /**
+   * Get the block type for a given block ID.
+   * Uses blockPathMap as the single source of truth (works for both regular blocks and object_list items).
+   * @param {string} blockId - The block ID
+   * @returns {string|undefined} The block type
+   */
+  getBlockType(blockId) {
+    return this.blockPathMap?.[blockId]?.blockType;
   }
 
   /**
@@ -610,8 +615,7 @@ export class Bridge {
 
     // Empty blocks should not have an add button - they are meant to be replaced
     // via block chooser, not have blocks added after them
-    const blockData = this.getBlockData(blockUid);
-    if (blockData?.['@type'] === 'empty') {
+    if (this.getBlockType(blockUid) === 'empty') {
       return 'hidden';
     }
 
@@ -1304,7 +1308,8 @@ export class Bridge {
                   let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
 
                   // If block is hidden (e.g., carousel slide), try to make it visible first
-                  if (blockElement && this.isElementHidden(blockElement)) {
+                  // Skip if navigation is already in progress (SELECT_BLOCK already triggered it)
+                  if (blockElement && this.isElementHidden(blockElement) && !this._navigatingToBlock) {
                     log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
                     const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
                     if (madeVisible) {
@@ -1470,8 +1475,13 @@ export class Bridge {
     this.blockClickHandler = (event) => {
       // Handle data-block-selector clicks (carousel nav buttons, etc.)
       // Don't stopPropagation or preventDefault - let frontend handle visibility changes
+      // Skip if tryMakeBlockVisible is currently navigating (to avoid interference)
       const selectorElement = event.target.closest('[data-block-selector]');
       if (selectorElement) {
+        if (this._navigatingToBlock) {
+          log('blockClickHandler: skipping handleBlockSelector, tryMakeBlockVisible in progress');
+          return;
+        }
         const selector = selectorElement.getAttribute('data-block-selector');
         this.handleBlockSelector(selector, selectorElement);
         return;
@@ -2952,8 +2962,7 @@ export class Bridge {
     const allBlocks = document.querySelectorAll('[data-block-uid]');
     allBlocks.forEach((blockElement) => {
       const blockUid = blockElement.getAttribute('data-block-uid');
-      const blockData = this.getBlockData(blockUid);
-      if (blockData?.['@type'] === 'empty') {
+      if (this.getBlockType(blockUid) === 'empty') {
         blockElement.setAttribute('data-hydra-empty', 'true');
       } else {
         blockElement.removeAttribute('data-hydra-empty');
@@ -4506,8 +4515,7 @@ export class Bridge {
           // Check if the dragged block type is allowed in the target container
           // If not, walk up the parent chain to find a valid drop target
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
-          const draggedBlockData = this.getBlockData(draggedBlockId);
-          const draggedBlockType = draggedBlockData?.['@type'];
+          const draggedBlockType = this.getBlockType(draggedBlockId);
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -4783,9 +4791,7 @@ export class Bridge {
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          // Use getBlockData to handle nested blocks (not just top-level)
-          const blockData = this.getBlockData(uid);
-          const blockType = blockData?.['@type'];
+          const blockType = this.getBlockType(uid);
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           const hasEditableFields = Object.keys(blockTypeFields).length > 0 || blockType === 'slate';
 
@@ -5316,6 +5322,8 @@ export class Bridge {
    */
   tryMakeBlockVisible(targetUid) {
     log(`tryMakeBlockVisible: ${targetUid}`);
+    // Set flag to prevent handleBlockSelector from interfering
+    this._navigatingToBlock = targetUid;
     // First, try direct selector: data-block-selector="{targetUid}"
     const directSelector = document.querySelector(
       `[data-block-selector="${targetUid}"]`,
@@ -5417,33 +5425,61 @@ export class Bridge {
     const nextBlock = siblings[nextIndex];
     const nextUid = nextBlock?.getAttribute('data-block-uid');
     log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
+    log(`tryMakeBlockVisible: selector element:`, selector.tagName, selector.className, `parent: ${selector.parentElement?.id || selector.parentElement?.className}`);
 
     // Click once
     selector.click();
+    log(`tryMakeBlockVisible: click() called`);
 
-    // Wait for the expected block to become visible, then recurse if needed
-    const waitAndContinue = async () => {
-      // Poll for up to 500ms for the next block to become visible
-      for (let i = 0; i < 10; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        if (nextBlock && !this.isElementHidden(nextBlock)) {
-          log(`tryMakeBlockVisible: ${nextUid} is now visible`);
-          // Check if we've reached the target
-          if (nextUid === targetUid) {
-            log(`tryMakeBlockVisible: reached target ${targetUid}`);
-            return true;
-          }
-          // Need more clicks - recurse
-          log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
-          return this.tryMakeBlockVisible(targetUid);
+    // Wait for the expected block to become visible using requestAnimationFrame
+    // This is more universal than setTimeout - works with CSS transitions, JS animations, and instant changes
+    const startTime = performance.now();
+    const MAX_WAIT_MS = 2000; // 2 second timeout
+
+    const checkVisibility = () => {
+      const elapsed = performance.now() - startTime;
+
+      // Re-query element each time - DOM may re-render and replace elements
+      const currentNextBlock = document.querySelector(`[data-block-uid="${nextUid}"]`);
+
+      // Debug: log element state every 500ms
+      if (elapsed > 0 && Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
+        if (currentNextBlock) {
+          const style = window.getComputedStyle(currentNextBlock);
+          const rect = currentNextBlock.getBoundingClientRect();
+          const container = currentNextBlock.parentElement?.closest('[data-block-uid]');
+          const containerRect = container?.getBoundingClientRect();
+          log(`tryMakeBlockVisible debug: display=${style.display} rect=${Math.round(rect.width)}x${Math.round(rect.height)} left=${Math.round(rect.left)} right=${Math.round(rect.right)} containerLeft=${containerRect ? Math.round(containerRect.left) : 'none'} containerRight=${containerRect ? Math.round(containerRect.right) : 'none'}`);
+        } else {
+          log(`tryMakeBlockVisible debug: element not found in DOM`);
         }
       }
-      log(`tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible`);
-      return false;
+
+      if (currentNextBlock && !this.isElementHidden(currentNextBlock)) {
+        log(`tryMakeBlockVisible: ${nextUid} is now visible after ${Math.round(elapsed)}ms`);
+        // Check if we've reached the target
+        if (nextUid === targetUid) {
+          log(`tryMakeBlockVisible: reached target ${targetUid}`);
+          this._navigatingToBlock = null; // Clear flag
+          return;
+        }
+        // Need more clicks - recurse
+        log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
+        this.tryMakeBlockVisible(targetUid);
+        return;
+      }
+
+      if (elapsed < MAX_WAIT_MS) {
+        // Not visible yet - check again next frame
+        requestAnimationFrame(checkVisibility);
+      } else {
+        log(`tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible after ${Math.round(elapsed)}ms`);
+        this._navigatingToBlock = null; // Clear flag on timeout
+      }
     };
 
-    // Start the async wait (caller will handle the promise via the polling loop)
-    waitAndContinue();
+    // Start checking on next frame (after click event has propagated)
+    requestAnimationFrame(checkVisibility);
     return true;
   }
 
@@ -5519,7 +5555,7 @@ export class Bridge {
       }
 
       // For regular blocks, use blockFieldTypes
-      const blockType = block['@type'];
+      const blockType = pathInfo.blockType;
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
       Object.keys(fieldTypes).forEach((fieldName) => {
         if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
@@ -6199,9 +6235,9 @@ export class Bridge {
       if (!blocks || typeof blocks !== 'object') return;
       for (const blockId of Object.keys(blocks)) {
         const block = blocks[blockId];
-        if (block && block['@type']) {
+        const blockType = this.getBlockType(blockId);
+        if (block && blockType) {
           // Check if this block has slate fields and strip nodeIds from them
-          const blockType = block['@type'];
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
             if (this.fieldTypeIsSlate(fieldType) && block[fieldName]) {
@@ -6297,8 +6333,7 @@ export class Bridge {
     }
 
     // Block field
-    const blockData = this.getBlockData(resolved.blockId);
-    const blockType = blockData?.['@type'];
+    const blockType = this.getBlockType(resolved.blockId);
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     return blockTypeFields[resolved.fieldName];
   }

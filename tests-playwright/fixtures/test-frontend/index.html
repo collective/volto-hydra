@@ -559,6 +559,7 @@
                     window.bridge = initBridge({
                         allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
                         voltoConfig: voltoConfig,
+                        debug: true,  // Enable debug logging for tests
                     });
 
                     console.log('[TEST-FRONTEND] Bridge initialized, setting up change listener');
@@ -588,6 +589,13 @@
                         // Re-render content with updated data
                         // Return promise so hydra.js can materialize comments after DOM is ready
                         if (formData.blocks && formData.blocks_layout) {
+                            // Debug: Log column contents
+                            const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
+                            const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
+                            if (col1 || col2) {
+                                console.log('[TEST-FRONTEND] col-1 blocks_layout:', col1?.blocks_layout?.items);
+                                console.log('[TEST-FRONTEND] col-2 blocks_layout:', col2?.blocks_layout?.items);
+                            }
                             console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');
                             return await renderContentWithListings(formData);
                         }

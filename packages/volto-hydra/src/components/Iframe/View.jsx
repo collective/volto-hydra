@@ -12,7 +12,7 @@ import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
-  typeof window !== 'undefined' && (window.HYDRA_DEBUG || true);
+  typeof window !== 'undefined' && window.HYDRA_DEBUG;
 const log = (...args) => debugEnabled && console.log('[VIEW]', ...args);
 // eslint-disable-next-line no-unused-vars
 const logExtract = (...args) =>
@@ -671,13 +671,14 @@ const Iframe = (props) => {
 
     if (action === 'inside') {
       const parentBlock = getBlockById(formData, blockPathMap, blockId);
+      const parentType = blockPathMap[blockId]?.blockType;
       const parentSchema =
-        typeof mergedBlocksConfig?.[parentBlock?.['@type']]?.blockSchema === 'function'
-          ? mergedBlocksConfig[parentBlock['@type']].blockSchema({
+        typeof mergedBlocksConfig?.[parentType]?.blockSchema === 'function'
+          ? mergedBlocksConfig[parentType].blockSchema({
               formData: {},
               intl: { formatMessage: (m) => m.defaultMessage },
             })
-          : mergedBlocksConfig?.[parentBlock?.['@type']]?.blockSchema;
+          : mergedBlocksConfig?.[parentType]?.blockSchema;
       fieldDef = parentSchema?.properties?.[fieldName];
       isObjectList = fieldDef?.widget === 'object_list';
       containerConfig = { parentId: blockId, fieldName, isObjectList };
@@ -694,7 +695,7 @@ const Iframe = (props) => {
     // Table mode: adding a cell adds a column (to ALL rows)
     if (isTableCell && action !== 'inside') {
       // Create cell template with defaults
-      const virtualType = blockPathMap[blockId]?.itemType; // e.g., 'slateTable:rows:cells'
+      const virtualType = blockPathMap[blockId]?.blockType; // e.g., 'slateTable:rows:cells'
       let cellData = { '@type': virtualType };
       cellData = applyBlockDefaults({ data: cellData, formData: cellData, intl, metadata, properties }, mergedBlocksConfig);
       cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties });
@@ -738,11 +739,11 @@ const Iframe = (props) => {
       const idField = containerConfig?.idField || fieldDef?.idField || '@id';
       let virtualType;
       if (action === 'inside') {
-        // Get parent type and append field name
-        virtualType = `${getBlockById(formData, blockPathMap, blockId)?.['@type']}:${fieldName}`;
+        // Get parent type and append field name (use blockPathMap for type lookup)
+        virtualType = `${blockPathMap[blockId]?.blockType}:${fieldName}`;
       } else {
         // For before/after, use the existing item's virtual type
-        virtualType = blockPathMap[blockId]?.itemType;
+        virtualType = blockPathMap[blockId]?.blockType;
       }
       blockData = { [idField]: newBlockId, '@type': virtualType };
 
@@ -763,7 +764,7 @@ const Iframe = (props) => {
           const parentId = rowPathInfo?.parentId;
           tableBlock = getBlockById(formData, blockPathMap, parentId);
           // Get dataPath from the row's container field definition
-          const tableType = tableBlock?.['@type'];
+          const tableType = blockPathMap[parentId]?.blockType;
           const tableBlockSchema = typeof mergedBlocksConfig?.[tableType]?.blockSchema === 'function'
             ? mergedBlocksConfig[tableType].blockSchema({ formData, intl: { formatMessage: (m) => m.defaultMessage } })
             : mergedBlocksConfig?.[tableType]?.blockSchema;
@@ -840,16 +841,19 @@ const Iframe = (props) => {
       }
     }
 
-    onChangeFormData(newFormData);
+    // Set pending selection and blockPathMap, but NOT formData
+    // formData will be updated by the useEffect after it sends FORM_DATA to iframe
+    // This ensures the useEffect sees a content change and doesn't skip sending
+    const insertBlockPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
     flushSync(() => {
       setIframeSyncState((prev) => ({
         ...prev,
-        // Rebuild blockPathMap immediately so Escape handler has current parent info
-        blockPathMap: buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
+        blockPathMap: insertBlockPathMap,
         pendingSelectBlockUid: selectBlockId,
         ...(formatRequestId ? { pendingFormatRequestId: formatRequestId } : {}),
       }));
     });
+    onChangeFormData(newFormData);
     dispatch(setSidebarTab(1));
 
     return newBlockId;
@@ -903,6 +907,13 @@ const Iframe = (props) => {
       containerConfig,
     );
 
+    // Rebuild blockPathMap to reflect the new block type (e.g., empty → slate)
+    // Do NOT set formData here - let the useEffect update it after sending FORM_DATA
+    const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+    setIframeSyncState(prev => ({
+      ...prev,
+      blockPathMap: newBlockPathMap,
+    }));
     onChangeFormData(newFormData);
   };
 
@@ -940,6 +951,13 @@ const Iframe = (props) => {
       { intl, metadata, properties },
     );
 
+    // Rebuild blockPathMap to reflect the deleted block
+    // Do NOT set formData here - let the useEffect update it after sending FORM_DATA
+    const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+    setIframeSyncState(prev => ({
+      ...prev,
+      blockPathMap: newBlockPathMap,
+    }));
     onChangeFormData(newFormData);
     onSelectBlock(selectPrev ? previous : null);
     setAddNewBlockOpened(false);
@@ -1307,11 +1325,17 @@ const Iframe = (props) => {
         case 'MOVE_BLOCK': {
           // Handle drag-and-drop block moves (supports container and page-level)
           const { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId } = event.data;
+          console.log('[MOVE_BLOCK] received:', { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId });
+
+          // Use properties (Redux) as source of truth for moves
+          // Rebuild blockPathMap from properties to ensure consistency
+          const currentFormData = properties;
+          const currentBlockPathMap = buildBlockPathMap(currentFormData, config.blocks.blocksConfig, intl);
 
           // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
           // Only needed when moving to a different container
           const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
-            ? getContainerFieldConfig(blockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl)
+            ? getContainerFieldConfig(blockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
             : null;
 
           // Use moveBlockBetweenContainers utility to handle all cases:
@@ -1319,8 +1343,8 @@ const Iframe = (props) => {
           // - Different container moves
           // - Page ↔ container moves
           let newFormData = moveBlockBetweenContainers(
-            properties,
-            iframeSyncState.blockPathMap,
+            currentFormData,
+            currentBlockPathMap,
             blockId,
             targetBlockId,
             insertAfter,
@@ -1329,6 +1353,7 @@ const Iframe = (props) => {
             blocksConfig,
             intl,
           );
+          console.log('[MOVE_BLOCK] moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
             // If we moved to a different container, ensure source container has at least one block
@@ -1336,20 +1361,30 @@ const Iframe = (props) => {
               newFormData = ensureEmptyBlockIfEmpty(
                 newFormData,
                 sourceContainerConfig,
-                iframeSyncState.blockPathMap,
+                currentBlockPathMap,
                 uuid,
                 blocksConfig,
-                { intl, metadata, properties },
+                { intl, metadata, properties: currentFormData },
               );
             }
             // Set pendingSelectBlockUid so the moved block stays selected after re-render
+            // Rebuild blockPathMap to reflect the new block positions
             // Use flushSync to ensure state is committed before Redux update triggers useEffect
+            // Do NOT set formData here - let the useEffect update it after sending FORM_DATA
+            const newBlockPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
             flushSync(() => {
               setIframeSyncState(prev => ({
                 ...prev,
+                blockPathMap: newBlockPathMap,
                 pendingSelectBlockUid: blockId,
               }));
             });
+            // Debug: Log column contents after move
+            const col1AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-1'];
+            const col2AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-2'];
+            console.log('[MOVE_BLOCK] col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
+            console.log('[MOVE_BLOCK] col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
+            console.log('[MOVE_BLOCK] calling onChangeFormData');
             onChangeFormData(newFormData);
           }
           break;
@@ -1893,7 +1928,7 @@ const Iframe = (props) => {
     const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
     if (parentId) {
       const parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
-      const parentType = parentBlockData?.['@type'];
+      const parentType = iframeSyncState.blockPathMap?.[parentId]?.blockType;
       allowed = filterByParentVariation(allowed, parentBlockData, parentType);
     }
     return allowed;
@@ -1914,7 +1949,7 @@ const Iframe = (props) => {
         return allowedBlocks;
       }
       parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
-      parentType = parentBlockData?.['@type'];
+      parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
       const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
       const resolvedSchema = typeof parentSchema === 'function'
         ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
@@ -1926,7 +1961,7 @@ const Iframe = (props) => {
       const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
       if (parentId) {
         parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
-        parentType = parentBlockData?.['@type'];
+        parentType = iframeSyncState.blockPathMap?.[parentId]?.blockType;
         const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
         const parentSchema = parentBlockConfig?.blockSchema;
         const resolvedSchema = typeof parentSchema === 'function'
@@ -1992,7 +2027,7 @@ const Iframe = (props) => {
     const parentBlock = parentBlockId
       ? getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId)
       : null;
-    const parentType = parentBlock?.['@type'];
+    const parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
     const blocksConfig = config.blocks.blocksConfig;
     const parentSchema =
       typeof blocksConfig?.[parentType]?.blockSchema === 'function'
@@ -2486,6 +2521,8 @@ const Iframe = (props) => {
       })()}
 
       {/* Hierarchical sidebar widgets */}
+      {/* Use properties (Redux) for formData - it's always up-to-date after onChangeFormData */}
+      {/* blockPathMap is updated synchronously before onChangeFormData, so they stay in sync */}
       <ParentBlocksWidget
         selectedBlock={selectedBlock}
         formData={properties}

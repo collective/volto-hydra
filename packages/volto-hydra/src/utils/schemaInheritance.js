@@ -683,7 +683,9 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     const blockData = getBlockById(result, blockPathMap, blockId);
     if (!blockData) continue;
 
-    const blockType = blockData['@type'];
+    // Use blockPathMap for type lookup (single source of truth)
+    // Don't use blockData['@type'] as object_list items don't store @type
+    const blockType = blockPathMap[blockId]?.blockType;
     if (!blockType) continue;
 
     const blockConfig = blocksConfig?.[blockType];

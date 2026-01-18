@@ -39,10 +39,10 @@ const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
   // (object_list items often don't have @type, so blockType may be undefined)
   const pathInfo = blockPathMap?.[blockId];
   if (pathInfo?.isObjectListItem) {
-    // Try to get title from itemType (parentType:fieldName format)
+    // Try to get title from blockType (parentType:fieldName format)
     // For nested types like slateTable:rows:cells, parentType is slateTable:rows, fieldName is cells
-    if (pathInfo.itemType) {
-      const parts = pathInfo.itemType.split(':');
+    if (pathInfo.blockType) {
+      const parts = pathInfo.blockType.split(':');
       const fieldName = parts.pop(); // Last part is the field name
       const parentType = parts.join(':'); // Everything else is parent type
       const parentConfig = config.blocks?.blocksConfig?.[parentType];
@@ -105,21 +105,6 @@ const getParentChain = (blockId, blockPathMap) => {
   return parents;
 };
 
-/**
- * Get block data by ID using blockPathMap
- * For object_list items, injects the virtual @type from itemType
- */
-const getBlockData = (blockId, formData, blockPathMap) => {
-  const block = getBlockById(formData, blockPathMap, blockId);
-  if (!block) return null;
-
-  // Inject virtual @type for object_list items
-  const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.isObjectListItem && pathInfo.itemType) {
-    return { ...block, '@type': pathInfo.itemType };
-  }
-  return block;
-};
 
 /**
  * Filter out container fields from schema (type: 'blocks' or widget: 'object_list')
@@ -525,10 +510,15 @@ const ParentBlocksWidget = ({
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
-  // Get current block data for its type
-  const currentBlockData = getBlockData(selectedBlock, formData, blockPathMap);
-  const currentBlockType = currentBlockData?.['@type'];
+  // Get current block data and type from blockPathMap (single source of truth)
+  const currentBlockData = getBlockById(formData, blockPathMap, selectedBlock);
+  const currentBlockType = blockPathMap[selectedBlock]?.blockType;
 
+  // Guard: If block data is undefined, skip rendering (data may be out of sync during drag operations)
+  if (!currentBlockData) {
+    console.warn('[ParentBlocksWidget] Block data undefined for:', selectedBlock, 'blockPathMap entry:', blockPathMap[selectedBlock]);
+    return null;
+  }
 
   return (
     <>
@@ -536,8 +526,8 @@ const ParentBlocksWidget = ({
         <>
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
-            const parentData = getBlockData(parentId, formData, blockPathMap);
-            const parentType = parentData?.['@type'];
+            const parentData = getBlockById(formData, blockPathMap, parentId);
+            const parentType = blockPathMap[parentId]?.blockType;
             // Parent of this parent (or null if root)
             const grandparentId = index > 0 ? parentIds[index - 1] : null;
 

@@ -1445,10 +1445,13 @@ function removeBlock(blockId) {
 function initCarouselNavigation() {
     // Use event delegation on the content container
     const content = document.getElementById('content');
+    console.log('[RENDERER] initCarouselNavigation called, content:', content ? 'found' : 'NOT FOUND');
     if (!content) return;
 
     content.addEventListener('click', function(event) {
+        console.log('[RENDERER] Content click received, target:', event.target.tagName, event.target.className);
         const selectorElement = event.target.closest('[data-block-selector]');
+        console.log('[RENDERER] selectorElement:', selectorElement ? selectorElement.getAttribute('data-block-selector') : 'null');
         if (!selectorElement) return;
 
         const selector = selectorElement.getAttribute('data-block-selector');
