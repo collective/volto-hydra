@@ -528,8 +528,14 @@ export class AdminUIHelper {
    * where clicking in the center would select a nested block instead.
    *
    * @param blockId - The data-block-uid of the container block
+   * @param options.waitForToolbar - If true (default), waits for Quanta toolbar. Set to false for
+   *                                  container blocks where toolbar positioning is unreliable.
    */
-  async clickContainerBlockInIframe(blockId: string) {
+  async clickContainerBlockInIframe(
+    blockId: string,
+    options: { waitForToolbar?: boolean } = {},
+  ) {
+    const { waitForToolbar = true } = options;
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -568,8 +574,13 @@ export class AdminUIHelper {
       }
     }
 
-    // Wait for toolbar to be positioned correctly
-    await this.waitForQuantaToolbar(blockId);
+    if (waitForToolbar) {
+      // Wait for toolbar to be positioned correctly
+      await this.waitForQuantaToolbar(blockId);
+    } else {
+      // Wait for sidebar to show the block is selected
+      await this.waitForSidebarOpen();
+    }
 
     return block;
   }

@@ -1176,23 +1176,19 @@ test.describe('Empty Block Behavior', () => {
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
-    // Select slate block type - use text content since title attribute may vary
-    await blockChooser.getByRole('button', { name: 'Text' }).click();
+    // Select teaser block type (gridBlock only allows ['teaser', 'image'])
+    await blockChooser.getByRole('button', { name: 'Teaser' }).click();
 
-    // Wait for re-render
-    await page.waitForTimeout(500);
-
-    // The block should now be slate type, not empty
-    const slateBlock = iframe
+    // The block should now be teaser type, not empty
+    const teaserBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
       .first();
-    await expect(helper.getSlateField(slateBlock)).toBeVisible();
+    // Wait for teaser to render (has a link element)
+    await expect(teaserBlock.locator('a').first()).toBeVisible({ timeout: 5000 });
 
-    // The slate block should have proper empty content, not "Empty block" fallback
-    // This verifies that onMutateBlock properly initializes the slate value
-    const slateText = await slateBlock.textContent();
-    expect(slateText?.trim()).toBe('');
-    expect(slateText).not.toContain('Empty block');
+    // The block should not have the empty fallback
+    const blockContent = await teaserBlock.textContent();
+    expect(blockContent).not.toContain('Empty block');
   });
 
   test('adding new container block creates initial block inside', async ({
@@ -1316,7 +1312,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     expect(initialColumnCount).toBe(2);
 
     // Select columns-1 (the container that only allows column blocks)
-    await helper.clickContainerBlockInIframe('columns-1');
+    await helper.clickContainerBlockInIframe('columns-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Columns');
 
     // Add a column via the sidebar (columns field only allows 'column' type, so auto-inserts)
     await helper.addBlockViaSidebar('Columns');
@@ -1375,8 +1372,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     expect(initialColumnCount).toBe(2);
 
     // Select col-1 (inside columns-1, which only allows column blocks)
-    await helper.clickContainerBlockInIframe('col-1');
-    await page.waitForTimeout(500);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Find and click the iframe add button (the + button next to the block)
     // This inserts AFTER col-1 as a sibling (another column)
@@ -1815,11 +1812,13 @@ test.describe('Container Block Drag and Drop', () => {
     const iframe = helper.getIframe();
 
     // Select col-1 (a column with data-block-add="right")
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    // Use clickContainerBlockInIframe to click on the column's title, not child blocks
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
-    // Start dragging
+    // Wait for drag handle to appear (indicates block is selected)
     const dragHandle = await helper.getDragHandle();
+    await expect(dragHandle).toBeVisible();
     const col2 = iframe.locator('[data-block-uid="col-2"]');
 
     // Get drag handle position
@@ -1893,8 +1892,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(secondColUid).toBe('col-2');
 
     // Select col-1
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Drag col-1 to the right of col-2 using horizontal drag
     const dragHandle = await helper.getDragHandle();
@@ -1933,8 +1932,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCell1).toBeVisible();
 
     // Click on grid-cell-1 to select it
-    await helper.clickBlockInIframe('grid-cell-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('grid-cell-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     // Start dragging
     const dragHandle = await helper.getDragHandle();
@@ -2110,8 +2109,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(col1).toBeVisible();
 
     // Select col-1
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Try to drag to page level (next to text-after which is a page-level block)
     const dragHandle = await helper.getDragHandle();
@@ -2185,8 +2184,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCell1).toBeVisible();
 
     // Select col-1
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Try to drag col-1 into the grid (next to grid-cell-1)
     const dragHandle = await helper.getDragHandle();
@@ -2254,7 +2253,8 @@ test.describe('Container Block Drag and Drop', () => {
     ).toHaveCount(2);
 
     // Select col-2 container (use clickContainerBlockInIframe to avoid hitting nested content)
-    await helper.clickContainerBlockInIframe('col-2');
+    await helper.clickContainerBlockInIframe('col-2', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // The add button is in the Admin UI (not iframe), positioned next to selected block
     const addButton = page.locator('.volto-hydra-add-button');
@@ -2268,8 +2268,9 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select the new (3rd) column and add 4th column
     const allColumns = columns1.locator(':scope > .columns-row > [data-block-uid]');
-    await allColumns.nth(2).click();
-    await helper.waitForQuantaToolbar((await allColumns.nth(2).getAttribute('data-block-uid'))!);
+    const thirdColId = await allColumns.nth(2).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(thirdColId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     await expect(addButton).toBeVisible();
     await addButton.click();
@@ -2280,8 +2281,9 @@ test.describe('Container Block Drag and Drop', () => {
     ).toHaveCount(4);
 
     // Select the new (4th) column
-    await allColumns.nth(3).click();
-    await helper.waitForQuantaToolbar((await allColumns.nth(3).getAttribute('data-block-uid'))!);
+    const fourthColId = await allColumns.nth(3).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(fourthColId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Add button should NOT be visible when container is at maxLength
     await expect(addButton).not.toBeVisible();
@@ -2306,7 +2308,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCells).toHaveCount(2);
 
     // Select grid-cell-2 and add a new cell after it
-    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.clickContainerBlockInIframe('grid-cell-2', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     // The add button is in the Admin UI (not iframe)
     const addButton = page.locator('.volto-hydra-add-button');
@@ -2320,10 +2323,9 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCells).toHaveCount(3);
 
     // Select the new (3rd) cell and add 4th cell
-    await gridCells.nth(2).click();
-    await helper.waitForQuantaToolbar(
-      (await gridCells.nth(2).getAttribute('data-block-uid'))!,
-    );
+    const thirdCellId = await gridCells.nth(2).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(thirdCellId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Text');
 
     await expect(addButton).toBeVisible();
     await addButton.click();
@@ -2334,10 +2336,9 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCells).toHaveCount(4);
 
     // Select the new (4th) cell
-    await gridCells.nth(3).click();
-    await helper.waitForQuantaToolbar(
-      (await gridCells.nth(3).getAttribute('data-block-uid'))!,
-    );
+    const fourthCellId = await gridCells.nth(3).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(fourthCellId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Text');
 
     // Add button should NOT be visible when container is at maxLength
     await expect(addButton).not.toBeVisible();
