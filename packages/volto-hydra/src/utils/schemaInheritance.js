@@ -49,13 +49,14 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
     const blockId = hydraContext?.currentBlockId;
 
     // Create or update typeField with computed choices
-    const { filterConvertibleFrom, allowedBlocks, title, default: defaultValue } = typeFieldOptions;
-    if (filterConvertibleFrom || allowedBlocks) {
+    const { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = typeFieldOptions;
+    if (filterConvertibleFrom || allowedBlocks || blocksField) {
       const choices = getBlockTypeChoices(
-        { filterConvertibleFrom, allowedBlocks },
+        { filterConvertibleFrom, allowedBlocks, blocksField },
         blocksConfig,
         blockPathMap,
         blockId,
+        formData,  // Pass formData for blocksField lookup
       );
 
       // Create or update the typeField
@@ -820,11 +821,11 @@ function createEnhancerByType(type, config) {
 
   switch (type) {
     case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField, filterConvertibleFrom, allowedBlocks, title, default: defaultValue } = config;
+      const { typeField, mappingField, defaultsField, filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = config;
       if (!typeField || !defaultsField) return null;
       // Pass typeFieldOptions if any type field config is provided
-      const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || title || defaultValue)
-        ? { filterConvertibleFrom, allowedBlocks, title, default: defaultValue }
+      const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || blocksField || title || defaultValue)
+        ? { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue }
         : {};
       enhancer = inheritSchemaFrom(typeField, mappingField || null, defaultsField, typeFieldOptions);
       enhancer.config = config;
@@ -1001,25 +1002,57 @@ function createSingleEnhancerLegacy(recipe) {
  *
  * Used by inheritSchemaFrom to compute choices for the typeField.
  * Logic:
- * 1. Start with allowedBlocks (if provided) or parent's allowedSiblingTypes
- * 2. Fall back to all non-restricted blocks (or all if filtering)
- * 3. Filter by filterConvertibleFrom (types with fieldMappings[source])
+ * 1. Start with allowedBlocks (if provided)
+ * 2. Or derive from blocksField (container's blocks field schema)
+ * 3. Or fall back to parent's allowedSiblingTypes from pathMap
+ * 4. Fall back to all non-restricted blocks (or all if filtering)
+ * 5. Filter by filterConvertibleFrom (types with fieldMappings[source])
  *
  * @param {Object} options - Configuration options
  * @param {string[]} options.allowedBlocks - Static list of allowed types
+ * @param {string} options.blocksField - Container field name to derive allowedBlocks from (e.g., 'blocks')
  * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., 'default')
  * @param {Object} blocksConfig - Block configuration registry
  * @param {Object} blockPathMap - Block path map (optional, for allowedSiblingTypes)
  * @param {string} blockId - Current block ID (optional, for allowedSiblingTypes)
+ * @param {Object} formData - Current block's formData (optional, for blocksField lookup)
  * @returns {Array} - Array of [value, label] tuples for choices
  */
-export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId) {
+export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId, formData) {
   if (!blocksConfig) return [];
 
-  const { allowedBlocks, filterConvertibleFrom } = options || {};
+  const { allowedBlocks, blocksField, filterConvertibleFrom } = options || {};
 
   // Determine base types in order of precedence
   let types = allowedBlocks;
+
+  // Derive from container's blocks field schema if blocksField is set
+  // blocksField specifies which container field to get allowedBlocks from
+  // Special value '..' means get sibling allowed types from parent container
+  if (!types && blocksField) {
+    if (blocksField === '..') {
+      // ".." means get sibling allowed types from parent container
+      // This is available via blockPathMap[blockId].allowedSiblingTypes
+      if (blockPathMap && blockId) {
+        const pathInfo = blockPathMap[blockId];
+        if (pathInfo?.allowedSiblingTypes) {
+          types = pathInfo.allowedSiblingTypes;
+        }
+      }
+    } else if (formData) {
+      // Regular field name - look at container's own field
+      const blockType = formData['@type'];
+      const blockSchema = getBlockSchema(blockType, null, blocksConfig);
+      const fieldDef = blockSchema?.properties?.[blocksField];
+      if (fieldDef?.allowedBlocks) {
+        // Get allowedBlocks from the field definition in schema
+        types = fieldDef.allowedBlocks;
+      } else {
+        // For implicit containers (blocks/blocks_layout), check block config's allowedBlocks
+        types = blocksConfig[blockType]?.allowedBlocks;
+      }
+    }
+  }
 
   // Try parent's allowedSiblingTypes from pathMap
   if (!types && blockPathMap && blockId) {

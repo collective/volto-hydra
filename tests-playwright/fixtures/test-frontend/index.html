@@ -460,39 +460,27 @@
                                 },
                                 // Grid block: add schema inheritance recipe
                                 // variation field is created by inheritSchemaFrom with computed choices
-                                // NO DEFAULT - children are independent until a type is selected
+                                // allowedBlocks on config controls what children can be added
+                                // blocksField: 'blocks' tells inheritSchemaFrom to derive choices from it
+                                // When variation is set, BlockChooser only shows that type
                                 gridBlock: {
+                                    allowedBlocks: ['teaser', 'image'],
                                     schemaEnhancer: {
                                         inheritSchemaFrom: {
                                             typeField: 'variation',
                                             defaultsField: 'itemDefaults',
-                                            allowedBlocks: ['teaser', 'image'],
+                                            blocksField: 'blocks',
                                             title: 'Item Type',
                                         },
                                     },
                                 },
                                 // Teaser block: use Volto's TeaserSchema (has href with object_browser)
-                                // fieldMappings at top level for block conversion and listing expansion
+                                // fieldMappings come from volto-hydra index.js (merged via deepMerge)
                                 teaser: {
                                     id: 'teaser',
                                     title: 'Teaser',
                                     icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
                                     group: 'common',
-                                    fieldMappings: {
-                                        // Default mapping for listings (query results -> teaser fields)
-                                        default: {
-                                            '@id': 'href',
-                                            'title': 'title',
-                                            'description': 'description',
-                                            'image': 'preview_image',
-                                        },
-                                        // Converting from image block - preserve href and map url to preview_image
-                                        image: {
-                                            'href': 'href',
-                                            'alt': 'title',
-                                            'url': 'preview_image',
-                                        },
-                                    },
                                     schemaEnhancer: {
                                         childBlockConfig: {
                                             defaultsField: 'itemDefaults',
@@ -501,23 +489,10 @@
                                     },
                                 },
                                 // Image block: configure which fields are editable on child vs parent
+                                // fieldMappings come from volto-hydra index.js (merged via deepMerge)
                                 image: {
                                     // editableFields: url, alt, and href (Link to) stay on child
                                     // alignment, size, openLinkInNewTab go to parent
-                                    fieldMappings: {
-                                        // Default mapping for listings (query results -> image fields)
-                                        default: {
-                                            '@id': 'href',
-                                            'title': 'alt',
-                                            'image': 'url',
-                                        },
-                                        // Converting from teaser block
-                                        teaser: {
-                                            'href': 'href',
-                                            'title': 'alt',
-                                            'preview_image': 'url',
-                                        },
-                                    },
                                     schemaEnhancer: {
                                         childBlockConfig: {
                                             defaultsField: 'itemDefaults',

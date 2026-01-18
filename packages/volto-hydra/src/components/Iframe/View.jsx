@@ -1851,62 +1851,114 @@ const Iframe = (props) => {
     );
   }, [selectedBlock, iframeSyncState.blockPathMap, iframeSyncState.formData, intl]);
 
+  // Filter allowedBlocks by parent's variation if inheritSchemaFrom with blocksField is configured
+  // This ensures new blocks match the parent's item type selection (container use case)
+  const filterByParentVariation = useCallback((rawAllowedBlocks, parentBlockData, parentType) => {
+    if (!rawAllowedBlocks || !parentBlockData || !parentType) {
+      return rawAllowedBlocks;
+    }
+    const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
+    const schemaEnhancer = parentBlockConfig?.schemaEnhancer;
+    // Handle both function (with .config) and recipe object (with .inheritSchemaFrom)
+    const schemaEnhancerConfig = typeof schemaEnhancer === 'function'
+      ? schemaEnhancer.config
+      : schemaEnhancer?.inheritSchemaFrom;
+    const typeField = schemaEnhancerConfig?.typeField;
+    const blocksField = schemaEnhancerConfig?.blocksField;
+
+    // Only filter when blocksField is set and not '..' (container use case)
+    // Listing use case (blocksField: '..') doesn't need BlockChooser filtering
+    if (!blocksField || blocksField === '..' || !typeField) {
+      return rawAllowedBlocks;
+    }
+
+    const variationValue = parentBlockData?.[typeField];
+    // If parent has a variation set and it's in allowedBlocks, filter to just that type
+    if (variationValue && rawAllowedBlocks.includes(variationValue)) {
+      return [variationValue];
+    }
+    return rawAllowedBlocks;
+  }, []);
+
   // Iframe add: adds AFTER the selected block (as sibling)
   // Uses parentContainerConfig.allowedBlocks, or page-level allowedBlocks
+  // Filtered by parent's variation if inheritSchemaFrom is configured
   const iframeAllowedBlocks = useMemo(() => {
+    let allowed = allowedBlocks;
     if (parentContainerConfig?.allowedBlocks) {
-      return parentContainerConfig.allowedBlocks;
+      allowed = parentContainerConfig.allowedBlocks;
     }
-    return allowedBlocks;
-  }, [parentContainerConfig, allowedBlocks]);
-
-  // Compute allowedBlocks for BlockChooser based on pendingAdd context
-  const effectiveAllowedBlocks = useMemo(() => {
-    if (pendingAdd?.mode === 'sidebar') {
-      // Sidebar add: get allowed blocks from the container's field schema
-      const { parentBlockId, fieldName } = pendingAdd;
-      if (parentBlockId === null) {
-        // Page-level
-        return allowedBlocks;
-      }
-      const parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
-      const parentType = parentBlockData?.['@type'];
-      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
-      const resolvedSchema = typeof parentSchema === 'function'
-        ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : parentSchema;
-      return resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
-    }
-    // Iframe add: get allowed blocks from parent container of afterBlockId
-    const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
+    // Get parent block data for variation filtering
+    const afterBlockId = selectedBlock;
     const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
     if (parentId) {
       const parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
       const parentType = parentBlockData?.['@type'];
-      const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
-      const parentSchema = parentBlockConfig?.blockSchema;
+      allowed = filterByParentVariation(allowed, parentBlockData, parentType);
+    }
+    return allowed;
+  }, [parentContainerConfig, allowedBlocks, selectedBlock, iframeSyncState.blockPathMap, properties, filterByParentVariation]);
+
+  // Compute allowedBlocks for BlockChooser based on pendingAdd context
+  // Also applies variation filtering when parent has blocksField configured
+  const effectiveAllowedBlocks = useMemo(() => {
+    let allowed = null;
+    let parentBlockData = null;
+    let parentType = null;
+
+    if (pendingAdd?.mode === 'sidebar') {
+      // Sidebar add: get allowed blocks from the container's field schema
+      const { parentBlockId, fieldName } = pendingAdd;
+      if (parentBlockId === null) {
+        // Page-level - no parent filtering
+        return allowedBlocks;
+      }
+      parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
+      parentType = parentBlockData?.['@type'];
+      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
       const resolvedSchema = typeof parentSchema === 'function'
         ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
         : parentSchema;
+      allowed = resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
+    } else {
+      // Iframe add: get allowed blocks from parent container of afterBlockId
+      const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
+      const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
+      if (parentId) {
+        parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
+        parentType = parentBlockData?.['@type'];
+        const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
+        const parentSchema = parentBlockConfig?.blockSchema;
+        const resolvedSchema = typeof parentSchema === 'function'
+          ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+          : parentSchema;
 
-      // First check schema-defined container fields (e.g., columns, accordion)
-      for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
-        if (fieldDef.type === 'blocks') {
-          const layoutField = `${fieldName}_layout`;
-          if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
-            return fieldDef.allowedBlocks || null;
+        // First check schema-defined container fields (e.g., columns, accordion)
+        for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
+          if (fieldDef.type === 'blocks') {
+            const layoutField = `${fieldName}_layout`;
+            if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
+              allowed = fieldDef.allowedBlocks || null;
+              break;
+            }
           }
         }
-      }
 
-      // Check for implicit container (uses blocks/blocks_layout directly)
-      // These have allowedBlocks on the block config, not in schema
-      if (parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
-        return parentBlockConfig?.allowedBlocks || null;
+        // Check for implicit container (uses blocks/blocks_layout directly)
+        // These have allowedBlocks on the block config, not in schema
+        if (!allowed && parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
+          allowed = parentBlockConfig?.allowedBlocks || null;
+        }
       }
     }
-    return allowedBlocks;
-  }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks]);
+
+    // Apply variation filtering if parent has blocksField configured
+    if (allowed && parentBlockData && parentType) {
+      allowed = filterByParentVariation(allowed, parentBlockData, parentType);
+    }
+
+    return allowed || allowedBlocks;
+  }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation]);
 
   // ============================================================================
   // BLOCK ADD FLOW (Unified for Sidebar and Iframe)

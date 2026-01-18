@@ -484,11 +484,12 @@ const bridge = initBridge({
         // Parent container: controls child type via 'variation' field
         // inheritSchemaFrom creates the typeField with computed choices
         gridBlock: {
+          allowedBlocks: ['teaser', 'image'],  // Allowed child block types
           schemaEnhancer: {
             inheritSchemaFrom: {
               typeField: 'variation',
               defaultsField: 'itemDefaults',
-              allowedBlocks: ['teaser', 'image'],
+              blocksField: 'blocks',  // Derive choices from blocks field
               title: 'Item Type',
             },
           },
@@ -523,6 +524,12 @@ const bridge = initBridge({
 ```
 
 **`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
+- `typeField`: Field name for selecting child type (e.g., `'variation'`)
+- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
+- `blocksField`: Where to derive type choices:
+  - `'blocks'` or `'items'`: Container use case - derive from own field's `allowedBlocks`
+  - `'..'`: Listing use case - derive from parent's sibling allowed types
+- `filterConvertibleFrom`: Filter types to only those with `fieldMappings[source]` (e.g., `'default'`)
 
 **`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
 

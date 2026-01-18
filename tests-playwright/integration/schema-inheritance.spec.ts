@@ -1075,17 +1075,14 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     // Click the add button in the iframe (appears near selected block)
     await helper.clickAddBlockButton();
 
-    // Block chooser should appear - select Image (a different type than Teaser)
-    const blockChooser = page.locator('.blocks-chooser');
-    await blockChooser.waitFor({ state: 'visible', timeout: 3000 });
-    const imageButton = blockChooser.getByRole('button', { name: /^Image$/i });
-    await imageButton.click();
+    // When variation is set, only that type is allowed in the block chooser
+    // Since there's only 1 allowed type (Teaser), the system auto-adds it without showing chooser
+    // This is the "nicer for user" approach: no need to choose when there's only 1 option
 
-    // Wait for block chooser to close and new block to be selected
-    await blockChooser.waitFor({ state: 'hidden', timeout: 3000 });
+    // Wait a bit for the block to be added and selected
+    await page.waitForTimeout(500);
 
-    // The new block should have been transformed to Teaser (synced to grid's variation)
-    // Check the sidebar - the selected block's breadcrumb should show Teaser, not Image
+    // The new block should be a Teaser (auto-added since it's the only choice)
     await helper.waitForSidebarOpen();
     const childBreadcrumb = page.locator('.parent-block-section .parent-nav').last();
     await expect(childBreadcrumb).toContainText('Teaser', { timeout: 5000 });

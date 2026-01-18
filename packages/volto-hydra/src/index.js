@@ -199,7 +199,10 @@ const applyConfig = (config) => {
     // Run schema inheritance for the referenced block type
     // inheritSchemaFrom creates the variation field with computed choices
     // and adds the inherited_fields fieldset (item type defaults, etc.)
+    // blocksField: '..' derives choices from sibling allowed types
+    // filterConvertibleFrom: 'default' filters to types with fieldMappings.default
     schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
+      blocksField: '..',
       filterConvertibleFrom: 'default',
       title: 'Item Type',
       default: 'summaryItem',
@@ -220,7 +223,12 @@ const applyConfig = (config) => {
     return schema;
   };
   // Attach config so syncChildBlockTypes can detect this uses inheritSchemaFrom
-  listingSchemaEnhancer.config = { typeField: 'variation', defaultsField: 'itemDefaults' };
+  listingSchemaEnhancer.config = {
+    typeField: 'variation',
+    defaultsField: 'itemDefaults',
+    blocksField: '..',
+    filterConvertibleFrom: 'default',
+  };
   config.blocks.blocksConfig.listing = {
     ...config.blocks.blocksConfig.listing,
     schemaEnhancer: listingSchemaEnhancer,
