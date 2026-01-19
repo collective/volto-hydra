@@ -207,29 +207,12 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     await helper.openSidebarTab('Block');
 
     // Check for expected fields in default fieldset
-    const hasUrlField = await helper.hasSidebarField('url');
+    // Note: Image block uses object browser for image selection, not a url text field
     const hasAltField = await helper.hasSidebarField('alt');
+    const hasAlignField = await helper.hasSidebarField('align');
 
-    expect(hasUrlField).toBe(true);
     expect(hasAltField).toBe(true);
-  });
-
-  test('Image block url field shows current image URL', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-
-    // Click on Image block
-    await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
-
-    // Get url field value
-    const urlFieldValue = await helper.getSidebarFieldValue('url');
-
-    // Should match the block's url
-    expect(urlFieldValue).toContain('placehold.co');
+    expect(hasAlignField).toBe(true);
   });
 
   test('Image block alt field shows current alt text', async ({ page }) => {
@@ -452,11 +435,11 @@ test.describe('Sidebar Forms - Block Type Differences', () => {
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
 
-    // Slate blocks should NOT have content fields on Block tab
+    // Slate blocks should NOT have image-specific fields on Block tab
     let hasAltField = await helper.hasSidebarField('alt');
-    let hasUrlField = await helper.hasSidebarField('url');
+    let hasAlignField = await helper.hasSidebarField('align');
     expect(hasAltField).toBe(false);
-    expect(hasUrlField).toBe(false);
+    expect(hasAlignField).toBe(false);
 
     // Click on Image block
     await helper.clickBlockInIframe('block-2-uuid');
@@ -465,9 +448,9 @@ test.describe('Sidebar Forms - Block Type Differences', () => {
 
     // Image blocks SHOULD have these fields
     hasAltField = await helper.hasSidebarField('alt');
-    hasUrlField = await helper.hasSidebarField('url');
+    hasAlignField = await helper.hasSidebarField('align');
     expect(hasAltField).toBe(true);
-    expect(hasUrlField).toBe(true);
+    expect(hasAlignField).toBe(true);
   });
 });
 
@@ -591,11 +574,10 @@ test.describe('Sidebar Forms - Field Validation', () => {
     const fields = await helper.getSidebarFormFields();
 
     // Should include core image fields
-    expect(fields).toContain('url');
+    // Note: Image block uses object browser for image selection, not a url text field
     expect(fields).toContain('alt');
-
-    // May also include align and size depending on whether image is loaded
-    // (ImageSchema conditionally shows these only when formData.url exists)
+    expect(fields).toContain('align');
+    expect(fields).toContain('size');
   });
 
   test('All visible Image fields are accessible', async ({ page }) => {
