@@ -281,8 +281,9 @@ test.describe('Multi-element blocks', () => {
 
     // KEY ASSERTION: First element should be visible after selecting
     // The block should be scrolled so at least the first element is in view
+    // Allow small tolerance for floating point rounding (-1px)
     expect(firstElementRectAfter!.y).toBeLessThan(viewportHeight);
-    expect(firstElementRectAfter!.y).toBeGreaterThanOrEqual(0);
+    expect(firstElementRectAfter!.y).toBeGreaterThanOrEqual(-1);
   });
 
   test('grid block paging works in view mode', async ({ page }) => {

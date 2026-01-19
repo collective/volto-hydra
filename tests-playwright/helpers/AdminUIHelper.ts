@@ -638,8 +638,9 @@ export class AdminUIHelper {
       const iframeBox = await iframeElement.boundingBox();
       const iframeTop = iframeBox?.y || 0;
       // Handle can be anywhere from iframe top to slightly below block top
+      // When block is above viewport (blockBox.y < iframeTop), handle is clamped to iframeTop
       const minY = iframeTop;
-      const maxY = blockBox.y + 30;
+      const maxY = Math.max(iframeTop + 30, blockBox.y + 30);
       const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
 
       if (xDiff > 30 || !inYRange) {

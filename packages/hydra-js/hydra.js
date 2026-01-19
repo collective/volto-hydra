@@ -3159,7 +3159,7 @@ export class Bridge {
     let didScroll = false;
     if (!this.elementIsVisibleInViewport(blockElement) && !this._justFinishedDrag) {
       log('updateBlockUIAfterFormData: scrolling to block', this.selectedBlockUid);
-      blockElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+      this.scrollBlockIntoView(blockElement);
       didScroll = true;
     }
 
@@ -3237,18 +3237,8 @@ export class Bridge {
 
     // Only scroll block into view when selecting a NEW block (not reselecting same block)
     // This prevents unwanted scroll-back when user has scrolled the selected block off screen
-    if (!isSelectingSameBlock) {
-      const toolbarMargin = 50; // Toolbar is ~40px tall
-      const addButtonMargin = 50; // Add button is ~30px tall
-      const scrollRect = blockElement.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-
-      if (scrollRect.top < toolbarMargin || scrollRect.bottom > viewportHeight - addButtonMargin) {
-        // Block or its UI elements are outside viewport - scroll to center it
-        const blockCenter = scrollRect.top + scrollRect.height / 2;
-        const viewportCenter = viewportHeight / 2;
-        window.scrollBy({ top: blockCenter - viewportCenter, behavior: 'instant' });
-      }
+    if (!isSelectingSameBlock && !this.elementIsVisibleInViewport(blockElement)) {
+      this.scrollBlockIntoView(blockElement);
     }
 
     // Flush any pending text updates from the previous block before switching
@@ -4912,11 +4902,9 @@ export class Bridge {
             return;
           }
 
-          !this.elementIsVisibleInViewport(blockElement) &&
-            blockElement.scrollIntoView();
-
           // Call selectBlock() to properly set up toolbar and contenteditable
           // This ensures blocks selected via Order tab work the same as clicking
+          // Note: selectBlock() handles scrolling with toolbar margin awareness
           this.selectBlock(blockElement);
 
           // Focus the contenteditable element for blocks with editable fields
@@ -5422,6 +5410,22 @@ export class Bridge {
           (bottom > 0 && bottom < innerHeight)) &&
           ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
       : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+  }
+
+  /**
+   * Scrolls an element into view, centering if it fits or showing top if too tall.
+   * @param {HTMLElement} el - Element to scroll into view
+   * @param {Object} options - Options
+   * @param {number} options.toolbarMargin - Space to reserve at top (default 50)
+   * @param {number} options.bottomMargin - Space to reserve at bottom (default 50)
+   */
+  scrollBlockIntoView(el, { toolbarMargin = 50, bottomMargin = 50 } = {}) {
+    const scrollRect = el.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const availableHeight = viewportHeight - toolbarMargin - bottomMargin;
+    // Center if block fits, otherwise show top
+    const blockPosition = scrollRect.height > availableHeight ? 'start' : 'center';
+    el.scrollIntoView({ behavior: 'instant', block: blockPosition });
   }
 
   /**
