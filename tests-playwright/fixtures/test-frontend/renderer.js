@@ -553,9 +553,13 @@ function renderTeaserBlock(block, blockUid) {
         ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
         : '';
 
+    // When overwrite is false, add data-block-readonly to prevent editing
+    // User must check "Customize teaser content" checkbox to enable editing
+    const readonlyAttr = block.overwrite ? '' : 'data-block-readonly';
+
     // Always include editable/linkable attributes - hydra.js respects data-block-readonly
     return `
-        <div ${blockUidAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+        <div ${blockUidAttr} ${readonlyAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
             <a href="${href || '#'}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
                 <h3 data-editable-field="title" style="margin: 0;">${title}</h3>
