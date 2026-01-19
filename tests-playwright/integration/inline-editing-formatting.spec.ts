@@ -317,9 +317,11 @@ test.describe('Inline Editing - Formatting', () => {
 
     console.log('[TEST] Second bold click done - should have unbolded without error');
 
-    // Verify the word "bold" is still selected
-    const selectedText = await editor.evaluate(() => window.getSelection()?.toString());
-    expect(selectedText).toBe('bold');
+    // Verify the word "bold" is still selected (poll until selection restoration completes)
+    await expect(async () => {
+      const selectedText = await editor.evaluate(() => window.getSelection()?.toString());
+      expect(selectedText).toBe('bold');
+    }).toPass({ timeout: 5000 });
 
     // Verify contenteditable is still enabled (not blocked from format operation)
     const isEditable = await editor.evaluate((el) => el.contentEditable === 'true');
