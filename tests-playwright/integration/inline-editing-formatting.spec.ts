@@ -161,8 +161,9 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.verifySelectionMatches(editor, 'Text with bold');
 
     // Check if the bold button shows active state
-    const isActive = await helper.isActiveFormatButton('bold')
-    expect(isActive).toBeTruthy();
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
 
   });
 

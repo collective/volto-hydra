@@ -454,23 +454,25 @@ test.describe('Inline Editing - Links', () => {
     await helper.clickRelativeToFormat(editor, 'inside', 'a');
 
     // Verify link button is active
-    expect(await helper.isActiveFormatButton('link')).toBe(true);
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('link')).toBe(true);
+    }).toPass({ timeout: 5000 });
 
     // Click before the link
     await helper.clickRelativeToFormat(editor, 'before', 'a');
 
-    await page.waitForTimeout(200);
-
     // Verify link button is NOT active
-    expect(await helper.isActiveFormatButton('link')).toBe(false);
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('link')).toBe(false);
+    }).toPass({ timeout: 5000 });
 
     // Click after the link
     await helper.clickRelativeToFormat(editor, 'after', 'a');
 
-    await page.waitForTimeout(200);
-
     // Verify link button is still NOT active
-    expect(await helper.isActiveFormatButton('link')).toBe(false);
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('link')).toBe(false);
+    }).toPass({ timeout: 5000 });
   });
 
 });
