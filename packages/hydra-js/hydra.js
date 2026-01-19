@@ -3229,6 +3229,14 @@ export class Bridge {
     log('selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
     if (!blockElement) return;
 
+    // Clear block selector navigation flag after a delay to let carousel animation settle
+    // This prevents transitionTracker from sending stale positions during animation
+    if (this._blockSelectorNavigating) {
+      setTimeout(() => {
+        this._blockSelectorNavigating = false;
+      }, 500);
+    }
+
     const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
 
@@ -3710,6 +3718,8 @@ export class Bridge {
 
     // For +1/-1, calculate the target block and wait for it to become visible
     // Stop any existing tracking and hide the block UI immediately
+    // Set flag to prevent scroll/resize handlers from sending stale BLOCK_SELECTED
+    this._blockSelectorNavigating = true;
     this.stopTransitionTracking();
     window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
 
@@ -4275,6 +4285,11 @@ export class Bridge {
     const trackPosition = () => {
       // Stop if tracking was cancelled or block changed
       if (!isTracking || this._trackingBlockUid !== blockUid) {
+        return;
+      }
+      // Skip during carousel navigation - animation may cause stale positions
+      if (this._blockSelectorNavigating) {
+        this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
         return;
       }
 
@@ -4995,9 +5010,10 @@ export class Bridge {
 
       // After scroll stops, re-send BLOCK_SELECTED with updated positions
       // Skip during drag - auto-scroll causes misleading position updates
+      // Skip during block selector navigation - carousel animations cause stale position updates
       this.scrollTimeout = setTimeout(() => {
-        if (this._isDragging) {
-          return; // Don't send BLOCK_SELECTED during drag
+        if (this._isDragging || this._blockSelectorNavigating) {
+          return; // Don't send BLOCK_SELECTED during drag or carousel navigation
         }
         if (this.selectedBlockUid) {
           const blockElement = document.querySelector(
