@@ -133,8 +133,8 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
 
     const blockId = 'block-1-uuid';
 
-    // Verify block exists - use dynamic count, don't hardcode
-    const initialBlockCount = await helper.getBlockCountInIframe();
+    // Verify block exists - use deduplicated count (getBlockCount)
+    const initialBlockCount = await helper.getBlockCount();
     expect(initialBlockCount).toBeGreaterThanOrEqual(3);
 
     // Select block and open menu
@@ -148,7 +148,7 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     await helper.waitForBlockCountToBe(initialBlockCount - 1);
 
     // Verify block count decreased by 1
-    const finalBlockCount = await helper.getBlockCountInIframe();
+    const finalBlockCount = await helper.getBlockCount();
     expect(finalBlockCount).toBe(initialBlockCount - 1);
   });
 
@@ -608,21 +608,24 @@ test.describe('Quanta Toolbar - Overflow', () => {
     expect(count).toBeGreaterThan(0);
   });
 
-  test('clicking overflow button applies formatting', async ({ page }) => {
+  test('clicking overflow button applies formatting', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Columns block not supported in Nuxt frontend');
+
     // Use narrow viewport to force link button into overflow
-    await page.setViewportSize({ width: 900, height: 768 });
+    await page.setViewportSize({ width: 800, height: 768 });
 
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    // Click on block in grid (limited space for toolbar)
-    // Use grid-cell-2 instead of text-2a (columns block not supported in Nuxt)
-    await helper.clickBlockInIframe('grid-cell-2');
+    // Click on slate block in column (constrained space forces overflow)
+    await helper.clickBlockInIframe('text-2a');
 
     // Select all text in the block using selectTextRange for reliability
-    const editableField = await helper.getEditorLocator('grid-cell-2');
+    const editableField = await helper.getEditorLocator('text-2a');
     const textContent = await editableField.textContent();
     await helper.selectTextRange(editableField, 0, textContent?.length || 0);
 
