@@ -479,18 +479,27 @@ const Iframe = (props) => {
     ],
   });
 
+  // Track last SELECT_BLOCK sent to avoid redundant sends during pending selection
+  const lastSentSelectBlockRef = useRef(null);
+
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
-    if (iframeOriginRef.current && selectedBlock) {
-      log('useEffect sending SELECT_BLOCK:', selectedBlock);
-      document.getElementById('previewIframe')?.contentWindow?.postMessage(
-        {
-          type: 'SELECT_BLOCK',
-          uid: selectedBlock,
-          method: 'select',
-        },
-        iframeOriginRef.current,
-      );
+    // Skip if there's a pending selection - it will be sent via FORM_DATA instead
+    // This prevents race condition where old selection overwrites pending new selection
+    // Also skip if we just sent this same block (prevents duplicate sends)
+    if (iframeOriginRef.current && selectedBlock && !iframeSyncState?.pendingSelectBlockUid) {
+      if (lastSentSelectBlockRef.current !== selectedBlock) {
+        log('useEffect sending SELECT_BLOCK:', selectedBlock);
+        lastSentSelectBlockRef.current = selectedBlock;
+        document.getElementById('previewIframe')?.contentWindow?.postMessage(
+          {
+            type: 'SELECT_BLOCK',
+            uid: selectedBlock,
+            method: 'select',
+          },
+          iframeOriginRef.current,
+        );
+      }
     }
   }, [selectedBlock]);
 
@@ -1421,7 +1430,33 @@ const Iframe = (props) => {
           // blockUI may not have updated yet, causing onSelectBlock to be skipped incorrectly
           const isNewBlock = !isPositionUpdateOnly &&
                              selectedBlock !== event.data.blockUid;
-          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
+
+          // Check if we're waiting for a specific block to be selected (e.g., after adding a new block)
+          const pendingUid = iframeSyncState?.pendingSelectBlockUid;
+          const isPendingBlock = pendingUid && event.data.blockUid === pendingUid;
+          const isWrongBlockDuringPending = pendingUid && event.data.blockUid !== pendingUid;
+
+          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock, 'pendingUid:', pendingUid);
+
+          // If we're waiting for a specific block and this is a different block, ignore it
+          // This prevents race conditions where parent container gets selected during re-render
+          if (isWrongBlockDuringPending) {
+            log('BLOCK_SELECTED ignoring - waiting for pending block:', pendingUid);
+            return;
+          }
+
+          // Clear pending selection if this is the block we were waiting for
+          if (isPendingBlock) {
+            log('BLOCK_SELECTED received pending block, clearing pendingSelectBlockUid');
+            setIframeSyncState(prev => ({ ...prev, pendingSelectBlockUid: null }));
+          }
+
+          // Update lastSentSelectBlockRef to match iframe's selection
+          // This is critical: when iframe confirms a selection, our ref must match
+          // Otherwise, if we later try to select the same block the iframe already has,
+          // we'll skip sending SELECT_BLOCK (thinking it's a duplicate) but the iframe
+          // may have moved to a different selection in the meantime
+          lastSentSelectBlockRef.current = event.data.blockUid;
 
           // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
           if (isNewBlock) {
@@ -1809,12 +1844,14 @@ const Iframe = (props) => {
     };
 
     // Update local state
+    // NOTE: Do NOT clear pendingSelectBlockUid here - keep it set until BLOCK_SELECTED
+    // is received for that block. This prevents race conditions where another block
+    // (e.g., parent container) gets selected during re-render and we send SELECT_BLOCK for it.
     setIframeSyncState(prev => ({
       ...prev,
       formData: formWithSequence,
       blockPathMap: newBlockPathMap,
       selection: newSelection,
-      ...(hasPendingSelect ? { pendingSelectBlockUid: null } : {}),
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
     }));
 

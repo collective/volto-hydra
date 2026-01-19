@@ -1042,14 +1042,51 @@ export class Bridge {
                 }
               }
 
-              // Restore block selection if provided (e.g., after in-page navigation)
+              // Restore block selection if provided (e.g., after adding a new block)
               if (e.data.selectedBlockUid) {
                 const blockUidToSelect = e.data.selectedBlockUid;
                 const bridge = this;
-                // Use setTimeout to let the DOM render first
-                setTimeout(() => {
-                  bridge.selectBlock(blockUidToSelect);
-                }, 200);
+                // Wait for element to appear AND position to stabilize before selecting
+                // This prevents race conditions during frontend re-render/animation
+                let lastRect = null;
+                let stableCount = 0;
+                const STABLE_THRESHOLD = 3;
+                const POSITION_TOLERANCE = 2; // pixels
+                const MAX_RETRIES = 40; // ~2 seconds at 50ms interval
+
+                const waitForStable = (retries = MAX_RETRIES) => {
+                  const element = document.querySelector(`[data-block-uid="${blockUidToSelect}"]`);
+                  if (!element) {
+                    if (retries > 0) {
+                      setTimeout(() => waitForStable(retries - 1), 50);
+                    } else {
+                      log('Could not find element for selectedBlockUid:', blockUidToSelect);
+                    }
+                    return;
+                  }
+
+                  const rect = element.getBoundingClientRect();
+                  const positionStable = lastRect !== null &&
+                    Math.abs(rect.left - lastRect.left) < POSITION_TOLERANCE &&
+                    Math.abs(rect.top - lastRect.top) < POSITION_TOLERANCE;
+
+                  if (positionStable) {
+                    stableCount++;
+                  } else {
+                    stableCount = 0;
+                  }
+                  lastRect = rect;
+
+                  if (stableCount >= STABLE_THRESHOLD) {
+                    bridge.selectBlock(blockUidToSelect);
+                  } else if (retries > 0) {
+                    setTimeout(() => waitForStable(retries - 1), 50);
+                  } else {
+                    // Timed out waiting for stable - select anyway
+                    bridge.selectBlock(blockUidToSelect);
+                  }
+                };
+                waitForStable();
               }
             }
           }
@@ -4060,6 +4097,12 @@ export class Bridge {
             }
             this._domChangeDebounce = setTimeout(() => {
               this._domChangeDebounce = null;
+              // Only send BLOCK_SELECTED if this block is still the selected block
+              // When adding a child block, the parent's DOM changes but selection has moved
+              if (blockUid !== this.selectedBlockUid) {
+                log('observeBlockDomChanges: skipping BLOCK_SELECTED, selection changed to', this.selectedBlockUid);
+                return;
+              }
               // Re-check element is still valid and get fresh rect
               const freshElements = this.getAllBlockElements(blockUid);
               if (freshElements.length > 0) {
