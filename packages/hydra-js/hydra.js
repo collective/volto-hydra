@@ -2860,8 +2860,22 @@ export class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
     // For multi-element blocks, collect fields from ALL elements with this UID
     const editableFields = [];
-    this.collectBlockFields(blockElement, 'data-editable-field',
-      (el) => { editableFields.push(el); });
+
+    if (blockUid) {
+      // Block-level field - use collectBlockFields to gather from all elements with this UID
+      this.collectBlockFields(blockElement, 'data-editable-field',
+        (el) => { editableFields.push(el); });
+    } else {
+      // Page-level field (no blockUid) - process the element directly
+      // The element itself has data-editable-field (e.g., #page-title)
+      if (blockElement.hasAttribute('data-editable-field')) {
+        editableFields.push(blockElement);
+      }
+      // Also check any children with data-editable-field
+      blockElement.querySelectorAll('[data-editable-field]').forEach((el) => {
+        editableFields.push(el);
+      });
+    }
     log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
       const fieldPath = field.getAttribute('data-editable-field');
@@ -5361,9 +5375,18 @@ export class Bridge {
     });
 
     // For multi-element blocks, observe ALL elements with the same block UID
-    const allElements = this.getAllBlockElements(blockUid);
-    for (const element of allElements) {
-      this.blockTextMutationObserver.observe(element, {
+    // For page-level fields (no blockUid), observe the element directly
+    if (blockUid) {
+      const allElements = this.getAllBlockElements(blockUid);
+      for (const element of allElements) {
+        this.blockTextMutationObserver.observe(element, {
+          subtree: true,
+          characterData: true,
+        });
+      }
+    } else {
+      // Page-level field - observe the element directly
+      this.blockTextMutationObserver.observe(blockElement, {
         subtree: true,
         characterData: true,
       });
