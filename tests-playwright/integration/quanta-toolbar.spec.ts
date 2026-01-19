@@ -569,9 +569,11 @@ test.describe('Quanta Toolbar - Overflow', () => {
 
   test('overflow menu contains buttons that do not fit inline', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Columns block not supported in Nuxt frontend');
+
     // Use a narrow viewport to force buttons into overflow
-    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.setViewportSize({ width: 800, height: 768 });
 
     const helper = new AdminUIHelper(page);
 
@@ -580,9 +582,8 @@ test.describe('Quanta Toolbar - Overflow', () => {
 
     const iframe = helper.getIframe();
 
-    // Click on block in grid where toolbar has limited space
-    // Use grid-cell-2 instead of text-2a (columns block not supported in Nuxt)
-    const block = iframe.locator('[data-block-uid="grid-cell-2"]');
+    // Click on slate block in column (constrained space forces overflow)
+    const block = iframe.locator('[data-block-uid="text-2a"]');
     await block.click();
 
     const toolbar = page.locator('.quanta-toolbar');
