@@ -1198,8 +1198,26 @@ export class Bridge {
               log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
             }
 
+            // Check if incoming FORM_DATA is stale (our local sequence is higher)
+            // EXCEPTION: Never reject format responses - they have formatRequestId and are
+            // the result of a format operation we requested
+            const incomingSeq = event.data.data?._editSequence || 0;
+            const localSeq = this.formData?._editSequence || 0;
+            const isFormatResponse = !!event.data.formatRequestId;
+            const isStale = incomingSeq < localSeq && !isFormatResponse;
+
+            if (isStale) {
+              log('FORM_DATA: skipping stale data, incoming seq:', incomingSeq, 'local seq:', localSeq,
+                  'isFormatResponse:', isFormatResponse, 'blockedBlockId:', this.blockedBlockId);
+              // Don't unblock here - the stale FORM_DATA is not the response we're waiting for
+              // Wait for the actual format response (which will have formatRequestId)
+              return;
+            }
+
             // Central method for setting form data with logging (also sets blockPathMap)
             this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
+
+            // === Non-stale FORM_DATA - apply it fully ===
 
             // Add nodeIds to all slate blocks before rendering
             // Admin UI never sends nodeIds, so we always need to add them
@@ -1798,7 +1816,7 @@ export class Bridge {
   replayBufferAndUnblock(context = '') {
     if (!this.pendingTransform) return;
 
-    const { blockId } = this.pendingTransform;
+    const { blockId, requestId: originalRequestId } = this.pendingTransform;
 
     // Prepare buffer for replay
     if (this.eventBuffer.length > 0) {
@@ -1810,12 +1828,19 @@ export class Bridge {
       log('Prepared', this.pendingBufferReplay.buffer.length, 'events for replay');
     }
 
-    // Replay buffered events
+    // Replay buffered events (may send new format request with new requestId)
     this.replayBufferedEvents();
 
-    // Unblock AFTER replay to prevent keystrokes arriving in the gap
-    log('Unblocking input for', blockId, '- after replay' + (context ? ` (${context})` : ''));
-    this.setBlockProcessing(blockId, false);
+    // Only unblock if replay didn't start a new transform (check if requestId changed)
+    const hasNewPendingTransform = this.pendingTransform?.requestId &&
+                                    this.pendingTransform.requestId !== originalRequestId;
+    if (!hasNewPendingTransform) {
+      // Unblock AFTER replay to prevent keystrokes arriving in the gap
+      log('Unblocking input for', blockId, '- after replay' + (context ? ` (${context})` : ''));
+      this.setBlockProcessing(blockId, false);
+    } else {
+      log('Skipping unblock - new transform pending:', this.pendingTransform.requestId);
+    }
   }
 
   /**
@@ -1848,12 +1873,33 @@ export class Bridge {
     this.pendingBufferReplay = null;
 
     // Build up text string from consecutive printable characters
+    // Also detect format hotkeys that need to be replayed
     let textToInsert = '';
+    let formatHotkeyToReplay = null;
     for (const evt of buffer) {
       if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
         textToInsert += evt.key;
+      } else if ((evt.ctrlKey || evt.metaKey) && this.slateConfig?.hotkeys) {
+        // Check if this is a format hotkey
+        for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
+          const parts = shortcut.toLowerCase().split('+');
+          const hasmod = parts.includes('mod');
+          const hasShift = parts.includes('shift');
+          const hasAlt = parts.includes('alt');
+          const key = parts[parts.length - 1];
+
+          const modifierMatch = hasmod ? (evt.ctrlKey || evt.metaKey) : true;
+          const shiftMatch = hasShift ? evt.shiftKey : !evt.shiftKey;
+          const altMatch = hasAlt ? evt.altKey : !evt.altKey;
+          const keyMatch = evt.key.toLowerCase() === key;
+
+          if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
+            formatHotkeyToReplay = config.format;
+            log('Detected format hotkey in buffer:', config.format);
+            break;
+          }
+        }
       }
-      // Note: special keys are ignored for now - they're complex to replay
     }
 
     if (textToInsert) {
@@ -1886,6 +1932,15 @@ export class Bridge {
           this.handleTextChange(editableField, textNode.parentElement, textNode);
         }
       }
+    }
+
+    // Replay any format hotkey that was buffered
+    if (formatHotkeyToReplay) {
+      log('Replaying buffered format hotkey:', formatHotkeyToReplay);
+      // Send the format request - this updates pendingTransform with new requestId
+      this.sendTransformRequest(blockId, 'format', {
+        format: formatHotkeyToReplay,
+      });
     }
   }
 
@@ -6645,9 +6700,19 @@ export class Bridge {
       return;
     }
 
-    log('bufferUpdate: buffering. from:', from, 'seq:', currentSeq, 'text:', JSON.stringify(text));
+    // Increment sequence immediately when we have local changes
+    // This marks our local state as "ahead" of Admin, so any incoming FORM_DATA
+    // at a lower sequence will be rejected as stale
+    const isNewPending = !this.pendingTextUpdate;
+    if (isNewPending) {
+      const newSeq = currentSeq + 1;
+      this.formData._editSequence = newSeq;
+      log('bufferUpdate: NEW pending, incrementing seq to:', newSeq, 'from:', from, 'text:', JSON.stringify(text));
+    } else {
+      log('bufferUpdate: updating existing pending, seq:', this.formData._editSequence, 'from:', from, 'text:', JSON.stringify(text));
+    }
 
-    // Buffer the update - sequence will be assigned at SEND time, not buffer time
+    // Buffer the update with current sequence
     this.pendingTextUpdate = {
       type: 'INLINE_EDIT_DATA',
       data: data,
@@ -6676,19 +6741,17 @@ export class Bridge {
       this.textUpdateTimer = null;
     }
     if (this.pendingTextUpdate) {
-      // Assign sequence number at SEND time, not buffer time
-      // This ensures monotonically increasing sequences even if FORM_DATA arrives during debounce
-      const currentSeq = this.formData?._editSequence || 0;
-      const newSeq = currentSeq + 1;
-      this.pendingTextUpdate.data._editSequence = newSeq;
-      this.formData._editSequence = newSeq;
+      // Use the sequence that was already incremented in bufferUpdate
+      // This ensures we send with the same seq that we used to reject stale FORM_DATA
+      const seq = this.formData?._editSequence || 1;
+      this.pendingTextUpdate.data._editSequence = seq;
 
       // Include requestId if provided (for FLUSH_BUFFER coordination)
       if (flushRequestId) {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
 
-      log('flushPendingTextUpdates: sending buffered update, seq:', newSeq,
+      log('flushPendingTextUpdates: sending buffered update, seq:', seq,
           'anchor:', this.pendingTextUpdate.selection?.anchor,
           'focus:', this.pendingTextUpdate.selection?.focus);
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
