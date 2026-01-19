@@ -2316,8 +2316,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(addButton).toBeVisible();
     await addButton.click();
 
-    // Select slate block type from chooser
-    await helper.selectBlockType('slate');
+    // Select teaser block type from chooser (gridBlock only allows teaser/image)
+    await helper.selectBlockType('teaser');
 
     // Wait for 3rd cell to be created
     await expect(gridCells).toHaveCount(3);
@@ -2325,12 +2325,12 @@ test.describe('Container Block Drag and Drop', () => {
     // Select the new (3rd) cell and add 4th cell
     const thirdCellId = await gridCells.nth(2).getAttribute('data-block-uid');
     await helper.clickContainerBlockInIframe(thirdCellId!, { waitForToolbar: false });
-    await helper.waitForSidebarCurrentBlock('Text');
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     await expect(addButton).toBeVisible();
     await addButton.click();
 
-    await helper.selectBlockType('slate');
+    await helper.selectBlockType('teaser');
 
     // Wait for 4th cell to be created
     await expect(gridCells).toHaveCount(4);
@@ -2338,7 +2338,7 @@ test.describe('Container Block Drag and Drop', () => {
     // Select the new (4th) cell
     const fourthCellId = await gridCells.nth(3).getAttribute('data-block-uid');
     await helper.clickContainerBlockInIframe(fourthCellId!, { waitForToolbar: false });
-    await helper.waitForSidebarCurrentBlock('Text');
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     // Add button should NOT be visible when container is at maxLength
     await expect(addButton).not.toBeVisible();
@@ -2547,11 +2547,11 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     const childItems = childBlocksWidget.locator('.child-block-item');
     await expect(childItems).toHaveCount(2);
 
-    // Verify the child blocks show their plaintext content
+    // Verify the child blocks show their block type (Teaser shows type, slate showed plaintext)
     const childTexts = await childItems
       .locator('.block-type')
       .allTextContents();
-    expect(childTexts).toEqual(['Grid Cell 1', 'Grid Cell 2']);
+    expect(childTexts).toEqual(['Teaser', 'Teaser']);
   });
 });
 

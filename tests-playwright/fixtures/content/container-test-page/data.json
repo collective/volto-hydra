@@ -73,14 +73,16 @@
       "@type": "gridBlock",
       "blocks": {
         "grid-cell-1": {
-          "@type": "slate",
-          "value": [{"type": "p", "children": [{"text": "Grid Cell 1"}]}],
-          "plaintext": "Grid Cell 1"
+          "@type": "teaser",
+          "title": "Grid Teaser 1",
+          "description": "First grid teaser",
+          "href": [{"@id": "/test-page", "@type": "Document", "title": "Test Page"}]
         },
         "grid-cell-2": {
-          "@type": "slate",
-          "value": [{"type": "p", "children": [{"text": "Grid Cell 2"}]}],
-          "plaintext": "Grid Cell 2"
+          "@type": "teaser",
+          "title": "Grid Teaser 2",
+          "description": "Second grid teaser",
+          "href": [{"@id": "/another-page", "@type": "Document", "title": "Another Page"}]
         }
       },
       "blocks_layout": {"items": ["grid-cell-1", "grid-cell-2"]}
