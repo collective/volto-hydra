@@ -1288,8 +1288,12 @@ export class Bridge {
 
                     if (event.data.transformedSelection || blockRectChanged || mediaFieldsChanged) {
                       // Send updated rect to admin so toolbar/overlays follow the block
+                      // Include transformedSelection if present - this prevents View.jsx from clearing
+                      // the selection when it receives BLOCK_SELECTED without selection
                       log('formDataHandler sending BLOCK_SELECTED with mediaFields:', newMediaFields);
-                      this.sendBlockSelected('formDataHandler', blockElement);
+                      this.sendBlockSelected('formDataHandler', blockElement, {
+                        selection: event.data.transformedSelection || undefined,
+                      });
                       this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
                       this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
 

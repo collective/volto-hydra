@@ -1523,14 +1523,17 @@ const Iframe = (props) => {
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
-          // Only update if selection actually changed
-          setIframeSyncState(prev => {
-            const newSelection = event.data.selection || null;
-            if (JSON.stringify(prev.selection) === JSON.stringify(newSelection)) {
-              return prev; // Skip re-render if selection unchanged
-            }
-            return { ...prev, selection: newSelection };
-          });
+          // Only update selection if EXPLICITLY provided in the message
+          // Position-only updates (rect changes) don't include selection - preserve existing
+          if (event.data.selection !== undefined) {
+            setIframeSyncState(prev => {
+              const newSelection = event.data.selection || null;
+              if (JSON.stringify(prev.selection) === JSON.stringify(newSelection)) {
+                return prev; // Skip re-render if selection unchanged
+              }
+              return { ...prev, selection: newSelection };
+            });
+          }
           break;
         }
 
@@ -1768,12 +1771,12 @@ const Iframe = (props) => {
         message,
         iframeOriginRef.current,
       );
-      // Use flushSync to ensure BOTH state updates commit before any pending re-renders
-      // This prevents race condition where onSelectBlock's Redux update triggers Case 2
-      // with stale properties before onChangeFormData's update propagates
       // Strip _editSequence from Redux - sequences are for iframe echo detection only.
       // Keeping them in Redux causes sidebar edits to inherit stale sequences.
       const { _editSequence: _, ...formWithoutSeq } = formWithSequence;
+      // Use flushSync to ensure BOTH state updates commit before any pending re-renders
+      // This prevents race condition where Redux update triggers Case 2 with stale properties
+      // NOTE: flushSync may warn "cannot flush when already rendering" but still works
       flushSync(() => {
         setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
         onChangeFormData(formWithoutSeq);

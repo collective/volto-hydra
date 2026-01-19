@@ -1065,27 +1065,34 @@ export class AdminUIHelper {
 
   /**
    * Check if a format button is in active state.
+   * Polls to handle async selection sync between iframe and admin.
    * Semantic UI Button with active={true} gets the "active" CSS class.
    */
   async isActiveFormatButton(
-    format: 'bold' | 'italic' | 'strikethrough' | 'link'
+    format: 'bold' | 'italic' | 'strikethrough' | 'link',
+    timeout: number = 5000
   ): Promise<boolean> {
     const formatKeyword = format.charAt(0).toUpperCase() + format.slice(1);
     const button = this.page.locator(
       `.quanta-toolbar [title*="${formatKeyword}" i]`
     );
 
-    const count = await button.count();
-    if (count === 0) {
-      throw new Error(`Format button "${format}" not found in visible toolbar`);
+    // Poll for button to become active, handling async selection sync
+    let lastState = false;
+    try {
+      await expect.poll(async () => {
+        const count = await button.count();
+        if (count === 0) return false;
+        lastState = await button.first().evaluate((el) =>
+          el.classList.contains('active')
+        );
+        return lastState;
+      }, { timeout }).toBeTruthy();
+      return true;
+    } catch {
+      // Polling timed out - return the last observed state
+      return lastState;
     }
-
-    // Check if button has "active" class (added by Semantic UI when active={true})
-    const hasActiveClass = await button.first().evaluate((el) =>
-      el.classList.contains('active')
-    );
-
-    return hasActiveClass;
   }
 
   /**
