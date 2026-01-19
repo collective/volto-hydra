@@ -497,14 +497,19 @@ export class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
 
     // Check if block is marked readonly (registry, block data, or DOM attribute)
-    if (this.isBlockReadonly(blockUid)) {
+    if (blockUid && this.isBlockReadonly(blockUid)) {
       return {};
     }
 
-    const allElements = this.getAllBlockElements(blockUid);
     const results = {};
 
-    for (const element of allElements) {
+    // For page-level fields (no blockUid), process the element directly
+    // For block fields, get all elements with this block UID (multi-element blocks)
+    const elementsToProcess = blockUid
+      ? this.getAllBlockElements(blockUid)
+      : [blockElement];
+
+    for (const element of elementsToProcess) {
       // Skip if this element has data-block-readonly
       // Readonly blocks ignore editable/linkable/media fields
       if (element.hasAttribute('data-block-readonly')) {
@@ -516,16 +521,18 @@ export class Bridge {
       if (selfField) {
         processor(element, selfField, results);
       }
-      // Check descendants
-      for (const field of element.querySelectorAll(`[${attrName}]`)) {
-        // Skip fields inside a readonly ancestor
-        if (field.closest('[data-block-readonly]')) {
-          continue;
-        }
-        if (this.fieldBelongsToBlock(field, element)) {
-          const fieldName = field.getAttribute(attrName);
-          if (fieldName) {
-            processor(field, fieldName, results);
+      // Check descendants (for blocks only - page-level fields are self-contained)
+      if (blockUid) {
+        for (const field of element.querySelectorAll(`[${attrName}]`)) {
+          // Skip fields inside a readonly ancestor
+          if (field.closest('[data-block-readonly]')) {
+            continue;
+          }
+          if (this.fieldBelongsToBlock(field, element)) {
+            const fieldName = field.getAttribute(attrName);
+            if (fieldName) {
+              processor(field, fieldName, results);
+            }
           }
         }
       }
@@ -706,18 +713,25 @@ export class Bridge {
     const blockUid = blockElement.getAttribute('data-block-uid');
 
     // Get all elements for this block (multi-element blocks like listings)
-    const allElements = this.getAllBlockElements(blockUid);
+    // For page-level fields (no blockUid), just use the element itself
     let rect;
-    if (allElements.length > 1) {
-      // Multi-element block: compute bounding box around all elements
-      rect = this.getBoundingBoxForElements(allElements);
-      // Fall back to single element rect if bounding box computation failed
-      if (!rect) {
+    if (blockUid) {
+      const allElements = this.getAllBlockElements(blockUid);
+      if (allElements.length > 1) {
+        // Multi-element block: compute bounding box around all elements
+        rect = this.getBoundingBoxForElements(allElements);
+        // Fall back to single element rect if bounding box computation failed
+        if (!rect) {
+          const singleRect = blockElement.getBoundingClientRect();
+          rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
+        }
+      } else {
+        // Single element block: use its rect directly
         const singleRect = blockElement.getBoundingClientRect();
         rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
       }
     } else {
-      // Single element block: use its rect directly
+      // Page-level field: use the element's rect directly
       const singleRect = blockElement.getBoundingClientRect();
       rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
     }
@@ -754,7 +768,7 @@ export class Bridge {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
-      isMultiElement: allElements.length > 1,
+      isMultiElement: blockUid ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
     // Include selection if provided
