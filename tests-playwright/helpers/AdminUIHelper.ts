@@ -205,6 +205,9 @@ export class AdminUIHelper {
     // Wait for iframe to have content with blocks
     const iframe = this.getIframe();
     await iframe.locator('[data-block-uid]').first().waitFor({ timeout });
+
+    // Wait for blocks to stabilize (avoid flaky tests due to partial renders)
+    await this.getStableBlockCount();
   }
 
   /**
@@ -2996,6 +2999,23 @@ export class AdminUIHelper {
   // ============================================================================
 
   /**
+   * Wait for an element's position to stabilize (stop moving).
+   * Returns when the element has a valid bounding box and position hasn't changed for 2 checks.
+   */
+  private async waitForPositionStable(element: Locator): Promise<void> {
+    let lastY: number | null = null;
+    await expect(async () => {
+      const rect = await element.boundingBox();
+      expect(rect).not.toBeNull(); // Element must be visible
+      const currentY = rect!.y;
+      if (lastY !== null) {
+        expect(Math.abs(currentY - lastY)).toBeLessThan(5);
+      }
+      lastY = currentY;
+    }).toPass({ timeout: 2000, intervals: [50, 100, 200] });
+  }
+
+  /**
    * Auto-scroll the iframe until the target block is visible in the viewport.
    *
    * IMPORTANT: We scroll PAST the target, then move the cursor back to the drop position.
@@ -3046,6 +3066,7 @@ export class AdminUIHelper {
         // Otherwise, as cursor moves from edge to target, it passes through scroll zone
         // and auto-scroll continues, causing the target to move away.
         await this.moveToSafeZone();
+        await this.waitForPositionStable(targetElement);
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
@@ -3056,6 +3077,7 @@ export class AdminUIHelper {
         if (stuckCount >= 3 && isVisibleInViewport) {
           console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
           await this.moveToSafeZone();
+          await this.waitForPositionStable(targetElement);
           return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
         }
       } else {
@@ -3085,9 +3107,9 @@ export class AdminUIHelper {
   ): Promise<{ x: number; y: number }> {
     const targetElement = insertAfter ? targetBlock.last() : targetBlock.first();
 
-    // Scroll target into view
+    // Scroll target into view and wait for position to stabilize
     await targetElement.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(100);
+    await this.waitForPositionStable(targetElement);
 
     // Verify drag is still active
     await this.verifyDragShadowVisible();
