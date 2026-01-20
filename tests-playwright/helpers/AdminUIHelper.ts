@@ -1023,17 +1023,10 @@ export class AdminUIHelper {
       `.quanta-toolbar [title*="${formatKeyword}" i]`
     );
 
+    // Wait for button to be visible FIRST (handles toolbar still rendering)
+    await button.first().waitFor({ state: 'visible', timeout: 5000 });
+
     const count = await button.count();
-
-    if (count === 0) {
-      throw new Error(
-        `Format button "${format}" not found in visible toolbar. ` +
-        `Expected button with title containing "${formatKeyword}". ` +
-        `Check that: (1) a block with a slate field is selected, (2) toolbar is visible in admin UI, ` +
-        `(3) the button has a title attribute set.`
-      );
-    }
-
     if (count > 1) {
       throw new Error(
         `Found ${count} buttons matching "${format}" - test is not deterministic. ` +
@@ -1041,7 +1034,6 @@ export class AdminUIHelper {
       );
     }
 
-    await button.waitFor({ state: 'visible', timeout: 2000 });
     await button.click();
   }
 
@@ -4045,10 +4037,10 @@ export class AdminUIHelper {
 
     if (!hasItems) {
       const homeButton = this.page.getByRole('button', { name: 'Home' });
-      if (await homeButton.isVisible().catch(() => false)) {
-        await homeButton.click();
-        await this.page.waitForTimeout(500);
-      }
+      // Wait for the button to be in viewport (page may be scrolling)
+      await expect(homeButton).toBeInViewport({ timeout: 5000 });
+      await homeButton.click();
+      await this.page.waitForTimeout(500);
     }
 
     // Wait for list items to appear

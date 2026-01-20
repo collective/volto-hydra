@@ -399,9 +399,10 @@ test.describe('Inline link editing', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero block
+    // Click the hero block (scroll into view first - it may be below the fold)
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    await heroBlock.scrollIntoViewIfNeeded();
     await heroBlock.click();
     await helper.waitForSidebarOpen();
     await helper.waitForSidebarCurrentBlock('Hero');
@@ -410,17 +411,23 @@ test.describe('Inline link editing', () => {
     const linkField = page.locator('.field-wrapper-buttonLink');
     await expect(linkField).toBeVisible({ timeout: 5000 });
 
-    // Click the browse button - first click clears existing value (buttonLink already has a value)
+    // Click the browse button to open object browser
     const browseButton = linkField.locator('button[aria-label="Open object browser"]');
     await expect(browseButton).toBeVisible({ timeout: 5000 });
     await expect(browseButton).toBeEnabled({ timeout: 5000 });
+
+    // Click the browse button - may need to click twice if field has a value
     await browseButton.click();
 
-    // Second click opens the object browser (now that value is cleared)
-    await browseButton.click();
-
-    // Wait for object browser - this handles navigating to Home if needed
-    const objectBrowser = await helper.waitForObjectBrowser();
+    // Wait for object browser or retry click if it didn't open
+    let objectBrowser: Awaited<ReturnType<typeof helper.waitForObjectBrowser>>;
+    try {
+      objectBrowser = await helper.waitForObjectBrowser(3000);
+    } catch {
+      // First click may have cleared value, try again
+      await browseButton.click();
+      objectBrowser = await helper.waitForObjectBrowser();
+    }
 
     // Select "Another Page"
     await helper.objectBrowserSelectItem(objectBrowser, /Another Page/);

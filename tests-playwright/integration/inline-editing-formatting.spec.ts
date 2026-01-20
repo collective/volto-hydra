@@ -247,11 +247,12 @@ test.describe('Inline Editing - Formatting', () => {
     //  0123456789...
     await helper.selectTextRange(editor, 10, 14);
 
-    // Wait for bold button to appear (not active yet)
-    await expect(async () => {
-      const isActive = await helper.isActiveFormatButton('bold');
-      expect(isActive).toBe(false);
-    }).toPass({ timeout: 5000 });
+    // Wait for toolbar to be visible with bold button (ensures selection is synced)
+    const boldButton = helper.page.locator('.quanta-toolbar [title*="Bold" i]');
+    await expect(boldButton).toBeVisible({ timeout: 5000 });
+
+    // Ensure editor is focused before hotkey
+    await expect(editor).toBeFocused({ timeout: 5000 });
 
     // Press Cmd+B (Mac) to bold the selection
     await editor.press('ControlOrMeta+b');
@@ -261,8 +262,8 @@ test.describe('Inline Editing - Formatting', () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 10000 });
 
-    // Verify "test" is now bold in the HTML
-    await helper.waitForFormattedText(editor, /test/, 'bold');
+    // Verify "test" is now bold in the HTML (allow extra time for iframe sync)
+    await helper.waitForFormattedText(editor, /test/, 'bold', { timeout: 10000 });
   });
 
   test('should handle bolding same text twice without path error', async ({ page }) => {
