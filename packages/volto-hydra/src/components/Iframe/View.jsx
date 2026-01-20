@@ -1251,6 +1251,16 @@ const Iframe = (props) => {
               transformAction.direction = event.data.direction;
             }
 
+            // IMPORTANT: Adopt the iframe's sequence if it's higher than ours.
+            // The iframe increments sequence when buffering local changes (typing).
+            // If we don't adopt it, FORM_DATA we send back will have a lower sequence,
+            // and subsequent typing will use a stale sequence baseline.
+            const incomingSeq = event.data.data?._editSequence || 0;
+            if (incomingSeq > editSequenceRef.current) {
+              editSequenceRef.current = incomingSeq;
+              log('SLATE_TRANSFORM_REQUEST: adopting iframe sequence:', incomingSeq);
+            }
+
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,

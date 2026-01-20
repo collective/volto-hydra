@@ -1224,6 +1224,22 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for the editor to have focus.
+   * Use after format operations since the iframe's FORM_DATA processing uses rAF
+   * and focus may not be restored immediately when the admin's toolbar updates.
+   */
+  async waitForEditorFocus(
+    editor: Locator,
+    options: { timeout?: number } = {}
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    await expect(async () => {
+      const sel = await this.getSelectionInfo(editor);
+      expect(sel.editorHasFocus).toBe(true);
+    }).toPass({ timeout });
+  }
+
+  /**
    * Get the visible text before and after the cursor position.
    * Uses Range APIs to get accurate text regardless of DOM structure.
    * Strips ZWS characters to return only visible text.
@@ -1329,8 +1345,9 @@ export class AdminUIHelper {
    */
   async getCleanTextContent(editor: Locator): Promise<string> {
     const text = (await editor.textContent()) || '';
-    // Strip ZWS and trim whitespace (Vue/Nuxt can have template whitespace)
-    return text.replace(/[\u200B\uFEFF]/g, '').trim();
+    // Strip ZWS and normalize NBSP to regular space, then trim whitespace
+    // NBSP (U+00A0) is inserted by browsers in certain contexts near ZWS nodes
+    return text.replace(/[\u200B\uFEFF]/g, '').replace(/\u00A0/g, ' ').trim();
   }
 
   /**
@@ -3358,6 +3375,40 @@ export class AdminUIHelper {
       `This likely means the block add/remove operation did not complete. ` +
       `Check that postMessage communication is working and the Admin UI is processing block changes.`
     );
+  }
+
+  /**
+   * Wait for block count to stabilize and return it.
+   * Use this when the page may still be rendering (e.g., Nuxt async components).
+   * Returns after getting the same count on consecutive checks.
+   *
+   * @param timeout - Maximum time to wait in milliseconds (default 5000)
+   * @returns The stable block count
+   */
+  async getStableBlockCount(timeout: number = 5000): Promise<number> {
+    const startTime = Date.now();
+    let lastCount = -1;
+    let stableChecks = 0;
+    const requiredStableChecks = 2;
+
+    while (Date.now() - startTime < timeout) {
+      const currentCount = await this.getBlockCount();
+
+      if (currentCount === lastCount) {
+        stableChecks++;
+        if (stableChecks >= requiredStableChecks) {
+          return currentCount;
+        }
+      } else {
+        lastCount = currentCount;
+        stableChecks = 1;
+      }
+
+      await this.page.waitForTimeout(100);
+    }
+
+    // Return the last count if timeout reached
+    return await this.getBlockCount();
   }
 
   /**

@@ -393,15 +393,15 @@ test.describe('Inline Editing - Basic', () => {
     await helper.navigateToEdit('/test-page');
 
     const blockId = 'block-1-uuid';
-
-    // Get initial block count
     const iframe = helper.getIframe();
-    const initialBlocks = await iframe.locator('[data-block-uid]').count();
 
     // Click the first block and type text (select all to replace existing content)
     const editor = await helper.enterEditMode(blockId);
     await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('First line', { delay: 10 });
+
+    // Wait for text to sync before continuing
+    await helper.waitForEditorText(editor, /First line/);
 
     // Click past the end of text to position cursor on whitespace (simulates real user click)
     // This tests the whitespace correction code path
@@ -413,12 +413,16 @@ test.describe('Inline Editing - Basic', () => {
       });
     }
 
+    // Get block count right before pressing Enter (as late as possible)
+    // to ensure all async rendering has completed
+    const initialBlocks = await helper.getStableBlockCount();
+
     // Press Enter - in standard Volto this would create a new block
     // Must press Enter in the iframe context, not the page context
     await editor.press('Enter');
 
     // Wait for the correct number of blocks to be created
-    await expect(iframe.locator('[data-block-uid]')).toHaveCount(initialBlocks + 1, { timeout: 3000 });
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
 
     // Check that no error toast appeared (Missing data-node-id)
     const errorToast = iframe.locator('#hydra-dev-warning');

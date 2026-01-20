@@ -442,6 +442,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Type "world" - this should be bold
     await editor.pressSequentially('world', { delay: 10 });
@@ -468,6 +469,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(false);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Check cursor is outside the bold element after toggle
     const selectionAfterToggle = await helper.getSelectionInfo(editor);
@@ -542,6 +544,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(false);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Verify cursor position after toggle off
     const selectionAfter = await helper.getSelectionInfo(editor);
@@ -645,8 +648,11 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
     await editor.pressSequentially('BOLD', { delay: 10 });
 
+    // Wait for text to sync after typing
+    await helper.waitForEditorText(editor, /one two BOLDthree four five/);
     let textContent = await helper.getCleanTextContent(editor);
     console.log('[TEST] After first bold:', textContent);
     expect(textContent).toBe('one two BOLDthree four five');
@@ -656,9 +662,11 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(false);
     }).toPass({ timeout: 5000 });
-
+    await helper.waitForEditorFocus(editor);
     await editor.pressSequentially(' normal ', { delay: 10 });
 
+    // Wait for text to sync after typing
+    await helper.waitForEditorText(editor, /one two BOLD normal three four five/);
     textContent = await helper.getCleanTextContent(editor);
     console.log('[TEST] After normal text:', textContent);
     expect(textContent).toBe('one two BOLD normal three four five');
@@ -668,6 +676,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Verify text to the right is still there
     textContent = await helper.getCleanTextContent(editor);
@@ -677,6 +686,8 @@ test.describe('Inline Editing - Formatting', () => {
     // Type more bold text
     await editor.pressSequentially('MORE', { delay: 10 });
 
+    // Wait for text to sync after typing
+    await helper.waitForEditorText(editor, /one two BOLD normal MOREthree four five/);
     // Final verification - all text should be preserved
     textContent = await helper.getCleanTextContent(editor);
     console.log('[TEST] Final text:', textContent);

@@ -567,26 +567,39 @@ const SyncedSlateToolbar = ({
       internalValueRef.current = editor.children;
 
     } else if (hasUnprocessedTransform) {
-      // No content sync needed, but transform is pending
+      // No content sync needed (sequence check passed), but transform is pending
       processedTransformRequestIdRef.current = transformAction.requestId;
-      console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
       // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
       // This is needed for delete/paste transforms that don't go through applyInlineFormat
       activeFormatRequestIdRef.current = transformAction.requestId;
-      // IMPORTANT: Apply the selection from the iframe before running the transform
-      // The transform request includes the selection where the format should be applied,
-      // but the editor's selection may be stale (e.g., at end of paragraph instead of
-      // the selected text range). We need to update editor.selection first.
-      if (currentSelection && !isEqual(currentSelection, editor.selection) &&
-          isSelectionValidForDocument(currentSelection, editor.children)) {
-        console.log('[TOOLBAR SYNC] Applying selection before transform:', JSON.stringify(currentSelection));
-        try {
-          Transforms.select(editor, currentSelection);
-        } catch (e) {
-          console.warn('[TOOLBAR SYNC] Failed to apply selection before transform:', e.message);
+
+      // IMPORTANT: Even if hasNewData is false, the transform request includes the iframe's
+      // current content. If content differs, sync it first. This handles cases where the
+      // iframe typed text but the sequence didn't change (e.g., typing during blocking).
+      if (contentIsDifferent) {
+        console.log('[TOOLBAR SYNC] Content differs, syncing before transform');
+        replaceEditorContent(fieldValue, currentSelection, () => {
+          console.log('[TOOLBAR SYNC] Applying transform after content sync');
+          applyTransform();
+        });
+        internalValueRef.current = editor.children;
+      } else {
+        console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
+        // IMPORTANT: Apply the selection from the iframe before running the transform
+        // The transform request includes the selection where the format should be applied,
+        // but the editor's selection may be stale (e.g., at end of paragraph instead of
+        // the selected text range). We need to update editor.selection first.
+        if (currentSelection && !isEqual(currentSelection, editor.selection) &&
+            isSelectionValidForDocument(currentSelection, editor.children)) {
+          console.log('[TOOLBAR SYNC] Applying selection before transform:', JSON.stringify(currentSelection));
+          try {
+            Transforms.select(editor, currentSelection);
+          } catch (e) {
+            console.warn('[TOOLBAR SYNC] Failed to apply selection before transform:', e.message);
+          }
         }
+        applyTransform();
       }
-      applyTransform();
 
     } else if (!contentNeedsSync && currentSelection && !isEqual(currentSelection, editor.selection)) {
       // Check if selection needs update
