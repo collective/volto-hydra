@@ -4538,15 +4538,19 @@ export class Bridge {
       let lastMouseX = 0; // Track last cursor position for scroll updates
       let lastMouseY = 0;
       let currentScrollSpeed = 0; // Variable speed based on edge proximity
-      const scrollThreshold = 50; // pixels from edge to trigger scroll
-      const minScrollSpeed = 8; // slowest scroll (at threshold edge)
-      const maxScrollSpeed = 40; // fastest scroll (at viewport edge)
+      const scrollThreshold = 80; // pixels from edge to trigger scroll
+      const minScrollSpeed = 10; // slowest scroll (at threshold edge)
+      const maxScrollSpeed = 50; // fastest scroll (at viewport edge)
 
       // Continuous scroll loop using requestAnimationFrame
       // Dispatches synthetic mousemove to update drop indicator while scrolling
       const scrollLoop = () => {
         if (scrollDirection !== 0) {
-          window.scrollBy(0, scrollDirection * currentScrollSpeed);
+          // Use scrollTo with behavior: 'instant' to override CSS scroll-behavior: smooth
+          window.scrollTo({
+            top: window.scrollY + (scrollDirection * currentScrollSpeed),
+            behavior: 'instant'
+          });
           // Dispatch synthetic mousemove to update drop indicator position
           // This ensures the indicator updates even when mouse is stationary
           const syntheticEvent = new MouseEvent('mousemove', {
