@@ -220,7 +220,7 @@ test.describe('Block Drag and Drop', () => {
     expect(newBlocks).toContain(middleBlock);
   });
 
-  test('can drag the same block to bottom then back up', async ({ page }) => {
+  test('auto-scroll: can drag block to bottom then back up', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -247,8 +247,8 @@ test.describe('Block Drag and Drop', () => {
     const dragHandle1 = await helper.getDragHandle();
     const lastBlockElement = iframe.locator(`[data-block-uid="${lastBlock}"]`);
 
-    // Drag to bottom (after last block)
-    await helper.dragBlockWithMouse(dragHandle1, lastBlockElement, true);
+    // Drag to bottom (after last block) - use testAutoScroll to explicitly test auto-scroll feature
+    await helper.dragBlockWithMouse(dragHandle1, lastBlockElement, true, { testAutoScroll: true });
     await page.waitForTimeout(500);
 
     // Verify first drag worked - first block should now be last
@@ -275,8 +275,8 @@ test.describe('Block Drag and Drop', () => {
     const secondBlockElement = iframe.locator(`[data-block-uid="${secondBlock}"]`);
 
     // Try to drag immediately after first drag (without clicking to reset)
-    // Use dragBlockWithMouse which handles scrolling (page may be scrolled after first drag)
-    await helper.dragBlockWithMouse(dragHandle2, secondBlockElement, false); // false = insert before
+    // Use testAutoScroll to explicitly test auto-scroll feature
+    await helper.dragBlockWithMouse(dragHandle2, secondBlockElement, false, { testAutoScroll: true }); // false = insert before
 
     // Wait for block order to change (block should no longer be at bottom)
     await expect

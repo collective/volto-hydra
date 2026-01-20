@@ -97,8 +97,10 @@ test.describe('Multi-element blocks', () => {
     const iframe = helper.getIframe();
 
     // Get initial element count (dynamic from search results)
+    // Wait for stable total block count to avoid nuxt hydration issues
     const elements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
     await expect(elements.first()).toBeVisible({ timeout: 5000 });
+    await helper.getStableBlockCount(); // Wait for page to stabilize
     const initialCount = await elements.count();
     console.log('Initial listing element count:', initialCount);
     expect(initialCount).toBeGreaterThan(0);

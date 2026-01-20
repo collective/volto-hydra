@@ -4538,9 +4538,9 @@ export class Bridge {
       let lastMouseX = 0; // Track last cursor position for scroll updates
       let lastMouseY = 0;
       let currentScrollSpeed = 0; // Variable speed based on edge proximity
-      const scrollThreshold = 50; // pixels from edge to trigger scroll
-      const minScrollSpeed = 8; // slowest scroll (at threshold edge)
-      const maxScrollSpeed = 40; // fastest scroll (at viewport edge)
+      const scrollThreshold = 80; // pixels from edge to trigger scroll
+      const minScrollSpeed = 15; // slowest scroll (at threshold edge)
+      const maxScrollSpeed = 80; // fastest scroll (at viewport edge)
 
       // Continuous scroll loop using requestAnimationFrame
       // Dispatches synthetic mousemove to update drop indicator while scrolling
