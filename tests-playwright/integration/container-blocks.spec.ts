@@ -833,7 +833,6 @@ test.describe('Hierarchical Sidebar', () => {
     // Select the deepest nested block (text-1a inside col-1 inside columns-1)
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
-    await page.waitForTimeout(300);
 
     // Should see parent block headers in sidebar-parents
     const sidebarParents = page.locator('#sidebar-parents');
@@ -841,13 +840,11 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Find all title input fields in the parent blocks sidebar
     // Each parent block (Columns, Column) should have a title field
+    // Wait for at least 2 title fields to appear (may take time on nuxt)
     const parentTitleInputs = sidebarParents.locator(
       'input[name="title"], .field-wrapper-title input',
     );
-
-    // Should have at least 2 title fields (Columns and Column)
-    const titleCount = await parentTitleInputs.count();
-    expect(titleCount).toBeGreaterThanOrEqual(2);
+    await expect(parentTitleInputs).toHaveCount(2, { timeout: 5000 });
 
     // ===== Edit Level 1: Columns block (grandparent) =====
     // The first title field should be for the Columns block
