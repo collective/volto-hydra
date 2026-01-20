@@ -3068,7 +3068,7 @@ export class AdminUIHelper {
       await this.moveToScrollEdge(scrollUp);
 
       // Brief wait for scroll to take effect
-      await this.page.waitForTimeout(100);
+      await this.page.waitForTimeout(50);
     }
 
     // If we get here, we've exceeded max attempts
@@ -3189,11 +3189,9 @@ export class AdminUIHelper {
       ? iframeRect.y + edgeThreshold
       : iframeRect.y + iframeRect.height - edgeThreshold;
 
-    // Multiple small moves to trigger scroll
-    for (let i = 0; i < 5; i++) {
-      await this.page.mouse.move(edgeX, edgeY + (i % 2), { steps: 2 });
-      await this.page.waitForTimeout(50);
-    }
+    // Single move to edge is enough to trigger scroll
+    await this.page.mouse.move(edgeX, edgeY, { steps: 2 });
+    await this.page.waitForTimeout(30);
   }
 
   /**
