@@ -3005,7 +3005,7 @@ export class AdminUIHelper {
   private async autoScrollToTarget(
     targetBlock: Locator,
     insertAfter: boolean,
-    maxTimeMs: number = 10000
+    maxAttempts: number = 60
   ): Promise<{ x: number; y: number }> {
     // For multi-element blocks, use the relevant element for scroll detection:
     // - insertAfter=true: scroll until LAST element visible (dropping below it)
@@ -3016,12 +3016,10 @@ export class AdminUIHelper {
 
     // Margin from viewport edge - ideally target should be this far from edge
     const edgeMargin = 100;
-    const startTime = Date.now();
     let lastTargetY: number | null = null;
-    let lastScrollDirection: boolean | null = null;
-    let stuckSince: number | null = null;
+    let stuckCount = 0;
 
-    while (Date.now() - startTime < maxTimeMs) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.verifyDragShadowVisible();
 
       // Quick visibility check using relevant element
@@ -3035,43 +3033,46 @@ export class AdminUIHelper {
       const isBelowViewport = targetY > viewportSize.height - edgeMargin;
       const isVisibleInViewport = targetY > 0 && targetY < viewportSize.height;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
-      const elapsed = Date.now() - startTime;
 
-      // Debug logging every 500ms
-      if (elapsed % 500 < 50) {
-        console.log(`[SCROLL] ${elapsed}ms targetY=${targetY.toFixed(0)} viewportH=${viewportSize.height} needsScroll=${needsAutoScroll}`);
+      // Debug logging every 5 attempts
+      if (attempt % 5 === 0) {
+        console.log(`[SCROLL] attempt=${attempt} targetY=${targetY.toFixed(0)} edgeMargin=${edgeMargin} viewportH=${viewportSize.height} above=${isAboveViewport} below=${isBelowViewport} visible=${isVisibleInViewport} needsScroll=${needsAutoScroll} t=${Date.now()}`);
       }
 
       if (!needsAutoScroll) {
         // Target is well within viewport (not near edges) - safe to drop
-        console.log(`[SCROLL] Target in range after ${elapsed}ms! targetY=${targetY.toFixed(0)}`);
+        console.log(`[SCROLL] Target in range! targetY=${targetY.toFixed(0)}`);
+        // CRITICAL: Move cursor to safe zone BEFORE returning, to stop auto-scroll.
+        // Otherwise, as cursor moves from edge to target, it passes through scroll zone
+        // and auto-scroll continues, causing the target to move away.
         await this.moveToSafeZone();
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
-      // Check if we've hit the scroll limit (target stopped moving for 300ms)
+      // Check if we've hit the scroll limit (target stopped moving)
       if (lastTargetY !== null && Math.abs(targetY - lastTargetY) < 5) {
-        if (stuckSince === null) stuckSince = Date.now();
-        if (Date.now() - stuckSince > 300 && isVisibleInViewport) {
-          console.log(`[SCROLL] Accepting position after scroll limit. targetY=${targetY.toFixed(0)}`);
+        stuckCount++;
+        // If target is visible and hasn't moved for 3 iterations, accept it
+        if (stuckCount >= 3 && isVisibleInViewport) {
+          console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
           await this.moveToSafeZone();
           return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
         }
       } else {
-        stuckSince = null;
+        stuckCount = 0;
       }
       lastTargetY = targetY;
 
-      // Move to edge to trigger/continue auto-scroll
+      // Target is near edge or off-screen - move to edge to trigger auto-scroll
       const scrollUp = isAboveViewport;
-      // Wiggle offset alternates to generate continuous mousemove events
-      const wiggleOffset = (Date.now() % 100 < 50) ? -5 : 5;
-      await this.moveToScrollEdge(scrollUp, wiggleOffset);
-      lastScrollDirection = scrollUp;
+      await this.moveToScrollEdge(scrollUp);
+
+      // Brief wait for scroll to take effect
+      await this.page.waitForTimeout(100);
     }
 
-    // If we get here, we've exceeded max time
-    throw new Error(`Auto-scroll failed after ${maxTimeMs}ms`);
+    // If we get here, we've exceeded max attempts
+    throw new Error(`Auto-scroll failed after ${maxAttempts} attempts`);
   }
 
   /**
@@ -3091,30 +3092,12 @@ export class AdminUIHelper {
     // Verify drag is still active
     await this.verifyDragShadowVisible();
 
-    // Get target position in iframe coords (relative to iframe viewport)
-    const iframeEl = this.page.locator('#previewIframe');
-    const iframeRect = await iframeEl.boundingBox();
-    if (!iframeRect) throw new Error('Could not get iframe bounding box');
-
-    const quickRect = await this.getCombinedBoundingBox(targetElement);
-    // clientX/Y should be relative to iframe viewport, not page
-    const clientX = quickRect.x + quickRect.width / 2;
-    const clientY = quickRect.y + quickRect.height / 2;
-
-    // Dispatch mousemove with iframe-relative coords to update drop indicator
-    const iframe = this.getIframe();
-    await iframe.locator('body').evaluate(({ clientX, clientY }) => {
-      const event = new MouseEvent('mousemove', {
-        clientX,
-        clientY,
-        bubbles: true,
-        cancelable: true,
-      });
-      document.dispatchEvent(event);
-    }, { clientX, clientY });
-
+    // Get drop position in page coordinates and move mouse there
+    const dropPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+    await this.page.mouse.move(dropPos.x, dropPos.y, { steps: 5 });
     await this.page.waitForTimeout(100);
-    return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+
+    return dropPos;
   }
 
   /**
@@ -3219,30 +3202,23 @@ export class AdminUIHelper {
 
   /**
    * Move mouse towards iframe edge to trigger auto-scroll.
-   * Dispatches synthetic mousemove directly into iframe since Playwright's
-   * page.mouse.move() doesn't propagate events to iframes properly.
    */
-  private async moveToScrollEdge(scrollUp: boolean, wiggleOffset: number = 0): Promise<void> {
+  private async moveToScrollEdge(scrollUp: boolean): Promise<void> {
     const iframeElement = this.page.locator('#previewIframe');
     const iframeRect = await iframeElement.boundingBox();
     if (!iframeRect) throw new Error('Could not get iframe bounds');
 
-    const edgeThreshold = 2; // Very close to edge for maximum scroll speed
-    // Coordinates relative to iframe viewport (for synthetic event inside iframe)
-    const clientX = iframeRect.width / 2 + wiggleOffset;
-    const clientY = scrollUp ? edgeThreshold : iframeRect.height - edgeThreshold;
+    const edgeThreshold = 10; // Close to edge for faster scroll speed
+    const edgeX = iframeRect.x + iframeRect.width / 2;
+    const edgeY = scrollUp
+      ? iframeRect.y + edgeThreshold
+      : iframeRect.y + iframeRect.height - edgeThreshold;
 
-    // Dispatch synthetic mousemove directly into iframe
-    const iframe = this.getIframe();
-    await iframe.locator('body').evaluate(({ clientX, clientY }) => {
-      const event = new MouseEvent('mousemove', {
-        clientX,
-        clientY,
-        bubbles: true,
-        cancelable: true,
-      });
-      document.dispatchEvent(event);
-    }, { clientX, clientY });
+    // Multiple small moves to trigger scroll
+    for (let i = 0; i < 5; i++) {
+      await this.page.mouse.move(edgeX, edgeY + (i % 2), { steps: 2 });
+      await this.page.waitForTimeout(50);
+    }
   }
 
   /**
@@ -3294,7 +3270,8 @@ export class AdminUIHelper {
     // testAutoScroll=false (default) scrolls directly for faster tests
     let dropPosPage: { x: number; y: number };
     if (options.testAutoScroll) {
-      dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter, 30000);
+      // Use more attempts for explicit auto-scroll testing (each attempt ~100ms = ~30s total)
+      dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter, 300);
     } else {
       dropPosPage = await this.fastScrollToTarget(targetBlock, insertAfter);
     }

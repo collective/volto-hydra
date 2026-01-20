@@ -85,7 +85,7 @@ export default defineConfig({
       name: 'mock',
       use: {
         ...devices['Desktop Chrome'],
-        viewport: { width: 1920, height: 1080 },
+        viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
       testIgnore: [
@@ -97,7 +97,7 @@ export default defineConfig({
       name: 'nuxt',
       use: {
         ...devices['Desktop Chrome'],
-        viewport: { width: 1920, height: 1080 },
+        viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
         // Pre-set iframe_url cookie to use Nuxt frontend
         storageState: 'tests-playwright/fixtures/storage-nuxt.json',
@@ -113,7 +113,7 @@ export default defineConfig({
       name: 'nuxt-specific',
       use: {
         ...devices['Desktop Chrome'],
-        viewport: { width: 1920, height: 1080 },
+        viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
       testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
