@@ -1161,14 +1161,16 @@ test.describe('Teaser starter UI and overwrite', () => {
     await customizeCheckbox.click();
 
     // After enabling customize, clicking on title should make it editable
-    // Find the editable field (may be the title element itself or a wrapper)
-    const editableTitle = filledTeaser.locator('[data-editable-field="title"]');
-    await editableTitle.click();
-    await expect(editableTitle).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+    // Wait for the frontend to re-render with the overwrite change
+    await expect(titleElement).toHaveAttribute('data-editable-field', 'title', { timeout: 10000 });
+
+    // Click on title to make it editable
+    await titleElement.click();
+    await expect(titleElement).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
 
     // Edit the title to something custom
-    await editableTitle.fill('Custom Title');
-    await expect(editableTitle).toHaveText('Custom Title');
+    await titleElement.fill('Custom Title');
+    await expect(titleElement).toHaveText('Custom Title');
 
     // Click the checkbox again to uncustomize
     await customizeCheckbox.click();

@@ -467,10 +467,10 @@
 
 </template>
 <script setup>
-import { ref, watch, nextTick, computed } from 'vue';
+import { ref, watch, nextTick, computed, toRefs } from 'vue';
 import RichText from './richtext.vue';
 
-const { block_uid, block, data, contained, apiUrl } = defineProps({
+const props = defineProps({
   block_uid: {
     type: String,
     required: true
@@ -494,13 +494,16 @@ const { block_uid, block, data, contained, apiUrl } = defineProps({
   }
 });
 
+// Use toRefs to maintain reactivity (destructuring props directly can lose reactivity in Vue 3)
+const { block_uid, block, data, contained, apiUrl } = toRefs(props);
+
 // Slider state: track active slide and detect new slides
 const activeSlideIndex = ref(0);
-const prevSlideCount = ref(block.slides?.length || 0);
+const prevSlideCount = ref(block.value?.slides?.length || 0);
 
 // Watch for slide count changes to detect new slides and reinitialize Flowbite
 watch(
-  () => block.slides?.length,
+  () => block.value?.slides?.length,
   async (newCount, oldCount) => {
     // Only detect new slides after initial render (when oldCount is defined)
     if (oldCount !== undefined && newCount > oldCount) {
@@ -555,18 +558,27 @@ const getImageUrl = (value) => {
 
 // Teaser helpers: use block data if overwrite is set OR if hrefObj has no content data
 // This ensures listing-expanded teasers (which have block data but empty hrefObj) display correctly
+// When overwrite is enabled but custom value not set yet, fall back to href value for editing
 const getTeaserTitle = (block) => {
   const hrefObj = block.href?.[0];
   const hrefObjHasContentData = hrefObj?.title !== undefined;
   const useBlockData = block.overwrite || !hrefObjHasContentData;
-  return useBlockData ? (block.title || '') : (hrefObj?.title || '');
+  if (useBlockData) {
+    // When customizing, use block title or fall back to href title for initial editing
+    return block.title || hrefObj?.title || '';
+  }
+  return hrefObj?.title || '';
 };
 
 const getTeaserDescription = (block) => {
   const hrefObj = block.href?.[0];
   const hrefObjHasContentData = hrefObj?.title !== undefined;
   const useBlockData = block.overwrite || !hrefObjHasContentData;
-  return useBlockData ? (block.description || '') : (hrefObj?.description || '');
+  if (useBlockData) {
+    // When customizing, use block description or fall back to href description for initial editing
+    return block.description || hrefObj?.description || '';
+  }
+  return hrefObj?.description || '';
 };
 
 // Search block helpers
