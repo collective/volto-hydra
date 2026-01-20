@@ -33,6 +33,11 @@ test.describe('Multi-element blocks', () => {
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
+    // Wait for elements to be stable after click (may re-render)
+    await expect(elements.first()).toBeVisible({ timeout: 5000 });
+    const newCount = await elements.count();
+    expect(newCount).toBeGreaterThan(1);
+
     // Get bounding boxes of all elements
     const boxes = await elements.evaluateAll((els) => {
       return els.map(el => {
@@ -40,6 +45,9 @@ test.describe('Multi-element blocks', () => {
         return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
       });
     });
+
+    // Verify we got boxes (elements may have re-rendered)
+    expect(boxes.length).toBeGreaterThan(0);
 
     // Calculate expected combined bounding box
     const expectedLeft = Math.min(...boxes.map(b => b.left));
