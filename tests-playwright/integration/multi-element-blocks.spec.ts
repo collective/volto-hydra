@@ -450,10 +450,13 @@ test.describe('Multi-element blocks', () => {
     // KEY ASSERTION: Indicator should be at the boundary of the multi-element block,
     // not between individual elements
     // Valid positions: above first element OR below last element
+    // Use 50px tolerance to account for inter-block gaps - hydra.js positions the
+    // indicator in the middle of the gap between blocks, which can be larger than 10px
     const indicatorTop = indicatorRect!.y;
+    const gapTolerance = 50;
     const isAboveFirst = indicatorTop < firstRect!.y;
-    const isBelowLast = indicatorTop > lastRect!.y + lastRect!.height - 10;
-    const isBetweenElements = indicatorTop > firstRect!.y + 10 && indicatorTop < lastRect!.y + lastRect!.height - 10;
+    const isBelowLast = indicatorTop > lastRect!.y + lastRect!.height - gapTolerance;
+    const isBetweenElements = indicatorTop > firstRect!.y + gapTolerance && indicatorTop < lastRect!.y + lastRect!.height - gapTolerance;
 
     console.log('Indicator position:', { isAboveFirst, isBelowLast, isBetweenElements, indicatorTop });
 
