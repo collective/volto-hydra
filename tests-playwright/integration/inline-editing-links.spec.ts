@@ -328,14 +328,18 @@ test.describe('Inline Editing - Links', () => {
 
     // Verify typing actually works (not just contenteditable attribute present)
     // This catches the bug where contenteditable is true but iframe is blocked
-    // Click to ensure focus is on editor (focus may shift after LinkEditor closes)
-    await editor.click();
-    await expect(editor).toBeFocused({ timeout: 5000 });
-    // Move cursor to end first (selection may still be "select all" after Escape)
-    await editor.press('End');
+    // Poll until editor is focused and cursor is at end (editor may need time after LinkEditor closes)
+    await expect(async () => {
+      await editor.click();
+      await expect(editor).toBeFocused();
+      await editor.press('End');
+      await helper.assertCursorAtEnd(editor, blockId, 'Test text');
+    }).toPass({ timeout: 5000, intervals: [500, 1000, 1500] });
+
+    // Now type and verify
     await editor.pressSequentially(' added', { delay: 10 });
     const newText = await helper.getCleanTextContent(editor);
-    expect(newText).toContain('added'); // Text was appended
+    expect(newText).toContain('added');
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {

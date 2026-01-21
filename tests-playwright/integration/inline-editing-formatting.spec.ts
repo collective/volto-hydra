@@ -59,10 +59,8 @@ test.describe('Inline Editing - Formatting', () => {
     // STEP 7: Wait for bold formatting AND text content to be stable (polls until both conditions met)
     await helper.waitForFormattedText(editor, /Text to make bold/, 'bold');
 
-    // STEP 8: Check selection after button click
-    await helper.assertTextSelection(editor, undefined, {
-      message: 'Step 8: After clicking bold button'
-    });
+    // STEP 8: Wait for selection to be restored (polls - selection restoration is async)
+    await helper.verifySelectionMatches(editor, 'Text to make bold');
 
     // STEP 9: Verify the text is bold
     const boldSelector = helper.getFormatSelector('bold');

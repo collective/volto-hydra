@@ -34,6 +34,9 @@ test.describe('Inline Editing - Clipboard', () => {
     // Wait for text to be cleared
     await helper.waitForEditorText(editor, /^$/);
 
+    // Wait for editor to regain focus after cut (focus restoration is async)
+    await expect(editor).toBeFocused({ timeout: 2000 });
+
     // Paste the text back and wait for it to appear
     await helper.pasteFromClipboard(editor);
     await helper.waitForEditorText(editor, /Text to paste/);
