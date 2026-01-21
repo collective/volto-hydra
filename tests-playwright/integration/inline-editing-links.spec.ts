@@ -328,14 +328,23 @@ test.describe('Inline Editing - Links', () => {
 
     // Verify typing actually works (not just contenteditable attribute present)
     // This catches the bug where contenteditable is true but iframe is blocked
-    // Click to ensure focus is on editor (focus may shift after LinkEditor closes)
-    await editor.click();
-    await expect(editor).toBeFocused({ timeout: 5000 });
-    // Move cursor to end first (selection may still be "select all" after Escape)
-    await editor.press('End');
+    // Poll until editor is focused and cursor is at end (editor may need time after LinkEditor closes)
+    await expect(async () => {
+      await editor.click();
+      await expect(editor).toBeFocused();
+      await editor.press('End');
+      await helper.assertCursorAtEnd(editor, blockId, 'Test text');
+    }).toPass({ timeout: 5000, intervals: [500, 1000, 1500] });
+
+    // Ensure editor still has focus before typing
+    await expect(editor).toBeFocused();
+
+    // Now type and verify (poll for text to appear in case of DOM sync delay)
     await editor.pressSequentially(' added', { delay: 10 });
-    const newText = await helper.getCleanTextContent(editor);
-    expect(newText).toContain('added'); // Text was appended
+    await expect(async () => {
+      const newText = await helper.getCleanTextContent(editor);
+      expect(newText).toContain('added');
+    }).toPass({ timeout: 2000 });
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {
@@ -454,23 +463,25 @@ test.describe('Inline Editing - Links', () => {
     await helper.clickRelativeToFormat(editor, 'inside', 'a');
 
     // Verify link button is active
-    expect(await helper.isActiveFormatButton('link')).toBe(true);
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('link')).toBe(true);
+    }).toPass({ timeout: 5000 });
 
     // Click before the link
     await helper.clickRelativeToFormat(editor, 'before', 'a');
 
-    await page.waitForTimeout(200);
-
     // Verify link button is NOT active
-    expect(await helper.isActiveFormatButton('link')).toBe(false);
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('link')).toBe(false);
+    }).toPass({ timeout: 5000 });
 
     // Click after the link
     await helper.clickRelativeToFormat(editor, 'after', 'a');
 
-    await page.waitForTimeout(200);
-
     // Verify link button is still NOT active
-    expect(await helper.isActiveFormatButton('link')).toBe(false);
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('link')).toBe(false);
+    }).toPass({ timeout: 5000 });
   });
 
 });

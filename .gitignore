@@ -1,6 +1,7 @@
 .*project
 .settings/
 .vscode
+.claude/settings.local.json
 *~
 acceptance/cypress/videos/
 acceptance/node_modules
@@ -12,6 +13,7 @@ results
 yarn.lock
 dist
 examples/nuxt-blog-starter/certs/mkcert
+examples/nuxt-blog-starter/packages/hydra.js
 
 examples/hydra-vue-f7/src/.vite-ssg-temp/
 # Local Netlify folder

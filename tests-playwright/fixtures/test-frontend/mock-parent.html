@@ -111,6 +111,28 @@
       return nodes.map(node => processNode(node));
     }
 
+    // Helper to build blockPathMap from mockFormData
+    function buildBlockPathMap() {
+      const pathMap = {};
+      mockFormData.blocks_layout.items.forEach(blockId => {
+        const block = mockFormData.blocks[blockId];
+        pathMap[blockId] = {
+          path: ['blocks', blockId],
+          parentId: null,
+          blockType: block?.['@type']
+        };
+      });
+      return pathMap;
+    }
+
+    // Block field types metadata (constant)
+    const blockFieldTypes = {
+      'slate': { value: 'slate' },
+      'text': { text: 'string' },
+      'multifield': { title: 'string', description: 'slate' },
+      'textarea': { content: 'string:textarea' }
+    };
+
     // Simple Slate transformation without needing full Slate library
     // This manually creates the expected structure for testing
     function applySlateTransform(value, selection, format, action) {
@@ -244,29 +266,13 @@
           // Respond with FORM_DATA including blockPathMap
           console.log('[MOCK_PARENT] Received INIT message:', message);
 
-          // Build blockPathMap for the mock blocks (simple page-level blocks)
-          const blockPathMap = {};
-          mockFormData.blocks_layout.items.forEach(blockId => {
-            blockPathMap[blockId] = {
-              path: ['blocks', blockId],
-              parentId: null
-            };
-          });
-
-          // Build block field types metadata based on block types
-          // Map blockType -> fieldName -> fieldType (not blockId!)
-          const blockFieldTypes = {
-            'slate': { value: 'slate' },
-            'text': { text: 'string' },  // Simple string field
-            'multifield': { title: 'string', description: 'slate' },  // title is string, description is slate
-            'textarea': { content: 'string:textarea' }  // Multiline text field
-          };
+          const blockPathMap = buildBlockPathMap();
 
           const response = {
             type: 'INITIAL_DATA',
             data: mockFormData,
-            blockPathMap: blockPathMap,
-            blockFieldTypes: blockFieldTypes,
+            blockPathMap,
+            blockFieldTypes,
             slateConfig: {
               hotkeys: {
                 'mod+b': { type: 'inline', format: 'strong' },
@@ -314,28 +320,13 @@
           // Legacy handler for backwards compatibility
           console.log('[MOCK_PARENT] Received legacy GET_INITIAL_DATA');
 
-          // Build blockPathMap
-          const blockPathMap = {};
-          mockFormData.blocks_layout.items.forEach(blockId => {
-            blockPathMap[blockId] = {
-              path: ['blocks', blockId],
-              parentId: null
-            };
-          });
-
-          // Build block field types metadata
-          const blockFieldTypes = {
-            'slate': { value: 'slate' },
-            'text': { text: 'string' },
-            'multifield': { title: 'string', description: 'slate' },
-            'textarea': { content: 'string:textarea' }
-          };
+          const blockPathMap = buildBlockPathMap();
 
           const response = {
             type: 'INITIAL_DATA',
             data: mockFormData,
-            blockPathMap: blockPathMap,
-            blockFieldTypes: blockFieldTypes,
+            blockPathMap,
+            blockFieldTypes,
             slateConfig: {
               hotkeys: {
                 'mod+b': { type: 'inline', format: 'strong' },
@@ -418,29 +409,12 @@
               [fieldName || 'value']: updatedValue,
             };
 
-            // Build blockPathMap for the current blocks
-            const pathMap = {};
-            mockFormData.blocks_layout.items.forEach(bid => {
-              pathMap[bid] = {
-                path: ['blocks', bid],
-                parentId: null
-              };
-            });
-
-            // Block field types metadata
-            const fieldTypes = {
-              'slate': { value: 'slate' },
-              'text': { text: 'string' },
-              'multifield': { title: 'string', description: 'slate' },
-              'textarea': { content: 'string:textarea' }
-            };
-
             // Send FORM_DATA with formatRequestId so hydra.js knows to unblock
             const response = {
               type: 'FORM_DATA',
               data: mockFormData,
-              blockPathMap: pathMap,
-              blockFieldTypes: fieldTypes,
+              blockPathMap: buildBlockPathMap(),
+              blockFieldTypes,
               formatRequestId: requestId,
               transformedSelection: selection,  // Must match what hydra.js checks for
             };

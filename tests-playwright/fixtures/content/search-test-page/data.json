@@ -1,0 +1,65 @@
+{
+  "@id": "/search-test-page",
+  "@type": "Document",
+  "id": "search-test-page",
+  "title": "Search Test Page",
+  "description": "A test page with search block",
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "search-block-1": {
+      "@type": "search",
+      "headline": "Search Content",
+      "showSearchInput": true,
+      "showSortOn": true,
+      "showTotalResults": true,
+      "facets": [
+        {
+          "@id": "facet-type",
+          "title": "Content Type",
+          "field": "portal_type",
+          "type": "checkboxFacet",
+          "multiple": true
+        },
+        {
+          "@id": "facet-state",
+          "title": "Review State",
+          "field": "review_state",
+          "type": "checkboxFacet",
+          "multiple": false
+        }
+      ],
+      "sortOnOptions": ["effective", "created", "sortable_title"],
+      "listing": {
+        "results-listing": {
+          "@type": "listing",
+          "variation": "teaser",
+          "fieldMapping": {
+            "@id": "href",
+            "title": "title",
+            "description": "description",
+            "image": "preview_image"
+          },
+          "querystring": {
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": ["Document"]
+              }
+            ],
+            "sort_on": "effective",
+            "sort_order": "descending"
+          }
+        }
+      },
+      "listing_layout": {
+        "items": ["results-listing"]
+      }
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "search-block-1"]
+  }
+}

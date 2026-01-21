@@ -38,8 +38,11 @@ const DropdownMenu = ({
   addMode, // 'table' if this is a row in a table
   parentAddMode, // 'table' if this is a cell in a table row
   addDirection, // 'right' or 'bottom' - determines Column vs Row terminology
+  convertibleTypes = [], // Array of { type, title } for block type conversion
+  onConvertBlock, // Handler for block conversion: (newType) => void
 }) => {
   const menuRef = useRef(null);
+  const [convertSubmenuOpen, setConvertSubmenuOpen] = React.useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -238,6 +241,82 @@ const DropdownMenu = ({
             onClick={handleSettings}
           >
             ⚙️ Settings
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
+      {/* Convert to submenu - only shown when there are convertible types */}
+      {convertibleTypes?.length > 0 && onConvertBlock && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item convert-to-menu"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+              position: 'relative',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = '#f0f0f0';
+              setConvertSubmenuOpen(true);
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'transparent';
+            }}
+          >
+            🔄 Convert to
+            <span style={{ marginLeft: 'auto' }}>▸</span>
+            {/* Submenu */}
+            {convertSubmenuOpen && (
+              <div
+                className="volto-hydra-submenu"
+                style={{
+                  position: 'absolute',
+                  left: '100%',
+                  top: '0',
+                  background: 'white',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+                  minWidth: '150px',
+                  zIndex: 10001,
+                }}
+                onMouseEnter={() => setConvertSubmenuOpen(true)}
+                onMouseLeave={() => setConvertSubmenuOpen(false)}
+              >
+                {convertibleTypes.map(({ type, title }) => (
+                  <div
+                    key={type}
+                    className="volto-hydra-dropdown-item"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px',
+                      cursor: 'pointer',
+                      fontSize: '15px',
+                      fontWeight: '500',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    onClick={() => {
+                      onClose();
+                      onConvertBlock(type);
+                    }}
+                  >
+                    {title}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div
             style={{

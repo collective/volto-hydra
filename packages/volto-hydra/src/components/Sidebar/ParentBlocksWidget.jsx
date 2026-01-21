@@ -20,12 +20,15 @@ import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
+import { set, cloneDeep } from 'lodash';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { getBlockById } from '../../utils/blockPath';
+import { getBlockById, getBlockSchema, updateBlockById } from '../../utils/blockPath';
+import { HydraSchemaProvider } from '../../context';
+import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
 
 /**
  * Get the display title for a block type
@@ -36,10 +39,10 @@ const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
   // (object_list items often don't have @type, so blockType may be undefined)
   const pathInfo = blockPathMap?.[blockId];
   if (pathInfo?.isObjectListItem) {
-    // Try to get title from itemType (parentType:fieldName format)
+    // Try to get title from blockType (parentType:fieldName format)
     // For nested types like slateTable:rows:cells, parentType is slateTable:rows, fieldName is cells
-    if (pathInfo.itemType) {
-      const parts = pathInfo.itemType.split(':');
+    if (pathInfo.blockType) {
+      const parts = pathInfo.blockType.split(':');
       const fieldName = parts.pop(); // Last part is the field name
       const parentType = parts.join(':'); // Everything else is parent type
       const parentConfig = config.blocks?.blocksConfig?.[parentType];
@@ -102,21 +105,6 @@ const getParentChain = (blockId, blockPathMap) => {
   return parents;
 };
 
-/**
- * Get block data by ID using blockPathMap
- * For object_list items, injects the virtual @type from itemType
- */
-const getBlockData = (blockId, formData, blockPathMap) => {
-  const block = getBlockById(formData, blockPathMap, blockId);
-  if (!block) return null;
-
-  // Inject virtual @type for object_list items
-  const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.isObjectListItem && pathInfo.itemType) {
-    return { ...block, '@type': pathInfo.itemType };
-  }
-  return block;
-};
 
 /**
  * Filter out container fields from schema (type: 'blocks' or widget: 'object_list')
@@ -151,34 +139,15 @@ const filterBlocksFields = (schema) => {
 };
 
 /**
- * Get the block schema for a block type
- * Returns filtered schema (without blocks-type fields) or null
- * For object_list items, uses itemSchema from blockPathMap
+ * Get the block schema for a block type, filtered for sidebar display.
+ * Returns filtered schema (without blocks-type fields) or null.
+ * Uses the central getBlockSchema which handles object_list items.
  */
-const getBlockSchema = (blockType, blockData, intl, blockPathMap, blockId) => {
-  // For object_list items, use itemSchema directly from pathMap
-  const pathInfo = blockPathMap?.[blockId];
-  if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
-    return {
-      ...pathInfo.itemSchema,
-      required: pathInfo.itemSchema.required || [],
-    };
-  }
+const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockData) => {
+  const schema = getBlockSchema(blockType, intl, config.blocks?.blocksConfig, blockPathMap, blockId, blockData);
+  if (!schema) return null;
 
-  if (!blockType) return null;
-
-  const blockConfig = config.blocks?.blocksConfig?.[blockType];
-  if (!blockConfig?.blockSchema) return null;
-
-  // Schema can be a function or object
-  let schema;
-  if (typeof blockConfig.blockSchema === 'function') {
-    schema = blockConfig.blockSchema({ formData: blockData || {}, intl });
-  } else {
-    schema = blockConfig.blockSchema;
-  }
-
-  // Filter out blocks-type fields (container fields)
+  // Filter out blocks-type fields (container fields) for sidebar display
   return filterBlocksFields(schema);
 };
 
@@ -201,7 +170,14 @@ const ParentBlockSection = ({
   pathname,
   intl,
   blockPathMap,
+  liveBlockDataRef,
 }) => {
+  // Store current block data in liveBlockDataRef on every render
+  // This ensures child schemaEnhancers can see parent's current data
+  if (liveBlockDataRef && blockData) {
+    liveBlockDataRef.current[blockId] = blockData;
+  }
+
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
   const menuButtonRef = React.useRef(null);
@@ -217,7 +193,20 @@ const ParentBlockSection = ({
   const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
 
   // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
-  const schema = !BlockEdit ? getBlockSchema(blockType, blockData, intl, blockPathMap, blockId) : null;
+  const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
+
+  // Compute a key suffix that changes when parent's schema inheritance state changes.
+  // This forces BlockEdit to remount when parent's typeField changes, ensuring child gets fresh schema.
+  // Without this, Volto's BlockEdit caches its internal form and doesn't re-render with new schema.
+  const parentSchemaKey = React.useMemo(() => {
+    if (!parentId || !liveBlockDataRef?.current) return '';
+    const parentBlock = liveBlockDataRef.current[parentId];
+    if (!parentBlock) return '';
+    const parentConfig = config.blocks?.blocksConfig?.[parentBlock['@type']];
+    const parentTypeField = parentConfig?.schemaEnhancer?.config?.typeField;
+    if (!parentTypeField) return '';
+    return `-parent-${parentTypeField}:${parentBlock[parentTypeField] || 'none'}`;
+  }, [parentId, liveBlockDataRef?.current?.[parentId]]);
 
   const handleMenuClick = (e) => {
     e.stopPropagation();
@@ -293,6 +282,14 @@ const ParentBlockSection = ({
           </button>
           {menuOpen && (() => {
             const pathInfo = blockPathMap?.[blockId];
+            const blocksConfig = config.blocks?.blocksConfig;
+            const convertibleTypes = getConvertibleTypes(blockType, blocksConfig);
+            const handleConvertBlock = (newType) => {
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig);
+              // Preserve the block ID
+              newBlockData['@uid'] = blockId;
+              onChangeBlock(blockId, newBlockData);
+            };
             return (
               <DropdownMenu
                 selectedBlock={blockId}
@@ -307,6 +304,8 @@ const ParentBlockSection = ({
                 addMode={pathInfo?.addMode}
                 parentAddMode={pathInfo?.parentAddMode}
                 addDirection={pathInfo?.addDirection}
+                convertibleTypes={convertibleTypes}
+                onConvertBlock={handleConvertBlock}
               />
             );
           })()}
@@ -327,58 +326,63 @@ const ParentBlockSection = ({
           Parent blocks: render to their own target div
           Current block: render to sidebar-properties */}
       {BlockEdit && (
-        <SidebarPortalTargetContext.Provider value={targetId}>
-          {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
-          <div style={{ display: 'none' }}>
-            <BlockEdit
-              type={blockType}
-              id={blockId}
-              data={blockData}
-              selected={true}
-              index={index}
-              properties={formData}
-              pathname={pathname}
-              onChangeBlock={onChangeBlock}
-              // For parent blocks, use no-op to prevent Edit components from changing
-              // selection when they initialize/render. This was causing parent blocks
-              // to get selected when clicking on child blocks (e.g., empty blocks).
-              // For current block, use real onSelectBlock for sub-selections.
-              onSelectBlock={isCurrentBlock ? onSelectBlock : () => {}}
-              // These are needed but not used for sidebar-only rendering
-              onMoveBlock={() => {}}
-              onDeleteBlock={() => {}}
-              onAddBlock={() => {}}
-              onFocusPreviousBlock={() => {}}
-              onFocusNextBlock={() => {}}
-              handleKeyDown={() => {}}
-              block={blockId}
-              blocksConfig={config.blocks?.blocksConfig}
-              navRoot={{}}
-              contentType={formData?.['@type']}
-            />
-          </div>
-        </SidebarPortalTargetContext.Provider>
+        <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+          <SidebarPortalTargetContext.Provider value={targetId}>
+            {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
+            {/* Key includes parentSchemaKey to force remount when parent's schema inheritance changes */}
+            <div key={`${blockId}${parentSchemaKey}`} style={{ display: 'none' }}>
+              <BlockEdit
+                type={blockType}
+                id={blockId}
+                data={blockData}
+                selected={true}
+                index={index}
+                properties={formData}
+                pathname={pathname}
+                intl={intl}
+                onChangeBlock={onChangeBlock}
+                // For parent blocks, use no-op to prevent Edit components from changing
+                // selection when they initialize/render. This was causing parent blocks
+                // to get selected when clicking on child blocks (e.g., empty blocks).
+                // For current block, use real onSelectBlock for sub-selections.
+                onSelectBlock={isCurrentBlock ? onSelectBlock : () => {}}
+                // These are needed but not used for sidebar-only rendering
+                onMoveBlock={() => {}}
+                onDeleteBlock={() => {}}
+                onAddBlock={() => {}}
+                onFocusPreviousBlock={() => {}}
+                onFocusNextBlock={() => {}}
+                handleKeyDown={() => {}}
+                block={blockId}
+                blocksConfig={config.blocks?.blocksConfig}
+                navRoot={{}}
+                contentType={formData?.['@type']}
+              />
+            </div>
+          </SidebarPortalTargetContext.Provider>
+        </HydraSchemaProvider>
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
       {!BlockEdit && schema && (() => {
         const formContent = (
-          <BlockDataForm
-            schema={schema}
-            onChangeField={(fieldId, value) => {
-              const newBlockData = {
-                ...blockData,
-                [fieldId]: value,
-              };
-              onChangeBlock(blockId, newBlockData);
-            }}
-            onChangeBlock={(id, data) => {
-              onChangeBlock(id, data);
-            }}
-            formData={blockData}
-            block={blockId}
-            applySchemaEnhancers={true}
-          />
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+            <BlockDataForm
+              schema={schema}
+              onChangeField={(fieldId, value) => {
+                // Use lodash set for nested paths like 'itemDefaults.overwrite'
+                const newBlockData = cloneDeep(blockData);
+                set(newBlockData, fieldId, value);
+                onChangeBlock(blockId, newBlockData);
+              }}
+              onChangeBlock={(id, data) => {
+                onChangeBlock(id, data);
+              }}
+              formData={blockData}
+              block={blockId}
+              applySchemaEnhancers={true}
+            />
+          </HydraSchemaProvider>
         );
         // Portal to the target element (sidebar-properties for current, parent-sidebar-{id} for parents)
         const targetElement = document.getElementById(targetId);
@@ -406,6 +410,19 @@ const ParentBlocksWidget = ({
   const intl = useIntl();
   const location = useLocation();
   const pathname = location?.pathname || '';
+
+  // Track live block data from each form's internal state
+  // This ref is updated synchronously when any block's form changes,
+  // so child schemaEnhancers see fresh parent data immediately
+  const liveBlockDataRef = React.useRef({});
+
+  // Wrapper that captures block data changes before propagating to parent
+  const handleBlockChange = React.useCallback((blockId, newBlockData) => {
+    // Update ref immediately (synchronous, no React batching)
+    liveBlockDataRef.current = { ...liveBlockDataRef.current, [blockId]: newBlockData };
+    // Propagate to parent
+    onChangeBlock(blockId, newBlockData);
+  }, [onChangeBlock]);
 
   React.useEffect(() => {
     setIsClient(true);
@@ -445,15 +462,32 @@ const ParentBlocksWidget = ({
       const containerRect = scrollContainer.getBoundingClientRect();
       const propertiesRect = sidebarProperties.getBoundingClientRect();
 
-      // Check if bottom of settings is below visible area
+      // Calculate scroll needed to show settings from the top
+      // We want: as much of settings visible as possible, but top must always be visible
+      const propertiesTop = propertiesRect.top;
       const propertiesBottom = propertiesRect.bottom;
+      const containerTop = containerRect.top;
       const containerBottom = containerRect.bottom;
+      const containerHeight = containerRect.height;
+      const propertiesHeight = propertiesRect.height;
 
-      if (propertiesBottom > containerBottom) {
-        // Scroll the container to show the bottom of settings
-        // Add 30px padding to ensure settings are comfortably visible
-        const scrollAmount = propertiesBottom - containerBottom + 30;
+      // First, ensure the TOP of settings is visible (scroll up if needed)
+      if (propertiesTop < containerTop) {
+        // Settings top is above viewport - scroll up to show it
+        const scrollAmount = propertiesTop - containerTop;
         scrollContainer.scrollTop += scrollAmount;
+      } else if (propertiesTop > containerTop && propertiesHeight <= containerHeight) {
+        // Settings fit entirely - scroll to show from top with some padding
+        const scrollAmount = propertiesTop - containerTop - 10;
+        if (scrollAmount > 0) {
+          scrollContainer.scrollTop += scrollAmount;
+        }
+      } else if (propertiesTop > containerTop && propertiesHeight > containerHeight) {
+        // Settings are taller than viewport - scroll to show top
+        const scrollAmount = propertiesTop - containerTop - 10;
+        if (scrollAmount > 0) {
+          scrollContainer.scrollTop += scrollAmount;
+        }
       }
     };
 
@@ -476,10 +510,15 @@ const ParentBlocksWidget = ({
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
-  // Get current block data for its type
-  const currentBlockData = getBlockData(selectedBlock, formData, blockPathMap);
-  const currentBlockType = currentBlockData?.['@type'];
+  // Get current block data and type from blockPathMap (single source of truth)
+  const currentBlockData = getBlockById(formData, blockPathMap, selectedBlock);
+  const currentBlockType = blockPathMap[selectedBlock]?.blockType;
 
+  // Guard: If block data is undefined, skip rendering (data may be out of sync during drag operations)
+  if (!currentBlockData) {
+    console.warn('[ParentBlocksWidget] Block data undefined for:', selectedBlock, 'blockPathMap entry:', blockPathMap[selectedBlock]);
+    return null;
+  }
 
   return (
     <>
@@ -487,8 +526,8 @@ const ParentBlocksWidget = ({
         <>
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
-            const parentData = getBlockData(parentId, formData, blockPathMap);
-            const parentType = parentData?.['@type'];
+            const parentData = getBlockById(formData, blockPathMap, parentId);
+            const parentType = blockPathMap[parentId]?.blockType;
             // Parent of this parent (or null if root)
             const grandparentId = index > 0 ? parentIds[index - 1] : null;
 
@@ -503,12 +542,13 @@ const ParentBlocksWidget = ({
                 isCurrentBlock={false}
                 onSelectBlock={onSelectBlock}
                 onDeleteBlock={onDeleteBlock}
-                onChangeBlock={onChangeBlock}
+                onChangeBlock={handleBlockChange}
                 onBlockAction={onBlockAction}
                 formData={formData}
                 pathname={pathname}
                 intl={intl}
                 blockPathMap={blockPathMap}
+                liveBlockDataRef={liveBlockDataRef}
               />
             );
           })}
@@ -524,12 +564,13 @@ const ParentBlocksWidget = ({
             isCurrentBlock={true}
             onSelectBlock={onSelectBlock}
             onDeleteBlock={onDeleteBlock}
-            onChangeBlock={onChangeBlock}
+            onChangeBlock={handleBlockChange}
             onBlockAction={onBlockAction}
             formData={formData}
             pathname={pathname}
             intl={intl}
             blockPathMap={blockPathMap}
+            liveBlockDataRef={liveBlockDataRef}
           />
         </>,
         parentsTarget,

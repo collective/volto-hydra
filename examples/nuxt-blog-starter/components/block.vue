@@ -16,8 +16,8 @@
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <a v-if="block.href" :href="block.href" class="image-link">
-      <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
+    <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-linkable-field="href">
+      <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" :src="props.url" :width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
     </a>
     <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
@@ -25,8 +25,8 @@
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
-      <a v-if="block.href" :href="block.href" class="image-link">
-        <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
+      <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-linkable-field="href">
+        <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" :src="props.url" _width="props.width"
           :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       </a>
       <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
@@ -45,39 +45,66 @@
       :class="['image-size-' + props.size, 'image-align-' + props.align]" loading="lazy" decoding="async" />
   </div>
 
-  <!-- Hero block - simple landing page hero section -->
+  <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
+  <!-- hydra editable-field=heading(.hero-heading) editable-field=subheading(.hero-subheading) media-field=image(.hero-image) editable-field=buttonText(.hero-button) linkable-field=buttonLink(.hero-button) -->
   <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
-    <!-- Image with data-media-field for inline image selection -->
-    <!-- Use getImageUrl to handle array/object formats and add @@images suffix for Plone paths -->
-    <img v-if="block.image" data-media-field="image"
+    <!-- Image - uses class for selector, no data-media-field -->
+    <img v-if="block.image" class="hero-image w-full h-auto max-h-64 object-cover mb-4 rounded"
          :src="getImageUrl(block.image)"
-         alt="Hero image"
-         class="w-full h-auto max-h-64 object-cover mb-4 rounded" />
-    <div v-else data-media-field="image"
-         class="w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
+         alt="Hero image" />
+    <div v-else class="hero-image w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
     </div>
-    <h1 data-editable-field="heading" class="text-3xl font-bold mb-2">{{ block.heading }}</h1>
-    <p data-editable-field="subheading" class="text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
+    <h1 class="hero-heading text-3xl font-bold mb-2">{{ block.heading }}</h1>
+    <p class="hero-subheading text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
     <div class="hero-description mb-4" data-editable-field="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
-    <!-- Button with both data-editable-field and data-linkable-field -->
-    <a data-editable-field="buttonText" data-linkable-field="buttonLink"
-       :href="getUrl(block.buttonLink)"
-       class="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline">
+    <!-- Button - uses class for selectors -->
+    <a class="hero-button inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline"
+       :href="getUrl(block.buttonLink)">
       {{ block.buttonText }}
     </a>
   </div>
+  <!-- /hydra -->
 
-  <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontal,5"
+  <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
     class="mt-6 mb-6"
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
-    <div class="grid-row grid grid-flow-col gap-4" :class="['grid-cols-' + (block.blocks_layout?.items?.length || 1)]">
-      <Block v-for="uid in (block.blocks_layout?.items || [])" :key="uid"
-        :block_uid="uid" :block="block.blocks?.[uid]" :data="data" :contained="true"
-        class="p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+    <!-- Grid that wraps to multiple rows -->
+    <div class="grid-row grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <template v-for="uid in (block.blocks_layout?.items || [])" :key="uid">
+        <Block v-if="block.blocks?.[uid]"
+          :block_uid="block.blocks[uid]._blockUid || uid"
+          :block="block.blocks[uid]" :data="data" :contained="true"
+          class="grid-cell p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+      </template>
     </div>
+    <!-- Paging controls using URL scheme @pg_blockId_pageNumber -->
+    <!-- data-linkable-allow tells hydra.js to allow navigation without beforeunload warning -->
+    <nav v-if="block._paging?.totalPages > 1" aria-label="Grid Navigation" class="grid-paging mt-4">
+      <ul class="inline-flex -space-x-px text-sm">
+        <li v-if="block._paging.prev !== null">
+          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${block._paging.prev}`" data-linkable-allow
+            class="paging-prev flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-s-lg hover:bg-gray-100">
+            Previous
+          </NuxtLink>
+        </li>
+        <li v-for="page in block._paging.pages" :key="page.page">
+          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${page.page - 1}`" data-linkable-allow
+            :class="['paging-page', block._paging.currentPage === page.page - 1 ? 'current bg-blue-100' : 'bg-white']"
+            class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 border border-gray-300 hover:bg-gray-100">
+            {{ page.page }}
+          </NuxtLink>
+        </li>
+        <li v-if="block._paging.next !== null">
+          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${block._paging.next}`" data-linkable-allow
+            class="paging-next flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100">
+            Next
+          </NuxtLink>
+        </li>
+      </ul>
+    </nav>
   </div>
 
   <!-- Columns container block -->
@@ -86,14 +113,14 @@
     <h3 data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
 
     <!-- Top images row - horizontal layout for images above columns -->
-    <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4" data-block-field="top_images">
+    <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4">
       <Block v-for="imgId in block.top_images_layout.items" :key="imgId"
              :block_uid="imgId" :block="block.top_images[imgId]" :data="data" :contained="true"
              data-block-add="right" />
     </div>
 
     <!-- Columns row - horizontal layout -->
-    <div class="columns-row flex gap-4" data-block-field="columns">
+    <div class="columns-row flex gap-4">
       <div v-for="columnId in (block.columns_layout?.items || [])" :key="columnId"
            :data-block-uid="columnId" data-block-add="right"
            class="column flex-1 p-3 border border-dashed border-gray-300 rounded">
@@ -108,10 +135,11 @@
   </div>
 
   <div v-else-if="block['@type'] == 'teaser'"
-    class="max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
-    :data-block-uid="block_uid">
+    class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
+    :data-block-uid="block._blockUid || block_uid">
     <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
-    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage">
+    <!-- data-linkable-field prevents navigation in edit mode -->
+    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage" data-linkable-field="href">
       <NuxtImg class="rounded-t-lg" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
       <NuxtImg class="rounded-t-lg" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
@@ -120,6 +148,7 @@
       <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
       <!-- Title link is also linkable (clicking it shows link editor for href) -->
       <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
+      <!-- Note: listing items are marked readonly via comment syntax in AsyncListingBlock -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
@@ -226,7 +255,7 @@
         class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
         :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
         :aria-controls="`accordion-collapse-body-${block_uid}`">
-        <span data-block-field="header">
+        <span>
           <Block v-for="uid in (block.header_layout?.items || [])" :key="uid"
                  :block_uid="uid" :block="block.header?.[uid]" :data="data" />
         </span>
@@ -238,7 +267,7 @@
       </button>
     </h2>
     <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
-      <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900" data-block-field="content">
+      <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
         <Block v-for="uid in (block.content_layout?.items || [])" :key="uid"
                :block_uid="uid" :block="block.content?.[uid]" :data="data" />
       </div>
@@ -247,18 +276,129 @@
 
 
 
-  <div v-else-if="block['@type'] == 'listing'" :data-block-uid="block_uid">
-    <h2 :is="block.headlineTag">{{ block.headline }}</h2>
-    <Listing :block_uid="block_uid" :data="data" :query="block?.querystring ? block?.querystring : {}"></Listing>
-  </div>
+  <!-- Note: listing blocks are expanded by expandListingBlocks() into individual
+       teaser/image blocks BEFORE rendering, so 'listing' case should never be hit -->
 
-  <div v-else-if="block['@type'] == 'search'" :data-block-uid="block_uid">
-    <ClientOnly fallback-tag="div" fallback="Loading search...">
-      <form>
-        <input name="searchableText" v-if="block.showSearchInput">
+  <!-- Search block: container with facets (object_list) and listing child -->
+  <!-- Variations: facetsLeftSide, facetsRightSide, facetsTopSide (default) -->
+  <div v-else-if="block['@type'] == 'search'" :data-block-uid="block_uid" class="search-block">
+    <!-- Headline -->
+    <h2 v-if="block.headline" data-editable-field="headline" class="text-2xl font-bold mb-4">{{ block.headline }}</h2>
+
+    <!-- Search controls -->
+    <div v-if="block.showSearchInput" class="search-controls mb-4">
+      <form class="search-form flex gap-2" @submit.prevent="handleSearchSubmit">
+        <input type="text" name="SearchableText" placeholder="Search..." :value="currentSearchText"
+          class="search-input-field flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+        <button type="submit"
+          class="search-submit-button px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          Search
+        </button>
       </form>
-      <Listing :block_uid="block_uid" :data="data" :query="block?.query"></Listing>
-    </ClientOnly>
+    </div>
+
+    <!-- Facets on top (default or facetsTopSide) -->
+    <template v-if="!block.variation || block.variation === 'facetsTopSide'">
+      <!-- Facets horizontal -->
+      <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
+        <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
+             :data-block-uid="facet['@id']" data-block-add="right"
+             class="facet-item p-3 border border-gray-200 rounded min-w-48">
+          <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+          <template v-if="facet.type === 'selectFacet'">
+            <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                    :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
+              <option value="">Select...</option>
+              <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
+            </select>
+          </template>
+          <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
+            <div class="facet-checkboxes space-y-1" data-linkable-allow>
+              <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
+                <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
+                       :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
+                       @change="handleFacetCheckboxChange" />
+                {{ opt.title }}
+              </label>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Sort and results count -->
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <p v-if="block.showTotalResults && getListingTotalResults(block)" class="text-gray-600">
+          {{ getListingTotalResults(block) }} results
+        </p>
+        <div v-if="block.showSortOn && block.sortOnOptions?.length" class="search-sort">
+          <label class="text-sm text-gray-600 mr-2">Sort by:</label>
+          <select class="px-3 py-1 border border-gray-300 rounded text-sm" @change="handleSortChange" data-linkable-allow>
+            <option v-for="opt in block.sortOnOptions" :key="opt" :value="opt">{{ opt }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="search-results">
+        <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
+          <AsyncListingBlock v-if="block.listing?.[uid]" :block_uid="uid" :block="block.listing[uid]"
+            :data="data" :api-url="apiUrl" />
+        </template>
+      </div>
+    </template>
+
+    <!-- Facets on left or right side -->
+    <template v-else-if="block.variation === 'facetsLeftSide' || block.variation === 'facetsRightSide'">
+      <div class="flex flex-col md:flex-row gap-6" :class="{ 'md:flex-row-reverse': block.variation === 'facetsRightSide' }">
+        <!-- Sidebar: facets -->
+        <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
+          <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
+            <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
+            <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
+                 :data-block-uid="facet['@id']" data-block-add="bottom"
+                 class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+              <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+              <template v-if="facet.type === 'selectFacet'">
+                <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
+                  <option value="">Select...</option>
+                  <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
+                </select>
+              </template>
+              <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
+                <div class="facet-checkboxes space-y-1" data-linkable-allow>
+                  <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
+                           :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
+                           @change="handleFacetCheckboxChange" />
+                    {{ opt.title }}
+                  </label>
+                </div>
+              </template>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main: results -->
+        <div class="search-results flex-1">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <p v-if="block.showTotalResults && getListingTotalResults(block)" class="text-gray-600">
+              {{ getListingTotalResults(block) }} results
+            </p>
+            <div v-if="block.showSortOn && block.sortOnOptions?.length" class="search-sort">
+              <label class="text-sm text-gray-600 mr-2">Sort by:</label>
+              <select class="px-3 py-1 border border-gray-300 rounded text-sm" @change="handleSortChange" data-linkable-allow>
+                <option v-for="opt in block.sortOnOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+          </div>
+          <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
+            <AsyncListingBlock v-if="block.listing?.[uid]" :block_uid="uid" :block="block.listing[uid]"
+              :data="data" :api-url="apiUrl" />
+          </template>
+        </div>
+      </div>
+    </template>
   </div>
 
   <template v-else-if="block['@type'] == 'heading'" :data-block-uid="block_uid">
@@ -327,11 +467,10 @@
 
 </template>
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, computed, toRefs } from 'vue';
 import RichText from './richtext.vue';
-import Listing from './listing.vue';
 
-const { block_uid, block, data } = defineProps({
+const props = defineProps({
   block_uid: {
     type: String,
     required: true
@@ -347,17 +486,24 @@ const { block_uid, block, data } = defineProps({
   contained: {
     type: Boolean,
     required: false,
+  },
+  apiUrl: {
+    type: String,
+    required: false,
     default: false
   }
 });
 
+// Use toRefs to maintain reactivity (destructuring props directly can lose reactivity in Vue 3)
+const { block_uid, block, data, contained, apiUrl } = toRefs(props);
+
 // Slider state: track active slide and detect new slides
 const activeSlideIndex = ref(0);
-const prevSlideCount = ref(block.slides?.length || 0);
+const prevSlideCount = ref(block.value?.slides?.length || 0);
 
 // Watch for slide count changes to detect new slides and reinitialize Flowbite
 watch(
-  () => block.slides?.length,
+  () => block.value?.slides?.length,
   async (newCount, oldCount) => {
     // Only detect new slides after initial render (when oldCount is defined)
     if (oldCount !== undefined && newCount > oldCount) {
@@ -410,19 +556,145 @@ const getImageUrl = (value) => {
   return url;
 };
 
-// Teaser helpers: show target content by default, only use block values if overwrite is set
+// Teaser helpers: use block data if overwrite is set OR if hrefObj has no content data
+// This ensures listing-expanded teasers (which have block data but empty hrefObj) display correctly
+// When overwrite is enabled but custom value not set yet, fall back to href value for editing
 const getTeaserTitle = (block) => {
-  if (block.overwrite && block.title) {
-    return block.title;
+  const hrefObj = block.href?.[0];
+  const hrefObjHasContentData = hrefObj?.title !== undefined;
+  const useBlockData = block.overwrite || !hrefObjHasContentData;
+  if (useBlockData) {
+    // When customizing, use block title or fall back to href title for initial editing
+    return block.title || hrefObj?.title || '';
   }
-  return block.href?.[0]?.title || '';
+  return hrefObj?.title || '';
 };
 
 const getTeaserDescription = (block) => {
-  if (block.overwrite && block.description) {
-    return block.description;
+  const hrefObj = block.href?.[0];
+  const hrefObjHasContentData = hrefObj?.title !== undefined;
+  const useBlockData = block.overwrite || !hrefObjHasContentData;
+  if (useBlockData) {
+    // When customizing, use block description or fall back to href description for initial editing
+    return block.description || hrefObj?.description || '';
   }
-  return block.href?.[0]?.description || '';
+  return hrefObj?.description || '';
+};
+
+// Search block helpers
+const getListingTotalResults = (searchBlock) => {
+  // Get total results from the listing child block
+  const listingUid = searchBlock.listing_layout?.items?.[0];
+  if (!listingUid) return null;
+  const listingBlock = searchBlock.listing?.[listingUid];
+  return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;
+};
+
+// Get current search text from URL (for preserving in input field)
+const currentSearchText = computed(() => {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  return params.get('SearchableText') || '';
+});
+
+const handleSearchSubmit = (event) => {
+  const formData = new FormData(event.target);
+  const searchText = formData.get('SearchableText');
+  const url = new URL(window.location.href);
+  if (searchText) {
+    url.searchParams.set('SearchableText', searchText);
+  } else {
+    url.searchParams.delete('SearchableText');
+  }
+  window.location.href = url.toString();
+};
+
+const handleSortChange = (event) => {
+  const sortOn = event.target.value;
+  const url = new URL(window.location.href);
+  url.searchParams.set('sort_on', sortOn);
+  window.location.href = url.toString();
+};
+
+// Facet field options - maps field name to available options
+const FACET_FIELD_OPTIONS = {
+  'review_state': [
+    { value: 'private', title: 'Private' },
+    { value: 'pending', title: 'Pending' },
+    { value: 'published', title: 'Published' },
+  ],
+  'portal_type': [
+    { value: 'Document', title: 'Page' },
+    { value: 'News Item', title: 'News Item' },
+    { value: 'Event', title: 'Event' },
+    { value: 'Image', title: 'Image' },
+    { value: 'File', title: 'File' },
+    { value: 'Link', title: 'Link' },
+  ],
+};
+
+// Get facet field value (handles object { label, value } or plain string)
+const getFacetField = (facet) => {
+  if (typeof facet.field === 'object') {
+    return facet.field?.value || '';
+  }
+  return facet.field || '';
+};
+
+// Get facet options based on field
+const getFacetOptions = (facet) => {
+  const field = getFacetField(facet);
+  return FACET_FIELD_OPTIONS[field] || [];
+};
+
+// Check if a facet value is currently selected (from URL params)
+const isFacetChecked = (facet, value) => {
+  if (typeof window === 'undefined') return false;
+  const field = getFacetField(facet);
+  const params = new URLSearchParams(window.location.search);
+  const currentValues = params.getAll(`facet.${field}`);
+  return currentValues.includes(value);
+};
+
+// Handle facet checkbox change
+const handleFacetCheckboxChange = (event) => {
+  const checkbox = event.target;
+  const field = checkbox.dataset.field;
+  const value = checkbox.value;
+  const url = new URL(window.location.href);
+  const paramKey = `facet.${field}`;
+
+  const currentValues = url.searchParams.getAll(paramKey);
+
+  if (checkbox.checked) {
+    if (!currentValues.includes(value)) {
+      url.searchParams.append(paramKey, value);
+    }
+  } else {
+    url.searchParams.delete(paramKey);
+    currentValues.filter(v => v !== value).forEach(v => {
+      url.searchParams.append(paramKey, v);
+    });
+  }
+
+  window.location.href = url.toString();
+};
+
+// Handle facet select change
+const handleFacetSelectChange = (event) => {
+  const select = event.target;
+  const field = select.dataset.field;
+  const value = select.value;
+  const url = new URL(window.location.href);
+  const paramKey = `facet.${field}`;
+
+  if (value) {
+    url.searchParams.set(paramKey, value);
+  } else {
+    url.searchParams.delete(paramKey);
+  }
+
+  window.location.href = url.toString();
 };
 
 </script>

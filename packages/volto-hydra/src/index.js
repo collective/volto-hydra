@@ -4,7 +4,16 @@ import {
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
+import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
+import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
+import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema';
+import {
+  inheritSchemaFrom,
+  QUERY_RESULT_FIELDS,
+  computeSmartDefaults,
+  getBlockSchema,
+} from './utils/schemaInheritance';
 import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
 import rowAfterSVG from '@plone/volto/icons/row-after.svg';
 import rowDeleteSVG from '@plone/volto/icons/row-delete.svg';
@@ -49,6 +58,12 @@ const applyConfig = (config) => {
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.type.blocks = HiddenBlocksWidget;
 
+  // Hide object_list fields - items are edited via iframe selection
+  config.widgets.widget.object_list = HiddenObjectListWidget;
+
+  // Field mapping widget - for mapping source fields to target block fields
+  config.widgets.widget.field_mapping = FieldMappingWidget;
+
   // Add the slate block in the sidebar with proper initialization
   // blockSchema is used by applyBlockDefaults to set initial values for new blocks
   // This is separate from schema (used for sidebar settings form)
@@ -75,18 +90,9 @@ const applyConfig = (config) => {
     mostUsed: true,
   };
 
-  // Add image from sidebar
-  config.blocks.blocksConfig.image = {
-    ...config.blocks.blocksConfig.image,
-    schemaEnhancer: ({ formData, schema, intl }) => {
-      schema.properties.url = {
-        title: 'Image Src',
-        widget: 'image',
-      };
-      schema.fieldsets[0].fields.push('url');
-      return schema;
-    },
-  };
+  // Image block: url field is added to blockSchema (not schemaEnhancer) so that
+  // frontend's childBlockConfig recipe doesn't overwrite it.
+  // The schemaEnhancer from frontend config adds childBlockConfig behavior.
 
   // Configure slateTable block schema for buildBlockPathMap traversal
   // Structure: block.table.rows[].cells[] with 'key' as idField
@@ -132,6 +138,253 @@ const applyConfig = (config) => {
           },
         },
       };
+    },
+  };
+
+  // Configure listing block to use variation as item type selector
+  // The existing variation field is repurposed to select the block type for rendering items
+  // expandListingBlocks reads from 'variation' field via itemTypeField option
+  const existingListingSchemaEnhancer =
+    config.blocks.blocksConfig.listing?.schemaEnhancer;
+  const listingSchemaEnhancer = (args) => {
+    let { schema, formData } = args;
+
+    // Run existing schemaEnhancer first (handles variations, etc.)
+    if (existingListingSchemaEnhancer) {
+      schema = existingListingSchemaEnhancer(args);
+    }
+
+    // Remove variation from all fieldsets (inheritSchemaFrom will add it to inherited_fields)
+    schema.fieldsets = schema.fieldsets.map((fs) => ({
+      ...fs,
+      fields: fs.fields.filter((f) => f !== 'variation'),
+    }));
+
+    // Remove b_size from querystring widget (paging handled by frontend)
+    if (schema.properties.querystring) {
+      schema.properties.querystring = {
+        ...schema.properties.querystring,
+        schemaEnhancer: ({ schema: qsSchema }) => ({
+          ...qsSchema,
+          fieldsets: qsSchema.fieldsets.map((fs) => ({
+            ...fs,
+            fields: fs.fields.filter((f) => f !== 'b_size'),
+          })),
+        }),
+      };
+    }
+
+    // Add fieldMapping field (fieldset added after inheritSchemaFrom runs)
+    if (!schema.properties.fieldMapping) {
+      schema.properties.fieldMapping = {
+        title: 'Field Mapping',
+        widget: 'field_mapping',
+        sourceFields: QUERY_RESULT_FIELDS,
+        targetTypeField: 'variation',
+        description: 'Map query result fields to item block fields',
+      };
+    }
+
+    // Inject current variation (item type) into fieldMapping widget props
+    // Use default if variation isn't set yet (e.g., new block)
+    const itemType =
+      formData?.variation || 'summaryItem';
+    if (schema.properties.fieldMapping && itemType) {
+      schema.properties.fieldMapping = {
+        ...schema.properties.fieldMapping,
+        targetType: itemType,
+      };
+    }
+
+    // Run schema inheritance for the referenced block type
+    // inheritSchemaFrom creates the variation field with computed choices
+    // and adds the inherited_fields fieldset (item type defaults, etc.)
+    // blocksField: '..' derives choices from sibling allowed types
+    // filterConvertibleFrom: 'default' filters to types with fieldMappings.default
+    schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
+      blocksField: '..',
+      filterConvertibleFrom: 'default',
+      title: 'Item Type',
+      default: 'summaryItem',
+    })({
+      ...args,
+      schema,
+    });
+
+    // Add fieldMapping fieldset AFTER inherited fields (so order is: variation, defaults, mapping)
+    if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
+      schema.fieldsets.push({
+        id: 'mapping',
+        title: 'Field Mapping',
+        fields: ['fieldMapping'],
+      });
+    }
+
+    return schema;
+  };
+  // Attach config so syncChildBlockTypes can detect this uses inheritSchemaFrom
+  listingSchemaEnhancer.config = {
+    typeField: 'variation',
+    defaultsField: 'itemDefaults',
+    blocksField: '..',
+    filterConvertibleFrom: 'default',
+  };
+  config.blocks.blocksConfig.listing = {
+    ...config.blocks.blocksConfig.listing,
+    schemaEnhancer: listingSchemaEnhancer,
+  };
+
+  // Configure image block with blockSchema for schema inheritance
+  // The default image block only has 'schema' (settings), not 'blockSchema' (data schema)
+  // We add 'url' field here (not in schemaEnhancer) so frontend's childBlockConfig
+  // recipe doesn't lose it when it replaces the schemaEnhancer.
+  config.blocks.blocksConfig.image = {
+    ...config.blocks.blocksConfig.image,
+    blockSchema: (props) => {
+      // applyBlockDefaults passes 'data', but ImageSchema expects 'formData'
+      const formData = props.formData || props.data || {};
+      const baseSchema = ImageSchema({ ...props, formData });
+      return {
+        ...baseSchema,
+        fieldsets: [
+          {
+            ...baseSchema.fieldsets[0],
+            fields: ['url', ...(baseSchema.fieldsets[0]?.fields || [])],
+          },
+          ...(baseSchema.fieldsets.slice(1) || []),
+        ],
+        properties: {
+          ...baseSchema.properties,
+          url: {
+            title: 'Image URL',
+            widget: 'image',
+          },
+        },
+      };
+    },
+    fieldMappings: {
+      default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+      // Converting from teaser block
+      teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
+    },
+  };
+
+  // Default result item for listings (simple title + description)
+  // Matches Volto's DefaultResultItem variation
+  config.blocks.blocksConfig.defaultItem = {
+    ...config.blocks.blocksConfig.defaultItem,
+    id: 'defaultItem',
+    title: 'Default',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Default Item',
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['href', 'title', 'description'] }],
+      properties: {
+        href: { title: 'Link', widget: 'url' },
+        title: { title: 'Title' },
+        description: { title: 'Description', widget: 'textarea' },
+      },
+      required: [],
+    }),
+    fieldMappings: {
+      default: { '@id': 'href', 'title': 'title', 'description': 'description' },
+    },
+  };
+
+  // Summary result item for listings (title + description + image)
+  // Matches Volto's SummaryResultItem variation - the default for listings
+  config.blocks.blocksConfig.summaryItem = {
+    ...config.blocks.blocksConfig.summaryItem,
+    id: 'summaryItem',
+    title: 'Summary',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Summary Item',
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['href', 'title', 'description', 'image'] }],
+      properties: {
+        href: { title: 'Link', widget: 'url' },
+        title: { title: 'Title' },
+        description: { title: 'Description', widget: 'textarea' },
+        image: { title: 'Image', widget: 'url' },
+      },
+      required: [],
+    }),
+    fieldMappings: {
+      default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
+    },
+  };
+
+  // Teaser block - add fieldMappings so it appears in listing item type dropdown
+  config.blocks.blocksConfig.teaser = {
+    ...config.blocks.blocksConfig.teaser,
+    fieldMappings: {
+      default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+      // Converting from image block
+      image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
+    },
+  };
+
+  // Configure search block to add listing container field
+  // Volto's search block already has facets with widget: 'object_list'
+  // We add listing/listing_layout so search can contain a listing block child
+  const existingSearchSchemaEnhancer =
+    config.blocks.blocksConfig.search?.schemaEnhancer;
+  config.blocks.blocksConfig.search = {
+    ...config.blocks.blocksConfig.search,
+    schemaEnhancer: (args) => {
+      let { schema } = args;
+
+      // Defensive check - schema must exist
+      if (!schema || !schema.properties) {
+        return schema;
+      }
+
+      // Run existing schemaEnhancer first
+      if (existingSearchSchemaEnhancer) {
+        schema = existingSearchSchemaEnhancer(args);
+      }
+
+      // Add listing container field for child listing block
+      // allowedBlocks includes 'listing' (container) + item types for the variation dropdown
+      if (schema.properties && !schema.properties.listing) {
+        schema.properties.listing = {
+          title: 'Results Listing',
+          type: 'blocks', // Required for blockPathMap traversal
+          description: 'Listing block to render search results',
+          allowedBlocks: ['listing', 'defaultItem', 'summaryItem', 'teaser', 'image'],
+          maxLength: 1,
+          defaultBlockType: 'listing',
+        };
+        schema.properties.listing_layout = {
+          title: 'Results Layout',
+          type: 'blocks_layout',
+        };
+      }
+
+      // Remove fields not needed for Hydra (query handled by child listing, no views selector)
+      // Facets are edited via iframe selection, not the accordion widget
+      // Keep showSortOn/sortOnOptions (sort dropdown controls), facetsTitle, and controls fieldset
+      const fieldsToRemove = [
+        'query',
+        'availableViews', // Results template - not needed, handled by listing child
+      ];
+      // Keep 'facets' fieldset - facetsTitle shows, facets object_list hidden by HiddenObjectListWidget
+      const fieldsetsToRemove = ['searchquery', 'views'];
+
+      // Remove from fieldsets
+      schema.fieldsets = (schema.fieldsets || [])
+        .filter((fs) => !fieldsetsToRemove.includes(fs.id))
+        .map((fs) => ({
+          ...fs,
+          fields: fs.fields.filter((f) => !fieldsToRemove.includes(f)),
+        }));
+
+      // Remove from properties
+      fieldsToRemove.forEach((field) => {
+        delete schema.properties[field];
+      });
+
+      return schema;
     },
   };
 

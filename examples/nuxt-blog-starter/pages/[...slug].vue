@@ -11,15 +11,27 @@
         <!-- <NuxtLink to="/blog/">Read the blog!</NuxtLink> -->
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
-                <section v-if="data.page?.blocks_layout" v-for="section in getSections(data.page)" :class="section.style">
-                    <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
-                        <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                            <div class="mx-auto" :class="{'max-w-4xl':block.block['@type'] != 'slider'}" v-for="block in section.blocks">
-                                <Block  :block_uid="block.id" :block="block.block" :data="data.page"></Block>
+
+                <!-- Render blocks - listing-type blocks use AsyncListingBlock which handles its own Suspense -->
+                <template v-if="data.page?.blocks_layout">
+                    <section v-for="section in getSections(data.page)" :class="section.style">
+                        <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
+                            <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
+                                <template v-for="block in section.blocks" :key="block.id">
+                                    <!-- Listing-type blocks: use AsyncListingBlock (handles its own Suspense internally) -->
+                                    <div v-if="isListingType(block.block['@type'])" class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
+                                        <AsyncListingBlock :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl" />
+                                    </div>
+                                    <!-- Static blocks: render immediately -->
+                                    <!-- Pass apiUrl for search blocks that contain async listing children -->
+                                    <div v-else class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
+                                        <Block :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl"></Block>
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
+                </template>
 
                 <div v-else-if="data?.page">
                     <h1>{{ data.page?.title }}</h1>
@@ -59,7 +71,22 @@ import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
-const adminUrl = runtimeConfig.public.adminUrl;
+const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
+
+// Block types that require async expansion (contain listings or queries)
+// Each gets its own Suspense at page level; inside containers they share paging
+// Note: 'search' blocks render via Block.vue which has the proper search UI (headline, facets)
+// The listing child inside search will be rendered by Block recursively
+const LISTING_BLOCK_TYPES = ['listing', 'gridBlock'];
+
+/**
+ * Check if a block type requires async expansion.
+ * @param {string} blockType - The @type of the block
+ * @returns {boolean}
+ */
+function isListingType(blockType) {
+  return LISTING_BLOCK_TYPES.includes(blockType);
+}
 
 // initialize components based on data attribute selectors
 onMounted(() => {
@@ -143,6 +170,21 @@ onMounted(() => {
                             },
                         },
                         required: [],
+                    },
+                    // fieldMappings for transitive conversion: image → teaser → hero
+                    fieldMappings: {
+                        default: {
+                            'title': 'heading',
+                            'description': 'subheading',
+                            '@id': 'buttonLink',
+                            'image': 'image',
+                        },
+                        teaser: {
+                            'title': 'heading',
+                            'description': 'subheading',
+                            'href': 'buttonLink',
+                            'preview_image': 'image',
+                        },
                     },
                 },
                 // Container block: columns contains column children AND top_images
@@ -259,19 +301,106 @@ onMounted(() => {
                         required: [],
                     },
                 },
+                // Grid block: add schema inheritance recipe
+                // variation field is created by inheritSchemaFrom with computed choices
+                // NO DEFAULT - children are independent until a type is selected
+                gridBlock: {
+                    schemaEnhancer: {
+                        inheritSchemaFrom: {
+                            typeField: 'variation',
+                            defaultsField: 'itemDefaults',
+                            allowedBlocks: ['teaser', 'image'],
+                            title: 'Item Type',
+                        },
+                    },
+                },
+                // Teaser block: use Volto's TeaserSchema (has href with object_browser)
+                // childBlockConfig hides fields that parent controls when inside a grid
+                teaser: {
+                    schemaEnhancer: {
+                        childBlockConfig: {
+                            defaultsField: 'itemDefaults',
+                            editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
+                        },
+                    },
+                },
+                // Image block: configure which fields are editable on child vs parent
+                image: {
+                    schemaEnhancer: {
+                        childBlockConfig: {
+                            defaultsField: 'itemDefaults',
+                            editableFields: ['url', 'alt', 'href'],
+                        },
+                    },
+                },
+                // Skiplogic test block: demonstrates conditional field visibility
+                skiplogicTest: {
+                    id: 'skiplogicTest',
+                    title: 'Skiplogic Test',
+                    group: 'common',
+                    blockSchema: {
+                        properties: {
+                            mode: {
+                                title: 'Mode',
+                                widget: 'select',
+                                choices: [['simple', 'Simple'], ['advanced', 'Advanced']],
+                            },
+                            columns: {
+                                title: 'Columns',
+                                type: 'integer',
+                                default: 1,
+                            },
+                            basicTitle: {
+                                title: 'Basic Title',
+                                type: 'string',
+                            },
+                            advancedOptions: {
+                                title: 'Advanced Options',
+                                type: 'string',
+                            },
+                            simpleWarning: {
+                                title: 'Simple Warning',
+                                type: 'string',
+                            },
+                            columnLayout: {
+                                title: 'Column Layout',
+                                widget: 'select',
+                                choices: [['equal', 'Equal'], ['weighted', 'Weighted']],
+                            },
+                            pageNotice: {
+                                title: 'Page Notice',
+                                type: 'string',
+                                description: 'Only visible when page has a description',
+                            },
+                        },
+                    },
+                    schemaEnhancer: {
+                        skiplogic: {
+                            advancedOptions: { field: 'mode', is: 'advanced' },
+                            simpleWarning: { field: 'mode', isNot: 'advanced' },
+                            columnLayout: { field: 'columns', gte: 2 },
+                            pageNotice: { field: '../description', isSet: true },
+                        },
+                    },
+                },
             };
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
-            const bridge = initBridge(adminUrl, {
-                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", ...pageLevelBlocks],
+            const bridge = initBridge({
+                allowedBlocks: ["slate", "image", "video", "gridBlock", "teaser", "listing", ...pageLevelBlocks],
                 voltoConfig: {
                     blocks: {
                         blocksConfig: newBlocks,
                     }
-                }
+                },
+                // Transform frontend path to API path by stripping paging segments
+                // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
+                pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
             });
             bridge.onEditChange((page) => {
                 if (page) {
+                    // Update page data - AsyncListingBlock components will
+                    // re-render and expand listings via their own Suspense
                     data.value.page = page;
                 }
             });
@@ -300,7 +429,8 @@ const { data, error } = await ploneApi({
   pages: pages
 });
 
-
+// Note: Listing expansion is now handled by AsyncListingBlock component
+// which uses Suspense for streaming SSR
 
 useSeoMeta({
   ogTitle: data.page?.title,

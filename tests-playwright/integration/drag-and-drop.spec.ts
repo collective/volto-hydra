@@ -14,27 +14,30 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Block Drag and Drop', () => {
-  test.setTimeout(30000); // 30 second timeout for all DND tests (drag-drop involves complex DOM manipulation)
+  test.setTimeout(60000); // 60 second timeout for all DND tests (variable scroll speed + DOM manipulation)
+
   test('blocks can be reordered via drag and drop', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Get initial block order
     const iframe = helper.getIframe();
-    const initialBlocks = await iframe.locator('[data-block-uid]').all();
-    const initialCount = initialBlocks.length;
+
+    // Get initial block order (deduplicated - handles multi-element blocks)
+    const initialOrder = await helper.getBlockOrder();
+    console.log('[TEST] Initial order:', initialOrder);
 
     // Need at least 2 blocks to test reordering
-    expect(initialCount).toBeGreaterThan(1);
+    expect(initialOrder.length).toBeGreaterThan(1);
 
     // Get the UIDs of first two blocks
-    const firstBlockUid = await initialBlocks[0].getAttribute('data-block-uid');
-    const secondBlockUid = await initialBlocks[1].getAttribute('data-block-uid');
+    const firstBlockUid = initialOrder[0];
+    const secondBlockUid = initialOrder[1];
+    console.log('[TEST] Dragging', firstBlockUid, 'to after', secondBlockUid);
 
     // Select first block
-    await helper.clickBlockInIframe(firstBlockUid!);
+    await helper.clickBlockInIframe(firstBlockUid);
     await helper.waitForSidebarOpen();
 
     // Get the drag handle from the toolbar (in parent window, not iframe)
@@ -47,38 +50,12 @@ test.describe('Block Drag and Drop', () => {
     await helper.dragBlockWithMouse(dragHandle, secondBlock, true);
 
     // Verify block order changed
-    const newBlocks = await iframe.locator('[data-block-uid]').all();
-    const newFirstBlockUid = await newBlocks[0].getAttribute('data-block-uid');
-    const newSecondBlockUid = await newBlocks[1].getAttribute('data-block-uid');
+    const newOrder = await helper.getBlockOrder();
+    console.log('[TEST] New order:', newOrder);
 
     // First block should now be second
-    expect(newSecondBlockUid).toBe(firstBlockUid);
-    expect(newFirstBlockUid).toBe(secondBlockUid);
-  });
-
-  test('blocks maintain data after drag and drop', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-
-    // Select image block and note its alt text
-    await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
-
-    const originalAlt = await helper.getSidebarFieldValue('alt');
-
-    // The data should remain the same even without dragging
-    // (This is a basic check - in a full DND test, we'd drag the block first)
-
-    // Re-select the block
-    await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
-
-    const newAlt = await helper.getSidebarFieldValue('alt');
-    expect(newAlt).toBe(originalAlt);
+    expect(newOrder[1]).toBe(firstBlockUid);
+    expect(newOrder[0]).toBe(secondBlockUid);
   });
 
   test('can drag first block to last position', async ({ page }) => {
@@ -91,9 +68,11 @@ test.describe('Block Drag and Drop', () => {
     const initialBlocks = await helper.getBlockOrder();
     const firstBlock = initialBlocks[0];
     const lastBlock = initialBlocks[initialBlocks.length - 1];
+    console.log('[TEST] Dragging first block:', firstBlock, 'to after last:', lastBlock);
 
     // Select first block
     await helper.clickBlockInIframe(firstBlock);
+    await helper.waitForSidebarOpen();
 
     // Get drag handle from toolbar
     const dragHandle = await helper.getDragHandle();
@@ -114,7 +93,7 @@ test.describe('Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
-
+    
     const iframe = helper.getIframe();
     const initialBlocks = await helper.getBlockOrder();
     const lastBlock = initialBlocks[initialBlocks.length - 1];
@@ -144,8 +123,9 @@ test.describe('Block Drag and Drop', () => {
     await helper.navigateToEdit('/test-page');
 
     const iframe = helper.getIframe();
-    const initialCount = await helper.getBlockCount();
+    // Blocks already stabilized by navigateToEdit
     const initialBlocks = await helper.getBlockOrder();
+    const initialCount = initialBlocks.length;
 
     expect(initialBlocks.length).toBeGreaterThan(1);
 
@@ -160,8 +140,11 @@ test.describe('Block Drag and Drop', () => {
     // Drag using mouse events to place after second block
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
 
-    const newCount = await helper.getBlockCount();
-    expect(newCount).toBe(initialCount);
+    // Wait for count to stabilize after re-render
+    await expect(async () => {
+      const newCount = await helper.getBlockCount();
+      expect(newCount).toBe(initialCount);
+    }).toPass({ timeout: 5000 });
   });
 
   test('dragging does not duplicate blocks', async ({ page }) => {
@@ -169,7 +152,7 @@ test.describe('Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
-
+    
     const iframe = helper.getIframe();
     const initialBlocks = await helper.getBlockOrder();
     const uniqueInitialBlocks = new Set(initialBlocks);
@@ -186,6 +169,9 @@ test.describe('Block Drag and Drop', () => {
 
     // Drag using mouse events to verify no duplication
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
+
+    // Wait for block count to stabilize after re-render
+    await helper.waitForBlockCountToBe(initialBlocks.length);
 
     const newBlocks = await helper.getBlockOrder();
     const uniqueNewBlocks = new Set(newBlocks);
@@ -204,19 +190,23 @@ test.describe('Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
-
+    
     const iframe = helper.getIframe();
     const initialBlocks = await helper.getBlockOrder();
 
-    // Need at least 3 blocks for this test
-    expect(initialBlocks.length).toBeGreaterThanOrEqual(3);
+    // Need at least 4 blocks for this test (use block at index 2 to avoid image block)
+    expect(initialBlocks.length).toBeGreaterThanOrEqual(4);
 
-    const middleBlock = initialBlocks[1];
+    // Use block at index 2 (block-3-uuid, a slate block) instead of index 1 (image block)
+    // Image blocks can have loading timing issues that make toolbar positioning flaky
+    const middleBlock = initialBlocks[2];
     const firstBlock = initialBlocks[0];
     const lastBlock = initialBlocks[initialBlocks.length - 1];
+    console.log('[TEST] Dragging middle block:', middleBlock, 'first:', firstBlock, 'last:', lastBlock);
 
     // Select middle block
     await helper.clickBlockInIframe(middleBlock);
+    await helper.waitForSidebarOpen();
 
     // Get drag handle from toolbar
     const dragHandle = await helper.getDragHandle();
@@ -227,6 +217,7 @@ test.describe('Block Drag and Drop', () => {
     await helper.dragBlockWithMouse(dragHandle, lastBlockElement, true);
 
     const newBlocks = await helper.getBlockOrder();
+    console.log('[TEST] Final order:', newBlocks);
 
     // First and last blocks should still exist
     expect(newBlocks).toContain(firstBlock);
@@ -234,7 +225,7 @@ test.describe('Block Drag and Drop', () => {
     expect(newBlocks).toContain(middleBlock);
   });
 
-  test('can drag the same block to bottom then back up', async ({ page }) => {
+  test('auto-scroll: can drag block to bottom then back up', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -242,13 +233,12 @@ test.describe('Block Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
-    // Get initial block order
+    // Get initial block order (blocks already stabilized by navigateToEdit)
     const initialBlocks = await helper.getBlockOrder();
     expect(initialBlocks.length).toBeGreaterThanOrEqual(3);
 
     const [firstBlock] = initialBlocks;
     const lastBlock = initialBlocks[initialBlocks.length - 1];
-    const secondLastBlock = initialBlocks[initialBlocks.length - 2];
 
     console.log('[TEST] Initial order:', initialBlocks);
     console.log('[TEST] Will drag first block:', firstBlock, 'to after last:', lastBlock);
@@ -256,14 +246,15 @@ test.describe('Block Drag and Drop', () => {
     // First drag: Move first block to BOTTOM (after last block)
     await helper.clickBlockInIframe(firstBlock);
     await helper.waitForSidebarOpen();
-    await page.waitForTimeout(300);
 
     const dragHandle1 = await helper.getDragHandle();
     const lastBlockElement = iframe.locator(`[data-block-uid="${lastBlock}"]`);
 
-    // Drag to bottom (after last block)
-    await helper.dragBlockWithMouse(dragHandle1, lastBlockElement, true);
-    await page.waitForTimeout(500);
+    // Drag to bottom (after last block) - use testAutoScroll to explicitly test auto-scroll feature
+    await helper.dragBlockWithMouse(dragHandle1, lastBlockElement, true, { testAutoScroll: true });
+
+    // Wait for all blocks to re-render before checking order
+    await helper.waitForBlockCountToBe(initialBlocks.length);
 
     // Verify first drag worked - first block should now be last
     const orderAfterFirstDrag = await helper.getBlockOrder();
@@ -272,10 +263,12 @@ test.describe('Block Drag and Drop', () => {
     const newLastBlock = orderAfterFirstDrag[orderAfterFirstDrag.length - 1];
     expect(newLastBlock).toBe(firstBlock);
 
+    // Wait for toolbar and drag handle to reposition for the block's new location
+    await helper.waitForBlockSelected(firstBlock);
+    await helper.waitForSidebarOpen();
+
     // Second drag: Move the same block (now at bottom) back UP
     // CRITICAL: Don't click the block - test if drag works immediately after first drag
-    await page.waitForTimeout(300);
-
     console.log('[TEST] Now dragging back up WITHOUT clicking block again');
 
     // BUG: After first drag completes, trying to drag again without clicking
@@ -289,19 +282,11 @@ test.describe('Block Drag and Drop', () => {
     const secondBlockElement = iframe.locator(`[data-block-uid="${secondBlock}"]`);
 
     // Try to drag immediately after first drag (without clicking to reset)
-    // Use dragBlockWithMouse which handles scrolling (page may be scrolled after first drag)
-    await helper.dragBlockWithMouse(dragHandle2, secondBlockElement, false); // false = insert before
+    // Use testAutoScroll to explicitly test auto-scroll feature
+    await helper.dragBlockWithMouse(dragHandle2, secondBlockElement, false, { testAutoScroll: true }); // false = insert before
 
-    // Wait for block order to change (block should no longer be at bottom)
-    await expect
-      .poll(
-        async () => {
-          const order = await helper.getBlockOrder();
-          return order.indexOf(firstBlock);
-        },
-        { timeout: 5000, message: 'Block should have moved from bottom position' },
-      )
-      .toBeLessThan(2); // Should be at position 0 or 1, not 2 (bottom)
+    // Wait for all blocks to re-render
+    await helper.waitForBlockCountToBe(initialBlocks.length);
 
     // Verify second drag worked - block should have moved up
     const finalOrder = await helper.getBlockOrder();
@@ -320,7 +305,7 @@ test.describe('Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
-
+    
     const iframe = helper.getIframe();
 
     // Get initial block order

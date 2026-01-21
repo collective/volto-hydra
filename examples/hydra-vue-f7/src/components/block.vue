@@ -6,7 +6,7 @@
     <f7-block v-else-if="block['@type']=='image'" :data-block-uid="block_uid">
         <img v-for="props in [imageProps(block)]" :src="props.url" :class="['image-size-'+props.size, 'image-align-'+props.align]" />
     </f7-block>
-    <f7-block v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid" data-container-blocks="blocks,horizontail,5">
+    <f7-block v-else-if="block['@type']=='gridBlock'" :data-block-uid="block_uid">
         <div :class="['grid', 'grid-cols-'+block.blocks_layout.items.length, 'grid-gap', 'column', 'style-bg-'+(block.styles.backgroundColor||'none')]">
             <Block v-for="uid in block.blocks_layout.items" :block_uid="uid" :block="block.blocks[uid]" :data="data"></Block>
         </div>

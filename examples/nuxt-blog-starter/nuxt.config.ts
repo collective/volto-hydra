@@ -22,6 +22,11 @@ export default defineNuxtConfig({
     '@nuxt/image'
   ],
   ssr: true, // "npm run generate" == SSG
+  vue: {
+    compilerOptions: {
+      comments: true, // Preserve HTML comments for hydra comment syntax
+    },
+  },
   routeRules: {
     "/**": { cors: true } // public site can't be edited
   },

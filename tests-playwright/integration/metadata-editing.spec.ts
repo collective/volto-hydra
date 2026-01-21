@@ -19,10 +19,10 @@ test.describe('Page Metadata Editing', () => {
 
     const iframe = helper.getIframe();
 
-    // Find the page title element
+    // Find the page title element (use #page-title for mock to avoid matching teaser titles)
     // Mock frontend uses "title" (without slash) to test shorthand works
     // Nuxt frontend uses "/title" (with slash) to test explicit page-level path
-    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '[data-editable-field="title"]';
+    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '#page-title';
     const pageTitle = iframe.locator(titleSelector);
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await expect(pageTitle).toHaveText(expectedInitialTitle);
@@ -72,9 +72,9 @@ test.describe('Page Metadata Editing', () => {
 
     const iframe = helper.getIframe();
 
-    // Find and click the page title
+    // Find and click the page title (use #page-title to avoid matching teaser titles)
     // Mock frontend uses "title" (without slash), Nuxt uses "/title"
-    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '[data-editable-field="title"]';
+    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '#page-title';
     const pageTitle = iframe.locator(titleSelector);
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await pageTitle.click();

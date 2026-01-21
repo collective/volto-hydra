@@ -47,6 +47,47 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get combined bounding box for a locator that may match multiple elements.
+   * For multi-element blocks (e.g., listing blocks), computes the union of all rects.
+   *
+   * @param mode - 'combined' for union of all, 'first' for first element only, 'last' for last element only
+   */
+  private async getCombinedBoundingBox(
+    locator: Locator,
+    mode: 'combined' | 'first' | 'last' = 'combined'
+  ): Promise<{ x: number; y: number; width: number; height: number }> {
+    return await locator.evaluateAll(
+      (elements, m) => {
+        if (elements.length === 0) {
+          throw new Error('No elements found');
+        }
+        if (elements.length === 1 || m === 'first') {
+          const r = elements[0].getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        }
+        if (m === 'last') {
+          const r = elements[elements.length - 1].getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        }
+        // Combined mode - compute union of all bounding boxes
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        for (const el of elements) {
+          const r = el.getBoundingClientRect();
+          minX = Math.min(minX, r.left);
+          minY = Math.min(minY, r.top);
+          maxX = Math.max(maxX, r.right);
+          maxY = Math.max(maxY, r.bottom);
+        }
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      },
+      mode
+    );
+  }
+
+  /**
    * Log in to the Volto admin UI.
    */
   async login(username: string = 'admin', password: string = 'admin'): Promise<void> {
@@ -125,6 +166,34 @@ export class AdminUIHelper {
   }
 
   /**
+   * Navigate to a content page in view mode (not editing).
+   * Uses client-side navigation to avoid SSR auth issues.
+   */
+  async navigateToView(contentPath: string): Promise<void> {
+    // Ensure path starts with /
+    if (!contentPath.startsWith('/')) {
+      contentPath = '/' + contentPath;
+    }
+
+    // Use React Router to navigate client-side
+    await this.page.evaluate((path) => {
+      // @ts-ignore - window.__HISTORY__ is set by Volto
+      if (window.__HISTORY__) {
+        window.__HISTORY__.push(path);
+      } else {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    }, contentPath);
+
+    // Wait for the URL to change
+    await this.page.waitForURL(`${this.adminUrl}${contentPath}`, { timeout: 10000 });
+
+    // Wait for iframe to load
+    await this.waitForIframeReady();
+  }
+
+  /**
    * Wait for the preview iframe to load.
    */
   async waitForIframeReady(timeout: number = 30000): Promise<void> {
@@ -136,6 +205,9 @@ export class AdminUIHelper {
     // Wait for iframe to have content with blocks
     const iframe = this.getIframe();
     await iframe.locator('[data-block-uid]').first().waitFor({ timeout });
+
+    // Wait for blocks to stabilize (avoid flaky tests due to partial renders)
+    await this.getStableBlockCount();
   }
 
   /**
@@ -310,38 +382,50 @@ export class AdminUIHelper {
   ) {
     const { waitForToolbar = true } = options;
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
     // Verify block exists before trying to click
-    const blockCount = await block.count();
+    const blockCount = await blockLocator.count();
     if (blockCount === 0) {
       throw new Error(`Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`);
     }
 
+    // Use first() for multi-element blocks (multiple elements with same UID)
+    const block = blockLocator.first();
+
+    // Wait for the element to be stable (not re-rendering) by checking it's attached
+    // Vue/Nuxt may re-render after hydration, causing element references to become stale
+    await expect(block).toBeAttached({ timeout: 5000 });
+
+    // Scroll block into view inside the iframe first
+    await block.scrollIntoViewIfNeeded();
+
     // Wait for block to be visible (have non-zero height) - hydra.js sets min-height on editable fields
     await block.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Scroll block into view inside the iframe
-    await block.scrollIntoViewIfNeeded();
     await block.click();
 
     if (waitForToolbar) {
-      // Wait for any block to be selected (toolbar visible)
-      const toolbar = this.page.locator('.quanta-toolbar');
-      await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+      // Try to wait for the target block to be selected
+      // If it times out, check if we need to navigate to parent (container case)
+      try {
+        await this.waitForBlockSelected(blockId, 3000);
+      } catch {
+        // Selection timed out - might be wrong block selected (clicked container, child selected)
+        // Check if there are parent navigation buttons (indicates we're viewing a child)
+        await this.waitForSidebarOpen();
+        const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
+        const hasParentButtons = await parentButtonLocator.count() > 0;
 
-      // Wait for selection to settle
-      await this.waitForBlockSelected(blockId);
-
-      // Check if the correct block is selected
-      const result = await this.isBlockSelectedInIframe(blockId);
-      if (!result.ok) {
-        // Wrong block selected - likely a child. Navigate up via sidebar.
-        await this.navigateToParentBlock(blockId);
-      } else {
-        // Target is selected, wait for toolbar to be positioned correctly
-        await this.waitForQuantaToolbar(blockId);
+        if (hasParentButtons) {
+          // Navigate up to the target container block
+          await this.navigateToParentBlock(blockId);
+        }
+        // Either way, wait for the target block to be properly selected
+        await this.waitForBlockSelected(blockId);
       }
+
+      await this.waitForQuantaToolbar(blockId);
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
       // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
@@ -447,8 +531,14 @@ export class AdminUIHelper {
    * where clicking in the center would select a nested block instead.
    *
    * @param blockId - The data-block-uid of the container block
+   * @param options.waitForToolbar - If true (default), waits for Quanta toolbar. Set to false for
+   *                                  container blocks where toolbar positioning is unreliable.
    */
-  async clickContainerBlockInIframe(blockId: string) {
+  async clickContainerBlockInIframe(
+    blockId: string,
+    options: { waitForToolbar?: boolean } = {},
+  ) {
+    const { waitForToolbar = true } = options;
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -487,19 +577,27 @@ export class AdminUIHelper {
       }
     }
 
-    // Wait for toolbar to be positioned correctly
-    await this.waitForQuantaToolbar(blockId);
+    if (waitForToolbar) {
+      // Wait for toolbar to be positioned correctly
+      await this.waitForQuantaToolbar(blockId);
+    } else {
+      // Wait for sidebar to show the block is selected
+      await this.waitForSidebarOpen();
+    }
 
     return block;
   }
 
   /**
    * Wait for a block to be selected in the iframe.
+   * Handles multi-element blocks (multiple elements with same UID).
    */
   async waitForBlockSelected(blockId: string, timeout: number = 5000) {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    await block.waitFor({ state: 'visible', timeout });
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Use first() for multi-element blocks
+    await blockLocator.first().waitFor({ state: 'visible', timeout });
 
     // Wait for drag handle to appear and be positioned at the correct block
     // The drag handle is positioned at the selected block's left edge, typically 48px above
@@ -508,8 +606,29 @@ export class AdminUIHelper {
     await expect(async () => {
       await expect(dragHandle).toBeVisible({ timeout: 100 });
 
-      // Verify drag handle is positioned near this block
-      const blockBox = await block.boundingBox();
+      // For multi-element blocks, compute combined bounding box
+      const allElements = await blockLocator.all();
+      let blockBox: { x: number; y: number; width: number; height: number } | null = null;
+
+      if (allElements.length > 1) {
+        // Multi-element: compute bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const el of allElements) {
+          const rect = await el.boundingBox();
+          if (rect) {
+            minX = Math.min(minX, rect.x);
+            minY = Math.min(minY, rect.y);
+            maxX = Math.max(maxX, rect.x + rect.width);
+            maxY = Math.max(maxY, rect.y + rect.height);
+          }
+        }
+        if (minX !== Infinity) {
+          blockBox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
+      } else {
+        blockBox = await blockLocator.first().boundingBox();
+      }
+
       const handleBox = await dragHandle.boundingBox();
       if (!blockBox || !handleBox) {
         throw new Error('Could not get bounding boxes');
@@ -522,8 +641,9 @@ export class AdminUIHelper {
       const iframeBox = await iframeElement.boundingBox();
       const iframeTop = iframeBox?.y || 0;
       // Handle can be anywhere from iframe top to slightly below block top
+      // When block is above viewport (blockBox.y < iframeTop), handle is clamped to iframeTop
       const minY = iframeTop;
-      const maxY = blockBox.y + 30;
+      const maxY = Math.max(iframeTop + 30, blockBox.y + 30);
       const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
 
       if (xDiff > 30 || !inYRange) {
@@ -535,8 +655,8 @@ export class AdminUIHelper {
       }
     }).toPass({ timeout });
 
-    // Return the block locator for chaining
-    return block;
+    // Return the first element locator for chaining
+    return blockLocator.first();
   }
 
   /**
@@ -704,10 +824,11 @@ export class AdminUIHelper {
    * Scroll a block into view with room for the toolbar above it.
    * The toolbar is in the parent page, positioned based on block position.
    * Using 'center' ensures there's room above for the toolbar.
+   * For multi-element blocks, scrolls the first element into view.
    */
   async scrollBlockIntoViewWithToolbarRoom(blockId: string): Promise<void> {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`).first();
     await block.evaluate((el) => {
       el.scrollIntoView({ block: 'center', behavior: 'instant' });
     });
@@ -746,17 +867,22 @@ export class AdminUIHelper {
    * Also verifies the toolbar is not covered by the sidebar.
    */
   async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
+    // Scroll block into view FIRST - toolbar is hidden when block is out of viewport
+    await this.scrollBlockIntoViewWithToolbarRoom(blockId);
+
     // Wait until toolbar is positioned correctly relative to the block
     // (isBlockSelectedInIframe checks visibility AND positioning)
+    let lastReason = '';
     await expect.poll(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await this.isBlockSelectedInIframe(blockId);
       if (typeof res === 'boolean') return res;
+      if (res?.reason && res.reason !== lastReason) {
+        console.log(`[waitForQuantaToolbar] ${blockId}: ${res.reason}`);
+        lastReason = res.reason;
+      }
       return !!res && !!res.ok;
     }, { timeout }).toBeTruthy();
-
-    // Scroll block into view with room for toolbar
-    await this.scrollBlockIntoViewWithToolbarRoom(blockId);
 
     // After scrolling, the viewport position changed, so poll again to ensure
     // the toolbar has re-adjusted its position correctly
@@ -897,17 +1023,10 @@ export class AdminUIHelper {
       `.quanta-toolbar [title*="${formatKeyword}" i]`
     );
 
+    // Wait for button to be visible FIRST (handles toolbar still rendering)
+    await button.first().waitFor({ state: 'visible', timeout: 5000 });
+
     const count = await button.count();
-
-    if (count === 0) {
-      throw new Error(
-        `Format button "${format}" not found in visible toolbar. ` +
-        `Expected button with title containing "${formatKeyword}". ` +
-        `Check that: (1) a block with a slate field is selected, (2) toolbar is visible in admin UI, ` +
-        `(3) the button has a title attribute set.`
-      );
-    }
-
     if (count > 1) {
       throw new Error(
         `Found ${count} buttons matching "${format}" - test is not deterministic. ` +
@@ -915,7 +1034,6 @@ export class AdminUIHelper {
       );
     }
 
-    await button.waitFor({ state: 'visible', timeout: 2000 });
     await button.click();
   }
 
@@ -943,10 +1061,11 @@ export class AdminUIHelper {
 
   /**
    * Check if a format button is in active state.
+   * Returns the current state without polling - use with toPass() for waiting.
    * Semantic UI Button with active={true} gets the "active" CSS class.
    */
   async isActiveFormatButton(
-    format: 'bold' | 'italic' | 'strikethrough' | 'link'
+    format: 'bold' | 'italic' | 'strikethrough' | 'link',
   ): Promise<boolean> {
     const formatKeyword = format.charAt(0).toUpperCase() + format.slice(1);
     const button = this.page.locator(
@@ -954,16 +1073,10 @@ export class AdminUIHelper {
     );
 
     const count = await button.count();
-    if (count === 0) {
-      throw new Error(`Format button "${format}" not found in visible toolbar`);
-    }
-
-    // Check if button has "active" class (added by Semantic UI when active={true})
-    const hasActiveClass = await button.first().evaluate((el) =>
+    if (count === 0) return false;
+    return await button.first().evaluate((el) =>
       el.classList.contains('active')
     );
-
-    return hasActiveClass;
   }
 
   /**
@@ -1106,6 +1219,22 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for the editor to have focus.
+   * Use after format operations since the iframe's FORM_DATA processing uses rAF
+   * and focus may not be restored immediately when the admin's toolbar updates.
+   */
+  async waitForEditorFocus(
+    editor: Locator,
+    options: { timeout?: number } = {}
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    await expect(async () => {
+      const sel = await this.getSelectionInfo(editor);
+      expect(sel.editorHasFocus).toBe(true);
+    }).toPass({ timeout });
+  }
+
+  /**
    * Get the visible text before and after the cursor position.
    * Uses Range APIs to get accurate text regardless of DOM structure.
    * Strips ZWS characters to return only visible text.
@@ -1211,8 +1340,9 @@ export class AdminUIHelper {
    */
   async getCleanTextContent(editor: Locator): Promise<string> {
     const text = (await editor.textContent()) || '';
-    // Strip ZWS and trim whitespace (Vue/Nuxt can have template whitespace)
-    return text.replace(/[\u200B\uFEFF]/g, '').trim();
+    // Strip ZWS and normalize NBSP to regular space, then trim whitespace
+    // NBSP (U+00A0) is inserted by browsers in certain contexts near ZWS nodes
+    return text.replace(/[\u200B\uFEFF]/g, '').replace(/\u00A0/g, ' ').trim();
   }
 
   /**
@@ -1463,12 +1593,35 @@ export class AdminUIHelper {
 
   /**
    * Get the bounding box of a block in the iframe, in parent window coordinates.
+   * Handles multi-element blocks (multiple elements with same UID) by computing combined bounding box.
    */
   async getBlockBoundingBoxInIframe(blockId: string): Promise<{ x: number; y: number; width: number; height: number } | null> {
     const iframe = this.getIframe();
-    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    const blockBox = await block.boundingBox();
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+    const allElements = await blockLocator.all();
 
+    if (allElements.length === 0) return null;
+
+    // For multi-element blocks, compute combined bounding box
+    if (allElements.length > 1) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const el of allElements) {
+        const rect = await el.boundingBox();
+        if (rect) {
+          minX = Math.min(minX, rect.x);
+          minY = Math.min(minY, rect.y);
+          maxX = Math.max(maxX, rect.x + rect.width);
+          maxY = Math.max(maxY, rect.y + rect.height);
+        }
+      }
+      if (minX === Infinity) return null;
+      return await this.getBoundsInParentCoordinates({
+        x: minX, y: minY, width: maxX - minX, height: maxY - minY
+      });
+    }
+
+    // Single element
+    const blockBox = await blockLocator.first().boundingBox();
     if (!blockBox) return null;
 
     // Convert from iframe page coordinates to parent window coordinates
@@ -2107,12 +2260,22 @@ export class AdminUIHelper {
 
   /**
    * Check if a specific field exists in the sidebar form.
-   * Matches Cypress pattern: #sidebar-properties .field-wrapper-{fieldname}
+   * @param fieldName - The field name to check for
+   * @param blockTitle - Optional block title to scope to a parent section (e.g., 'Grid', 'Listing').
+   *                     If not provided, checks the current block's form (#sidebar-properties).
    */
-  async hasSidebarField(fieldName: string): Promise<boolean> {
-    const fieldWrapper = this.page.locator(
-      `#sidebar-properties .field-wrapper-${fieldName}`,
-    );
+  async hasSidebarField(fieldName: string, blockTitle?: string): Promise<boolean> {
+    let container;
+    if (blockTitle) {
+      // Scope to a specific parent block section by title
+      container = this.page.locator('.parent-block-section').filter({
+        has: this.page.locator('.parent-nav', { hasText: new RegExp(blockTitle) }),
+      });
+    } else {
+      // Default: current block's form
+      container = this.page.locator('#sidebar-properties');
+    }
+    const fieldWrapper = container.locator(`.field-wrapper-${fieldName}`);
     return await fieldWrapper.isVisible();
   }
 
@@ -2413,28 +2576,32 @@ export class AdminUIHelper {
 
   /**
    * Get the current number of blocks in the iframe.
+   * Deduplicates multi-element blocks (e.g., listings with multiple items sharing same UID).
    */
   async getBlockCount(): Promise<number> {
-    return this.getBlockCountInIframe();
+    const blockOrder = await this.getBlockOrder();
+    return blockOrder.length;
   }
 
   /**
    * Get all block IDs in order.
-   * Returns an array of block UIDs.
+   * Returns an array of block UIDs, deduplicated (multi-element blocks count as one).
+   * Uses evaluateAll for single browser round-trip instead of N sequential getAttribute calls.
    */
   async getBlockOrder(): Promise<string[]> {
     const iframe = this.getIframe();
-    const blocks = await iframe.locator('[data-block-uid]').all();
-
-    const blockIds: string[] = [];
-    for (const block of blocks) {
-      const uid = await block.getAttribute('data-block-uid');
-      if (uid) {
-        blockIds.push(uid);
+    return await iframe.locator('[data-block-uid]').evaluateAll((elements) => {
+      const seen = new Set<string>();
+      const blockIds: string[] = [];
+      for (const el of elements) {
+        const uid = el.getAttribute('data-block-uid');
+        if (uid && !seen.has(uid)) {
+          seen.add(uid);
+          blockIds.push(uid);
+        }
       }
-    }
-
-    return blockIds;
+      return blockIds;
+    });
   }
 
   /**
@@ -2642,10 +2809,8 @@ export class AdminUIHelper {
       const r = el.getBoundingClientRect();
       return { x: r.x, y: r.y, width: r.width, height: r.height, display: getComputedStyle(el).display };
     });
-    const targetRectInIframeCoords = await targetBlock.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    });
+    // Use getCombinedBoundingBox to handle multi-element blocks (listing blocks)
+    const targetRectInIframeCoords = await this.getCombinedBoundingBox(targetBlock);
 
     const targetTop = targetRectInIframeCoords.y;
     const targetBottom = targetRectInIframeCoords.y + targetRectInIframeCoords.height;
@@ -2692,13 +2857,20 @@ export class AdminUIHelper {
    * Fails if toolbar is not visible.
    */
   private async getToolbarDragIconCenterInPageCoords(): Promise<{ x: number; y: number }> {
+    console.log('[DEBUG] getToolbarDragIconCenterInPageCoords called');
     const toolbar = this.page.locator('.quanta-toolbar');
     const toolbarDragIcon = toolbar.locator('.drag-handle');
+
+    // Debug: check if toolbar and drag handle exist
+    const toolbarCount = await toolbar.count();
+    const dragHandleCount = await toolbarDragIcon.count();
+    console.log(`[DEBUG] toolbar count: ${toolbarCount}, drag-handle count: ${dragHandleCount}`);
 
     const rect = await toolbarDragIcon.boundingBox();
     if (!rect) {
       throw new Error('Toolbar drag icon not visible');
     }
+    console.log(`[DEBUG] drag handle rect: ${JSON.stringify(rect)}`);
 
     return {
       x: rect.x + rect.width / 2,
@@ -2717,15 +2889,8 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockUid}"]`);
 
-    // Evaluate inside the iframe to get viewport-relative coords
-    const rect = await block.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return {
-        x: r.x, y: r.y, width: r.width, height: r.height,
-        tagName: el.tagName,
-        className: el.className,
-      };
-    });
+    // Use getCombinedBoundingBox to handle multi-element blocks (listing blocks)
+    const rect = await this.getCombinedBoundingBox(block);
 
     return {
       x: rect.x + rect.width / 2,
@@ -2765,12 +2930,11 @@ export class AdminUIHelper {
     targetBlock: Locator,
     insertAfter: boolean
   ): Promise<{ x: number; y: number }> {
-    // Use evaluate to get getBoundingClientRect - this gives coords relative
-    // to the iframe's VIEWPORT, which is what we need for mouse positioning
-    const rect = await targetBlock.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    });
+    // For multi-element blocks (listings), use first/last element depending on direction
+    // - insertAfter=true: target last element (drop below the listing)
+    // - insertAfter=false: target first element (drop above the listing)
+    const mode = insertAfter ? 'last' : 'first';
+    const rect = await this.getCombinedBoundingBox(targetBlock, mode);
 
     // Get iframe position in page coordinates
     const iframeEl = this.page.locator('#previewIframe');
@@ -2779,11 +2943,13 @@ export class AdminUIHelper {
       throw new Error('Could not get iframe bounding box');
     }
 
+    // Position cursor at center of bottom/top half (55%/45%) - closer to center to avoid
+    // edge detection issues where hydra.js might detect the adjacent block instead
     const result = {
       x: iframeRect.x + rect.x + rect.width / 2,
       y: insertAfter
-        ? iframeRect.y + rect.y + rect.height * 0.75
-        : iframeRect.y + rect.y + rect.height * 0.25,
+        ? iframeRect.y + rect.y + rect.height * 0.55
+        : iframeRect.y + rect.y + rect.height * 0.45,
     };
 
     return result;
@@ -2798,7 +2964,9 @@ export class AdminUIHelper {
    * Returns the starting position for reference.
    */
   private async startDragFromToolbar(): Promise<{ x: number; y: number }> {
+    console.log('[DEBUG] startDragFromToolbar called');
     const startPosPage = await this.getToolbarDragIconCenterInPageCoords();
+    console.log(`[DEBUG] startPosPage: ${JSON.stringify(startPosPage)}`);
 
     if (!this.isInPageViewport(startPosPage.y)) {
       throw new Error(
@@ -2808,9 +2976,12 @@ export class AdminUIHelper {
       );
     }
 
+    console.log('[DEBUG] moving mouse and pressing down');
     await this.page.mouse.move(startPosPage.x, startPosPage.y);
     await this.page.mouse.down();
+    console.log('[DEBUG] verifying drag shadow visible');
     await this.verifyDragShadowVisible();
+    console.log('[DEBUG] drag started successfully');
 
     return startPosPage;
   }
@@ -2820,34 +2991,102 @@ export class AdminUIHelper {
   // ============================================================================
 
   /**
+   * Wait for an element's position to stabilize (stop moving).
+   * Returns when the element has a valid bounding box and position hasn't changed for 2 checks.
+   */
+  private async waitForPositionStable(element: Locator): Promise<void> {
+    let lastY: number | null = null;
+    await expect(async () => {
+      const rect = await element.boundingBox();
+      expect(rect).not.toBeNull(); // Element must be visible
+      const currentY = rect!.y;
+      if (lastY !== null) {
+        expect(Math.abs(currentY - lastY)).toBeLessThan(5);
+      }
+      lastY = currentY;
+    }).toPass({ timeout: 2000, intervals: [50, 100, 200] });
+  }
+
+  /**
    * Auto-scroll the iframe until the target block is visible in the viewport.
-   * Returns when the target is in the viewport and ready for drop.
+   *
+   * IMPORTANT: We scroll PAST the target, then move the cursor back to the drop position.
+   * This ensures the cursor isn't at the scroll edge when we drop, which would cause
+   * auto-scroll to continue and change the detected target block.
    */
   private async autoScrollToTarget(
     targetBlock: Locator,
     insertAfter: boolean,
-    maxAttempts: number = 40
+    maxAttempts: number = 60
   ): Promise<{ x: number; y: number }> {
+    // For multi-element blocks, use the relevant element for scroll detection:
+    // - insertAfter=true: scroll until LAST element visible (dropping below it)
+    // - insertAfter=false: scroll until FIRST element visible (dropping above it)
+    const targetElement = insertAfter ? targetBlock.last() : targetBlock.first();
+    const viewportSize = this.page.viewportSize();
+    if (!viewportSize) throw new Error('Could not get viewport size');
+
+    // Margin from viewport edge - target should be this far from edge before we stop scrolling.
+    // This needs to be large enough to account for:
+    // 1. The hydra.js auto-scroll zone (80px from edges)
+    // 2. Scroll momentum/overshoot that can move the target after we stop
+    // Using 200px gives buffer for ~100px of overshoot beyond the auto-scroll zone.
+    const edgeMargin = 200;
+    let lastTargetY: number | null = null;
+    let stuckCount = 0;
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await this.verifyDragShadowVisible();
 
-      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      // Quick visibility check using relevant element
+      const quickRect = await this.getCombinedBoundingBox(targetElement);
+      const iframeEl = this.page.locator('#previewIframe');
+      const iframeRect = await iframeEl.boundingBox();
+      if (!iframeRect) throw new Error('Could not get iframe bounding box');
 
-      const viewportSize = this.page.viewportSize();
-      const isAboveViewport = dropPosPage.y < 0;
-      const isBelowViewport = viewportSize && dropPosPage.y > viewportSize.height;
+      const targetY = iframeRect.y + quickRect.y + quickRect.height / 2;
+      const isAboveViewport = targetY < edgeMargin;
+      const isBelowViewport = targetY > viewportSize.height - edgeMargin;
+      const isVisibleInViewport = targetY > 0 && targetY < viewportSize.height;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
 
-      if (!needsAutoScroll) {
-        return dropPosPage;
+      // Debug logging every 5 attempts
+      if (attempt % 5 === 0) {
+        console.log(`[SCROLL] attempt=${attempt} targetY=${targetY.toFixed(0)} edgeMargin=${edgeMargin} viewportH=${viewportSize.height} above=${isAboveViewport} below=${isBelowViewport} visible=${isVisibleInViewport} needsScroll=${needsAutoScroll} t=${Date.now()}`);
       }
 
-      // Target is off-screen - move to edge to trigger auto-scroll
+      if (!needsAutoScroll) {
+        // Target is well within viewport (not near edges) - safe to drop
+        console.log(`[SCROLL] Target in range! targetY=${targetY.toFixed(0)}`);
+        // CRITICAL: Move cursor to safe zone BEFORE returning, to stop auto-scroll.
+        // Otherwise, as cursor moves from edge to target, it passes through scroll zone
+        // and auto-scroll continues, causing the target to move away.
+        await this.moveToSafeZone();
+        await this.waitForPositionStable(targetElement);
+        return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      }
+
+      // Check if we've hit the scroll limit (target stopped moving)
+      if (lastTargetY !== null && Math.abs(targetY - lastTargetY) < 5) {
+        stuckCount++;
+        // If target is visible and hasn't moved for 3 iterations, accept it
+        if (stuckCount >= 3 && isVisibleInViewport) {
+          console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
+          await this.moveToSafeZone();
+          await this.waitForPositionStable(targetElement);
+          return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+        }
+      } else {
+        stuckCount = 0;
+      }
+      lastTargetY = targetY;
+
+      // Target is near edge or off-screen - move to edge to trigger auto-scroll
       const scrollUp = isAboveViewport;
       await this.moveToScrollEdge(scrollUp);
 
-      // Wait for auto-scroll to happen (target position must change)
-      await this.waitForAutoScrollProgress(targetBlock, insertAfter, dropPosPage.y);
+      // Brief wait for scroll to take effect
+      await this.page.waitForTimeout(100);
     }
 
     // If we get here, we've exceeded max attempts
@@ -2855,23 +3094,64 @@ export class AdminUIHelper {
   }
 
   /**
-   * Wait for auto-scroll to make progress (target position changes).
+   * Fast scroll directly to target using scrollIntoView.
+   * Use this for most tests; use autoScrollToTarget with testAutoScroll=true to test auto-scroll.
+   */
+  private async fastScrollToTarget(
+    targetBlock: Locator,
+    insertAfter: boolean
+  ): Promise<{ x: number; y: number }> {
+    const targetElement = insertAfter ? targetBlock.last() : targetBlock.first();
+
+    // Scroll target into view and wait for position to stabilize
+    await targetElement.scrollIntoViewIfNeeded();
+    await this.waitForPositionStable(targetElement);
+
+    // Verify drag is still active
+    await this.verifyDragShadowVisible();
+
+    // Get drop position in page coordinates and move mouse there
+    const dropPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+    await this.page.mouse.move(dropPos.x, dropPos.y, { steps: 5 });
+    await this.page.waitForTimeout(100);
+
+    return dropPos;
+  }
+
+  /**
+   * Wait for auto-scroll to make progress (target position changes) OR target becomes visible.
+   * This handles the case where we hit the scroll limit before the target is within the edge margin.
    */
   private async waitForAutoScrollProgress(
-    targetBlock: Locator,
-    insertAfter: boolean,
+    targetElement: Locator,
     prevY: number
   ): Promise<void> {
+    const viewportSize = this.page.viewportSize();
+    if (!viewportSize) throw new Error('Could not get viewport size');
+
     await expect(async () => {
       await this.verifyDragShadowVisible();
-      // Don't check drop indicator during scroll - it may legitimately hide when
-      // mouse is between valid drop zones. We'll verify it before drop instead.
-      const newPos = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
-      const scrollAmount = Math.abs(newPos.y - prevY);
-      if (scrollAmount < 5) {
-        throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px`);
+      // Quick position check using single element
+      const rect = await this.getCombinedBoundingBox(targetElement);
+      const iframeEl = this.page.locator('#previewIframe');
+      const iframeRect = await iframeEl.boundingBox();
+      if (!iframeRect) throw new Error('Could not get iframe bounding box');
+      const newY = iframeRect.y + rect.y + rect.height / 2;
+
+      // Success if target moved at least 5px
+      const scrollAmount = Math.abs(newY - prevY);
+      if (scrollAmount >= 5) {
+        return; // Scroll is making progress
       }
-    }).toPass({ timeout: 2000 });
+
+      // Also succeed if target is now visible in viewport (scroll limit reached)
+      const isInViewport = newY > 0 && newY < viewportSize.height;
+      if (isInViewport) {
+        return; // Target is visible, even if we hit scroll limit
+      }
+
+      throw new Error(`Waiting for auto-scroll: target moved only ${scrollAmount.toFixed(1)}px, newY=${newY.toFixed(0)}, prevY=${prevY.toFixed(0)}, rect.y=${rect.y.toFixed(0)}, viewportH=${viewportSize.height}`);
+    }).toPass({ timeout: 2000, intervals: [100, 200, 300, 500] });
   }
 
   // ============================================================================
@@ -2882,25 +3162,45 @@ export class AdminUIHelper {
    * Move the mouse to the drop position and verify the drop indicator is correct.
    *
    * NOTE: We continuously update the mouse position until the drop indicator is correct.
-   * This handles the case where auto-scroll continues after we start moving to the target.
+   * This handles the case where auto-scroll continues after we start moving to the target
+   * (e.g., due to momentum/overshoot that causes the target to move after we calculated
+   * the drop position).
    */
   private async moveToDropPosition(
     targetBlock: Locator,
     insertAfter: boolean,
-    _initialDropPos: { x: number; y: number }
+    _initialDropPos: { x: number; y: number },
+    skipVerification: boolean = false
   ): Promise<void> {
-    // Keep moving to the target and checking until indicator is correct
-    await expect(async () => {
-      // Get current position and move to it
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Get current position and move to it (recalculate each time in case scroll settled)
       const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
 
       // Wait a moment for the drop indicator to update
-      await this.page.waitForTimeout(50);
+      await this.page.waitForTimeout(100);
 
-      // Verify the indicator is in the right position
-      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
-    }).toPass({ timeout: 5000 });
+      // Verify the indicator is in the right position (unless skipped)
+      if (skipVerification) {
+        return;
+      }
+
+      try {
+        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+        return; // Success - indicator is in the right place
+      } catch (error) {
+        if (attempt < maxRetries - 1) {
+          console.log(`[DROP] Indicator not in expected position, retrying (attempt ${attempt + 1}/${maxRetries})`);
+          // Wait a bit for scroll to settle before retrying
+          await this.page.waitForTimeout(100);
+        } else {
+          // Last attempt failed - re-throw the error
+          throw error;
+        }
+      }
+    }
   }
 
   // ============================================================================
@@ -2911,11 +3211,22 @@ export class AdminUIHelper {
    * Complete the drag operation by releasing the mouse and waiting for cleanup.
    */
   private async completeDrop(): Promise<void> {
+    // Get block order before drop
+    const orderBefore = await this.getBlockOrder();
+
     await this.page.mouse.up();
 
     const iframe = this.getIframe();
     await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
     await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
+
+    // Wait for block order to change (indicates formData update and re-render completed)
+    await expect(async () => {
+      const orderAfter = await this.getBlockOrder();
+      if (JSON.stringify(orderBefore) === JSON.stringify(orderAfter)) {
+        throw new Error('Block order has not changed yet');
+      }
+    }).toPass({ timeout: 5000 });
   }
 
   /**
@@ -2935,7 +3246,7 @@ export class AdminUIHelper {
     const iframeRect = await iframeElement.boundingBox();
     if (!iframeRect) throw new Error('Could not get iframe bounds');
 
-    const edgeThreshold = 30;
+    const edgeThreshold = 10; // Close to edge for faster scroll speed
     const edgeX = iframeRect.x + iframeRect.width / 2;
     const edgeY = scrollUp
       ? iframeRect.y + edgeThreshold
@@ -2946,6 +3257,29 @@ export class AdminUIHelper {
       await this.page.mouse.move(edgeX, edgeY + (i % 2), { steps: 2 });
       await this.page.waitForTimeout(50);
     }
+  }
+
+  /**
+   * Move cursor to a "safe zone" in the center of the viewport to stop auto-scroll.
+   * This prevents race conditions where auto-scroll continues while cursor moves to target.
+   */
+  private async moveToSafeZone(): Promise<void> {
+    const viewportSize = this.page.viewportSize();
+    if (!viewportSize) throw new Error('Could not get viewport size');
+
+    const iframeElement = this.page.locator('#previewIframe');
+    const iframeRect = await iframeElement.boundingBox();
+    if (!iframeRect) throw new Error('Could not get iframe bounds');
+
+    // Move to center of viewport (well away from scroll edges)
+    const safeX = iframeRect.x + iframeRect.width / 2;
+    const safeY = viewportSize.height / 2;
+
+    console.log(`[SCROLL] Moving to safe zone: (${safeX.toFixed(0)}, ${safeY.toFixed(0)})`);
+    await this.page.mouse.move(safeX, safeY, { steps: 3 });
+
+    // Wait for any residual scroll to settle
+    await this.page.waitForTimeout(150);
   }
 
   /**
@@ -2963,19 +3297,61 @@ export class AdminUIHelper {
   async dragBlockWithMouse(
     _dragHandle: Locator,
     targetBlock: Locator,
-    insertAfter: boolean = true
+    insertAfter: boolean = true,
+    options: { testAutoScroll?: boolean } = {}
   ): Promise<void> {
     // Step 1: Start drag from toolbar
     await this.startDragFromToolbar();
 
-    // Step 2: Auto-scroll until target is in viewport
-    const dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
+    // Step 2: Scroll until target is in viewport
+    // testAutoScroll=true uses hydra's rAF-based auto-scroll (slow in Playwright due to rAF throttling)
+    // testAutoScroll=false (default) scrolls directly for faster tests
+    let dropPosPage: { x: number; y: number };
+    if (options.testAutoScroll) {
+      // Use more attempts for explicit auto-scroll testing (each attempt ~100ms = ~30s total)
+      dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter, 300);
+    } else {
+      dropPosPage = await this.fastScrollToTarget(targetBlock, insertAfter);
+    }
 
     // Step 3: Move to drop position and verify indicator
     await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage);
 
     // Step 4: Complete the drop
     await this.completeDrop();
+  }
+
+  /**
+   * Drag a block to target position but DON'T complete the drop.
+   * Use this to inspect drop indicator position during drag.
+   * Call page.mouse.up() to release when done inspecting.
+   *
+   * @param _dragHandle - Unused, kept for API compatibility
+   * @param targetBlock - The target block locator (where to drag to)
+   * @param insertAfter - If true, position for insertion after target; if false, before
+   * @param options.testAutoScroll - If true, use hydra's auto-scroll; if false (default), use fast scroll
+   */
+  async dragBlockWithMouseNoDrop(
+    _dragHandle: Locator,
+    targetBlock: Locator,
+    insertAfter: boolean = true,
+    options: { testAutoScroll?: boolean } = {}
+  ): Promise<void> {
+    // Step 1: Start drag from toolbar
+    await this.startDragFromToolbar();
+
+    // Step 2: Scroll until target is in viewport
+    let dropPosPage: { x: number; y: number };
+    if (options.testAutoScroll) {
+      dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
+    } else {
+      dropPosPage = await this.fastScrollToTarget(targetBlock, insertAfter);
+    }
+
+    // Step 3: Move to drop position (skip verification - test will check indicator)
+    await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage, true);
+
+    // Don't complete drop - let test inspect indicator and release mouse
   }
 
   /**
@@ -3078,6 +3454,40 @@ export class AdminUIHelper {
       `This likely means the block add/remove operation did not complete. ` +
       `Check that postMessage communication is working and the Admin UI is processing block changes.`
     );
+  }
+
+  /**
+   * Wait for block count to stabilize and return it.
+   * Use this when the page may still be rendering (e.g., Nuxt async components).
+   * Returns after getting the same count on consecutive checks.
+   *
+   * @param timeout - Maximum time to wait in milliseconds (default 5000)
+   * @returns The stable block count
+   */
+  async getStableBlockCount(timeout: number = 5000): Promise<number> {
+    const startTime = Date.now();
+    let lastCount = -1;
+    let stableChecks = 0;
+    const requiredStableChecks = 2;
+
+    while (Date.now() - startTime < timeout) {
+      const currentCount = await this.getBlockCount();
+
+      if (currentCount === lastCount) {
+        stableChecks++;
+        if (stableChecks >= requiredStableChecks) {
+          return currentCount;
+        }
+      } else {
+        lastCount = currentCount;
+        stableChecks = 1;
+      }
+
+      await this.page.waitForTimeout(100);
+    }
+
+    // Return the last count if timeout reached
+    return await this.getBlockCount();
   }
 
   /**
@@ -3658,10 +4068,10 @@ export class AdminUIHelper {
 
     if (!hasItems) {
       const homeButton = this.page.getByRole('button', { name: 'Home' });
-      if (await homeButton.isVisible().catch(() => false)) {
-        await homeButton.click();
-        await this.page.waitForTimeout(500);
-      }
+      // Wait for the button to be in viewport (page may be scrolling)
+      await expect(homeButton).toBeInViewport({ timeout: 5000 });
+      await homeButton.click();
+      await this.page.waitForTimeout(500);
     }
 
     // Wait for list items to appear

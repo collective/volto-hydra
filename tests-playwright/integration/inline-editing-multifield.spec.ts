@@ -1,5 +1,6 @@
 /**
  * Tests for multi-field block inline editing using the hero block.
+ * Also tests the hydra comment syntax for field selectors.
  *
  * The hero block has multiple string fields (heading, subheading, buttonText)
  * which allows testing:
@@ -7,13 +8,15 @@
  * - Editing multiple fields in a single block
  * - Focus movement between fields
  * - Independent field updates
+ * - Hydra comment syntax: field selectors are specified via HTML comments
+ *   instead of data-* attributes (tests materializeHydraComments)
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 const HERO_BLOCK_ID = 'block-4-hero';
 
-test.describe('Inline Editing - Hero Block Fields', () => {
+test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
   test('hero block renders with all editable fields', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

@@ -141,6 +141,8 @@ const SyncedSlateToolbar = ({
   onFieldLinkChange, // Handler for link field changes: (fieldName, url) => void
   onOpenObjectBrowser, // Handler to open object browser for media fields
   onFileUpload, // Handler for file uploads: (fieldName, file) => void
+  convertibleTypes = [], // Array of { type, title } for block type conversion
+  onConvertBlock, // Handler for block conversion: (newType) => void
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -461,13 +463,16 @@ const SyncedSlateToolbar = ({
     // === DETERMINE WHAT NEEDS TO HAPPEN ===
     const incomingSequence = form?._editSequence || 0;
     const hasNewData = incomingSequence > lastSeenSequenceRef.current;
-    // Content sync is needed if fieldValue differs from editor.children
-    // The isEqual check handles echo detection - if they match, no sync needed
-    // We check hasNewData OR content difference to handle both cases:
-    // 1. hasNewData: sequence increased, check if content actually changed
-    // 2. !hasNewData: sequence didn't increase but content might have changed (edge case)
+    // Always track the highest sequence seen, even if we don't sync content
+    // This prevents older data (e.g., INLINE_EDIT_DATA sent before format) from being seen as "new"
+    if (hasNewData) {
+      lastSeenSequenceRef.current = incomingSequence;
+    }
+    // Content sync is needed if fieldValue differs from editor.children AND it's newer data
+    // The sequence check prevents older INLINE_EDIT_DATA (e.g., from typing before format)
+    // from overwriting formatted content that was applied after it was sent
     const contentIsDifferent = fieldValue && !isEqual(fieldValue, editor.children);
-    const contentNeedsSync = contentIsDifferent;
+    const contentNeedsSync = hasNewData && contentIsDifferent;
     const hasUnprocessedTransform = transformAction &&
       transformAction.requestId !== processedTransformRequestIdRef.current;
 
@@ -530,8 +535,6 @@ const SyncedSlateToolbar = ({
 
     // === EXECUTE ===
     if (contentNeedsSync) {
-      // Only mark sequence as seen when we actually sync content
-      lastSeenSequenceRef.current = incomingSequence;
       // Content changed from external source - sync it
       console.log('[TOOLBAR SYNC] Syncing content from iframe, incomingSeq:', incomingSequence, 'fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
       // Debug: log full children structure to diagnose missing "w" bug
@@ -564,38 +567,55 @@ const SyncedSlateToolbar = ({
       internalValueRef.current = editor.children;
 
     } else if (hasUnprocessedTransform) {
-      // No content sync needed, but transform is pending
+      // No content sync needed (sequence check passed), but transform is pending
       processedTransformRequestIdRef.current = transformAction.requestId;
-      console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
       // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
       // This is needed for delete/paste transforms that don't go through applyInlineFormat
       activeFormatRequestIdRef.current = transformAction.requestId;
-      // IMPORTANT: Apply the selection from the iframe before running the transform
-      // The transform request includes the selection where the format should be applied,
-      // but the editor's selection may be stale (e.g., at end of paragraph instead of
-      // the selected text range). We need to update editor.selection first.
-      if (currentSelection && !isEqual(currentSelection, editor.selection) &&
-          isSelectionValidForDocument(currentSelection, editor.children)) {
-        console.log('[TOOLBAR SYNC] Applying selection before transform:', JSON.stringify(currentSelection));
+
+      // IMPORTANT: Even if hasNewData is false, the transform request includes the iframe's
+      // current content. If content differs, sync it first. This handles cases where the
+      // iframe typed text but the sequence didn't change (e.g., typing during blocking).
+      if (contentIsDifferent) {
+        console.log('[TOOLBAR SYNC] Content differs, syncing before transform');
+        replaceEditorContent(fieldValue, currentSelection, () => {
+          console.log('[TOOLBAR SYNC] Applying transform after content sync');
+          applyTransform();
+        });
+        internalValueRef.current = editor.children;
+      } else {
+        console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
+        // IMPORTANT: Apply the selection from the iframe before running the transform
+        // The transform request includes the selection where the format should be applied,
+        // but the editor's selection may be stale (e.g., at end of paragraph instead of
+        // the selected text range). We need to update editor.selection first.
+        if (currentSelection && !isEqual(currentSelection, editor.selection) &&
+            isSelectionValidForDocument(currentSelection, editor.children)) {
+          console.log('[TOOLBAR SYNC] Applying selection before transform:', JSON.stringify(currentSelection));
+          try {
+            Transforms.select(editor, currentSelection);
+          } catch (e) {
+            console.warn('[TOOLBAR SYNC] Failed to apply selection before transform:', e.message);
+          }
+        }
+        applyTransform();
+      }
+
+    } else if (!contentNeedsSync && currentSelection && !isEqual(currentSelection, editor.selection)) {
+      // Check if selection needs update
+      const isValid = isSelectionValidForDocument(currentSelection, editor.children);
+      if (isValid) {
+        // Selection-only change - update editor's selection
+        // This handles clicks that move cursor without changing content
+        console.log('[TOOLBAR SYNC] Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
         try {
           Transforms.select(editor, currentSelection);
         } catch (e) {
-          console.warn('[TOOLBAR SYNC] Failed to apply selection before transform:', e.message);
+          // Selection invalid, ignore
         }
-      }
-      applyTransform();
-
-    } else if (!contentNeedsSync &&
-               currentSelection && !isEqual(currentSelection, editor.selection) &&
-               isSelectionValidForDocument(currentSelection, editor.children)) {
-      // Selection-only change - update editor's selection
-      // This handles clicks that move cursor without changing content
-      // No sequence check needed - selection is just current state, not conflicting edits
-      console.log('[TOOLBAR SYNC] Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
-      try {
-        Transforms.select(editor, currentSelection);
-      } catch (e) {
-        // Selection invalid, ignore
+      } else {
+        console.log('[TOOLBAR SYNC] Selection invalid for document:', JSON.stringify(currentSelection),
+          'editor.children[0]:', JSON.stringify(editor.children?.[0]?.children?.map(c => ({ type: c.type, text: c.text?.substring(0,20) }))));
       }
     }
 
@@ -1128,6 +1148,8 @@ const SyncedSlateToolbar = ({
         addMode={blockPathMap?.[selectedBlock]?.addMode}
         parentAddMode={blockPathMap?.[selectedBlock]?.parentAddMode}
         addDirection={blockUI?.addDirection}
+        convertibleTypes={convertibleTypes}
+        onConvertBlock={onConvertBlock}
       />
     )}
 

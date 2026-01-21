@@ -43,8 +43,21 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         image_url = block.download;
     }
     else if (block?.url && block['@type'] == "image") {
-        // image block with image_field and url
-        image_url = block.url;
+        // image block with url field - handle both string URLs and catalog brain format
+        const urlValue = block.url;
+        if (typeof urlValue === 'string') {
+            image_url = urlValue;
+        } else if (urlValue?.image_scales && urlValue?.image_field) {
+            // Catalog brain format from listing expansion
+            const field = urlValue.image_field;
+            const scales = urlValue.image_scales[field];
+            if (scales?.[0]?.download) {
+                image_url = `${urlValue['@id'] || ''}/${scales[0].download}`;
+            }
+        } else if (urlValue?.['@id']) {
+            // Simple object with @id
+            image_url = urlValue['@id'];
+        }
     } else {
         return {
             url:null,
@@ -92,8 +105,8 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         // image block with image_field and url
         image_url = `${image_url}/@@images/${block?.image_field}`;
     }
-    else if (block['@type'] == "image") {
-        // image block with image_field and url
+    else if (block['@type'] == "image" && !image_url.includes('@@images')) {
+        // image block without scale info - add default image scale
         image_url = `${image_url}/@@images/image`;
     }
     else if (!/\.[a-zA-Z]+$/.test(image_url)) {

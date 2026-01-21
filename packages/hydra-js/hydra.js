@@ -93,11 +93,13 @@ export class Bridge {
    * @param {Object} options - Options for the bridge initialization:
    *   - allowedBlocks: Array of allowed block types (e.g., ['title', 'text', 'image', ...])
    *   - debug: Enable verbose logging (default: false)
+   *   - pathToApiPath: Function to transform frontend path to API/admin path
+   *                    e.g., (path) => path.replace(/\/@pg\/[^/]+\/\d+/, '')
+   *                    Used when frontend embeds paging/state in URL path
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
     if (options.debug) debugEnabled = true;
-    this.learnOriginFromFirstMessage = options._learnOriginFromFirstMessage || false;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
     this.realTimeDataHandler = null; // Handler for message events
@@ -129,7 +131,171 @@ export class Bridge {
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
+    // Path transformer for frontends that embed state in URL (e.g., paging)
+    this.pathToApiPath = options.pathToApiPath || ((path) => path);
+    // Readonly registry - blocks marked readonly won't have fields collected
+    // Set by expandListingBlocks() or frontend code, not persisted to backend
+    this._readonlyBlocks = new Set();
     this.init(options); // Initialize the bridge
+  }
+
+  /**
+   * Mark a block as readonly (or not). Readonly blocks won't have editable/linkable/media
+   * fields collected - they're display-only. Used by expandListingBlocks() for listing items.
+   * This is transient state, not persisted to the backend.
+   *
+   * @param {string} blockUid - The block UID to mark
+   * @param {boolean} readonly - Whether the block is readonly (default: true)
+   */
+  setBlockReadonly(blockUid, readonly = true) {
+    if (readonly) {
+      this._readonlyBlocks.add(blockUid);
+    } else {
+      this._readonlyBlocks.delete(blockUid);
+    }
+  }
+
+  /**
+   * Check if a block is readonly. Checks in order:
+   * 1. Readonly registry (set by setBlockReadonly)
+   * 2. Block data property (block.readOnly)
+   * DOM attribute (data-block-readonly) is checked separately in collectBlockFields.
+   *
+   * @param {string} blockUid - The block UID to check
+   * @returns {boolean} Whether the block is readonly
+   */
+  isBlockReadonly(blockUid) {
+    // 1. Check registry first (set by expander or frontend)
+    if (this._readonlyBlocks.has(blockUid)) {
+      log('isBlockReadonly: TRUE (registry) for:', blockUid);
+      return true;
+    }
+    // 2. Fall back to block data property
+    const blockData = this.getBlockData(blockUid);
+    if (blockData?.readOnly) {
+      log('isBlockReadonly: TRUE (blockData) for:', blockUid);
+      return true;
+    }
+    log('isBlockReadonly: FALSE for:', blockUid, 'registry:', [...this._readonlyBlocks]);
+    return false;
+  }
+
+  /**
+   * Parse a hydra comment string into attributes and selectors.
+   * Format: "hydra attr=value attr attr=value(selector) /"
+   *
+   * @param {string} commentText - The comment text (without <!-- and -->)
+   * @returns {Object|null} Parsed attributes or null if not a hydra comment
+   */
+  parseHydraComment(commentText) {
+    const text = commentText.trim();
+    if (!text.startsWith('hydra ') && text !== 'hydra' && !text.startsWith('hydra/')) {
+      return null;
+    }
+
+    const isSelfClosing = text.endsWith('/');
+    const content = text.replace(/^hydra\s*/, '').replace(/\/$/, '').trim();
+
+    // Parse attribute=value or attribute=value(selector) patterns
+    // Supports multiple values for the same attribute (e.g., multiple editable-field)
+    const attrs = {};
+    // Match: word-name=value(selector) or word-name=value or word-name (boolean)
+    // Value can contain paths like /page-name
+    const attrRegex = /([\w-]+)(?:=([^(\s]+)(?:\(([^)]+)\))?)?/g;
+    let match;
+    while ((match = attrRegex.exec(content)) !== null) {
+      const [, name, value, selector] = match;
+      const entry = { value: value || true, selector: selector || null };
+      // Support multiple entries for the same attribute name
+      if (!attrs[name]) {
+        attrs[name] = [];
+      }
+      attrs[name].push(entry);
+    }
+
+    return { attrs, selfClosing: isSelfClosing };
+  }
+
+  /**
+   * Scan DOM for hydra comments and materialize attributes to elements.
+   * Converts comment-based hydra attributes to actual DOM attributes.
+   *
+   * Called after content changes to support comment syntax for third-party components.
+   */
+  materializeHydraComments() {
+    if (typeof document === 'undefined') return;
+
+    const treeWalker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_COMMENT,
+      null,
+      false
+    );
+
+    while (treeWalker.nextNode()) {
+      const comment = treeWalker.currentNode;
+      const text = comment.textContent.trim();
+
+      // Skip closing comments
+      if (text === '/hydra') continue;
+
+      // Check for hydra comment
+      const parsed = this.parseHydraComment(text);
+      if (!parsed) continue;
+
+      // Find the next element sibling (skip text nodes)
+      let nextElement = comment.nextSibling;
+      while (nextElement && nextElement.nodeType !== Node.ELEMENT_NODE) {
+        nextElement = nextElement.nextSibling;
+      }
+
+      if (!nextElement) continue;
+
+      // Apply attributes to the element
+      this.applyHydraAttributes(nextElement, parsed.attrs);
+    }
+
+    log('materializeHydraComments: completed');
+  }
+
+  /**
+   * Apply hydra attributes to an element and its children based on selectors.
+   *
+   * @param {HTMLElement} element - The root element
+   * @param {Object} attrs - Parsed attributes { name: [{ value, selector }, ...] }
+   */
+  applyHydraAttributes(element, attrs) {
+    const attrMap = {
+      'block-uid': 'data-block-uid',
+      'block-readonly': 'data-block-readonly',
+      'editable-field': 'data-editable-field',
+      'linkable-field': 'data-linkable-field',
+      'media-field': 'data-media-field',
+      'block-add': 'data-block-add',
+      'block-selector': 'data-block-selector',
+      'block-container': 'data-block-container',
+    };
+
+    for (const [name, entries] of Object.entries(attrs)) {
+      const domAttr = attrMap[name];
+      if (!domAttr) continue;
+
+      // Each attribute can have multiple entries (e.g., multiple editable-field)
+      for (const { value, selector } of entries) {
+        // Determine target element(s)
+        const targets = selector
+          ? element.querySelectorAll(selector)
+          : [element];
+
+        for (const target of targets) {
+          // Don't overwrite existing attributes
+          if (!target.hasAttribute(domAttr)) {
+            target.setAttribute(domAttr, value === true ? '' : value);
+            log('applyHydraAttributes:', domAttr, '=', value, 'to', target.tagName, selector ? `(${selector})` : '');
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -147,6 +313,11 @@ export class Bridge {
     }
 
     this.blockPathMap = blockPathMap;
+
+    // Clear readonly registry - new data means fresh state
+    // Frontend will re-register readonly blocks after expansion
+    log('setFormDataFromAdmin: clearing readonly registry, was:', [...this._readonlyBlocks]);
+    this._readonlyBlocks.clear();
 
     const seq = data?._editSequence || 0;
     // Use simple direct lookup for logging - getBlockData uses this.formData which isn't set yet
@@ -185,18 +356,23 @@ export class Bridge {
         }
       }
       if (current) {
-        // Inject virtual @type for object_list items (e.g., 'slider:slides')
-        // This allows field type lookup to work without items having actual @type
-        // IMPORTANT: Mutate the original object, don't return a copy, so that
-        // modifications to the returned object update formData for inline editing sync
-        if (pathInfo.itemType) {
-          current['@type'] = pathInfo.itemType;
-        }
+        // Return the block data directly - no @type mutation needed
+        // Block types are looked up via blockPathMap.blockType (single source of truth)
         return current;
       }
     }
     // No fallback - blockPathMap is the single source of truth
     return undefined;
+  }
+
+  /**
+   * Get the block type for a given block ID.
+   * Uses blockPathMap as the single source of truth (works for both regular blocks and object_list items).
+   * @param {string} blockId - The block ID
+   * @returns {string|undefined} The block type
+   */
+  getBlockType(blockId) {
+    return this.blockPathMap?.[blockId]?.blockType;
   }
 
   /**
@@ -284,18 +460,10 @@ export class Bridge {
    * @returns {HTMLElement|null} The first editable field or null if none
    */
   getOwnFirstEditableField(blockElement) {
-    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
-    if (blockElement.hasAttribute('data-editable-field')) {
-      return blockElement;
-    }
-    // Check descendants
-    const allFields = blockElement.querySelectorAll('[data-editable-field]');
-    for (const field of allFields) {
-      if (this.fieldBelongsToBlock(field, blockElement)) {
-        return field;
-      }
-    }
-    return null;
+    const fields = [];
+    this.collectBlockFields(blockElement, 'data-editable-field',
+      (el, name, results) => { fields.push(el); });
+    return fields[0] || null;
   }
 
   /**
@@ -316,39 +484,71 @@ export class Bridge {
   }
 
   /**
-   * Get linkable fields that belong directly to a block.
-   * Linkable fields use data-linkable-field attribute for URL/link editing.
+   * Collect fields with a given attribute from all elements of a block.
+   * For multi-element blocks, searches ALL elements with the same UID.
+   * Checks both the element itself and its descendants.
    *
-   * @param {HTMLElement} blockElement - The block element
-   * @returns {Object} Map of field names to true
+   * @param {HTMLElement} blockElement - Any element of the block
+   * @param {string} attrName - Attribute name (e.g., 'data-linkable-field')
+   * @param {Function} processor - (fieldElement, fieldName, results) => void
+   * @returns {Object} Collected results
    */
-  getLinkableFields(blockElement) {
-    const linkableFields = {};
-    // Check if block element itself has data-linkable-field
-    const selfField = blockElement.getAttribute('data-linkable-field');
-    if (selfField) {
-      linkableFields[selfField] = true;
+  collectBlockFields(blockElement, attrName, processor) {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // Check if block is marked readonly (registry, block data, or DOM attribute)
+    if (blockUid && this.isBlockReadonly(blockUid)) {
+      return {};
     }
-    // Check descendants
-    const allFields = blockElement.querySelectorAll('[data-linkable-field]');
-    for (const field of allFields) {
-      if (this.fieldBelongsToBlock(field, blockElement)) {
-        const fieldName = field.getAttribute('data-linkable-field');
-        if (fieldName) {
-          linkableFields[fieldName] = true;
+
+    const results = {};
+
+    // For page-level fields (no blockUid), process the element directly
+    // For block fields, get all elements with this block UID (multi-element blocks)
+    const elementsToProcess = blockUid
+      ? this.getAllBlockElements(blockUid)
+      : [blockElement];
+
+    for (const element of elementsToProcess) {
+      // Skip if this element has data-block-readonly
+      // Readonly blocks ignore editable/linkable/media fields
+      if (element.hasAttribute('data-block-readonly')) {
+        continue;
+      }
+
+      // Check if element itself has the attribute
+      const selfField = element.getAttribute(attrName);
+      if (selfField) {
+        processor(element, selfField, results);
+      }
+      // Check descendants (for blocks only - page-level fields are self-contained)
+      if (blockUid) {
+        for (const field of element.querySelectorAll(`[${attrName}]`)) {
+          // Skip fields inside a readonly ancestor
+          if (field.closest('[data-block-readonly]')) {
+            continue;
+          }
+          if (this.fieldBelongsToBlock(field, element)) {
+            const fieldName = field.getAttribute(attrName);
+            if (fieldName) {
+              processor(field, fieldName, results);
+            }
+          }
         }
       }
     }
-    return linkableFields;
+    return results;
   }
 
   /**
-   * Get media fields that belong directly to a block.
-   * Media fields use data-media-field attribute for image/media editing.
-   *
-   * @param {HTMLElement} blockElement - The block element
-   * @returns {Object} Map of field names to { rect: DOMRect } with element position
+   * Get linkable fields that belong directly to a block.
+   * For multi-element blocks, searches ALL elements with the same UID.
    */
+  getLinkableFields(blockElement) {
+    return this.collectBlockFields(blockElement, 'data-linkable-field',
+      (el, name, results) => { results[name] = true; });
+  }
+
   /**
    * Get effective bounding rect for a media field element.
    * If element has zero dimensions but uses absolute positioning with inset-0,
@@ -395,28 +595,13 @@ export class Bridge {
     return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
   }
 
+  /**
+   * Get media fields that belong directly to a block.
+   * For multi-element blocks, searches ALL elements with the same UID.
+   */
   getMediaFields(blockElement) {
-    const mediaFields = {};
-    // Check if block element itself has data-media-field
-    const selfField = blockElement.getAttribute('data-media-field');
-    if (selfField) {
-      mediaFields[selfField] = {
-        rect: this.getEffectiveMediaRect(blockElement, selfField)
-      };
-    }
-    // Check descendants
-    const allFields = blockElement.querySelectorAll('[data-media-field]');
-    for (const field of allFields) {
-      if (this.fieldBelongsToBlock(field, blockElement)) {
-        const fieldName = field.getAttribute('data-media-field');
-        if (fieldName) {
-          mediaFields[fieldName] = {
-            rect: this.getEffectiveMediaRect(field, fieldName)
-          };
-        }
-      }
-    }
-    return mediaFields;
+    return this.collectBlockFields(blockElement, 'data-media-field',
+      (el, name, results) => { results[name] = { rect: this.getEffectiveMediaRect(el, name) }; });
   }
 
   /**
@@ -437,8 +622,7 @@ export class Bridge {
 
     // Empty blocks should not have an add button - they are meant to be replaced
     // via block chooser, not have blocks added after them
-    const blockData = this.getBlockData(blockUid);
-    if (blockData?.['@type'] === 'empty') {
+    if (this.getBlockType(blockUid) === 'empty') {
       return 'hidden';
     }
 
@@ -457,6 +641,51 @@ export class Bridge {
       addDirection = depth % 2 === 0 ? 'bottom' : 'right';
     }
     return addDirection;
+  }
+
+  /**
+   * Gets all DOM elements for a block UID.
+   * A block may render as multiple elements (e.g., listing block renders multiple cards).
+   *
+   * @param {string} blockUid - The block UID to find elements for
+   * @returns {NodeList} All elements with the given data-block-uid
+   */
+  getAllBlockElements(blockUid) {
+    return document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+  }
+
+  /**
+   * Computes a bounding box that encompasses all given elements.
+   * Used for multi-element blocks where one block renders as multiple DOM elements.
+   *
+   * @param {NodeList|Array} elements - Elements to compute bounding box for
+   * @returns {Object|null} Bounding box with {top, left, width, height, right, bottom} or null if no elements
+   */
+  getBoundingBoxForElements(elements) {
+    if (!elements || elements.length === 0) return null;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const el of elements) {
+      const rect = el.getBoundingClientRect();
+      // Skip zero-size elements (might be hidden or not rendered yet)
+      if (rect.width === 0 && rect.height === 0) continue;
+      minX = Math.min(minX, rect.left);
+      minY = Math.min(minY, rect.top);
+      maxX = Math.max(maxX, rect.right);
+      maxY = Math.max(maxY, rect.bottom);
+    }
+
+    // If all elements were zero-size, return null
+    if (minX === Infinity) return null;
+
+    return {
+      top: minY,
+      left: minX,
+      width: maxX - minX,
+      height: maxY - minY,
+      right: maxX,
+      bottom: maxY,
+    };
   }
 
   /**
@@ -482,7 +711,32 @@ export class Bridge {
     }
 
     const blockUid = blockElement.getAttribute('data-block-uid');
-    const rect = blockElement.getBoundingClientRect();
+
+    // Get all elements for this block (multi-element blocks like listings)
+    // For page-level fields (no blockUid), just use the element itself
+    let rect;
+    if (blockUid) {
+      const allElements = this.getAllBlockElements(blockUid);
+      if (allElements.length > 1) {
+        // Multi-element block: compute bounding box around all elements
+        rect = this.getBoundingBoxForElements(allElements);
+        // Fall back to single element rect if bounding box computation failed
+        if (!rect) {
+          const singleRect = blockElement.getBoundingClientRect();
+          rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
+        }
+      } else {
+        // Single element block: use its rect directly
+        const singleRect = blockElement.getBoundingClientRect();
+        rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
+      }
+    } else {
+      // Page-level field: use the element's rect directly
+      const singleRect = blockElement.getBoundingClientRect();
+      rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
+    }
+
+    // For field operations, use the passed element (which may be the focused one)
     const editableFields = this.getEditableFields(blockElement);
     const linkableFields = this.getLinkableFields(blockElement);
     const mediaFields = this.getMediaFields(blockElement);
@@ -514,6 +768,7 @@ export class Bridge {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
+      isMultiElement: blockUid ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
     // Include selection if provided
@@ -638,22 +893,25 @@ export class Bridge {
       detectNavigation((currentUrl) => {
         const currentUrlObj = new URL(currentUrl);
         if (window.location.pathname !== currentUrlObj.pathname) {
-          log('Sending PATH_CHANGE:', window.location.pathname, 'to', this.adminOrigin);
+          const apiPath = this.pathToApiPath(window.location.pathname);
+          log('Sending PATH_CHANGE:', window.location.pathname, '-> apiPath:', apiPath, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
-              path: window.location.pathname,
+              path: apiPath,
             },
             this.adminOrigin,
           );
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
-          log('Sending PATH_CHANGE (hash):', i !== -1 ? hash.slice(i) || '/' : '/', 'to', this.adminOrigin);
+          const rawPath = i !== -1 ? hash.slice(i) || '/' : '/';
+          const apiPath = this.pathToApiPath(rawPath);
+          log('Sending PATH_CHANGE (hash):', rawPath, '-> apiPath:', apiPath, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
-              path: i !== -1 ? hash.slice(i) || '/' : '/',
+              path: apiPath,
             },
             this.adminOrigin,
           );
@@ -706,6 +964,11 @@ export class Bridge {
 
         // Add beforeunload warning to prevent accidental navigation
         window.addEventListener('beforeunload', (e) => {
+          // Skip warning for explicitly allowed link navigation (e.g., paging)
+          if (this._allowLinkNavigation) {
+            this._allowLinkNavigation = false;
+            return;
+          }
           e.preventDefault();
           e.returnValue = '';
           return '';
@@ -732,10 +995,24 @@ export class Bridge {
         // Without stored token, it's initial load even if URL has no token (e.g., mock-parent tests)
         const hasStoredToken = !!sessionStorage.getItem('hydra_access_token');
         const isSpaNavigation = isHydraEdit && !hasUrlToken && hasStoredToken;
-        if (isSpaNavigation) {
-          log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE');
+
+        // Check if this is in-page navigation (e.g., paging) - send PATH_CHANGE with inPage flag
+        const inPageNavTime = sessionStorage.getItem('hydra_in_page_nav_time');
+        const isInPageNavigation = inPageNavTime && (Date.now() - parseInt(inPageNavTime, 10)) < 5000;
+        if (isInPageNavigation) {
+          sessionStorage.removeItem('hydra_in_page_nav_time');
+          const apiPath = this.pathToApiPath(currentPath);
+          log('In-page navigation detected (paging), sending PATH_CHANGE with inPage flag, apiPath:', apiPath);
           window.parent.postMessage(
-            { type: 'PATH_CHANGE', path: currentPath },
+            { type: 'PATH_CHANGE', path: apiPath, inPage: true },
+            this.adminOrigin,
+          );
+          // Admin will resend form data without changing URL
+        } else if (isSpaNavigation) {
+          const apiPath = this.pathToApiPath(currentPath);
+          log('SPA navigation detected (window.name present, access_token missing), sending PATH_CHANGE, apiPath:', apiPath);
+          window.parent.postMessage(
+            { type: 'PATH_CHANGE', path: apiPath },
             this.adminOrigin,
           );
           // Don't send INIT - admin will just update its URL
@@ -767,8 +1044,63 @@ export class Bridge {
               this.addNodeIdsToAllSlateFields();
 
               // Call onContentChange callback directly to trigger initial render
+              // Support async callbacks (e.g., renderContentWithListings)
               if (this.onContentChangeCallback) {
-                this.onContentChangeCallback(this.formData);
+                const result = this.onContentChangeCallback(this.formData);
+                // If callback is async, wait for it before materializing comments
+                const materialize = () => requestAnimationFrame(() => this.materializeHydraComments());
+                if (result && typeof result.then === 'function') {
+                  result.then(materialize);
+                } else {
+                  materialize();
+                }
+              }
+
+              // Restore block selection if provided (e.g., after adding a new block)
+              if (e.data.selectedBlockUid) {
+                const blockUidToSelect = e.data.selectedBlockUid;
+                const bridge = this;
+                // Wait for element to appear AND position to stabilize before selecting
+                // This prevents race conditions during frontend re-render/animation
+                let lastRect = null;
+                let stableCount = 0;
+                const STABLE_THRESHOLD = 3;
+                const POSITION_TOLERANCE = 2; // pixels
+                const MAX_RETRIES = 40; // ~2 seconds at 50ms interval
+
+                const waitForStable = (retries = MAX_RETRIES) => {
+                  const element = document.querySelector(`[data-block-uid="${blockUidToSelect}"]`);
+                  if (!element) {
+                    if (retries > 0) {
+                      setTimeout(() => waitForStable(retries - 1), 50);
+                    } else {
+                      log('Could not find element for selectedBlockUid:', blockUidToSelect);
+                    }
+                    return;
+                  }
+
+                  const rect = element.getBoundingClientRect();
+                  const positionStable = lastRect !== null &&
+                    Math.abs(rect.left - lastRect.left) < POSITION_TOLERANCE &&
+                    Math.abs(rect.top - lastRect.top) < POSITION_TOLERANCE;
+
+                  if (positionStable) {
+                    stableCount++;
+                  } else {
+                    stableCount = 0;
+                  }
+                  lastRect = rect;
+
+                  if (stableCount >= STABLE_THRESHOLD) {
+                    bridge.selectBlock(blockUidToSelect);
+                  } else if (retries > 0) {
+                    setTimeout(() => waitForStable(retries - 1), 50);
+                  } else {
+                    // Timed out waiting for stable - select anyway
+                    bridge.selectBlock(blockUidToSelect);
+                  }
+                };
+                waitForStable();
               }
             }
           }
@@ -853,13 +1185,6 @@ export class Bridge {
     // Store callback so INITIAL_DATA handler can use it
     this.onContentChangeCallback = callback;
     this.realTimeDataHandler = (event) => {
-      // Learn admin origin from first message if needed
-      if (this.learnOriginFromFirstMessage && !this.adminOrigin) {
-        this.adminOrigin = event.origin;
-        this.learnOriginFromFirstMessage = false;
-        log('Learned admin origin from first postMessage:', this.adminOrigin);
-      }
-
       if (
         event.origin === this.adminOrigin ||
         event.origin === window.location.origin
@@ -887,8 +1212,26 @@ export class Bridge {
               log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
             }
 
+            // Check if incoming FORM_DATA is stale (our local sequence is higher)
+            // EXCEPTION: Never reject format responses - they have formatRequestId and are
+            // the result of a format operation we requested
+            const incomingSeq = event.data.data?._editSequence || 0;
+            const localSeq = this.formData?._editSequence || 0;
+            const isFormatResponse = !!event.data.formatRequestId;
+            const isStale = incomingSeq < localSeq && !isFormatResponse;
+
+            if (isStale) {
+              log('FORM_DATA: skipping stale data, incoming seq:', incomingSeq, 'local seq:', localSeq,
+                  'isFormatResponse:', isFormatResponse, 'blockedBlockId:', this.blockedBlockId);
+              // Don't unblock here - the stale FORM_DATA is not the response we're waiting for
+              // Wait for the actual format response (which will have formatRequestId)
+              return;
+            }
+
             // Central method for setting form data with logging (also sets blockPathMap)
             this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
+
+            // === Non-stale FORM_DATA - apply it fully ===
 
             // Add nodeIds to all slate blocks before rendering
             // Admin UI never sends nodeIds, so we always need to add them
@@ -898,15 +1241,21 @@ export class Bridge {
             const formatRequestId = event.data.formatRequestId;
 
             // Call the callback first to trigger the re-render
+            // Support async callbacks (e.g., renderContentWithListings)
             log('Calling onEditChange callback to trigger re-render');
-            callback(this.formData);
+            const callbackResult = callback(this.formData);
 
+            // Run post-render code after callback completes (async or sync)
+            const afterRender = () => {
             // Restore cursor position after re-render (use requestAnimationFrame to ensure DOM is updated)
             // If the message includes a transformed Slate selection, use that
             // Otherwise fall back to the old DOM-based cursor saving approach
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                // Materialize hydra comments after DOM renders
+                this.materializeHydraComments();
+
                 // Mark empty blocks so they can be styled (must run on every render)
                 this.markEmptyBlocks();
 
@@ -971,8 +1320,12 @@ export class Bridge {
 
                     if (event.data.transformedSelection || blockRectChanged || mediaFieldsChanged) {
                       // Send updated rect to admin so toolbar/overlays follow the block
+                      // Include transformedSelection if present - this prevents View.jsx from clearing
+                      // the selection when it receives BLOCK_SELECTED without selection
                       log('formDataHandler sending BLOCK_SELECTED with mediaFields:', newMediaFields);
-                      this.sendBlockSelected('formDataHandler', blockElement);
+                      this.sendBlockSelected('formDataHandler', blockElement, {
+                        selection: event.data.transformedSelection || undefined,
+                      });
                       this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
                       this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
 
@@ -1028,7 +1381,8 @@ export class Bridge {
                   let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
 
                   // If block is hidden (e.g., carousel slide), try to make it visible first
-                  if (blockElement && this.isElementHidden(blockElement)) {
+                  // Skip if navigation is already in progress (SELECT_BLOCK already triggered it)
+                  if (blockElement && this.isElementHidden(blockElement) && !this._navigatingToBlock) {
                     log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
                     const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
                     if (madeVisible) {
@@ -1046,11 +1400,23 @@ export class Bridge {
 
                   // Re-query element in case it changed during wait
                   blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+                  // If element not found yet, retry a few times (frontend may still be rendering)
+                  if (!blockElement && needsBlockSwitch) {
+                    for (let retry = 0; retry < 10 && !blockElement; retry++) {
+                      await new Promise(r => setTimeout(r, 100));
+                      blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                      log('FORM_DATA: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
+                    }
+                  }
+
                   // Ensure elements have min size BEFORE sending BLOCK_SELECTED
                   // so the new block has dimensions when the admin UI receives the message
                   this.ensureElementsHaveMinSize();
                   if (blockElement) {
                     blockHandler(blockElement);
+                  } else if (needsBlockSwitch) {
+                    log('FORM_DATA: block element not found after retries:', blockUidToProcess);
                   }
                 }
 
@@ -1058,6 +1424,14 @@ export class Bridge {
                 this.replayBufferAndUnblock();
               });
             });
+            }; // End of afterRender function
+
+            // Call afterRender after callback completes (async or sync)
+            if (callbackResult && typeof callbackResult.then === 'function') {
+              callbackResult.then(afterRender);
+            } else {
+              afterRender();
+            }
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
@@ -1174,8 +1548,13 @@ export class Bridge {
     this.blockClickHandler = (event) => {
       // Handle data-block-selector clicks (carousel nav buttons, etc.)
       // Don't stopPropagation or preventDefault - let frontend handle visibility changes
+      // Skip if tryMakeBlockVisible is currently navigating (to avoid interference)
       const selectorElement = event.target.closest('[data-block-selector]');
       if (selectorElement) {
+        if (this._navigatingToBlock) {
+          log('blockClickHandler: skipping handleBlockSelector, tryMakeBlockVisible in progress');
+          return;
+        }
         const selector = selectorElement.getAttribute('data-block-selector');
         this.handleBlockSelector(selector, selectorElement);
         return;
@@ -1194,21 +1573,50 @@ export class Bridge {
           return; // Don't re-select block - preserves cursor for text input
         }
 
-        // Prevent link navigation in edit mode (for blocks wrapped in links)
+        // Check if we're inside a readonly block (e.g., listing items with _blockUid)
+        // Readonly blocks ignore editable/linkable/media fields and prevent link navigation
+        // Check both DOM attribute and readonly registry
+        const blockUid = blockElement.getAttribute('data-block-uid');
+        const isInsideReadonly = event.target.closest('[data-block-readonly]') || this.isBlockReadonly(blockUid);
+
+        // Check if clicked element (or ancestor) has data-linkable-allow - allows navigation
+        // Works for any element: links, checkboxes, selects, etc.
+        // Note: Don't return early - still need block selection to happen
+        const allowedElement = event.target.closest('[data-linkable-allow]');
+        if (allowedElement) {
+          this._allowLinkNavigation = true;
+          // Reset flag after short delay if navigation didn't happen
+          setTimeout(() => { this._allowLinkNavigation = false; }, 100);
+          // Store timestamp for in-page navigation - checked on reload to skip PATH_CHANGE
+          sessionStorage.setItem('hydra_in_page_nav_time', String(Date.now()));
+          // Don't return - continue with block selection
+        }
+
+        // Handle link clicks in edit mode
         const linkElement = event.target.closest('a');
         if (linkElement) {
-          event.preventDefault();
+          // Prevent link navigation inside readonly blocks
+          if (isInsideReadonly) {
+            event.preventDefault();
+          } else {
+            // Only prevent if this is a linkable field (opens link editor in sidebar)
+            const isLinkableField = linkElement.closest('[data-linkable-field]');
+            if (isLinkableField) {
+              event.preventDefault();
+            }
+          }
         }
 
         // Store click position relative to the editable element for cursor positioning
         // Using relative coordinates ensures focus()/scroll doesn't invalidate the position
         // Also store the target for field detection
-        const clickedEditableField = event.target.closest('[data-editable-field]');
-        const editableField = clickedEditableField || blockElement.querySelector('[data-editable-field]');
+        // Inside readonly blocks, ignore editable/linkable/media fields (they're from query results, not editable)
+        const clickedEditableField = isInsideReadonly ? null : event.target.closest('[data-editable-field]');
+        const editableField = clickedEditableField || (isInsideReadonly ? null : blockElement.querySelector('[data-editable-field]'));
 
-        // Detect clicked linkable and media fields
-        const clickedLinkableField = event.target.closest('[data-linkable-field]');
-        const clickedMediaField = event.target.closest('[data-media-field]');
+        // Detect clicked linkable and media fields (ignored inside readonly blocks)
+        const clickedLinkableField = isInsideReadonly ? null : event.target.closest('[data-linkable-field]');
+        const clickedMediaField = isInsideReadonly ? null : event.target.closest('[data-media-field]');
 
         if (editableField) {
           const rect = editableField.getBoundingClientRect();
@@ -1422,7 +1830,7 @@ export class Bridge {
   replayBufferAndUnblock(context = '') {
     if (!this.pendingTransform) return;
 
-    const { blockId } = this.pendingTransform;
+    const { blockId, requestId: originalRequestId } = this.pendingTransform;
 
     // Prepare buffer for replay
     if (this.eventBuffer.length > 0) {
@@ -1434,12 +1842,19 @@ export class Bridge {
       log('Prepared', this.pendingBufferReplay.buffer.length, 'events for replay');
     }
 
-    // Replay buffered events
+    // Replay buffered events (may send new format request with new requestId)
     this.replayBufferedEvents();
 
-    // Unblock AFTER replay to prevent keystrokes arriving in the gap
-    log('Unblocking input for', blockId, '- after replay' + (context ? ` (${context})` : ''));
-    this.setBlockProcessing(blockId, false);
+    // Only unblock if replay didn't start a new transform (check if requestId changed)
+    const hasNewPendingTransform = this.pendingTransform?.requestId &&
+                                    this.pendingTransform.requestId !== originalRequestId;
+    if (!hasNewPendingTransform) {
+      // Unblock AFTER replay to prevent keystrokes arriving in the gap
+      log('Unblocking input for', blockId, '- after replay' + (context ? ` (${context})` : ''));
+      this.setBlockProcessing(blockId, false);
+    } else {
+      log('Skipping unblock - new transform pending:', this.pendingTransform.requestId);
+    }
   }
 
   /**
@@ -1472,12 +1887,33 @@ export class Bridge {
     this.pendingBufferReplay = null;
 
     // Build up text string from consecutive printable characters
+    // Also detect format hotkeys that need to be replayed
     let textToInsert = '';
+    let formatHotkeyToReplay = null;
     for (const evt of buffer) {
       if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
         textToInsert += evt.key;
+      } else if ((evt.ctrlKey || evt.metaKey) && this.slateConfig?.hotkeys) {
+        // Check if this is a format hotkey
+        for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
+          const parts = shortcut.toLowerCase().split('+');
+          const hasmod = parts.includes('mod');
+          const hasShift = parts.includes('shift');
+          const hasAlt = parts.includes('alt');
+          const key = parts[parts.length - 1];
+
+          const modifierMatch = hasmod ? (evt.ctrlKey || evt.metaKey) : true;
+          const shiftMatch = hasShift ? evt.shiftKey : !evt.shiftKey;
+          const altMatch = hasAlt ? evt.altKey : !evt.altKey;
+          const keyMatch = evt.key.toLowerCase() === key;
+
+          if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
+            formatHotkeyToReplay = config.format;
+            log('Detected format hotkey in buffer:', config.format);
+            break;
+          }
+        }
       }
-      // Note: special keys are ignored for now - they're complex to replay
     }
 
     if (textToInsert) {
@@ -1510,6 +1946,15 @@ export class Bridge {
           this.handleTextChange(editableField, textNode.parentElement, textNode);
         }
       }
+    }
+
+    // Replay any format hotkey that was buffered
+    if (formatHotkeyToReplay) {
+      log('Replaying buffered format hotkey:', formatHotkeyToReplay);
+      // Send the format request - this updates pendingTransform with new requestId
+      this.sendTransformRequest(blockId, 'format', {
+        format: formatHotkeyToReplay,
+      });
     }
   }
 
@@ -2340,6 +2785,11 @@ export class Bridge {
       const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
       const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
 
+      // Skip error for readonly blocks - they don't need selection sync
+      if (blockUid !== 'unknown' && this.isBlockReadonly(blockUid)) {
+        return null;
+      }
+
       // Check if this field is supposed to be a Slate field
       // Use getFieldType which handles page-level fields (e.g., /title) correctly
       const fieldType = blockUid !== 'unknown' ? this.getFieldType(blockUid, fieldName) : undefined;
@@ -2420,10 +2870,26 @@ export class Bridge {
    * @param {string} caller - The caller for debugging (e.g., 'selectBlock', 'FORM_DATA')
    */
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
-    // Only restore on THIS block's own fields, not nested blocks' fields
-    const editableFields = this.getOwnEditableFields(blockElement);
     // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
     const blockUid = blockElement.getAttribute('data-block-uid');
+    // For multi-element blocks, collect fields from ALL elements with this UID
+    const editableFields = [];
+
+    if (blockUid) {
+      // Block-level field - use collectBlockFields to gather from all elements with this UID
+      this.collectBlockFields(blockElement, 'data-editable-field',
+        (el) => { editableFields.push(el); });
+    } else {
+      // Page-level field (no blockUid) - process the element directly
+      // The element itself has data-editable-field (e.g., #page-title)
+      if (blockElement.hasAttribute('data-editable-field')) {
+        editableFields.push(blockElement);
+      }
+      // Also check any children with data-editable-field
+      blockElement.querySelectorAll('[data-editable-field]').forEach((el) => {
+        editableFields.push(el);
+      });
+    }
     log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
       const fieldPath = field.getAttribute('data-editable-field');
@@ -2620,8 +3086,7 @@ export class Bridge {
     const allBlocks = document.querySelectorAll('[data-block-uid]');
     allBlocks.forEach((blockElement) => {
       const blockUid = blockElement.getAttribute('data-block-uid');
-      const blockData = this.getBlockData(blockUid);
-      if (blockData?.['@type'] === 'empty') {
+      if (this.getBlockType(blockUid) === 'empty') {
         blockElement.setAttribute('data-hydra-empty', 'true');
       } else {
         blockElement.removeAttribute('data-hydra-empty');
@@ -2687,14 +3152,33 @@ export class Bridge {
       }
     }
 
+    // Scroll to block if not visible - BUT skip if we just finished a drag-drop
+    // After drag-drop, the block should be visible where we dropped it.
+    // If it's "not visible", the async renderer may not have completed yet and
+    // we'd be scrolling to the OLD position. Wait for domChange to handle it.
+    let didScroll = false;
+    if (!this.elementIsVisibleInViewport(blockElement) && !this._justFinishedDrag) {
+      log('updateBlockUIAfterFormData: scrolling to block', this.selectedBlockUid);
+      this.scrollBlockIntoView(blockElement);
+      didScroll = true;
+    }
+
     // Send updated block position to Admin UI for toolbar/overlay positioning
-    const currentRect = blockElement.getBoundingClientRect();
+    // For multi-element blocks, use combined bounding box
+    const allElements = this.getAllBlockElements(this.selectedBlockUid);
+    // Always convert to plain object - DOMRect is live and would cause comparison issues
+    let currentRect = this.getBoundingBoxForElements(allElements);
+    if (!currentRect) {
+      const domRect = blockElement.getBoundingClientRect();
+      currentRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
+    }
 
     // For skipFocus (sidebar edits): only send if position actually changed (e.g., after drag-and-drop)
     // For !skipFocus (format operations): always send
-    let shouldSendBlockSelected = !skipFocus;
+    // IMPORTANT: Always send if we just scrolled to the block - Admin needs the new rect
+    let shouldSendBlockSelected = !skipFocus || didScroll;
 
-    if (skipFocus && this._lastBlockRect) {
+    if (skipFocus && !didScroll && this._lastBlockRect) {
       const topChanged = Math.abs(currentRect.top - this._lastBlockRect.top) > 1;
       const leftChanged = Math.abs(currentRect.left - this._lastBlockRect.left) > 1;
 
@@ -2708,8 +3192,10 @@ export class Bridge {
       this.sendBlockSelected('updateBlockUIAfterFormData', blockElement);
     }
 
-    // Update _lastBlockRect for future comparisons
-    this._lastBlockRect = currentRect;
+    // Update _lastBlockRect for future comparisons (only if valid rect)
+    if (currentRect.width > 0 && currentRect.height > 0) {
+      this._lastBlockRect = currentRect;
+    }
 
     // Always reposition drag button after DOM updates - block may have moved
     if (this.dragHandlePositioner) {
@@ -2731,12 +3217,25 @@ export class Bridge {
   /**
    * Selects a block and communicates the selection to the adminUI.
    *
-   * @param {HTMLElement} blockElement - The block element to select.
+   * @param {HTMLElement|string} blockElementOrUid - The block element or block UID to select.
    */
-  selectBlock(blockElement) {
+  selectBlock(blockElementOrUid) {
+    // Accept either a DOM element (from click handlers) or a block UID string
+    const blockElement = typeof blockElementOrUid === 'string'
+      ? document.querySelector(`[data-block-uid="${blockElementOrUid}"]`)
+      : blockElementOrUid;
+
     const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
     log('selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
     if (!blockElement) return;
+
+    // Clear block selector navigation flag after a delay to let carousel animation settle
+    // This prevents transitionTracker from sending stale positions during animation
+    if (this._blockSelectorNavigating) {
+      setTimeout(() => {
+        this._blockSelectorNavigating = false;
+      }, 500);
+    }
 
     const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
@@ -2746,18 +3245,8 @@ export class Bridge {
 
     // Only scroll block into view when selecting a NEW block (not reselecting same block)
     // This prevents unwanted scroll-back when user has scrolled the selected block off screen
-    if (!isSelectingSameBlock) {
-      const toolbarMargin = 50; // Toolbar is ~40px tall
-      const addButtonMargin = 50; // Add button is ~30px tall
-      const scrollRect = blockElement.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-
-      if (scrollRect.top < toolbarMargin || scrollRect.bottom > viewportHeight - addButtonMargin) {
-        // Block or its UI elements are outside viewport - scroll to center it
-        const blockCenter = scrollRect.top + scrollRect.height / 2;
-        const viewportCenter = viewportHeight / 2;
-        window.scrollBy({ top: blockCenter - viewportCenter, behavior: 'instant' });
-      }
+    if (!isSelectingSameBlock && !this.elementIsVisibleInViewport(blockElement)) {
+      this.scrollBlockIntoView(blockElement);
     }
 
     // Flush any pending text updates from the previous block before switching
@@ -3229,6 +3718,8 @@ export class Bridge {
 
     // For +1/-1, calculate the target block and wait for it to become visible
     // Stop any existing tracking and hide the block UI immediately
+    // Set flag to prevent scroll/resize handlers from sending stale BLOCK_SELECTED
+    this._blockSelectorNavigating = true;
     this.stopTransitionTracking();
     window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
 
@@ -3471,6 +3962,7 @@ export class Bridge {
   /**
    * Observes the selected block for size changes (e.g., image loading, content changes).
    * When the block's size changes, sends an updated BLOCK_SELECTED message to update the selection outline.
+   * For multi-element blocks, observes ALL elements and recomputes combined bounding box.
    *
    * @param {Element} blockElement - The block element to observe.
    * @param {string} blockUid - The block's UID.
@@ -3479,17 +3971,24 @@ export class Bridge {
   observeBlockResize(blockElement, blockUid, editableFields, skipInitialUpdate = false) {
     log('observeBlockResize called for block:', blockUid, 'skipInitialUpdate:', skipInitialUpdate);
 
-    // Skip if already observing the same block (by UID, not element reference)
+    // Skip if already observing the same block AND the current DOM elements match observed
     // ResizeObserver fires immediately when attached - recreating it causes spurious updates
-    // After re-render, element reference changes but we're still on same block
-    if (this._lastBlockRectUid === blockUid && this.blockResizeObserver && this._observedBlockElement) {
-      // Check if the old element is still in the DOM
-      // If detached, we need to re-attach to the new element
-      if (document.body.contains(this._observedBlockElement)) {
+    // After re-render, element references change but we're still on same block
+    // For multi-element blocks, we must check ALL elements, not just one
+    if (this._lastBlockRectUid === blockUid && this.blockResizeObserver && this._observedElements?.length > 0) {
+      // Check if ALL observed elements are still in the DOM
+      const allStillConnected = this._observedElements.every(el => document.body.contains(el));
+      // Also check if current DOM elements match what we're observing
+      // (re-render may have created new elements)
+      const currentElements = this.getAllBlockElements(blockUid);
+      const elementsMatch = currentElements.length === this._observedElements.length &&
+        Array.from(currentElements).every(el => this._observedElements.includes(el));
+      log('observeBlockResize: allStillConnected:', allStillConnected, 'elementsMatch:', elementsMatch, 'observed:', this._observedElements.length, 'current:', currentElements.length);
+      if (allStillConnected && elementsMatch) {
         log('observeBlockResize: already observing this block, skipping');
         return;
       }
-      log('observeBlockResize: old element detached, re-attaching to new element');
+      log('observeBlockResize: elements changed, re-attaching to new elements');
     }
 
     // Clean up any existing observer
@@ -3497,10 +3996,18 @@ export class Bridge {
       this.blockResizeObserver.disconnect();
     }
 
-    // Store initial dimensions to detect actual changes
+    // Get all elements for multi-element blocks
+    const allElements = this.getAllBlockElements(blockUid);
+
+    // Store initial dimensions using combined bounding box for multi-element blocks
     // Use instance variable so it persists across observer recreations
     // Only reset if this is a different block
-    const currentRect = blockElement.getBoundingClientRect();
+    // Always convert to plain object - DOMRect is live and would cause comparison issues
+    let currentRect = this.getBoundingBoxForElements(allElements);
+    if (!currentRect) {
+      const domRect = blockElement.getBoundingClientRect();
+      currentRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
+    }
     if (!this._lastBlockRect || this._lastBlockRectUid !== blockUid) {
       this._lastBlockRect = currentRect;
       this._lastBlockRectUid = blockUid;
@@ -3508,8 +4015,8 @@ export class Bridge {
       // Don't update _lastBlockRect - let updateBlockUIAfterFormData compare and update it
       // This preserves the pre-update position for comparison after re-render
     }
-    this._observedBlockElement = blockElement;
-    log('observeBlockResize initial rect:', { width: currentRect.width, height: currentRect.height });
+    this._observedElements = Array.from(allElements);
+    log('observeBlockResize initial rect:', { width: currentRect.width, height: currentRect.height }, 'observing', allElements.length, 'elements');
 
     this.blockResizeObserver = new ResizeObserver((entries) => {
       log('ResizeObserver callback fired for:', blockUid);
@@ -3519,41 +4026,191 @@ export class Bridge {
         return;
       }
 
-      // Skip if element was detached during re-render (getBoundingClientRect returns zeros)
-      if (!entries[0]?.target?.isConnected) {
-        log('ResizeObserver: element detached, ignoring');
+      // For multi-element blocks, recompute the combined bounding box from fresh DOM query
+      // Don't check entries[0].isConnected - for multi-element blocks, some elements may
+      // be detached while others are still valid. The fresh query handles this.
+      const freshElements = this.getAllBlockElements(blockUid);
+      if (freshElements.length === 0) {
+        log('ResizeObserver: no elements found, ignoring');
+        return;
+      }
+      const newRect = this.getBoundingBoxForElements(freshElements);
+      if (!newRect) {
+        log('ResizeObserver: could not compute bounding box, ignoring');
+        return;
+      }
+      const lastRect = this._lastBlockRect;
+
+      // Compare with last rect if we have one, or update if we now have valid dimensions
+      const hadValidLastRect = lastRect && (lastRect.width > 0 || lastRect.height > 0);
+      const widthChanged = hadValidLastRect ? Math.abs(newRect.width - lastRect.width) > 1 : false;
+      const heightChanged = hadValidLastRect ? Math.abs(newRect.height - lastRect.height) > 1 : false;
+      const topChanged = hadValidLastRect ? Math.abs(newRect.top - lastRect.top) > 1 : false;
+      const leftChanged = hadValidLastRect ? Math.abs(newRect.left - lastRect.left) > 1 : false;
+      const dimensionsChanged = widthChanged || heightChanged || topChanged || leftChanged;
+
+      // Update if: dimensions changed, OR we went from invalid/zero to valid rect
+      const shouldUpdate = dimensionsChanged || (!hadValidLastRect && newRect.height > 0);
+
+      log('ResizeObserver: comparing rects - last:', lastRect?.height || 0, 'new:', newRect.height, 'shouldUpdate:', shouldUpdate);
+
+      // Always update _lastBlockRect if we have a valid new rect
+      this._lastBlockRect = newRect;
+
+      if (shouldUpdate) {
+        log('Block size changed, updating selection outline:', blockUid,
+          'old:', lastRect?.top || 0, lastRect?.left || 0, lastRect?.width || 0, lastRect?.height || 0,
+          'new:', newRect.top, newRect.left, newRect.width, newRect.height);
+
+        // Send updated BLOCK_SELECTED with new rect
+        this.sendBlockSelected('resizeObserver', blockElement);
+      }
+    });
+
+    // Observe ALL elements of multi-element blocks
+    for (const element of allElements) {
+      this.blockResizeObserver.observe(element, { box: 'border-box' });
+    }
+
+    // Also observe DOM structure changes for async rendering
+    // (e.g., listing blocks that fetch results after initial render)
+    this.observeBlockDomChanges(blockUid);
+
+    // Also track position during CSS transitions (e.g., carousel slide animations)
+    this.observeBlockTransition(blockElement, blockUid);
+  }
+
+  /**
+   * Observes DOM structure changes for the selected block.
+   * Async rendering (e.g., listing blocks fetching results) may replace elements
+   * after we've attached ResizeObserver. This MutationObserver detects when that
+   * happens and re-attaches the ResizeObserver to the new elements.
+   *
+   * @param {string} blockUid - The block's UID to watch for.
+   */
+  observeBlockDomChanges(blockUid) {
+    // Clean up existing observer
+    if (this._domMutationObserver) {
+      this._domMutationObserver.disconnect();
+    }
+
+    // Find the content container to observe
+    const container = document.getElementById('content') || document.body;
+
+    this._domMutationObserver = new MutationObserver((mutations) => {
+      // Only process if this is still the selected block
+      if (this.selectedBlockUid !== blockUid) {
         return;
       }
 
-      for (const entry of entries) {
-        const newRect = entry.target.getBoundingClientRect();
-        const lastRect = this._lastBlockRect;
+      // Check if any mutations added elements with our block UID
+      let relevantChange = false;
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          // Check added nodes for our block UID
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (
+                node.getAttribute?.('data-block-uid') === blockUid ||
+                node.querySelector?.(`[data-block-uid="${blockUid}"]`)
+              ) {
+                relevantChange = true;
+                break;
+              }
+            }
+          }
+          if (relevantChange) break;
+        }
+      }
 
-        // Only send update if dimensions actually changed significantly (> 1px)
-        const widthChanged = Math.abs(newRect.width - lastRect.width) > 1;
-        const heightChanged = Math.abs(newRect.height - lastRect.height) > 1;
-        const topChanged = Math.abs(newRect.top - lastRect.top) > 1;
-        const leftChanged = Math.abs(newRect.left - lastRect.left) > 1;
+      if (!relevantChange) return;
 
-        if (widthChanged || heightChanged || topChanged || leftChanged) {
-          log('Block size changed, updating selection outline:', blockUid,
-            'old:', lastRect.top, lastRect.left, lastRect.width, lastRect.height,
-            'new:', newRect.top, newRect.left, newRect.width, newRect.height);
+      log('observeBlockDomChanges: detected relevant DOM change for', blockUid);
 
+      // Materialize any new hydra comments (e.g., from async Suspense content)
+      this.materializeHydraComments();
+
+      // Check if our observed elements are still in the DOM
+      if (!this._observedElements?.length) return;
+
+      const currentElements = this.getAllBlockElements(blockUid);
+      const elementsMatch =
+        currentElements.length === this._observedElements.length &&
+        Array.from(currentElements).every((el) =>
+          this._observedElements.includes(el),
+        );
+
+      if (elementsMatch) {
+        log('observeBlockDomChanges: elements still match, no action needed');
+        return;
+      }
+
+      log(
+        'observeBlockDomChanges: elements changed, re-attaching ResizeObserver',
+        'old:',
+        this._observedElements.length,
+        'new:',
+        currentElements.length,
+      );
+
+      // Elements have changed - re-attach ResizeObserver
+      if (this.blockResizeObserver) {
+        this.blockResizeObserver.disconnect();
+
+        // Update _lastBlockRect BEFORE observing - observe() fires callback immediately
+        const newRect = this.getBoundingBoxForElements(currentElements);
+        if (newRect && (newRect.width > 0 || newRect.height > 0)) {
           this._lastBlockRect = newRect;
+        }
 
-          // Send updated BLOCK_SELECTED with new rect
-          this.sendBlockSelected('resizeObserver', blockElement);
+        // Observe the new elements
+        this._observedElements = Array.from(currentElements);
+        for (const element of currentElements) {
+          this.blockResizeObserver.observe(element, { box: 'border-box' });
+        }
+
+        // Send updated selection (debounced to wait for animations to settle)
+        if (newRect && (newRect.width > 0 || newRect.height > 0)) {
+          const firstElement = currentElements[0];
+          if (firstElement) {
+            // Restore contenteditable on fields - DOM elements may have been replaced
+            // This is needed when the renderer re-renders (e.g., after checkbox toggle)
+            this.restoreContentEditableOnFields(firstElement, 'domChange');
+
+            // Debounce BLOCK_SELECTED to wait for animations (carousel transitions, etc.)
+            // This prevents sending intermediate positions during animation
+            if (this._domChangeDebounce) {
+              clearTimeout(this._domChangeDebounce);
+            }
+            this._domChangeDebounce = setTimeout(() => {
+              this._domChangeDebounce = null;
+              // Only send BLOCK_SELECTED if this block is still the selected block
+              // When adding a child block, the parent's DOM changes but selection has moved
+              if (blockUid !== this.selectedBlockUid) {
+                log('observeBlockDomChanges: skipping BLOCK_SELECTED, selection changed to', this.selectedBlockUid);
+                return;
+              }
+              // Re-check element is still valid and get fresh rect
+              const freshElements = this.getAllBlockElements(blockUid);
+              if (freshElements.length > 0) {
+                this.sendBlockSelected('domChange', freshElements[0]);
+              }
+            }, 150); // Wait for animation to settle
+
+            // Reposition drag button - block may have moved (e.g., after drag-drop re-render)
+            if (this.dragHandlePositioner) {
+              this.dragHandlePositioner();
+            }
+          }
         }
       }
     });
 
-    // Observe border-box to catch padding/border changes too (not just content)
-    // This ensures the selection outline updates for any visual size change
-    this.blockResizeObserver.observe(blockElement, { box: 'border-box' });
-
-    // Also track position during CSS transitions (e.g., carousel slide animations)
-    this.observeBlockTransition(blockElement, blockUid);
+    // Observe the container for childList changes in the subtree
+    this._domMutationObserver.observe(container, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   /**
@@ -3586,6 +4243,11 @@ export class Bridge {
     if (this.blockResizeObserver) {
       this.blockResizeObserver.disconnect();
       this.blockResizeObserver = null;
+    }
+    // Also disconnect DOM mutation observer
+    if (this._domMutationObserver) {
+      this._domMutationObserver.disconnect();
+      this._domMutationObserver = null;
     }
     // Clear scroll timeout that might re-send position updates
     if (this.scrollTimeout) {
@@ -3625,8 +4287,15 @@ export class Bridge {
       if (!isTracking || this._trackingBlockUid !== blockUid) {
         return;
       }
+      // Skip during carousel navigation - animation may cause stale positions
+      if (this._blockSelectorNavigating) {
+        this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
+        return;
+      }
 
-      const newRect = blockElement.getBoundingClientRect();
+      const domRect = blockElement.getBoundingClientRect();
+      // Convert to plain object - DOMRect is live and would cause comparison issues
+      const newRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
       const lastRect = this._lastBlockRect;
 
       if (lastRect) {
@@ -3661,7 +4330,9 @@ export class Bridge {
 
       // Final position update
       if (this.selectedBlockUid === blockUid) {
-        const finalRect = blockElement.getBoundingClientRect();
+        const domRect = blockElement.getBoundingClientRect();
+        // Convert to plain object - DOMRect is live and would cause comparison issues
+        const finalRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
         if (this._lastBlockRect) {
           const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
                         Math.abs(finalRect.top - this._lastBlockRect.top) > 1;
@@ -3754,13 +4425,23 @@ export class Bridge {
         return;
       }
 
-      const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-      if (!blockElement) {
+      // Get all elements for this block (multi-element blocks like listings)
+      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      if (allElements.length === 0) {
         dragButton.style.display = 'none';
         return;
       }
 
-      const rect = blockElement.getBoundingClientRect();
+      // Use bounding box for multi-element blocks
+      let rect;
+      if (allElements.length > 1) {
+        rect = this.getBoundingBoxForElements(allElements);
+        if (!rect) {
+          rect = allElements[0].getBoundingClientRect();
+        }
+      } else {
+        rect = allElements[0].getBoundingClientRect();
+      }
 
       // Hide if block is completely out of view
       if (rect.bottom < 0 || rect.top > window.innerHeight) {
@@ -3791,18 +4472,46 @@ export class Bridge {
     const dragHandler = (e) => {
       e.preventDefault();
 
-      // Get the current block element
-      const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-      if (!blockElement) return;
+      // Set flag to suppress scrollHandler during drag
+      this._isDragging = true;
 
-      const rect = blockElement.getBoundingClientRect();
+      // Get all elements for this block (multi-element blocks like listings)
+      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      if (allElements.length === 0) return;
+
+      const blockElement = allElements[0]; // Primary element for reference
+
+      // Compute bounding box for all elements
+      let rect;
+      if (allElements.length > 1) {
+        rect = this.getBoundingBoxForElements(allElements);
+        if (!rect) {
+          rect = blockElement.getBoundingClientRect();
+        }
+      } else {
+        rect = blockElement.getBoundingClientRect();
+      }
+
       document.querySelector('body').classList.add('grabbing');
 
-      // Create a visual copy of the block being dragged
-      const draggedBlock = blockElement.cloneNode(true);
-      draggedBlock.classList.add('dragging');
-      // Remove data-block-uid from shadow so it doesn't interfere with selectors
-      draggedBlock.removeAttribute('data-block-uid');
+      // Create a visual ghost for dragging
+      let draggedBlock;
+      if (allElements.length > 1) {
+        // Multi-element block: create a placeholder box representing the bounding area
+        draggedBlock = document.createElement('div');
+        draggedBlock.classList.add('dragging', 'multi-element-ghost');
+        draggedBlock.style.cssText = `
+          background: rgba(0, 123, 255, 0.2);
+          border: 2px dashed rgba(0, 123, 255, 0.5);
+          border-radius: 4px;
+        `;
+      } else {
+        // Single element: clone it as before
+        draggedBlock = blockElement.cloneNode(true);
+        draggedBlock.classList.add('dragging');
+        // Remove data-block-uid from shadow so it doesn't interfere with selectors
+        draggedBlock.removeAttribute('data-block-uid');
+      }
 
       // IMPORTANT: Set styles BEFORE appending to avoid brief layout flash
       // where element is in document flow before position:fixed takes effect
@@ -3823,22 +4532,83 @@ export class Bridge {
       let insertAt = null; // 0 for top, 1 for bottom
       let dropIndicatorVisible = false; // Track if drop indicator is shown - drop only allowed when visible
 
+      // Auto-scroll state - uses requestAnimationFrame for continuous scrolling
+      let scrollDirection = 0; // -1 = up, 0 = none, 1 = down
+      let scrollAnimationId = null;
+      let lastMouseX = 0; // Track last cursor position for scroll updates
+      let lastMouseY = 0;
+      let currentScrollSpeed = 0; // Variable speed based on edge proximity
+      const scrollThreshold = 80; // pixels from edge to trigger scroll
+      const minScrollSpeed = 10; // slowest scroll (at threshold edge)
+      const maxScrollSpeed = 50; // fastest scroll (at viewport edge)
+
+      // Continuous scroll loop using requestAnimationFrame
+      // Dispatches synthetic mousemove to update drop indicator while scrolling
+      const scrollLoop = () => {
+        if (scrollDirection !== 0) {
+          // Use scrollTo with behavior: 'instant' to override CSS scroll-behavior: smooth
+          window.scrollTo({
+            top: window.scrollY + (scrollDirection * currentScrollSpeed),
+            behavior: 'instant'
+          });
+          // Dispatch synthetic mousemove to update drop indicator position
+          // This ensures the indicator updates even when mouse is stationary
+          const syntheticEvent = new MouseEvent('mousemove', {
+            clientX: lastMouseX,
+            clientY: lastMouseY,
+            bubbles: true,
+          });
+          document.dispatchEvent(syntheticEvent);
+          scrollAnimationId = requestAnimationFrame(scrollLoop);
+        }
+      };
+
+      const startScrolling = (direction) => {
+        if (scrollDirection !== direction) {
+          scrollDirection = direction;
+          if (scrollAnimationId === null && direction !== 0) {
+            scrollAnimationId = requestAnimationFrame(scrollLoop);
+          }
+        }
+      };
+
+      const stopScrolling = () => {
+        scrollDirection = 0;
+        if (scrollAnimationId !== null) {
+          cancelAnimationFrame(scrollAnimationId);
+          scrollAnimationId = null;
+        }
+      };
+
       // Handle mouse movement
       const onMouseMove = (e) => {
+        // Track cursor position for scroll loop updates
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+
         draggedBlock.style.left = `${e.clientX}px`;
         draggedBlock.style.top = `${e.clientY}px`;
 
         // Auto-scroll when dragging near viewport edges
-        const scrollThreshold = 50; // pixels from edge to trigger scroll
-        const scrollSpeed = 10; // pixels per frame
+        // Uses continuous scrolling that works even when mouse is stationary at edge
         const viewportHeight = window.innerHeight;
 
         if (e.clientY < scrollThreshold) {
           // Near top edge - scroll up
-          window.scrollBy(0, -scrollSpeed);
+          // Speed increases as cursor gets closer to edge (0 = fastest, threshold = slowest)
+          const distanceFromEdge = e.clientY;
+          const speedFactor = 1 - (distanceFromEdge / scrollThreshold); // 1 at edge, 0 at threshold
+          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
+          startScrolling(-1);
         } else if (e.clientY > viewportHeight - scrollThreshold) {
           // Near bottom edge - scroll down
-          window.scrollBy(0, scrollSpeed);
+          const distanceFromEdge = viewportHeight - e.clientY;
+          const speedFactor = 1 - (distanceFromEdge / scrollThreshold);
+          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
+          startScrolling(1);
+        } else {
+          // Not near edge - stop scrolling
+          stopScrolling();
         }
 
         // Find element under cursor (no throttle - these operations are fast)
@@ -3884,8 +4654,7 @@ export class Bridge {
           // Check if the dragged block type is allowed in the target container
           // If not, walk up the parent chain to find a valid drop target
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
-          const draggedBlockData = this.getBlockData(draggedBlockId);
-          const draggedBlockType = draggedBlockData?.['@type'];
+          const draggedBlockType = this.getBlockType(draggedBlockId);
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -3945,7 +4714,21 @@ export class Bridge {
             document.body.appendChild(dropIndicator);
           }
 
-          const rect = closestBlock.getBoundingClientRect();
+          // Check if this is a multi-element block (multiple elements with same UID)
+          const allElements = this.getAllBlockElements(closestBlockUid);
+          const isMultiElement = allElements.length > 1;
+
+          // For multi-element blocks, use combined bounding box and first/last elements
+          let targetElement = closestBlock;
+          let rect;
+
+          if (isMultiElement) {
+            // Use combined bounding box for positioning decision
+            rect = this.getBoundingBoxForElements(allElements);
+          } else {
+            rect = closestBlock.getBoundingClientRect();
+          }
+
           const isHorizontal = this.getAddDirection(closestBlock) === 'right';
 
           // Determine insertion point based on mouse position relative to block center
@@ -3953,9 +4736,18 @@ export class Bridge {
           const blockSize = isHorizontal ? rect.width : rect.height;
           insertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
 
+          // For multi-element blocks, use first or last element for indicator positioning
+          if (isMultiElement) {
+            targetElement = insertAt === 0 ? allElements[0] : allElements[allElements.length - 1];
+          }
+
           // Calculate indicator position in the gap between blocks
-          const sibling = insertAt === 0 ? closestBlock.previousElementSibling : closestBlock.nextElementSibling;
-          const siblingRect = sibling?.hasAttribute('data-block-uid') ? sibling.getBoundingClientRect() : null;
+          // For sibling lookup, use targetElement (first/last of multi-element, or the single element)
+          const sibling = insertAt === 0 ? targetElement.previousElementSibling : targetElement.nextElementSibling;
+          // Don't use sibling if it has the same UID (another element of same multi-element block)
+          const siblingUid = sibling?.getAttribute('data-block-uid');
+          const siblingRect = sibling?.hasAttribute('data-block-uid') && siblingUid !== closestBlockUid
+            ? sibling.getBoundingClientRect() : null;
           const indicatorSize = 4;
 
           let indicatorPos;
@@ -3996,6 +4788,26 @@ export class Bridge {
 
       // Cleanup on mouseup & update blocks layout
       const onMouseUp = () => {
+        // Clear drag flag
+        this._isDragging = false;
+
+        // Mark that we just finished a drag - prevents scrollIntoView race condition
+        // with async renderers. Clear after a delay to allow render to complete.
+        this._justFinishedDrag = true;
+        setTimeout(() => {
+          this._justFinishedDrag = false;
+        }, 500);
+
+        // Clear any pending scroll timeout from auto-scroll
+        // This prevents stale BLOCK_SELECTED from firing after drop
+        if (this.scrollTimeout) {
+          clearTimeout(this.scrollTimeout);
+          this.scrollTimeout = null;
+        }
+
+        // Stop auto-scroll
+        stopScrolling();
+
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
@@ -4109,18 +4921,14 @@ export class Bridge {
             return;
           }
 
-          !this.elementIsVisibleInViewport(blockElement) &&
-            blockElement.scrollIntoView();
-
           // Call selectBlock() to properly set up toolbar and contenteditable
           // This ensures blocks selected via Order tab work the same as clicking
+          // Note: selectBlock() handles scrolling with toolbar margin awareness
           this.selectBlock(blockElement);
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          // Use getBlockData to handle nested blocks (not just top-level)
-          const blockData = this.getBlockData(uid);
-          const blockType = blockData?.['@type'];
+          const blockType = this.getBlockType(uid);
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           const hasEditableFields = Object.keys(blockTypeFields).length > 0 || blockType === 'slate';
 
@@ -4205,7 +5013,12 @@ export class Bridge {
       }
 
       // After scroll stops, re-send BLOCK_SELECTED with updated positions
+      // Skip during drag - auto-scroll causes misleading position updates
+      // Skip during block selector navigation - carousel animations cause stale position updates
       this.scrollTimeout = setTimeout(() => {
+        if (this._isDragging || this._blockSelectorNavigating) {
+          return; // Don't send BLOCK_SELECTED during drag or carousel navigation
+        }
         if (this.selectedBlockUid) {
           const blockElement = document.querySelector(
             `[data-block-uid="${this.selectedBlockUid}"]`,
@@ -4549,11 +5362,13 @@ export class Bridge {
 
   /**
    * Observes changes in the text content of a block.
+   * For multi-element blocks, observes ALL elements with the same block UID.
    *
    * @param {HTMLElement} blockElement - The block element to observe.
    */
   observeBlockTextChanges(blockElement) {
-    log('observeBlockTextChanges called for block:', blockElement.getAttribute('data-block-uid'));
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    log('observeBlockTextChanges called for block:', blockUid);
     if (this.blockTextMutationObserver) {
       this.blockTextMutationObserver.disconnect();
     }
@@ -4580,10 +5395,24 @@ export class Bridge {
         }
       });
     });
-    this.blockTextMutationObserver.observe(blockElement, {
-      subtree: true,
-      characterData: true,
-    });
+
+    // For multi-element blocks, observe ALL elements with the same block UID
+    // For page-level fields (no blockUid), observe the element directly
+    if (blockUid) {
+      const allElements = this.getAllBlockElements(blockUid);
+      for (const element of allElements) {
+        this.blockTextMutationObserver.observe(element, {
+          subtree: true,
+          characterData: true,
+        });
+      }
+    } else {
+      // Page-level field - observe the element directly
+      this.blockTextMutationObserver.observe(blockElement, {
+        subtree: true,
+        characterData: true,
+      });
+    }
   }
 
   /**
@@ -4601,6 +5430,22 @@ export class Bridge {
           (bottom > 0 && bottom < innerHeight)) &&
           ((left > 0 && left < innerWidth) || (right > 0 && right < innerWidth))
       : top >= 0 && left >= 0 && bottom <= innerHeight && right <= innerWidth;
+  }
+
+  /**
+   * Scrolls an element into view, centering if it fits or showing top if too tall.
+   * @param {HTMLElement} el - Element to scroll into view
+   * @param {Object} options - Options
+   * @param {number} options.toolbarMargin - Space to reserve at top (default 50)
+   * @param {number} options.bottomMargin - Space to reserve at bottom (default 50)
+   */
+  scrollBlockIntoView(el, { toolbarMargin = 50, bottomMargin = 50 } = {}) {
+    const scrollRect = el.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const availableHeight = viewportHeight - toolbarMargin - bottomMargin;
+    // Center if block fits, otherwise show top
+    const blockPosition = scrollRect.height > availableHeight ? 'start' : 'center';
+    el.scrollIntoView({ behavior: 'instant', block: blockPosition });
   }
 
   /**
@@ -4640,6 +5485,8 @@ export class Bridge {
    */
   tryMakeBlockVisible(targetUid) {
     log(`tryMakeBlockVisible: ${targetUid}`);
+    // Set flag to prevent handleBlockSelector from interfering
+    this._navigatingToBlock = targetUid;
     // First, try direct selector: data-block-selector="{targetUid}"
     const directSelector = document.querySelector(
       `[data-block-selector="${targetUid}"]`,
@@ -4741,60 +5588,74 @@ export class Bridge {
     const nextBlock = siblings[nextIndex];
     const nextUid = nextBlock?.getAttribute('data-block-uid');
     log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
+    log(`tryMakeBlockVisible: selector element:`, selector.tagName, selector.className, `parent: ${selector.parentElement?.id || selector.parentElement?.className}`);
 
     // Click once
     selector.click();
+    log(`tryMakeBlockVisible: click() called`);
 
-    // Wait for the expected block to become visible, then recurse if needed
-    const waitAndContinue = async () => {
-      // Poll for up to 500ms for the next block to become visible
-      for (let i = 0; i < 10; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        if (nextBlock && !this.isElementHidden(nextBlock)) {
-          log(`tryMakeBlockVisible: ${nextUid} is now visible`);
-          // Check if we've reached the target
-          if (nextUid === targetUid) {
-            log(`tryMakeBlockVisible: reached target ${targetUid}`);
-            return true;
-          }
-          // Need more clicks - recurse
-          log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
-          return this.tryMakeBlockVisible(targetUid);
+    // Wait for the expected block to become visible using requestAnimationFrame
+    // This is more universal than setTimeout - works with CSS transitions, JS animations, and instant changes
+    const startTime = performance.now();
+    const MAX_WAIT_MS = 2000; // 2 second timeout
+
+    const checkVisibility = () => {
+      const elapsed = performance.now() - startTime;
+
+      // Re-query element each time - DOM may re-render and replace elements
+      const currentNextBlock = document.querySelector(`[data-block-uid="${nextUid}"]`);
+
+      // Debug: log element state every 500ms
+      if (elapsed > 0 && Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
+        if (currentNextBlock) {
+          const style = window.getComputedStyle(currentNextBlock);
+          const rect = currentNextBlock.getBoundingClientRect();
+          const container = currentNextBlock.parentElement?.closest('[data-block-uid]');
+          const containerRect = container?.getBoundingClientRect();
+          log(`tryMakeBlockVisible debug: display=${style.display} rect=${Math.round(rect.width)}x${Math.round(rect.height)} left=${Math.round(rect.left)} right=${Math.round(rect.right)} containerLeft=${containerRect ? Math.round(containerRect.left) : 'none'} containerRight=${containerRect ? Math.round(containerRect.right) : 'none'}`);
+        } else {
+          log(`tryMakeBlockVisible debug: element not found in DOM`);
         }
       }
-      log(`tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible`);
-      return false;
+
+      if (currentNextBlock && !this.isElementHidden(currentNextBlock)) {
+        log(`tryMakeBlockVisible: ${nextUid} is now visible after ${Math.round(elapsed)}ms`);
+        // Check if we've reached the target
+        if (nextUid === targetUid) {
+          log(`tryMakeBlockVisible: reached target ${targetUid}`);
+          this._navigatingToBlock = null; // Clear flag
+          return;
+        }
+        // Need more clicks - recurse
+        log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
+        this.tryMakeBlockVisible(targetUid);
+        return;
+      }
+
+      if (elapsed < MAX_WAIT_MS) {
+        // Not visible yet - check again next frame
+        requestAnimationFrame(checkVisibility);
+      } else {
+        log(`tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible after ${Math.round(elapsed)}ms`);
+        this._navigatingToBlock = null; // Clear flag on timeout
+      }
     };
 
-    // Start the async wait (caller will handle the promise via the polling loop)
-    waitAndContinue();
+    // Start checking on next frame (after click event has propagated)
+    requestAnimationFrame(checkVisibility);
     return true;
   }
 
   /**
    * Collects all editable fields from a block element.
-   * Returns an object mapping fieldName -> fieldType (e.g., { heading: 'string', description: 'slate' })
-   * @param {HTMLElement} blockElement - The block element to scan
+   * For multi-element blocks, searches ALL elements with the same UID.
    * @returns {Object} Map of field names to their types
    */
   getEditableFields(blockElement) {
     if (!blockElement) return {};
-
     const blockUid = blockElement.getAttribute('data-block-uid');
-    const editableFields = {};
-    // Use getOwnEditableFields to only get THIS block's fields, not nested blocks' fields
-    const fieldElements = this.getOwnEditableFields(blockElement);
-
-    fieldElements.forEach((element) => {
-      const fieldPath = element.getAttribute('data-editable-field');
-      if (fieldPath) {
-        // Use getFieldType which handles page-level fields (e.g., /title) correctly
-        const fieldType = this.getFieldType(blockUid, fieldPath) || 'string';
-        editableFields[fieldPath] = fieldType;
-      }
-    });
-
-    return editableFields;
+    return this.collectBlockFields(blockElement, 'data-editable-field',
+      (el, name, results) => { results[name] = this.getFieldType(blockUid, name) || 'string'; });
   }
 
   /**
@@ -4857,7 +5718,7 @@ export class Bridge {
       }
 
       // For regular blocks, use blockFieldTypes
-      const blockType = block['@type'];
+      const blockType = pathInfo.blockType;
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
       Object.keys(fieldTypes).forEach((fieldName) => {
         if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
@@ -5537,9 +6398,9 @@ export class Bridge {
       if (!blocks || typeof blocks !== 'object') return;
       for (const blockId of Object.keys(blocks)) {
         const block = blocks[blockId];
-        if (block && block['@type']) {
+        const blockType = this.getBlockType(blockId);
+        if (block && blockType) {
           // Check if this block has slate fields and strip nodeIds from them
-          const blockType = block['@type'];
           const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
           for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
             if (this.fieldTypeIsSlate(fieldType) && block[fieldName]) {
@@ -5635,8 +6496,7 @@ export class Bridge {
     }
 
     // Block field
-    const blockData = this.getBlockData(resolved.blockId);
-    const blockType = blockData?.['@type'];
+    const blockType = this.getBlockType(resolved.blockId);
     const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
     return blockTypeFields[resolved.fieldName];
   }
@@ -5901,9 +6761,19 @@ export class Bridge {
       return;
     }
 
-    log('bufferUpdate: buffering. from:', from, 'seq:', currentSeq, 'text:', JSON.stringify(text));
+    // Increment sequence immediately when we have local changes
+    // This marks our local state as "ahead" of Admin, so any incoming FORM_DATA
+    // at a lower sequence will be rejected as stale
+    const isNewPending = !this.pendingTextUpdate;
+    if (isNewPending) {
+      const newSeq = currentSeq + 1;
+      this.formData._editSequence = newSeq;
+      log('bufferUpdate: NEW pending, incrementing seq to:', newSeq, 'from:', from, 'text:', JSON.stringify(text));
+    } else {
+      log('bufferUpdate: updating existing pending, seq:', this.formData._editSequence, 'from:', from, 'text:', JSON.stringify(text));
+    }
 
-    // Buffer the update - sequence will be assigned at SEND time, not buffer time
+    // Buffer the update with current sequence
     this.pendingTextUpdate = {
       type: 'INLINE_EDIT_DATA',
       data: data,
@@ -5932,19 +6802,17 @@ export class Bridge {
       this.textUpdateTimer = null;
     }
     if (this.pendingTextUpdate) {
-      // Assign sequence number at SEND time, not buffer time
-      // This ensures monotonically increasing sequences even if FORM_DATA arrives during debounce
-      const currentSeq = this.formData?._editSequence || 0;
-      const newSeq = currentSeq + 1;
-      this.pendingTextUpdate.data._editSequence = newSeq;
-      this.formData._editSequence = newSeq;
+      // Use the sequence that was already incremented in bufferUpdate
+      // This ensures we send with the same seq that we used to reject stale FORM_DATA
+      const seq = this.formData?._editSequence || 1;
+      this.pendingTextUpdate.data._editSequence = seq;
 
       // Include requestId if provided (for FLUSH_BUFFER coordination)
       if (flushRequestId) {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
 
-      log('flushPendingTextUpdates: sending buffered update, seq:', newSeq,
+      log('flushPendingTextUpdates: sending buffered update, seq:', seq,
           'anchor:', this.pendingTextUpdate.selection?.anchor,
           'focus:', this.pendingTextUpdate.selection?.focus);
       window.parent.postMessage(this.pendingTextUpdate, this.adminOrigin);
@@ -6411,11 +7279,12 @@ export class Bridge {
           display: block;
         }
         /* Linkable field hover styles - indicate clickable link areas */
-        [data-linkable-field] {
+        /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
+        [data-linkable-field]:not([data-block-readonly] [data-linkable-field]):not([data-block-readonly][data-linkable-field]) {
           cursor: pointer;
           position: relative;
         }
-        [data-linkable-field]:hover::after {
+        [data-linkable-field]:not([data-block-readonly] [data-linkable-field]):not([data-block-readonly][data-linkable-field]):hover::after {
           content: "";
           position: absolute;
           inset: -2px;
@@ -6424,11 +7293,12 @@ export class Bridge {
           pointer-events: none;
         }
         /* Media field hover styles - indicate clickable image areas */
-        [data-media-field] {
+        /* Exclude fields inside readonly blocks */
+        [data-media-field]:not([data-block-readonly] [data-media-field]):not([data-block-readonly][data-media-field]) {
           cursor: pointer;
           position: relative;
         }
-        [data-media-field]:hover::after {
+        [data-media-field]:not([data-block-readonly] [data-media-field]):not([data-block-readonly][data-media-field]):hover::after {
           content: "";
           position: absolute;
           inset: -2px;
@@ -6681,30 +7551,42 @@ let bridgeInstance = (typeof window !== 'undefined' && window.__hydraBridge) || 
 /**
  * Initialize the bridge
  *
- * @param {URL} adminOrigin
- * @param {Object} options
- * @returns new Bridge()
+ * @param {Object|string} [adminOriginOrOptions] - Options object or admin origin URL
+ * @param {Object} [options] - Options (if first param is adminOrigin)
+ * @returns {Bridge} The bridge instance
  */
-export function initBridge(adminOrigin, options = {}) {
+export function initBridge(adminOriginOrOptions, options = {}) {
+  let adminOrigin;
+
+  // Support both calling conventions:
+  // - initBridge({ options }) - just options, no adminOrigin
+  // - initBridge(adminOrigin, { options }) - with explicit adminOrigin
+  if (
+    typeof adminOriginOrOptions === 'object' &&
+    adminOriginOrOptions !== null
+  ) {
+    // First argument is options object
+    options = adminOriginOrOptions;
+    adminOrigin = options.adminOrigin; // Can optionally include adminOrigin in options
+  } else {
+    // First argument is adminOrigin (string or null/undefined)
+    adminOrigin = adminOriginOrOptions;
+  }
+
   // 1. Explicit parameter (highest priority)
   if (adminOrigin) {
     log('Using explicit admin origin:', adminOrigin);
   }
-  // 2. Auto-detect from referrer (most secure)
-  else if (document.referrer) {
-    try {
-      adminOrigin = new URL(document.referrer).origin;
-      log('Auto-detected admin origin from referrer:', adminOrigin);
-    } catch (e) {
-      console.error('[HYDRA] Failed to parse referrer URL:', e);
-    }
+  // 2. Extract from window.name (set by Volto, persists across iframe navigation)
+  else if (window.name.startsWith('hydra-edit:') || window.name.startsWith('hydra-view:')) {
+    const prefix = window.name.startsWith('hydra-edit:') ? 'hydra-edit:' : 'hydra-view:';
+    adminOrigin = window.name.slice(prefix.length);
+    log('Got admin origin from window.name:', adminOrigin);
   }
-  // 3. Learn from first postMessage (fallback, less secure)
+  // 3. No window.name means we're not in a Volto iframe - nothing to communicate with
   else {
-    console.warn('[HYDRA] No referrer available, will learn origin from first postMessage (less secure)');
-    // Set a flag to learn from first message
-    options._learnOriginFromFirstMessage = true;
-    adminOrigin = null; // Will be set when first message is received
+    log('No hydra window.name set - not in Volto iframe, skipping bridge setup');
+    adminOrigin = null;
   }
 
   if (!bridgeInstance) {
@@ -6717,10 +7599,15 @@ export function initBridge(adminOrigin, options = {}) {
   } else {
     // Bridge already exists - check if URL changed (e.g., after SPA navigation + remount)
     const currentPath = window.location.pathname;
+    // Update pathToApiPath if provided in new options
+    if (options.pathToApiPath) {
+      bridgeInstance.pathToApiPath = options.pathToApiPath;
+    }
     if (bridgeInstance.lastKnownPath && bridgeInstance.lastKnownPath !== currentPath) {
-      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath);
+      const apiPath = bridgeInstance.pathToApiPath(currentPath);
+      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath, '-> apiPath:', apiPath);
       window.parent.postMessage(
-        { type: 'PATH_CHANGE', path: currentPath },
+        { type: 'PATH_CHANGE', path: apiPath },
         bridgeInstance.adminOrigin,
       );
     }
@@ -6782,6 +7669,389 @@ export function onEditChange(callback) {
   if (bridgeInstance) {
     bridgeInstance.onEditChange(callback);
   }
+}
+
+// ============================================================================
+// Listing/Search API Utilities (fetch-agnostic helpers)
+// ============================================================================
+
+/**
+ * Get authorization headers for API requests.
+ * Uses the access token from URL, sessionStorage, or cookie.
+ * @returns {Object} Headers object with Authorization if token exists
+ */
+export function getAuthHeaders() {
+  const token = getAccessToken();
+  if (token) {
+    return {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    };
+  }
+  return {
+    Accept: 'application/json',
+  };
+}
+
+/**
+ * Build the request body for @querystring-search endpoint.
+ * This is the Plone endpoint that accepts Volto's querystring format.
+ *
+ * @param {Object} queryConfig - Volto querystring configuration
+ * @param {Array} queryConfig.query - Array of query conditions [{i, o, v}, ...]
+ * @param {string} [queryConfig.sort_on] - Field to sort on
+ * @param {string} [queryConfig.sort_order] - 'ascending' or 'descending'
+ * @param {number} [queryConfig.limit] - Maximum number of results (0 = unlimited)
+ * @param {Object} [paging] - Paging options
+ * @param {number} [paging.b_start=0] - Starting index
+ * @param {number} [paging.b_size=10] - Number of items per page
+ * @param {Object} [extraCriteria={}] - Additional query criteria (for search blocks)
+ * @param {string} [extraCriteria.SearchableText] - Text search term
+ * @param {string} [extraCriteria.sort_on] - Override sort field
+ * @param {string} [extraCriteria.sort_order] - Override sort order
+ * @param {string|string[]} [extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
+ * @returns {Object} Request body for POST to @querystring-search
+ */
+export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriteria = {}) {
+  const { b_start = 0, b_size = 10 } = paging;
+
+  // Ensure query array exists with default if empty
+  let query = queryConfig?.query;
+  if (!query || !Array.isArray(query) || query.length === 0) {
+    // Default: search from root path
+    query = [
+      {
+        i: 'path',
+        o: 'plone.app.querystring.operation.string.absolutePath',
+        v: '/',
+      },
+    ];
+  } else {
+    // Clone to avoid mutations
+    query = [...query];
+  }
+
+  // Merge extraCriteria into query
+  if (extraCriteria.SearchableText) {
+    query.push({
+      i: 'SearchableText',
+      o: 'plone.app.querystring.operation.string.contains',
+      v: extraCriteria.SearchableText,
+    });
+  }
+
+  // Add facet filters from extraCriteria (keys starting with 'facet.')
+  for (const [key, value] of Object.entries(extraCriteria)) {
+    if (key.startsWith('facet.')) {
+      const field = key.replace('facet.', '');
+      query.push({
+        i: field,
+        o: 'plone.app.querystring.operation.selection.any',
+        v: Array.isArray(value) ? value : [value],
+      });
+    }
+  }
+
+  const body = {
+    query,
+    sort_on: extraCriteria.sort_on || queryConfig?.sort_on || 'effective',
+    sort_order: extraCriteria.sort_order || queryConfig?.sort_order || 'descending',
+    b_start,
+    b_size,
+    metadata_fields: '_all',
+  };
+
+  // Add limit if specified (0 or undefined means no limit)
+  if (queryConfig?.limit && queryConfig.limit > 0) {
+    body.limit = queryConfig.limit;
+  }
+
+  return body;
+}
+
+/**
+ * Calculate paging information from search results.
+ *
+ * @param {number} itemsTotal - Total number of items
+ * @param {number} bSize - Items per page
+ * @param {number} currentPage - Current page index (0-based)
+ * @returns {Object} Paging info with pages array, prev, next, last
+ */
+export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
+  if (!bSize || bSize <= 0 || !itemsTotal || itemsTotal <= 0) {
+    return { pages: [], prev: null, next: null, last: null, totalPages: 0, currentPage: 0, totalItems: 0 };
+  }
+
+  const totalPages = Math.ceil(itemsTotal / bSize);
+  const pages = Array.from({ length: totalPages }, (_, i) => ({
+    start: i * bSize,
+    page: i + 1,
+  }));
+
+  // Get a window of pages around current page (show 5 pages max)
+  const windowStart = Math.max(0, currentPage - 2);
+  const windowEnd = Math.min(totalPages, currentPage + 3);
+  const visiblePages = pages.slice(windowStart, windowEnd);
+
+  return {
+    pages: visiblePages,
+    prev: currentPage > 0 ? currentPage - 1 : null,
+    next: currentPage < totalPages - 1 ? currentPage + 1 : null,
+    last: totalPages - 1,
+    totalPages,
+    currentPage,
+    totalItems: itemsTotal,
+  };
+}
+
+/**
+ * Expand listing blocks by fetching query results and converting items to blocks.
+ * Uses itemType and fieldMapping from each listing block to determine output format.
+ * Each listing is replaced by multiple blocks of the specified itemType in the layout.
+ * Works with any fetch library (Nuxt $fetch, React Query, SWR, etc.)
+ *
+ * @param {Object} blocks - Block data keyed by block ID
+ * @param {Array} blocksLayout - Ordered array of block IDs (blocks_layout.items)
+ * @param {Object} options
+ * @param {string} [options.apiUrl] - Base API URL (required if no fetcher provided)
+ * @param {string} options.contextPath - Current content path for relative queries
+ * @param {number} [options.page=0] - Current page number (0-indexed)
+ * @param {number} [options.pageSize=10] - Number of elements per page
+ * @param {Function} [options.fetcher] - Custom fetch function(path, body, headers) => Promise<response>
+ * @param {Object} [options.extraCriteria={}] - Additional query criteria (for search blocks)
+ * @param {string} [options.extraCriteria.SearchableText] - Text search term
+ * @param {string} [options.extraCriteria.sort_on] - Override sort field
+ * @param {string} [options.extraCriteria.sort_order] - Override sort order ('ascending'|'descending')
+ * @param {string|string[]} [options.extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
+ * @param {string} [options.itemTypeField='itemType'] - Field name to read item block type from (e.g., 'variation')
+ * @param {string} [options.defaultItemType='summaryItem'] - Default item type when field is not set
+ * @returns {Promise<{items: Array, paging: Object}>}
+ *   - items: Array of blocks, each with @uid (block ID for data-block-uid) and @type
+ *   - paging: { currentPage, totalPages, totalItems, prev, next, pages }
+ *
+ * @example
+ * // Listing block with itemType and fieldMapping:
+ * // {
+ * //   '@type': 'listing',
+ * //   'itemType': 'teaser',
+ * //   'fieldMapping': { 'title': 'headline', '@id': 'href' },
+ * //   'itemDefaults': { 'showImage': true }
+ * // }
+ * // Query result: { title: 'My Page', '@id': '/my-page', description: '...' }
+ * // Output block: { '@type': 'teaser', headline: 'My Page', href: '/my-page', showImage: true }
+ */
+
+/**
+ * Synchronous helper to pass through static blocks with @uid.
+ * Use for blocks without listings that render outside Suspense.
+ * Shares paging object with expandBlocks for combined paging.
+ *
+ * @param {Object} blocks - Map of blockId -> block data
+ * @param {Array} blocksLayout - Array of blockIds in order
+ * @param {Object} paging - Paging object { start, size, total, _seen } - mutated
+ * @returns {{ items: Array, paging: Object }} Items on current page + updated paging
+ */
+export function staticBlocks(blocks, blocksLayout, paging) {
+  const items = [];
+  const startingSeen = paging._seen;
+
+  for (const blockId of blocksLayout) {
+    const block = blocks[blockId];
+    if (block) {
+      paging._seen++;
+      // Only include items on current page
+      if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
+        items.push({ ...block, '@uid': blockId });
+      }
+    }
+  }
+
+  // Update total
+  paging.total += paging._seen - startingSeen;
+
+  // Compute paging UI values
+  computePagingUI(paging);
+
+  return { items, paging };
+}
+
+/**
+ * Internal helper to compute paging UI values.
+ */
+function computePagingUI(paging) {
+  const { start, size, total } = paging;
+  if (size && total) {
+    paging.currentPage = Math.floor(start / size);
+    paging.totalPages = Math.ceil(total / size);
+    paging.totalItems = total;
+
+    // Page number window (show ~5 pages centered on current)
+    const windowStart = Math.max(0, paging.currentPage - 2);
+    const windowEnd = Math.min(paging.totalPages, paging.currentPage + 3);
+    paging.pages = [];
+    for (let i = windowStart; i < windowEnd; i++) {
+      paging.pages.push({ start: i * size, page: i + 1 });
+    }
+
+    paging.prev = paging.currentPage > 0 ? paging.currentPage - 1 : null;
+    paging.next = paging.currentPage < paging.totalPages - 1 ? paging.currentPage + 1 : null;
+  }
+}
+
+export async function expandListingBlocks(blocks, blocksLayout, options) {
+  const {
+    apiUrl,
+    contextPath = '/',
+    paging: pagingIn,  // { start, size, total, _seen } - mutated to track position across calls
+    fetcher,
+    extraCriteria = {},
+    itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
+    defaultItemType = 'summaryItem',  // Default item type when field is not set
+  } = options;
+
+  // Create default paging if not provided
+  const paging = pagingIn || { start: 0, size: 1000, total: 0, _seen: 0 };
+
+  const headers = getAuthHeaders();
+  headers['Content-Type'] = 'application/json';
+
+  // Validate: need either apiUrl or fetcher
+  if (!apiUrl && !fetcher) {
+    throw new Error('expandListingBlocks requires either apiUrl or fetcher option');
+  }
+
+  const listingResults = {}; // Store fetched results per listing
+
+  // Find all listing blocks that need expansion and fetch in parallel
+  const listingBlockIds = blocksLayout.filter(
+    (blockId) => blocks[blockId]?.['@type'] === 'listing' && blocks[blockId]?.querystring?.query
+  );
+
+  // Register listing blocks as readonly on bridge (if editing)
+  // Expanded items share these UIDs and shouldn't have editable fields
+  if (bridgeInstance) {
+    for (const blockId of listingBlockIds) {
+      bridgeInstance.setBlockReadonly(blockId, true);
+      log('expandListingBlocks: registered readonly block:', blockId);
+    }
+  } else {
+    log('expandListingBlocks: no bridgeInstance, skipping readonly registration for:', listingBlockIds);
+  }
+
+  await Promise.all(
+    listingBlockIds.map(async (blockId) => {
+      const block = blocks[blockId];
+      const body = buildQuerystringSearchBody(block.querystring, {
+        b_start: 0,
+        b_size: 1000,
+      }, extraCriteria);
+
+      const path = `${contextPath}/++api++/@querystring-search`;
+
+      try {
+        let response;
+        if (fetcher) {
+          response = await fetcher(path, body, headers);
+        } else {
+          const res = await fetch(`${apiUrl}${path}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+          });
+          response = await res.json();
+        }
+        listingResults[blockId] = response.items || [];
+      } catch (error) {
+        console.error(`[HYDRA] Failed to fetch listing ${blockId}:`, error);
+        listingResults[blockId] = [];
+      }
+    })
+  );
+
+  // Build items array - each item has @uid for the block_uid to use when rendering
+  const items = [];
+  const startingSeen = paging._seen;  // Track for updating total
+
+  // Helper to process an item through paging
+  const processItem = (item) => {
+    paging._seen++;
+    if (paging._seen <= paging.start) return;  // Before current page
+    if ((paging._seen - paging.start) > paging.size) return;  // Page is full
+    items.push(item);
+  };
+
+  for (const blockId of blocksLayout) {
+    const block = blocks[blockId];
+
+    if (block?.['@type'] === 'listing' && listingResults[blockId]) {
+      const queryResults = listingResults[blockId];
+      const itemType = block[itemTypeField] || defaultItemType;
+      const fieldMapping = block.fieldMapping || {};
+
+      // Extract itemDefaults from flat keys (e.g., itemDefaults_overwrite -> overwrite)
+      // Volto stores these as flat keys because forms don't handle nested paths
+      const itemDefaults = {};
+      const defaultsPrefix = 'itemDefaults_';
+      for (const [key, value] of Object.entries(block)) {
+        if (key.startsWith(defaultsPrefix)) {
+          const fieldName = key.slice(defaultsPrefix.length);
+          itemDefaults[fieldName] = value;
+        }
+      }
+      console.log('[HYDRA] expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
+
+      // Convert each query result to a block of itemType
+      // All expanded items share the same @uid (the listing block's ID)
+      for (const result of queryResults) {
+        const itemBlock = {
+          '@uid': blockId,  // Block UID for data-block-uid attribute
+          '@type': itemType,
+          ...itemDefaults,
+          // readOnly: Volto standard property - disables inline editing
+          // hydra.js checks this in collectBlockFields() to skip all fields
+          readOnly: true,
+        };
+
+        // Apply field mapping: source field -> target field
+        // e.g., { 'title': 'headline', '@id': 'href', 'image': 'preview_image' }
+        for (const [sourceField, targetField] of Object.entries(fieldMapping)) {
+          if (!targetField) continue;
+
+          // Special handling for 'image' source - copy as catalog brain format
+          // Volto's Image component uses: item['@id'], item.image_field, item.image_scales[field][0]
+          if (sourceField === 'image' && result.image_scales) {
+            // Set target field (e.g., preview_image) with catalog brain structure
+            itemBlock[targetField] = {
+              '@id': result['@id'],
+              image_field: result.image_field || 'image',
+              image_scales: result.image_scales,
+            };
+          }
+          // Special handling for href field - wrap in array format expected by link fields
+          else if (targetField === 'href' && result[sourceField] !== undefined) {
+            itemBlock[targetField] = [{ '@id': result[sourceField] }];
+          }
+          // Default: copy value as-is
+          else if (result[sourceField] !== undefined) {
+            itemBlock[targetField] = result[sourceField];
+          }
+        }
+
+        processItem(itemBlock);
+      }
+    } else if (block) {
+      // Non-listing blocks: add with their own @uid
+      processItem({ ...block, '@uid': blockId });
+    }
+  }
+
+  // Update paging total with items from this call
+  paging.total += paging._seen - startingSeen;
+
+  // Compute paging UI values
+  computePagingUI(paging);
+
+  return { items, paging };
 }
 
 // ============================================================================

@@ -126,25 +126,19 @@ test.describe('Block Selection', () => {
 
     // Test selecting an image block
     await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
+    await helper.waitForSidebarCurrentBlock('Image');
 
-    // Verify sidebar shows image-specific fields (url, alt)
-    const hasUrlField = await helper.hasSidebarField('url');
-    const hasAltField = await helper.hasSidebarField('alt');
-    expect(hasUrlField).toBe(true);
-    expect(hasAltField).toBe(true);
+    // Verify sidebar shows image-specific fields (alt, size)
+    await expect(page.locator('#sidebar-properties .field-wrapper-alt')).toBeVisible();
+    await expect(page.locator('#sidebar-properties .field-wrapper-size')).toBeVisible();
 
     // Test selecting a slate/text block
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForSidebarOpen();
-    await helper.openSidebarTab('Block');
+    await helper.waitForSidebarCurrentBlock('Text');
 
     // Verify sidebar no longer shows image-specific fields
-    const stillHasUrlField = await helper.hasSidebarField('url');
-    const stillHasAltField = await helper.hasSidebarField('alt');
-    expect(stillHasUrlField).toBe(false);
-    expect(stillHasAltField).toBe(false);
+    await expect(page.locator('#sidebar-properties .field-wrapper-alt')).not.toBeVisible();
+    await expect(page.locator('#sidebar-properties .field-wrapper-size')).not.toBeVisible();
   });
 
   test('clicking block in ChildBlocksWidget selects it in iframe', async ({ page }) => {
@@ -328,6 +322,47 @@ test.describe('Block Selection', () => {
     expect(scrollAfter).toBe(scrollBefore);
   });
 
+  test('selecting block shows sidebar settings from top, not scrolled down', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select listing block which has multiple settings (variation, headline, querystring, fieldMapping)
+    await helper.clickBlockInIframe('block-9-listing');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // Get the sidebar scroll container and block settings
+    const sidebarScroller = page.locator('.sidebar-content-wrapper');
+    const blockSettings = page.locator('#sidebar-properties');
+    await expect(sidebarScroller).toBeVisible();
+    await expect(blockSettings).toBeVisible({ timeout: 5000 });
+
+    // Wait for any scroll animation to complete
+    await page.waitForTimeout(500);
+
+    // Verify the TOP of block settings is visible (not scrolled past)
+    // Get bounding boxes to compare positions
+    const scrollerBox = await sidebarScroller.boundingBox();
+    const settingsBox = await blockSettings.boundingBox();
+
+    expect(scrollerBox).toBeTruthy();
+    expect(settingsBox).toBeTruthy();
+
+    // The top of settings should be at or below the top of the scroller viewport
+    // (i.e., not scrolled so far that the top of settings is above the viewport)
+    const settingsTopIsVisible = settingsBox!.y >= scrollerBox!.y - 20; // Allow 20px tolerance
+    expect(
+      settingsTopIsVisible,
+      `Top of block settings should be visible. Settings top: ${settingsBox!.y}, Scroller top: ${scrollerBox!.y}`,
+    ).toBe(true);
+
+    // Also verify the first field is visible (variation for listing block)
+    const firstField = page.locator('#sidebar-properties .field-wrapper-variation');
+    await expect(firstField).toBeVisible({ timeout: 5000 });
+  });
+
   test('sidebar block header menu has same items as toolbar menu except settings', async ({
     page,
   }) => {
@@ -434,11 +469,11 @@ test.describe('Block Selection', () => {
     const iframeBody = iframe.locator('body');
     const scrollBefore = await iframeBody.evaluate(() => window.scrollY);
 
-    // Use End key to scroll to bottom (like user reported)
-    await page.keyboard.press('End');
+    // Scroll iframe to bottom programmatically (simulates user scrolling)
+    await iframeBody.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(200);
 
-    // Check scroll position right after pressing End
+    // Check scroll position right after scrolling
     const scrollAfterEnd = await iframeBody.evaluate(() => window.scrollY);
     expect(scrollAfterEnd).toBeGreaterThan(scrollBefore);
 
@@ -452,7 +487,7 @@ test.describe('Block Selection', () => {
     expect(scrollFinal).toBeGreaterThanOrEqual(scrollAfterEnd - 50);
 
     // Now scroll back to the top - the toolbar should reappear on the selected block
-    await page.keyboard.press('Home');
+    await iframeBody.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(500);
 
     // Verify the toolbar is visible again for the selected block

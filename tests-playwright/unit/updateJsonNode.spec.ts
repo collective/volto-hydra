@@ -431,7 +431,7 @@ test.describe('Bridge.updateJsonNode()', () => {
       // Set up bridge with mock block data
       const bridge = (window as any).bridge;
       bridge.blockPathMap = {
-        'test-block': { path: ['blocks', 'test-block'] },
+        'test-block': { path: ['blocks', 'test-block'], blockType: 'slate' },
       };
       bridge.formData = {
         blocks: {

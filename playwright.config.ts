@@ -1,6 +1,34 @@
 import { defineConfig, devices } from '@playwright/test';
-import { defineCoverageReporterConfig } from '@bgotink/playwright-coverage';
 import * as path from 'path';
+
+// Only import coverage reporter when COVERAGE is enabled (CI)
+// This prevents V8 coverage collection overhead locally
+const coverageReporter = process.env.COVERAGE
+  ? (() => {
+      const { defineCoverageReporterConfig } = require('@bgotink/playwright-coverage');
+      return [
+        [
+          '@bgotink/playwright-coverage',
+          defineCoverageReporterConfig({
+            sourceRoot: __dirname,
+            exclude: [
+              '**/node_modules/**',
+              '**/tests-playwright/**',
+              '**/core/**',
+              '**/*.spec.ts',
+              '**/examples/**',
+            ],
+            resultDir: path.join(__dirname, 'coverage'),
+            reports: [
+              ['html'],
+              ['lcovonly', { file: 'lcov.info' }],
+              ['text-summary', { file: null }],
+            ],
+          }),
+        ] as const,
+      ];
+    })()
+  : [];
 
 /**
  * Playwright Test configuration for Volto Hydra tests.
@@ -31,31 +59,8 @@ export default defineConfig({
   /* Reporter to use */
   reporter: [
     ['html', { open: 'never' }],
-    // Code coverage reporter - collects V8 coverage during test execution
-    ...(process.env.COVERAGE
-      ? [
-          [
-            '@bgotink/playwright-coverage',
-            defineCoverageReporterConfig({
-              sourceRoot: __dirname,
-              // Exclude test fixtures, node_modules, core Volto code (we only want coverage for our code)
-              exclude: [
-                '**/node_modules/**',
-                '**/tests-playwright/**',
-                '**/core/**',
-                '**/*.spec.ts',
-                '**/examples/**',
-              ],
-              resultDir: path.join(__dirname, 'coverage'),
-              reports: [
-                ['html'], // HTML report for local viewing
-                ['lcovonly', { file: 'lcov.info' }], // LCOV for Codecov upload
-                ['text-summary', { file: null }], // Summary to stdout
-              ],
-            }),
-          ] as const,
-        ]
-      : []),
+    // Code coverage reporter - only enabled when COVERAGE=1 (CI)
+    ...coverageReporter,
   ],
 
   /* Shared settings for all the projects below */

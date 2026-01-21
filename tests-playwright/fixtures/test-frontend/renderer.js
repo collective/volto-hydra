@@ -25,13 +25,30 @@ const sliderSlideCount = {};
 
 /**
  * Extract URL from various formats and construct image URL.
- * Handles: array of objects [{@id: '/path'}], object {@id: '/path'}, or string '/path'
- * Adds @@images/image suffix for Plone paths.
+ * Handles:
+ * - Catalog brain: { '@id': '/path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
+ * - Array: [{ '@id': '/path' }]
+ * - Object: { '@id': '/path' }
+ * - String: '/path'
  * @param {Array|Object|string} value - Image value in various formats
  * @returns {string} Image URL ready for src attribute
  */
 function getImageUrl(value) {
     if (!value) return '';
+
+    // Handle catalog brain format from expandListingBlocks
+    // { '@id': '/content-path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
+    if (value.image_scales && value.image_field) {
+        const field = value.image_field;
+        const scales = value.image_scales[field];
+        if (scales?.[0]?.download) {
+            // download is relative like "@@images/image-800-hash.svg"
+            // Prepend the content @id to make it absolute
+            const baseUrl = value['@id'] || '';
+            return `${baseUrl}/${scales[0].download}`;
+        }
+    }
+
     // Extract @id from array or object format
     let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
     if (typeof url !== 'string') return '';
@@ -57,9 +74,9 @@ function getLinkUrl(value) {
 
 /**
  * Render content blocks to the DOM.
- * @param {Object} content - Content object with blocks and blocks_layout
+ * @param {Object} content - Content object with items array (each item has @uid and @type)
  */
-function renderContent(content) {
+async function renderContent(content) {
     // Increment render counter
     window.hydraRenderCount++;
     const counterEl = document.getElementById('render-counter');
@@ -68,31 +85,28 @@ function renderContent(content) {
     const container = document.getElementById('content');
     container.innerHTML = '';
 
-    const { blocks, blocks_layout } = content;
-    if (!blocks_layout) {
+    const { items } = content;
+    if (!items) {
         // Expected for non-block content types (Image, File, etc.)
         return;
     }
-    const items = blocks_layout.items || [];
 
-    items.forEach(blockId => {
-        const block = blocks[blockId];
-        if (!block) return;
-
-        const blockElement = renderBlock(blockId, block);
+    for (const item of items) {
+        // Pass @uid as blockId - this becomes data-block-uid
+        const blockElement = await renderBlock(item['@uid'], item);
         if (blockElement) {
             container.appendChild(blockElement);
         }
-    });
+    }
 }
 
 /**
  * Render a single block.
- * @param {string} blockId - Block UUID
+ * @param {string} blockId - Block UID (used for data-block-uid attribute)
  * @param {Object} block - Block data
- * @returns {HTMLElement} Rendered block element
+ * @returns {Promise<HTMLElement>} Rendered block element
  */
-function renderBlock(blockId, block) {
+async function renderBlock(blockId, block) {
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', blockId);
 
@@ -109,20 +123,33 @@ function renderBlock(blockId, block) {
         case 'image':
             wrapper.innerHTML = renderImageBlock(block);
             break;
+        case 'video':
+            wrapper.innerHTML = renderVideoBlock(block);
+            break;
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
         case 'hero':
-            wrapper.innerHTML = renderHeroBlock(block);
-            break;
+            // Hero uses comment syntax instead of data attributes
+            // This tests the hydra comment parser with selectors
+            const heroFragment = document.createDocumentFragment();
+            // Comment specifies block-uid and field selectors
+            const heroComment = document.createComment(` hydra block-uid=${blockId} editable-field=heading(.hero-heading) editable-field=subheading(.hero-subheading) media-field=image(.hero-image) editable-field=buttonText(.hero-button) linkable-field=buttonLink(.hero-button) `);
+            heroFragment.appendChild(heroComment);
+            const heroEl = document.createElement('div');
+            heroEl.innerHTML = renderHeroBlockClean(block);
+            heroFragment.appendChild(heroEl.firstElementChild);
+            heroFragment.appendChild(document.createComment(' /hydra '));
+            return heroFragment;
+
         case 'columns':
-            wrapper.innerHTML = renderColumnsBlock(block);
+            wrapper.innerHTML = await renderColumnsBlock(block);
             break;
         case 'column':
             wrapper.innerHTML = renderColumnBlock(block);
             break;
         case 'gridBlock':
-            wrapper.innerHTML = renderGridBlock(block);
+            wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
         case 'carousel':
             wrapper.classList.add('carousel-block');
@@ -137,13 +164,31 @@ function renderBlock(blockId, block) {
             wrapper.innerHTML = renderSlideBlock(block);
             break;
         case 'accordion':
-            wrapper.innerHTML = renderAccordionBlock(block);
+            wrapper.innerHTML = await renderAccordionBlock(block, blockId);
             break;
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
+        case 'search':
+            wrapper.innerHTML = await renderSearchBlock(block, blockId);
+            break;
         case 'teaser':
-            wrapper.innerHTML = renderTeaserBlock(block);
+            // Teaser handles its own data-block-uid, so return it directly
+            const teaserEl = document.createElement('div');
+            teaserEl.innerHTML = renderTeaserBlock(block, blockId);
+            return teaserEl.firstElementChild;
+        case 'defaultItem':
+            const defaultEl = document.createElement('div');
+            defaultEl.innerHTML = renderDefaultItemBlock(block, blockId);
+            return defaultEl.firstElementChild;
+        case 'summaryItem':
+            const summaryEl = document.createElement('div');
+            summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
+            return summaryEl.firstElementChild;
+        // Note: listing blocks are expanded by expandListingBlocks() into individual
+        // teaser/image blocks BEFORE rendering, so 'listing' case should never be hit
+        case 'skiplogicTest':
+            wrapper.innerHTML = renderSkiplogicTestBlock(block);
             break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
@@ -356,7 +401,8 @@ function renderMultiFieldBlock(block) {
  */
 function renderHeroBlock(block) {
     const heading = block.heading || '';
-    const subheading = block.subheading || '';
+    // Ensure subheading is a string (might be object from conversion)
+    const subheading = typeof block.subheading === 'string' ? block.subheading : '';
     const buttonText = block.buttonText || '';
     const buttonLink = getLinkUrl(block.buttonLink);
     const imageSrc = getImageUrl(block.image);
@@ -400,40 +446,103 @@ function renderHeroBlock(block) {
 }
 
 /**
+ * Render a hero block WITHOUT data attributes (for comment syntax testing).
+ * Uses CSS classes instead of data-* attributes - hydra comment will add them.
+ * @param {Object} block - Hero block data
+ * @returns {string} HTML string
+ */
+function renderHeroBlockClean(block) {
+    const heading = block.heading || '';
+    // Ensure subheading is a string (might be object from conversion)
+    const subheading = typeof block.subheading === 'string' ? block.subheading : '';
+    const buttonText = block.buttonText || '';
+    const buttonLink = getLinkUrl(block.buttonLink);
+    const imageSrc = getImageUrl(block.image);
+    const description = block.description || [{ type: 'p', children: [{ text: '' }] }];
+
+    // Render subheading as textarea (preserve newlines)
+    const subheadingHtml = subheading.replace(/\n/g, '<br>');
+
+    // Render description - still needs node IDs for slate editing
+    let descriptionHtml = '';
+    description.forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        switch (node.type) {
+            case 'h1':
+                descriptionHtml += `<h1 class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</h1>`;
+                break;
+            case 'h2':
+                descriptionHtml += `<h2 class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</h2>`;
+                break;
+            case 'p':
+            default:
+                descriptionHtml += `<p class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</p>`;
+        }
+    });
+
+    // Image - uses class instead of data-media-field
+    const imageHtml = imageSrc
+        ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
+        : `<div class="hero-image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
+
+    // No data-* attributes on fields - comment syntax will add them via selectors
+    return `
+        <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
+            ${imageHtml}
+            <h1 class="hero-heading">${heading}</h1>
+            <p class="hero-subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
+            <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
+            <a class="hero-button" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+        </div>
+    `;
+}
+
+/**
  * Render a teaser block.
  * Shows placeholder when href is empty, content when href has value.
  * By default, shows target page title/description from href.
- * Only uses block.title/description when overrideTitle/overrideDescription is true.
+ * Only uses block.title/description when overwrite is true.
+ *
+ * For listing items, hydra.js uses the readonly registry (set by expandListingBlocks)
+ * to determine if fields should be editable.
+ *
  * @param {Object} block - Teaser block data
- * @returns {string} HTML string
+ * @param {string|null} blockUid - Block UID (null if inside a container with its own UID)
+ * @returns {string} HTML string (includes wrapper with data-block-uid)
  */
-function renderTeaserBlock(block) {
-    const href = getLinkUrl(block.href);
+function renderTeaserBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
 
-    // Get title: use block.title only if overwrite is true, otherwise use href title
-    const title = block.overwrite && block.title
-        ? block.title
-        : (hrefObj?.title || '');
+    // Determine whether to use block data or hrefObj data for ALL fields (no mixing)
+    // - overwrite=true: user wants custom data → use block data
+    // - overwrite=false but hrefObj has no content data: use block data (e.g., listing items)
+    // - overwrite=false and hrefObj has content data: use hrefObj data (object browser selection)
+    const hrefObjHasContentData = hrefObj?.title !== undefined;
+    const useBlockData = block.overwrite || !hrefObjHasContentData;
 
-    // Get description: use block.description only if overwrite is true, otherwise use href description
-    const description = block.overwrite && block.description
-        ? block.description
-        : (hrefObj?.description || '');
+    // Get href: always from hrefObj @id (link destination)
+    const href = hrefObj?.['@id'] || '';
 
-    // Get preview image: use block.preview_image if set, otherwise use target content's image
+    // Get title/description/image based on useBlockData (all or nothing, no mixing)
+    const title = useBlockData ? (block.title || '') : (hrefObj?.title || '');
+    const description = useBlockData ? (block.description || '') : (hrefObj?.description || '');
+
     let imageSrc = '';
-    if (block.preview_image) {
+    if (useBlockData && block.preview_image) {
         imageSrc = getImageUrl(block.preview_image);
-    } else if (hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
-        // Target content has a preview image - construct URL from target path
+    } else if (!useBlockData && hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
         imageSrc = hrefObj['@id'] + '/@@images/preview_image';
     }
 
-    // If href is empty, show placeholder for starter UI
-    if (!href) {
+    // Only add data-block-uid if blockUid is provided (not when inside a container that already has it)
+    const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
+
+
+    // If href is empty, show placeholder for starter UI (only for standalone teasers)
+    if (!href && blockUid) {
         return `
-            <div class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
+            <div ${blockUidAttr} class="teaser-block teaser-placeholder" style="padding: 40px 20px; background: #f5f5f5; border: 2px dashed #ccc; border-radius: 8px; text-align: center; min-height: 150px; display: flex; align-items: center; justify-content: center;">
                 <p style="color: #999; margin: 0;">Select a target page for this teaser</p>
             </div>
         `;
@@ -444,19 +553,74 @@ function renderTeaserBlock(block) {
         ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
         : '';
 
-    // Only add data-editable-field when overwrite is true (field is customizable)
-    // Title is always linkable (clicking it opens link editor for href)
-    const titleEditableAttr = block.overwrite ? 'data-editable-field="title"' : '';
-    const descAttr = block.overwrite ? 'data-editable-field="description"' : '';
+    // When overwrite is false, add data-block-readonly to prevent editing
+    // User must check "Customize teaser content" checkbox to enable editing
+    const readonlyAttr = block.overwrite ? '' : 'data-block-readonly';
+
+    // Always include editable/linkable attributes - hydra.js respects data-block-readonly
+    return `
+        <div ${blockUidAttr} ${readonlyAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+            ${imageHtml}
+            <a href="${href || '#'}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
+                <h3 data-editable-field="title" style="margin: 0;">${title}</h3>
+            </a>
+            <p data-editable-field="description" style="color: #666; margin: 0;">${description}</p>
+            <a href="${href || '#'}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
+        </div>
+    `;
+}
+
+/**
+ * Render a default result item (simple title + description).
+ * @param {Object} block - Block data
+ * @param {string} blockUid - Block UID
+ * @returns {string} HTML string
+ */
+function renderDefaultItemBlock(block, blockUid) {
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+    const href = hrefObj?.['@id'] || '';
+    const title = block.title || hrefObj?.title || '';
+    const description = block.description || hrefObj?.description || '';
+    const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
     return `
-        <div class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
-            ${imageHtml}
-            <a href="${href}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
-                <h3 ${titleEditableAttr} style="margin: 0;">${title}</h3>
+        <div ${blockUidAttr} class="default-item-block" style="padding: 15px; border-bottom: 1px solid #eee;">
+            <a href="${href || '#'}" data-linkable-field="href" style="text-decoration: none; color: inherit;">
+                <h4 data-editable-field="title" style="margin: 0 0 5px 0;">${title}</h4>
             </a>
-            <p ${descAttr} style="color: #666; margin: 0;">${description}</p>
-            <a href="${href}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
+            <p data-editable-field="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
+        </div>
+    `;
+}
+
+/**
+ * Render a summary result item (title + description + image).
+ * @param {Object} block - Block data
+ * @param {string} blockUid - Block UID
+ * @returns {string} HTML string
+ */
+function renderSummaryItemBlock(block, blockUid) {
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+    const href = hrefObj?.['@id'] || '';
+    const title = block.title || hrefObj?.title || '';
+    const description = block.description || hrefObj?.description || '';
+    const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
+
+    const imageSrc = block.image ? getImageUrl(block.image) : '';
+
+    const imageHtml = imageSrc
+        ? `<img src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
+        : '';
+
+    return `
+        <div ${blockUidAttr} class="summary-item-block" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start;">
+            ${imageHtml}
+            <div style="flex: 1;">
+                <a href="${href || '#'}" data-linkable-field="href" style="text-decoration: none; color: inherit;">
+                    <h4 data-editable-field="title" style="margin: 0 0 5px 0;">${title}</h4>
+                </a>
+                <p data-editable-field="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
+            </div>
         </div>
     `;
 }
@@ -467,28 +631,44 @@ function renderTeaserBlock(block) {
  * @returns {string} HTML string
  */
 function renderImageBlock(block) {
+    console.log('[TEST-FRONTEND] renderImageBlock:', { url: block.url, type: typeof block.url, hasImageScales: !!block.url?.image_scales });
     const imageSrc = getImageUrl(block.url);
-    const alt = block.alt || '';
+    // Volto's image block uses 'placeholder' for alt text, not 'alt'
+    const alt = block.placeholder || block.alt || '';
     const href = getLinkUrl(block.href);
 
     // Add data-media-field="url" for inline image editing
-    // Add data-linkable-field="href" for inline link editing
-    const img = `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
+    const img = `<img data-media-field="url" src="${imageSrc}" alt="${alt}" />`;
 
-    // If href is set, wrap in link - tests that click behavior is prevented in edit mode
+    // If href is set, wrap in link with data-linkable-field on the <a>
+    // This ensures hydra.js prevents navigation in edit mode
     if (href) {
-        return `<a href="${href}" class="image-link">${img}</a>`;
+        return `<a href="${href}" class="image-link" data-linkable-field="href">${img}</a>`;
     }
-    return img;
+    // No href yet - put data-linkable-field on img so users can add a link
+    return `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
+}
+
+/**
+ * Render a video block.
+ * @param {Object} block - Video block data with url
+ * @returns {string} HTML string
+ */
+function renderVideoBlock(block) {
+    const url = block.url || '';
+    return `<div class="video-block">
+        <p>Video: ${url || 'No URL set'}</p>
+    </div>`;
 }
 
 /**
  * Render a columns container block.
  * Has TWO container fields: top_images and columns (tests multi-field routing)
+ * Calls window._expandListingBlocks for nested listings in columns.
  * @param {Object} block - Columns block data with top_images/top_images_layout and columns/columns_layout
- * @returns {string} HTML string
+ * @returns {Promise<string>} HTML string
  */
-function renderColumnsBlock(block) {
+async function renderColumnsBlock(block) {
     const topImages = block.top_images || {};
     const topImagesLayout = block.top_images_layout || { items: [] };
     const topImagesItems = topImagesLayout.items || [];
@@ -506,34 +686,34 @@ function renderColumnsBlock(block) {
 
     // Render top_images container field (images go right)
     if (topImagesItems.length > 0) {
-        html += '<div class="top-images-row" data-block-field="top_images" style="display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">';
+        html += '<div class="top-images-row" style="display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">';
         html += '<div class="field-label" style="font-weight: bold; color: #666; font-size: 12px; writing-mode: vertical-rl; text-orientation: mixed;">TOP IMAGES</div>';
 
-        topImagesItems.forEach(imgId => {
+        for (const imgId of topImagesItems) {
             const img = topImages[imgId];
-            if (!img) return;
+            if (!img) continue;
 
             // Render image as a nested block with data-block-uid and data-block-add="right"
             html += `<div data-block-uid="${imgId}" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
             html += renderImageBlock(img);
             html += '</div>';
-        });
+        }
 
         html += '</div>';
     }
 
-    // Render columns container field (columns go right)
-    html += '<div class="columns-row" data-block-field="columns" style="display: flex; gap: 20px;">';
+    // Render columns container (columns go right)
+    html += '<div class="columns-row" style="display: flex; gap: 20px;">';
 
-    columnsItems.forEach(columnId => {
+    for (const columnId of columnsItems) {
         const column = columns[columnId];
-        if (!column) return;
+        if (!column) continue;
 
         // Render column as a nested block with data-block-uid and data-block-add="right"
         html += `<div data-block-uid="${columnId}" data-block-add="right" class="column" style="flex: 1; padding: 10px; border: 1px dashed #ccc;">`;
-        html += renderColumnContent(column);
+        html += await renderColumnContent(column, columnId);
         html += '</div>';
-    });
+    }
 
     html += '</div>';
     return html;
@@ -542,14 +722,23 @@ function renderColumnsBlock(block) {
 /**
  * Render a column block content (the content blocks inside a column).
  * Content blocks go down (data-block-add="bottom").
+ * Calls window._expandListingBlocks for nested listings.
  * @param {Object} column - Column block data with blocks/blocks_layout
- * @returns {string} HTML string
+ * @param {string} columnId - Column ID for expansion
+ * @returns {Promise<string>} HTML string
  */
-function renderColumnContent(column) {
-    const blocks = column.blocks || {};
-    const blocksLayout = column.blocks_layout || { items: [] };
-    const items = blocksLayout.items || [];
+async function renderColumnContent(column, columnId) {
+    let blocks = column.blocks || {};
+    let items = column.blocks_layout?.items || [];
     const title = column.title || '';
+
+    // Expand nested listings if expansion function is available
+    // expandListingBlocks returns { items: [...], paging: {...} } where each item is a full block object
+    let expandedItems = null;
+    if (window._expandListingBlocks && items.length > 0) {
+        const result = await window._expandListingBlocks(blocks, items, columnId);
+        expandedItems = result.items;
+    }
 
     let html = '';
 
@@ -558,9 +747,12 @@ function renderColumnContent(column) {
         html += `<h4 data-editable-field="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
     }
 
-    items.forEach(blockId => {
-        const block = blocks[blockId];
-        if (!block) return;
+    // Use expanded items if available, otherwise use original blocks/items
+    const itemsToRender = expandedItems || items.map(id => ({ ...blocks[id], '@uid': id }));
+    for (const item of itemsToRender) {
+        const blockId = item['@uid'];
+        const block = item;
+        if (!block || !block['@type']) continue;
 
         // Render nested content block with data-block-uid and data-block-add="bottom"
         html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
@@ -573,12 +765,15 @@ function renderColumnContent(column) {
             case 'image':
                 html += renderImageBlock(block);
                 break;
+            case 'teaser':
+                html += renderTeaserBlock(block, null);
+                break;
             default:
                 html += `<p>Unknown block type: ${block['@type']}</p>`;
         }
 
         html += '</div>';
-    });
+    }
 
     return html || '<p style="color: #999;">Empty column</p>';
 }
@@ -595,31 +790,57 @@ function renderColumnBlock(block) {
 /**
  * Render a grid block (Volto's built-in container).
  * NO explicit data-block-add attributes - tests automatic direction inference.
+ * Calls window._expandListingBlocks for nested listings (set by index.html).
  * @param {Object} block - Grid block data with blocks/blocks_layout
- * @returns {string} HTML string
+ * @param {string} blockId - Block ID for paging URL
+ * @returns {Promise<string>} HTML string
  */
-function renderGridBlock(block) {
-    const blocks = block.blocks || {};
-    const blocksLayout = block.blocks_layout || { items: [] };
-    const items = blocksLayout.items || [];
+async function renderGridBlock(block, blockId) {
+    let blocks = block.blocks || {};
+    let items = block.blocks_layout?.items || [];
+    let paging = block._paging;
 
-    let html = '<div class="grid-row" style="display: flex; gap: 20px;">';
+    // Expand nested listings if expansion function is available
+    // expandListingBlocks returns { items, paging } where each item has @uid
+    // paging includes computed UI values: currentPage, totalPages, pages, prev, next
+    let expandedItems = null;
+    if (window._expandListingBlocks) {
+        const result = await window._expandListingBlocks(blocks, items, blockId);
+        expandedItems = result.items;
+        paging = result.paging?.totalPages > 1 ? result.paging : null;
+    }
 
-    items.forEach(blockId => {
-        const childBlock = blocks[blockId];
-        if (!childBlock) return;
+    let html = '<div class="grid-row" style="display: flex; flex-wrap: wrap; gap: 20px;">';
 
-        // Render grid cell WITHOUT data-block-add attribute
-        // This tests that hydra.js correctly infers direction from nesting depth
-        html += `<div data-block-uid="${blockId}" class="grid-cell" style="flex: 1; padding: 10px; border: 1px dashed #999;">`;
+    // Use expanded items if available, otherwise fall back to original blocks
+    const itemsToRender = expandedItems || items.map(id => ({ ...blocks[id], '@uid': id }));
+
+    for (const childBlock of itemsToRender) {
+        if (!childBlock) continue;
+
+        // Use @uid from block for data-block-uid
+        const uid = childBlock['@uid'];
+
+        // All grid cells have data-block-uid so clicking anywhere in the cell selects the block
+        html += `<div data-block-uid="${uid}" class="grid-cell" style="flex: 0 0 calc(25% - 15px); padding: 10px; border: 1px dashed #999;">`;
 
         // Render inner content based on block type
+        // Note: Don't pass uid to render functions - grid-cell already has data-block-uid
         switch (childBlock['@type']) {
+            case 'teaser':
+                html += renderTeaserBlock(childBlock, null);
+                break;
             case 'slate':
                 html += renderSlateBlock(childBlock);
                 break;
             case 'image':
                 html += renderImageBlock(childBlock);
+                break;
+            case 'summaryItem':
+                html += renderSummaryItemBlock(childBlock, null);
+                break;
+            case 'defaultItem':
+                html += renderDefaultItemBlock(childBlock, null);
                 break;
             case 'empty':
                 html += renderEmptyBlock(childBlock);
@@ -629,9 +850,50 @@ function renderGridBlock(block) {
         }
 
         html += '</div>';
-    });
+    }
 
     html += '</div>';
+
+    // Render paging controls if available
+    // data-linkable-allow tells hydra.js to allow navigation without beforeunload warning
+    // Uses query params: ?pg_{blockId}={page} (preserves other params)
+    if (paging) {
+        const buildUrl = (page) => {
+            const url = new URL(window.location.href);
+            if (page > 0) {
+                url.searchParams.set(`pg_${blockId}`, page);
+            } else {
+                url.searchParams.delete(`pg_${blockId}`);
+            }
+            return url.pathname + url.search;
+        };
+
+        html += '<nav class="grid-paging" style="margin-top: 15px; text-align: center;">';
+
+        // Previous link
+        if (paging.prev !== null) {
+            html += `<a href="${buildUrl(paging.prev)}" data-linkable-allow class="paging-prev" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">← Prev</a>`;
+        }
+
+        // Page numbers (p.page is 1-indexed display, paging.currentPage is 0-indexed)
+        // URL uses 0-indexed page number, not offset
+        paging.pages.forEach(p => {
+            const pageIndex = p.page - 1; // Convert to 0-indexed
+            const isCurrent = pageIndex === paging.currentPage;
+            const style = isCurrent
+                ? 'margin: 0 3px; padding: 5px 10px; background: #007bff; color: white; border: 1px solid #007bff; text-decoration: none;'
+                : 'margin: 0 3px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;';
+            html += `<a href="${buildUrl(pageIndex)}" data-linkable-allow class="paging-page${isCurrent ? ' current' : ''}" style="${style}">${p.page}</a>`;
+        });
+
+        // Next link
+        if (paging.next !== null) {
+            html += `<a href="${buildUrl(paging.next)}" data-linkable-allow class="paging-next" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">Next →</a>`;
+        }
+
+        html += '</nav>';
+    }
+
     return html;
 }
 
@@ -801,47 +1063,243 @@ function renderSlideBlock(block) {
 }
 
 /**
- * Render an accordion block with separate header and content container fields.
- * This demonstrates data-block-field for multi-container targeting.
+ * Render an accordion block with separate header and content containers.
+ * Calls window._expandListingBlocks for nested listings in content.
  *
  * @param {Object} block - Accordion block data with header/header_layout and content/content_layout
- * @returns {string} HTML string
+ * @param {string} blockId - Accordion block ID
+ * @returns {Promise<string>} HTML string
  */
-function renderAccordionBlock(block) {
-    const header = block.header || {};
-    const headerLayout = block.header_layout?.items || [];
-    const content = block.content || {};
-    const contentLayout = block.content_layout?.items || [];
+async function renderAccordionBlock(block, blockId) {
+    let header = block.header || {};
+    let headerItems = block.header_layout?.items || [];
+    let content = block.content || {};
+    let contentItems = block.content_layout?.items || [];
+
+    // Expand nested listings in content (header usually doesn't have listings)
+    // expandListingBlocks returns { items, paging } where each item has @uid
+    let expandedItems = null;
+    if (window._expandListingBlocks && contentItems.length > 0) {
+        const result = await window._expandListingBlocks(content, contentItems, `${blockId}-content`);
+        expandedItems = result.items;
+    }
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
-    // Header section - uses 'header' container field
-    html += '<div class="accordion-header" data-block-field="header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">';
+    // Header section
+    html += '<div class="accordion-header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">';
     html += '<div class="header-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">HEADER</div>';
 
-    headerLayout.forEach(blockId => {
-        const childBlock = header[blockId];
+    for (const childId of headerItems) {
+        const childBlock = header[childId];
         if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
+            html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
             html += '</div>';
         }
-    });
+    }
 
     html += '</div>';
 
-    // Content section - uses 'content' container field
-    html += '<div class="accordion-content" data-block-field="content" style="padding: 15px;">';
+    // Content section
+    html += '<div class="accordion-content" style="padding: 15px;">';
     html += '<div class="content-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">CONTENT</div>';
 
-    contentLayout.forEach(blockId => {
-        const childBlock = content[blockId];
-        if (childBlock) {
-            html += `<div data-block-uid="${blockId}" data-block-add="bottom">`;
-            html += renderNestedSlateBlock(childBlock);
-            html += '</div>';
+    // Use expanded items if available, otherwise fall back to original blocks
+    const itemsToRender = expandedItems || contentItems.map(id => ({ ...content[id], '@uid': id }));
+
+    for (const childBlock of itemsToRender) {
+        if (!childBlock) continue;
+        const uid = childBlock['@uid'];
+        html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+        switch (childBlock['@type']) {
+            case 'slate':
+                html += renderNestedSlateBlock(childBlock);
+                break;
+            case 'image':
+                html += renderImageBlock(childBlock);
+                break;
+            case 'teaser':
+                html += renderTeaserBlock(childBlock, null);
+                break;
+            case 'summaryItem':
+                html += renderSummaryItemBlock(childBlock, null);
+                break;
+            default:
+                html += renderNestedSlateBlock(childBlock);
         }
-    });
+        html += '</div>';
+    }
+
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Known facet field options for rendering widgets.
+ * Maps field name to array of { value, title } options.
+ * Matches the options from @querystring endpoint in mock API.
+ */
+const FACET_FIELD_OPTIONS = {
+    'review_state': [
+        { value: 'private', title: 'Private' },
+        { value: 'pending', title: 'Pending' },
+        { value: 'published', title: 'Published' },
+    ],
+    'portal_type': [
+        { value: 'Document', title: 'Page' },
+        { value: 'News Item', title: 'News Item' },
+        { value: 'Event', title: 'Event' },
+        { value: 'Image', title: 'Image' },
+        { value: 'File', title: 'File' },
+        { value: 'Link', title: 'Link' },
+    ],
+};
+
+/**
+ * Render the appropriate widget for a facet based on its type.
+ * @param {Object} facet - Facet configuration
+ * @returns {string} HTML string for the facet widget
+ */
+function renderFacetWidget(facet) {
+    const facetType = facet.type || 'checkboxFacet';
+    // Field can be an object { label, value } from Volto's select widget, or a plain string
+    const field = typeof facet.field === 'object' ? facet.field?.value : facet.field || '';
+    const options = FACET_FIELD_OPTIONS[field] || [];
+
+    if (options.length === 0) {
+        return '<div class="facet-widget" style="font-size: 11px; color: #999;">No options available</div>';
+    }
+
+    if (facetType === 'selectFacet') {
+        // Render as dropdown select
+        let optionsHtml = '<option value="">Select...</option>';
+        optionsHtml += options.map(opt =>
+            `<option value="${opt.value}">${opt.title}</option>`
+        ).join('');
+        return `<select class="facet-widget facet-select" data-field="${field}" style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px;">
+            ${optionsHtml}
+        </select>`;
+    } else if (facetType === 'checkboxFacet') {
+        // Get current facet values from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentValues = urlParams.getAll(`facet.${field}`);
+
+        // Render as checkboxes with checked state from URL
+        const checkboxesHtml = options.map(opt => {
+            const isChecked = currentValues.includes(opt.value) ? 'checked' : '';
+            return `<label style="display: block; margin-top: 4px;">
+                <input type="checkbox" class="facet-checkbox" data-field="${field}" value="${opt.value}" ${isChecked} />
+                ${opt.title}
+            </label>`;
+        }).join('');
+        return `<div class="facet-widget facet-checkboxes" style="margin-top: 4px;">
+            ${checkboxesHtml}
+        </div>`;
+    }
+
+    // Default: just show field name
+    return '<div class="facet-widget" style="font-size: 11px; color: #999;">Widget not implemented</div>';
+}
+
+/**
+ * Render a search block with facets and listing container.
+ * The listing child is expanded via expandListingBlocks before rendering.
+ *
+ * @param {Object} block - Search block data with facets and listing/listing_layout
+ * @param {string} blockId - Search block ID
+ * @returns {Promise<string>} HTML string
+ */
+async function renderSearchBlock(block, blockId) {
+    const headline = block.headline || '';
+    const showSearchInput = block.showSearchInput;
+    const showSortOn = block.showSortOn;
+    const facets = block.facets || [];
+    const sortOnOptions = block.sortOnOptions || [];
+    const listing = block.listing || {};
+    const listingLayout = block.listing_layout?.items || [];
+
+    let html = '<div class="search-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
+
+    // Headline
+    if (headline) {
+        html += `<h2 data-editable-field="headline" style="margin-bottom: 15px;">${headline}</h2>`;
+    }
+
+    // Search input
+    if (showSearchInput) {
+        // Get current search text from URL criteria (if available)
+        const currentSearchText = window._searchCriteria?.SearchableText || '';
+        html += `<div class="search-input" style="margin-bottom: 15px;">
+            <form class="search-form" data-search-block="${blockId}" style="display: flex; gap: 10px;">
+                <input type="text" name="SearchableText" placeholder="Search..." value="${currentSearchText}"
+                    class="search-input-field"
+                    style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
+                <button type="submit" class="search-submit-button" style="padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px;">
+                    Search
+                </button>
+            </form>
+        </div>`;
+    }
+
+    // Sort options
+    if (showSortOn && sortOnOptions.length > 0) {
+        html += `<div class="search-sort" style="margin-bottom: 15px;">
+            <label style="margin-right: 8px;">Sort by:</label>
+            <select style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;">
+                ${sortOnOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+            </select>
+        </div>`;
+    }
+
+    // Facets (rendered from object_list - each has data-block-uid for selection)
+    if (facets.length > 0) {
+        html += '<div class="search-facets" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">FACETS</div>';
+        for (const facet of facets) {
+            const facetId = facet['@id'] || facet.id || '';
+            html += `<div class="facet-item" data-block-uid="${facetId}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                <div data-editable-field="title" style="font-weight: bold;">${facet.title || ''}</div>
+                <div style="font-size: 12px; color: #666;">Field: ${typeof facet.field === 'object' ? facet.field?.value : facet.field || ''}</div>
+                ${renderFacetWidget(facet)}
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    // Listing container - expand and render child blocks
+    html += '<div class="search-results" style="display: grid; gap: 15px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">';
+
+    // Expand listing blocks if we have the helper
+    // expandListingBlocks returns { items, paging } where each item has @uid
+    if (window._expandListingBlocks && listingLayout.length > 0) {
+        const result = await window._expandListingBlocks(listing, listingLayout, `${blockId}-listing`);
+        const expandedItems = result.items;
+
+        for (const childBlock of expandedItems) {
+            if (!childBlock) continue;
+
+            // Use general block renderer - it handles all block types
+            const uid = childBlock['@uid'];
+            const blockElement = await renderBlock(uid, childBlock);
+            if (blockElement) {
+                // Add data-block-add attribute for direction
+                if (blockElement instanceof DocumentFragment) {
+                    // For fragments (like hero), find the actual block element
+                    const actualElement = blockElement.querySelector('[data-block-uid]');
+                    if (actualElement) actualElement.setAttribute('data-block-add', 'bottom');
+                    html += Array.from(blockElement.childNodes).map(n => n.outerHTML || n.textContent).join('');
+                } else {
+                    blockElement.setAttribute('data-block-add', 'bottom');
+                    html += blockElement.outerHTML;
+                }
+            }
+        }
+    } else {
+        html += '<p style="color: #999;">No results</p>';
+    }
 
     html += '</div>';
 
@@ -902,6 +1360,25 @@ function renderSlateTableBlock(block) {
 }
 
 /**
+ * Render a Skiplogic Test block.
+ * @param {Object} block - Skiplogic test block data
+ * @returns {string} HTML string
+ */
+function renderSkiplogicTestBlock(block) {
+    const mode = block.mode || 'not set';
+    const columns = block.columns || 1;
+    const title = block.basicTitle || 'Untitled';
+    return `
+        <div class="skiplogic-test-block" style="padding: 16px; border: 1px solid #ccc; background: #f9f9f9;">
+            <h4>Skiplogic Test Block</h4>
+            <p>Mode: ${mode}</p>
+            <p>Columns: ${columns}</p>
+            <p>Title: ${title}</p>
+        </div>
+    `;
+}
+
+/**
  * Render an Empty block.
  * Empty blocks are inserted into empty containers and can be clicked to add a real block.
  * @param {Object} block - Empty block data
@@ -922,6 +1399,14 @@ function updateBlock(blockId, newData) {
 
     const newBlock = renderBlock(blockId, newData);
     blockElement.innerHTML = newBlock.innerHTML;
+
+    // Sync data-block-readonly attribute from new block to existing element
+    // This is needed because innerHTML only updates children, not the element's own attributes
+    if (newBlock.hasAttribute('data-block-readonly')) {
+        blockElement.setAttribute('data-block-readonly', '');
+    } else {
+        blockElement.removeAttribute('data-block-readonly');
+    }
 }
 
 /**
@@ -964,10 +1449,13 @@ function removeBlock(blockId) {
 function initCarouselNavigation() {
     // Use event delegation on the content container
     const content = document.getElementById('content');
+    console.log('[RENDERER] initCarouselNavigation called, content:', content ? 'found' : 'NOT FOUND');
     if (!content) return;
 
     content.addEventListener('click', function(event) {
+        console.log('[RENDERER] Content click received, target:', event.target.tagName, event.target.className);
         const selectorElement = event.target.closest('[data-block-selector]');
+        console.log('[RENDERER] selectorElement:', selectorElement ? selectorElement.getAttribute('data-block-selector') : 'null');
         if (!selectorElement) return;
 
         const selector = selectorElement.getAttribute('data-block-selector');
@@ -1035,9 +1523,96 @@ function initCarouselNavigation() {
     });
 }
 
+/**
+ * Initialize search form submission handling.
+ * Uses event delegation to handle all search forms.
+ * Updates the URL with SearchableText param and reloads the page.
+ */
+function initSearchFormHandling() {
+    document.addEventListener('submit', function(event) {
+        const form = event.target.closest('.search-form');
+        if (!form) return;
+
+        event.preventDefault();
+
+        const searchInput = form.querySelector('input[name="SearchableText"]');
+        const searchText = searchInput?.value?.trim() || '';
+
+        // Build new URL with search criteria
+        const url = new URL(window.location.href);
+
+        if (searchText) {
+            url.searchParams.set('SearchableText', searchText);
+        } else {
+            url.searchParams.delete('SearchableText');
+        }
+
+        // Reload page with new search criteria
+        console.log('[RENDERER] Search form submitted, navigating to:', url.toString());
+        window.location.href = url.toString();
+    });
+}
+
+/**
+ * Initialize facet checkbox/select handling.
+ * Uses event delegation to handle all facet widgets.
+ * Updates the URL with facet.{field}={value} params and reloads the page.
+ */
+function initFacetHandling() {
+    document.addEventListener('change', function(event) {
+        const checkbox = event.target.closest('.facet-checkbox');
+        const select = event.target.closest('.facet-select');
+
+        if (!checkbox && !select) return;
+
+        const url = new URL(window.location.href);
+
+        if (checkbox) {
+            const field = checkbox.dataset.field;
+            const value = checkbox.value;
+            const paramKey = `facet.${field}`;
+
+            // Get current values for this facet (may be multiple)
+            const currentValues = url.searchParams.getAll(paramKey);
+
+            if (checkbox.checked) {
+                // Add value if not already present
+                if (!currentValues.includes(value)) {
+                    url.searchParams.append(paramKey, value);
+                }
+            } else {
+                // Remove this specific value
+                url.searchParams.delete(paramKey);
+                currentValues.filter(v => v !== value).forEach(v => {
+                    url.searchParams.append(paramKey, v);
+                });
+            }
+        } else if (select) {
+            const field = select.dataset.field;
+            const value = select.value;
+            const paramKey = `facet.${field}`;
+
+            if (value) {
+                url.searchParams.set(paramKey, value);
+            } else {
+                url.searchParams.delete(paramKey);
+            }
+        }
+
+        console.log('[RENDERER] Facet changed, navigating to:', url.toString());
+        window.location.href = url.toString();
+    });
+}
+
 // Initialize carousel navigation when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCarouselNavigation);
+    document.addEventListener('DOMContentLoaded', () => {
+        initCarouselNavigation();
+        initSearchFormHandling();
+        initFacetHandling();
+    });
 } else {
     initCarouselNavigation();
+    initSearchFormHandling();
+    initFacetHandling();
 }

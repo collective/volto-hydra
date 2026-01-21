@@ -127,6 +127,43 @@ test.describe('Navigation and URL Handling', () => {
     await expect(page.locator('.sidebar-container input[name="title"]')).toHaveValue('Another Page', { timeout: 5000 });
   });
 
+  test('Clicking linked image block in edit mode does not navigate', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForSidebarOpen();
+
+    const iframe = helper.getIframe();
+
+    // Track if beforeunload dialog appears (it shouldn't - link should be prevented)
+    let dialogAppeared = false;
+    page.on('dialog', async (dialog) => {
+      dialogAppeared = true;
+      await dialog.accept();
+    });
+
+    // Find and click the linked image block (block-5-linked-image has href="https://example.com")
+    const linkedImageBlock = iframe.locator('[data-block-uid="block-5-linked-image"]');
+    await linkedImageBlock.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Click the image/link inside the block
+    const imageOrLink = linkedImageBlock.locator('a, img').first();
+    await imageOrLink.click();
+
+    // Wait a moment to ensure no navigation occurs
+    await page.waitForTimeout(500);
+
+    // Verify we're still on the edit page - no navigation happened
+    await expect(page).toHaveURL(/test-page\/edit/);
+
+    // Verify no beforeunload warning appeared (link was prevented at click level)
+    expect(dialogAppeared, 'No beforeunload warning should appear - link click should be prevented').toBe(false);
+
+    // Verify the block got selected (Quanta toolbar should appear)
+    await helper.waitForQuantaToolbar('block-5-linked-image');
+  });
+
   test('Cancelling navigation warning stays on edit page', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -235,6 +272,50 @@ test.describe('Navigation and URL Handling', () => {
 
     // Verify no warning dialog appeared during navigation
     expect(dialogAppeared, 'No beforeunload warning should appear in view mode').toBe(false);
+  });
+
+  test('Grid block paging works in view mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+
+    // Go to view mode (not edit)
+    await page.goto('http://localhost:3001/test-page');
+
+    // Wait for iframe content to load
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+
+    // Grid block (block-8-grid) should have paging since it has >6 elements
+    // (1 manual teaser + query results from listing-in-grid)
+    // Wait for paging controls to appear
+    const pagingNav = iframe.locator('.grid-paging');
+    await expect(pagingNav).toBeVisible({ timeout: 10000 });
+
+    // Track if beforeunload dialog appears (it shouldn't in view mode)
+    let dialogAppeared = false;
+    page.on('dialog', async (dialog) => {
+      dialogAppeared = true;
+      await dialog.accept();
+    });
+
+    // Click the "Next" or page 2 paging link
+    const pagingLink = iframe.locator('.grid-paging a').filter({ hasText: /Next|2/ }).first();
+    await pagingLink.click();
+
+    // Wait for the iframe to reload with page 2 content
+    // The paging link has data-linkable-allow so navigation should work without warning
+    // After navigation, the "Prev" link should become visible (indicating we're on page 2)
+    // Re-get iframe reference since navigation may have invalidated it
+    const iframeAfter = helper.getIframe();
+    // Mock frontend uses "← Prev", Nuxt uses "Previous"
+    await expect(iframeAfter.locator('a.paging-prev')).toBeVisible({ timeout: 10000 });
+
+    // Verify no warning dialog appeared during navigation
+    expect(dialogAppeared, 'No beforeunload warning should appear for paging in view mode').toBe(false);
+
+    // Verify the iframe still shows the page content (didn't break)
+    await expect(iframeAfter.locator('main')).toBeVisible({ timeout: 5000 });
   });
 
   test('Iframe does not double-load when clicking nav link', async ({ page }, testInfo) => {

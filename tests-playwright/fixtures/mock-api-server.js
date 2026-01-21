@@ -201,8 +201,44 @@ function getImageScales(content, baseUrl) {
 }
 
 /**
+ * Generate placeholder image_scales for search results
+ * Mimics Plone's image_scales structure - uses relative @@images paths
+ * The mock server's @@images/* endpoint serves SVG placeholders
+ */
+function getPlaceholderImageScales(title, fieldName = 'image') {
+  // Use a hash based on title for consistent URLs
+  const hash = (title || 'item').split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0).toString(16);
+  return {
+    [fieldName]: [{
+      'content-type': 'image/svg+xml',
+      'download': `@@images/image-800-${hash}.svg`,
+      'filename': 'placeholder.svg',
+      'height': 600,
+      'width': 800,
+      'scales': {
+        'preview': {
+          'download': `@@images/image/preview`,
+          'height': 300,
+          'width': 400,
+        },
+        'mini': {
+          'download': `@@images/image/mini`,
+          'height': 150,
+          'width': 200,
+        },
+        'thumb': {
+          'download': `@@images/image/thumb`,
+          'height': 96,
+          'width': 128,
+        },
+      },
+    }],
+  };
+}
+
+/**
  * Format a content item for search results
- * Includes image_field and image_scales for Image content types
+ * Includes image_field and image_scales matching real Plone API structure
  * Includes is_folderish for folder navigation in object browser
  * Includes hasPreviewImage for teaser blocks to show target's preview image
  */
@@ -220,12 +256,17 @@ function formatSearchItem(content, baseUrl) {
     'UID': content.UID,
     'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
+    // Match real Plone API: image_field and image_scales for all items
+    'image_field': 'image',
+    'image_scales': getPlaceholderImageScales(content.title),
   };
 
-  // Add image fields for Image content types (needed by object browser)
+  // For Image content types, use actual image data if available
   if (content['@type'] === 'Image') {
-    item.image_field = 'image';
-    item.image_scales = getImageScales(content, baseUrl);
+    const scales = getImageScales(content, baseUrl);
+    if (scales) {
+      item.image_scales = scales;
+    }
   }
 
   return item;
@@ -715,6 +756,275 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /@querystring
+ * Get querystring schema (available indexes, operators, sortable indexes)
+ * Used by QuerystringWidget to populate criteria and sort dropdowns
+ */
+app.get('/@querystring', (req, res) => {
+  res.json({
+    '@id': 'http://localhost:8888/@querystring',
+    'indexes': {
+      'portal_type': {
+        'title': 'Type',
+        'description': 'Content type',
+        'group': 'Metadata',
+        'enabled': true,
+        'sortable': false,
+        'operations': [
+          'plone.app.querystring.operation.selection.any',
+          'plone.app.querystring.operation.selection.all',
+          'plone.app.querystring.operation.selection.none',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.selection.any': {
+            'title': 'Matches any of',
+            'description': 'Matches any of the selected values',
+            'widget': 'MultipleSelectionWidget',
+            'operation': 'plone.app.querystring.operation.selection.any',
+          },
+          'plone.app.querystring.operation.selection.all': {
+            'title': 'Matches all of',
+            'description': 'Matches all of the selected values',
+            'widget': 'MultipleSelectionWidget',
+            'operation': 'plone.app.querystring.operation.selection.all',
+          },
+          'plone.app.querystring.operation.selection.none': {
+            'title': 'Matches none of',
+            'description': 'Matches none of the selected values',
+            'widget': 'MultipleSelectionWidget',
+            'operation': 'plone.app.querystring.operation.selection.none',
+          },
+        },
+        'values': {
+          'Document': { 'title': 'Page' },
+          'News Item': { 'title': 'News Item' },
+          'Event': { 'title': 'Event' },
+          'Image': { 'title': 'Image' },
+          'File': { 'title': 'File' },
+          'Link': { 'title': 'Link' },
+        },
+      },
+      'path': {
+        'title': 'Location',
+        'description': 'Location in the site structure',
+        'group': 'Metadata',
+        'enabled': true,
+        'sortable': false,
+        'operations': [
+          'plone.app.querystring.operation.string.absolutePath',
+          'plone.app.querystring.operation.string.relativePath',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.string.absolutePath': {
+            'title': 'Absolute path',
+            'description': 'Absolute path from site root',
+            'widget': 'ReferenceWidget',
+            'operation': 'plone.app.querystring.operation.string.absolutePath',
+          },
+          'plone.app.querystring.operation.string.relativePath': {
+            'title': 'Relative path',
+            'description': 'Relative to current location',
+            'widget': 'ReferenceWidget',
+            'operation': 'plone.app.querystring.operation.string.relativePath',
+          },
+        },
+      },
+      'review_state': {
+        'title': 'Review state',
+        'description': 'Workflow state',
+        'group': 'Metadata',
+        'enabled': true,
+        'sortable': true,
+        'operations': [
+          'plone.app.querystring.operation.selection.any',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.selection.any': {
+            'title': 'Matches any of',
+            'widget': 'MultipleSelectionWidget',
+            'operation': 'plone.app.querystring.operation.selection.any',
+          },
+        },
+        'values': {
+          'private': { 'title': 'Private' },
+          'pending': { 'title': 'Pending' },
+          'published': { 'title': 'Published' },
+        },
+      },
+      'created': {
+        'title': 'Creation date',
+        'description': 'Date created',
+        'group': 'Dates',
+        'enabled': true,
+        'sortable': true,
+        'operations': [
+          'plone.app.querystring.operation.date.lessThan',
+          'plone.app.querystring.operation.date.largerThan',
+          'plone.app.querystring.operation.date.between',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.date.lessThan': {
+            'title': 'Before',
+            'widget': 'DateWidget',
+            'operation': 'plone.app.querystring.operation.date.lessThan',
+          },
+          'plone.app.querystring.operation.date.largerThan': {
+            'title': 'After',
+            'widget': 'DateWidget',
+            'operation': 'plone.app.querystring.operation.date.largerThan',
+          },
+          'plone.app.querystring.operation.date.between': {
+            'title': 'Between',
+            'widget': 'DateRangeWidget',
+            'operation': 'plone.app.querystring.operation.date.between',
+          },
+        },
+      },
+      'effective': {
+        'title': 'Effective date',
+        'description': 'Publication date',
+        'group': 'Dates',
+        'enabled': true,
+        'sortable': true,
+        'operations': [
+          'plone.app.querystring.operation.date.lessThan',
+          'plone.app.querystring.operation.date.largerThan',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.date.lessThan': {
+            'title': 'Before',
+            'widget': 'DateWidget',
+            'operation': 'plone.app.querystring.operation.date.lessThan',
+          },
+          'plone.app.querystring.operation.date.largerThan': {
+            'title': 'After',
+            'widget': 'DateWidget',
+            'operation': 'plone.app.querystring.operation.date.largerThan',
+          },
+        },
+      },
+      'modified': {
+        'title': 'Modification date',
+        'description': 'Date last modified',
+        'group': 'Dates',
+        'enabled': true,
+        'sortable': true,
+        'operations': [
+          'plone.app.querystring.operation.date.lessThan',
+          'plone.app.querystring.operation.date.largerThan',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.date.lessThan': {
+            'title': 'Before',
+            'widget': 'DateWidget',
+            'operation': 'plone.app.querystring.operation.date.lessThan',
+          },
+          'plone.app.querystring.operation.date.largerThan': {
+            'title': 'After',
+            'widget': 'DateWidget',
+            'operation': 'plone.app.querystring.operation.date.largerThan',
+          },
+        },
+      },
+      'Creator': {
+        'title': 'Creator',
+        'description': 'Content author',
+        'group': 'Metadata',
+        'enabled': true,
+        'sortable': true,
+        'operations': [
+          'plone.app.querystring.operation.string.is',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.string.is': {
+            'title': 'Is',
+            'widget': null,
+            'operation': 'plone.app.querystring.operation.string.is',
+          },
+        },
+      },
+      'Subject': {
+        'title': 'Tag',
+        'description': 'Subject/tag',
+        'group': 'Text',
+        'enabled': true,
+        'sortable': false,
+        'vocabulary': 'plone.app.vocabularies.Keywords',
+        'operations': [
+          'plone.app.querystring.operation.selection.any',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.selection.any': {
+            'title': 'Matches any of',
+            'widget': 'autocomplete',
+            'operation': 'plone.app.querystring.operation.selection.any',
+          },
+        },
+      },
+      'Title': {
+        'title': 'Title',
+        'description': 'Content title',
+        'group': 'Text',
+        'enabled': true,
+        'sortable': true,
+        'operations': [
+          'plone.app.querystring.operation.string.contains',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.string.contains': {
+            'title': 'Contains',
+            'widget': null,
+            'operation': 'plone.app.querystring.operation.string.contains',
+          },
+        },
+      },
+      'Description': {
+        'title': 'Description',
+        'description': 'Content description',
+        'group': 'Text',
+        'enabled': true,
+        'sortable': false,
+        'operations': [
+          'plone.app.querystring.operation.string.contains',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.string.contains': {
+            'title': 'Contains',
+            'widget': null,
+            'operation': 'plone.app.querystring.operation.string.contains',
+          },
+        },
+      },
+      'SearchableText': {
+        'title': 'Searchable text',
+        'description': 'All text content',
+        'group': 'Text',
+        'enabled': true,
+        'sortable': false,
+        'operations': [
+          'plone.app.querystring.operation.string.contains',
+        ],
+        'operators': {
+          'plone.app.querystring.operation.string.contains': {
+            'title': 'Contains',
+            'widget': null,
+            'operation': 'plone.app.querystring.operation.string.contains',
+          },
+        },
+      },
+    },
+    'sortable_indexes': {
+      'effective': { 'title': 'Effective date', 'description': 'Publication date' },
+      'created': { 'title': 'Creation date', 'description': 'Date created' },
+      'modified': { 'title': 'Modification date', 'description': 'Date last modified' },
+      'sortable_title': { 'title': 'Title', 'description': 'Title (sortable)' },
+      'Creator': { 'title': 'Creator', 'description': 'Content author' },
+      'review_state': { 'title': 'Review state', 'description': 'Workflow state' },
+    },
+  });
+});
+
+/**
  * GET /@site
  * Get site information
  */
@@ -866,6 +1176,113 @@ app.get(/.*\/@actions$/, (req, res) => {
     ],
     object_buttons: [],
     user: [],
+  });
+});
+
+/**
+ * POST /@querystring-search
+ * Search for content using Volto's querystring format.
+ * Used by listing blocks to fetch query results.
+ *
+ * Request body:
+ * {
+ *   query: [{ i: 'portal_type', o: 'plone.app.querystring.operation.selection.any', v: ['Document'] }],
+ *   sort_on: 'effective',
+ *   sort_order: 'descending',
+ *   b_start: 0,
+ *   b_size: 10,
+ *   metadata_fields: '_all'
+ * }
+ */
+app.post('*/@querystring-search', (req, res) => {
+  const contextPath = req.path.replace('/++api++/@querystring-search', '').replace('/@querystring-search', '');
+  const baseUrl = `http://localhost:${PORT}`;
+
+  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
+  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
+
+  // Get all content items
+  let allItems = Object.keys(contentDirMap)
+    .filter((itemPath) => itemPath !== '/')
+    .map((itemPath) => loadContentFromDisk(itemPath))
+    .filter((content) => content !== null);
+
+  // Apply query filters
+  for (const condition of query) {
+    const { i: index, o: operation, v: value } = condition;
+
+    if (index === 'portal_type' && operation.includes('selection')) {
+      // Filter by content type
+      const types = Array.isArray(value) ? value : [value];
+      allItems = allItems.filter((item) => types.includes(item['@type']));
+    } else if (index === 'path' && operation.includes('absolutePath')) {
+      // Filter by path - items under the specified path
+      const basePath = value || '/';
+      if (basePath !== '/') {
+        allItems = allItems.filter((item) => item['@id'].startsWith(basePath));
+      }
+    } else if (index === 'path' && operation.includes('relativePath')) {
+      // Filter by relative path from context
+      const fullPath = contextPath + (value || '');
+      if (fullPath !== '/') {
+        allItems = allItems.filter((item) => item['@id'].startsWith(fullPath));
+      }
+    } else if (index === 'SearchableText' && operation.includes('string.contains')) {
+      // Full-text search - search in title, description, and text content
+      const searchTerm = (value || '').toLowerCase();
+      if (searchTerm) {
+        allItems = allItems.filter((item) => {
+          const title = (item.title || '').toLowerCase();
+          const description = (item.description || '').toLowerCase();
+          const id = (item.id || '').toLowerCase();
+          return title.includes(searchTerm) || description.includes(searchTerm) || id.includes(searchTerm);
+        });
+      }
+    } else if (index === 'review_state' && operation.includes('selection')) {
+      // Filter by review state
+      const states = Array.isArray(value) ? value : [value];
+      allItems = allItems.filter((item) => states.includes(item.review_state || 'published'));
+    }
+  }
+
+  // Sort items
+  if (sort_on) {
+    allItems.sort((a, b) => {
+      const aVal = a[sort_on] || '';
+      const bVal = b[sort_on] || '';
+      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      return sort_order === 'descending' ? -cmp : cmp;
+    });
+  }
+
+  // Apply results limit (different from b_size which is for pagination)
+  if (limit && limit > 0) {
+    allItems = allItems.slice(0, limit);
+  }
+
+  const itemsTotal = allItems.length;
+
+  // Apply paging
+  const pagedItems = allItems.slice(b_start, b_start + b_size);
+
+  // Format items for response
+  const items = pagedItems.map((content) => formatSearchItem(content, baseUrl));
+
+  const searchUrl = contextPath
+    ? `${baseUrl}${contextPath}/@querystring-search`
+    : `${baseUrl}/@querystring-search`;
+
+  res.json({
+    '@id': searchUrl,
+    items,
+    items_total: itemsTotal,
+    batching: {
+      '@id': searchUrl,
+      first: `${searchUrl}?b_start=0`,
+      last: `${searchUrl}?b_start=${Math.max(0, itemsTotal - b_size)}`,
+      next: b_start + b_size < itemsTotal ? `${searchUrl}?b_start=${b_start + b_size}` : null,
+      prev: b_start > 0 ? `${searchUrl}?b_start=${Math.max(0, b_start - b_size)}` : null,
+    },
   });
 });
 

@@ -47,6 +47,75 @@ You can try out the editing experience now by logging into https://hydra.pretago
 Note that the default is a Nuxt.js frontend, deployed as a [SSG](https://hydra-nuxt-flowbrite.netlify.app/) 
 to demonstrate scale-to-zero editing (free hosting) see [SSG/SSR with Hydra](./ssg_ssr_with_hydra)
 
+## Quick Start
+
+To make a site editable with hydra you will need to break up your page into
+- slots - areas of the page that contain a list of blocks that make up your page content
+- blocks - a discrete visual element of the page with a schema and settings that can be moved around and edited
+   -  fields - string, image, link etc each with their own sidebar widget
+   -  container fields/slots - areas on the block where more blocks can be added
+   -  rich text - container field that contains slate blocks each being one paragraph or heading.
+
+With a hydra instance running, go to user preferences and enter the url of your frontend.
+
+Modify your front end to work with the editor by loading the hydra bridge.
+
+
+```js
+let bridge;
+
+if (window.name.startsWith('hydra')) {
+    bridge = initBridge({
+      // which blocks can be added in the main content area
+      allowedBlocks: ['slate', 'grid', 'myimage'],
+      voltoConfig: {
+        blocks: {
+          blocksConfig: {
+            // we can add custom blocks (or alter builtin ones)
+            myimage: {
+              blockSchema: {
+                properties: {
+                  image: { widget: 'image' },
+                  url: { widget: 'url' },
+                  caption: { type: 'string' },
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+}
+
+if (window.name.startsWith('hydra-edit')) {
+    // When the user edits the page we take the content directly from the editor
+    bridge.onEditChange((formData) => renderPage(formData));
+} else {
+    // Otherwise we render from the server api
+    renderPage(await fetchContent(path));
+}
+```
+
+Finally augment the frontend's rendered html telling hydra where your blocks are and where
+the fields are.
+
+```html
+<!-- hydra editable-field=title -->
+<div>Page Title</div>
+
+<div id=content>
+  <!-- hydra block-uid="1234" editable-field=title(p) media-field=image(img) linkable-field=url -->
+  <a href="http://go.to">
+    <img src="http://my.img"/>
+    <p>A caption</p>
+  </a>
+</div>
+```
+
+Note you can just embed the hydra tags directly if you want,
+e.g. `<p data-editable-field="title">A caption</p>`
+
+
 ## Run locally
 
 Clone the Volto-Hydra repository from GitHub:
@@ -67,13 +136,13 @@ cd examples/nuxt-blog-starter
 pnpm install
 NUXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080/Plone pnpm run dev
 ```
-The frontend is at https://localhost:3000
+The frontend is at http://localhost:3000
 
 To Edit, start the Hydra Admin interface
 ```bash
 cd ../..
 make install
-RAZZLE_API_PATH="http://localhost:8080/Plone" RAZZLE_DEFAULT_IFRAME_URL=https://localhost:3000 pnpm start
+RAZZLE_API_PATH="http://localhost:8080/Plone" RAZZLE_DEFAULT_IFRAME_URL=http://localhost:3000 pnpm start
 ```
 
 Now you can login to Hydra to edit
@@ -229,7 +298,7 @@ You can use whatever frontend technology you want but a basic vue.js example mig
 </template>
 <script setup>
 const { data, error } = await ploneApi({});
-</sscript>
+</script>
 ```
 
 
@@ -260,13 +329,13 @@ At this your Editor can :-
 We include the hydra iframe bridge which creates a two way link between the hydra editor and your frontend.
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
-- During admin, initilize it with the url of Hydra and Volto settings
+- During admin, initilize it with Volto settings
   ```js
   import { initBridge } from './hydra.js';
-  const bridge = initBridge("https://hydra.pretagov.com", {allowedBlocks: ['slate', 'image', 'video']});
+  const bridge = initBridge({allowedBlocks: ['slate', 'image', 'video']});
   ```
 - To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
-- To see private content you will need to [change your authentication token]((#authenticate-frontend-to-access-private-content))
+- To see private content you will need to [change your authentication token]((#authenticatitee-frontend-to-access-private-content))
 
 This will enable an Editor to :-
 - browse in your frontend and Hydra will change context so AdminUI actions are on the current page you are seeing.
@@ -274,8 +343,22 @@ This will enable an Editor to :-
    - now the frontend has the same editor authentication it can see private content
 - edit a page the content still won't change until after save
 
-- You can pass in a function to map plone url paths to frontend paths if there is not a one to one mapping
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
+
+#### Path Transformation (pathToApiPath)
+
+If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
+
+```js
+const bridge = initBridge({
+  allowedBlocks: ['slate', 'image', 'video'],
+  // Transform frontend path to API path by stripping paging segments
+  // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
+  pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
+});
+```
+
+The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
 
 ### Level 2: Custom Blocks
 
@@ -288,7 +371,7 @@ For our slider example, we can configure this new block directly in the frontend
 ```js
 import { initBridge } from './hydra.js';
 
-const bridge = initBridge("https://hydra.pretagov.com", {
+const bridge = initBridge({
   allowedBlocks: ['slate', 'image', 'video', 'slider'],
   voltoConfig: {
     blocks: {
@@ -389,6 +472,96 @@ You can configure any Volto settings during init. Such as:
    - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
    - determine which shortcuts appear on the quanta toolbar for a given block (TODO)
 
+#### Schema Enhancers
+
+Schema enhancers modify block schemas dynamically:
+
+```js
+const bridge = initBridge({
+  voltoConfig: {
+    blocks: {
+      blocksConfig: {
+        // Parent container: controls child type via 'variation' field
+        // inheritSchemaFrom creates the typeField with computed choices
+        gridBlock: {
+          allowedBlocks: ['teaser', 'image'],  // Allowed child block types
+          schemaEnhancer: {
+            inheritSchemaFrom: {
+              typeField: 'variation',
+              defaultsField: 'itemDefaults',
+              blocksField: 'blocks',  // Derive choices from blocks field
+              title: 'Item Type',
+            },
+          },
+        },
+        // Child block: hides fields that parent controls
+        teaser: {
+          schemaEnhancer: {
+            childBlockConfig: {
+              defaultsField: 'itemDefaults',
+              editableFields: ['href', 'title', 'description'],
+            },
+          },
+        },
+        // Conditional field visibility
+        myBlock: {
+          blockSchema: {
+            properties: {
+              mode: { title: 'Mode', widget: 'select', choices: [['simple', 'Simple'], ['advanced', 'Advanced']] },
+              advancedOptions: { title: 'Advanced Options', type: 'string' },
+            },
+          },
+          schemaEnhancer: {
+            skiplogic: {
+              advancedOptions: { field: 'mode', is: 'advanced' },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+```
+
+**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
+- `typeField`: Field name for selecting child type (e.g., `'variation'`)
+- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
+- `blocksField`: Where to derive type choices:
+  - `'blocks'` or `'items'`: Container use case - derive from own field's `allowedBlocks`
+  - `'..'`: Listing use case - derive from parent's sibling allowed types
+- `filterConvertibleFrom`: Filter types to only those with `fieldMappings[source]` (e.g., `'default'`)
+
+**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+
+**`skiplogic`**: Conditionally show/hide fields based on other field values.
+- `field`: Field to check (use `../field` for parent/page fields)
+- Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
+
+#### Field Mappings
+
+`fieldMappings` is a top-level block config that defines how fields map when converting between block types:
+
+```js
+teaser: {
+  fieldMappings: {
+    default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+    image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
+  },
+},
+image: {
+  fieldMappings: {
+    default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+    teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
+  },
+},
+```
+
+- **`default`**: Used for listings (query results → block fields) and as fallback for conversions
+- **`[sourceType]`**: Specific mapping when converting FROM that type (e.g., `image:` means "when converting from image")
+- **"Convert to" dropdown**: Shows only types with valid mappings from current type
+- **Transitive conversion**: Finds paths through intermediate types (hero → teaser → image)
+- **Roundtrip preservation**: Unmapped fields persist through conversions back to original type
+
 ### Level 3: Enable Frontend block selection and Quanta Toolbar
 
 In your frontend insert the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most html element of the rendered block html.
@@ -421,23 +594,55 @@ This will enable an Editor to :-
 - selecting a block in the sidebar will highlight that block on the frontend
 
 
-#### Alternative Comment syntax ([TODO](https://github.com/collective/volto-hydra/issues/113))
+#### Comment Syntax
 
-If you can't easily modify the markup (for example using a 3rd party component library) you can use the alternative comment syntax to specify which elements are editable.
-Use css selectors to specify which elements are editable. The selectors are applied just to the following element.
+If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
 
-e.g.
 ``` html
-<!-- hydra_block_uid:...; img:image; h2:title; .description:desc_field; div a:url  -->
-<div class="slide">
-  <img src="/big_news.jpg"/>
-  <h2>Big News</h2>
-  <div class="desciption">Check out <b>hydra</b>, it will change everything</div>
-  <div><a href="/big_news">Read more</a></div>
+<!-- hydra block-uid=block-123 editable-field=title(.card-title) media-field=url(img) linkable-field=href(a.link) -->
+<div class="third-party-card">
+  <h3 class="card-title">Title</h3>
+  <img src="image.jpg">
+  <a class="link" href="...">Read more</a>
+</div>
+<!-- /hydra -->
+```
+
+- Attributes without selectors apply to the root element: `block-uid=xxx`
+- Attributes with selectors target child elements: `editable-field=title(.card-title)`
+- Closing `<!-- /hydra -->` marks end of scope
+- Self-closing `<!-- hydra block-uid=xxx /-->` applies only to next sibling element
+
+Supported attributes: `block-uid`, `block-readonly`, `editable-field`, `linkable-field`, `media-field`, `block-add`
+
+
+#### Readonly Regions
+
+Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
+
+``` html
+<div class="teaser" data-block-uid="teaser-1">
+  <div data-block-readonly>
+    <h2 data-editable-field="title">Target Page Title</h2>
+  </div>
+  <a data-linkable-field="href" href="/target">Read more</a>
 </div>
 ```
-- This will also support nested blocks (TODO)
 
+Or using comment syntax:
+``` html
+<!-- hydra block-readonly -->
+<div class="listing-item" data-block-uid="item-1">...</div>
+```
+
+#### Allowed Navigation (data-linkable-allow)
+
+Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
+
+``` html
+<a href="/page?pg=2" data-linkable-allow>Next</a>
+<select data-linkable-allow @change="handleFilter">...</select>
+```
 
 ### Level 4: Enable Realtime changes while editing and preview Block controls
 
@@ -448,7 +653,7 @@ follows the same format as you get from the
 
 e.g.
 ```js
-const bridge = initBridge('https://hydra.pretagov.com');
+const bridge = initBridge();
 bridge.onEditChange(handleEditChange);
 ```
 Since the data structure is that same as returned by the contents [RESTApi](https://6.docs.plone.org/plone.restapi/docs/source/index.html) it's normally easy to rerender your page dynamically using the same

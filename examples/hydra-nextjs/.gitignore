@@ -130,3 +130,6 @@ dist
 .pnp.*
 
 certificates
+
+# Copied from packages/hydra-js at build time
+src/utils/hydra.js

@@ -66,7 +66,7 @@ export default function Blog({ params }) {
 ```js
   // In Layout.js
   import { initBridge } from './hydra.js';
-  initBridge("https://hydra.pretagov.com");
+  initBridge();
 ```
 
 #### Enabling Click on Blocks

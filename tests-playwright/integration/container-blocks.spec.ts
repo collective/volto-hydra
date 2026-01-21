@@ -277,9 +277,10 @@ test.describe('Adding Blocks to Containers', () => {
       .count();
 
     // Select grid-cell-1 and add a new block after it
+    // gridBlock only allows ['teaser', 'image'] blocks
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.clickAddBlockButton();
-    await helper.selectBlockType('slate');
+    await helper.selectBlockType('teaser');
 
     // grid-1 should now have 3 blocks
     const finalGridBlocks = await iframe
@@ -666,12 +667,17 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    // Select a container block (col-1 is a column with child blocks)
-    await helper.clickBlockInIframe('col-1');
-    await helper.waitForSidebarOpen();
+    // Click a child block first (text-1a is inside col-1)
+    // Clicking directly on a container is unreliable as you often click a child inside
+    await helper.clickBlockInIframe('text-1a', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Text');
 
-    // Wait for sidebar to fully render
-    await page.waitForTimeout(300);
+    // Navigate up to the parent container (col-1) by clicking the parent nav
+    const parentNav = page.locator(
+      '.sidebar-section-header[data-is-current="true"] .parent-nav',
+    );
+    await parentNav.click();
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // The child blocks widget should be visible for container blocks
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
@@ -679,8 +685,7 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Should show the child blocks (text-1a, text-1b)
     const childItems = page.locator('#sidebar-order .child-block-item');
-    const itemCount = await childItems.count();
-    expect(itemCount).toBe(2);
+    await expect(childItems).toHaveCount(2);
   });
 
   test('clicking arrow on headers navigates up to parent', async ({
@@ -828,7 +833,6 @@ test.describe('Hierarchical Sidebar', () => {
     // Select the deepest nested block (text-1a inside col-1 inside columns-1)
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
-    await page.waitForTimeout(300);
 
     // Should see parent block headers in sidebar-parents
     const sidebarParents = page.locator('#sidebar-parents');
@@ -836,13 +840,11 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Find all title input fields in the parent blocks sidebar
     // Each parent block (Columns, Column) should have a title field
+    // Wait for at least 2 title fields to appear (may take time on nuxt)
     const parentTitleInputs = sidebarParents.locator(
       'input[name="title"], .field-wrapper-title input',
     );
-
-    // Should have at least 2 title fields (Columns and Column)
-    const titleCount = await parentTitleInputs.count();
-    expect(titleCount).toBeGreaterThanOrEqual(2);
+    await expect(parentTitleInputs).toHaveCount(2, { timeout: 5000 });
 
     // ===== Edit Level 1: Columns block (grandparent) =====
     // The first title field should be for the Columns block
@@ -1171,23 +1173,19 @@ test.describe('Empty Block Behavior', () => {
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
-    // Select slate block type - use text content since title attribute may vary
-    await blockChooser.getByRole('button', { name: 'Text' }).click();
+    // Select teaser block type (gridBlock only allows ['teaser', 'image'])
+    await blockChooser.getByRole('button', { name: 'Teaser' }).click();
 
-    // Wait for re-render
-    await page.waitForTimeout(500);
-
-    // The block should now be slate type, not empty
-    const slateBlock = iframe
+    // The block should now be teaser type, not empty
+    const teaserBlock = iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
       .first();
-    await expect(helper.getSlateField(slateBlock)).toBeVisible();
+    // Wait for teaser to render (has a link element)
+    await expect(teaserBlock.locator('a').first()).toBeVisible({ timeout: 5000 });
 
-    // The slate block should have proper empty content, not "Empty block" fallback
-    // This verifies that onMutateBlock properly initializes the slate value
-    const slateText = await slateBlock.textContent();
-    expect(slateText?.trim()).toBe('');
-    expect(slateText).not.toContain('Empty block');
+    // The block should not have the empty fallback
+    const blockContent = await teaserBlock.textContent();
+    expect(blockContent).not.toContain('Empty block');
   });
 
   test('adding new container block creates initial block inside', async ({
@@ -1250,29 +1248,17 @@ test.describe('Empty Block Behavior', () => {
     // Click on a page-level block (text-after) to get add button at page level
     await helper.clickBlockInIframe('text-after');
 
-    // Click the add button
+    // Click the add button and select Columns block type
     await helper.clickAddBlockButton();
+    await helper.selectBlockType('columns');
 
-    // Wait for block chooser
-    const blockChooser = page.locator('.blocks-chooser');
-    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+    // Wait for sidebar to show the new Columns block is selected
+    await helper.waitForSidebarCurrentBlock('Columns', 10000);
 
-    // Expand the Common section to find Columns (it's folded by default)
-    const commonSection = blockChooser.locator('text=Common');
-    await commonSection.click();
-
-    // Select Columns block type (this is a container that only allows 'column')
-    await blockChooser.getByRole('button', { name: 'Columns' }).click();
-
-    // Wait for re-render
-    await page.waitForTimeout(1000);
-
-    // Find the newly added columns block (should be after text-after)
-    // The page layout should now have: title-block, columns-1, text-after, NEW-COLUMNS, grid-1
+    // Wait for the new columns block to appear in iframe (should be 2 total: original columns-1 + new one)
     // Columns blocks have a .columns-row child - find all blocks with this structure
     const allColumnsBlocks = iframe.locator('[data-block-uid]:has(> .columns-row)');
-    const columnsCount = await allColumnsBlocks.count();
-    expect(columnsCount).toBe(2); // Original columns-1 + new one
+    await expect(allColumnsBlocks).toHaveCount(2, { timeout: 10000 });
 
     // Get the new columns block (the last one)
     const newColumnsBlock = allColumnsBlocks.last();
@@ -1323,7 +1309,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     expect(initialColumnCount).toBe(2);
 
     // Select columns-1 (the container that only allows column blocks)
-    await helper.clickContainerBlockInIframe('columns-1');
+    await helper.clickContainerBlockInIframe('columns-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Columns');
 
     // Add a column via the sidebar (columns field only allows 'column' type, so auto-inserts)
     await helper.addBlockViaSidebar('Columns');
@@ -1382,8 +1369,8 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     expect(initialColumnCount).toBe(2);
 
     // Select col-1 (inside columns-1, which only allows column blocks)
-    await helper.clickContainerBlockInIframe('col-1');
-    await page.waitForTimeout(500);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Find and click the iframe add button (the + button next to the block)
     // This inserts AFTER col-1 as a sibling (another column)
@@ -1822,11 +1809,13 @@ test.describe('Container Block Drag and Drop', () => {
     const iframe = helper.getIframe();
 
     // Select col-1 (a column with data-block-add="right")
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    // Use clickContainerBlockInIframe to click on the column's title, not child blocks
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
-    // Start dragging
+    // Wait for drag handle to appear (indicates block is selected)
     const dragHandle = await helper.getDragHandle();
+    await expect(dragHandle).toBeVisible();
     const col2 = iframe.locator('[data-block-uid="col-2"]');
 
     // Get drag handle position
@@ -1900,8 +1889,8 @@ test.describe('Container Block Drag and Drop', () => {
     expect(secondColUid).toBe('col-2');
 
     // Select col-1
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Drag col-1 to the right of col-2 using horizontal drag
     const dragHandle = await helper.getDragHandle();
@@ -1940,8 +1929,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCell1).toBeVisible();
 
     // Click on grid-cell-1 to select it
-    await helper.clickBlockInIframe('grid-cell-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('grid-cell-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     // Start dragging
     const dragHandle = await helper.getDragHandle();
@@ -2117,8 +2106,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(col1).toBeVisible();
 
     // Select col-1
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Try to drag to page level (next to text-after which is a page-level block)
     const dragHandle = await helper.getDragHandle();
@@ -2192,8 +2181,8 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCell1).toBeVisible();
 
     // Select col-1
-    await helper.clickBlockInIframe('col-1');
-    await page.waitForTimeout(300);
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Try to drag col-1 into the grid (next to grid-cell-1)
     const dragHandle = await helper.getDragHandle();
@@ -2261,7 +2250,8 @@ test.describe('Container Block Drag and Drop', () => {
     ).toHaveCount(2);
 
     // Select col-2 container (use clickContainerBlockInIframe to avoid hitting nested content)
-    await helper.clickContainerBlockInIframe('col-2');
+    await helper.clickContainerBlockInIframe('col-2', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // The add button is in the Admin UI (not iframe), positioned next to selected block
     const addButton = page.locator('.volto-hydra-add-button');
@@ -2275,8 +2265,9 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select the new (3rd) column and add 4th column
     const allColumns = columns1.locator(':scope > .columns-row > [data-block-uid]');
-    await allColumns.nth(2).click();
-    await helper.waitForQuantaToolbar((await allColumns.nth(2).getAttribute('data-block-uid'))!);
+    const thirdColId = await allColumns.nth(2).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(thirdColId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     await expect(addButton).toBeVisible();
     await addButton.click();
@@ -2287,8 +2278,9 @@ test.describe('Container Block Drag and Drop', () => {
     ).toHaveCount(4);
 
     // Select the new (4th) column
-    await allColumns.nth(3).click();
-    await helper.waitForQuantaToolbar((await allColumns.nth(3).getAttribute('data-block-uid'))!);
+    const fourthColId = await allColumns.nth(3).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(fourthColId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Add button should NOT be visible when container is at maxLength
     await expect(addButton).not.toBeVisible();
@@ -2313,38 +2305,37 @@ test.describe('Container Block Drag and Drop', () => {
     await expect(gridCells).toHaveCount(2);
 
     // Select grid-cell-2 and add a new cell after it
-    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.clickContainerBlockInIframe('grid-cell-2', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     // The add button is in the Admin UI (not iframe)
     const addButton = page.locator('.volto-hydra-add-button');
     await expect(addButton).toBeVisible();
     await addButton.click();
 
-    // Select slate block type from chooser
-    await helper.selectBlockType('slate');
+    // Select teaser block type from chooser (gridBlock only allows teaser/image)
+    await helper.selectBlockType('teaser');
 
     // Wait for 3rd cell to be created
     await expect(gridCells).toHaveCount(3);
 
     // Select the new (3rd) cell and add 4th cell
-    await gridCells.nth(2).click();
-    await helper.waitForQuantaToolbar(
-      (await gridCells.nth(2).getAttribute('data-block-uid'))!,
-    );
+    const thirdCellId = await gridCells.nth(2).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(thirdCellId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     await expect(addButton).toBeVisible();
     await addButton.click();
 
-    await helper.selectBlockType('slate');
+    await helper.selectBlockType('teaser');
 
     // Wait for 4th cell to be created
     await expect(gridCells).toHaveCount(4);
 
     // Select the new (4th) cell
-    await gridCells.nth(3).click();
-    await helper.waitForQuantaToolbar(
-      (await gridCells.nth(3).getAttribute('data-block-uid'))!,
-    );
+    const fourthCellId = await gridCells.nth(3).getAttribute('data-block-uid');
+    await helper.clickContainerBlockInIframe(fourthCellId!, { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Teaser');
 
     // Add button should NOT be visible when container is at maxLength
     await expect(addButton).not.toBeVisible();
@@ -2478,8 +2469,8 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     const iframe = helper.getIframe();
 
     // Select col-1 (a container with 2 child blocks: text-1a, text-1b)
-    await helper.clickBlockInIframe('col-1');
-    await helper.waitForSidebarOpen();
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Verify initial order in iframe: text-1a comes before text-1b
     const col1 = iframe.locator('[data-block-uid="col-1"]');
@@ -2518,15 +2509,16 @@ test.describe('Sidebar Child Blocks Reordering', () => {
       secondBox!.y + secondBox!.height + 10,
       { steps: 10 },
     );
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(100); // Small delay for drag library to register position
     await page.mouse.up();
-    await page.waitForTimeout(500);
 
     // Verify order changed in iframe: text-1b now comes before text-1a
-    const newOrder = await col1
-      .locator(':scope > [data-block-uid]')
-      .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
-    expect(newOrder).toEqual(['text-1b', 'text-1a']);
+    await expect(async () => {
+      const newOrder = await col1
+        .locator(':scope > [data-block-uid]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+      expect(newOrder).toEqual(['text-1b', 'text-1a']);
+    }).toPass({ timeout: 5000 });
   });
 
   test('implicit container (gridBlock) shows child blocks in Order tab', async ({
@@ -2552,11 +2544,11 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     const childItems = childBlocksWidget.locator('.child-block-item');
     await expect(childItems).toHaveCount(2);
 
-    // Verify the child blocks show their plaintext content
+    // Verify the child blocks show their block type (Teaser shows type, slate showed plaintext)
     const childTexts = await childItems
       .locator('.block-type')
       .allTextContents();
-    expect(childTexts).toEqual(['Grid Cell 1', 'Grid Cell 2']);
+    expect(childTexts).toEqual(['Teaser', 'Teaser']);
   });
 });
 
@@ -2815,6 +2807,7 @@ test.describe('data-block-selector Navigation', () => {
     // Wait for sidebar to show Slide as current (carousel transition happening)
     await helper.waitForSidebarCurrentBlock('Slide');
     // Wait for slide-1 to be selected (toolbar positioned correctly)
+    // Note: hydra.js debounces BLOCK_SELECTED during animations, so this waits for stable position
     await helper.waitForQuantaToolbar('slide-1');
   });
 
@@ -3598,11 +3591,8 @@ test.describe('Multi-Container Field Operations', () => {
     await iframe.locator('[data-block-uid="col-1"]').waitFor();
 
     // Click the first column block
-    await helper.clickBlockInIframe('col-1');
-
-    // Wait for sidebar to show Column block settings (includes nav chevron "‹ Column")
-    const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Column').first()).toBeVisible();
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
   });
 
   test('Escape from top_images block navigates to columns parent', async ({
@@ -3640,16 +3630,14 @@ test.describe('Multi-Container Field Operations', () => {
     await iframe.locator('[data-block-uid="col-1"]').waitFor();
 
     // Click the first column to select it
-    await helper.clickBlockInIframe('col-1');
-
-    // Wait for Column sidebar to appear
-    const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Column').first()).toBeVisible();
+    await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
+    await helper.waitForSidebarCurrentBlock('Column');
 
     // Press Escape to navigate to parent (columns)
     await page.keyboard.press('Escape');
 
     // Verify the columns block is now selected - Title field should be editable
+    const sidebar = page.locator('.sidebar-container');
     await expect(sidebar.getByLabel('Title')).toBeVisible();
   });
 

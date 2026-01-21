@@ -251,6 +251,7 @@ const ChildBlocksWidget = ({
     blockPathMap,
     formData,
     blocksConfig,
+    intl,
   );
 
   // If no container fields, don't render anything
