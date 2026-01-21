@@ -674,7 +674,16 @@ test.describe('Image upload and drag-drop', () => {
 
     const clearButton = page.locator('button[title="Clear image"]');
     await expect(clearButton).toBeVisible({ timeout: 5000 });
+
+    // Get initial src to verify clear completes
+    const initialSrc = await heroImage.getAttribute('src');
+
     await clearButton.click();
+
+    // Wait for image src to change (cleared) before checking overlay
+    if (initialSrc) {
+      await expect(heroImage).not.toHaveAttribute('src', initialSrc, { timeout: 5000 });
+    }
 
     // Wait for empty overlay
     const emptyOverlay = page.locator('.empty-image-overlay');

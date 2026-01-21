@@ -336,10 +336,15 @@ test.describe('Inline Editing - Links', () => {
       await helper.assertCursorAtEnd(editor, blockId, 'Test text');
     }).toPass({ timeout: 5000, intervals: [500, 1000, 1500] });
 
-    // Now type and verify
+    // Ensure editor still has focus before typing
+    await expect(editor).toBeFocused();
+
+    // Now type and verify (poll for text to appear in case of DOM sync delay)
     await editor.pressSequentially(' added', { delay: 10 });
-    const newText = await helper.getCleanTextContent(editor);
-    expect(newText).toContain('added');
+    await expect(async () => {
+      const newText = await helper.getCleanTextContent(editor);
+      expect(newText).toContain('added');
+    }).toPass({ timeout: 2000 });
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {

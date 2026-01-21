@@ -543,15 +543,15 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(false);
     }).toPass({ timeout: 5000 });
-    await helper.waitForEditorFocus(editor);
 
-    // Verify cursor position after toggle off
-    const selectionAfter = await helper.getSelectionInfo(editor);
-    console.log('[TEST] Selection after toggle off:', JSON.stringify(selectionAfter));
-
-    // Cursor should still be collapsed and editor should have focus
-    expect(selectionAfter.isCollapsed).toBe(true);
-    expect(selectionAfter.editorHasFocus).toBe(true);
+    // Wait for editor to have focus and cursor to be collapsed (poll together to avoid race)
+    let selectionAfter: Awaited<ReturnType<typeof helper.getSelectionInfo>>;
+    await expect(async () => {
+      selectionAfter = await helper.getSelectionInfo(editor);
+      expect(selectionAfter.editorHasFocus).toBe(true);
+      expect(selectionAfter.isCollapsed).toBe(true);
+    }).toPass({ timeout: 5000 });
+    console.log('[TEST] Selection after toggle off:', JSON.stringify(selectionAfter!));
 
     // Visible text should still be "Hello world"
     const textContent = await helper.getCleanTextContent(editor);
