@@ -3329,17 +3329,24 @@ export class AdminUIHelper {
    * @param _dragHandle - Unused, kept for API compatibility
    * @param targetBlock - The target block locator (where to drag to)
    * @param insertAfter - If true, position for insertion after target; if false, before
+   * @param options.testAutoScroll - If true, use hydra's auto-scroll; if false (default), use fast scroll
    */
   async dragBlockWithMouseNoDrop(
     _dragHandle: Locator,
     targetBlock: Locator,
-    insertAfter: boolean = true
+    insertAfter: boolean = true,
+    options: { testAutoScroll?: boolean } = {}
   ): Promise<void> {
     // Step 1: Start drag from toolbar
     await this.startDragFromToolbar();
 
-    // Step 2: Auto-scroll until target is in viewport
-    const dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
+    // Step 2: Scroll until target is in viewport
+    let dropPosPage: { x: number; y: number };
+    if (options.testAutoScroll) {
+      dropPosPage = await this.autoScrollToTarget(targetBlock, insertAfter);
+    } else {
+      dropPosPage = await this.fastScrollToTarget(targetBlock, insertAfter);
+    }
 
     // Step 3: Move to drop position (skip verification - test will check indicator)
     await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage, true);
