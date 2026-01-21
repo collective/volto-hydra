@@ -3026,8 +3026,12 @@ export class AdminUIHelper {
     const viewportSize = this.page.viewportSize();
     if (!viewportSize) throw new Error('Could not get viewport size');
 
-    // Margin from viewport edge - ideally target should be this far from edge
-    const edgeMargin = 100;
+    // Margin from viewport edge - target should be this far from edge before we stop scrolling.
+    // This needs to be large enough to account for:
+    // 1. The hydra.js auto-scroll zone (80px from edges)
+    // 2. Scroll momentum/overshoot that can move the target after we stop
+    // Using 200px gives buffer for ~100px of overshoot beyond the auto-scroll zone.
+    const edgeMargin = 200;
     let lastTargetY: number | null = null;
     let stuckCount = 0;
 
@@ -3158,7 +3162,9 @@ export class AdminUIHelper {
    * Move the mouse to the drop position and verify the drop indicator is correct.
    *
    * NOTE: We continuously update the mouse position until the drop indicator is correct.
-   * This handles the case where auto-scroll continues after we start moving to the target.
+   * This handles the case where auto-scroll continues after we start moving to the target
+   * (e.g., due to momentum/overshoot that causes the target to move after we calculated
+   * the drop position).
    */
   private async moveToDropPosition(
     targetBlock: Locator,
@@ -3166,16 +3172,34 @@ export class AdminUIHelper {
     _initialDropPos: { x: number; y: number },
     skipVerification: boolean = false
   ): Promise<void> {
-    // Get current position and move to it
-    const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
-    await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
+    const maxRetries = 3;
 
-    // Wait a moment for the drop indicator to update
-    await this.page.waitForTimeout(100);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Get current position and move to it (recalculate each time in case scroll settled)
+      const dropPosPage = await this.getDropPositionInPageCoords(targetBlock, insertAfter);
+      await this.page.mouse.move(dropPosPage.x, dropPosPage.y, { steps: 5 });
 
-    // Verify the indicator is in the right position (unless skipped)
-    if (!skipVerification) {
-      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+      // Wait a moment for the drop indicator to update
+      await this.page.waitForTimeout(100);
+
+      // Verify the indicator is in the right position (unless skipped)
+      if (skipVerification) {
+        return;
+      }
+
+      try {
+        await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter, dropPosPage);
+        return; // Success - indicator is in the right place
+      } catch (error) {
+        if (attempt < maxRetries - 1) {
+          console.log(`[DROP] Indicator not in expected position, retrying (attempt ${attempt + 1}/${maxRetries})`);
+          // Wait a bit for scroll to settle before retrying
+          await this.page.waitForTimeout(100);
+        } else {
+          // Last attempt failed - re-throw the error
+          throw error;
+        }
+      }
     }
   }
 
