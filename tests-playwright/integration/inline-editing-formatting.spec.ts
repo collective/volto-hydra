@@ -249,13 +249,18 @@ test.describe('Inline Editing - Formatting', () => {
     const boldButton = helper.page.locator('.quanta-toolbar [title*="Bold" i]');
     await expect(boldButton).toBeVisible({ timeout: 5000 });
 
-    // Ensure editor is focused before hotkey
-    await expect(editor).toBeFocused({ timeout: 5000 });
+    // Ensure editor is focused and selection is correct before hotkey
+    await expect(async () => {
+      await expect(editor).toBeFocused();
+      const sel = await helper.getSelectionInfo(editor);
+      expect(sel.editorHasFocus).toBe(true);
+      expect(sel.isCollapsed).toBe(false); // Should have text selected
+    }).toPass({ timeout: 5000 });
 
     // Press Cmd+B (Mac) to bold the selection
     await editor.press('ControlOrMeta+b');
 
-    // Wait for bold button to become active
+    // Wait for bold button to become active (focus/selection may shift during formatting)
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 10000 });
