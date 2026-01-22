@@ -1652,11 +1652,16 @@ export class Bridge {
           this.focusedLinkableField = pageField.getAttribute('data-linkable-field');
           this.focusedFieldName = pageField.getAttribute('data-editable-field');
 
-          // Make page-level text fields editable (same as selectBlock does for blocks)
+          // Make page-level text fields editable and focusable
           if (this.focusedFieldName) {
+            // Check if field was already editable (user may be re-clicking an edited field)
+            const wasAlreadyEditable = pageField.getAttribute('contenteditable') === 'true';
+
             this.isInlineEditing = true;
-            this.restoreContentEditableOnFields(pageField, 'pageFieldClick');
-            this.observeBlockTextChanges(pageField);
+            this.activateEditableField(pageField, this.focusedFieldName, null, 'pageFieldClick', {
+              wasAlreadyEditable,
+              saveClickPosition: true, // Save for FORM_DATA handler after re-render
+            });
           }
 
           // Send BLOCK_SELECTED with pageField as "block" - blockUid will be null
@@ -2936,6 +2941,111 @@ export class Bridge {
   }
 
   /**
+   * Activate an editable field: make it contenteditable, set up observers, focus it, and position cursor.
+   * This is the common logic used by both block selection and page-level field clicks.
+   *
+   * @param {HTMLElement} fieldElement - The element with data-editable-field
+   * @param {string} fieldName - The field name (e.g., 'value', 'title')
+   * @param {string|null} blockUid - The block UID (null for page-level fields)
+   * @param {string} caller - Caller name for debugging
+   * @param {Object} options - Optional settings:
+   *   - skipContentEditable: Don't call restoreContentEditableOnFields (already done)
+   *   - skipObservers: Don't set up text change observers (already done)
+   *   - preventScroll: Pass to focus() to prevent scrolling
+   *   - wasAlreadyEditable: Field was contenteditable before click (trust browser positioning if also focused)
+   *   - saveClickPosition: Save position for FORM_DATA handler to restore after re-render
+   */
+  activateEditableField(fieldElement, fieldName, blockUid, caller, options = {}) {
+    log(`activateEditableField called from ${caller}:`, { fieldName, blockUid, options });
+
+    // Make field contenteditable (unless already done)
+    if (!options.skipContentEditable) {
+      this.restoreContentEditableOnFields(fieldElement, caller);
+    }
+
+    // Set up text change observers (unless already done)
+    if (!options.skipObservers) {
+      this.observeBlockTextChanges(fieldElement);
+    }
+
+    // Get field type to determine if it's text-editable
+    const fieldType = this.getFieldType(blockUid, fieldName);
+
+    if (!this.fieldTypeIsTextEditable(fieldType)) {
+      return;
+    }
+
+    // Check if already focused (avoid disrupting cursor position)
+    const isAlreadyFocused = document.activeElement === fieldElement;
+    log('activateEditableField focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName });
+
+    // Focus the field if not already focused
+    if (!isAlreadyFocused) {
+      fieldElement.focus({ preventScroll: options.preventScroll });
+      log(`activateEditableField: focused field`);
+    }
+
+    // If field was already editable AND already focused, browser already handled
+    // cursor positioning on click - don't redo it (causes race with typing)
+    if (options.wasAlreadyEditable && isAlreadyFocused) {
+      log('activateEditableField: field already editable and focused, trusting browser positioning');
+      this.lastClickPosition = null;
+      return;
+    }
+
+    // Position cursor at click location if we have coordinates
+    if (!this.lastClickPosition) {
+      log('activateEditableField: no lastClickPosition, skipping cursor positioning');
+      return;
+    }
+
+    const currentRect = fieldElement.getBoundingClientRect();
+    const clientX = currentRect.left + this.lastClickPosition.relativeX;
+    const clientY = currentRect.top + this.lastClickPosition.relativeY;
+
+    log('activateEditableField: positioning cursor at click location:', {
+      relativeX: this.lastClickPosition.relativeX,
+      relativeY: this.lastClickPosition.relativeY,
+      clientX,
+      clientY,
+    });
+
+    // Save click position for FORM_DATA handler if requested (for re-render scenarios)
+    if (options.saveClickPosition) {
+      this.savedClickPosition = {
+        relativeX: this.lastClickPosition.relativeX,
+        relativeY: this.lastClickPosition.relativeY,
+        editableField: this.lastClickPosition.editableField,
+      };
+    }
+
+    // Only restore click position if there's no existing non-collapsed selection
+    const currentSelection = window.getSelection();
+    const hasNonCollapsedSelection = currentSelection &&
+      currentSelection.rangeCount > 0 &&
+      !currentSelection.getRangeAt(0).collapsed;
+
+    if (hasNonCollapsedSelection) {
+      log('activateEditableField: skipping cursor positioning - non-collapsed selection exists');
+    } else {
+      const range = document.caretRangeFromPoint(clientX, clientY);
+      if (range) {
+        const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+        const finalRange = document.createRange();
+        finalRange.setStart(validPos.node, validPos.offset);
+        finalRange.collapse(true);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(finalRange);
+        log('activateEditableField: cursor positioned at offset:', validPos.offset);
+      }
+    }
+
+    // Clear lastClickPosition - we've used it
+    this.lastClickPosition = null;
+  }
+
+  /**
    * Ensure all interactive elements have minimum size so users can click/select them.
    * Called after FORM_DATA to handle newly added blocks that haven't been selected yet.
    * Only sets min dimensions on elements that have zero width or height (respects existing styling).
@@ -3523,100 +3633,21 @@ export class Bridge {
               contentEditableField = null;
             }
           }
+
           if (contentEditableField) {
             const fieldPath = contentEditableField.getAttribute('data-editable-field');
-            // Use getFieldType which handles page-level fields (e.g., /title) correctly
-            const fieldType = fieldPath ? this.getFieldType(this.selectedBlockUid, fieldPath) : undefined;
-
-            if (this.fieldTypeIsTextEditable(fieldType)) {
-              // Only call focus if not already focused
-              // Calling focus() on already-focused element can disrupt cursor position
-              const isAlreadyFocused = document.activeElement === contentEditableField;
-              log('selectBlock focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName, contentEditableField: contentEditableField.tagName });
-              if (!isAlreadyFocused) {
-                log('selectBlock calling focus() on field');
-                // Use preventScroll when reselecting same block to avoid scroll-back bug
-                // (user may have scrolled the block off screen intentionally)
-                contentEditableField.focus({ preventScroll: this._isReselectingSameBlock });
-              } else {
-                log('selectBlock skipping focus() - already focused');
-              }
-
-              // If field was already editable AND already focused, browser already handled
-              // cursor positioning on click - don't redo it (causes race with typing)
-              // But if we had to call focus(), we need to restore click position because
-              // focus() moves cursor to end of text
-              if (wasAlreadyEditable && isAlreadyFocused) {
-                log('Field already editable and focused, trusting browser click positioning');
-                this.lastClickPosition = null;
-              } else if (this.lastClickPosition) {
-                // Need to position cursor at click location
-                // Convert relative position back to screen coordinates using current element position
-                const currentRect = contentEditableField.getBoundingClientRect();
-                const clientX = currentRect.left + this.lastClickPosition.relativeX;
-                const clientY = currentRect.top + this.lastClickPosition.relativeY;
-
-                log('Positioning cursor at click location:', {
-                  relativeX: this.lastClickPosition.relativeX,
-                  relativeY: this.lastClickPosition.relativeY,
-                  clientX,
-                  clientY,
-                  wasAlreadyEditable,
-                  isAlreadyFocused,
-                });
-
-                // Save click position for FORM_DATA handler to use after renderer updates
-                this.savedClickPosition = {
-                  relativeX: this.lastClickPosition.relativeX,
-                  relativeY: this.lastClickPosition.relativeY,
-                  editableField: this.lastClickPosition.editableField,
-                };
-
-                // Only restore click position if there's no existing non-collapsed selection
-                // (e.g., from Meta+A or programmatic selection)
-                const currentSelection = window.getSelection();
-                const hasNonCollapsedSelection = currentSelection &&
-                  currentSelection.rangeCount > 0 &&
-                  !currentSelection.getRangeAt(0).collapsed;
-
-                if (!hasNonCollapsedSelection) {
-                  // Position cursor at the click location using caretRangeFromPoint
-                  const range = document.caretRangeFromPoint(clientX, clientY);
-                  log('caretRangeFromPoint result:', range ? {
-                    startContainer: range.startContainer.nodeName,
-                    startOffset: range.startOffset,
-                    text: range.startContainer.textContent?.substring(0, 30),
-                  } : null);
-                  if (range) {
-                    // Validate position before setting (may land on invalid whitespace)
-                    const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
-                    const finalRange = document.createRange();
-                    finalRange.setStart(validPos.node, validPos.offset);
-                    finalRange.collapse(true);
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(finalRange);
-                    log('Cursor positioned at offset:', validPos.offset);
-                  }
-                } else {
-                  log('Skipping cursor positioning - non-collapsed selection exists');
-                }
-
-                // Clear lastClickPosition - we've used it to position cursor
-                // Keep savedClickPosition for FORM_DATA handler in case React re-renders
-                // (staleness check in updateBlockUIAfterFormData handles old positions)
-                this.lastClickPosition = null;
-              }
-            } else {
-              // No lastClickPosition, just log that we skipped cursor positioning
-              log('No lastClickPosition, skipping cursor positioning');
-            }
-          } else {
-            // Not an editable field type, clear click position if any
-            if (this.lastClickPosition) {
-              log('Non-editable field type, clearing lastClickPosition');
-              this.lastClickPosition = null;
-            }
+            // Use activateEditableField for focus and cursor positioning
+            this.activateEditableField(contentEditableField, fieldPath, this.selectedBlockUid, 'selectBlock', {
+              skipContentEditable: true, // Already done above
+              skipObservers: true, // Text observers set up elsewhere for blocks
+              preventScroll: this._isReselectingSameBlock,
+              wasAlreadyEditable,
+              saveClickPosition: true, // Save for FORM_DATA handler after re-render
+            });
+          } else if (this.lastClickPosition) {
+            // No editable field found, clear click position
+            log('selectBlock: no editable field found, clearing lastClickPosition');
+            this.lastClickPosition = null;
           }
 
           // Now send BLOCK_SELECTED with selection - both arrive atomically
