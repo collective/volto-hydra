@@ -30,8 +30,9 @@ test.describe('Page Metadata Editing', () => {
     // Click on the title to make it editable
     await pageTitle.click();
 
-    // The title should become contenteditable
+    // The title should become contenteditable and focused
     await expect(pageTitle).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+    await helper.waitForEditorFocus(pageTitle);
 
     // The slate warning popup should NOT appear - title is a plain string, not slate
     const slateWarning = page.locator('text=Missing data-node-id attributes');
@@ -79,8 +80,9 @@ test.describe('Page Metadata Editing', () => {
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await pageTitle.click();
 
-    // Make it editable and type
+    // Make it editable and wait for focus
     await expect(pageTitle).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+    await helper.waitForEditorFocus(pageTitle);
     await pageTitle.fill('');
     await pageTitle.pressSequentially('New Title', { delay: 50 });
 
