@@ -694,6 +694,10 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   if (!blockType) return [];
   const schema = getBlockSchema(blockType, intl, blocksConfig);
 
+  // Compute default allowed blocks (used when field doesn't specify allowedBlocks)
+  const blockConfig = blocksConfig?.[blockType];
+  const defaultAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
+
   const containerFields = [];
 
   // Check for schema-defined container fields (type: 'blocks' or widget: 'object_list')
@@ -703,9 +707,9 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
-          allowedBlocks: fieldDef.allowedBlocks || null,
-          defaultBlock: fieldDef.defaultBlock || null,
-          maxLength: fieldDef.maxLength || null,
+          allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
+          defaultBlock: fieldDef.defaultBlock || blockConfig?.defaultBlock || null,
+          maxLength: fieldDef.maxLength || blockConfig?.maxLength || null,
         });
       } else if (fieldDef.widget === 'object_list') {
         // object_list: items stored as array, virtual type is blockType:fieldName
@@ -728,14 +732,13 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   // Check for implicit container (blocks/blocks_layout without schema definition)
   // Only if no explicit container fields found
   // Detect from blockConfig (allowedBlocks/defaultBlock) or existing blocks/blocks_layout
-  const blockConfig = blocksConfig?.[blockType];
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
   if (containerFields.length === 0 && isImplicitContainer) {
     containerFields.push({
       fieldName: 'blocks',
       title: 'Blocks',
-      allowedBlocks: blockConfig?.allowedBlocks || null,
+      allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
       defaultBlock: blockConfig?.defaultBlock || null,
       maxLength: blockConfig?.maxLength || null,
     });

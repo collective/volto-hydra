@@ -2136,20 +2136,13 @@ const Iframe = (props) => {
 
   // Handle sidebar add - adds inside a container's field as last child
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
-    // Get allowed blocks for this container field
+    // Use getAllContainerFields to get container config (handles _page and nested blocks uniformly)
     const blocksConfig = config.blocks.blocksConfig;
-    let containerAllowed = null;
-    let isObjectList = false;
+    const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
+    const fieldConfig = containerFields.find(f => f.fieldName === fieldName);
 
-    // Use unified schema lookup - parentType is '_page' for page-level
-    const parentType = parentBlockId ? iframeSyncState.blockPathMap?.[parentBlockId]?.blockType : '_page';
-    const parentSchema =
-      typeof blocksConfig?.[parentType]?.schema === 'function'
-        ? blocksConfig[parentType].schema({ intl })
-        : blocksConfig?.[parentType]?.schema;
-    const fieldDef = parentSchema?.properties?.[fieldName];
-    isObjectList = fieldDef?.widget === 'object_list';
-    containerAllowed = fieldDef?.allowedBlocks || null;
+    const isObjectList = fieldConfig?.isObjectList || false;
+    const containerAllowed = fieldConfig?.allowedBlocks || null;
 
     // Auto-insert if object_list or single allowedBlock
     if (isObjectList || containerAllowed?.length === 1) {
