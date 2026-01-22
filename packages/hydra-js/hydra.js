@@ -2791,17 +2791,17 @@ export class Bridge {
         container = container.parentNode;
       }
       const blockElement = container?.closest?.('[data-block-uid]');
-      const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
-      const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+      const blockUid = blockElement?.getAttribute('data-block-uid') || null;
+      const fieldName = container?.getAttribute?.('data-editable-field') || null;
 
       // Skip error for readonly blocks - they don't need selection sync
-      if (blockUid !== 'unknown' && this.isBlockReadonly(blockUid)) {
+      if (blockUid && this.isBlockReadonly(blockUid)) {
         return null;
       }
 
       // Check if this field is supposed to be a Slate field
-      // Use getFieldType which handles page-level fields (e.g., /title) correctly
-      const fieldType = blockUid !== 'unknown' ? this.getFieldType(blockUid, fieldName) : undefined;
+      // Use getFieldType which handles page-level fields (blockUid === null) correctly
+      const fieldType = this.getFieldType(blockUid, fieldName);
 
       // Only skip error for KNOWN non-Slate fields
       // If fieldType is undefined (not registered), assume it could be Slate and show error
