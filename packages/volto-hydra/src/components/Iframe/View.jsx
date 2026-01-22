@@ -546,7 +546,6 @@ const Iframe = (props) => {
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
-    pageBlocksFields: null, // Page-level blocks fields configuration from frontend
   }));
 
   // Handle Escape key in Admin UI to navigate to parent block
@@ -1695,20 +1694,37 @@ const Iframe = (props) => {
             });
           }
 
-          // 3. Extract block field types (now includes custom blocks and page-level fields)
+          // 3. Register _page as virtual block type in blocksConfig
+          // This allows buildBlockPathMap to look up page schema without parameter passing
+          const pageBlocksFieldsDef = Object.fromEntries(
+            effectivePageBlocksFields.map(field => [
+              field.fieldName,
+              {
+                type: 'blocks',
+                allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
+                maxLength: field.maxLength || null,
+                title: field.title || field.fieldName,
+              },
+            ]),
+          );
+          config.blocks.blocksConfig['_page'] = {
+            id: '_page',
+            schema: () => ({ properties: pageBlocksFieldsDef }),
+            restricted: true, // Can't be added as a child block
+          };
+
+          // 4. Extract block field types (now includes custom blocks and page-level fields)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
           setBlockFieldTypes(initialBlockFieldTypes);
 
-          // 4. Build blockPathMap (now has complete schema knowledge)
-          // Pass pageBlocksFields to traverse multiple page-level blocks fields
+          // 5. Build blockPathMap (now has complete schema knowledge from _page registration)
           const initialBlockPathMap = buildBlockPathMap(
             formWithPageFields,
             config.blocks.blocksConfig,
             intl,
-            effectivePageBlocksFields, // pageBlocksFields - null means default to single 'blocks' field
           );
 
-          // 5. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
+          // 6. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
           const formWithDefaults = applySchemaDefaultsToFormData(
             formWithPageFields,
             initialBlockPathMap,
@@ -1720,10 +1736,9 @@ const Iframe = (props) => {
             ...prev,
             formData: formWithDefaults,
             blockPathMap: initialBlockPathMap,
-            pageBlocksFields: effectivePageBlocksFields,
           }));
 
-          // 6. Send everything to iframe (only in edit mode)
+          // 7. Send everything to iframe (only in edit mode)
           // In view mode, frontend renders from its own API - no need to send data
           const inEditMode = history.location.pathname.endsWith('/edit');
           if (!inEditMode) {
@@ -2126,21 +2141,15 @@ const Iframe = (props) => {
     let containerAllowed = null;
     let isObjectList = false;
 
-    if (parentBlockId) {
-      // Container-level add - look up from parent block's schema
-      const parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
-      const parentSchema =
-        typeof blocksConfig?.[parentType]?.blockSchema === 'function'
-          ? blocksConfig[parentType].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-          : blocksConfig?.[parentType]?.blockSchema;
-      const fieldDef = parentSchema?.properties?.[fieldName];
-      isObjectList = fieldDef?.widget === 'object_list';
-      containerAllowed = fieldDef?.allowedBlocks || null;
-    } else {
-      // Page-level add - look up from pageBlocksFields config
-      const pageFieldConfig = iframeSyncState.pageBlocksFields?.find(f => f.fieldName === fieldName);
-      containerAllowed = pageFieldConfig?.allowedBlocks || null;
-    }
+    // Use unified schema lookup - parentType is '_page' for page-level
+    const parentType = parentBlockId ? iframeSyncState.blockPathMap?.[parentBlockId]?.blockType : '_page';
+    const parentSchema =
+      typeof blocksConfig?.[parentType]?.schema === 'function'
+        ? blocksConfig[parentType].schema({ intl })
+        : blocksConfig?.[parentType]?.schema;
+    const fieldDef = parentSchema?.properties?.[fieldName];
+    isObjectList = fieldDef?.widget === 'object_list';
+    containerAllowed = fieldDef?.allowedBlocks || null;
 
     // Auto-insert if object_list or single allowedBlock
     if (isObjectList || containerAllowed?.length === 1) {
@@ -2150,7 +2159,7 @@ const Iframe = (props) => {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
       setAddNewBlockOpened(true);
     }
-  }, [properties, iframeSyncState.blockPathMap, iframeSyncState.pageBlocksFields, insertAndSelectBlock]);
+  }, [properties, iframeSyncState.blockPathMap, insertAndSelectBlock, intl]);
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -2721,17 +2730,18 @@ const Iframe = (props) => {
           const oldBlockData = getBlockById(properties, currentBlockPathMap, blockId);
           console.log('[View onChangeBlock] blockId:', blockId, 'oldVariation:', oldBlockData?.variation, 'newVariation:', newBlockData?.variation);
 
-          // Find container config for nested blocks
+          // Find container config (works for both page-level and nested blocks)
           const pathInfo = currentBlockPathMap[blockId];
-          const containerConfig = pathInfo?.parentId
-            ? getContainerFieldConfig(
-                blockId,
-                currentBlockPathMap,
-                properties,
-                blocksConfig,
-                intl,
-              )
-            : null;
+          if (!pathInfo) {
+            throw new Error(`[HYDRA] onChangeBlock: block ${blockId} not in pathMap`);
+          }
+          const containerConfig = getContainerFieldConfig(
+            blockId,
+            currentBlockPathMap,
+            properties,
+            blocksConfig,
+            intl,
+          );
 
           let newFormData = mutateBlockInContainer(
             properties,
@@ -2760,7 +2770,6 @@ const Iframe = (props) => {
         selectedBlock={selectedBlock}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
-        pageBlocksFields={iframeSyncState.pageBlocksFields}
         onSelectBlock={onSelectBlock}
         onAddBlock={(parentBlockId, fieldName) => {
           handleSidebarAdd(parentBlockId, fieldName);

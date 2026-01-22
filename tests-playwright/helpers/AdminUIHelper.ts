@@ -2587,10 +2587,12 @@ export class AdminUIHelper {
    * Get all block IDs in order.
    * Returns an array of block UIDs, deduplicated (multi-element blocks count as one).
    * Uses evaluateAll for single browser round-trip instead of N sequential getAttribute calls.
+   * @param container - Container selector to scope the search (default: 'main' for main content)
    */
-  async getBlockOrder(): Promise<string[]> {
+  async getBlockOrder(container: string = 'main'): Promise<string[]> {
     const iframe = this.getIframe();
-    return await iframe.locator('[data-block-uid]').evaluateAll((elements) => {
+    const selector = `${container} [data-block-uid]`;
+    return await iframe.locator(selector).evaluateAll((elements) => {
       const seen = new Set<string>();
       const blockIds: string[] = [];
       for (const el of elements) {

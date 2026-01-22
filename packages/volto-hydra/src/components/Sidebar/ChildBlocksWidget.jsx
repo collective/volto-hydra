@@ -219,9 +219,9 @@ const ChildBlocksWidget = ({
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
-  pageBlocksFields,
 }) => {
   const intl = useIntl();
+  const blocksConfig = config.blocks?.blocksConfig;
   const [isClient, setIsClient] = React.useState(false);
 
   React.useEffect(() => {
@@ -229,9 +229,9 @@ const ChildBlocksWidget = ({
   }, []);
 
   // If no block selected, show page-level blocks for each page field
+  // Uses getAllContainerFields(null, ...) to get _page container fields
   if (!selectedBlock) {
-    // Use pageBlocksFields if provided, otherwise default to single 'blocks' field
-    const fieldsConfig = pageBlocksFields || [{ fieldName: 'blocks', title: 'Blocks' }];
+    const fieldsConfig = getAllContainerFields(null, blockPathMap, formData, blocksConfig, intl);
 
     if (!isClient) return null;
 
@@ -264,7 +264,6 @@ const ChildBlocksWidget = ({
   }
 
   // Use shared helper to get all container fields (supports multiple and implicit)
-  const blocksConfig = config.blocks?.blocksConfig;
   const containerFields = getAllContainerFields(
     selectedBlock,
     blockPathMap,
@@ -316,12 +315,6 @@ ChildBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
-  pageBlocksFields: PropTypes.arrayOf(PropTypes.shape({
-    fieldName: PropTypes.string.isRequired,
-    title: PropTypes.string,
-    allowedBlocks: PropTypes.arrayOf(PropTypes.string),
-    maxLength: PropTypes.number,
-  })),
 };
 
 export default ChildBlocksWidget;

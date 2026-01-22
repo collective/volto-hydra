@@ -305,7 +305,7 @@ test.describe('Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
-    
+
     const iframe = helper.getIframe();
 
     // Get initial block order
@@ -335,5 +335,125 @@ test.describe('Block Drag and Drop', () => {
 
     // Clean up - release the drag
     await page.mouse.up();
+  });
+
+  test('footer blocks can be reordered via drag and drop', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - no footer_blocks configured');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial footer block order
+    const initialFooterBlocks = await helper.getBlockOrder('footer');
+    console.log('[TEST] Initial footer blocks:', initialFooterBlocks);
+
+    // Need at least 2 footer blocks to test reordering
+    expect(initialFooterBlocks.length).toBeGreaterThanOrEqual(2);
+
+    const firstFooterBlock = initialFooterBlocks[0];
+    const secondFooterBlock = initialFooterBlocks[1];
+
+    // Select first footer block
+    await helper.clickBlockInIframe(firstFooterBlock);
+    await helper.waitForSidebarOpen();
+
+    // Get the drag handle from the toolbar
+    const dragHandle = await helper.getDragHandle();
+
+    // Get the second footer block element to drag to
+    const secondBlock = iframe.locator(`[data-block-uid="${secondFooterBlock}"]`);
+
+    // Drag using mouse events
+    await helper.dragBlockWithMouse(dragHandle, secondBlock, true);
+
+    // Verify block order changed
+    const newFooterBlocks = await helper.getBlockOrder('footer');
+    console.log('[TEST] New footer blocks:', newFooterBlocks);
+
+    // First block should now be second
+    expect(newFooterBlocks[1]).toBe(firstFooterBlock);
+    expect(newFooterBlocks[0]).toBe(secondFooterBlock);
+  });
+
+  test('can drag content block to footer and back', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - no footer_blocks configured');
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial content and footer blocks
+    const initialContentBlocks = await helper.getBlockOrder('main');
+    const initialFooterBlocks = await helper.getBlockOrder('footer');
+    console.log('[TEST] Initial content blocks:', initialContentBlocks);
+    console.log('[TEST] Initial footer blocks:', initialFooterBlocks);
+
+    expect(initialContentBlocks.length).toBeGreaterThan(0);
+    expect(initialFooterBlocks.length).toBeGreaterThan(0);
+
+    // Use a slate block from content (not image to avoid timing issues)
+    // block-3-uuid is a slate block at index 2
+    const contentBlock = initialContentBlocks[2]; // block-3-uuid
+    const firstFooterBlock = initialFooterBlocks[0];
+
+    // Step 1: Drag content block to footer
+    console.log('[TEST] Dragging content block:', contentBlock, 'to footer after:', firstFooterBlock);
+    await helper.clickBlockInIframe(contentBlock);
+    await helper.waitForSidebarOpen();
+
+    const dragHandle1 = await helper.getDragHandle();
+    const footerTarget = iframe.locator(`[data-block-uid="${firstFooterBlock}"]`);
+    await helper.dragBlockWithMouse(dragHandle1, footerTarget, true);
+
+    // Verify block moved to footer
+    await expect(async () => {
+      const newContentBlocks = await helper.getBlockOrder('main');
+      const newFooterBlocks = await helper.getBlockOrder('footer');
+      expect(newContentBlocks).not.toContain(contentBlock);
+      expect(newFooterBlocks).toContain(contentBlock);
+    }).toPass({ timeout: 5000 });
+
+    const afterDragToFooter = await helper.getBlockOrder('footer');
+    console.log('[TEST] Footer after drag from content:', afterDragToFooter);
+    expect(afterDragToFooter).toContain(contentBlock);
+
+    // Wait for toolbar to reposition
+    await helper.waitForBlockSelected(contentBlock);
+    await helper.waitForSidebarOpen();
+
+    // Step 2: Drag the same block back to content
+    console.log('[TEST] Dragging block back to content');
+    const contentTarget = iframe.locator(`[data-block-uid="${initialContentBlocks[0]}"]`);
+    const dragHandle2 = await helper.getDragHandle();
+    await helper.dragBlockWithMouse(dragHandle2, contentTarget, false);
+
+    // Verify block moved back to content
+    await expect(async () => {
+      const finalContentBlocks = await helper.getBlockOrder('main');
+      const finalFooterBlocks = await helper.getBlockOrder('footer');
+      expect(finalContentBlocks).toContain(contentBlock);
+      expect(finalFooterBlocks).not.toContain(contentBlock);
+    }).toPass({ timeout: 5000 });
+
+    const finalContentBlocks = await helper.getBlockOrder('main');
+    const finalFooterBlocks = await helper.getBlockOrder('footer');
+    console.log('[TEST] Final content blocks:', finalContentBlocks);
+    console.log('[TEST] Final footer blocks:', finalFooterBlocks);
+
+    // Block should be in content, not footer
+    expect(finalContentBlocks).toContain(contentBlock);
+    expect(finalFooterBlocks).not.toContain(contentBlock);
+
+    // Total block count should remain the same
+    expect(finalContentBlocks.length + finalFooterBlocks.length).toBe(
+      initialContentBlocks.length + initialFooterBlocks.length
+    );
   });
 });

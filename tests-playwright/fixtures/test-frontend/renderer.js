@@ -75,14 +75,18 @@ function getLinkUrl(value) {
 /**
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with items array (each item has @uid and @type)
+ * @param {string} containerId - ID of the container element (default: 'content')
  */
-async function renderContent(content) {
-    // Increment render counter
-    window.hydraRenderCount++;
-    const counterEl = document.getElementById('render-counter');
-    if (counterEl) counterEl.textContent = window.hydraRenderCount;
+async function renderContent(content, containerId = 'content') {
+    // Increment render counter (only for main content)
+    if (containerId === 'content') {
+        window.hydraRenderCount++;
+        const counterEl = document.getElementById('render-counter');
+        if (counterEl) counterEl.textContent = window.hydraRenderCount;
+    }
 
-    const container = document.getElementById('content');
+    const container = document.getElementById(containerId);
+    if (!container) return;
     container.innerHTML = '';
 
     const { items } = content;
