@@ -722,6 +722,8 @@ test.describe('Inline Editing - Formatting', () => {
     await editor.press('ControlOrMeta+b');
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
+      // Verify focus is still on editor after format toggle
+      await expect(editor).toBeFocused();
     }).toPass({ timeout: 5000 });
 
     // Type "world" - this should be bold

@@ -82,8 +82,9 @@ test.describe('Nuxt Frontend - Slider Block', () => {
 
     // Check that slides are rendered
     // The Nuxt block.vue renders slides with data-carousel-item
+    // Wait longer for Flowbite carousel initialization
     const slides = slider.locator('[data-carousel-item]');
-    await expect(slides).toHaveCount(3);
+    await expect(slides).toHaveCount(3, { timeout: 10000 });
   });
 
   // Note: 'selection is preserved after applying bold formatting' test is in
