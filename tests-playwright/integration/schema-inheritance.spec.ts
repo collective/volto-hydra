@@ -451,14 +451,8 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await helper.login();
     await helper.navigateToEdit('/search-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for the listing child block to be visible
-    const listingItems = iframe.locator('[data-block-uid="results-listing"]');
-    await expect(listingItems.first()).toBeVisible({ timeout: 10000 });
-
-    // Click on the listing block
-    await listingItems.first().click();
+    // Click on the listing block (waits for async expandListingBlocks to complete)
+    await helper.clickBlockInIframe('results-listing');
 
     // Toolbar should be visible
     const toolbar = page.locator('.quanta-toolbar');
@@ -466,10 +460,6 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Since maxLength=1 and there's already 1 listing block,
     // there should be no add block buttons (data-block-add markers should be hidden)
-    // The listing items should NOT have visible add buttons
-    const addButtons = iframe.locator('[data-block-uid="results-listing"] [data-block-add]');
-
-    // If add buttons exist, they should not trigger the add block UI
     // Check that no "+" buttons are visible in the listing container area
     const plusButtons = page.locator('.volto-hydra-add-button');
     await expect(plusButtons).toHaveCount(0);
