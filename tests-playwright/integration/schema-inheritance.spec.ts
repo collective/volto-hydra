@@ -561,18 +561,16 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     const iframe = helper.getIframe();
 
-    // Wait for facets to be visible
-    const facetItem = iframe.locator('[data-block-uid="facet-type"]');
-    await expect(facetItem).toBeVisible({ timeout: 10000 });
-
-    // Count initial facets
+    // Count initial facets (wait for async expandListingBlocks to complete)
     const initialFacets = iframe.locator('.facet-item[data-block-uid]');
+    await expect(initialFacets.first()).toBeVisible({ timeout: 10000 });
     const initialCount = await initialFacets.count();
     expect(initialCount).toBe(2); // facet-type and facet-state
 
     // Click on a facet title to select it (avoid clicking checkboxes)
-    const facetTitle = facetItem.locator('[data-editable-field="title"]');
-    await facetTitle.click();
+    await helper.clickBlockInIframe('facet-type', {
+      selector: '[data-editable-field="title"]',
+    });
 
     // Toolbar should appear
     const toolbar = page.locator('.quanta-toolbar');
