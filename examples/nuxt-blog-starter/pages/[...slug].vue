@@ -390,7 +390,7 @@ onMounted(() => {
                 pageBlocksFields: [
                     {
                         fieldName: 'blocks',
-                        title: 'Content',
+                        title: 'Blocks',
                         allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks],
                     },
                 ],
