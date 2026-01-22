@@ -3266,12 +3266,12 @@ export class Bridge {
       }
     }
 
-    // Scroll to block if not visible - BUT skip if we just finished a drag-drop
-    // After drag-drop, the block should be visible where we dropped it.
-    // If it's "not visible", the async renderer may not have completed yet and
-    // we'd be scrolling to the OLD position. Wait for domChange to handle it.
+    // Scroll to block if not visible - BUT skip if we just finished dragging this block.
+    // After drag-drop, the async renderer may not have completed yet and we'd be
+    // scrolling to the OLD position. observeBlockDomChanges will scroll after re-render.
     let didScroll = false;
-    if (!this.elementIsVisibleInViewport(blockElement) && !this._justFinishedDrag) {
+    const justDraggedThisBlock = this._justFinishedDragBlockId === this.selectedBlockUid;
+    if (!this.elementIsVisibleInViewport(blockElement) && !justDraggedThisBlock) {
       log('updateBlockUIAfterFormData: scrolling to block', this.selectedBlockUid);
       this.scrollBlockIntoView(blockElement);
       didScroll = true;
@@ -4129,8 +4129,8 @@ export class Bridge {
       this._domMutationObserver.disconnect();
     }
 
-    // Find the content container to observe
-    const container = document.getElementById('content') || document.body;
+    // Observe document.body to catch all DOM changes including footer blocks
+    const container = document.body;
 
     this._domMutationObserver = new MutationObserver((mutations) => {
       // Only process if this is still the selected block
@@ -4228,6 +4228,13 @@ export class Bridge {
               // Re-check element is still valid and get fresh rect
               const freshElements = this.getAllBlockElements(blockUid);
               if (freshElements.length > 0) {
+                // Scroll to block if not visible AND we were waiting for this dragged block
+                // (prevents unwanted scrolling on normal DOM changes like size updates)
+                if (this._justFinishedDragBlockId === blockUid && !this.elementIsVisibleInViewport(freshElements[0])) {
+                  log('observeBlockDomChanges: scrolling to dragged block', blockUid);
+                  this.scrollBlockIntoView(freshElements[0]);
+                  this._justFinishedDragBlockId = null;
+                }
                 this.sendBlockSelected('domChange', freshElements[0]);
               }
             }, 150); // Wait for animation to settle
@@ -4826,12 +4833,9 @@ export class Bridge {
         // Clear drag flag
         this._isDragging = false;
 
-        // Mark that we just finished a drag - prevents scrollIntoView race condition
-        // with async renderers. Clear after a delay to allow render to complete.
-        this._justFinishedDrag = true;
-        setTimeout(() => {
-          this._justFinishedDrag = false;
-        }, 500);
+        // Mark which block we just finished dragging - prevents scrollIntoView race condition
+        // with async renderers. Cleared when FORM_DATA arrives with this block selected.
+        this._justFinishedDragBlockId = this.selectedBlockUid;
 
         // Clear any pending scroll timeout from auto-scroll
         // This prevents stale BLOCK_SELECTED from firing after drop

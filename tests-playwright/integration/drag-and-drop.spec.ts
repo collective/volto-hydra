@@ -412,6 +412,9 @@ test.describe('Block Drag and Drop', () => {
     const footerTarget = iframe.locator(`[data-block-uid="${firstFooterBlock}"]`);
     await helper.dragBlockWithMouse(dragHandle1, footerTarget, true);
 
+    // Wait for DOM to stabilize after drag
+    await helper.getStableBlockCount();
+
     // Verify block moved to footer
     await expect(async () => {
       const newContentBlocks = await helper.getBlockOrder('main');
@@ -433,6 +436,9 @@ test.describe('Block Drag and Drop', () => {
     const contentTarget = iframe.locator(`[data-block-uid="${initialContentBlocks[0]}"]`);
     const dragHandle2 = await helper.getDragHandle();
     await helper.dragBlockWithMouse(dragHandle2, contentTarget, false);
+
+    // Wait for DOM to stabilize after drag
+    await helper.getStableBlockCount();
 
     // Verify block moved back to content
     await expect(async () => {

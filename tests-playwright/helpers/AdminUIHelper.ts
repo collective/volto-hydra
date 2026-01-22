@@ -414,19 +414,23 @@ export class AdminUIHelper {
       // If it times out, check if we need to navigate to parent (container case)
       try {
         await this.waitForBlockSelected(blockId, 3000);
-      } catch {
-        // Selection timed out - might be wrong block selected (clicked container, child selected)
-        // Check if there are parent navigation buttons (indicates we're viewing a child)
-        await this.waitForSidebarOpen();
-        const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
-        const hasParentButtons = await parentButtonLocator.count() > 0;
+      } catch (error) {
+        // Selection timed out - check if a CHILD block got selected instead
+        // (happens when clicking a container block like grid)
+        const iframe = this.getIframe();
+        const selectedChild = iframe.locator(
+          `[data-block-uid="${blockId}"] [data-block-uid].volto-hydra-selected`
+        );
+        const childWasSelected = await selectedChild.count() > 0;
 
-        if (hasParentButtons) {
-          // Navigate up to the target container block
+        if (childWasSelected) {
+          // A child of the target block is selected - navigate up to the target
           await this.navigateToParentBlock(blockId);
+          await this.waitForBlockSelected(blockId);
+        } else {
+          // Target is not parent of selected block - rethrow original error
+          throw error;
         }
-        // Either way, wait for the target block to be properly selected
-        await this.waitForBlockSelected(blockId);
       }
 
       await this.waitForQuantaToolbar(blockId);
@@ -593,6 +597,85 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for both drag handles (iframe and Volto toolbar) to be visible and aligned.
+   * The iframe drag handle (.volto-hydra-drag-button) handles clicks.
+   * The Volto toolbar drag handle (.drag-handle) is positioned over it.
+   */
+  async waitForDragHandlesAligned(
+    blockLocator: Locator,
+    timeout: number = 5000
+  ): Promise<void> {
+    const iframe = this.getIframe();
+    const iframeDragHandle = iframe.locator('.volto-hydra-drag-button');
+    const voltoToolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
+
+    await expect(async () => {
+      // Both handles must be visible
+      await expect(iframeDragHandle).toBeVisible({ timeout: 100 });
+      await expect(voltoToolbarDragHandle).toBeVisible({ timeout: 100 });
+
+      // For multi-element blocks, compute combined bounding box
+      const allElements = await blockLocator.all();
+      let blockBox: { x: number; y: number; width: number; height: number } | null = null;
+
+      if (allElements.length > 1) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const el of allElements) {
+          const rect = await el.boundingBox();
+          if (rect) {
+            minX = Math.min(minX, rect.x);
+            minY = Math.min(minY, rect.y);
+            maxX = Math.max(maxX, rect.x + rect.width);
+            maxY = Math.max(maxY, rect.y + rect.height);
+          }
+        }
+        if (minX !== Infinity) {
+          blockBox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
+      } else {
+        blockBox = await blockLocator.first().boundingBox();
+      }
+
+      const iframeHandleBox = await iframeDragHandle.boundingBox();
+      const voltoHandleBox = await voltoToolbarDragHandle.boundingBox();
+      if (!blockBox || !iframeHandleBox || !voltoHandleBox) {
+        throw new Error('Could not get bounding boxes');
+      }
+
+      // Iframe drag handle should be at block's left edge (within tolerance)
+      const xDiff = Math.abs(iframeHandleBox.x - blockBox.x);
+      // Handle can be from iframe top to slightly below block top (clamped when block is above viewport)
+      const iframeElement = this.page.locator('iframe').first();
+      const iframeBox = await iframeElement.boundingBox();
+      const iframeTop = iframeBox?.y || 0;
+      const minY = iframeTop;
+      const maxY = Math.max(iframeTop + 30, blockBox.y + 30);
+      const inYRange = iframeHandleBox.y >= minY && iframeHandleBox.y <= maxY;
+
+      if (xDiff > 30 || !inYRange) {
+        throw new Error(
+          `Iframe drag handle not at block position. Block: (${blockBox.x.toFixed(0)}, ${blockBox.y.toFixed(0)}), ` +
+          `Handle: (${iframeHandleBox.x.toFixed(0)}, ${iframeHandleBox.y.toFixed(0)}), ` +
+          `expected y range: [${minY.toFixed(0)}, ${maxY.toFixed(0)}]`
+        );
+      }
+
+      // Volto toolbar drag handle should be aligned with iframe drag handle
+      const handleAlignmentTolerance = 15;
+      const voltoIframeXDiff = Math.abs(voltoHandleBox.x - iframeHandleBox.x);
+      const voltoIframeYDiff = Math.abs(voltoHandleBox.y - iframeHandleBox.y);
+
+      if (voltoIframeXDiff > handleAlignmentTolerance || voltoIframeYDiff > handleAlignmentTolerance) {
+        throw new Error(
+          `Drag handles not aligned. Iframe: (${iframeHandleBox.x.toFixed(0)}, ${iframeHandleBox.y.toFixed(0)}), ` +
+          `Volto: (${voltoHandleBox.x.toFixed(0)}, ${voltoHandleBox.y.toFixed(0)}), ` +
+          `diff: (${voltoIframeXDiff.toFixed(0)}, ${voltoIframeYDiff.toFixed(0)})`
+        );
+      }
+    }).toPass({ timeout });
+  }
+
+  /**
    * Wait for a block to be selected in the iframe.
    * Handles multi-element blocks (multiple elements with same UID).
    */
@@ -603,9 +686,7 @@ export class AdminUIHelper {
     // Use first() for multi-element blocks
     await blockLocator.first().waitFor({ state: 'visible', timeout });
 
-    // Wait for drag handle to appear and be positioned at the correct block
-    // The drag handle is positioned at the selected block's left edge, typically 48px above
-    // For container blocks, positioning may vary, so we check if handle is near the block
+    // Wait for iframe drag handle to appear and be positioned at the correct block
     const dragHandle = iframe.locator('.volto-hydra-drag-button');
     await expect(async () => {
       await expect(dragHandle).toBeVisible({ timeout: 100 });
@@ -615,7 +696,6 @@ export class AdminUIHelper {
       let blockBox: { x: number; y: number; width: number; height: number } | null = null;
 
       if (allElements.length > 1) {
-        // Multi-element: compute bounding box
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const el of allElements) {
           const rect = await el.boundingBox();
@@ -640,12 +720,9 @@ export class AdminUIHelper {
 
       // Drag handle should be at block's left edge (within tolerance)
       const xDiff = Math.abs(handleBox.x - blockBox.x);
-      // Drag handle should be near the block's top or at iframe top when clamped
       const iframeElement = this.page.locator('iframe').first();
       const iframeBox = await iframeElement.boundingBox();
       const iframeTop = iframeBox?.y || 0;
-      // Handle can be anywhere from iframe top to slightly below block top
-      // When block is above viewport (blockBox.y < iframeTop), handle is clamped to iframeTop
       const minY = iframeTop;
       const maxY = Math.max(iframeTop + 30, blockBox.y + 30);
       const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
@@ -901,6 +978,11 @@ export class AdminUIHelper {
     await expect.poll(async () => {
       return await this.isToolbarNotCoveredBySidebar();
     }, { timeout: 5000 }).toBeTruthy();
+
+    // Wait for both drag handles (iframe and Volto toolbar) to be aligned
+    const iframe = this.getIframe();
+    const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await this.waitForDragHandlesAligned(blockLocator, 5000);
   }
 
   async getMenuButtonInQuantaToolbar(blockId: string, formatKeyword:string): Promise<void> {
@@ -3217,8 +3299,8 @@ export class AdminUIHelper {
    * Complete the drag operation by releasing the mouse and waiting for cleanup.
    */
   private async completeDrop(): Promise<void> {
-    // Get block order before drop
-    const orderBefore = await this.getBlockOrder();
+    // Get all block order before drop (using body to include all containers)
+    const orderBefore = await this.getBlockOrder('body');
 
     await this.page.mouse.up();
 
@@ -3228,7 +3310,7 @@ export class AdminUIHelper {
 
     // Wait for block order to change (indicates formData update and re-render completed)
     await expect(async () => {
-      const orderAfter = await this.getBlockOrder();
+      const orderAfter = await this.getBlockOrder('body');
       if (JSON.stringify(orderBefore) === JSON.stringify(orderAfter)) {
         throw new Error('Block order has not changed yet');
       }
