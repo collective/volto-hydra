@@ -1395,7 +1395,11 @@ export function moveBlockBetweenContainers(
   }
 
   // Same container - just reorder
-  if (sourceParentId === targetParentId) {
+  // Check both parentId AND containerField to handle page-level blocks in different fields
+  // (e.g., blocks vs footer_blocks both have parentId=null but different containerField)
+  const sourceContainerField = blockPathMap[blockId]?.containerField;
+  const targetContainerField = blockPathMap[targetBlockId]?.containerField;
+  if (sourceParentId === targetParentId && sourceContainerField === targetContainerField) {
     return reorderBlockInContainer(
       formData,
       blockPathMap,
