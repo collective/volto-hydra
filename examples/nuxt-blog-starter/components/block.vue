@@ -490,7 +490,7 @@ const props = defineProps({
   apiUrl: {
     type: String,
     required: false,
-    default: false
+    default: ''
   }
 });
 
