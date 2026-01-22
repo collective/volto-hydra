@@ -6,7 +6,11 @@ import BlocksList from "@/components/BlocksList";
 import { fetchContent } from '#utils/api';
 
 export default function Home({ params }) {
-  const bridge = initBridge({allowedBlocks: [ "slate", "image", "video", "teaser"]});
+  const bridge = initBridge({
+    pageBlocksFields: [
+      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
+    ],
+  });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [value, setValue] = useState(data);

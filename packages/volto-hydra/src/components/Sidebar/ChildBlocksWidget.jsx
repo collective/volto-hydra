@@ -189,6 +189,26 @@ const ContainerFieldSection = ({
 };
 
 /**
+ * Get child blocks for a page-level field
+ */
+const getChildBlocksForPageField = (formData, fieldConfig) => {
+  const { fieldName } = fieldConfig;
+  const layoutField = `${fieldName}_layout`;
+  const pageBlocks = formData?.[layoutField]?.items || [];
+  const blocksData = formData?.[fieldName] || {};
+
+  return pageBlocks.map((blockId) => {
+    const blockData = blocksData[blockId];
+    return {
+      id: blockId,
+      type: blockData?.['@type'] || 'unknown',
+      title: getBlockTitle(blockData),
+      data: blockData,
+    };
+  });
+};
+
+/**
  * ChildBlocksWidget - Main component
  * Renders all container fields for the current block
  */
@@ -199,6 +219,7 @@ const ChildBlocksWidget = ({
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
+  pageBlocksFields,
 }) => {
   const intl = useIntl();
   const [isClient, setIsClient] = React.useState(false);
@@ -207,20 +228,10 @@ const ChildBlocksWidget = ({
     setIsClient(true);
   }, []);
 
-  // If no block selected, show page-level blocks
+  // If no block selected, show page-level blocks for each page field
   if (!selectedBlock) {
-    const pageBlocks = formData?.blocks_layout?.items || [];
-    const blocksData = formData?.blocks || {};
-
-    const childBlocks = pageBlocks.map((blockId) => {
-      const blockData = blocksData[blockId];
-      return {
-        id: blockId,
-        type: blockData?.['@type'] || 'unknown',
-        title: getBlockTitle(blockData),
-        data: blockData,
-      };
-    });
+    // Use pageBlocksFields if provided, otherwise default to single 'blocks' field
+    const fieldsConfig = pageBlocksFields || [{ fieldName: 'blocks', title: 'Blocks' }];
 
     if (!isClient) return null;
 
@@ -229,16 +240,24 @@ const ChildBlocksWidget = ({
     if (!target) return null;
 
     return createPortal(
-      <div className="child-blocks-widget">
-        <ContainerFieldSection
-          fieldName="blocks"
-          fieldTitle={intl.formatMessage(messages.blocks)}
-          childBlocks={childBlocks}
-          onSelectBlock={onSelectBlock}
-          onAddBlock={onAddBlock}
-          onMoveBlock={onMoveBlock}
-          parentBlockId={null}
-        />
+      <div className="child-blocks-widget page-blocks-fields">
+        {fieldsConfig.map((fieldConfig) => {
+          const childBlocks = getChildBlocksForPageField(formData, fieldConfig);
+          return (
+            <ContainerFieldSection
+              key={fieldConfig.fieldName}
+              fieldName={fieldConfig.fieldName}
+              fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
+              childBlocks={childBlocks}
+              allowedBlocks={fieldConfig.allowedBlocks}
+              maxLength={fieldConfig.maxLength}
+              onSelectBlock={onSelectBlock}
+              onAddBlock={onAddBlock}
+              onMoveBlock={onMoveBlock}
+              parentBlockId={null}
+            />
+          );
+        })}
       </div>,
       target,
     );
@@ -297,6 +316,12 @@ ChildBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
+  pageBlocksFields: PropTypes.arrayOf(PropTypes.shape({
+    fieldName: PropTypes.string.isRequired,
+    title: PropTypes.string,
+    allowedBlocks: PropTypes.arrayOf(PropTypes.string),
+    maxLength: PropTypes.number,
+  })),
 };
 
 export default ChildBlocksWidget;

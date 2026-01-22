@@ -91,7 +91,10 @@ export class Bridge {
    *
    * @param {URL} adminOrigin - The origin of the adminUI.
    * @param {Object} options - Options for the bridge initialization:
-   *   - allowedBlocks: Array of allowed block types (e.g., ['title', 'text', 'image', ...])
+   *   - pageBlocksFields: Array of page-level blocks fields configuration
+   *                       Each entry: { fieldName, title, allowedBlocks, maxLength }
+   *                       e.g., [{ fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image'] }]
+   *                       Default: [{ fieldName: 'blocks' }] with all non-restricted block types
    *   - debug: Enable verbose logging (default: false)
    *   - pathToApiPath: Function to transform frontend path to API/admin path
    *                    e.g., (path) => path.replace(/\/@pg\/[^/]+\/\d+/, '')
@@ -1017,15 +1020,16 @@ export class Bridge {
           );
           // Don't send INIT - admin will just update its URL
         } else {
-          window.parent.postMessage(
-            {
-              type: 'INIT',
-              voltoConfig: options?.voltoConfig,
-              allowedBlocks: options?.allowedBlocks,
-              currentPath: currentPath,
-            },
-            this.adminOrigin,
-          );
+          const initMessage = {
+            type: 'INIT',
+            voltoConfig: options?.voltoConfig,
+            currentPath: currentPath,
+          };
+          // Send pageBlocksFields configuration for page-level blocks fields
+          if (options?.pageBlocksFields) {
+            initMessage.pageBlocksFields = options.pageBlocksFields;
+          }
+          window.parent.postMessage(initMessage, this.adminOrigin);
         }
 
         const receiveInitialData = (e) => {

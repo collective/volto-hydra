@@ -66,8 +66,11 @@ let bridge;
 
 if (window.name.startsWith('hydra')) {
     bridge = initBridge({
-      // which blocks can be added in the main content area
-      allowedBlocks: ['slate', 'grid', 'myimage'],
+      // Configure page-level blocks fields
+      // Default: [{ fieldName: 'blocks' }] with all non-restricted block types
+      pageBlocksFields: [
+        { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'grid', 'myimage'] },
+      ],
       voltoConfig: {
         blocks: {
           blocksConfig: {
@@ -85,6 +88,46 @@ if (window.name.startsWith('hydra')) {
         }
       }
     });
+}
+```
+
+### Multiple Page-Level Blocks Fields
+
+Pages can have multiple blocks fields (e.g., header, content, footer). If you don't specify a 'blocks' field, one is automatically added with all non-restricted block types:
+
+```js
+bridge = initBridge({
+  pageBlocksFields: [
+    { fieldName: 'header_blocks', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+    // 'blocks' field is automatically added if not specified
+    { fieldName: 'footer_blocks', title: 'Footer', allowedBlocks: ['slate', 'link'] }
+  ],
+  voltoConfig: { ... }
+});
+```
+
+Or explicitly configure the 'blocks' field:
+
+```js
+bridge = initBridge({
+  pageBlocksFields: [
+    { fieldName: 'header_blocks', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'hero', 'columns'] },
+    { fieldName: 'footer_blocks', title: 'Footer', allowedBlocks: ['slate', 'link'] }
+  ],
+});
+```
+
+Each page field is shown as a separate section in the sidebar when no block is selected. The page data structure becomes:
+
+```js
+{
+  header_blocks: { 'header-1': { '@type': 'image', ... } },
+  header_blocks_layout: { items: ['header-1'] },
+  blocks: { 'text-1': { '@type': 'slate', ... } },
+  blocks_layout: { items: ['text-1'] },
+  footer_blocks: { 'footer-1': { '@type': 'slate', ... } },
+  footer_blocks_layout: { items: ['footer-1'] }
 }
 
 if (window.name.startsWith('hydra-edit')) {
@@ -332,7 +375,11 @@ We include the hydra iframe bridge which creates a two way link between the hydr
 - During admin, initilize it with Volto settings
   ```js
   import { initBridge } from './hydra.js';
-  const bridge = initBridge({allowedBlocks: ['slate', 'image', 'video']});
+  const bridge = initBridge({
+    pageBlocksFields: [
+      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+    ],
+  });
   ```
 - To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
 - To see private content you will need to [change your authentication token]((#authenticatitee-frontend-to-access-private-content))
@@ -351,7 +398,9 @@ If your frontend embeds state in the URL path (like pagination), you need to tel
 
 ```js
 const bridge = initBridge({
-  allowedBlocks: ['slate', 'image', 'video'],
+  pageBlocksFields: [
+    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+  ],
   // Transform frontend path to API path by stripping paging segments
   // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
   pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
@@ -372,7 +421,9 @@ For our slider example, we can configure this new block directly in the frontend
 import { initBridge } from './hydra.js';
 
 const bridge = initBridge({
-  allowedBlocks: ['slate', 'image', 'video', 'slider'],
+  pageBlocksFields: [
+    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'slider'] },
+  ],
   voltoConfig: {
     blocks: {
       blocksConfig: {

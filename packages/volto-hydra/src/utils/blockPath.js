@@ -236,7 +236,10 @@ function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  *
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
- * @param {Array|null} pageAllowedBlocks - Allowed block types at page level (overrides restricted-based computation)
+ * @param {Object} intl - The intl object from react-intl (required for i18n schemas)
+ * @param {Array|null} pageBlocksFields - Page-level blocks fields configuration
+ *                                        Each entry: { fieldName, title, allowedBlocks, maxLength }
+ *                                        If null, defaults to single 'blocks' field
  * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, containerField: string|null, ... }
  *
  * Path format examples:
@@ -244,21 +247,29 @@ function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  * - Nested block: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
  * - Object list item: ['blocks', 'slider-1', 'slides', 0]
  * - Nested object list: ['blocks', 'table-1', 'table', 'rows', 0, 'cells', 1]
+ * - Multiple page fields: ['header_blocks', 'header-1'], ['footer_blocks', 'footer-1']
  */
-export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlocks = null) {
+export function buildBlockPathMap(formData, blocksConfig, intl, pageBlocksFields = null) {
   if (!intl) {
     throw new Error('buildBlockPathMap requires intl parameter');
   }
 
   const pathMap = {};
 
-  if (!formData?.blocks) {
+  // Determine effective page blocks fields configuration
+  // If not provided, default to single 'blocks' field (standard Volto structure)
+  const effectivePageBlocksFields = pageBlocksFields || [{ fieldName: 'blocks' }];
+
+  // Check if any page fields have data
+  const hasAnyPageData = effectivePageBlocksFields.some(
+    field => formData?.[field.fieldName] || formData?.[`${field.fieldName}_layout`]?.items?.length > 0
+  );
+  if (!hasAnyPageData) {
     return pathMap;
   }
 
-  // Compute page-level allowed blocks from restricted if not explicitly provided
-  const effectivePageAllowedBlocks = pageAllowedBlocks ??
-    getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
+  // Compute default page-level allowed blocks from restricted (used when field doesn't specify allowedBlocks)
+  const defaultPageAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
   // Helper to find empty required fields for starter UI
   // Returns array of { fieldName, fieldDef } for required fields that are empty
@@ -473,30 +484,41 @@ export function buildBlockPathMap(formData, blocksConfig, intl, pageAllowedBlock
   }
 
   // Start traversal from page-level blocks
-  const pageLayout = formData.blocks_layout?.items || [];
-  pageLayout.forEach(blockId => {
-    const block = formData.blocks[blockId];
-    if (!block) return;
+  // Iterate over each page blocks field (supports multiple: header_blocks, blocks, footer_blocks, etc.)
+  for (const pageField of effectivePageBlocksFields) {
+    const { fieldName, allowedBlocks: fieldAllowedBlocks, maxLength } = pageField;
+    const layoutFieldName = `${fieldName}_layout`;
+    const pageLayout = formData[layoutFieldName]?.items || [];
+    const pageBlocks = formData[fieldName] || {};
 
-    const blockPath = ['blocks', blockId];
-    const blockType = block['@type'];
-    const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
+    // Determine allowed blocks for this page field
+    // Use field-specific allowedBlocks if provided, otherwise fall back to default
+    const fieldEffectiveAllowedBlocks = fieldAllowedBlocks || defaultPageAllowedBlocks;
 
-    pathMap[blockId] = {
-      path: blockPath,
-      parentId: null,
-      containerField: 'blocks',
-      blockType, // Block type for uniform lookups (single source of truth)
-      allowedSiblingTypes: effectivePageAllowedBlocks,
-      maxSiblings: null,
-      emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
-    };
+    pageLayout.forEach(blockId => {
+      const block = pageBlocks[blockId];
+      if (!block) return;
 
-    // Process this block's container fields
-    if (blockSchema) {
-      processItem(block, blockId, blockPath, blockSchema);
-    }
-  });
+      const blockPath = [fieldName, blockId];
+      const blockType = block['@type'];
+      const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
+
+      pathMap[blockId] = {
+        path: blockPath,
+        parentId: null,
+        containerField: fieldName, // Now tracks which page field this block belongs to
+        blockType, // Block type for uniform lookups (single source of truth)
+        allowedSiblingTypes: fieldEffectiveAllowedBlocks,
+        maxSiblings: maxLength || null,
+        emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
+      };
+
+      // Process this block's container fields
+      if (blockSchema) {
+        processItem(block, blockId, blockPath, blockSchema);
+      }
+    });
+  }
 
   return pathMap;
 }
@@ -773,12 +795,19 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
 
   // Page-level insertion (page is just a container with blocks/blocks_layout)
   if (!containerConfig || containerConfig.parentId === null) {
+    // Determine which page field to insert into
+    // Use containerField from reference block, or from containerConfig, or default to 'blocks'
+    const pageField = blockPathMap[refBlockId]?.containerField
+      || containerConfig?.fieldName
+      || 'blocks';
+    const layoutField = `${pageField}_layout`;
+
     const newBlocks = {
-      ...formData.blocks,
+      ...(formData[pageField] || {}),
       [newBlockId]: newBlockData,
     };
 
-    const currentItems = formData.blocks_layout?.items || [];
+    const currentItems = formData[layoutField]?.items || [];
     const refIndex = currentItems.indexOf(refBlockId);
     const insertIndex = getInsertIndex(currentItems, refIndex);
     const newItems = [...currentItems];
@@ -786,8 +815,8 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
 
     return {
       ...formData,
-      blocks: newBlocks,
-      blocks_layout: { items: newItems },
+      [pageField]: newBlocks,
+      [layoutField]: { items: newItems },
     };
   }
 
@@ -837,15 +866,20 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
 export function deleteBlockFromContainer(formData, blockPathMap, blockId, containerConfig) {
   // Page-level deletion (page is just a container with blocks/blocks_layout)
   if (!containerConfig) {
-    const { [blockId]: removed, ...remainingBlocks } = formData.blocks;
+    // Determine which page field to delete from
+    // Use containerField from the block being deleted, or default to 'blocks'
+    const pageField = blockPathMap[blockId]?.containerField || 'blocks';
+    const layoutField = `${pageField}_layout`;
 
-    const currentItems = formData.blocks_layout?.items || [];
+    const { [blockId]: removed, ...remainingBlocks } = formData[pageField] || {};
+
+    const currentItems = formData[layoutField]?.items || [];
     const newItems = currentItems.filter((id) => id !== blockId);
 
     return {
       ...formData,
-      blocks: remainingBlocks,
-      blocks_layout: { items: newItems },
+      [pageField]: remainingBlocks,
+      [layoutField]: { items: newItems },
     };
   }
 
@@ -1134,14 +1168,17 @@ function getEmptyBlockType(containerConfig) {
  * @param {Object} options.intl - Intl object for i18n
  * @param {Object} options.metadata - Metadata from form
  * @param {Object} options.properties - Form properties
+ * @param {string} options.pageField - For page-level, which page field to check (default: 'blocks')
  * @returns {Object} formData with empty block added if container was empty, or original formData
  */
 export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap, uuidGenerator, blocksConfig, options = {}) {
-  const { intl, metadata, properties } = options;
+  const { intl, metadata, properties, pageField: optionPageField } = options;
 
   if (!containerConfig) {
-    // Page-level: check blocks_layout.items
-    const items = formData.blocks_layout?.items || [];
+    // Page-level: check the specified page field's layout items
+    const pageField = optionPageField || 'blocks';
+    const layoutField = `${pageField}_layout`;
+    const items = formData[layoutField]?.items || [];
     if (items.length === 0) {
       const newBlockId = uuidGenerator();
       const blockType = getEmptyBlockType(null);
@@ -1159,11 +1196,11 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 
       return {
         ...formData,
-        blocks: {
-          ...formData.blocks,
+        [pageField]: {
+          ...(formData[pageField] || {}),
           [newBlockId]: blockData,
         },
-        blocks_layout: { items: [newBlockId] },
+        [layoutField]: { items: [newBlockId] },
       };
     }
     return formData;
@@ -1388,10 +1425,11 @@ export function reorderBlocksInContainer(
   intl = null,
 ) {
   if (!parentBlockId) {
-    // Page-level reorder
+    // Page-level reorder - use fieldName to determine which page field
+    const layoutField = `${fieldName}_layout`;
     return {
       ...formData,
-      blocks_layout: { items: newOrder },
+      [layoutField]: { items: newOrder },
     };
   }
 
@@ -1544,17 +1582,19 @@ export function moveBlockBetweenContainers(
 
     newFormData = setBlockByPath(newFormData, parentPath, updatedParentBlock);
   } else {
-    // Insert at page level
-    const items = [...(newFormData.blocks_layout?.items || [])];
+    // Insert at page level - use containerField from target block
+    const pageField = blockPathMap[targetBlockId]?.containerField || 'blocks';
+    const layoutField = `${pageField}_layout`;
+    const items = [...(newFormData[layoutField]?.items || [])];
     items.splice(insertIndex, 0, blockId);
 
     newFormData = {
       ...newFormData,
-      blocks: {
-        ...newFormData.blocks,
+      [pageField]: {
+        ...(newFormData[pageField] || {}),
         [blockId]: blockData,
       },
-      blocks_layout: { items },
+      [layoutField]: { items },
     };
   }
 
@@ -1624,8 +1664,10 @@ function reorderBlockInContainer(
 
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   } else {
-    // Page-level reorder
-    const items = [...(formData.blocks_layout?.items || [])];
+    // Page-level reorder - use containerField from block being moved
+    const pageField = blockPathMap[blockId]?.containerField || 'blocks';
+    const layoutField = `${pageField}_layout`;
+    const items = [...(formData[layoutField]?.items || [])];
     const currentIndex = items.indexOf(blockId);
     const targetIndex = items.indexOf(targetBlockId);
 
@@ -1651,7 +1693,7 @@ function reorderBlockInContainer(
 
     return {
       ...formData,
-      blocks_layout: { items },
+      [layoutField]: { items },
     };
   }
 }
@@ -1669,7 +1711,10 @@ function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, c
     const parentBlock = getBlockByPath(formData, parentPath);
     items = parentBlock?.[layoutFieldName]?.items || [];
   } else {
-    items = formData.blocks_layout?.items || [];
+    // Page-level - use containerField from target block
+    const pageField = blockPathMap[targetBlockId]?.containerField || 'blocks';
+    const layoutField = `${pageField}_layout`;
+    items = formData[layoutField]?.items || [];
   }
 
   const targetIndex = items.indexOf(targetBlockId);

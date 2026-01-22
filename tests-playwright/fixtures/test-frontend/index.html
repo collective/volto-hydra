@@ -557,7 +557,13 @@
                     // Initialize bridge - admin origin auto-detected from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge({
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                        pageBlocksFields: [
+                            {
+                                fieldName: 'blocks',
+                                title: 'Content',
+                                allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                            },
+                        ],
                         voltoConfig: voltoConfig,
                         debug: true,  // Enable debug logging for tests
                     });

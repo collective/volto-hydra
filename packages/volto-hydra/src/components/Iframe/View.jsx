@@ -546,6 +546,7 @@ const Iframe = (props) => {
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
+    pageBlocksFields: null, // Page-level blocks fields configuration from frontend
   }));
 
   // Handle Escape key in Admin UI to navigate to parent block
@@ -1633,25 +1634,65 @@ const Iframe = (props) => {
             }
           }
 
-          // 2. Apply allowedBlocks by setting `restricted: true` on blocks not in the list
-          // This integrates with Volto's standard block restriction mechanism
-          if (event.data.allowedBlocks) {
-            validateFrontendConfig(event.data, config.blocks.blocksConfig);
-            const allowedSet = new Set(event.data.allowedBlocks);
+          // 2. Process pageBlocksFields - merge with default 'blocks' field
+          // Default: [{ fieldName: 'blocks', title: 'Blocks' }] with all non-restricted block types
+          // If provided, merge with default (unless 'blocks' is explicitly configured)
+          let effectivePageBlocksFields;
+          const defaultBlocksField = { fieldName: 'blocks', title: 'Blocks' };
+
+          if (event.data.pageBlocksFields) {
+            // Check if 'blocks' field is already configured
+            const hasBlocksField = event.data.pageBlocksFields.some(f => f.fieldName === 'blocks');
+            if (hasBlocksField) {
+              // Use provided config as-is
+              effectivePageBlocksFields = event.data.pageBlocksFields;
+            } else {
+              // Merge with default 'blocks' field
+              effectivePageBlocksFields = [defaultBlocksField, ...event.data.pageBlocksFields];
+            }
+          } else {
+            // No config provided - use default 'blocks' field
+            effectivePageBlocksFields = [defaultBlocksField];
+          }
+
+          // 2b. Apply restrictions based on pageBlocksFields
+          // Collect all unique allowed blocks across all page fields and restrict the rest
+          const allAllowedBlocks = new Set();
+          effectivePageBlocksFields.forEach(field => {
+            if (field.allowedBlocks) {
+              field.allowedBlocks.forEach(blockType => allAllowedBlocks.add(blockType));
+            }
+          });
+          // Only apply restrictions if at least one field has allowedBlocks
+          if (allAllowedBlocks.size > 0) {
+            validateFrontendConfig({ allowedBlocks: [...allAllowedBlocks] }, config.blocks.blocksConfig);
             Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
               const blockConfig = config.blocks.blocksConfig[blockType];
-              if (blockConfig && !allowedSet.has(blockType)) {
-                // Block not in allowedBlocks - mark as restricted at page level
-                // Preserve existing restricted function if it exists (for dynamic restrictions)
+              if (blockConfig && !allAllowedBlocks.has(blockType)) {
                 const existingRestricted = blockConfig.restricted;
                 if (typeof existingRestricted !== 'function') {
                   blockConfig.restricted = true;
                 }
-                // If it's already a function, leave it - function takes precedence
               }
             });
-            // Keep the list for backwards compatibility
-            setAllowedBlocksList(event.data.allowedBlocks);
+            setAllowedBlocksList([...allAllowedBlocks]);
+          }
+
+          // 2c. Auto-initialize missing page fields with empty blocks/layout
+          let formWithPageFields = form ? { ...form } : form;
+          if (form) {
+            effectivePageBlocksFields.forEach(field => {
+              const { fieldName } = field;
+              const layoutFieldName = `${fieldName}_layout`;
+              // Initialize missing blocks field
+              if (!formWithPageFields[fieldName]) {
+                formWithPageFields[fieldName] = {};
+              }
+              // Initialize missing layout field
+              if (!formWithPageFields[layoutFieldName]) {
+                formWithPageFields[layoutFieldName] = { items: [] };
+              }
+            });
           }
 
           // 3. Extract block field types (now includes custom blocks and page-level fields)
@@ -1659,12 +1700,17 @@ const Iframe = (props) => {
           setBlockFieldTypes(initialBlockFieldTypes);
 
           // 4. Build blockPathMap (now has complete schema knowledge)
-          // No need to pass allowedBlocks - it's now derived from blocksConfig.restricted
-          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, intl);
+          // Pass pageBlocksFields to traverse multiple page-level blocks fields
+          const initialBlockPathMap = buildBlockPathMap(
+            formWithPageFields,
+            config.blocks.blocksConfig,
+            intl,
+            effectivePageBlocksFields, // pageBlocksFields - null means default to single 'blocks' field
+          );
 
           // 5. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
           const formWithDefaults = applySchemaDefaultsToFormData(
-            form,
+            formWithPageFields,
             initialBlockPathMap,
             config.blocks.blocksConfig,
             intl,
@@ -1674,6 +1720,7 @@ const Iframe = (props) => {
             ...prev,
             formData: formWithDefaults,
             blockPathMap: initialBlockPathMap,
+            pageBlocksFields: effectivePageBlocksFields,
           }));
 
           // 6. Send everything to iframe (only in edit mode)
@@ -2075,18 +2122,25 @@ const Iframe = (props) => {
   // Handle sidebar add - adds inside a container's field as last child
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
     // Get allowed blocks for this container field
-    const parentBlock = parentBlockId
-      ? getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId)
-      : null;
-    const parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
     const blocksConfig = config.blocks.blocksConfig;
-    const parentSchema =
-      typeof blocksConfig?.[parentType]?.blockSchema === 'function'
-        ? blocksConfig[parentType].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : blocksConfig?.[parentType]?.blockSchema;
-    const fieldDef = parentSchema?.properties?.[fieldName];
-    const isObjectList = fieldDef?.widget === 'object_list';
-    const containerAllowed = fieldDef?.allowedBlocks || null;
+    let containerAllowed = null;
+    let isObjectList = false;
+
+    if (parentBlockId) {
+      // Container-level add - look up from parent block's schema
+      const parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
+      const parentSchema =
+        typeof blocksConfig?.[parentType]?.blockSchema === 'function'
+          ? blocksConfig[parentType].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
+          : blocksConfig?.[parentType]?.blockSchema;
+      const fieldDef = parentSchema?.properties?.[fieldName];
+      isObjectList = fieldDef?.widget === 'object_list';
+      containerAllowed = fieldDef?.allowedBlocks || null;
+    } else {
+      // Page-level add - look up from pageBlocksFields config
+      const pageFieldConfig = iframeSyncState.pageBlocksFields?.find(f => f.fieldName === fieldName);
+      containerAllowed = pageFieldConfig?.allowedBlocks || null;
+    }
 
     // Auto-insert if object_list or single allowedBlock
     if (isObjectList || containerAllowed?.length === 1) {
@@ -2096,7 +2150,7 @@ const Iframe = (props) => {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
       setAddNewBlockOpened(true);
     }
-  }, [properties, iframeSyncState.blockPathMap, insertAndSelectBlock]);
+  }, [properties, iframeSyncState.blockPathMap, iframeSyncState.pageBlocksFields, insertAndSelectBlock]);
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -2706,6 +2760,7 @@ const Iframe = (props) => {
         selectedBlock={selectedBlock}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
+        pageBlocksFields={iframeSyncState.pageBlocksFields}
         onSelectBlock={onSelectBlock}
         onAddBlock={(parentBlockId, fieldName) => {
           handleSidebarAdd(parentBlockId, fieldName);
