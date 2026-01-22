@@ -2716,6 +2716,18 @@ const Iframe = (props) => {
           }
         }}
         onChangeBlock={(blockId, newBlockData) => {
+          // Guard: blockId can be undefined when Volto components like BlockDataForm
+          // are missing the block prop (e.g., SearchBlockEdit doesn't pass block to BlockDataForm)
+          if (!blockId) {
+            console.warn(
+              '[HYDRA] onChangeBlock called with undefined blockId. ' +
+              'This is likely a Volto bug where BlockDataForm is used without a block prop. ' +
+              'Data keys:', Object.keys(newBlockData || {}),
+              'Stack:', new Error().stack
+            );
+            return;
+          }
+
           // Rebuild blockPathMap from current properties to ensure it's up to date
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
 

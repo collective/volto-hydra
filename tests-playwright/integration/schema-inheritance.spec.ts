@@ -379,27 +379,19 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await helper.login();
     await helper.navigateToEdit('/search-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for search block to be visible
-    const searchBlock = iframe.locator('[data-block-uid="search-block-1"]');
-    await expect(searchBlock).toBeVisible({ timeout: 10000 });
-
-    // Click on the search block headline (not on the listing results area)
-    const searchHeadline = searchBlock.locator('h2[data-editable-field="headline"]');
-    await expect(searchHeadline).toBeVisible();
-    await searchHeadline.click();
+    // Click on the search block headline (waits for block, clicks specific element)
+    await helper.clickBlockInIframe('search-block-1', {
+      selector: 'h2[data-editable-field="headline"]',
+    });
 
     // Verify the search block is selected (toolbar visible)
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
-    // Click on a facet item's title (avoid clicking checkboxes which filter results)
-    const facetItem = iframe.locator('[data-block-uid="facet-type"]');
-    await expect(facetItem).toBeVisible({ timeout: 5000 });
-    // Click on the title, not the checkbox area
-    const facetTitle = facetItem.locator('[data-editable-field="title"]');
-    await facetTitle.click();
+    // Click on a facet title (waits for block - async expandListingBlocks must complete)
+    await helper.clickBlockInIframe('facet-type', {
+      selector: '[data-editable-field="title"]',
+    });
 
     // Toolbar should be visible for the facet
     await expect(toolbar).toBeVisible({ timeout: 5000 });
@@ -412,10 +404,8 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const titleField = page.locator('#sidebar-properties .field-wrapper-title');
     await expect(titleField).toBeVisible({ timeout: 5000 });
 
-    // Now click on the listing child block inside search
-    const listingItems = iframe.locator('[data-block-uid="results-listing"]');
-    await expect(listingItems.first()).toBeVisible({ timeout: 10000 });
-    await listingItems.first().click();
+    // Click on the listing child block inside search
+    await helper.clickBlockInIframe('results-listing');
 
     // Toolbar should still be visible for the listing block
     await expect(toolbar).toBeVisible({ timeout: 5000 });

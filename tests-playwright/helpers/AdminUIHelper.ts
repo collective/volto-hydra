@@ -375,12 +375,13 @@ export class AdminUIHelper {
    * @param blockId - The data-block-uid of the block to click
    * @param options.waitForToolbar - If true (default), waits for Volto's quanta-toolbar.
    *                                  Set to false for mock parent tests where Volto isn't running.
+   * @param options.selector - Optional selector within the block to click on a specific element.
    */
   async clickBlockInIframe(
     blockId: string,
-    options: { waitForToolbar?: boolean } = {},
+    options: { waitForToolbar?: boolean; selector?: string } = {},
   ) {
-    const { waitForToolbar = true } = options;
+    const { waitForToolbar = true, selector } = options;
     const iframe = this.getIframe();
     const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -397,13 +398,16 @@ export class AdminUIHelper {
     // Vue/Nuxt may re-render after hydration, causing element references to become stale
     await expect(block).toBeAttached({ timeout: 5000 });
 
-    // Scroll block into view inside the iframe first
-    await block.scrollIntoViewIfNeeded();
+    // Determine click target - either specific selector within block, or block itself
+    const clickTarget = selector ? block.locator(selector) : block;
 
-    // Wait for block to be visible (have non-zero height) - hydra.js sets min-height on editable fields
-    await block.waitFor({ state: 'visible', timeout: 5000 });
+    // Scroll click target into view inside the iframe first
+    await clickTarget.scrollIntoViewIfNeeded();
 
-    await block.click();
+    // Wait for click target to be visible
+    await clickTarget.waitFor({ state: 'visible', timeout: 5000 });
+
+    await clickTarget.click();
 
     if (waitForToolbar) {
       // Try to wait for the target block to be selected
