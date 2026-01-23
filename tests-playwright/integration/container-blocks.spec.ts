@@ -2533,9 +2533,18 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     await helper.navigateToEdit('/container-test-page');
 
     // Select grid-1 (an implicit container with grid-cell-1 and grid-cell-2)
-    // Use clickContainerBlockInIframe to avoid selecting a child block
-    await helper.clickContainerBlockInIframe('grid-1');
+    // Navigate from page level child blocks widget since clicking on grid selects a child
     await helper.waitForSidebarOpen();
+
+    // Press Escape to deselect any auto-selected block and show page-level child blocks
+    await page.keyboard.press('Escape');
+
+    // Find grid-1 in the page's child blocks widget and click it
+    const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
+    await expect(pageChildBlocks).toBeVisible({ timeout: 5000 });
+    const gridItem = pageChildBlocks.locator('.child-block-item', { hasText: 'Grid' });
+    await expect(gridItem).toBeVisible({ timeout: 5000 });
+    await gridItem.click();
 
     // The child blocks widget should show the grid's children
     const childBlocksWidget = page.locator('.child-blocks-widget');
