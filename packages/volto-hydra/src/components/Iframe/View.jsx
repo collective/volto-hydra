@@ -1442,25 +1442,16 @@ const Iframe = (props) => {
           const isNewBlock = !isPositionUpdateOnly &&
                              selectedBlock !== event.data.blockUid;
 
-          // Check if we're waiting for a specific block to be selected (e.g., after adding a new block)
+          // Clear any pending selection - BLOCK_SELECTED from hydra.js is authoritative
+          // The hydra.js domChange observer already checks blockUid === selectedBlockUid
+          // before sending, so we don't need to filter here
           const pendingUid = iframeSyncState?.pendingSelectBlockUid;
-          const isPendingBlock = pendingUid && event.data.blockUid === pendingUid;
-          const isWrongBlockDuringPending = pendingUid && event.data.blockUid !== pendingUid;
-
-          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock, 'pendingUid:', pendingUid);
-
-          // If we're waiting for a specific block and this is a different block, ignore it
-          // This prevents race conditions where parent container gets selected during re-render
-          if (isWrongBlockDuringPending) {
-            log('BLOCK_SELECTED ignoring - waiting for pending block:', pendingUid);
-            return;
-          }
-
-          // Clear pending selection if this is the block we were waiting for
-          if (isPendingBlock) {
-            log('BLOCK_SELECTED received pending block, clearing pendingSelectBlockUid');
+          if (pendingUid) {
+            log('BLOCK_SELECTED clearing pendingSelectBlockUid:', pendingUid);
             setIframeSyncState(prev => ({ ...prev, pendingSelectBlockUid: null }));
           }
+
+          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
 
           // Update lastSentSelectBlockRef to match iframe's selection
           // This is critical: when iframe confirms a selection, our ref must match
