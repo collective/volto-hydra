@@ -336,8 +336,8 @@ test.describe('Inline Editing - Links', () => {
       await helper.assertCursorAtEnd(editor, blockId, 'Test text');
     }).toPass({ timeout: 5000, intervals: [500, 1000, 1500] });
 
-    // Ensure editor still has focus before typing
-    await expect(editor).toBeFocused();
+    // Wait for editor to have focus before typing
+    await helper.waitForEditorFocus(editor);
 
     // Now type and verify (poll for text to appear in case of DOM sync delay)
     await editor.pressSequentially(' added', { delay: 10 });
