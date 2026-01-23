@@ -6,6 +6,7 @@
 import { produce } from 'immer';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 /**
  * Strip functions from a schema object for postMessage serialization.
@@ -237,7 +238,7 @@ function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry (must have _page registered for multiple page fields)
  * @param {Object} intl - The intl object from react-intl (required for i18n schemas)
- * @returns {Object} Map of blockId -> { path: string[], parentId: string|null, containerField: string|null, ... }
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string, containerField: string|null, ... }
  *
  * Path format examples:
  * - Page block: ['blocks', 'text-1']
@@ -488,11 +489,20 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     });
   }
 
+  // Add entry for the page itself (PAGE_BLOCK_UID virtual block)
+  // This allows getBlockById, getParentChain, etc. to handle PAGE_BLOCK_UID consistently
+  pathMap[PAGE_BLOCK_UID] = {
+    path: [],
+    parentId: null, // Page has no parent
+    containerField: null,
+    blockType: '_page',
+  };
+
   // Start traversal with page as root container
   // pageSchema was retrieved from blocksConfig['_page'] at the top of this function
-  // parentId=null means page-level blocks have null parent
+  // parentId=PAGE_BLOCK_UID means page-level blocks have the page as parent
   // parentPath=[] means paths start with [fieldName, blockId]
-  processItem(formData, null, [], pageSchema);
+  processItem(formData, PAGE_BLOCK_UID, [], pageSchema);
 
   return pathMap;
 }
@@ -608,7 +618,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const fieldName = pathInfo.containerField;
 
   // Determine parent type: '_page' for page-level blocks, otherwise from blockPathMap
-  const parentType = parentId === null ? '_page' : blockPathMap[parentId]?.blockType;
+  const parentType = parentId === PAGE_BLOCK_UID ? '_page' : blockPathMap[parentId]?.blockType;
   const schema = getBlockSchema(parentType, intl, blocksConfig);
   const fieldDef = schema?.properties?.[fieldName];
 
@@ -631,7 +641,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   }
 
   // For standard blocks (including page-level), look up container config from schema
-  const parentBlock = parentId === null ? formData : getBlockById(formData, blockPathMap, parentId);
+  const parentBlock = parentId === PAGE_BLOCK_UID ? formData : getBlockById(formData, blockPathMap, parentId);
 
   if (!parentBlock) {
     console.log('[BLOCKPATH] getContainerFieldConfig: parentBlock not found for', parentId);
@@ -684,13 +694,13 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
  * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, defaultBlock, maxLength }]
  */
 export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl) {
-  // For page-level (blockId === null), use _page schema and formData as the block
-  const block = blockId === null ? formData : getBlockById(formData, blockPathMap, blockId);
+  // For page-level (blockId is PAGE_BLOCK_UID), use _page schema and formData as the block
+  const block = blockId === PAGE_BLOCK_UID ? formData : getBlockById(formData, blockPathMap, blockId);
   if (!block) return [];
 
   // Use blockPathMap for type lookup (single source of truth)
   // For page-level, use '_page' as the type
-  const blockType = blockId === null ? '_page' : blockPathMap[blockId]?.blockType;
+  const blockType = blockId === PAGE_BLOCK_UID ? '_page' : blockPathMap[blockId]?.blockType;
   if (!blockType) return [];
   const schema = getBlockSchema(blockType, intl, blocksConfig);
 
@@ -756,7 +766,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
  * @param {string} refBlockId - Reference block ID for positioning
  * @param {string} newBlockId - New block's ID
  * @param {Object} newBlockData - New block's data
- * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or null for page-level
+ * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or PAGE_BLOCK_UID for page-level
  * @param {'before'|'after'|'inside'} action - Where to insert relative to refBlockId
  * @returns {Object} New formData with block inserted
  */
@@ -775,8 +785,8 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
 
   const { parentId, fieldName, isObjectList } = containerConfig;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
 
   if (!parentBlock) {
@@ -811,7 +821,7 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
  * @param {Object} formData - The form data
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {string} blockId - Block ID to delete
- * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or null for page-level
+ * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or PAGE_BLOCK_UID for page-level
  * @returns {Object} New formData with block removed
  */
 export function deleteBlockFromContainer(formData, blockPathMap, blockId, containerConfig) {
@@ -821,8 +831,8 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
 
   const { parentId, fieldName, isObjectList } = containerConfig;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
 
   if (!parentBlock) {
@@ -1029,7 +1039,7 @@ export function deleteTableColumn(formData, blockPathMap, cellId) {
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {string} blockId - Block ID to mutate
  * @param {Object} newBlockData - New block data
- * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or null for page-level
+ * @param {Object|null} containerConfig - Container config from getContainerFieldConfig, or PAGE_BLOCK_UID for page-level
  * @returns {Object} New formData with block mutated
  */
 export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlockData, containerConfig) {
@@ -1039,8 +1049,8 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
 
   const { parentId, fieldName, isObjectList } = containerConfig;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
 
   if (!parentBlock) {
@@ -1087,7 +1097,7 @@ function getEmptyBlockType(containerConfig) {
  * Call this after deleting a block to ensure empty containers get an empty block.
  *
  * @param {Object} formData - The form data
- * @param {Object|null} containerConfig - Container config (null for page-level)
+ * @param {Object|null} containerConfig - Container config (PAGE_BLOCK_UID for page-level)
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {Function} uuidGenerator - Function to generate UUIDs
  * @param {Object} blocksConfig - Block configuration from registry
@@ -1124,8 +1134,8 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 
   const { parentId, fieldName, isObjectList } = containerConfig;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
 
   if (!parentBlock) {
@@ -1307,7 +1317,7 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
  *
  * @param {Object} formData - The form data
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
- * @param {string|null} parentBlockId - Parent block ID (null for page-level)
+ * @param {string|null} parentBlockId - Parent block ID (PAGE_BLOCK_UID for page-level)
  * @param {string} fieldName - Container field name (e.g., 'blocks', 'columns')
  * @param {Array<string>} newOrder - New order of block IDs
  * @param {Object} blocksConfig - Block configuration from registry
@@ -1323,9 +1333,9 @@ export function reorderBlocksInContainer(
   blocksConfig = null,
   intl = null,
 ) {
-  // parentPath is [] for page-level (parentBlockId === null)
-  const parentPath = parentBlockId === null ? [] : blockPathMap[parentBlockId]?.path;
-  if (parentBlockId !== null && !parentPath) {
+  // parentPath is [] for page-level (parentBlockId === PAGE_BLOCK_UID)
+  const parentPath = parentBlockId === PAGE_BLOCK_UID ? [] : blockPathMap[parentBlockId]?.path;
+  if (parentBlockId !== PAGE_BLOCK_UID && !parentPath) {
     console.error('[REORDER] Could not find parent path for:', parentBlockId);
     return formData;
   }
@@ -1338,7 +1348,7 @@ export function reorderBlocksInContainer(
 
   // Detect if this is an object_list field
   // For page-level, parent type is '_page'
-  const parentType = parentBlockId === null ? '_page' : parentBlock['@type'];
+  const parentType = parentBlockId === PAGE_BLOCK_UID ? '_page' : parentBlock['@type'];
   const schema = getBlockSchema(parentType, intl, blocksConfig);
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';
@@ -1367,8 +1377,8 @@ export function reorderBlocksInContainer(
  * @param {string} blockId - Block being moved
  * @param {string} targetBlockId - Block to insert relative to
  * @param {boolean} insertAfter - True to insert after target, false for before
- * @param {string|null} sourceParentId - Parent of source block (null for page-level)
- * @param {string|null} targetParentId - Parent of target block (null for page-level)
+ * @param {string|null} sourceParentId - Parent of source block (PAGE_BLOCK_UID for page-level)
+ * @param {string|null} targetParentId - Parent of target block (PAGE_BLOCK_UID for page-level)
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
  * @returns {Object|null} New formData with block moved, or null if invalid move
@@ -1396,7 +1406,7 @@ export function moveBlockBetweenContainers(
 
   // Same container - just reorder
   // Check both parentId AND containerField to handle page-level blocks in different fields
-  // (e.g., blocks vs footer_blocks both have parentId=null but different containerField)
+  // (e.g., blocks vs footer_blocks both have parentId=PAGE_BLOCK_UID but different containerField)
   const sourceContainerField = blockPathMap[blockId]?.containerField;
   const targetContainerField = blockPathMap[targetBlockId]?.containerField;
   if (sourceParentId === targetParentId && sourceContainerField === targetContainerField) {
@@ -1455,8 +1465,8 @@ export function moveBlockBetweenContainers(
   const { parentId, fieldName } = targetContainerConfig;
   const layoutFieldName = `${fieldName}_layout`;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(newFormData, parentPath);
 
   if (!parentBlock) {
@@ -1503,8 +1513,8 @@ function reorderBlockInContainer(
   const { fieldName } = containerConfig;
   const layoutFieldName = `${fieldName}_layout`;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
 
   if (!parentBlock) {
@@ -1555,8 +1565,8 @@ function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, c
   const { parentId, fieldName } = containerConfig;
   const layoutFieldName = `${fieldName}_layout`;
 
-  // parentPath is [] for page-level (parentId === null)
-  const parentPath = parentId === null ? [] : blockPathMap[parentId]?.path;
+  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
   const items = parentBlock?.[layoutFieldName]?.items || [];
 

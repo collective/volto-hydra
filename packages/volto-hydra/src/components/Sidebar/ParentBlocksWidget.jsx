@@ -29,6 +29,7 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, getBlockSchema, updateBlockById } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 /**
  * Get the display title for a block type
@@ -94,7 +95,8 @@ const getParentChain = (blockId, blockPathMap) => {
 
   while (currentId) {
     const pathInfo = blockPathMap[currentId];
-    if (pathInfo?.parentId) {
+    // Stop at PAGE_BLOCK_UID - it's the root, not a block to show in hierarchy
+    if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
       parents.unshift(pathInfo.parentId); // Add to front
       currentId = pathInfo.parentId;
     } else {

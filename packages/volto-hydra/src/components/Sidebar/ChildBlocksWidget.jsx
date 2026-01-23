@@ -19,6 +19,7 @@ import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 const messages = defineMessages({
   blocks: {
@@ -229,9 +230,9 @@ const ChildBlocksWidget = ({
   }, []);
 
   // If no block selected, show page-level blocks for each page field
-  // Uses getAllContainerFields(null, ...) to get _page container fields
+  // Uses getAllContainerFields(PAGE_BLOCK_UID, ...) to get _page container fields
   if (!selectedBlock) {
-    const fieldsConfig = getAllContainerFields(null, blockPathMap, formData, blocksConfig, intl);
+    const fieldsConfig = getAllContainerFields(PAGE_BLOCK_UID, blockPathMap, formData, blocksConfig, intl);
 
     if (!isClient) return null;
 

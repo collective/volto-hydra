@@ -4,6 +4,7 @@ import SlateButtonsWrapper from './SlateButtonsWrapper';
 import FormatDropdown from './FormatDropdown';
 import config from '@plone/volto/registry';
 import { Icon } from '@plone/volto/components';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 /**
  * Dropdown Menu for Block Actions
@@ -356,8 +357,8 @@ const DropdownMenu = ({
         </>
       )}
       {/* Remove action - label changes based on table mode and add direction */}
-      {/* Hide remove for page-level fields (selectedBlock is null) */}
-      {selectedBlock && (() => {
+      {/* Hide remove for page-level fields (selectedBlock is PAGE_BLOCK_UID) */}
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && (() => {
         // Determine remove label and action based on table mode
         // Uses addDirection to determine Column vs Row (same as add button icon)
         const actionsRegistry = config.settings.hydraActions || {};

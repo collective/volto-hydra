@@ -337,6 +337,53 @@ test.describe('Block Drag and Drop', () => {
     await page.mouse.up();
   });
 
+  test('can select another block after cancelling drag', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial block order
+    const initialBlocks = await helper.getBlockOrder();
+    expect(initialBlocks.length).toBeGreaterThanOrEqual(2);
+
+    const firstBlock = initialBlocks[0];
+    const secondBlock = initialBlocks[1];
+
+    // Select first block
+    await helper.clickBlockInIframe(firstBlock);
+    await helper.waitForSidebarOpen();
+    await helper.waitForBlockSelected(firstBlock);
+
+    // Start dragging but cancel it (release without moving to valid drop target)
+    const startPos = await helper.getToolbarDragIconCenterInPageCoords();
+    await page.mouse.move(startPos.x, startPos.y);
+    await page.mouse.down();
+    await helper.verifyDragShadowVisible();
+
+    // Move mouse slightly (not to a valid drop position)
+    await page.mouse.move(startPos.x + 10, startPos.y + 10, { steps: 3 });
+
+    // Release - this cancels the drag without completing it
+    await page.mouse.up();
+
+    // Wait for drag cleanup
+    await page.waitForTimeout(200);
+
+    // Now try to select a different block
+    await helper.clickBlockInIframe(secondBlock);
+
+    // Verify the second block gets selected
+    await helper.waitForBlockSelected(secondBlock);
+    await helper.waitForSidebarOpen();
+
+    // Verify sidebar shows the correct block
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar).toBeVisible();
+  });
+
   test('footer blocks can be reordered via drag and drop', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - no footer_blocks configured');
 

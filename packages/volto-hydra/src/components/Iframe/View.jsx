@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -505,12 +505,12 @@ const Iframe = (props) => {
   }, [selectedBlock]);
 
   // Clear blockUI when no block is selected
-  // BUT keep it for page-level fields (blockUI exists with rect but blockUid is null)
+  // BUT keep it for page-level fields (blockUI exists with rect and blockUid is PAGE_BLOCK_UID)
   useEffect(() => {
     if (!selectedBlock) {
       setBlockUI((prev) => {
-        // Keep blockUI if it's a page-level selection (blockUid is null but has rect)
-        if (prev?.blockUid === null && prev?.rect) {
+        // Keep blockUI if it's a page-level selection (blockUid is PAGE_BLOCK_UID with rect)
+        if (prev?.blockUid === PAGE_BLOCK_UID && prev?.rect) {
           return prev;
         }
         return null;
@@ -2446,7 +2446,7 @@ const Iframe = (props) => {
             onFieldLinkChange={(fieldName, url, metadata) => {
               let updatedProperties;
 
-              if (selectedBlock === null) {
+              if (selectedBlock === PAGE_BLOCK_UID) {
                 // Page-level field - update directly on properties
                 // For image fields with metadata, construct NamedBlobImage format
                 if (metadata?.image_scales) {
@@ -2725,6 +2725,14 @@ const Iframe = (props) => {
               'Data keys:', Object.keys(newBlockData || {}),
               'Stack:', new Error().stack
             );
+            return;
+          }
+
+          // Handle page-level changes (PAGE_BLOCK_UID) - merge directly into formData
+          if (blockId === PAGE_BLOCK_UID) {
+            const newFormData = { ...properties, ...newBlockData };
+            validateAndLog(newFormData, 'onChangeBlock (page-level)', blockFieldTypes);
+            onChangeFormData(newFormData);
             return;
           }
 
