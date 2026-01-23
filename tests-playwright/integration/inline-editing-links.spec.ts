@@ -288,9 +288,9 @@ test.describe('Inline Editing - Links', () => {
     await helper.clickFormatButton('link');
     await helper.waitForLinkEditorPopup();
 
-    // Click at the start of the text (position different from center)
-    // This ensures selection actually changes, triggering the close behavior
-    await editor.click({ position: { x: 5, y: 5 }, force: true });
+    // Click back on the editor to close the LinkEditor
+    // Uses clickInIframeWithBlur because Playwright doesn't trigger blur reliably
+    await helper.clickInIframeWithBlur(editor);
 
     // LinkEditor should close
     await helper.waitForLinkEditorToClose();

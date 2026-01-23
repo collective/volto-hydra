@@ -3771,9 +3771,6 @@ export class AdminUIHelper {
   async waitForLinkEditorToClose(timeout: number = 5000): Promise<void> {
     // LinkEditor renders in a PositionedToolbar with className "add-link"
     // Wait for NO .add-link elements to be visible
-    const popup = this.page.locator('.add-link');
-
-    // Wait until there are no visible LinkEditor popups
     await this.page.waitForFunction(
       () => {
         const popups = document.querySelectorAll('.add-link');
@@ -3784,6 +3781,33 @@ export class AdminUIHelper {
       },
       { timeout }
     );
+  }
+
+  /**
+   * Click in the iframe and dispatch mousedown on admin document.
+   *
+   * In real browsers, clicking inside the iframe causes the parent window to
+   * lose focus (blur event), which triggers blur-based handlers like closing
+   * popups. Playwright doesn't trigger blur reliably when clicking in iframes,
+   * so this method does both: the click AND the mousedown dispatch.
+   *
+   * @param target - Locator to click, or position relative to iframe
+   * @param options - Click options (position, force, etc.)
+   */
+  async clickInIframeWithBlur(target: Locator): Promise<void> {
+    // Click on the target (e.g., an editable element in the iframe)
+    await target.click();
+
+    // Dispatch mousedown on admin document to trigger blur-based handlers
+    // This mimics what SyncedSlateToolbar.jsx does on window blur
+    await this.page.evaluate(() => {
+      const mousedownEvent = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      });
+      document.dispatchEvent(mousedownEvent);
+    });
   }
 
   /**
