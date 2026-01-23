@@ -2533,7 +2533,8 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     await helper.navigateToEdit('/container-test-page');
 
     // Select grid-1 (an implicit container with grid-cell-1 and grid-cell-2)
-    await helper.clickBlockInIframe('grid-1');
+    // Use clickContainerBlockInIframe to avoid selecting a child block
+    await helper.clickContainerBlockInIframe('grid-1');
     await helper.waitForSidebarOpen();
 
     // The child blocks widget should show the grid's children
