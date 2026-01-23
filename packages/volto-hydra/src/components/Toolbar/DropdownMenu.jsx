@@ -328,8 +328,8 @@ const DropdownMenu = ({
           />
         </>
       )}
-      {/* Select Container option - only shown for nested blocks with a parent */}
-      {parentId && onSelectBlock && (
+      {/* Select Container option - only shown for nested blocks with a real parent (not page) */}
+      {parentId && parentId !== PAGE_BLOCK_UID && onSelectBlock && (
         <>
           <div
             className="volto-hydra-dropdown-item"
