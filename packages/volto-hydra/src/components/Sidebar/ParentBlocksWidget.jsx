@@ -500,7 +500,9 @@ const ParentBlocksWidget = ({
   if (!isClient) {
     return null;
   }
-  if (!selectedBlock) {
+  // Don't render block hierarchy for page-level selection
+  // PAGE_BLOCK_UID is the virtual root, not a block to show in the hierarchy
+  if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
     return null;
   }
 

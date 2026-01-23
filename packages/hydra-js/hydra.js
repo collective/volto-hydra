@@ -1732,14 +1732,15 @@ export class Bridge {
         const parentId = pathInfo?.parentId || null;
         log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
 
-        if (parentId) {
+        // PAGE_BLOCK_UID is the virtual root - treat as "no parent" (deselect)
+        if (parentId && parentId !== PAGE_BLOCK_UID) {
           // Select the parent block
           const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
           if (parentElement) {
             this.selectBlock(parentElement, 'escapeKey');
           }
         } else {
-          // No parent - deselect by sending BLOCK_SELECTED with null
+          // No parent or parent is page - deselect by sending BLOCK_SELECTED with null
           this.selectedBlockUid = null;
           this.sendBlockSelected('escapeKey', null);
         }
