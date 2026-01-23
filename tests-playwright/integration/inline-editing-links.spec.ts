@@ -288,9 +288,9 @@ test.describe('Inline Editing - Links', () => {
     await helper.clickFormatButton('link');
     await helper.waitForLinkEditorPopup();
 
-    // Click at the start of the text (position different from center)
-    // This ensures selection actually changes, triggering the close behavior
-    await editor.click({ position: { x: 5, y: 5 }, force: true });
+    // Click back on the editor to close the LinkEditor
+    // Uses clickInIframeWithBlur because Playwright doesn't trigger blur reliably
+    await helper.clickInIframeWithBlur(editor);
 
     // LinkEditor should close
     await helper.waitForLinkEditorToClose();
@@ -326,21 +326,14 @@ test.describe('Inline Editing - Links', () => {
     const textContent = await helper.getCleanTextContent(editor);
     expect(textContent).toBe('Test text');
 
-    // Verify typing actually works (not just contenteditable attribute present)
-    // This catches the bug where contenteditable is true but iframe is blocked
-    // Poll until editor is focused and cursor is at end (editor may need time after LinkEditor closes)
-    await expect(async () => {
-      await editor.click();
-      await expect(editor).toBeFocused();
-      await editor.press('End');
-      await helper.assertCursorAtEnd(editor, blockId, 'Test text');
-    }).toPass({ timeout: 5000, intervals: [500, 1000, 1500] });
+    // Verify focus returns to editor automatically after cancelling LinkEditor
+    await helper.waitForEditorFocus(editor);
 
-    // Ensure editor still has focus before typing
-    await expect(editor).toBeFocused();
-
-    // Now type and verify (poll for text to appear in case of DOM sync delay)
+    // Move cursor to end and type
+    await editor.press('End');
     await editor.pressSequentially(' added', { delay: 10 });
+
+    // Verify typing worked
     await expect(async () => {
       const newText = await helper.getCleanTextContent(editor);
       expect(newText).toContain('added');

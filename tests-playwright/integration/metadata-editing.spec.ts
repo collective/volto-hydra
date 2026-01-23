@@ -172,4 +172,56 @@ test.describe('Page Metadata Editing', () => {
     const newSrc = await previewImage.getAttribute('src');
     expect(newSrc).not.toBe(originalSrc);
   });
+
+  test('page-level preview_image outline tracks on scroll', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend needs preview_image element added');
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the preview image to be visible
+    const previewImage = iframe.locator('#preview-image');
+    await expect(previewImage).toBeVisible({ timeout: 10000 });
+
+    // Click on the preview image to select it
+    await previewImage.click();
+
+    // Wait for outline to appear
+    const outline = page.locator('.volto-hydra-block-outline');
+    await expect(outline).toBeVisible({ timeout: 5000 });
+
+    // Get initial outline position
+    const initialOutlineBox = await outline.boundingBox();
+    expect(initialOutlineBox).toBeTruthy();
+
+    // Get initial preview image position relative to iframe
+    const initialImageBox = await previewImage.boundingBox();
+    expect(initialImageBox).toBeTruthy();
+
+    // Scroll down in the iframe
+    await iframe.locator('body').evaluate((body) => {
+      body.ownerDocument.defaultView?.scrollBy(0, 100);
+    });
+
+    // Wait for scroll to complete and outline to update
+    await page.waitForTimeout(300);
+
+    // Get new positions after scroll
+    const newOutlineBox = await outline.boundingBox();
+    const newImageBox = await previewImage.boundingBox();
+
+    expect(newOutlineBox).toBeTruthy();
+    expect(newImageBox).toBeTruthy();
+
+    // The outline should have moved with the image (both should move up by ~100px)
+    // Allow some tolerance for timing
+    const outlineMovement = initialOutlineBox!.y - newOutlineBox!.y;
+    const imageMovement = initialImageBox!.y - newImageBox!.y;
+
+    // Both should have moved approximately the same amount
+    expect(Math.abs(outlineMovement - imageMovement)).toBeLessThan(10);
+  });
 });

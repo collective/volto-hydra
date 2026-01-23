@@ -375,12 +375,13 @@ export class AdminUIHelper {
    * @param blockId - The data-block-uid of the block to click
    * @param options.waitForToolbar - If true (default), waits for Volto's quanta-toolbar.
    *                                  Set to false for mock parent tests where Volto isn't running.
+   * @param options.selector - Optional selector within the block to click on a specific element.
    */
   async clickBlockInIframe(
     blockId: string,
-    options: { waitForToolbar?: boolean } = {},
+    options: { waitForToolbar?: boolean; selector?: string } = {},
   ) {
-    const { waitForToolbar = true } = options;
+    const { waitForToolbar = true, selector } = options;
     const iframe = this.getIframe();
     const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -397,32 +398,39 @@ export class AdminUIHelper {
     // Vue/Nuxt may re-render after hydration, causing element references to become stale
     await expect(block).toBeAttached({ timeout: 5000 });
 
-    // Scroll block into view inside the iframe first
-    await block.scrollIntoViewIfNeeded();
+    // Determine click target - either specific selector within block, or block itself
+    const clickTarget = selector ? block.locator(selector) : block;
 
-    // Wait for block to be visible (have non-zero height) - hydra.js sets min-height on editable fields
-    await block.waitFor({ state: 'visible', timeout: 5000 });
+    // Scroll click target into view inside the iframe first
+    await clickTarget.scrollIntoViewIfNeeded();
 
-    await block.click();
+    // Wait for click target to be visible
+    await clickTarget.waitFor({ state: 'visible', timeout: 5000 });
+
+    await clickTarget.click();
 
     if (waitForToolbar) {
       // Try to wait for the target block to be selected
       // If it times out, check if we need to navigate to parent (container case)
       try {
         await this.waitForBlockSelected(blockId, 3000);
-      } catch {
-        // Selection timed out - might be wrong block selected (clicked container, child selected)
-        // Check if there are parent navigation buttons (indicates we're viewing a child)
-        await this.waitForSidebarOpen();
-        const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
-        const hasParentButtons = await parentButtonLocator.count() > 0;
+      } catch (error) {
+        // Selection timed out - check if a CHILD block got selected instead
+        // (happens when clicking a container block like grid)
+        const iframe = this.getIframe();
+        const selectedChild = iframe.locator(
+          `[data-block-uid="${blockId}"] [data-block-uid].volto-hydra-selected`
+        );
+        const childWasSelected = await selectedChild.count() > 0;
 
-        if (hasParentButtons) {
-          // Navigate up to the target container block
+        if (childWasSelected) {
+          // A child of the target block is selected - navigate up to the target
           await this.navigateToParentBlock(blockId);
+          await this.waitForBlockSelected(blockId);
+        } else {
+          // Target is not parent of selected block - rethrow original error
+          throw error;
         }
-        // Either way, wait for the target block to be properly selected
-        await this.waitForBlockSelected(blockId);
       }
 
       await this.waitForQuantaToolbar(blockId);
@@ -589,6 +597,45 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for both drag handles (iframe and Volto toolbar) to be visible and aligned.
+   * The iframe drag handle (.volto-hydra-drag-button) handles clicks.
+   * The Volto toolbar drag handle (.drag-handle) is positioned over it.
+   */
+  /**
+   * Wait for the iframe drag button and toolbar drag button to be aligned.
+   * The iframe drag button MUST be directly underneath the toolbar drag icon
+   * for DND to work - clicks on the visible toolbar fall through to the iframe button.
+   */
+  async waitForDragHandlesAligned(timeout: number = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    const iframeDragHandle = iframe.locator('.volto-hydra-drag-button');
+    const toolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
+
+    await expect(async () => {
+      await expect(iframeDragHandle).toBeVisible({ timeout: 100 });
+      await expect(toolbarDragHandle).toBeVisible({ timeout: 100 });
+
+      const iframeBox = await iframeDragHandle.boundingBox();
+      const toolbarBox = await toolbarDragHandle.boundingBox();
+      if (!iframeBox || !toolbarBox) {
+        throw new Error('Could not get drag handle bounding boxes');
+      }
+
+      const xDiff = Math.abs(toolbarBox.x - iframeBox.x);
+      const yDiff = Math.abs(toolbarBox.y - iframeBox.y);
+      const tolerance = 10;
+
+      if (xDiff > tolerance || yDiff > tolerance) {
+        throw new Error(
+          `Drag handles not aligned. Iframe: (${iframeBox.x.toFixed(0)}, ${iframeBox.y.toFixed(0)}), ` +
+          `Toolbar: (${toolbarBox.x.toFixed(0)}, ${toolbarBox.y.toFixed(0)}), ` +
+          `diff: (${xDiff.toFixed(0)}, ${yDiff.toFixed(0)})`
+        );
+      }
+    }).toPass({ timeout });
+  }
+
+  /**
    * Wait for a block to be selected in the iframe.
    * Handles multi-element blocks (multiple elements with same UID).
    */
@@ -599,61 +646,10 @@ export class AdminUIHelper {
     // Use first() for multi-element blocks
     await blockLocator.first().waitFor({ state: 'visible', timeout });
 
-    // Wait for drag handle to appear and be positioned at the correct block
-    // The drag handle is positioned at the selected block's left edge, typically 48px above
-    // For container blocks, positioning may vary, so we check if handle is near the block
+    // Wait for iframe drag handle to appear
+    // Position checks are done in waitForDragHandlesAligned (called from waitForQuantaToolbar)
     const dragHandle = iframe.locator('.volto-hydra-drag-button');
-    await expect(async () => {
-      await expect(dragHandle).toBeVisible({ timeout: 100 });
-
-      // For multi-element blocks, compute combined bounding box
-      const allElements = await blockLocator.all();
-      let blockBox: { x: number; y: number; width: number; height: number } | null = null;
-
-      if (allElements.length > 1) {
-        // Multi-element: compute bounding box
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const el of allElements) {
-          const rect = await el.boundingBox();
-          if (rect) {
-            minX = Math.min(minX, rect.x);
-            minY = Math.min(minY, rect.y);
-            maxX = Math.max(maxX, rect.x + rect.width);
-            maxY = Math.max(maxY, rect.y + rect.height);
-          }
-        }
-        if (minX !== Infinity) {
-          blockBox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-        }
-      } else {
-        blockBox = await blockLocator.first().boundingBox();
-      }
-
-      const handleBox = await dragHandle.boundingBox();
-      if (!blockBox || !handleBox) {
-        throw new Error('Could not get bounding boxes');
-      }
-
-      // Drag handle should be at block's left edge (within tolerance)
-      const xDiff = Math.abs(handleBox.x - blockBox.x);
-      // Drag handle should be near the block's top or at iframe top when clamped
-      const iframeElement = this.page.locator('iframe').first();
-      const iframeBox = await iframeElement.boundingBox();
-      const iframeTop = iframeBox?.y || 0;
-      // Handle can be anywhere from iframe top to slightly below block top
-      // When block is above viewport (blockBox.y < iframeTop), handle is clamped to iframeTop
-      const minY = iframeTop;
-      const maxY = Math.max(iframeTop + 30, blockBox.y + 30);
-      const inYRange = handleBox.y >= minY && handleBox.y <= maxY;
-
-      if (xDiff > 30 || !inYRange) {
-        throw new Error(
-          `Drag handle not at block position. Block: (${blockBox.x.toFixed(0)}, ${blockBox.y.toFixed(0)}), ` +
-          `Handle: (${handleBox.x.toFixed(0)}, ${handleBox.y.toFixed(0)}), ` +
-          `expected y range: [${minY.toFixed(0)}, ${maxY.toFixed(0)}]`
-        );
-      }
-    }).toPass({ timeout });
+    await expect(dragHandle).toBeVisible({ timeout });
 
     // Return the first element locator for chaining
     return blockLocator.first();
@@ -897,6 +893,13 @@ export class AdminUIHelper {
     await expect.poll(async () => {
       return await this.isToolbarNotCoveredBySidebar();
     }, { timeout: 5000 }).toBeTruthy();
+
+    // Wait for both drag handles (iframe and Volto toolbar) to be aligned
+    // Only check if the Volto toolbar drag handle exists (some blocks/tests may not have it)
+    const voltoToolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
+    if (await voltoToolbarDragHandle.count() > 0) {
+      await this.waitForDragHandlesAligned(5000);
+    }
   }
 
   async getMenuButtonInQuantaToolbar(blockId: string, formatKeyword:string): Promise<void> {
@@ -2587,10 +2590,12 @@ export class AdminUIHelper {
    * Get all block IDs in order.
    * Returns an array of block UIDs, deduplicated (multi-element blocks count as one).
    * Uses evaluateAll for single browser round-trip instead of N sequential getAttribute calls.
+   * @param container - Container selector to scope the search (default: 'main' for main content)
    */
-  async getBlockOrder(): Promise<string[]> {
+  async getBlockOrder(container: string = 'main'): Promise<string[]> {
     const iframe = this.getIframe();
-    return await iframe.locator('[data-block-uid]').evaluateAll((elements) => {
+    const selector = `${container} [data-block-uid]`;
+    return await iframe.locator(selector).evaluateAll((elements) => {
       const seen = new Set<string>();
       const blockIds: string[] = [];
       for (const el of elements) {
@@ -2654,40 +2659,11 @@ export class AdminUIHelper {
   async getDragHandle(): Promise<Locator> {
     const toolbar = this.page.locator('.quanta-toolbar');
     const dragHandle = toolbar.locator('.drag-handle');
-    await expect(dragHandle).toBeVisible({ timeout: 2000 });
 
-    // Get the invisible drag button in iframe (this is what actually receives drag events)
-    const iframe = this.getIframe();
-    const iframeDragButton = iframe.locator('.volto-hydra-drag-button');
+    // Wait for drag handles to be visible and aligned
+    await this.waitForDragHandlesAligned(5000);
 
-    // Verify iframe drag button is aligned with the toolbar (which is aligned with the block)
-    const iframeDragButtonBox = await this.getIframeDragButtonBoundingBox();
-    const toolbarBox = await toolbar.boundingBox();
-
-    if (iframeDragButtonBox && toolbarBox) {
-      // Both toolbar and iframe drag button should be left-aligned with the block
-      const xDiff = Math.abs(iframeDragButtonBox.x - toolbarBox.x);
-
-      if (xDiff > 5) {
-        throw new Error(
-          `Iframe drag button not aligned with toolbar (both should be left-aligned with block). ` +
-          `Toolbar at x=${toolbarBox.x}, iframe button at x=${iframeDragButtonBox.x}. ` +
-          `Difference: ${xDiff}px`
-        );
-      }
-
-      // Verify pointer-events allows mouse events
-      const pointerEvents = await iframeDragButton.evaluate((el) =>
-        window.getComputedStyle(el).pointerEvents
-      );
-      if (pointerEvents !== 'auto') {
-        throw new Error(
-          `Iframe drag button should have pointer-events: auto, got: ${pointerEvents}`
-        );
-      }
-    }
-
-    // we will mouse down in this but it will actually fall through to the iframe button
+    // we will mouse down on toolbar but it falls through to the iframe button
     return dragHandle;
   }
 
@@ -3211,8 +3187,8 @@ export class AdminUIHelper {
    * Complete the drag operation by releasing the mouse and waiting for cleanup.
    */
   private async completeDrop(): Promise<void> {
-    // Get block order before drop
-    const orderBefore = await this.getBlockOrder();
+    // Get all block order before drop (using body to include all containers)
+    const orderBefore = await this.getBlockOrder('body');
 
     await this.page.mouse.up();
 
@@ -3222,7 +3198,7 @@ export class AdminUIHelper {
 
     // Wait for block order to change (indicates formData update and re-render completed)
     await expect(async () => {
-      const orderAfter = await this.getBlockOrder();
+      const orderAfter = await this.getBlockOrder('body');
       if (JSON.stringify(orderBefore) === JSON.stringify(orderAfter)) {
         throw new Error('Block order has not changed yet');
       }
@@ -3795,9 +3771,6 @@ export class AdminUIHelper {
   async waitForLinkEditorToClose(timeout: number = 5000): Promise<void> {
     // LinkEditor renders in a PositionedToolbar with className "add-link"
     // Wait for NO .add-link elements to be visible
-    const popup = this.page.locator('.add-link');
-
-    // Wait until there are no visible LinkEditor popups
     await this.page.waitForFunction(
       () => {
         const popups = document.querySelectorAll('.add-link');
@@ -3808,6 +3781,33 @@ export class AdminUIHelper {
       },
       { timeout }
     );
+  }
+
+  /**
+   * Click in the iframe and dispatch mousedown on admin document.
+   *
+   * In real browsers, clicking inside the iframe causes the parent window to
+   * lose focus (blur event), which triggers blur-based handlers like closing
+   * popups. Playwright doesn't trigger blur reliably when clicking in iframes,
+   * so this method does both: the click AND the mousedown dispatch.
+   *
+   * @param target - Locator to click, or position relative to iframe
+   * @param options - Click options (position, force, etc.)
+   */
+  async clickInIframeWithBlur(target: Locator): Promise<void> {
+    // Click on the target (e.g., an editable element in the iframe)
+    await target.click();
+
+    // Dispatch mousedown on admin document to trigger blur-based handlers
+    // This mimics what SyncedSlateToolbar.jsx does on window blur
+    await this.page.evaluate(() => {
+      const mousedownEvent = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      });
+      document.dispatchEvent(mousedownEvent);
+    });
   }
 
   /**

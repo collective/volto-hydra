@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -505,12 +505,12 @@ const Iframe = (props) => {
   }, [selectedBlock]);
 
   // Clear blockUI when no block is selected
-  // BUT keep it for page-level fields (blockUI exists with rect but blockUid is null)
+  // BUT keep it for page-level fields (blockUI exists with rect and blockUid is PAGE_BLOCK_UID)
   useEffect(() => {
     if (!selectedBlock) {
       setBlockUI((prev) => {
-        // Keep blockUI if it's a page-level selection (blockUid is null but has rect)
-        if (prev?.blockUid === null && prev?.rect) {
+        // Keep blockUI if it's a page-level selection (blockUid is PAGE_BLOCK_UID with rect)
+        if (prev?.blockUid === PAGE_BLOCK_UID && prev?.rect) {
           return prev;
         }
         return null;
@@ -1442,25 +1442,16 @@ const Iframe = (props) => {
           const isNewBlock = !isPositionUpdateOnly &&
                              selectedBlock !== event.data.blockUid;
 
-          // Check if we're waiting for a specific block to be selected (e.g., after adding a new block)
+          // Clear any pending selection - BLOCK_SELECTED from hydra.js is authoritative
+          // The hydra.js domChange observer already checks blockUid === selectedBlockUid
+          // before sending, so we don't need to filter here
           const pendingUid = iframeSyncState?.pendingSelectBlockUid;
-          const isPendingBlock = pendingUid && event.data.blockUid === pendingUid;
-          const isWrongBlockDuringPending = pendingUid && event.data.blockUid !== pendingUid;
-
-          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock, 'pendingUid:', pendingUid);
-
-          // If we're waiting for a specific block and this is a different block, ignore it
-          // This prevents race conditions where parent container gets selected during re-render
-          if (isWrongBlockDuringPending) {
-            log('BLOCK_SELECTED ignoring - waiting for pending block:', pendingUid);
-            return;
-          }
-
-          // Clear pending selection if this is the block we were waiting for
-          if (isPendingBlock) {
-            log('BLOCK_SELECTED received pending block, clearing pendingSelectBlockUid');
+          if (pendingUid) {
+            log('BLOCK_SELECTED clearing pendingSelectBlockUid:', pendingUid);
             setIframeSyncState(prev => ({ ...prev, pendingSelectBlockUid: null }));
           }
+
+          log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
 
           // Update lastSentSelectBlockRef to match iframe's selection
           // This is critical: when iframe confirms a selection, our ref must match
@@ -1633,38 +1624,100 @@ const Iframe = (props) => {
             }
           }
 
-          // 2. Apply allowedBlocks by setting `restricted: true` on blocks not in the list
-          // This integrates with Volto's standard block restriction mechanism
-          if (event.data.allowedBlocks) {
-            validateFrontendConfig(event.data, config.blocks.blocksConfig);
-            const allowedSet = new Set(event.data.allowedBlocks);
+          // 2. Process pageBlocksFields - merge with default 'blocks' field
+          // Default: [{ fieldName: 'blocks', title: 'Blocks' }] with all non-restricted block types
+          // If provided, merge with default (unless 'blocks' is explicitly configured)
+          let effectivePageBlocksFields;
+          const defaultBlocksField = { fieldName: 'blocks', title: 'Blocks' };
+
+          if (event.data.pageBlocksFields) {
+            // Check if 'blocks' field is already configured
+            const hasBlocksField = event.data.pageBlocksFields.some(f => f.fieldName === 'blocks');
+            if (hasBlocksField) {
+              // Use provided config as-is
+              effectivePageBlocksFields = event.data.pageBlocksFields;
+            } else {
+              // Merge with default 'blocks' field
+              effectivePageBlocksFields = [defaultBlocksField, ...event.data.pageBlocksFields];
+            }
+          } else {
+            // No config provided - use default 'blocks' field
+            effectivePageBlocksFields = [defaultBlocksField];
+          }
+
+          // 2b. Apply restrictions based on pageBlocksFields
+          // Collect all unique allowed blocks across all page fields and restrict the rest
+          const allAllowedBlocks = new Set();
+          effectivePageBlocksFields.forEach(field => {
+            if (field.allowedBlocks) {
+              field.allowedBlocks.forEach(blockType => allAllowedBlocks.add(blockType));
+            }
+          });
+          // Only apply restrictions if at least one field has allowedBlocks
+          if (allAllowedBlocks.size > 0) {
+            validateFrontendConfig({ allowedBlocks: [...allAllowedBlocks] }, config.blocks.blocksConfig);
             Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
               const blockConfig = config.blocks.blocksConfig[blockType];
-              if (blockConfig && !allowedSet.has(blockType)) {
-                // Block not in allowedBlocks - mark as restricted at page level
-                // Preserve existing restricted function if it exists (for dynamic restrictions)
+              if (blockConfig && !allAllowedBlocks.has(blockType)) {
                 const existingRestricted = blockConfig.restricted;
                 if (typeof existingRestricted !== 'function') {
                   blockConfig.restricted = true;
                 }
-                // If it's already a function, leave it - function takes precedence
               }
             });
-            // Keep the list for backwards compatibility
-            setAllowedBlocksList(event.data.allowedBlocks);
+            setAllowedBlocksList([...allAllowedBlocks]);
           }
 
-          // 3. Extract block field types (now includes custom blocks and page-level fields)
+          // 2c. Auto-initialize missing page fields with empty blocks/layout
+          let formWithPageFields = form ? { ...form } : form;
+          if (form) {
+            effectivePageBlocksFields.forEach(field => {
+              const { fieldName } = field;
+              const layoutFieldName = `${fieldName}_layout`;
+              // Initialize missing blocks field
+              if (!formWithPageFields[fieldName]) {
+                formWithPageFields[fieldName] = {};
+              }
+              // Initialize missing layout field
+              if (!formWithPageFields[layoutFieldName]) {
+                formWithPageFields[layoutFieldName] = { items: [] };
+              }
+            });
+          }
+
+          // 3. Register _page as virtual block type in blocksConfig
+          // This allows buildBlockPathMap to look up page schema without parameter passing
+          const pageBlocksFieldsDef = Object.fromEntries(
+            effectivePageBlocksFields.map(field => [
+              field.fieldName,
+              {
+                type: 'blocks',
+                allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
+                maxLength: field.maxLength || null,
+                title: field.title || field.fieldName,
+              },
+            ]),
+          );
+          config.blocks.blocksConfig['_page'] = {
+            id: '_page',
+            schema: () => ({ properties: pageBlocksFieldsDef }),
+            restricted: true, // Can't be added as a child block
+          };
+
+          // 4. Extract block field types (now includes custom blocks and page-level fields)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
           setBlockFieldTypes(initialBlockFieldTypes);
 
-          // 4. Build blockPathMap (now has complete schema knowledge)
-          // No need to pass allowedBlocks - it's now derived from blocksConfig.restricted
-          const initialBlockPathMap = buildBlockPathMap(form, config.blocks.blocksConfig, intl);
+          // 5. Build blockPathMap (now has complete schema knowledge from _page registration)
+          const initialBlockPathMap = buildBlockPathMap(
+            formWithPageFields,
+            config.blocks.blocksConfig,
+            intl,
+          );
 
-          // 5. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
+          // 6. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
           const formWithDefaults = applySchemaDefaultsToFormData(
-            form,
+            formWithPageFields,
             initialBlockPathMap,
             config.blocks.blocksConfig,
             intl,
@@ -1676,7 +1729,7 @@ const Iframe = (props) => {
             blockPathMap: initialBlockPathMap,
           }));
 
-          // 6. Send everything to iframe (only in edit mode)
+          // 7. Send everything to iframe (only in edit mode)
           // In view mode, frontend renders from its own API - no need to send data
           const inEditMode = history.location.pathname.endsWith('/edit');
           if (!inEditMode) {
@@ -2074,19 +2127,13 @@ const Iframe = (props) => {
 
   // Handle sidebar add - adds inside a container's field as last child
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
-    // Get allowed blocks for this container field
-    const parentBlock = parentBlockId
-      ? getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId)
-      : null;
-    const parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
+    // Use getAllContainerFields to get container config (handles _page and nested blocks uniformly)
     const blocksConfig = config.blocks.blocksConfig;
-    const parentSchema =
-      typeof blocksConfig?.[parentType]?.blockSchema === 'function'
-        ? blocksConfig[parentType].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : blocksConfig?.[parentType]?.blockSchema;
-    const fieldDef = parentSchema?.properties?.[fieldName];
-    const isObjectList = fieldDef?.widget === 'object_list';
-    const containerAllowed = fieldDef?.allowedBlocks || null;
+    const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
+    const fieldConfig = containerFields.find(f => f.fieldName === fieldName);
+
+    const isObjectList = fieldConfig?.isObjectList || false;
+    const containerAllowed = fieldConfig?.allowedBlocks || null;
 
     // Auto-insert if object_list or single allowedBlock
     if (isObjectList || containerAllowed?.length === 1) {
@@ -2096,7 +2143,7 @@ const Iframe = (props) => {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
       setAddNewBlockOpened(true);
     }
-  }, [properties, iframeSyncState.blockPathMap, insertAndSelectBlock]);
+  }, [properties, iframeSyncState.blockPathMap, insertAndSelectBlock, intl]);
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -2390,7 +2437,7 @@ const Iframe = (props) => {
             onFieldLinkChange={(fieldName, url, metadata) => {
               let updatedProperties;
 
-              if (selectedBlock === null) {
+              if (selectedBlock === PAGE_BLOCK_UID) {
                 // Page-level field - update directly on properties
                 // For image fields with metadata, construct NamedBlobImage format
                 if (metadata?.image_scales) {
@@ -2660,6 +2707,26 @@ const Iframe = (props) => {
           }
         }}
         onChangeBlock={(blockId, newBlockData) => {
+          // Guard: blockId can be undefined when Volto components like BlockDataForm
+          // are missing the block prop (e.g., SearchBlockEdit doesn't pass block to BlockDataForm)
+          if (!blockId) {
+            console.warn(
+              '[HYDRA] onChangeBlock called with undefined blockId. ' +
+              'This is likely a Volto bug where BlockDataForm is used without a block prop. ' +
+              'Data keys:', Object.keys(newBlockData || {}),
+              'Stack:', new Error().stack
+            );
+            return;
+          }
+
+          // Handle page-level changes (PAGE_BLOCK_UID) - merge directly into formData
+          if (blockId === PAGE_BLOCK_UID) {
+            const newFormData = { ...properties, ...newBlockData };
+            validateAndLog(newFormData, 'onChangeBlock (page-level)', blockFieldTypes);
+            onChangeFormData(newFormData);
+            return;
+          }
+
           // Rebuild blockPathMap from current properties to ensure it's up to date
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
 
@@ -2667,17 +2734,18 @@ const Iframe = (props) => {
           const oldBlockData = getBlockById(properties, currentBlockPathMap, blockId);
           console.log('[View onChangeBlock] blockId:', blockId, 'oldVariation:', oldBlockData?.variation, 'newVariation:', newBlockData?.variation);
 
-          // Find container config for nested blocks
+          // Find container config (works for both page-level and nested blocks)
           const pathInfo = currentBlockPathMap[blockId];
-          const containerConfig = pathInfo?.parentId
-            ? getContainerFieldConfig(
-                blockId,
-                currentBlockPathMap,
-                properties,
-                blocksConfig,
-                intl,
-              )
-            : null;
+          if (!pathInfo) {
+            throw new Error(`[HYDRA] onChangeBlock: block ${blockId} not in pathMap`);
+          }
+          const containerConfig = getContainerFieldConfig(
+            blockId,
+            currentBlockPathMap,
+            properties,
+            blocksConfig,
+            intl,
+          );
 
           let newFormData = mutateBlockInContainer(
             properties,

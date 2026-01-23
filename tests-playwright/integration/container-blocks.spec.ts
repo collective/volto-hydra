@@ -940,7 +940,7 @@ test.describe('Hierarchical Sidebar', () => {
     // Re-open sidebar
     const triggerButton = page.locator('.sidebar-container .trigger');
     await triggerButton.click();
-    await page.waitForTimeout(500); // Wait for resize
+    await helper.waitForQuantaToolbar('text-after'); // Wait for toolbar to reposition
 
     // Verify positioning is still correct after sidebar reopen
     const afterReopenResult = await helper.isBlockSelectedInIframe('text-after');
@@ -2533,8 +2533,18 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     await helper.navigateToEdit('/container-test-page');
 
     // Select grid-1 (an implicit container with grid-cell-1 and grid-cell-2)
-    await helper.clickBlockInIframe('grid-1');
+    // Navigate from page level child blocks widget since clicking on grid selects a child
     await helper.waitForSidebarOpen();
+
+    // Press Escape to deselect any auto-selected block and show page-level child blocks
+    await page.keyboard.press('Escape');
+
+    // Find grid-1 in the page's child blocks widget and click it
+    const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
+    await expect(pageChildBlocks).toBeVisible({ timeout: 5000 });
+    const gridItem = pageChildBlocks.locator('.child-block-item', { hasText: 'Grid' });
+    await expect(gridItem).toBeVisible({ timeout: 5000 });
+    await gridItem.click();
 
     // The child blocks widget should show the grid's children
     const childBlocksWidget = page.locator('.child-blocks-widget');

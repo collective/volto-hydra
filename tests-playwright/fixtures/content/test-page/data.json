@@ -135,5 +135,25 @@
   },
   "blocks_layout": {
     "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing", "skiplogic-test"]
+  },
+  "footer_blocks": {
+    "footer-block-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Footer text content" }]
+        }
+      ],
+      "plaintext": "Footer text content"
+    },
+    "footer-block-2": {
+      "@type": "image",
+      "url": "https://placehold.co/200x100",
+      "alt": "Footer image"
+    }
+  },
+  "footer_blocks_layout": {
+    "items": ["footer-block-1", "footer-block-2"]
   }
 }

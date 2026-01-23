@@ -56,6 +56,9 @@
         <img id="preview-image" data-media-field="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
         <div id="content"></div>
     </main>
+    <footer>
+        <div id="footer-content"></div>
+    </footer>
 
     <script src="renderer.js"></script>
     <script type="module">
@@ -137,8 +140,22 @@
                 { ...baseOptions, itemTypeField: 'variation' }
             );
 
-            // Render with expanded items
+            // Render main content with expanded items
             await renderContent({ ...content, items });
+
+            // Render footer_blocks if present
+            if (content.footer_blocks && content.footer_blocks_layout?.items?.length > 0) {
+                const { items: footerItems } = await expandListingBlocks(
+                    content.footer_blocks,
+                    content.footer_blocks_layout?.items || [],
+                    { ...baseOptions, itemTypeField: 'variation' }
+                );
+                await renderContent({ items: footerItems }, 'footer-content');
+            } else {
+                // Clear footer if no footer blocks
+                const footerContainer = document.getElementById('footer-content');
+                if (footerContainer) footerContainer.innerHTML = '';
+            }
         }
 
         // Track page loads to detect double-loading issues (persisted in sessionStorage)
@@ -557,7 +574,18 @@
                     // Initialize bridge - admin origin auto-detected from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     window.bridge = initBridge({
-                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                        pageBlocksFields: [
+                            {
+                                fieldName: 'blocks',
+                                title: 'Blocks',
+                                allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                            },
+                            {
+                                fieldName: 'footer_blocks',
+                                title: 'Footer',
+                                allowedBlocks: ['slate', 'image'],
+                            },
+                        ],
                         voltoConfig: voltoConfig,
                         debug: true,  // Enable debug logging for tests
                     });

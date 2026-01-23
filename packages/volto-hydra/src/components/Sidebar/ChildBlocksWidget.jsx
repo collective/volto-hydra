@@ -19,6 +19,7 @@ import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 
 const messages = defineMessages({
   blocks: {
@@ -189,6 +190,26 @@ const ContainerFieldSection = ({
 };
 
 /**
+ * Get child blocks for a page-level field
+ */
+const getChildBlocksForPageField = (formData, fieldConfig) => {
+  const { fieldName } = fieldConfig;
+  const layoutField = `${fieldName}_layout`;
+  const pageBlocks = formData?.[layoutField]?.items || [];
+  const blocksData = formData?.[fieldName] || {};
+
+  return pageBlocks.map((blockId) => {
+    const blockData = blocksData[blockId];
+    return {
+      id: blockId,
+      type: blockData?.['@type'] || 'unknown',
+      title: getBlockTitle(blockData),
+      data: blockData,
+    };
+  });
+};
+
+/**
  * ChildBlocksWidget - Main component
  * Renders all container fields for the current block
  */
@@ -201,26 +222,17 @@ const ChildBlocksWidget = ({
   onMoveBlock,
 }) => {
   const intl = useIntl();
+  const blocksConfig = config.blocks?.blocksConfig;
   const [isClient, setIsClient] = React.useState(false);
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // If no block selected, show page-level blocks
+  // If no block selected, show page-level blocks for each page field
+  // Uses getAllContainerFields(PAGE_BLOCK_UID, ...) to get _page container fields
   if (!selectedBlock) {
-    const pageBlocks = formData?.blocks_layout?.items || [];
-    const blocksData = formData?.blocks || {};
-
-    const childBlocks = pageBlocks.map((blockId) => {
-      const blockData = blocksData[blockId];
-      return {
-        id: blockId,
-        type: blockData?.['@type'] || 'unknown',
-        title: getBlockTitle(blockData),
-        data: blockData,
-      };
-    });
+    const fieldsConfig = getAllContainerFields(PAGE_BLOCK_UID, blockPathMap, formData, blocksConfig, intl);
 
     if (!isClient) return null;
 
@@ -229,23 +241,30 @@ const ChildBlocksWidget = ({
     if (!target) return null;
 
     return createPortal(
-      <div className="child-blocks-widget">
-        <ContainerFieldSection
-          fieldName="blocks"
-          fieldTitle={intl.formatMessage(messages.blocks)}
-          childBlocks={childBlocks}
-          onSelectBlock={onSelectBlock}
-          onAddBlock={onAddBlock}
-          onMoveBlock={onMoveBlock}
-          parentBlockId={null}
-        />
+      <div className="child-blocks-widget page-blocks-fields">
+        {fieldsConfig.map((fieldConfig) => {
+          const childBlocks = getChildBlocksForPageField(formData, fieldConfig);
+          return (
+            <ContainerFieldSection
+              key={fieldConfig.fieldName}
+              fieldName={fieldConfig.fieldName}
+              fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
+              childBlocks={childBlocks}
+              allowedBlocks={fieldConfig.allowedBlocks}
+              maxLength={fieldConfig.maxLength}
+              onSelectBlock={onSelectBlock}
+              onAddBlock={onAddBlock}
+              onMoveBlock={onMoveBlock}
+              parentBlockId={null}
+            />
+          );
+        })}
       </div>,
       target,
     );
   }
 
   // Use shared helper to get all container fields (supports multiple and implicit)
-  const blocksConfig = config.blocks?.blocksConfig;
   const containerFields = getAllContainerFields(
     selectedBlock,
     blockPathMap,

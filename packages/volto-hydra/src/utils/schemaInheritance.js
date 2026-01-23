@@ -7,6 +7,7 @@
  */
 import config from '@plone/volto/registry';
 import { getBlockSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 
 // Re-export getBlockSchema from blockPath for convenience
@@ -362,28 +363,30 @@ export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], opti
   return (args) => {
     const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
 
-    // Get blockPathMap and blockId from context (set by HydraSchemaProvider)
-    // Fall back to passed params for compatibility
+    // Only use context values when called for a specific block instance.
+    // When called for TYPE inspection (getBlockSchema without blockId), passedBlockId is undefined
+    // and we should NOT filter - that would incorrectly hide fields from the type schema.
     const hydraContext = getHydraSchemaContext();
-    const blockPathMap = hydraContext?.blockPathMap || passedBlockPathMap;
-    const blockId = hydraContext?.currentBlockId || passedBlockId;
+    const blockPathMap = passedBlockPathMap || (passedBlockId !== undefined ? hydraContext?.blockPathMap : null);
+    const blockId = passedBlockId ?? (passedBlockPathMap ? hydraContext?.currentBlockId : null);
     const blocksConfig = hydraContext?.blocksConfig;
 
     if (!blockPathMap || !blockId) return schema;
 
     const pathInfo = blockPathMap?.[blockId];
-    if (!pathInfo?.parentId) return schema;
+    // Skip field hiding for top-level blocks (no parent or page is parent)
+    if (!pathInfo?.parentId || pathInfo.parentId === PAGE_BLOCK_UID) return schema;
 
-    // Check if parent has a type selected (via inheritSchemaFrom's typeField)
-    // If parent has no type selected, children are free to be any type - don't hide fields
+    // Only filter fields if parent uses schema inheritance (has typeField configured)
+    // AND has a type selected. Otherwise children keep all their fields.
     if (blocksConfig) {
-      // Use getLiveBlockData to get fresh parent data from form internal state
       const parentBlock = getLiveBlockData(pathInfo.parentId);
       if (parentBlock) {
         const parentConfig = blocksConfig[parentBlock['@type']];
         const typeField = parentConfig?.schemaEnhancer?.config?.typeField;
-        if (typeField && !parentBlock[typeField]) {
-          // Parent has a typeField config but no value selected - children are independent
+        // If parent doesn't use schema inheritance (no typeField), or no type selected,
+        // don't filter child fields - they're independent blocks
+        if (!typeField || !parentBlock[typeField]) {
           return schema;
         }
       }

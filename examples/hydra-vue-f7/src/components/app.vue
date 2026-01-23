@@ -125,7 +125,11 @@
       }
 
       // In Layout.js or App.js
-      const bridge = initBridge({allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser']});
+      const bridge = initBridge({
+        pageBlocksFields: [
+          { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
+        ],
+      });
 
       onMounted(() => {
         f7ready((f7) => {

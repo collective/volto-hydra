@@ -16,15 +16,17 @@ const HydraSchemaContext = React.createContext(null);
 let currentContextValue = null;
 
 export const HydraSchemaProvider = ({ children, value }) => {
-  // Update module-level store when context changes
-  React.useEffect(() => {
+  // useLayoutEffect runs synchronously - cleanup happens before unmount completes
+  // This prevents stale context leaking between tests in CI
+  React.useLayoutEffect(() => {
     currentContextValue = value;
     return () => {
       currentContextValue = null;
     };
   }, [value]);
 
-  // Also set synchronously for immediate access during render
+  // Set synchronously for immediate access during initial render
+  // (useLayoutEffect hasn't run yet on first render)
   currentContextValue = value;
 
   return (

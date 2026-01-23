@@ -874,8 +874,9 @@ test.describe('Sidebar image upload and drag-drop', () => {
     // Enter URL
     await urlInput.fill('https://placehold.co/777x777');
 
-    // Submit
+    // Submit - wait for button to be enabled (form validation may take a moment)
     const submitButton = sidebar.locator('button[aria-label="Submit"]');
+    await expect(submitButton).toBeEnabled({ timeout: 5000 });
     await submitButton.click();
 
     // Verify the image appears in iframe with new URL

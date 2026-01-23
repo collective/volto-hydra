@@ -8,7 +8,7 @@ import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slat
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
-import { isSlateFieldType } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -146,9 +146,9 @@ const SyncedSlateToolbar = ({
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
-  // For page-level fields (blockId is null), return form itself
+  // For page-level fields (blockId is PAGE_BLOCK_UID), return form itself
   const getBlock = useCallback((blockId) => {
-    if (blockId === null) {
+    if (blockId === PAGE_BLOCK_UID) {
       return form; // Page-level fields access form directly
     }
     return getBlockById(form, blockPathMap, blockId);
@@ -350,11 +350,22 @@ const SyncedSlateToolbar = ({
       // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
       // The polling might detect a stale popup closing while a new button click is pending,
       // and we don't want to interfere with that pending operation.
+
+      // Restore focus to the specific field in the iframe after LinkEditor closes
+      // We know which block and field was selected when the popup opened
+      if (iframeElement?.contentWindow && selectedBlock) {
+        const fieldName = blockUI?.focusedFieldName || 'value';
+        iframeElement.contentWindow.postMessage({
+          type: 'FOCUS_FIELD',
+          blockId: selectedBlock,
+          fieldName: fieldName,
+        }, '*');
+      }
     };
 
     const intervalId = setInterval(checkVisibility, 100);
     return () => clearInterval(intervalId);
-  }, [form, currentSelection, onChangeFormData]);
+  }, [form, currentSelection, onChangeFormData, iframeElement, selectedBlock, blockUI?.focusedFieldName]);
 
   // Helper function for applying inline format with prospective formatting support
   // Used by both hotkey transforms and toolbar button clicks
@@ -796,7 +807,7 @@ const SyncedSlateToolbar = ({
   });
 
   // Render toolbar when we have a rect (either block or page-level field)
-  // selectedBlock can be null for page-level fields
+  // selectedBlock is PAGE_BLOCK_UID for page-level fields
   if (!blockUI?.rect) {
     return null;
   }
@@ -857,10 +868,11 @@ const SyncedSlateToolbar = ({
   const iframeBottom = toolbarIframeRect.top + toolbarIframeRect.height;
   const isBlockVisible = blockBottomInPage > toolbarIframeRect.top && blockTopInPage < iframeBottom;
 
-  const toolbarTopRaw = blockTopInPage - 40; // 40px above block container
-  // Clamp to top of iframe if toolbar would be above it
-  const toolbarTop = Math.max(toolbarIframeRect.top, toolbarTopRaw);
-  const toolbarLeft = toolbarIframeRect.left + blockUI.rect.left; // Always align with block's left edge
+  // Use shared calculation (same as iframe drag handle in hydra.js)
+  const { top: toolbarTop, left: toolbarLeft } = calculateDragHandlePosition(
+    blockUI.rect,
+    { top: toolbarIframeRect.top, left: toolbarIframeRect.left }
+  );
 
   // Update hydraData with toolbar position for LinkEditor positioning
   // This must be set SYNCHRONOUSLY during render (not in an effect) because
@@ -937,7 +949,7 @@ const SyncedSlateToolbar = ({
         }}
       >
       {/* Drag handle - only show for blocks, not page-level fields */}
-      {selectedBlock ? (
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID ? (
         <div
           className="drag-handle"
           style={{

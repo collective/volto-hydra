@@ -82,6 +82,12 @@ let debugEnabled = true; // TEMP: Enable for debugging
 const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
 
 /**
+ * Virtual block UID for page-level fields (title, description, preview_image, etc.)
+ * Used to distinguish "page field selected" from "nothing selected" (null)
+ */
+export const PAGE_BLOCK_UID = '_page';
+
+/**
  * Bridge class creating a two-way link between the Hydra and the frontend.
  * @exports Bridge - Exported for testing purposes
  */
@@ -91,7 +97,10 @@ export class Bridge {
    *
    * @param {URL} adminOrigin - The origin of the adminUI.
    * @param {Object} options - Options for the bridge initialization:
-   *   - allowedBlocks: Array of allowed block types (e.g., ['title', 'text', 'image', ...])
+   *   - pageBlocksFields: Array of page-level blocks fields configuration
+   *                       Each entry: { fieldName, title, allowedBlocks, maxLength }
+   *                       e.g., [{ fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image'] }]
+   *                       Default: [{ fieldName: 'blocks' }] with all non-restricted block types
    *   - debug: Enable verbose logging (default: false)
    *   - pathToApiPath: Function to transform frontend path to API/admin path
    *                    e.g., (path) => path.replace(/\/@pg\/[^/]+\/\d+/, '')
@@ -337,8 +346,8 @@ export class Bridge {
    * @returns {Object|undefined} The block data or undefined if not found
    */
   getBlockData(blockUid) {
-    // null blockUid means page-level data
-    if (blockUid === null) {
+    // PAGE_BLOCK_UID means page-level data
+    if (blockUid === PAGE_BLOCK_UID) {
       return this.formData;
     }
 
@@ -383,18 +392,18 @@ export class Bridge {
    * - "/fieldName" -> page-level field
    *
    * @param {string} fieldPath - The field path from data-editable-field
-   * @param {string|null} blockId - Current block ID (null for page-level)
-   * @returns {Object} { blockId: string|null, fieldName: string }
+   * @param {string|null} blockId - Current block ID (PAGE_BLOCK_UID for page-level)
+   * @returns {Object} { blockId: string, fieldName: string }
    */
   resolveFieldPath(fieldPath, blockId) {
     // Handle absolute path (page-level)
     if (fieldPath.startsWith('/')) {
-      return { blockId: null, fieldName: fieldPath.slice(1) };
+      return { blockId: PAGE_BLOCK_UID, fieldName: fieldPath.slice(1) };
     }
 
-    // If no block context, treat as page-level
-    if (!blockId) {
-      return { blockId: null, fieldName: fieldPath };
+    // If no block context or PAGE_BLOCK_UID, treat as page-level
+    if (!blockId || blockId === PAGE_BLOCK_UID) {
+      return { blockId: PAGE_BLOCK_UID, fieldName: fieldPath };
     }
 
     // Handle relative path with ../
@@ -403,9 +412,9 @@ export class Bridge {
 
     while (remainingPath.startsWith('../')) {
       const pathInfo = this.blockPathMap?.[currentBlockId];
-      if (!pathInfo?.parentId) {
+      if (!pathInfo?.parentId || pathInfo.parentId === PAGE_BLOCK_UID) {
         // Already at top level, next ../ goes to page
-        return { blockId: null, fieldName: remainingPath.slice(3) };
+        return { blockId: PAGE_BLOCK_UID, fieldName: remainingPath.slice(3) };
       }
       currentBlockId = pathInfo.parentId;
       remainingPath = remainingPath.slice(3);
@@ -710,12 +719,13 @@ export class Bridge {
       return;
     }
 
-    const blockUid = blockElement.getAttribute('data-block-uid');
+    // Get blockUid from element attribute, or use PAGE_BLOCK_UID for page-level fields
+    const blockUid = blockElement.getAttribute('data-block-uid') || PAGE_BLOCK_UID;
 
     // Get all elements for this block (multi-element blocks like listings)
-    // For page-level fields (no blockUid), just use the element itself
+    // For page-level fields (blockUid === PAGE_BLOCK_UID), just use the element itself
     let rect;
-    if (blockUid) {
+    if (blockUid && blockUid !== PAGE_BLOCK_UID) {
       const allElements = this.getAllBlockElements(blockUid);
       if (allElements.length > 1) {
         // Multi-element block: compute bounding box around all elements
@@ -751,6 +761,16 @@ export class Bridge {
       ? options.focusedMediaField
       : this.focusedMediaField;
 
+    // Update iframe drag handle position using the same rect
+    // This ensures alignment with Volto toolbar which uses this rect
+    const dragHandle = document.querySelector('.volto-hydra-drag-button');
+    if (dragHandle && blockUid && blockUid !== PAGE_BLOCK_UID) {
+      const handlePos = calculateDragHandlePosition(rect);
+      dragHandle.style.left = `${handlePos.left}px`;
+      dragHandle.style.top = `${handlePos.top}px`;
+      dragHandle.style.display = 'block';
+    }
+
     const message = {
       type: 'BLOCK_SELECTED',
       src,
@@ -768,7 +788,7 @@ export class Bridge {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
-      isMultiElement: blockUid ? this.getAllBlockElements(blockUid).length > 1 : false,
+      isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
     // Include selection if provided
@@ -1017,15 +1037,16 @@ export class Bridge {
           );
           // Don't send INIT - admin will just update its URL
         } else {
-          window.parent.postMessage(
-            {
-              type: 'INIT',
-              voltoConfig: options?.voltoConfig,
-              allowedBlocks: options?.allowedBlocks,
-              currentPath: currentPath,
-            },
-            this.adminOrigin,
-          );
+          const initMessage = {
+            type: 'INIT',
+            voltoConfig: options?.voltoConfig,
+            currentPath: currentPath,
+          };
+          // Send pageBlocksFields configuration for page-level blocks fields
+          if (options?.pageBlocksFields) {
+            initMessage.pageBlocksFields = options.pageBlocksFields;
+          }
+          window.parent.postMessage(initMessage, this.adminOrigin);
         }
 
         const receiveInitialData = (e) => {
@@ -1328,11 +1349,7 @@ export class Bridge {
                       });
                       this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
                       this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
-
-                      // Reposition drag button to follow the block
-                      if (this.dragHandlePositioner) {
-                        this.dragHandlePositioner();
-                      }
+                      // Drag handle position is now set in sendBlockSelected
                     }
                   }
                 }
@@ -1475,6 +1492,27 @@ export class Bridge {
             log('Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
+        } else if (event.data.type === 'FOCUS_FIELD') {
+          // Restore focus to a specific field (e.g., after LinkEditor closes)
+          const { blockId, fieldName } = event.data;
+          log('Received FOCUS_FIELD:', blockId, fieldName);
+
+          const blockElement = document.querySelector(`[data-block-uid="${blockId}"]`);
+          if (blockElement) {
+            // Find the specific field by data-field-id attribute
+            const field = blockElement.querySelector(`[data-field-id="${fieldName}"][contenteditable="true"]`);
+            if (field) {
+              field.focus();
+              log('Focused field:', fieldName);
+            } else {
+              // Fallback to first editable field if specific field not found
+              const firstEditable = this.getOwnFirstEditableField(blockElement);
+              if (firstEditable) {
+                firstEditable.focus();
+                log('Focused first editable field (fallback)');
+              }
+            }
+          }
         }
       }
     };
@@ -1546,6 +1584,9 @@ export class Bridge {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
+      log('blockClickHandler: event target:', event.target.tagName, event.target.className);
+      log('blockClickHandler: _isDragging:', this._isDragging, '_navigatingToBlock:', this._navigatingToBlock);
+
       // Handle data-block-selector clicks (carousel nav buttons, etc.)
       // Don't stopPropagation or preventDefault - let frontend handle visibility changes
       // Skip if tryMakeBlockVisible is currently navigating (to avoid interference)
@@ -1641,21 +1682,26 @@ export class Bridge {
         const pageField = event.target.closest('[data-media-field], [data-linkable-field], [data-editable-field]');
         if (pageField) {
           event.preventDefault();
-          this.selectedBlockUid = null;
+          this.selectedBlockUid = PAGE_BLOCK_UID;
 
           // Detect focused field type
           this.focusedMediaField = pageField.getAttribute('data-media-field');
           this.focusedLinkableField = pageField.getAttribute('data-linkable-field');
           this.focusedFieldName = pageField.getAttribute('data-editable-field');
 
-          // Make page-level text fields editable (same as selectBlock does for blocks)
+          // Make page-level text fields editable and focusable
           if (this.focusedFieldName) {
+            // Check if field was already editable (user may be re-clicking an edited field)
+            const wasAlreadyEditable = pageField.getAttribute('contenteditable') === 'true';
+
             this.isInlineEditing = true;
-            this.restoreContentEditableOnFields(pageField, 'pageFieldClick');
-            this.observeBlockTextChanges(pageField);
+            this.activateEditableField(pageField, this.focusedFieldName, null, 'pageFieldClick', {
+              wasAlreadyEditable,
+              saveClickPosition: true, // Save for FORM_DATA handler after re-render
+            });
           }
 
-          // Send BLOCK_SELECTED with pageField as "block" - blockUid will be null
+          // Send BLOCK_SELECTED with pageField as "block" - blockUid will be PAGE_BLOCK_UID
           this.sendBlockSelected('pageFieldClick', pageField);
         }
       }
@@ -1707,14 +1753,15 @@ export class Bridge {
         const parentId = pathInfo?.parentId || null;
         log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
 
-        if (parentId) {
+        // PAGE_BLOCK_UID is the virtual root - treat as "no parent" (deselect)
+        if (parentId && parentId !== PAGE_BLOCK_UID) {
           // Select the parent block
           const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
           if (parentElement) {
             this.selectBlock(parentElement, 'escapeKey');
           }
         } else {
-          // No parent - deselect by sending BLOCK_SELECTED with null
+          // No parent or parent is page - deselect by sending BLOCK_SELECTED with null
           this.selectedBlockUid = null;
           this.sendBlockSelected('escapeKey', null);
         }
@@ -2782,17 +2829,17 @@ export class Bridge {
         container = container.parentNode;
       }
       const blockElement = container?.closest?.('[data-block-uid]');
-      const blockUid = blockElement?.getAttribute('data-block-uid') || 'unknown';
-      const fieldName = container?.getAttribute?.('data-editable-field') || 'unknown';
+      const blockUid = blockElement?.getAttribute('data-block-uid') || null;
+      const fieldName = container?.getAttribute?.('data-editable-field') || null;
 
       // Skip error for readonly blocks - they don't need selection sync
-      if (blockUid !== 'unknown' && this.isBlockReadonly(blockUid)) {
+      if (blockUid && this.isBlockReadonly(blockUid)) {
         return null;
       }
 
       // Check if this field is supposed to be a Slate field
-      // Use getFieldType which handles page-level fields (e.g., /title) correctly
-      const fieldType = blockUid !== 'unknown' ? this.getFieldType(blockUid, fieldName) : undefined;
+      // Use getFieldType which handles page-level fields (blockUid === null) correctly
+      const fieldType = this.getFieldType(blockUid, fieldName);
 
       // Only skip error for KNOWN non-Slate fields
       // If fieldType is undefined (not registered), assume it could be Slate and show error
@@ -2929,6 +2976,111 @@ export class Bridge {
         log(`  Removed stale contenteditable from element without data-editable-field`);
       }
     });
+  }
+
+  /**
+   * Activate an editable field: make it contenteditable, set up observers, focus it, and position cursor.
+   * This is the common logic used by both block selection and page-level field clicks.
+   *
+   * @param {HTMLElement} fieldElement - The element with data-editable-field
+   * @param {string} fieldName - The field name (e.g., 'value', 'title')
+   * @param {string|null} blockUid - The block UID (null for page-level fields)
+   * @param {string} caller - Caller name for debugging
+   * @param {Object} options - Optional settings:
+   *   - skipContentEditable: Don't call restoreContentEditableOnFields (already done)
+   *   - skipObservers: Don't set up text change observers (already done)
+   *   - preventScroll: Pass to focus() to prevent scrolling
+   *   - wasAlreadyEditable: Field was contenteditable before click (trust browser positioning if also focused)
+   *   - saveClickPosition: Save position for FORM_DATA handler to restore after re-render
+   */
+  activateEditableField(fieldElement, fieldName, blockUid, caller, options = {}) {
+    log(`activateEditableField called from ${caller}:`, { fieldName, blockUid, options });
+
+    // Make field contenteditable (unless already done)
+    if (!options.skipContentEditable) {
+      this.restoreContentEditableOnFields(fieldElement, caller);
+    }
+
+    // Set up text change observers (unless already done)
+    if (!options.skipObservers) {
+      this.observeBlockTextChanges(fieldElement);
+    }
+
+    // Get field type to determine if it's text-editable
+    const fieldType = this.getFieldType(blockUid, fieldName);
+
+    if (!this.fieldTypeIsTextEditable(fieldType)) {
+      return;
+    }
+
+    // Check if already focused (avoid disrupting cursor position)
+    const isAlreadyFocused = document.activeElement === fieldElement;
+    log('activateEditableField focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName });
+
+    // Focus the field if not already focused
+    if (!isAlreadyFocused) {
+      fieldElement.focus({ preventScroll: options.preventScroll });
+      log(`activateEditableField: focused field`);
+    }
+
+    // If field was already editable AND already focused, browser already handled
+    // cursor positioning on click - don't redo it (causes race with typing)
+    if (options.wasAlreadyEditable && isAlreadyFocused) {
+      log('activateEditableField: field already editable and focused, trusting browser positioning');
+      this.lastClickPosition = null;
+      return;
+    }
+
+    // Position cursor at click location if we have coordinates
+    if (!this.lastClickPosition) {
+      log('activateEditableField: no lastClickPosition, skipping cursor positioning');
+      return;
+    }
+
+    const currentRect = fieldElement.getBoundingClientRect();
+    const clientX = currentRect.left + this.lastClickPosition.relativeX;
+    const clientY = currentRect.top + this.lastClickPosition.relativeY;
+
+    log('activateEditableField: positioning cursor at click location:', {
+      relativeX: this.lastClickPosition.relativeX,
+      relativeY: this.lastClickPosition.relativeY,
+      clientX,
+      clientY,
+    });
+
+    // Save click position for FORM_DATA handler if requested (for re-render scenarios)
+    if (options.saveClickPosition) {
+      this.savedClickPosition = {
+        relativeX: this.lastClickPosition.relativeX,
+        relativeY: this.lastClickPosition.relativeY,
+        editableField: this.lastClickPosition.editableField,
+      };
+    }
+
+    // Only restore click position if there's no existing non-collapsed selection
+    const currentSelection = window.getSelection();
+    const hasNonCollapsedSelection = currentSelection &&
+      currentSelection.rangeCount > 0 &&
+      !currentSelection.getRangeAt(0).collapsed;
+
+    if (hasNonCollapsedSelection) {
+      log('activateEditableField: skipping cursor positioning - non-collapsed selection exists');
+    } else {
+      const range = document.caretRangeFromPoint(clientX, clientY);
+      if (range) {
+        const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+        const finalRange = document.createRange();
+        finalRange.setStart(validPos.node, validPos.offset);
+        finalRange.collapse(true);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(finalRange);
+        log('activateEditableField: cursor positioned at offset:', validPos.offset);
+      }
+    }
+
+    // Clear lastClickPosition - we've used it
+    this.lastClickPosition = null;
   }
 
   /**
@@ -3152,12 +3304,12 @@ export class Bridge {
       }
     }
 
-    // Scroll to block if not visible - BUT skip if we just finished a drag-drop
-    // After drag-drop, the block should be visible where we dropped it.
-    // If it's "not visible", the async renderer may not have completed yet and
-    // we'd be scrolling to the OLD position. Wait for domChange to handle it.
+    // Scroll to block if not visible - BUT skip if we just finished dragging this block.
+    // After drag-drop, the async renderer may not have completed yet and we'd be
+    // scrolling to the OLD position. observeBlockDomChanges will scroll after re-render.
     let didScroll = false;
-    if (!this.elementIsVisibleInViewport(blockElement) && !this._justFinishedDrag) {
+    const justDraggedThisBlock = this._justFinishedDragBlockId === this.selectedBlockUid;
+    if (!this.elementIsVisibleInViewport(blockElement) && !justDraggedThisBlock) {
       log('updateBlockUIAfterFormData: scrolling to block', this.selectedBlockUid);
       this.scrollBlockIntoView(blockElement);
       didScroll = true;
@@ -3196,11 +3348,7 @@ export class Bridge {
     if (currentRect.width > 0 && currentRect.height > 0) {
       this._lastBlockRect = currentRect;
     }
-
-    // Always reposition drag button after DOM updates - block may have moved
-    if (this.dragHandlePositioner) {
-      this.dragHandlePositioner();
-    }
+    // Drag handle position is now set in sendBlockSelected
 
     // Re-attach ResizeObserver to the new DOM element
     // React re-renders may have replaced the block element, so our old observer
@@ -3370,6 +3518,7 @@ export class Bridge {
     const mediaFields = this.getMediaFields(blockElement);
     // Get add button direction (right, bottom, hidden) - uses attribute or infers from nesting depth
     const addDirection = this.getAddDirection(blockElement);
+    log('Setting _pendingBlockSelected for:', blockUid, '_justFinishedDragBlockId:', this._justFinishedDragBlockId);
     this._pendingBlockSelected = {
       blockUid,
       rect: {
@@ -3519,100 +3668,21 @@ export class Bridge {
               contentEditableField = null;
             }
           }
+
           if (contentEditableField) {
             const fieldPath = contentEditableField.getAttribute('data-editable-field');
-            // Use getFieldType which handles page-level fields (e.g., /title) correctly
-            const fieldType = fieldPath ? this.getFieldType(this.selectedBlockUid, fieldPath) : undefined;
-
-            if (this.fieldTypeIsTextEditable(fieldType)) {
-              // Only call focus if not already focused
-              // Calling focus() on already-focused element can disrupt cursor position
-              const isAlreadyFocused = document.activeElement === contentEditableField;
-              log('selectBlock focus check:', { isAlreadyFocused, activeElement: document.activeElement?.tagName, contentEditableField: contentEditableField.tagName });
-              if (!isAlreadyFocused) {
-                log('selectBlock calling focus() on field');
-                // Use preventScroll when reselecting same block to avoid scroll-back bug
-                // (user may have scrolled the block off screen intentionally)
-                contentEditableField.focus({ preventScroll: this._isReselectingSameBlock });
-              } else {
-                log('selectBlock skipping focus() - already focused');
-              }
-
-              // If field was already editable AND already focused, browser already handled
-              // cursor positioning on click - don't redo it (causes race with typing)
-              // But if we had to call focus(), we need to restore click position because
-              // focus() moves cursor to end of text
-              if (wasAlreadyEditable && isAlreadyFocused) {
-                log('Field already editable and focused, trusting browser click positioning');
-                this.lastClickPosition = null;
-              } else if (this.lastClickPosition) {
-                // Need to position cursor at click location
-                // Convert relative position back to screen coordinates using current element position
-                const currentRect = contentEditableField.getBoundingClientRect();
-                const clientX = currentRect.left + this.lastClickPosition.relativeX;
-                const clientY = currentRect.top + this.lastClickPosition.relativeY;
-
-                log('Positioning cursor at click location:', {
-                  relativeX: this.lastClickPosition.relativeX,
-                  relativeY: this.lastClickPosition.relativeY,
-                  clientX,
-                  clientY,
-                  wasAlreadyEditable,
-                  isAlreadyFocused,
-                });
-
-                // Save click position for FORM_DATA handler to use after renderer updates
-                this.savedClickPosition = {
-                  relativeX: this.lastClickPosition.relativeX,
-                  relativeY: this.lastClickPosition.relativeY,
-                  editableField: this.lastClickPosition.editableField,
-                };
-
-                // Only restore click position if there's no existing non-collapsed selection
-                // (e.g., from Meta+A or programmatic selection)
-                const currentSelection = window.getSelection();
-                const hasNonCollapsedSelection = currentSelection &&
-                  currentSelection.rangeCount > 0 &&
-                  !currentSelection.getRangeAt(0).collapsed;
-
-                if (!hasNonCollapsedSelection) {
-                  // Position cursor at the click location using caretRangeFromPoint
-                  const range = document.caretRangeFromPoint(clientX, clientY);
-                  log('caretRangeFromPoint result:', range ? {
-                    startContainer: range.startContainer.nodeName,
-                    startOffset: range.startOffset,
-                    text: range.startContainer.textContent?.substring(0, 30),
-                  } : null);
-                  if (range) {
-                    // Validate position before setting (may land on invalid whitespace)
-                    const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
-                    const finalRange = document.createRange();
-                    finalRange.setStart(validPos.node, validPos.offset);
-                    finalRange.collapse(true);
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(finalRange);
-                    log('Cursor positioned at offset:', validPos.offset);
-                  }
-                } else {
-                  log('Skipping cursor positioning - non-collapsed selection exists');
-                }
-
-                // Clear lastClickPosition - we've used it to position cursor
-                // Keep savedClickPosition for FORM_DATA handler in case React re-renders
-                // (staleness check in updateBlockUIAfterFormData handles old positions)
-                this.lastClickPosition = null;
-              }
-            } else {
-              // No lastClickPosition, just log that we skipped cursor positioning
-              log('No lastClickPosition, skipping cursor positioning');
-            }
-          } else {
-            // Not an editable field type, clear click position if any
-            if (this.lastClickPosition) {
-              log('Non-editable field type, clearing lastClickPosition');
-              this.lastClickPosition = null;
-            }
+            // Use activateEditableField for focus and cursor positioning
+            this.activateEditableField(contentEditableField, fieldPath, this.selectedBlockUid, 'selectBlock', {
+              skipContentEditable: true, // Already done above
+              skipObservers: true, // Text observers set up elsewhere for blocks
+              preventScroll: this._isReselectingSameBlock,
+              wasAlreadyEditable,
+              saveClickPosition: true, // Save for FORM_DATA handler after re-render
+            });
+          } else if (this.lastClickPosition) {
+            // No editable field found, clear click position
+            log('selectBlock: no editable field found, clearing lastClickPosition');
+            this.lastClickPosition = null;
           }
 
           // Now send BLOCK_SELECTED with selection - both arrive atomically
@@ -4094,8 +4164,8 @@ export class Bridge {
       this._domMutationObserver.disconnect();
     }
 
-    // Find the content container to observe
-    const container = document.getElementById('content') || document.body;
+    // Observe document.body to catch all DOM changes including footer blocks
+    const container = document.body;
 
     this._domMutationObserver = new MutationObserver((mutations) => {
       // Only process if this is still the selected block
@@ -4193,14 +4263,20 @@ export class Bridge {
               // Re-check element is still valid and get fresh rect
               const freshElements = this.getAllBlockElements(blockUid);
               if (freshElements.length > 0) {
+                // Scroll to block if not visible AND we were waiting for this dragged block
+                // (prevents unwanted scrolling on normal DOM changes like size updates)
+                if (this._justFinishedDragBlockId === blockUid) {
+                  if (!this.elementIsVisibleInViewport(freshElements[0])) {
+                    log('observeBlockDomChanges: scrolling to dragged block', blockUid);
+                    this.scrollBlockIntoView(freshElements[0]);
+                  }
+                  // Always clear after processing - drag is complete
+                  this._justFinishedDragBlockId = null;
+                }
                 this.sendBlockSelected('domChange', freshElements[0]);
               }
             }, 150); // Wait for animation to settle
-
-            // Reposition drag button - block may have moved (e.g., after drag-drop re-render)
-            if (this.dragHandlePositioner) {
-              this.dragHandlePositioner();
-            }
+            // Drag handle position is now set in sendBlockSelected
           }
         }
       }
@@ -4449,24 +4525,18 @@ export class Bridge {
         return;
       }
 
-      // Position above block, or at top of iframe if that would be off-screen
-      const handleTop = Math.max(0, rect.top - 48);
+      // Position using shared calculation (same as Volto toolbar)
+      const handlePos = calculateDragHandlePosition(rect);
 
       dragButton.style.right = 'auto';
-      dragButton.style.left = `${rect.left}px`;
-      dragButton.style.top = `${handleTop}px`;
+      dragButton.style.left = `${handlePos.left}px`;
+      dragButton.style.top = `${handlePos.top}px`;
       dragButton.style.display = 'block';
     };
 
-    // Position immediately
-    positionDragHandle();
-
-    // Reposition on scroll
-    window.addEventListener('scroll', positionDragHandle, true);
-
-    // Store for cleanup
-    this.dragHandlePositioner = positionDragHandle;
-    this.dragHandleScrollListener = positionDragHandle;
+    // Drag handle position is now set in sendBlockSelected() to ensure
+    // alignment with Volto toolbar (both use the same rect at the same time)
+    // No scroll listener needed - sendBlockSelected handles position updates
 
     // Create the drag handler
     const dragHandler = (e) => {
@@ -4791,13 +4861,6 @@ export class Bridge {
         // Clear drag flag
         this._isDragging = false;
 
-        // Mark that we just finished a drag - prevents scrollIntoView race condition
-        // with async renderers. Clear after a delay to allow render to complete.
-        this._justFinishedDrag = true;
-        setTimeout(() => {
-          this._justFinishedDrag = false;
-        }, 500);
-
         // Clear any pending scroll timeout from auto-scroll
         // This prevents stale BLOCK_SELECTED from firing after drop
         if (this.scrollTimeout) {
@@ -4825,6 +4888,11 @@ export class Bridge {
 
         // Only allow drop if indicator was visible - this ensures all validation passed
         if (closestBlockUid && dropIndicatorVisible) {
+          // Mark which block we just finished dragging - prevents scrollIntoView race condition
+          // with async renderers. Cleared when FORM_DATA arrives with this block selected.
+          // Only set on successful drop, not on cancelled drags.
+          this._justFinishedDragBlockId = this.selectedBlockUid;
+
           const draggedBlockId = blockElement.getAttribute('data-block-uid');
           const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
@@ -5020,12 +5088,22 @@ export class Bridge {
           return; // Don't send BLOCK_SELECTED during drag or carousel navigation
         }
         if (this.selectedBlockUid) {
-          const blockElement = document.querySelector(
-            `[data-block-uid="${this.selectedBlockUid}"]`,
-          );
+          let element;
+          if (this.selectedBlockUid === PAGE_BLOCK_UID) {
+            // Page-level field - find element using focused field info
+            if (this.focusedMediaField) {
+              element = document.querySelector(`[data-media-field="${this.focusedMediaField}"]`);
+            } else if (this.focusedLinkableField) {
+              element = document.querySelector(`[data-linkable-field="${this.focusedLinkableField}"]`);
+            } else if (this.focusedFieldName) {
+              element = document.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+            }
+          } else {
+            element = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          }
 
-          if (blockElement) {
-            this.sendBlockSelected('scrollHandler', blockElement);
+          if (element) {
+            this.sendBlockSelected('scrollHandler', element);
           }
         }
       }, 150);
@@ -6428,7 +6506,7 @@ export class Bridge {
    * @returns {boolean} True if values are equal (ignoring nodeIds)
    */
   focusedFieldValuesEqual(formDataA, formDataB) {
-    // selectedBlockUid can be null for page-level fields, so only check focusedFieldName
+    // selectedBlockUid is PAGE_BLOCK_UID for page-level fields, so only check focusedFieldName
     if (!this.focusedFieldName) {
       return true; // No focused field to compare
     }
@@ -6437,7 +6515,7 @@ export class Bridge {
     const resolved = this.resolveFieldPath(this.focusedFieldName, this.selectedBlockUid);
 
     let fieldA, fieldB;
-    if (resolved.blockId === null) {
+    if (resolved.blockId === PAGE_BLOCK_UID) {
       // Page-level field - compare directly on formData
       fieldA = formDataA?.[resolved.fieldName];
       fieldB = formDataB?.[resolved.fieldName];
@@ -6491,7 +6569,7 @@ export class Bridge {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
 
     // Page-level field
-    if (resolved.blockId === null) {
+    if (resolved.blockId === PAGE_BLOCK_UID) {
       return this.blockFieldTypes?._page?.[resolved.fieldName];
     }
 
@@ -8115,6 +8193,23 @@ export function formDataContentEqual(formDataA, formDataB) {
   const { _editSequence: seqA, ...contentA } = formDataA;
   const { _editSequence: seqB, ...contentB } = formDataB;
   return JSON.stringify(contentA) === JSON.stringify(contentB);
+}
+
+/**
+ * Calculate drag handle/toolbar position for a block.
+ * Used by both iframe drag handle and Volto toolbar to ensure alignment.
+ *
+ * @param {Object} blockRect - Block's bounding rect {top, left}
+ * @param {Object} viewportOffset - Viewport offset {top, left}
+ *        For iframe: {top: 0, left: 0}
+ *        For parent: iframe.getBoundingClientRect()
+ * @returns {Object} {top, left} position
+ */
+export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0, left: 0 }) {
+  const HANDLE_OFFSET_TOP = 40;
+  const top = Math.max(viewportOffset.top, viewportOffset.top + blockRect.top - HANDLE_OFFSET_TOP);
+  const left = viewportOffset.left + blockRect.left;
+  return { top, left };
 }
 
 // Make initBridge available globally

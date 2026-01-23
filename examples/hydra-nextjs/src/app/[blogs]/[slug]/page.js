@@ -7,7 +7,11 @@ import BlocksList from "@/components/BlocksList";
 import { fetchContent } from '#utils/api';
 
 export default function Blog({ params }) {
-  const bridge = initBridge({allowedBlocks: [ "slate", "image", "video"]});
+  const bridge = initBridge({
+    pageBlocksFields: [
+      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+    ],
+  });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
