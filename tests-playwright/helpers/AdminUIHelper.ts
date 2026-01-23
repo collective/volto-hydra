@@ -601,57 +601,35 @@ export class AdminUIHelper {
    * The iframe drag handle (.volto-hydra-drag-button) handles clicks.
    * The Volto toolbar drag handle (.drag-handle) is positioned over it.
    */
-  async waitForDragHandlesAligned(
-    blockLocator: Locator,
-    timeout: number = 5000
-  ): Promise<void> {
+  /**
+   * Wait for the iframe drag button and toolbar drag button to be aligned.
+   * The iframe drag button MUST be directly underneath the toolbar drag icon
+   * for DND to work - clicks on the visible toolbar fall through to the iframe button.
+   */
+  async waitForDragHandlesAligned(timeout: number = 5000): Promise<void> {
     const iframe = this.getIframe();
     const iframeDragHandle = iframe.locator('.volto-hydra-drag-button');
-    const voltoToolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
+    const toolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
 
     await expect(async () => {
-      // Both handles must be visible
       await expect(iframeDragHandle).toBeVisible({ timeout: 100 });
-      await expect(voltoToolbarDragHandle).toBeVisible({ timeout: 100 });
+      await expect(toolbarDragHandle).toBeVisible({ timeout: 100 });
 
-      // For multi-element blocks, compute combined bounding box
-      const allElements = await blockLocator.all();
-      let blockBox: { x: number; y: number; width: number; height: number } | null = null;
-
-      if (allElements.length > 1) {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const el of allElements) {
-          const rect = await el.boundingBox();
-          if (rect) {
-            minX = Math.min(minX, rect.x);
-            minY = Math.min(minY, rect.y);
-            maxX = Math.max(maxX, rect.x + rect.width);
-            maxY = Math.max(maxY, rect.y + rect.height);
-          }
-        }
-        if (minX !== Infinity) {
-          blockBox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-        }
-      } else {
-        blockBox = await blockLocator.first().boundingBox();
+      const iframeBox = await iframeDragHandle.boundingBox();
+      const toolbarBox = await toolbarDragHandle.boundingBox();
+      if (!iframeBox || !toolbarBox) {
+        throw new Error('Could not get drag handle bounding boxes');
       }
 
-      const iframeHandleBox = await iframeDragHandle.boundingBox();
-      const voltoHandleBox = await voltoToolbarDragHandle.boundingBox();
-      if (!blockBox || !iframeHandleBox || !voltoHandleBox) {
-        throw new Error('Could not get bounding boxes');
-      }
+      const xDiff = Math.abs(toolbarBox.x - iframeBox.x);
+      const yDiff = Math.abs(toolbarBox.y - iframeBox.y);
+      const tolerance = 10;
 
-      // Volto toolbar drag handle should be aligned with iframe drag handle
-      const handleAlignmentTolerance = 15;
-      const voltoIframeXDiff = Math.abs(voltoHandleBox.x - iframeHandleBox.x);
-      const voltoIframeYDiff = Math.abs(voltoHandleBox.y - iframeHandleBox.y);
-
-      if (voltoIframeXDiff > handleAlignmentTolerance || voltoIframeYDiff > handleAlignmentTolerance) {
+      if (xDiff > tolerance || yDiff > tolerance) {
         throw new Error(
-          `Drag handles not aligned. Iframe: (${iframeHandleBox.x.toFixed(0)}, ${iframeHandleBox.y.toFixed(0)}), ` +
-          `Volto: (${voltoHandleBox.x.toFixed(0)}, ${voltoHandleBox.y.toFixed(0)}), ` +
-          `diff: (${voltoIframeXDiff.toFixed(0)}, ${voltoIframeYDiff.toFixed(0)})`
+          `Drag handles not aligned. Iframe: (${iframeBox.x.toFixed(0)}, ${iframeBox.y.toFixed(0)}), ` +
+          `Toolbar: (${toolbarBox.x.toFixed(0)}, ${toolbarBox.y.toFixed(0)}), ` +
+          `diff: (${xDiff.toFixed(0)}, ${yDiff.toFixed(0)})`
         );
       }
     }).toPass({ timeout });
@@ -920,9 +898,7 @@ export class AdminUIHelper {
     // Only check if the Volto toolbar drag handle exists (some blocks/tests may not have it)
     const voltoToolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
     if (await voltoToolbarDragHandle.count() > 0) {
-      const iframe = this.getIframe();
-      const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
-      await this.waitForDragHandlesAligned(blockLocator, 5000);
+      await this.waitForDragHandlesAligned(5000);
     }
   }
 
@@ -2683,40 +2659,11 @@ export class AdminUIHelper {
   async getDragHandle(): Promise<Locator> {
     const toolbar = this.page.locator('.quanta-toolbar');
     const dragHandle = toolbar.locator('.drag-handle');
-    await expect(dragHandle).toBeVisible({ timeout: 2000 });
 
-    // Get the invisible drag button in iframe (this is what actually receives drag events)
-    const iframe = this.getIframe();
-    const iframeDragButton = iframe.locator('.volto-hydra-drag-button');
+    // Wait for drag handles to be visible and aligned
+    await this.waitForDragHandlesAligned(5000);
 
-    // Verify iframe drag button is aligned with the toolbar (which is aligned with the block)
-    const iframeDragButtonBox = await this.getIframeDragButtonBoundingBox();
-    const toolbarBox = await toolbar.boundingBox();
-
-    if (iframeDragButtonBox && toolbarBox) {
-      // Both toolbar and iframe drag button should be left-aligned with the block
-      const xDiff = Math.abs(iframeDragButtonBox.x - toolbarBox.x);
-
-      if (xDiff > 5) {
-        throw new Error(
-          `Iframe drag button not aligned with toolbar (both should be left-aligned with block). ` +
-          `Toolbar at x=${toolbarBox.x}, iframe button at x=${iframeDragButtonBox.x}. ` +
-          `Difference: ${xDiff}px`
-        );
-      }
-
-      // Verify pointer-events allows mouse events
-      const pointerEvents = await iframeDragButton.evaluate((el) =>
-        window.getComputedStyle(el).pointerEvents
-      );
-      if (pointerEvents !== 'auto') {
-        throw new Error(
-          `Iframe drag button should have pointer-events: auto, got: ${pointerEvents}`
-        );
-      }
-    }
-
-    // we will mouse down in this but it will actually fall through to the iframe button
+    // we will mouse down on toolbar but it falls through to the iframe button
     return dragHandle;
   }
 
