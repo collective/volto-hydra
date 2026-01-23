@@ -940,7 +940,7 @@ test.describe('Hierarchical Sidebar', () => {
     // Re-open sidebar
     const triggerButton = page.locator('.sidebar-container .trigger');
     await triggerButton.click();
-    await page.waitForTimeout(500); // Wait for resize
+    await helper.waitForQuantaToolbar('text-after'); // Wait for toolbar to reposition
 
     // Verify positioning is still correct after sidebar reopen
     const afterReopenResult = await helper.isBlockSelectedInIframe('text-after');
