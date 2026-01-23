@@ -363,11 +363,12 @@ export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], opti
   return (args) => {
     const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
 
-    // Get blockPathMap and blockId from context (set by HydraSchemaProvider)
-    // Fall back to passed params for compatibility
+    // Only use context values when called for a specific block instance.
+    // When called for TYPE inspection (getBlockSchema without blockId), passedBlockId is undefined
+    // and we should NOT filter - that would incorrectly hide fields from the type schema.
     const hydraContext = getHydraSchemaContext();
-    const blockPathMap = hydraContext?.blockPathMap || passedBlockPathMap;
-    const blockId = hydraContext?.currentBlockId || passedBlockId;
+    const blockPathMap = passedBlockPathMap || (passedBlockId !== undefined ? hydraContext?.blockPathMap : null);
+    const blockId = passedBlockId ?? (passedBlockPathMap ? hydraContext?.currentBlockId : null);
     const blocksConfig = hydraContext?.blocksConfig;
 
     if (!blockPathMap || !blockId) return schema;
