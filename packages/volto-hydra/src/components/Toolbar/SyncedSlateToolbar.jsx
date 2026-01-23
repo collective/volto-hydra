@@ -351,16 +351,21 @@ const SyncedSlateToolbar = ({
       // The polling might detect a stale popup closing while a new button click is pending,
       // and we don't want to interfere with that pending operation.
 
-      // Restore focus to iframe after LinkEditor closes (e.g., after pressing Escape)
-      // This ensures the user can continue typing without having to click back into the editor
-      if (iframeElement) {
-        iframeElement.focus();
+      // Restore focus to the specific field in the iframe after LinkEditor closes
+      // We know which block and field was selected when the popup opened
+      if (iframeElement?.contentWindow && selectedBlock) {
+        const fieldName = blockUI?.focusedFieldName || 'value';
+        iframeElement.contentWindow.postMessage({
+          type: 'FOCUS_FIELD',
+          blockId: selectedBlock,
+          fieldName: fieldName,
+        }, '*');
       }
     };
 
     const intervalId = setInterval(checkVisibility, 100);
     return () => clearInterval(intervalId);
-  }, [form, currentSelection, onChangeFormData, iframeElement]);
+  }, [form, currentSelection, onChangeFormData, iframeElement, selectedBlock, blockUI?.focusedFieldName]);
 
   // Helper function for applying inline format with prospective formatting support
   // Used by both hotkey transforms and toolbar button clicks

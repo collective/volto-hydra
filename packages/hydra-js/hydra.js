@@ -1492,6 +1492,27 @@ export class Bridge {
             log('Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
+        } else if (event.data.type === 'FOCUS_FIELD') {
+          // Restore focus to a specific field (e.g., after LinkEditor closes)
+          const { blockId, fieldName } = event.data;
+          log('Received FOCUS_FIELD:', blockId, fieldName);
+
+          const blockElement = document.querySelector(`[data-block-uid="${blockId}"]`);
+          if (blockElement) {
+            // Find the specific field by data-field-id attribute
+            const field = blockElement.querySelector(`[data-field-id="${fieldName}"][contenteditable="true"]`);
+            if (field) {
+              field.focus();
+              log('Focused field:', fieldName);
+            } else {
+              // Fallback to first editable field if specific field not found
+              const firstEditable = this.getOwnFirstEditableField(blockElement);
+              if (firstEditable) {
+                firstEditable.focus();
+                log('Focused first editable field (fallback)');
+              }
+            }
+          }
         }
       }
     };
