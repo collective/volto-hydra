@@ -34,7 +34,7 @@ test.describe('Multi-element blocks', () => {
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
     // Wait for elements to be stable after click (may re-render)
-    await expect(elements.first()).toBeVisible({ timeout: 5000 });
+    await helper.getStableBlockCount();
     const newCount = await elements.count();
     expect(newCount).toBeGreaterThan(1);
 
