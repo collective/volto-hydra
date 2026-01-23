@@ -7,6 +7,7 @@
  */
 import config from '@plone/volto/registry';
 import { getBlockSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 
 // Re-export getBlockSchema from blockPath for convenience
@@ -372,18 +373,19 @@ export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], opti
     if (!blockPathMap || !blockId) return schema;
 
     const pathInfo = blockPathMap?.[blockId];
-    if (!pathInfo?.parentId) return schema;
+    // Skip field hiding for top-level blocks (no parent or page is parent)
+    if (!pathInfo?.parentId || pathInfo.parentId === PAGE_BLOCK_UID) return schema;
 
-    // Check if parent has a type selected (via inheritSchemaFrom's typeField)
-    // If parent has no type selected, children are free to be any type - don't hide fields
+    // Only filter fields if parent uses schema inheritance (has typeField configured)
+    // AND has a type selected. Otherwise children keep all their fields.
     if (blocksConfig) {
-      // Use getLiveBlockData to get fresh parent data from form internal state
       const parentBlock = getLiveBlockData(pathInfo.parentId);
       if (parentBlock) {
         const parentConfig = blocksConfig[parentBlock['@type']];
         const typeField = parentConfig?.schemaEnhancer?.config?.typeField;
-        if (typeField && !parentBlock[typeField]) {
-          // Parent has a typeField config but no value selected - children are independent
+        // If parent doesn't use schema inheritance (no typeField), or no type selected,
+        // don't filter child fields - they're independent blocks
+        if (!typeField || !parentBlock[typeField]) {
           return schema;
         }
       }
