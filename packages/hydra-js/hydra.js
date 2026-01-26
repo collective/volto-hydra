@@ -70,6 +70,22 @@
 // injectCSS
 
 ////////////////////////////////////////////////////////////////////////////////
+// Template Utilities
+////////////////////////////////////////////////////////////////////////////////
+
+// isLayoutTemplate
+// findPlaceholderRegions
+// isTemplateAllowedIn
+// getLayoutTemplates
+// getSnippetTemplates
+// cloneBlocksWithNewIds
+// applyLayoutTemplate
+// insertSnippetBlocks
+// getTemplateBlocks
+// isFixedTemplateBlock
+// isPlaceholderContent
+
+////////////////////////////////////////////////////////////////////////////////
 // Methods provided by THIS hydra.js as export
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -8210,6 +8226,337 @@ export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0
   const top = Math.max(viewportOffset.top, viewportOffset.top + blockRect.top - HANDLE_OFFSET_TOP);
   const left = viewportOffset.left + blockRect.left;
   return { top, left };
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Template Utilities
+// For discovering, filtering, and merging templates.
+// Templates are Documents with blocks that have `_template` markers.
+////////////////////////////////////////////////////////////////////////////////
+
+export const TEMPLATE_MARKER = '_template';
+export const TEMPLATE_SOURCE_MARKER = '_templateSource';
+
+/**
+ * Simple UUID generator for block IDs.
+ * @returns {string} UUID v4 format string
+ */
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Check if a template is a layout (has fixed blocks at edges).
+ * Layout = first or last block has _template marker without placeholderName.
+ *
+ * @param {Object} templateData - Template document with blocks and blocks_layout
+ * @returns {boolean}
+ */
+export function isLayoutTemplate(templateData) {
+  const { blocks, blocks_layout } = templateData;
+  const layout = blocks_layout?.items || [];
+  if (layout.length === 0) return false;
+
+  const firstBlock = blocks?.[layout[0]];
+  const lastBlock = blocks?.[layout[layout.length - 1]];
+
+  // If first or last block has _template marker (fixed position), it's a layout
+  const firstIsFixed =
+    firstBlock?.[TEMPLATE_MARKER] &&
+    !firstBlock[TEMPLATE_MARKER].placeholderName;
+  const lastIsFixed =
+    lastBlock?.[TEMPLATE_MARKER] &&
+    !lastBlock[TEMPLATE_MARKER].placeholderName;
+
+  return firstIsFixed || lastIsFixed;
+}
+
+/**
+ * Find placeholder regions in a template.
+ * Blocks with same placeholderName form a region.
+ *
+ * @param {Object} templateData - Template document
+ * @returns {Object} { placeholderName: { blockIds: [], allowedBlocks: [] } }
+ */
+export function findPlaceholderRegions(templateData) {
+  const { blocks, blocks_layout } = templateData;
+  const layout = blocks_layout?.items || [];
+  const regions = {};
+
+  for (const blockId of layout) {
+    const block = blocks?.[blockId];
+    const templateMarker = block?.[TEMPLATE_MARKER];
+    const placeholderName = templateMarker?.placeholderName;
+
+    if (placeholderName) {
+      if (!regions[placeholderName]) {
+        regions[placeholderName] = {
+          blockIds: [],
+          // First block of region holds config
+          allowedBlocks: templateMarker.allowedBlocks || null,
+        };
+      }
+      regions[placeholderName].blockIds.push(blockId);
+    }
+  }
+  return regions;
+}
+
+/**
+ * Check if a template is allowed in a given container context.
+ *
+ * @param {Object} templateData - Template document
+ * @param {string} containerType - Block @type of container (e.g., "page", "columns")
+ * @param {string} fieldName - Container field name (e.g., "blocks")
+ * @returns {boolean}
+ */
+export function isTemplateAllowedIn(templateData, containerType, fieldName) {
+  const { allowed_container_types, allowed_field_names } = templateData;
+
+  // If no restrictions, allow everywhere
+  if (!allowed_container_types?.length && !allowed_field_names?.length) {
+    return true;
+  }
+
+  // Check restrictions
+  const typeOk =
+    !allowed_container_types?.length ||
+    allowed_container_types.includes(containerType);
+  const fieldOk =
+    !allowed_field_names?.length || allowed_field_names.includes(fieldName);
+
+  return typeOk && fieldOk;
+}
+
+/**
+ * Filter templates for "Apply Layout" UI.
+ * Returns templates that are layouts and allowed in the given context.
+ *
+ * @param {Array} templates - Array of template documents
+ * @param {string} containerType - Block @type of container
+ * @param {string} fieldName - Container field name
+ * @returns {Array} Filtered templates
+ */
+export function getLayoutTemplates(templates, containerType, fieldName) {
+  return templates.filter(
+    (t) => isLayoutTemplate(t) && isTemplateAllowedIn(t, containerType, fieldName),
+  );
+}
+
+/**
+ * Filter templates for block chooser (snippets).
+ * Returns templates that are NOT layouts and allowed in the given context.
+ *
+ * @param {Array} templates - Array of template documents
+ * @param {string} containerType - Block @type of container
+ * @param {string} fieldName - Container field name
+ * @returns {Array} Filtered templates
+ */
+export function getSnippetTemplates(templates, containerType, fieldName) {
+  return templates.filter(
+    (t) =>
+      !isLayoutTemplate(t) && isTemplateAllowedIn(t, containerType, fieldName),
+  );
+}
+
+/**
+ * Clone template blocks with fresh UUIDs.
+ *
+ * @param {Object} blocks - Template blocks object
+ * @param {Array} layout - Template blocks_layout.items array
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} { blocks, layout, idMap } where idMap tracks old->new IDs
+ */
+export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUUID) {
+  const idMap = {}; // oldId -> newId
+  const newBlocks = {};
+  const newLayout = [];
+
+  for (const oldId of layout) {
+    const newId = uuidGenerator();
+    idMap[oldId] = newId;
+
+    // Deep clone the block
+    const block = blocks[oldId];
+    if (block) {
+      newBlocks[newId] = JSON.parse(JSON.stringify(block));
+    }
+
+    newLayout.push(newId);
+  }
+
+  return { blocks: newBlocks, layout: newLayout, idMap };
+}
+
+/**
+ * Apply a layout template to existing page/container content.
+ * - Clones template blocks with new IDs
+ * - Adds _templateSource markers to all blocks
+ * - Moves existing content into the "default" placeholder
+ *
+ * @param {Object} pageFormData - Existing page data with blocks and blocks_layout
+ * @param {Object} templateData - Template document
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} Merged formData with template applied
+ */
+export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = generateUUID) {
+  const result = { blocks: {}, blocks_layout: { items: [] } };
+  const templateId = templateData.UID;
+
+  // 1. Clone template blocks with new IDs
+  const { blocks: clonedBlocks, layout: clonedLayout, idMap } =
+    cloneBlocksWithNewIds(
+      templateData.blocks,
+      templateData.blocks_layout?.items || [],
+      uuidGenerator,
+    );
+
+  // 2. Add _templateSource to each cloned block
+  for (const [newId, block] of Object.entries(clonedBlocks)) {
+    const originalId = Object.entries(idMap).find(
+      ([_, v]) => v === newId,
+    )?.[0];
+    const originalBlock = templateData.blocks?.[originalId];
+    const templateMarker = originalBlock?.[TEMPLATE_MARKER];
+
+    if (templateMarker) {
+      if (templateMarker.placeholderName) {
+        // Placeholder block - mark with placeholderName
+        block[TEMPLATE_SOURCE_MARKER] = {
+          templateId,
+          placeholderName: templateMarker.placeholderName,
+        };
+      } else {
+        // Fixed template block - mark with original blockId
+        block[TEMPLATE_SOURCE_MARKER] = {
+          templateId,
+          blockId: originalId,
+        };
+      }
+    }
+    result.blocks[newId] = block;
+  }
+
+  // 3. Get existing page blocks and mark them for the "default" placeholder
+  const existingBlockIds = pageFormData.blocks_layout?.items || [];
+  for (const existingId of existingBlockIds) {
+    const existingBlock = pageFormData.blocks?.[existingId];
+    if (existingBlock) {
+      result.blocks[existingId] = {
+        ...existingBlock,
+        [TEMPLATE_SOURCE_MARKER]: {
+          templateId,
+          placeholderName: 'default',
+        },
+      };
+    }
+  }
+
+  // 4. Build final layout - insert existing blocks after "default" placeholder start
+  for (const newBlockId of clonedLayout) {
+    result.blocks_layout.items.push(newBlockId);
+
+    // If this block is the "default" placeholder, insert existing content after it
+    const block = result.blocks[newBlockId];
+    if (block?.[TEMPLATE_MARKER]?.placeholderName === 'default') {
+      result.blocks_layout.items.push(...existingBlockIds);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Insert snippet blocks at a specific position.
+ * - Clones snippet blocks with new IDs
+ * - Adds _templateSource markers
+ * - Inserts at the specified position
+ *
+ * @param {Object} pageFormData - Existing page data
+ * @param {Object} templateData - Snippet template document
+ * @param {number} position - Index to insert at
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} Updated formData with snippet inserted
+ */
+export function insertSnippetBlocks(pageFormData, templateData, position, uuidGenerator = generateUUID) {
+  const result = {
+    blocks: { ...pageFormData.blocks },
+    blocks_layout: {
+      items: [...(pageFormData.blocks_layout?.items || [])],
+    },
+  };
+  const templateId = templateData.UID;
+
+  // Clone snippet blocks
+  const { blocks: clonedBlocks, layout: clonedLayout, idMap } =
+    cloneBlocksWithNewIds(
+      templateData.blocks,
+      templateData.blocks_layout?.items || [],
+      uuidGenerator,
+    );
+
+  // Add _templateSource markers
+  for (const [newId, block] of Object.entries(clonedBlocks)) {
+    const originalId = Object.entries(idMap).find(
+      ([_, v]) => v === newId,
+    )?.[0];
+
+    block[TEMPLATE_SOURCE_MARKER] = {
+      templateId,
+      blockId: originalId,
+    };
+    result.blocks[newId] = block;
+  }
+
+  // Insert at position
+  result.blocks_layout.items.splice(position, 0, ...clonedLayout);
+
+  return result;
+}
+
+/**
+ * Get blocks that belong to a specific template.
+ *
+ * @param {Object} formData - Page form data
+ * @param {string} templateId - Template UID to find
+ * @returns {Array} Array of block IDs belonging to this template
+ */
+export function getTemplateBlocks(formData, templateId) {
+  const blockIds = [];
+  for (const blockId of formData.blocks_layout?.items || []) {
+    const block = formData.blocks?.[blockId];
+    if (block?.[TEMPLATE_SOURCE_MARKER]?.templateId === templateId) {
+      blockIds.push(blockId);
+    }
+  }
+  return blockIds;
+}
+
+/**
+ * Check if a block is a fixed template block (cannot be moved individually).
+ *
+ * @param {Object} block - Block data
+ * @returns {boolean}
+ */
+export function isFixedTemplateBlock(block) {
+  const source = block?.[TEMPLATE_SOURCE_MARKER];
+  // Fixed if it has blockId (not placeholderName)
+  return source && source.blockId && !source.placeholderName;
+}
+
+/**
+ * Check if a block is placeholder content (can be moved freely).
+ *
+ * @param {Object} block - Block data
+ * @returns {boolean}
+ */
+export function isPlaceholderContent(block) {
+  const source = block?.[TEMPLATE_SOURCE_MARKER];
+  return source && source.placeholderName;
 }
 
 // Make initBridge available globally

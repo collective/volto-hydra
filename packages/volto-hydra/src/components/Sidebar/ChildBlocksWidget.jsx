@@ -20,6 +20,7 @@ import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import LayoutSelector from './LayoutSelector';
 
 const messages = defineMessages({
   blocks: {
@@ -109,11 +110,14 @@ const ContainerFieldSection = ({
   fieldTitle,
   childBlocks,
   allowedBlocks,
+  allowedTemplates,
   maxLength,
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
   parentBlockId,
+  formData,
+  onChangeFormData,
 }) => {
   const intl = useIntl();
   const canAdd = !maxLength || childBlocks.length < maxLength;
@@ -139,6 +143,14 @@ const ContainerFieldSection = ({
       <div className="widget-header">
         <span className="widget-title">{fieldTitle}</span>
         <div className="widget-actions">
+          {onChangeFormData && allowedTemplates?.length > 0 && (
+            <LayoutSelector
+              formData={formData}
+              onChangeFormData={onChangeFormData}
+              allowedTemplates={allowedTemplates}
+              targetBlockId={parentBlockId}
+            />
+          )}
           {canAdd && (
             <button
               onClick={() => onAddBlock(parentBlockId, fieldName)}
@@ -220,6 +232,7 @@ const ChildBlocksWidget = ({
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
+  onChangeFormData,
 }) => {
   const intl = useIntl();
   const blocksConfig = config.blocks?.blocksConfig;
@@ -251,11 +264,14 @@ const ChildBlocksWidget = ({
               fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
               childBlocks={childBlocks}
               allowedBlocks={fieldConfig.allowedBlocks}
+              allowedTemplates={fieldConfig.allowedTemplates}
               maxLength={fieldConfig.maxLength}
               onSelectBlock={onSelectBlock}
               onAddBlock={onAddBlock}
               onMoveBlock={onMoveBlock}
               parentBlockId={null}
+              formData={formData}
+              onChangeFormData={onChangeFormData}
             />
           );
         })}
@@ -296,11 +312,14 @@ const ChildBlocksWidget = ({
             fieldTitle={field.title}
             childBlocks={childBlocks}
             allowedBlocks={field.allowedBlocks}
+            allowedTemplates={field.allowedTemplates}
             maxLength={field.maxLength}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
             onMoveBlock={onMoveBlock}
             parentBlockId={selectedBlock}
+            formData={formData}
+            onChangeFormData={onChangeFormData}
           />
         );
       })}
@@ -316,6 +335,7 @@ ChildBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
+  onChangeFormData: PropTypes.func,
 };
 
 export default ChildBlocksWidget;
