@@ -64,7 +64,7 @@ node tests-playwright/fixtures/mock-api-server.js
 
 **Terminal 2** - Start Volto Dev Server:
 ```bash
-RAZZLE_API_PATH=http://localhost:8888 pnpm start
+RAZZLE_API_PATH=http://localhost:8888 pnpm start:test
 ```
 
 Wait for webpack to compile and see "🎭 Volto started at 0.0.0.0:3000 🚀" (takes ~1-5 minutes).
