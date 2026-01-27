@@ -1,0 +1,11 @@
+{
+  "cookies": [
+    {
+      "name": "iframe_url_3001",
+      "value": "http://localhost:4321",
+      "domain": "localhost",
+      "path": "/"
+    }
+  ],
+  "origins": []
+}

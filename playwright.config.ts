@@ -118,6 +118,34 @@ export default defineConfig({
       },
       testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
     },
+    // Next.js frontend - tests run against Next.js frontend on port 4321
+    {
+      name: 'nextjs',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        // Pre-set iframe_url cookie to use Next.js frontend
+        storageState: 'tests-playwright/fixtures/storage-nextjs.json',
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/,              // Skip nuxt-specific tests
+        /inline-editing-multifield\.spec\.ts/,  // Skip if not ready for multifield
+        /container-blocks\.spec\.ts/,      // Skip accordion/columns (not implemented)
+        /unit\/.*\.spec\.ts/,              // Unit tests don't need to run per-frontend
+        /mock-parent\/.*\.spec\.ts/,       // Mock parent tests not needed
+      ],
+      testMatch: [
+        // Core integration tests only (manually specified)
+        'tests-playwright/integration/authentication.spec.ts',
+        'tests-playwright/integration/block-selection.spec.ts',
+        'tests-playwright/integration/sidebar-forms.spec.ts',
+        'tests-playwright/integration/navigation.spec.ts',
+        'tests-playwright/integration/block-add-remove.spec.ts',
+        'tests-playwright/integration/metadata-editing.spec.ts',
+        'tests-playwright/integration/drag-and-drop.spec.ts',
+      ],
+    },
 
     // Uncomment to test on Firefox and WebKit
     // {
@@ -164,8 +192,8 @@ export default defineConfig({
             NODE_ENV: 'production',
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
+            // Mock frontend (8888), Nuxt frontend (3003), and Next.js frontend (4321) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:4321',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -188,23 +216,28 @@ export default defineConfig({
           env: {
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
-            // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
+            // Mock frontend (8888), Nuxt frontend (3003), and Next.js frontend (4321) available for switching
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:4321',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
           },
         },
     // Nuxt frontend for testing Nuxt-specific scenarios
-    {
-      name: 'Nuxt Frontend (Test)',
-      command: 'npm run dev:test',
-      url: 'http://localhost:3003',
-      timeout: 120 * 1000, // 2 minutes for Nuxt compilation
-      reuseExistingServer: true, // CI starts server in advance, local dev starts manually
-      cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
+    // Only start if ENABLE_NUXT=1 environment variable is set
+    ...(process.env.ENABLE_NUXT
+      ? [
+          {
+            name: 'Nuxt Frontend (Test)',
+            command: 'npm run dev:test',
+            url: 'http://localhost:3003',
+            timeout: 120 * 1000, // 2 minutes for Nuxt compilation
+            reuseExistingServer: true, // CI starts server in advance, local dev starts manually
+            cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
+            stdout: 'pipe',
+            stderr: 'pipe',
+          },
+        ]
+      : []),
   ],
 });
