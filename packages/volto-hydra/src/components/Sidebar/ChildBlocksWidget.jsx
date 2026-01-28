@@ -21,7 +21,6 @@ import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import LayoutSelector from './LayoutSelector';
-import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
 
 const messages = defineMessages({
   blocks: {
@@ -119,10 +118,9 @@ const ContainerFieldSection = ({
   parentBlockId,
   formData,
   onChangeFormData,
+  blockPathMap,
 }) => {
   const intl = useIntl();
-  const hydraContext = useHydraSchemaContext();
-  const blockPathMap = hydraContext?.blockPathMap;
 
   // Check if we can add based on maxLength
   const maxLengthOk = !maxLength || childBlocks.length < maxLength;
@@ -293,6 +291,7 @@ const ChildBlocksWidget = ({
               parentBlockId={null}
               formData={formData}
               onChangeFormData={onChangeFormData}
+              blockPathMap={blockPathMap}
             />
           );
         })}
@@ -358,6 +357,7 @@ const ChildBlocksWidget = ({
             parentBlockId={selectedBlock}
             formData={formData}
             onChangeFormData={onChangeFormData}
+            blockPathMap={blockPathMap}
           />
         );
       })}
