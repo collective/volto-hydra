@@ -368,7 +368,16 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     const layout = parent[layoutFieldName]?.items;
     if (!blocks || !layout) return;
 
+    // First pass: collect fixed status for all blocks to determine insert restrictions
+    const blockFixedStatus = {};
     layout.forEach(blockId => {
+      const block = blocks[blockId];
+      if (block) {
+        blockFixedStatus[blockId] = block.fixed === true;
+      }
+    });
+
+    layout.forEach((blockId, index) => {
       const block = blocks[blockId];
       if (!block) return;
 
@@ -380,6 +389,15 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const templateSource = block._templateSource;
       const isFixed = block.fixed === true;        // Volto standard: position locked
       const isReadonly = block.readOnly === true;  // Volto standard: content locked
+
+      // Check if inserting before/after this block is allowed
+      // Can't insert between two adjacent fixed blocks
+      const prevBlockId = layout[index - 1];
+      const nextBlockId = layout[index + 1];
+      const prevBlockIsFixed = prevBlockId ? blockFixedStatus[prevBlockId] : false;
+      const nextBlockIsFixed = nextBlockId ? blockFixedStatus[nextBlockId] : false;
+      const canInsertBefore = !(isFixed && prevBlockIsFixed);
+      const canInsertAfter = !(isFixed && nextBlockIsFixed);
 
       // Template instance virtual container
       // Only FIRST-LEVEL template blocks get the virtual instance as parent
@@ -430,6 +448,9 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
         ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
         ...(isReadonly && { isReadonly: true }), // Readonly template blocks can't be edited
+        // Insert restrictions for fixed block boundaries
+        ...(!canInsertBefore && { canInsertBefore: false }),
+        ...(!canInsertAfter && { canInsertAfter: false }),
       };
 
       // RECURSE: process this block's container fields

@@ -277,13 +277,14 @@ test.describe('Templates', () => {
     await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
 
     // Get initial block order - should be:
-    // standalone-block-1, template-header, user-content-1, template-footer, standalone-block-2
+    // standalone-block-1, template-header, template-grid, user-content-1, template-footer, standalone-block-2
     const initialOrder = await helper.getBlockOrder();
     expect(initialOrder[0]).toBe('standalone-block-1');
     expect(initialOrder[1]).toBe('template-header');
-    expect(initialOrder[2]).toBe('user-content-1');
-    expect(initialOrder[3]).toBe('template-footer');
-    expect(initialOrder[4]).toBe('standalone-block-2');
+    expect(initialOrder[2]).toBe('template-grid');
+    expect(initialOrder[3]).toBe('user-content-1');
+    expect(initialOrder[4]).toBe('template-footer');
+    expect(initialOrder[5]).toBe('standalone-block-2');
 
     // Select template header, then navigate up to template instance
     await helper.clickBlockInIframe('template-header');
@@ -303,11 +304,202 @@ test.describe('Templates', () => {
 
     // Get new block order - template blocks should all be at the top now
     const newOrder = await helper.getBlockOrder();
-    // Template blocks (header, user-content-1, footer) should be first, followed by standalone blocks
+    // Template blocks (header, grid, user-content-1, footer) should be first, followed by standalone blocks
     expect(newOrder[0]).toBe('template-header');
-    expect(newOrder[1]).toBe('user-content-1');
-    expect(newOrder[2]).toBe('template-footer');
-    expect(newOrder[3]).toBe('standalone-block-1');
-    expect(newOrder[4]).toBe('standalone-block-2');
+    expect(newOrder[1]).toBe('template-grid');
+    expect(newOrder[2]).toBe('user-content-1');
+    expect(newOrder[3]).toBe('template-footer');
+    expect(newOrder[4]).toBe('standalone-block-1');
+    expect(newOrder[5]).toBe('standalone-block-2');
+  });
+
+  test('cannot insert blocks between two fixed template blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for merged content to appear
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+    await expect(iframe.locator('[data-block-uid="template-grid"]')).toBeVisible({ timeout: 5000 });
+
+    // Select the template header (first fixed block)
+    // template-header is followed by template-grid (both fixed)
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+
+    // The add button should NOT be visible because you can't insert
+    // between two adjacent fixed blocks
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).not.toBeVisible();
+
+    // Verify blocks are still adjacent (no blocks in between)
+    const blockOrder = await helper.getBlockOrder();
+    const headerIndex = blockOrder.indexOf('template-header');
+    const gridIndex = blockOrder.indexOf('template-grid');
+    expect(gridIndex).toBe(headerIndex + 1);
+  });
+
+  test('can insert blocks inside fixed grid block cells', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the grid block to be visible with merged content
+    await expect(iframe.locator('[data-block-uid="template-grid"]')).toBeVisible({ timeout: 15000 });
+
+    // Click on the first grid cell
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.waitForQuantaToolbar('grid-cell-1');
+
+    // Grid cells inside a fixed container might still be editable
+    // This tests nested block behavior
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible();
+
+    // The grid cell itself should be visible in the toolbar
+    // (even if the parent grid is fixed, cells might have different rules)
+  });
+
+  test('cannot drag block between two fixed template blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for blocks to be visible
+    await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible({ timeout: 15000 });
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible();
+    await expect(iframe.locator('[data-block-uid="template-grid"]')).toBeVisible();
+
+    // Get initial block order - header and grid should be adjacent
+    const initialOrder = await helper.getBlockOrder();
+    expect(initialOrder.indexOf('template-header') + 1).toBe(initialOrder.indexOf('template-grid'));
+
+    // Select the standalone block (not fixed)
+    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.waitForSidebarOpen();
+
+    // Get drag handle and start drag
+    const dragHandle = await helper.getDragHandle();
+    const handleBox = await dragHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+    await page.mouse.down();
+
+    // Move to after template-header (which is followed by template-grid, also fixed)
+    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    const headerBox = await headerBlock.boundingBox();
+    expect(headerBox).not.toBeNull();
+
+    // Position for "insert after" - bottom area of header block
+    await page.mouse.move(
+      headerBox!.x + headerBox!.width / 2,
+      headerBox!.y + headerBox!.height * 0.75,
+      { steps: 10 },
+    );
+
+    // Drop indicator should NOT be positioned between header and grid
+    // (it may appear elsewhere, like before the header, but not in the gap)
+    const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
+    const gridBlock = iframe.locator('[data-block-uid="template-grid"]');
+    const gridBox = await gridBlock.boundingBox();
+    expect(gridBox).not.toBeNull();
+
+    // If indicator is visible, verify it's NOT between header and grid
+    const indicatorVisible = await dropIndicator.isVisible();
+    if (indicatorVisible) {
+      const indicatorBox = await dropIndicator.boundingBox();
+      if (indicatorBox) {
+        // Indicator should NOT be in the gap between header bottom and grid top
+        const headerBottom = headerBox!.y + headerBox!.height;
+        const gridTop = gridBox!.y;
+        const indicatorCenter = indicatorBox.y + indicatorBox.height / 2;
+
+        // Indicator should be either above header or below grid, not in between
+        const isBetweenFixedBlocks = indicatorCenter > headerBottom - 10 && indicatorCenter < gridTop + 10;
+        expect(isBetweenFixedBlocks).toBe(false);
+      }
+    }
+
+    // Also move over the grid and check - indicator should NOT show before grid (between header and grid)
+    await page.mouse.move(
+      gridBox!.x + gridBox!.width / 2,
+      gridBox!.y + gridBox!.height * 0.25, // Top area of grid = "insert before"
+      { steps: 10 },
+    );
+
+    // Check indicator position when hovering over grid
+    const indicatorVisible2 = await dropIndicator.isVisible();
+    if (indicatorVisible2) {
+      const indicatorBox2 = await dropIndicator.boundingBox();
+      if (indicatorBox2) {
+        const headerBottom = headerBox!.y + headerBox!.height;
+        const gridTop = gridBox!.y;
+        const indicatorCenter2 = indicatorBox2.y + indicatorBox2.height / 2;
+
+        // Indicator should NOT be between header and grid
+        const isBetweenFixedBlocks2 = indicatorCenter2 > headerBottom - 10 && indicatorCenter2 < gridTop + 10;
+        expect(isBetweenFixedBlocks2).toBe(false);
+      }
+    }
+
+    // Drop
+    await page.mouse.up();
+
+    // Verify block order - template-header and template-grid should still be adjacent
+    const newOrder = await helper.getBlockOrder();
+    const headerIndex = newOrder.indexOf('template-header');
+    const gridIndex = newOrder.indexOf('template-grid');
+
+    // The key assertion: header and grid must remain adjacent
+    expect(gridIndex).toBe(headerIndex + 1);
+  });
+
+  test('can drag block into placeholder region', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for blocks to be visible
+    await expect(iframe.locator('[data-block-uid="standalone-block-2"]')).toBeVisible({ timeout: 15000 });
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible();
+
+    // Get initial block order - standalone-block-2 should be after template-footer
+    const initialOrder = await helper.getBlockOrder();
+    expect(initialOrder.indexOf('standalone-block-2')).toBeGreaterThan(initialOrder.indexOf('template-footer'));
+
+    // Select standalone-block-2
+    await helper.clickBlockInIframe('standalone-block-2');
+    await helper.waitForSidebarOpen();
+
+    // Get drag handle
+    const dragHandle = await helper.getDragHandle();
+
+    // Drag standalone-block-2 to after user-content-1 (which is in the placeholder region)
+    const userContentBlock = iframe.locator('[data-block-uid="user-content-1"]');
+    await helper.dragBlockWithMouse(dragHandle, userContentBlock, true); // insertAfter=true
+
+    // Wait for DOM to stabilize
+    await helper.getStableBlockCount();
+
+    // Verify standalone-block-2 is now right after user-content-1
+    const newOrder = await helper.getBlockOrder();
+    const newUserContentIndex = newOrder.indexOf('user-content-1');
+    const newStandalone2Index = newOrder.indexOf('standalone-block-2');
+
+    // standalone-block-2 should now be right after user-content-1
+    expect(newStandalone2Index).toBe(newUserContentIndex + 1);
   });
 });

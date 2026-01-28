@@ -4639,7 +4639,8 @@ export class Bridge {
       this._isDragging = true;
 
       // Get all elements for this block (multi-element blocks like listings, template instances)
-      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      // Convert NodeList to array for .map() and .includes() support
+      const allElements = [...this.getAllBlockElements(this.selectedBlockUid)];
       if (allElements.length === 0) return;
 
       // Compute bounding box for all elements
@@ -4891,7 +4892,32 @@ export class Bridge {
           // Determine insertion point based on mouse position relative to block center
           const mousePos = isHorizontal ? e.clientX - rect.left : e.clientY - rect.top;
           const blockSize = isHorizontal ? rect.width : rect.height;
-          insertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
+          const preferredInsertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
+
+          // Check if insert position is allowed (not between two fixed template blocks)
+          const targetPathInfo = this.blockPathMap?.[closestBlockUid];
+          const canInsertBefore = targetPathInfo?.canInsertBefore !== false;
+          const canInsertAfter = targetPathInfo?.canInsertAfter !== false;
+
+          // Use preferred position if allowed, otherwise try the other side
+          if (preferredInsertAt === 0 && canInsertBefore) {
+            insertAt = 0;
+          } else if (preferredInsertAt === 1 && canInsertAfter) {
+            insertAt = 1;
+          } else if (canInsertBefore) {
+            insertAt = 0;
+          } else if (canInsertAfter) {
+            insertAt = 1;
+          } else {
+            // Neither side is allowed - hide indicator
+            const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (existingIndicator) {
+              existingIndicator.style.display = 'none';
+            }
+            dropIndicatorVisible = false;
+            closestBlockUid = null;
+            return;
+          }
 
           // For multi-element blocks, use first or last element for indicator positioning
           if (isMultiElement) {

@@ -32,6 +32,29 @@
         "placeholderName": "header"
       }
     },
+    "template-grid": {
+      "@type": "gridBlock",
+      "fixed": true,
+      "readOnly": true,
+      "blocks": {
+        "grid-cell-1": {
+          "@type": "slate",
+          "value": [{ "type": "p", "children": [{ "text": "Stale Grid Cell 1" }] }],
+          "plaintext": "Stale Grid Cell 1"
+        },
+        "grid-cell-2": {
+          "@type": "slate",
+          "value": [{ "type": "p", "children": [{ "text": "Stale Grid Cell 2" }] }],
+          "plaintext": "Stale Grid Cell 2"
+        }
+      },
+      "blocks_layout": { "items": ["grid-cell-1", "grid-cell-2"] },
+      "_templateSource": {
+        "instanceId": "tpl-instance-1",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "grid"
+      }
+    },
     "user-content-1": {
       "@type": "slate",
       "value": [
@@ -76,7 +99,7 @@
     }
   },
   "blocks_layout": {
-    "items": ["standalone-block-1", "template-header", "user-content-1", "template-footer", "standalone-block-2"]
+    "items": ["standalone-block-1", "template-header", "template-grid", "user-content-1", "template-footer", "standalone-block-2"]
   },
   "@components": {
     "actions": {

@@ -2614,8 +2614,15 @@ const Iframe = (props) => {
 
           {/* Add Button - positioned based on data-block-add direction */}
           {blockUI.addDirection !== 'hidden' && (() => {
-            // Check if container is at maxLength
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
+
+            // Don't show add button if inserting after this block is not allowed
+            // (e.g., between two fixed template blocks)
+            if (pathInfo?.canInsertAfter === false) {
+              return null;
+            }
+
+            // Check if container is at maxLength
             if (pathInfo?.maxSiblings) {
               // Count siblings in the same container field
               // Must match both parentId AND containerField (for multi-field containers like columns with top_images + columns)
