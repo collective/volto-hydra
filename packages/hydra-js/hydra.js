@@ -140,6 +140,10 @@ export class Bridge {
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
+    // Track active prospective inline element (link/format with ZWS) for Chrome workaround.
+    // Chrome always positions cursor outside <a> elements, unlike <span> for bold.
+    // See: https://www.w3.org/community/editing/wiki/ContentEditable
+    this.prospectiveInlineElement = null;
     // Path transformer for frontends that embed state in URL (e.g., paging)
     this.pathToApiPath = options.pathToApiPath || ((path) => path);
     // Readonly registry - blocks marked readonly won't have fields collected
@@ -5180,6 +5184,51 @@ export class Bridge {
       }
       editableField._hydraListenersAttached = true;
 
+      // Handle Chrome's cursor-outside-anchor quirk for prospective inline elements.
+      // Chrome moves cursor outside <a> elements during text insertion.
+      // We intercept beforeinput to manually insert text into the prospective inline.
+      // See: https://www.w3.org/community/editing/wiki/ContentEditable
+      //      https://github.com/ianstormtaylor/slate/issues/4704
+      editableField.addEventListener('beforeinput', (e) => {
+        // Handle Chrome's cursor-outside-anchor quirk for prospective inline elements.
+        // Chrome moves cursor outside <a> elements DURING DOM insertion (after keydown/beforeinput).
+        // We intercept beforeinput and manually insert text into the prospective inline.
+        // See: https://www.w3.org/community/editing/wiki/ContentEditable
+        //      https://github.com/ianstormtaylor/slate/issues/4704
+        if (e.inputType !== 'insertText' || !e.data) return;
+        if (!this.prospectiveInlineElement) return;
+
+        const prospectiveInline = this.prospectiveInlineElement;
+        if (!prospectiveInline.isConnected) {
+          this.prospectiveInlineElement = null;
+          return;
+        }
+
+        // Redirect text into prospective inline
+        e.preventDefault();
+
+        // Find the text node inside the inline
+        let inlineTextNode = null;
+        for (const child of prospectiveInline.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            inlineTextNode = child;
+            break;
+          }
+        }
+
+        if (inlineTextNode) {
+          // Insert the character at the end of the inline's text
+          const selection = window.getSelection();
+          inlineTextNode.textContent += e.data;
+          // Position cursor at end
+          const newRange = document.createRange();
+          newRange.setStart(inlineTextNode, inlineTextNode.textContent.length);
+          newRange.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+      });
+
       // Add paste event listener
       editableField.addEventListener('paste', (e) => {
         e.preventDefault(); // Prevent default paste
@@ -5216,6 +5265,14 @@ export class Bridge {
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
       editableField.addEventListener('keydown', (e) => {
+        // Clear prospective inline on navigation keys (user intentionally leaving the inline)
+        const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
+        const isNavigationKey = navigationKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;
+        if (isNavigationKey && this.prospectiveInlineElement) {
+          log('Clearing prospective inline due to navigation key:', e.key);
+          this.prospectiveInlineElement = null;
+        }
+
         // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
         // to prevent native formatting from conflicting with Slate-based formatting
         const nativeFormattingKeys = ['b', 'i', 'u', 's'];
@@ -6065,6 +6122,8 @@ export class Bridge {
               const zwsNode = document.createTextNode('\uFEFF');
               targetElement.appendChild(zwsNode);
               log('restoreSlateSelection: prospective formatting - created ZWS inside empty inline:', result.nodeId);
+              // Track this as the active prospective inline (for handling Chrome's cursor-outside-anchor quirk)
+              this.prospectiveInlineElement = targetElement;
               return { node: zwsNode, offset: 1 }; // Position after ZWS
             }
           }

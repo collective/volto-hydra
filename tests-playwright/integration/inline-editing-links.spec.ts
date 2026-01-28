@@ -3,7 +3,6 @@
  *
  * TODO - additional tests and bugs:
  * - Bug - I can clear a link in the sidebar (causes path exception currently)
- * - click link without selection and then type - should create link?
  * - paste a link
  */
 import { test, expect } from '../fixtures';
@@ -474,6 +473,46 @@ test.describe('Inline Editing - Links', () => {
     // Verify link button is still NOT active
     await expect(async () => {
       expect(await helper.isActiveFormatButton('link')).toBe(false);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('prospective link: click link button without selection, then type', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Type some text - cursor ends up at the end with no selection (collapsed)
+    await helper.editBlockTextInIframe(blockId, 'Hello ');
+    const editor = await helper.getEditorLocator(blockId);
+
+    // Click the link button with no text selected (prospective link)
+    await helper.clickFormatButton('link');
+
+    // Enter URL and submit
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+    await linkUrlInput.fill('https://plone.org');
+    await linkUrlInput.press('Enter');
+
+    // Wait for LinkEditor to close
+    await helper.waitForLinkEditorToClose();
+
+    // Wait for editor to be focused again
+    await helper.waitForEditorFocus(editor);
+
+    // Type text - it should go inside the link
+    await editor.pressSequentially('world', { delay: 10 });
+
+    // Verify typed text is inside a link
+    await expect(async () => {
+      const blockHtml = await editor.innerHTML();
+      expect(blockHtml).toContain('<a ');
+      expect(blockHtml).toContain('https://plone.org');
+      // The link should contain the typed text
+      const linkText = await editor.locator('a').textContent();
+      expect(linkText).toContain('world');
     }).toPass({ timeout: 5000 });
   });
 
