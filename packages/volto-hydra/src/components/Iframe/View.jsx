@@ -552,6 +552,10 @@ const Iframe = (props) => {
   // Used for comparison on save to detect template changes
   const templateCacheRef = useRef({});
 
+  // Pending INITIAL_DATA: when templates are loading during INIT, store data here
+  // Sync effect will send INITIAL_DATA after templates are merged
+  const pendingInitialDataRef = useRef(null);
+
   // Handle Escape key in Admin UI to navigate to parent block
   // This is needed because when selecting via sidebar, focus stays in Admin UI,
   // not iframe, so the iframe's Escape handler doesn't receive the event.
@@ -1783,7 +1787,20 @@ const Iframe = (props) => {
             break;
           }
 
-          // 8. Send INITIAL_DATA to iframe
+          // 8. Check if templates need loading - if so, defer INITIAL_DATA until after merge
+          const templateIds = getUniqueTemplateIds(formWithDefaults);
+          const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
+          if (unloadedTemplates.length > 0) {
+            log('[INIT] Templates loading, deferring INITIAL_DATA until merge completes');
+            pendingInitialDataRef.current = {
+              source: event.source,
+              origin: event.origin,
+              blockFieldTypes: initialBlockFieldTypes,
+            };
+            break;
+          }
+
+          // 9. Send INITIAL_DATA to iframe
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
           event.source.postMessage(
             {
@@ -1799,10 +1816,6 @@ const Iframe = (props) => {
             event.origin,
           );
 
-          // 9. Trigger UNIFIED FORM SYNC now that iframeOriginRef is set
-          // This allows template merge to run (it needs iframeOriginRef)
-          // formWithDefaults may have schema defaults that differ from properties
-          onChangeFormData(formWithDefaults);
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -1897,14 +1910,9 @@ const Iframe = (props) => {
       return;
     }
 
-    // Case 2: Form properties changed (sidebar edit, block add, etc.)
-    if (!formToUse || !iframeOriginRef.current) {
-      return;
-    }
-
     // Template Merge on Access: Check if templates need loading and merging
-    // Fetch async in background - when done, merge and update Redux, which triggers another sync
-    // Don't block the normal flow - unmerged data is sent first, merged data follows
+    // This runs BEFORE iframe check - templates can be fetched as soon as formData is available
+    // When fetch completes, onChangeFormData updates Redux, which triggers another sync
     if (formToUse?.blocks) {
       const templateIds = getUniqueTemplateIds(formToUse);
       // Skip templates already in cache OR marked as failed (null)
@@ -1947,17 +1955,55 @@ const Iframe = (props) => {
             }),
           );
 
-          if (Object.keys(newTemplates).length === 0) return;
+          if (Object.keys(newTemplates).length === 0) {
+            // No templates loaded, but check if INITIAL_DATA is pending
+            if (pendingInitialDataRef.current) {
+              const { source, origin, blockFieldTypes } = pendingInitialDataRef.current;
+              const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+              const blockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+              source.postMessage({
+                type: 'INITIAL_DATA',
+                data: formToUse,
+                blockFieldTypes,
+                blockPathMap,
+                slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+              }, origin);
+              pendingInitialDataRef.current = null;
+            }
+            return;
+          }
 
           // Update template cache ref
           templateCacheRef.current = { ...templateCacheRef.current, ...newTemplates };
 
-          // Merge template content and update Redux - triggers another sync cycle
+          // Merge template content
           log('[TEMPLATE MERGE] Merging templates:', Object.keys(newTemplates));
           const mergedFormData = mergeTemplateContent(formToUse, templateCacheRef.current);
+
+          // If INITIAL_DATA was deferred, send it now with merged data
+          if (pendingInitialDataRef.current) {
+            const { source, origin, blockFieldTypes } = pendingInitialDataRef.current;
+            const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+            const blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
+            source.postMessage({
+              type: 'INITIAL_DATA',
+              data: mergedFormData,
+              blockFieldTypes,
+              blockPathMap,
+              slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+            }, origin);
+            pendingInitialDataRef.current = null;
+          }
+
+          // Update Redux - triggers another sync cycle
           onChangeFormData(mergedFormData);
         })();
       }
+    }
+
+    // Case 2: Form properties changed (sidebar edit, block add, etc.)
+    if (!formToUse || !iframeOriginRef.current) {
+      return;
     }
 
     // Skip if properties has an older sequence than what we've already sent
