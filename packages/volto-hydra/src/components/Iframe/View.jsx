@@ -1799,10 +1799,6 @@ const Iframe = (props) => {
             event.origin,
           );
 
-          // 9. Trigger UNIFIED FORM SYNC now that iframeOriginRef is set
-          // This allows template merge to run (it needs iframeOriginRef)
-          // formWithDefaults may have schema defaults that differ from properties
-          onChangeFormData(formWithDefaults);
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -1897,14 +1893,9 @@ const Iframe = (props) => {
       return;
     }
 
-    // Case 2: Form properties changed (sidebar edit, block add, etc.)
-    if (!formToUse || !iframeOriginRef.current) {
-      return;
-    }
-
     // Template Merge on Access: Check if templates need loading and merging
-    // Fetch async in background - when done, merge and update Redux, which triggers another sync
-    // Don't block the normal flow - unmerged data is sent first, merged data follows
+    // This runs BEFORE iframe check - templates can be fetched as soon as formData is available
+    // When fetch completes, onChangeFormData updates Redux, which triggers another sync
     if (formToUse?.blocks) {
       const templateIds = getUniqueTemplateIds(formToUse);
       // Skip templates already in cache OR marked as failed (null)
@@ -1958,6 +1949,11 @@ const Iframe = (props) => {
           onChangeFormData(mergedFormData);
         })();
       }
+    }
+
+    // Case 2: Form properties changed (sidebar edit, block add, etc.)
+    if (!formToUse || !iframeOriginRef.current) {
+      return;
     }
 
     // Skip if properties has an older sequence than what we've already sent
