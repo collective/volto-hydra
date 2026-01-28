@@ -5223,11 +5223,16 @@ export class Bridge {
               element = document.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
             }
           } else {
-            element = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+            // Use getAllBlockElements to handle template instances (virtual containers)
+            // which don't have their own DOM element but have child block elements
+            const elements = this.getAllBlockElements(this.selectedBlockUid);
+            element = elements[0] || null;
           }
 
           if (element) {
-            this.sendBlockSelected('scrollHandler', element);
+            // Pass blockUid explicitly to preserve template instance selection
+            // (element may be a child block with different UID)
+            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid });
           }
         }
       }, 150);
@@ -5243,12 +5248,13 @@ export class Bridge {
     const handleResize = () => {
       // After resize, re-send BLOCK_SELECTED with updated positions
       if (this.selectedBlockUid) {
-        const blockElement = document.querySelector(
-          `[data-block-uid="${this.selectedBlockUid}"]`,
-        );
+        // Use getAllBlockElements to handle template instances (virtual containers)
+        const elements = this.getAllBlockElements(this.selectedBlockUid);
+        const blockElement = elements[0] || null;
 
         if (blockElement) {
-          this.sendBlockSelected('resizeHandler', blockElement);
+          // Pass blockUid explicitly to preserve template instance selection
+          this.sendBlockSelected('resizeHandler', blockElement, { blockUid: this.selectedBlockUid });
         }
       }
     };

@@ -21,6 +21,7 @@ import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import LayoutSelector from './LayoutSelector';
+import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
 
 const messages = defineMessages({
   blocks: {
@@ -120,7 +121,27 @@ const ContainerFieldSection = ({
   onChangeFormData,
 }) => {
   const intl = useIntl();
-  const canAdd = !maxLength || childBlocks.length < maxLength;
+  const hydraContext = useHydraSchemaContext();
+  const blockPathMap = hydraContext?.blockPathMap;
+
+  // Check if we can add based on maxLength
+  const maxLengthOk = !maxLength || childBlocks.length < maxLength;
+
+  // Check if there are any valid insertion points
+  // If container is empty, we can add. Otherwise, check if any block allows insertion.
+  let hasInsertionPoint = childBlocks.length === 0;
+  if (!hasInsertionPoint && blockPathMap) {
+    for (const child of childBlocks) {
+      const pathInfo = blockPathMap[child.id];
+      // Can insert after this block OR can insert before first block
+      if (pathInfo?.canInsertAfter !== false || pathInfo?.canInsertBefore !== false) {
+        hasInsertionPoint = true;
+        break;
+      }
+    }
+  }
+
+  const canAdd = maxLengthOk && hasInsertionPoint;
 
   // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
   const childList = childBlocks.map((child) => [child.id, child]);

@@ -425,7 +425,7 @@ test.describe('Templates', () => {
     expect(gridIndex).toBe(headerIndex + 1);
   });
 
-  test('can insert blocks inside fixed grid block cells', async ({ page }) => {
+  test('cannot insert blocks at container edges around fixed nested block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -436,17 +436,15 @@ test.describe('Templates', () => {
     // Wait for the grid block to be visible with merged content
     await expect(iframe.locator('[data-block-uid="template-grid"]')).toBeVisible({ timeout: 15000 });
 
-    // Click on the first grid cell (merged from template with ID template-grid-cell-1)
+    // Click on the fixed grid cell (it's the only block in the grid, so it's at both edges)
     await helper.clickBlockInIframe('template-grid-cell-1');
     await helper.waitForQuantaToolbar('template-grid-cell-1');
 
-    // Grid cells inside a fixed container might still be editable
-    // This tests nested block behavior
-    const toolbar = page.locator('.quanta-toolbar');
-    await expect(toolbar).toBeVisible();
-
-    // The grid cell itself should be visible in the toolbar
-    // (even if the parent grid is fixed, cells might have different rules)
+    // The add button should NOT be visible because:
+    // 1. It's a fixed block at the end of the container (no placeholder after it)
+    // 2. Can't insert between fixed block and container edge
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).not.toBeVisible();
   });
 
   test('cannot drag block between two fixed template blocks', async ({ page }) => {
@@ -584,5 +582,36 @@ test.describe('Templates', () => {
 
     // standalone-block-2 should now be right after user-content-1
     expect(newStandalone2Index).toBe(newUserContentIndex + 1);
+  });
+
+  test('template instance toolbar remains visible after scrolling', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for template blocks to be visible
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Select template header, then Escape to navigate up to template instance
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+    await page.keyboard.press('Escape');
+
+    // Template instance child block IDs (the outline should cover all of these)
+    const templateChildBlocks = ['template-header', 'template-grid', 'user-content-1', 'user-content-2', 'template-footer'];
+
+    // Wait for template instance toolbar to be positioned correctly
+    await helper.waitForQuantaToolbar(templateChildBlocks);
+
+    // Scroll the iframe content down
+    await iframe.locator('body').evaluate((body) => body.ownerDocument.defaultView?.scrollBy(0, 200));
+
+    // BUG: After scrolling, the toolbar should still be visible and positioned
+    // correctly for the template instance. The instance is still selected
+    // (shows in sidebar) but toolbar/outline disappears from iframe.
+    await helper.waitForQuantaToolbar(templateChildBlocks);
   });
 });

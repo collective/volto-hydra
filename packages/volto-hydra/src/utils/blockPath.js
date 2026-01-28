@@ -391,13 +391,19 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const isReadonly = block.readOnly === true;  // Volto standard: content locked
 
       // Check if inserting before/after this block is allowed
-      // Can't insert between two adjacent fixed blocks
+      // Can't insert:
+      // 1. Between two adjacent fixed blocks
+      // 2. Before a fixed block at container start (no placeholder there)
+      // 3. After a fixed block at container end (no placeholder there)
       const prevBlockId = layout[index - 1];
       const nextBlockId = layout[index + 1];
       const prevBlockIsFixed = prevBlockId ? blockFixedStatus[prevBlockId] : false;
       const nextBlockIsFixed = nextBlockId ? blockFixedStatus[nextBlockId] : false;
-      const canInsertBefore = !(isFixed && prevBlockIsFixed);
-      const canInsertAfter = !(isFixed && nextBlockIsFixed);
+      const atContainerStart = index === 0;
+      const atContainerEnd = index === layout.length - 1;
+      // Fixed block at edge OR between two fixed blocks = can't insert
+      const canInsertBefore = !(isFixed && (atContainerStart || prevBlockIsFixed));
+      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed));
 
       // Template instance virtual container
       // Only FIRST-LEVEL template blocks get the virtual instance as parent

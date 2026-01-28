@@ -861,20 +861,26 @@ export class AdminUIHelper {
   /**
    * Wait for the Quanta toolbar to appear on a block and scroll it into view.
    * Also verifies the toolbar is not covered by the sidebar.
+   * For template instances, pass an array of child block IDs to verify combined bounds.
    */
-  async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
-    // Scroll block into view FIRST - toolbar is hidden when block is out of viewport
-    await this.scrollBlockIntoViewWithToolbarRoom(blockId);
+  async waitForQuantaToolbar(blockIds: string | string[], timeout: number = 10000): Promise<void> {
+    // Normalize to array
+    const ids = Array.isArray(blockIds) ? blockIds : [blockIds];
+    const firstBlockId = ids[0];
+    const displayId = Array.isArray(blockIds) ? `[${ids.length} blocks]` : blockIds;
 
-    // Wait until toolbar is positioned correctly relative to the block
+    // Scroll first block into view - toolbar is hidden when block is out of viewport
+    await this.scrollBlockIntoViewWithToolbarRoom(firstBlockId);
+
+    // Wait until toolbar is positioned correctly relative to the block(s)
     // (isBlockSelectedInIframe checks visibility AND positioning)
     let lastReason = '';
     await expect.poll(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res: any = await this.isBlockSelectedInIframe(blockId);
+      const res: any = await this.isBlockSelectedInIframe(ids);
       if (typeof res === 'boolean') return res;
       if (res?.reason && res.reason !== lastReason) {
-        console.log(`[waitForQuantaToolbar] ${blockId}: ${res.reason}`);
+        console.log(`[waitForQuantaToolbar] ${displayId}: ${res.reason}`);
         lastReason = res.reason;
       }
       return !!res && !!res.ok;
@@ -884,7 +890,7 @@ export class AdminUIHelper {
     // the toolbar has re-adjusted its position correctly
     await expect.poll(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res: any = await this.isBlockSelectedInIframe(blockId);
+      const res: any = await this.isBlockSelectedInIframe(ids);
       if (typeof res === 'boolean') return res;
       return !!res && !!res.ok;
     }, { timeout: 5000 }).toBeTruthy();
@@ -1426,8 +1432,11 @@ export class AdminUIHelper {
    * 2. They are positioned correctly relative to the block (toolbar above, add button below)
    * 3. Elements are horizontally aligned with the block
    */
-  async isBlockSelectedInIframe(blockId: string): Promise<{ ok: boolean; reason?: string }> {
+  async isBlockSelectedInIframe(blockIds: string | string[]): Promise<{ ok: boolean; reason?: string }> {
     try {
+      // Normalize to array
+      const ids = Array.isArray(blockIds) ? blockIds : [blockIds];
+
       // Verify essential UI overlays are visible (toolbar and outline)
       // Note: add button visibility/positioning is checked separately by verifyBlockUIPositioning
       const toolbar = this.page.locator('.quanta-toolbar');
@@ -1443,8 +1452,9 @@ export class AdminUIHelper {
         };
       }
 
-      // Verify the outline covers THIS specific block
-      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      // Verify the outline covers the block(s)
+      // For multiple blocks, compute combined bounding box
+      const blockBox = await this.getCombinedBlockBoundingBox(ids);
       const outlineBox = await this.getBlockOutlineBoundingBox();
 
       if (!blockBox || !outlineBox) {
@@ -1629,6 +1639,35 @@ export class AdminUIHelper {
 
     // Convert from iframe page coordinates to parent window coordinates
     return await this.getBoundsInParentCoordinates(blockBox);
+  }
+
+  /**
+   * Get the combined bounding box for one or more blocks.
+   * For template instances, pass all child block IDs to get the combined bounds.
+   */
+  async getCombinedBlockBoundingBox(blockIds: string[]): Promise<{ x: number; y: number; width: number; height: number } | null> {
+    if (blockIds.length === 0) return null;
+
+    if (blockIds.length === 1) {
+      return await this.getBlockBoundingBoxInIframe(blockIds[0]);
+    }
+
+    // Multiple blocks - compute combined bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const blockId of blockIds) {
+      const box = await this.getBlockBoundingBoxInIframe(blockId);
+      if (box) {
+        minX = Math.min(minX, box.x);
+        minY = Math.min(minY, box.y);
+        maxX = Math.max(maxX, box.x + box.width);
+        maxY = Math.max(maxY, box.y + box.height);
+      }
+    }
+
+    if (minX === Infinity) return null;
+
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
   /**
