@@ -1,0 +1,313 @@
+/**
+ * Integration tests for template functionality in Volto Hydra.
+ *
+ * Tests that:
+ * 1. Template content is merged on page load (fixed blocks get content from template)
+ * 2. Fixed template blocks show lock icon instead of drag handle
+ * 3. Fixed template blocks cannot be edited or deleted
+ * 4. Placeholder content remains fully editable
+ */
+import { test, expect } from '../fixtures';
+import { AdminUIHelper } from '../helpers/AdminUIHelper';
+
+test.describe('Templates', () => {
+  test('template content is merged on page load', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the fixed template block (header) to be visible
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // The header should show content from the TEMPLATE, not the stale page content
+    // Page has "Stale Header - Should Be Replaced By Merge"
+    // Template has "Template Header - From Template"
+    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    await expect(headerBlock).toContainText('Template Header - From Template');
+    await expect(headerBlock).not.toContainText('Stale Header');
+
+    // User content in placeholder should be preserved (not replaced)
+    const userContent = iframe.locator('[data-block-uid="user-content-1"]');
+    await expect(userContent).toContainText('This is user content that can be edited');
+  });
+
+  test('merged template content persists after editing placeholder', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for merged content to appear
+    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
+
+    // Edit the placeholder content (user-content-1)
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForQuantaToolbar('user-content-1');
+
+    const userBlock = iframe.locator('[data-block-uid="user-content-1"]');
+    const editor = helper.getSlateField(userBlock);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Type something new
+    await editor.click();
+    await page.keyboard.type(' - EDITED');
+
+    // Wait for the edit to propagate (FORM_DATA sent back to frontend)
+    await page.waitForTimeout(500);
+
+    // The merged template header should STILL show template content, not stale page content
+    // This catches the bug where edits trigger a re-merge or reload
+    await expect(headerBlock).toContainText('Template Header - From Template');
+    await expect(headerBlock).not.toContainText('Stale Header');
+
+    // Footer should also still have merged content
+    const footerBlock = iframe.locator('[data-block-uid="template-footer"]');
+    await expect(footerBlock).toContainText('Template Footer - From Template');
+    await expect(footerBlock).not.toContainText('Stale Footer');
+  });
+
+  test('fixed template blocks show lock icon instead of drag handle', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the fixed template block (header) to be visible
+    // The template-test-page has pre-applied template with fixed header block
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Click the fixed template block
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+
+    // The toolbar is rendered in admin UI
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible();
+
+    // Lock icon should be visible instead of drag handle
+    const lockIcon = toolbar.locator('.lock-icon');
+    await expect(lockIcon).toBeVisible();
+
+    // Drag handle should NOT be visible for fixed template blocks
+    const dragHandle = toolbar.locator('.drag-handle');
+    await expect(dragHandle).not.toBeVisible();
+  });
+
+  test('fixed template blocks cannot be edited', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for merged content to appear (template merge must complete)
+    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
+
+    // Click the fixed template block
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+
+    // 1. Check inline editing is disabled (contenteditable should not be true)
+    const h1Element = headerBlock.locator('h1');
+    await expect(h1Element).toBeVisible();
+    const isEditable = await h1Element.getAttribute('contenteditable');
+    expect(isEditable).not.toBe('true');
+
+    // 2. Check toolbar has NO slate formatting buttons (Bold, Italic, etc.)
+    const toolbarButtons = await helper.getQuantaToolbarButtons();
+    const buttonTitles = toolbarButtons.filter(b => b.visible).map(b => b.title.toLowerCase());
+
+    // Slate formatting buttons should NOT be visible for readonly blocks
+    expect(buttonTitles).not.toContain('bold');
+    expect(buttonTitles).not.toContain('italic');
+    expect(buttonTitles).not.toContain('underline');
+    expect(buttonTitles).not.toContain('strikethrough');
+
+    // 3. Check sidebar does NOT have editable value field
+    await helper.waitForSidebarOpen();
+
+    // The sidebar should NOT have a 'value' field (the slate content field)
+    // Readonly blocks don't expose their content for editing in sidebar
+    const hasValueField = await helper.hasSidebarField('value');
+    expect(hasValueField).toBe(false);
+
+    // 4. Try typing in iframe - nothing should happen
+    await h1Element.click();
+    const textBefore = await h1Element.textContent();
+    await page.keyboard.type('SHOULD NOT APPEAR');
+    const textAfter = await h1Element.textContent();
+    expect(textAfter).toBe(textBefore);
+  });
+
+  test('fixed template blocks cannot be deleted', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for the fixed template block
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Click the fixed template block
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+
+    // Open the toolbar menu
+    await helper.openQuantaToolbarMenu('template-header');
+    const menuOptions = await helper.getQuantaToolbarMenuOptions('template-header');
+    const optionLabels = menuOptions.map(o => o.toLowerCase());
+
+    // Should NOT have delete/remove option
+    expect(optionLabels).not.toContain('remove');
+    expect(optionLabels).not.toContain('delete');
+  });
+
+  test('placeholder content is fully editable', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for user content block (in placeholder region)
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
+
+    // Click the user content block
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForQuantaToolbar('user-content-1');
+
+    // The toolbar (in admin UI) should show drag handle (not lock)
+    const toolbar = page.locator('.quanta-toolbar');
+    const dragHandle = toolbar.locator('.drag-handle');
+    await expect(dragHandle).toBeVisible();
+
+    // Lock icon should NOT be visible
+    const lockIcon = toolbar.locator('.lock-icon');
+    await expect(lockIcon).not.toBeVisible();
+
+    // Content should be editable
+    const userBlock = iframe.locator('[data-block-uid="user-content-1"]');
+    const editor = helper.getSlateField(userBlock);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Should have delete option in menu
+    await helper.openQuantaToolbarMenu('user-content-1');
+    const menuOptions = await helper.getQuantaToolbarMenuOptions('user-content-1');
+    const optionLabels = menuOptions.map(o => o.toLowerCase());
+    expect(optionLabels.some(o => o.includes('remove') || o.includes('delete'))).toBe(true);
+  });
+
+  // Phase 2: Virtual Container Tests
+
+  test('sidebar shows template instance in hierarchy when selecting template block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Click the template header block
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForSidebarOpen();
+
+    // Sidebar should show hierarchy: Page > Template Instance > Text (block title)
+    // The template instance uses "Template: {path}" format
+    const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
+    await expect(stickyHeaders).toHaveCount(3);
+    await expect(stickyHeaders.nth(0)).toContainText('Page');
+    await expect(stickyHeaders.nth(1)).toContainText('Template: test-layout');
+    await expect(stickyHeaders.nth(2)).toContainText('Text'); // slate block's display name
+  });
+
+  test('Escape key navigates up to template instance', async ({ page }) => {
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Click the template header block
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForSidebarOpen();
+
+    // Initially 3 headers: Page > Template Instance > Slate
+    const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
+    await expect(stickyHeaders).toHaveCount(3);
+
+    // Press Escape to navigate up to template instance
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Now should have 2 headers: Page > Template Instance
+    await expect(stickyHeaders).toHaveCount(2);
+    await expect(stickyHeaders.nth(1)).toContainText('Template: test-layout');
+
+    // Sidebar should show placeholder children of the template
+    const childBlocksList = page.locator('.child-blocks-list');
+    await expect(childBlocksList).toBeVisible();
+  });
+
+  test('dragging template instance moves all template blocks together', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+    // Wait for all blocks to be visible
+    await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible({ timeout: 15000 });
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Get initial block order - should be:
+    // standalone-block-1, template-header, user-content-1, template-footer, standalone-block-2
+    const initialOrder = await helper.getBlockOrder();
+    expect(initialOrder[0]).toBe('standalone-block-1');
+    expect(initialOrder[1]).toBe('template-header');
+    expect(initialOrder[2]).toBe('user-content-1');
+    expect(initialOrder[3]).toBe('template-footer');
+    expect(initialOrder[4]).toBe('standalone-block-2');
+
+    // Select template header, then navigate up to template instance
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+    await page.keyboard.press('Escape');
+
+    // Wait for the template instance toolbar to appear with a drag handle
+    // Template instances are virtual (no DOM element), so just check toolbar visibility
+    const toolbar = page.locator('.quanta-toolbar');
+    const dragHandle = toolbar.locator('.drag-handle');
+    await expect(dragHandle).toBeVisible({ timeout: 5000 });
+
+    // Drag the template instance before standalone-block-1
+    // This moves the entire template (header + user-content + footer) to the top
+    const standaloneBlock1 = iframe.locator('[data-block-uid="standalone-block-1"]');
+    await helper.dragBlockWithMouse(dragHandle, standaloneBlock1, false); // insertAfter=false means before
+
+    // Get new block order - template blocks should all be at the top now
+    const newOrder = await helper.getBlockOrder();
+    // Template blocks (header, user-content-1, footer) should be first, followed by standalone blocks
+    expect(newOrder[0]).toBe('template-header');
+    expect(newOrder[1]).toBe('user-content-1');
+    expect(newOrder[2]).toBe('template-footer');
+    expect(newOrder[3]).toBe('standalone-block-1');
+    expect(newOrder[4]).toBe('standalone-block-2');
+  });
+});

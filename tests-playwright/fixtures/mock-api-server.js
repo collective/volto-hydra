@@ -92,8 +92,9 @@ app.use((req, res, next) => {
   const parsedUrl = url.parse(req.url, true);
   let cleanPath = parsedUrl.pathname;
 
-  // Check if this is an API request (contains ++api++ prefix)
-  req.isApiRequest = cleanPath.includes('++api++');
+  // Check if this is an API request (contains ++api++ prefix or Accept: application/json header)
+  const acceptHeader = req.headers.accept || '';
+  req.isApiRequest = cleanPath.includes('++api++') || acceptHeader.includes('application/json');
 
   // Handle full VHM path: /VirtualHostBase/http/localhost:8888/++api++/VirtualHostRoot/@login
   const vhmPattern = /^\/VirtualHostBase\/[^/]+\/[^/]+\/\+\+api\+\+\/VirtualHostRoot(.*)$/;

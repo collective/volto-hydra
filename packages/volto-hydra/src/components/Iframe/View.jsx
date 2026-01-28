@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplateContent } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -547,6 +547,10 @@ const Iframe = (props) => {
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
   }));
+
+  // Template cache: stores loaded template documents keyed by templateId
+  // Used for comparison on save to detect template changes
+  const templateCacheRef = useRef({});
 
   // Handle Escape key in Admin UI to navigate to parent block
   // This is needed because when selecting via sidebar, focus stays in Admin UI,
@@ -1352,27 +1356,63 @@ const Iframe = (props) => {
           const currentFormData = properties;
           const currentBlockPathMap = buildBlockPathMap(currentFormData, config.blocks.blocksConfig, intl);
 
+          // Check if this is a template instance (virtual container with child blocks)
+          const isTemplateInstance = currentBlockPathMap[blockId]?.isTemplateInstance;
+
+          // Get all blocks to move - for template instances, get all child blocks in order
+          let blocksToMove;
+          if (isTemplateInstance) {
+            // Get child blocks of the template instance, maintaining their relative order
+            // by filtering the parent's blocks_layout
+            const parentId = currentBlockPathMap[blockId]?.parentId || 'page';
+            const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
+            const containerField = currentBlockPathMap[blockId]?.containerField || 'blocks_layout';
+            const layoutItems = parentBlock?.[containerField]?.items || parentBlock?.blocks_layout?.items || [];
+
+            // Find all child blocks of this template instance in layout order
+            blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
+            console.log('[MOVE_BLOCK] template instance - moving blocks:', blocksToMove);
+          } else {
+            blocksToMove = [blockId];
+          }
+
           // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
           // Only needed when moving to a different container
+          const firstBlockId = blocksToMove[0];
           const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
-            ? getContainerFieldConfig(blockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
+            ? getContainerFieldConfig(firstBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
             : null;
 
-          // Use moveBlockBetweenContainers utility to handle all cases:
-          // - Same container reordering
-          // - Different container moves
-          // - Page ↔ container moves
-          let newFormData = moveBlockBetweenContainers(
-            currentFormData,
-            currentBlockPathMap,
-            blockId,
-            targetBlockId,
-            insertAfter,
-            sourceParentId,
-            targetParentId,
-            blocksConfig,
-            intl,
-          );
+          // Move all blocks in sequence, each one after the previous
+          let newFormData = currentFormData;
+          let currentTarget = targetBlockId;
+          let currentInsertAfter = insertAfter;
+
+          for (let i = 0; i < blocksToMove.length; i++) {
+            const moveBlockId = blocksToMove[i];
+            const updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+
+            newFormData = moveBlockBetweenContainers(
+              newFormData,
+              updatedPathMap,
+              moveBlockId,
+              currentTarget,
+              currentInsertAfter,
+              sourceParentId,
+              targetParentId,
+              blocksConfig,
+              intl,
+            );
+
+            if (!newFormData) {
+              console.log('[MOVE_BLOCK] moveBlockBetweenContainers failed for:', moveBlockId);
+              break;
+            }
+
+            // After first block, subsequent blocks go after the previous one
+            currentTarget = moveBlockId;
+            currentInsertAfter = true;
+          }
           console.log('[MOVE_BLOCK] moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
@@ -1452,6 +1492,7 @@ const Iframe = (props) => {
           }
 
           log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
+          console.log('[VIEW-DEBUG] BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect);
 
           // Update lastSentSelectBlockRef to match iframe's selection
           // This is critical: when iframe confirms a selection, our ref must match
@@ -1479,6 +1520,7 @@ const Iframe = (props) => {
           }
 
           // Now update blockUI state
+          console.log('[VIEW-DEBUG] About to call setBlockUI for:', event.data.blockUid);
           setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
             // IMPORTANT: Must compare mediaFields because they can change independently
@@ -1740,6 +1782,8 @@ const Iframe = (props) => {
             log('INIT: form data not available yet, skipping INITIAL_DATA');
             break;
           }
+
+          // 8. Send INITIAL_DATA to iframe
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
           event.source.postMessage(
             {
@@ -1754,6 +1798,11 @@ const Iframe = (props) => {
             },
             event.origin,
           );
+
+          // 9. Trigger UNIFIED FORM SYNC now that iframeOriginRef is set
+          // This allows template merge to run (it needs iframeOriginRef)
+          // formWithDefaults may have schema defaults that differ from properties
+          onChangeFormData(formWithDefaults);
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -1851,6 +1900,64 @@ const Iframe = (props) => {
     // Case 2: Form properties changed (sidebar edit, block add, etc.)
     if (!formToUse || !iframeOriginRef.current) {
       return;
+    }
+
+    // Template Merge on Access: Check if templates need loading and merging
+    // Fetch async in background - when done, merge and update Redux, which triggers another sync
+    // Don't block the normal flow - unmerged data is sent first, merged data follows
+    if (formToUse?.blocks) {
+      const templateIds = getUniqueTemplateIds(formToUse);
+      // Skip templates already in cache OR marked as failed (null)
+      const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
+
+      if (unloadedTemplates.length > 0) {
+        log('[TEMPLATE MERGE] Fetching unloaded templates:', unloadedTemplates);
+
+        // Derive API base URL from page @id
+        const pageId = formToUse['@id'] || '';
+        const pageUrl = new URL(pageId, window.location.origin);
+        const apiBaseUrl = `${pageUrl.protocol}//${pageUrl.host}`;
+
+        // Fetch templates async in background - don't block
+        (async () => {
+          const newTemplates = {};
+
+          await Promise.all(
+            unloadedTemplates.map(async (templateId) => {
+              const templateUrl = `${apiBaseUrl}${templateId}`;
+              try {
+                const response = await fetch(templateUrl, {
+                  headers: {
+                    Accept: 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
+                });
+                if (response.ok) {
+                  newTemplates[templateId] = await response.json();
+                } else {
+                  console.warn(`[TEMPLATE MERGE] Failed to fetch template ${templateId}: ${response.status}`);
+                  // Mark as failed so we don't retry indefinitely
+                  templateCacheRef.current[templateId] = null;
+                }
+              } catch (error) {
+                console.warn(`[TEMPLATE MERGE] Error fetching template ${templateId}:`, error);
+                // Mark as failed so we don't retry indefinitely
+                templateCacheRef.current[templateId] = null;
+              }
+            }),
+          );
+
+          if (Object.keys(newTemplates).length === 0) return;
+
+          // Update template cache ref
+          templateCacheRef.current = { ...templateCacheRef.current, ...newTemplates };
+
+          // Merge template content and update Redux - triggers another sync cycle
+          log('[TEMPLATE MERGE] Merging templates:', Object.keys(newTemplates));
+          const mergedFormData = mergeTemplateContent(formToUse, templateCacheRef.current);
+          onChangeFormData(mergedFormData);
+        })();
+      }
     }
 
     // Skip if properties has an older sequence than what we've already sent

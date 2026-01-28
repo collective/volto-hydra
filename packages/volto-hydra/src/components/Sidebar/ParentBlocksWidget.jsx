@@ -190,9 +190,11 @@ const ParentBlockSection = ({
 
   // Get the Edit component for this block type
   // Skip Edit component if sidebarSchemaOnly is set (e.g., slateTable's Edit expects specific data structures)
+  // For readonly blocks, use the View component instead (like Volto core does)
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   const useSchemaOnly = blockConfig?.sidebarSchemaOnly;
-  const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
+  const isReadonly = blockData?.readOnly === true;
+  const BlockEdit = useSchemaOnly ? null : (isReadonly ? blockConfig?.view : blockConfig?.edit);
 
   // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
   const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
@@ -515,12 +517,14 @@ const ParentBlocksWidget = ({
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
   // Get current block data and type from blockPathMap (single source of truth)
-  const currentBlockData = getBlockById(formData, blockPathMap, selectedBlock);
-  const currentBlockType = blockPathMap[selectedBlock]?.blockType;
+  // For virtual blocks (like template instances), use blockData from pathMap
+  const pathInfo = blockPathMap[selectedBlock];
+  const currentBlockData = pathInfo?.blockData || getBlockById(formData, blockPathMap, selectedBlock);
+  const currentBlockType = pathInfo?.blockType;
 
   // Guard: If block data is undefined, skip rendering (data may be out of sync during drag operations)
   if (!currentBlockData) {
-    console.warn('[ParentBlocksWidget] Block data undefined for:', selectedBlock, 'blockPathMap entry:', blockPathMap[selectedBlock]);
+    console.warn('[ParentBlocksWidget] Block data undefined for:', selectedBlock, 'blockPathMap entry:', pathInfo);
     return null;
   }
 
@@ -530,8 +534,10 @@ const ParentBlocksWidget = ({
         <>
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
-            const parentData = getBlockById(formData, blockPathMap, parentId);
-            const parentType = blockPathMap[parentId]?.blockType;
+            // For virtual blocks (like template instances), use blockData from pathMap
+            const parentPathInfo = blockPathMap[parentId];
+            const parentData = parentPathInfo?.blockData || getBlockById(formData, blockPathMap, parentId);
+            const parentType = parentPathInfo?.blockType;
             // Parent of this parent (or null if root)
             const grandparentId = index > 0 ? parentIds[index - 1] : null;
 

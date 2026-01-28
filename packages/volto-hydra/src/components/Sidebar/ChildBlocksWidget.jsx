@@ -298,13 +298,30 @@ const ChildBlocksWidget = ({
   const target = document.getElementById('sidebar-order');
   if (!target) return null;
 
-  // Get the block data for retrieving children
-  const blockData = getBlockById(formData, blockPathMap, selectedBlock);
+  // Get the block data for retrieving children (use virtual blockData for template instances)
+  const pathInfo = blockPathMap[selectedBlock];
+  const blockData = pathInfo?.blockData || getBlockById(formData, blockPathMap, selectedBlock);
 
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
+        // For template instances, get children from pathMap (via parentId)
+        let childBlocks;
+        if (field.isTemplateInstance) {
+          const childIds = Object.entries(blockPathMap)
+            .filter(([, info]) => info.parentId === selectedBlock)
+            .map(([id]) => id);
+          childBlocks = childIds.map((childId) => {
+            const childPathInfo = blockPathMap[childId];
+            const childData = getBlockById(formData, blockPathMap, childId);
+            const blockType = childPathInfo?.blockType || 'unknown';
+            const blockConfig = config.blocks?.blocksConfig?.[blockType];
+            const title = childData?.plaintext || blockConfig?.title || blockType;
+            return { id: childId, type: blockType, title, data: childData };
+          });
+        } else {
+          childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
+        }
         return (
           <ContainerFieldSection
             key={field.fieldName}

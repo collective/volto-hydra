@@ -1,0 +1,61 @@
+{
+  "@id": "/templates/test-layout",
+  "@type": "Document",
+  "id": "test-layout",
+  "title": "Test Layout Template",
+  "description": "A test template with header, footer, and main placeholder",
+  "blocks": {
+    "header-block": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "header"
+      },
+      "value": [
+        {
+          "type": "h1",
+          "children": [{ "text": "Template Header - From Template" }]
+        }
+      ],
+      "plaintext": "Template Header - From Template"
+    },
+    "main-placeholder": {
+      "@type": "slate",
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "primary"
+      },
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Default placeholder content" }]
+        }
+      ],
+      "plaintext": "Default placeholder content"
+    },
+    "footer-block": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "footer"
+      },
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Template Footer - From Template" }]
+        }
+      ],
+      "plaintext": "Template Footer - From Template"
+    }
+  },
+  "blocks_layout": {
+    "items": ["header-block", "main-placeholder", "footer-block"]
+  }
+}
