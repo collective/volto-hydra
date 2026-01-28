@@ -34,6 +34,13 @@
       "blocks": {
         "tpl-grid-cell-1": {
           "@type": "slate",
+          "fixed": true,
+          "readOnly": true,
+          "_templateSource": {
+            "instanceId": "/templates/test-layout",
+            "templateId": "/templates/test-layout",
+            "placeholderName": "grid-cell-1"
+          },
           "value": [{ "type": "p", "children": [{ "text": "Template Grid Cell 1" }] }],
           "plaintext": "Template Grid Cell 1"
         },

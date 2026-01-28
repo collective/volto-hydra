@@ -8709,6 +8709,9 @@ export function getUniqueTemplateIds(formData) {
  * Fixed template blocks get their content updated from the template.
  * Placeholder content (fixed: false) is preserved.
  *
+ * IMPORTANT: Only blocks with _templateSource markers are processed.
+ * Blocks without _templateSource are ignored at all levels (not synced).
+ *
  * Uses Volto's standard block properties:
  * - fixed: true = position locked (merge content from template)
  * - readOnly: true = content locked (set on merged blocks)
@@ -8719,51 +8722,221 @@ export function getUniqueTemplateIds(formData) {
  */
 export function mergeTemplateContent(formData, templates) {
   const mergedBlocks = { ...formData.blocks };
+  let mergedLayout = [...(formData.blocks_layout?.items || [])];
 
-  for (const blockId of Object.keys(mergedBlocks)) {
-    const block = mergedBlocks[blockId];
+  // Group page blocks by instanceId -> placeholderName -> blockId
+  const pageBlocksByInstance = new Map();
+  for (const [blockId, block] of Object.entries(mergedBlocks)) {
     const source = block?.[TEMPLATE_SOURCE_MARKER];
+    if (!source || source.instanceId === source.templateId) continue;
+    const { instanceId, placeholderName } = source;
+    if (!pageBlocksByInstance.has(instanceId)) {
+      pageBlocksByInstance.set(instanceId, new Map());
+    }
+    pageBlocksByInstance.get(instanceId).set(placeholderName, blockId);
+  }
 
-    if (!source) continue;
-
-    const { templateId, placeholderName, instanceId } = source;
-
-    // Skip template definitions (instanceId === templateId)
-    if (instanceId === templateId) continue;
-
-    // Only merge fixed blocks (Volto standard property)
-    // Placeholder blocks (fixed: false or undefined) keep page content
-    if (!block.fixed) continue;
-
+  // Process each template instance
+  for (const [instanceId, placeholderMap] of pageBlocksByInstance) {
+    // Get templateId from any block in this instance
+    const anyBlockId = placeholderMap.values().next().value;
+    const templateId = mergedBlocks[anyBlockId]?.[TEMPLATE_SOURCE_MARKER]?.templateId;
     const template = templates[templateId];
-    if (!template) {
-      console.warn(`[mergeTemplateContent] Template not found: ${templateId}`);
-      continue;
+    if (!template) continue;
+
+    const templateLayout = template.blocks_layout?.items || [];
+    const processedPlaceholders = new Set();
+
+    // Find first page block of this instance for insert position
+    const firstPageBlockIndex = mergedLayout.findIndex(id => placeholderMap.has(mergedBlocks[id]?.[TEMPLATE_SOURCE_MARKER]?.placeholderName));
+    let insertIndex = firstPageBlockIndex >= 0 ? firstPageBlockIndex : mergedLayout.length;
+
+    // Iterate template blocks in order
+    for (const templateBlockId of templateLayout) {
+      const templateBlock = template.blocks?.[templateBlockId];
+      if (!templateBlock?.fixed) continue; // Only process fixed blocks
+
+      const placeholderName = templateBlock[TEMPLATE_SOURCE_MARKER]?.placeholderName;
+      if (!placeholderName) continue;
+      processedPlaceholders.add(placeholderName);
+
+      const pageBlockId = placeholderMap.get(placeholderName);
+
+      if (pageBlockId) {
+        // Fixed block exists in both - merge content from template
+        mergedBlocks[pageBlockId] = mergeBlockContent(
+          mergedBlocks[pageBlockId],
+          templateBlock,
+          instanceId,
+          templateId,
+          templates
+        );
+        // Update insert position to after this existing block
+        const existingIndex = mergedLayout.indexOf(pageBlockId);
+        if (existingIndex >= 0) {
+          insertIndex = existingIndex + 1;
+        }
+      } else {
+        // Fixed block in template only - insert into page
+        const newBlockId = `template-${placeholderName}`;
+        mergedBlocks[newBlockId] = mergeBlockContent(
+          null, // No page block exists
+          templateBlock,
+          instanceId,
+          templateId,
+          templates
+        );
+        mergedLayout.splice(insertIndex, 0, newBlockId);
+        insertIndex++;
+      }
     }
 
-    // Find matching template block by placeholderName
-    const templateBlock = Object.values(template.blocks || {}).find(
-      b => b?.[TEMPLATE_SOURCE_MARKER]?.placeholderName === placeholderName
-    );
-
-    if (!templateBlock) {
-      console.warn(`[mergeTemplateContent] Block with placeholderName "${placeholderName}" not found in template ${templateId}`);
-      continue;
+    // Remove fixed blocks from page that aren't in template
+    for (const [placeholderName, pageBlockId] of placeholderMap) {
+      const block = mergedBlocks[pageBlockId];
+      if (block?.fixed && !processedPlaceholders.has(placeholderName)) {
+        delete mergedBlocks[pageBlockId];
+        mergedLayout = mergedLayout.filter(id => id !== pageBlockId);
+      }
     }
-
-    // Merge template content into page block
-    // Preserve the page block's _templateSource marker
-    // Copy fixed/readOnly from template block (Volto standard properties)
-    mergedBlocks[blockId] = {
-      ...templateBlock,
-      [TEMPLATE_SOURCE_MARKER]: source, // Keep page's source marker (has instanceId)
-    };
   }
 
   return {
     ...formData,
     blocks: mergedBlocks,
+    blocks_layout: { ...formData.blocks_layout, items: mergedLayout },
   };
+}
+
+/**
+ * Merge a single block's content from template to page.
+ * Only syncs properties and nested blocks that have _templateSource markers.
+ * Blocks/properties without markers are left untouched (page content preserved).
+ *
+ * @param {Object|null} pageBlock - Existing page block (null if inserting new)
+ * @param {Object} templateBlock - Template block to merge from
+ * @param {string} instanceId - Instance ID for this template usage
+ * @param {string} templateId - Template ID
+ * @param {Object} templates - Map of templateId -> template document
+ * @returns {Object} Merged block
+ */
+function mergeBlockContent(pageBlock, templateBlock, instanceId, templateId, templates) {
+  // Start with template block's non-container properties
+  const result = {};
+
+  for (const [key, value] of Object.entries(templateBlock)) {
+    if (key === 'blocks' || key === 'blocks_layout') {
+      // Handle container fields separately (recursive merge)
+      continue;
+    }
+    if (key === TEMPLATE_SOURCE_MARKER) {
+      // Update instanceId for page usage
+      result[key] = {
+        ...value,
+        instanceId,
+      };
+    } else {
+      result[key] = value;
+    }
+  }
+
+  // Handle nested blocks recursively
+  if (templateBlock.blocks) {
+    const templateNestedBlocks = templateBlock.blocks;
+    const templateNestedLayout = templateBlock.blocks_layout?.items || [];
+    const pageNestedBlocks = pageBlock?.blocks || {};
+    const pageNestedLayout = pageBlock?.blocks_layout?.items || [];
+
+    // Build map of page blocks by placeholderName (only those with _templateSource)
+    const pageByPlaceholder = new Map();
+    for (const [blockId, block] of Object.entries(pageNestedBlocks)) {
+      const source = block?.[TEMPLATE_SOURCE_MARKER];
+      if (source?.placeholderName) {
+        pageByPlaceholder.set(source.placeholderName, { blockId, block });
+      }
+    }
+
+    // Build map of template blocks by placeholderName (only those with _templateSource)
+    const templateByPlaceholder = new Map();
+    for (const blockId of templateNestedLayout) {
+      const block = templateNestedBlocks[blockId];
+      const source = block?.[TEMPLATE_SOURCE_MARKER];
+      if (source?.placeholderName) {
+        templateByPlaceholder.set(source.placeholderName, { blockId, block });
+      }
+    }
+
+    const mergedNestedBlocks = {};
+    const mergedNestedLayout = [];
+    const processedPageBlocks = new Set();
+
+    // Process template blocks in order
+    for (const templateBlockId of templateNestedLayout) {
+      const templateNestedBlock = templateNestedBlocks[templateBlockId];
+      const source = templateNestedBlock?.[TEMPLATE_SOURCE_MARKER];
+
+      if (!source?.placeholderName) {
+        // No _templateSource marker - skip this block entirely
+        // (don't copy from template, don't include in result)
+        continue;
+      }
+
+      const placeholderName = source.placeholderName;
+      const pageEntry = pageByPlaceholder.get(placeholderName);
+
+      if (templateNestedBlock.fixed) {
+        // Fixed nested block - sync from template (recursively)
+        const newBlockId = pageEntry?.blockId || `template-${placeholderName}`;
+        mergedNestedBlocks[newBlockId] = mergeBlockContent(
+          pageEntry?.block || null,
+          templateNestedBlock,
+          instanceId,
+          templateId,
+          templates
+        );
+        mergedNestedLayout.push(newBlockId);
+        if (pageEntry) {
+          processedPageBlocks.add(pageEntry.blockId);
+        }
+      } else {
+        // Placeholder nested block - keep page content if exists
+        if (pageEntry) {
+          mergedNestedBlocks[pageEntry.blockId] = pageEntry.block;
+          mergedNestedLayout.push(pageEntry.blockId);
+          processedPageBlocks.add(pageEntry.blockId);
+        } else {
+          // No page content - use template default
+          const newBlockId = `template-${placeholderName}`;
+          mergedNestedBlocks[newBlockId] = {
+            ...templateNestedBlock,
+            [TEMPLATE_SOURCE_MARKER]: {
+              ...source,
+              instanceId,
+            },
+          };
+          mergedNestedLayout.push(newBlockId);
+        }
+      }
+    }
+
+    // Keep page blocks without _templateSource (user content not in template)
+    for (const blockId of pageNestedLayout) {
+      if (!processedPageBlocks.has(blockId)) {
+        const block = pageNestedBlocks[blockId];
+        if (!block?.[TEMPLATE_SOURCE_MARKER]) {
+          // No marker - this is user content, keep it
+          mergedNestedBlocks[blockId] = block;
+          mergedNestedLayout.push(blockId);
+        }
+        // If it has a marker but wasn't processed, it's a stale template block - remove it
+      }
+    }
+
+    result.blocks = mergedNestedBlocks;
+    result.blocks_layout = { items: mergedNestedLayout };
+  }
+
+  return result;
 }
 
 // Make initBridge available globally

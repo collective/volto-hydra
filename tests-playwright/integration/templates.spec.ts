@@ -31,7 +31,85 @@ test.describe('Templates', () => {
 
     // User content in placeholder should be preserved (not replaced)
     const userContent = iframe.locator('[data-block-uid="user-content-1"]');
-    await expect(userContent).toContainText('This is user content that can be edited');
+    await expect(userContent).toContainText('User content - different from template default');
+  });
+
+  test('new fixed blocks from template are inserted during merge', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for merge to complete (header gets template content)
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+
+    // The grid block exists in the template but NOT in the page's original data
+    // It should be inserted during merge
+    const gridBlock = iframe.locator('[data-block-uid="template-grid"]');
+    await expect(gridBlock).toBeVisible();
+
+    // Grid should have content from template cell 1 (which has _templateSource)
+    await expect(gridBlock).toContainText('Template Grid Cell 1');
+
+    // Verify block order: header, grid, user-content-1, user-content-2, footer
+    const blockOrder = await helper.getBlockOrder();
+    const headerIndex = blockOrder.indexOf('template-header');
+    const gridIndex = blockOrder.indexOf('template-grid');
+    const userContent1Index = blockOrder.indexOf('user-content-1');
+    const footerIndex = blockOrder.indexOf('template-footer');
+
+    // Grid should be after header and before user content
+    expect(gridIndex).toBe(headerIndex + 1);
+    expect(userContent1Index).toBeGreaterThan(gridIndex);
+    expect(footerIndex).toBeGreaterThan(userContent1Index);
+  });
+
+  test('nested blocks without _templateSource are NOT synced from template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for merge to complete
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+
+    // The grid block should be visible
+    const gridBlock = iframe.locator('[data-block-uid="template-grid"]');
+    await expect(gridBlock).toBeVisible();
+
+    // Grid cell 1 HAS _templateSource marker - should be synced
+    await expect(gridBlock).toContainText('Template Grid Cell 1');
+
+    // Grid cell 2 does NOT have _templateSource marker - should NOT be synced
+    // The merge logic ignores blocks without placeholderName
+    await expect(gridBlock).not.toContainText('Template Grid Cell 2');
+  });
+
+  test('placeholder content is preserved during merge', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for merge to complete
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+
+    // User content should have the PAGE's content, not the template default
+    // Page has "User content - different from template default"
+    // Template default is "Default placeholder content - should be replaced by user content"
+    const userContent1 = iframe.locator('[data-block-uid="user-content-1"]');
+    await expect(userContent1).toContainText('User content - different from template default');
+    await expect(userContent1).not.toContainText('Default placeholder content');
+
+    // Second user content block should also be preserved
+    const userContent2 = iframe.locator('[data-block-uid="user-content-2"]');
+    await expect(userContent2).toContainText('Second user content block in placeholder');
   });
 
   test('merged template content persists after editing placeholder', async ({ page }) => {
@@ -277,14 +355,17 @@ test.describe('Templates', () => {
     await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
 
     // Get initial block order - should be:
-    // standalone-block-1, template-header, template-grid, user-content-1, template-footer, standalone-block-2
+    // standalone-block-1, template-header, template-grid, template-grid-cell-1, user-content-1, user-content-2, template-footer, standalone-block-2
+    // Note: template-grid-cell-1 is a nested block that appears after template-grid in DOM order
     const initialOrder = await helper.getBlockOrder();
     expect(initialOrder[0]).toBe('standalone-block-1');
     expect(initialOrder[1]).toBe('template-header');
     expect(initialOrder[2]).toBe('template-grid');
-    expect(initialOrder[3]).toBe('user-content-1');
-    expect(initialOrder[4]).toBe('template-footer');
-    expect(initialOrder[5]).toBe('standalone-block-2');
+    expect(initialOrder[3]).toBe('template-grid-cell-1');
+    expect(initialOrder[4]).toBe('user-content-1');
+    expect(initialOrder[5]).toBe('user-content-2');
+    expect(initialOrder[6]).toBe('template-footer');
+    expect(initialOrder[7]).toBe('standalone-block-2');
 
     // Select template header, then navigate up to template instance
     await helper.clickBlockInIframe('template-header');
@@ -304,13 +385,15 @@ test.describe('Templates', () => {
 
     // Get new block order - template blocks should all be at the top now
     const newOrder = await helper.getBlockOrder();
-    // Template blocks (header, grid, user-content-1, footer) should be first, followed by standalone blocks
+    // Template blocks (header, grid + nested cell, user-content-1, user-content-2, footer) should be first, followed by standalone blocks
     expect(newOrder[0]).toBe('template-header');
     expect(newOrder[1]).toBe('template-grid');
-    expect(newOrder[2]).toBe('user-content-1');
-    expect(newOrder[3]).toBe('template-footer');
-    expect(newOrder[4]).toBe('standalone-block-1');
-    expect(newOrder[5]).toBe('standalone-block-2');
+    expect(newOrder[2]).toBe('template-grid-cell-1');
+    expect(newOrder[3]).toBe('user-content-1');
+    expect(newOrder[4]).toBe('user-content-2');
+    expect(newOrder[5]).toBe('template-footer');
+    expect(newOrder[6]).toBe('standalone-block-1');
+    expect(newOrder[7]).toBe('standalone-block-2');
   });
 
   test('cannot insert blocks between two fixed template blocks', async ({ page }) => {
@@ -353,9 +436,9 @@ test.describe('Templates', () => {
     // Wait for the grid block to be visible with merged content
     await expect(iframe.locator('[data-block-uid="template-grid"]')).toBeVisible({ timeout: 15000 });
 
-    // Click on the first grid cell
-    await helper.clickBlockInIframe('grid-cell-1');
-    await helper.waitForQuantaToolbar('grid-cell-1');
+    // Click on the first grid cell (merged from template with ID template-grid-cell-1)
+    await helper.clickBlockInIframe('template-grid-cell-1');
+    await helper.waitForQuantaToolbar('template-grid-cell-1');
 
     // Grid cells inside a fixed container might still be editable
     // This tests nested block behavior
