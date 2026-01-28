@@ -998,6 +998,45 @@ Both `<strong>` and `<b>` have the same node-id, so they count as one Slate chil
 ```
 This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 
+#### Complete Slate Rendering Example
+
+**Slate data structure** (note: `value` is an array but always contains a single root node):
+```json
+{
+  "value": [
+    {
+      "type": "p", "nodeId": "0",
+      "children": [
+        { "text": "Hello " },
+        { "type": "strong", "nodeId": "0.1", "children": [{ "text": "world" }] },
+        { "text": "! Visit " },
+        { "type": "link", "nodeId": "0.3", "data": { "url": "/about" },
+          "children": [{ "text": "our page" }] }
+      ]
+    }
+  ]
+}
+```
+
+**Renderer:**
+```js
+function renderSlate(nodes) {
+  return (nodes || []).map(node => {
+    if (node.text !== undefined) return escapeHtml(node.text);
+    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong', em:'em', link:'a' }[node.type] || 'span';
+    const attrs = node.type === 'link' ? ` href="${node.data?.url || '#'}"` : '';
+    return `<${tag} data-node-id="${node.nodeId}"${attrs}>${renderSlate(node.children)}</${tag}>`;
+  }).join('');
+}
+```
+
+**Usage:**
+```html
+<div data-block-uid="block-1" data-editable-field="value">
+  <!-- renderSlate(block.value) output goes here -->
+</div>
+```
+
 Additionally your frontend can
 - add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
 - specify parts of the text that aren't editable by the user which could be needed for some use-cases where style includes text that needs to appear. (TODO)
