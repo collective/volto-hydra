@@ -831,10 +831,12 @@ const SyncedSlateToolbar = ({
   const fieldValue = block[fieldName];
 
   // Determine if we should show format buttons based on field type
+  // Also hide for readonly blocks (e.g., fixed template blocks)
   const blockType = block?.['@type'];
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
-  const showFormatButtons = isSlateFieldType(fieldType);
+  const isBlockReadonly = block?.readOnly === true;
+  const showFormatButtons = isSlateFieldType(fieldType) && !isBlockReadonly;
 
   // Debug: Check what blockFieldTypes the toolbar is receiving
   if (blockType === 'hero') {
@@ -948,28 +950,54 @@ const SyncedSlateToolbar = ({
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
-      {/* Drag handle - only show for blocks, not page-level fields */}
-      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID ? (
-        <div
-          className="drag-handle"
-          style={{
-            cursor: 'move',
-            padding: '4px 6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            color: '#666',
-            fontSize: '14px',
-            background: '#e8e8e8',
-            borderRadius: '2px',
-          }}
-        >
-          ⠿
-        </div>
-      ) : (
-        <div style={{ width: '8px' }} /> // Spacer for page-level fields
-      )}
+      {/* Drag handle or lock icon - only show for blocks, not page-level fields */}
+      {(() => {
+        if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
+          return <div style={{ width: '8px' }} />; // Spacer for page-level fields
+        }
+        // Block is position-locked if marked as isFixed in pathMap (template blocks)
+        const isPositionLocked = blockPathMap?.[selectedBlock]?.isFixed;
+        if (isPositionLocked) {
+          return (
+            <div
+              className="lock-icon"
+              title="This block is part of a template and cannot be moved"
+              style={{
+                padding: '4px 6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                color: '#999',
+                fontSize: '14px',
+                background: '#f5f5f5',
+                borderRadius: '2px',
+              }}
+            >
+              🔒
+            </div>
+          );
+        }
+        return (
+          <div
+            className="drag-handle"
+            style={{
+              cursor: 'move',
+              padding: '4px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              color: '#666',
+              fontSize: '14px',
+              background: '#e8e8e8',
+              borderRadius: '2px',
+            }}
+          >
+            ⠿
+          </div>
+        );
+      })()}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
@@ -1162,6 +1190,7 @@ const SyncedSlateToolbar = ({
         addDirection={blockUI?.addDirection}
         convertibleTypes={convertibleTypes}
         onConvertBlock={onConvertBlock}
+        isFixed={blockPathMap?.[selectedBlock]?.isFixed}
       />
     )}
 

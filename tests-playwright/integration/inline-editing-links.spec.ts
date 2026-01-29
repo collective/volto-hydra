@@ -326,17 +326,21 @@ test.describe('Inline Editing - Links', () => {
     expect(textContent).toBe('Test text');
 
     // Verify focus returns to editor automatically after cancelling LinkEditor
+    // This is the key test - focus should be restored without user action
     await helper.waitForEditorFocus(editor);
 
-    // Move cursor to end and type
-    await editor.press('End');
-    await editor.pressSequentially(' added', { delay: 10 });
+    // Selection should be preserved from before popup (all text was selected)
+    const selectionInfo = await helper.getSelectionInfo(editor);
+    expect(selectionInfo.isCollapsed).toBe(false);
 
-    // Verify typing worked
+    // Type to verify editor accepts input - will replace selected text
+    await editor.pressSequentially('replaced', { delay: 10 });
+
+    // Verify typing worked (replaced selected text since all was selected)
     await expect(async () => {
       const newText = await helper.getCleanTextContent(editor);
-      expect(newText).toContain('added');
-    }).toPass({ timeout: 2000 });
+      expect(newText).toBe('replaced');
+    }).toPass({ timeout: 5000 });
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {

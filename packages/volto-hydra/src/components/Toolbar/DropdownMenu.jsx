@@ -41,6 +41,7 @@ const DropdownMenu = ({
   addDirection, // 'right' or 'bottom' - determines Column vs Row terminology
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  isFixed = false, // Template blocks that can't be moved/deleted
 }) => {
   const menuRef = useRef(null);
   const [convertSubmenuOpen, setConvertSubmenuOpen] = React.useState(false);
@@ -357,8 +358,8 @@ const DropdownMenu = ({
         </>
       )}
       {/* Remove action - label changes based on table mode and add direction */}
-      {/* Hide remove for page-level fields (selectedBlock is PAGE_BLOCK_UID) */}
-      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && (() => {
+      {/* Hide remove for page-level fields and fixed template blocks */}
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && !isFixed && (() => {
         // Determine remove label and action based on table mode
         // Uses addDirection to determine Column vs Row (same as add button icon)
         const actionsRegistry = config.settings.hydraActions || {};

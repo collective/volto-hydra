@@ -20,6 +20,7 @@ import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import LayoutSelector from './LayoutSelector';
 
 const messages = defineMessages({
   blocks: {
@@ -109,14 +110,36 @@ const ContainerFieldSection = ({
   fieldTitle,
   childBlocks,
   allowedBlocks,
+  allowedTemplates,
   maxLength,
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
   parentBlockId,
+  formData,
+  onChangeFormData,
+  blockPathMap,
 }) => {
   const intl = useIntl();
-  const canAdd = !maxLength || childBlocks.length < maxLength;
+
+  // Check if we can add based on maxLength
+  const maxLengthOk = !maxLength || childBlocks.length < maxLength;
+
+  // Check if there are any valid insertion points
+  // If container is empty, we can add. Otherwise, check if any block allows insertion.
+  let hasInsertionPoint = childBlocks.length === 0;
+  if (!hasInsertionPoint && blockPathMap) {
+    for (const child of childBlocks) {
+      const pathInfo = blockPathMap[child.id];
+      // Can insert after this block OR can insert before first block
+      if (pathInfo?.canInsertAfter !== false || pathInfo?.canInsertBefore !== false) {
+        hasInsertionPoint = true;
+        break;
+      }
+    }
+  }
+
+  const canAdd = maxLengthOk && hasInsertionPoint;
 
   // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
   const childList = childBlocks.map((child) => [child.id, child]);
@@ -139,6 +162,14 @@ const ContainerFieldSection = ({
       <div className="widget-header">
         <span className="widget-title">{fieldTitle}</span>
         <div className="widget-actions">
+          {onChangeFormData && allowedTemplates?.length > 0 && (
+            <LayoutSelector
+              formData={formData}
+              onChangeFormData={onChangeFormData}
+              allowedTemplates={allowedTemplates}
+              targetBlockId={parentBlockId}
+            />
+          )}
           {canAdd && (
             <button
               onClick={() => onAddBlock(parentBlockId, fieldName)}
@@ -220,6 +251,7 @@ const ChildBlocksWidget = ({
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
+  onChangeFormData,
 }) => {
   const intl = useIntl();
   const blocksConfig = config.blocks?.blocksConfig;
@@ -251,11 +283,15 @@ const ChildBlocksWidget = ({
               fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
               childBlocks={childBlocks}
               allowedBlocks={fieldConfig.allowedBlocks}
+              allowedTemplates={fieldConfig.allowedTemplates}
               maxLength={fieldConfig.maxLength}
               onSelectBlock={onSelectBlock}
               onAddBlock={onAddBlock}
               onMoveBlock={onMoveBlock}
               parentBlockId={null}
+              formData={formData}
+              onChangeFormData={onChangeFormData}
+              blockPathMap={blockPathMap}
             />
           );
         })}
@@ -282,13 +318,30 @@ const ChildBlocksWidget = ({
   const target = document.getElementById('sidebar-order');
   if (!target) return null;
 
-  // Get the block data for retrieving children
-  const blockData = getBlockById(formData, blockPathMap, selectedBlock);
+  // Get the block data for retrieving children (use virtual blockData for template instances)
+  const pathInfo = blockPathMap[selectedBlock];
+  const blockData = pathInfo?.blockData || getBlockById(formData, blockPathMap, selectedBlock);
 
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
+        // For template instances, get children from pathMap (via parentId)
+        let childBlocks;
+        if (field.isTemplateInstance) {
+          const childIds = Object.entries(blockPathMap)
+            .filter(([, info]) => info.parentId === selectedBlock)
+            .map(([id]) => id);
+          childBlocks = childIds.map((childId) => {
+            const childPathInfo = blockPathMap[childId];
+            const childData = getBlockById(formData, blockPathMap, childId);
+            const blockType = childPathInfo?.blockType || 'unknown';
+            const blockConfig = config.blocks?.blocksConfig?.[blockType];
+            const title = childData?.plaintext || blockConfig?.title || blockType;
+            return { id: childId, type: blockType, title, data: childData };
+          });
+        } else {
+          childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
+        }
         return (
           <ContainerFieldSection
             key={field.fieldName}
@@ -296,11 +349,15 @@ const ChildBlocksWidget = ({
             fieldTitle={field.title}
             childBlocks={childBlocks}
             allowedBlocks={field.allowedBlocks}
+            allowedTemplates={field.allowedTemplates}
             maxLength={field.maxLength}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
             onMoveBlock={onMoveBlock}
             parentBlockId={selectedBlock}
+            formData={formData}
+            onChangeFormData={onChangeFormData}
+            blockPathMap={blockPathMap}
           />
         );
       })}
@@ -316,6 +373,7 @@ ChildBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
+  onChangeFormData: PropTypes.func,
 };
 
 export default ChildBlocksWidget;

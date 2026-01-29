@@ -70,6 +70,22 @@
 // injectCSS
 
 ////////////////////////////////////////////////////////////////////////////////
+// Template Utilities
+////////////////////////////////////////////////////////////////////////////////
+
+// isLayoutTemplate
+// findPlaceholderRegions
+// isTemplateAllowedIn
+// getLayoutTemplates
+// getSnippetTemplates
+// cloneBlocksWithNewIds
+// applyLayoutTemplate
+// insertSnippetBlocks
+// getTemplateBlocks
+// isFixedTemplateBlock
+// isPlaceholderContent
+
+////////////////////////////////////////////////////////////////////////////////
 // Methods provided by THIS hydra.js as export
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -659,12 +675,30 @@ export class Bridge {
   /**
    * Gets all DOM elements for a block UID.
    * A block may render as multiple elements (e.g., listing block renders multiple cards).
+   * For template instances (virtual containers), returns elements from all child blocks.
    *
    * @param {string} blockUid - The block UID to find elements for
-   * @returns {NodeList} All elements with the given data-block-uid
+   * @returns {Array} All elements for the block (array, not NodeList, for template instances)
    */
   getAllBlockElements(blockUid) {
-    return document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+    // Check if this is a template instance (virtual container)
+    // Template instances don't have DOM elements - their children do
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (pathInfo?.isTemplateInstance) {
+      const childBlockIds = Object.entries(this.blockPathMap)
+        .filter(([, info]) => info.parentId === blockUid)
+        .map(([id]) => id);
+      log('getAllBlockElements: template instance', blockUid, 'childBlockIds:', childBlockIds);
+      // Get elements for all child blocks and flatten
+      const elements = childBlockIds.flatMap(id => [...document.querySelectorAll(`[data-block-uid="${id}"]`)]);
+      log('getAllBlockElements: found', elements.length, 'elements for template instance');
+      return elements;
+    }
+    const elements = document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+    if (elements.length === 0) {
+      log('getAllBlockElements: no DOM elements for', blockUid, 'pathInfo:', pathInfo ? 'exists' : 'missing', 'isTemplateInstance:', pathInfo?.isTemplateInstance);
+    }
+    return elements;
   }
 
   /**
@@ -712,8 +746,11 @@ export class Bridge {
    * @param {Object} [options.selection] - Serialized selection to include
    */
   sendBlockSelected(src, blockElement, options = {}) {
-    if (!blockElement) {
-      // Deselection case - send null values
+    // Get blockUid from options or element attribute
+    const blockUid = options.blockUid || blockElement?.getAttribute('data-block-uid') || PAGE_BLOCK_UID;
+
+    // Deselection case - no element and no blockUid in options
+    if (!blockElement && !options.blockUid) {
       this.sendMessageToParent({
         type: 'BLOCK_SELECTED',
         src,
@@ -723,38 +760,32 @@ export class Bridge {
       return;
     }
 
-    // Get blockUid from element attribute, or use PAGE_BLOCK_UID for page-level fields
-    const blockUid = blockElement.getAttribute('data-block-uid') || PAGE_BLOCK_UID;
+    // Get all elements for this block (multi-element blocks, template instances)
+    const allElements = blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : [];
 
-    // Get all elements for this block (multi-element blocks like listings)
-    // For page-level fields (blockUid === PAGE_BLOCK_UID), just use the element itself
+    // Use first element for field detection if no element was passed
+    const elementForFields = blockElement || allElements[0] || null;
+
+    // Compute rect from all elements (combined bounding box for multi-element)
     let rect;
-    if (blockUid && blockUid !== PAGE_BLOCK_UID) {
-      const allElements = this.getAllBlockElements(blockUid);
-      if (allElements.length > 1) {
-        // Multi-element block: compute bounding box around all elements
-        rect = this.getBoundingBoxForElements(allElements);
-        // Fall back to single element rect if bounding box computation failed
-        if (!rect) {
-          const singleRect = blockElement.getBoundingClientRect();
-          rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
-        }
-      } else {
-        // Single element block: use its rect directly
-        const singleRect = blockElement.getBoundingClientRect();
+    if (allElements.length > 0) {
+      rect = this.getBoundingBoxForElements(allElements);
+      // Fall back to single element rect if bounding box computation failed
+      if (!rect && elementForFields) {
+        const singleRect = elementForFields.getBoundingClientRect();
         rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
       }
-    } else {
-      // Page-level field: use the element's rect directly
-      const singleRect = blockElement.getBoundingClientRect();
+    } else if (elementForFields) {
+      // Page-level field or single element: use its rect directly
+      const singleRect = elementForFields.getBoundingClientRect();
       rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
     }
 
-    // For field operations, use the passed element (which may be the focused one)
-    const editableFields = this.getEditableFields(blockElement);
-    const linkableFields = this.getLinkableFields(blockElement);
-    const mediaFields = this.getMediaFields(blockElement);
-    const addDirection = this.getAddDirection(blockElement);
+    // For field operations, use elementForFields (first element if none passed)
+    const editableFields = elementForFields ? this.getEditableFields(elementForFields) : {};
+    const linkableFields = elementForFields ? this.getLinkableFields(elementForFields) : {};
+    const mediaFields = elementForFields ? this.getMediaFields(elementForFields) : {};
+    const addDirection = elementForFields ? this.getAddDirection(elementForFields) : 'bottom';
     const focusedFieldName = options.focusedFieldName !== undefined
       ? options.focusedFieldName
       : this.focusedFieldName;
@@ -1300,7 +1331,8 @@ export class Bridge {
                     // For sidebar edits (no transformedSelection): pass skipInitialUpdate to prevent toolbar blink
                     const editableFields = this.getEditableFields(blockElement);
                     const isSidebarEdit = !event.data.transformedSelection;
-                    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, isSidebarEdit);
+                    const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+                    this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, isSidebarEdit);
 
                     // Send BLOCK_SELECTED if toolbar operation OR if block/media field rects changed
                     // Block may resize/move after edits, media fields may change (e.g., clearing image → placeholder)
@@ -1759,10 +1791,15 @@ export class Bridge {
 
         // PAGE_BLOCK_UID is the virtual root - treat as "no parent" (deselect)
         if (parentId && parentId !== PAGE_BLOCK_UID) {
-          // Select the parent block
-          const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
-          if (parentElement) {
-            this.selectBlock(parentElement, 'escapeKey');
+          // Handle template instances (virtual containers with no DOM element)
+          if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
+            this.selectBlock(parentId);
+          } else {
+            // Select the parent block
+            const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
+            if (parentElement) {
+              this.selectBlock(parentElement, 'escapeKey');
+            }
           }
         } else {
           // No parent or parent is page - deselect by sending BLOCK_SELECTED with null
@@ -3360,7 +3397,8 @@ export class Bridge {
     // changes (e.g., image loading after a re-render).
     // For sidebar edits: pass skipInitialUpdate to prevent spurious BLOCK_SELECTED from immediate observer fire
     const editableFields = this.getEditableFields(blockElement);
-    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, skipFocus);
+    const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+    this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, skipFocus);
 
     // Also re-attach the text change observer for the same reason
     this.observeBlockTextChanges(blockElement);
@@ -3373,13 +3411,25 @@ export class Bridge {
    */
   selectBlock(blockElementOrUid) {
     // Accept either a DOM element (from click handlers) or a block UID string
-    const blockElement = typeof blockElementOrUid === 'string'
-      ? document.querySelector(`[data-block-uid="${blockElementOrUid}"]`)
-      : blockElementOrUid;
+    const blockUidFromArg = typeof blockElementOrUid === 'string' ? blockElementOrUid : null;
+
+    // Get blockUid - either from argument or from element attribute
+    const blockUid = blockUidFromArg || blockElementOrUid?.getAttribute?.('data-block-uid');
+    if (!blockUid) return;
+
+    // Check if this is a virtual template instance (no DOM element, but has child blocks)
+    const isTemplateInstance = this.blockPathMap?.[blockUid]?.isTemplateInstance;
+
+    // Get all elements for this block (handles multi-element blocks and template instances)
+    // getAllBlockElements returns child block elements for template instances
+    const blockElements = [...this.getAllBlockElements(blockUid)];
 
     const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
-    log('selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
-    if (!blockElement) return;
+    log('selectBlock called for:', blockUid, 'from:', caller, 'elements:', blockElements.length);
+    if (blockElements.length === 0) return;
+
+    // Primary element for operations that need a single element
+    const blockElement = blockElements[0];
 
     // Clear block selector navigation flag after a delay to let carousel animation settle
     // This prevents transitionTracker from sending stale positions during animation
@@ -3389,7 +3439,6 @@ export class Bridge {
       }, 500);
     }
 
-    const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
 
     // Store for use in async callback (focus handler uses this to decide preventScroll)
@@ -3397,7 +3446,7 @@ export class Bridge {
 
     // Only scroll block into view when selecting a NEW block (not reselecting same block)
     // This prevents unwanted scroll-back when user has scrolled the selected block off screen
-    if (!isSelectingSameBlock && !this.elementIsVisibleInViewport(blockElement)) {
+    if (!isSelectingSameBlock && blockElement && !this.elementIsVisibleInViewport(blockElement)) {
       this.scrollBlockIntoView(blockElement);
     }
 
@@ -3408,37 +3457,37 @@ export class Bridge {
       this.eventBuffer = [];
     }
 
-    this.isInlineEditing = true;
+    // Skip contenteditable setup for template instances (they're virtual containers)
+    if (!isTemplateInstance) {
+      this.isInlineEditing = true;
 
-    // Set contenteditable on all text-editable fields
-    this.restoreContentEditableOnFields(blockElement, 'selectBlock');
+      // Set contenteditable on all text-editable fields
+      this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
-    // For slate blocks (value field), also set up paste/keydown handlers
-    // Check blockElement itself first (Nuxt puts both attributes on same element)
-    // then fall back to querying for child elements
-    let valueField = blockElement.hasAttribute('data-editable-field') &&
-                     blockElement.getAttribute('data-editable-field') === 'value'
-                     ? blockElement
-                     : blockElement.querySelector('[data-editable-field="value"]');
-    if (valueField) {
-      this.makeBlockContentEditable(valueField);
+      // For slate blocks (value field), also set up paste/keydown handlers
+      // Check blockElement itself first (Nuxt puts both attributes on same element)
+      // then fall back to querying for child elements
+      let valueField = blockElement.hasAttribute('data-editable-field') &&
+                       blockElement.getAttribute('data-editable-field') === 'value'
+                       ? blockElement
+                       : blockElement.querySelector('[data-editable-field="value"]');
+      if (valueField) {
+        this.makeBlockContentEditable(valueField);
+      }
     }
 
     // Remove border and button from the previously selected block
-    if (
-      this.prevSelectedBlock === null ||
-      this.prevSelectedBlock?.getAttribute('data-block-uid') !==
-        blockElement?.getAttribute('data-block-uid')
-    ) {
+    const prevBlockUid = this.prevSelectedBlock?.getAttribute('data-block-uid');
+    if (this.prevSelectedBlock === null || prevBlockUid !== blockUid) {
       if (this.currentlySelectedBlock) {
         this.deselectBlock(
           this.currentlySelectedBlock?.getAttribute('data-block-uid'),
-          blockElement?.getAttribute('data-block-uid'),
+          blockUid,
         );
       }
 
-      if (this.formData && !isSelectingSameBlock) {
-        // Add nodeIds if this block has slate fields (only on first selection)
+      // Add nodeIds for slate fields (skip for template instances - they're virtual)
+      if (this.formData && !isSelectingSameBlock && !isTemplateInstance) {
         const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
         const hasSlateField = Object.values(blockFieldTypes).some(
           fieldType => this.fieldTypeIsSlate(fieldType)
@@ -3459,8 +3508,9 @@ export class Bridge {
         }
       }
 
-      this.currentlySelectedBlock = blockElement;
-      this.prevSelectedBlock = blockElement;
+      // For template instances, there's no single element to track
+      this.currentlySelectedBlock = isTemplateInstance ? null : blockElement;
+      this.prevSelectedBlock = isTemplateInstance ? null : blockElement;
       if (!this.clickOnBtn) {
         window.parent.postMessage(
           { type: 'OPEN_SETTINGS', uid: blockUid },
@@ -3482,8 +3532,8 @@ export class Bridge {
     this.lastBlockRect = null;
     this.lastMediaFields = null;
 
-    // Detect focused fields from click location
-    if (this.lastClickPosition?.target) {
+    // Detect focused fields from click location (skip for template instances)
+    if (!isTemplateInstance && this.lastClickPosition?.target) {
       // Find the clicked editable field
       const clickedElement = this.lastClickPosition.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
@@ -3503,8 +3553,8 @@ export class Bridge {
       }
     }
 
-    // If no clicked field, use the first editable field that belongs to THIS block
-    if (!this.focusedFieldName) {
+    // If no clicked field, use the first editable field that belongs to THIS block (skip for template instances)
+    if (!isTemplateInstance && !this.focusedFieldName && blockElement) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-editable-field');
@@ -3516,21 +3566,28 @@ export class Bridge {
     }
 
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
-    const rect = blockElement.getBoundingClientRect();
-    const editableFields = this.getEditableFields(blockElement);
-    const linkableFields = this.getLinkableFields(blockElement);
-    const mediaFields = this.getMediaFields(blockElement);
+    // Use combined bounding box for multi-element blocks and template instances
+    const isMultiElement = blockElements.length > 1;
+    const rect = isMultiElement
+      ? this.getBoundingBoxForElements(blockElements)
+      : blockElement.getBoundingClientRect();
+
+    // For template instances, don't collect editable/linkable/media fields (they're virtual containers)
+    const editableFields = isTemplateInstance ? {} : this.getEditableFields(blockElement);
+    const linkableFields = isTemplateInstance ? {} : this.getLinkableFields(blockElement);
+    const mediaFields = isTemplateInstance ? {} : this.getMediaFields(blockElement);
     // Get add button direction (right, bottom, hidden) - uses attribute or infers from nesting depth
     const addDirection = this.getAddDirection(blockElement);
+
     log('Setting _pendingBlockSelected for:', blockUid, '_justFinishedDragBlockId:', this._justFinishedDragBlockId);
     this._pendingBlockSelected = {
       blockUid,
-      rect: {
+      rect: rect ? {
         top: rect.top,
         left: rect.left,
         width: rect.width,
         height: rect.height,
-      },
+      } : null,
       editableFields, // Map of fieldName -> fieldType from DOM
       linkableFields, // Map of fieldName -> true for URL/link fields
       mediaFields, // Map of fieldName -> true for image/media fields
@@ -3538,6 +3595,7 @@ export class Bridge {
       focusedLinkableField: this.focusedLinkableField,
       focusedMediaField: this.focusedMediaField,
       addDirection, // Direction for add button positioning
+      isMultiElement, // Signal that this is a multi-element selection
     };
 
     log('Block selected, sending UI messages:', {
@@ -3550,17 +3608,34 @@ export class Bridge {
       mediaFields,
     });
 
-    // Create drag handle for block reordering
+    // Create drag handle for block reordering (works for all block types including template instances)
     // This creates an invisible button in the iframe positioned under the parent's visual drag handle
     // Mouse events pass through the parent's visual (which has pointerEvents: 'none') to this button
-    this.createDragHandle(blockElement);
-
-    // Observe block text changes for inline editing
-    this.observeBlockTextChanges(blockElement);
+    this.createDragHandle(blockElements);
 
     // Observe block size changes (e.g., image loading, content changes)
     // This updates the selection outline when block dimensions change
-    this.observeBlockResize(blockElement, blockUid, editableFields);
+    this.observeBlockResize(blockElements, blockUid, editableFields);
+
+    // Observe block text changes for inline editing (skip for template instances - they're virtual)
+    if (!isTemplateInstance) {
+      this.observeBlockTextChanges(blockElement);
+    }
+
+    // For template instances, send BLOCK_SELECTED immediately (no text selection to trigger it)
+    if (isTemplateInstance && this._pendingBlockSelected) {
+      const pending = this._pendingBlockSelected;
+      this._pendingBlockSelected = null;
+      log('Sending BLOCK_SELECTED for template instance:', pending.blockUid);
+      // Use sendBlockSelected with blockUid override (template instances have no DOM element)
+      this.sendBlockSelected('templateInstance', blockElement, {
+        blockUid: pending.blockUid,
+        focusedFieldName: pending.focusedFieldName,
+        focusedLinkableField: pending.focusedLinkableField,
+        focusedMediaField: pending.focusedMediaField,
+      });
+      return; // Exit early - no further processing needed for template instances
+    }
 
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
@@ -3699,6 +3774,7 @@ export class Bridge {
             const pendingFocusedMediaField = this._pendingBlockSelected.focusedMediaField;
             this._pendingBlockSelected = null;
             this.sendBlockSelected('selectionChangeListener', currentBlockElement, {
+              blockUid: pendingBlockUid,
               focusedFieldName: pendingFocusedFieldName,
               focusedLinkableField: pendingFocusedLinkableField,
               focusedMediaField: pendingFocusedMediaField,
@@ -4038,11 +4114,11 @@ export class Bridge {
    * When the block's size changes, sends an updated BLOCK_SELECTED message to update the selection outline.
    * For multi-element blocks, observes ALL elements and recomputes combined bounding box.
    *
-   * @param {Element} blockElement - The block element to observe.
+   * @param {Array} blockElements - Array of DOM elements for the block (used for initial rect fallback).
    * @param {string} blockUid - The block's UID.
    * @param {Object} editableFields - Map of fieldName -> fieldType for editable fields in this block.
    */
-  observeBlockResize(blockElement, blockUid, editableFields, skipInitialUpdate = false) {
+  observeBlockResize(blockElements, blockUid, editableFields, skipInitialUpdate = false) {
     log('observeBlockResize called for block:', blockUid, 'skipInitialUpdate:', skipInitialUpdate);
 
     // Skip if already observing the same block AND the current DOM elements match observed
@@ -4078,8 +4154,8 @@ export class Bridge {
     // Only reset if this is a different block
     // Always convert to plain object - DOMRect is live and would cause comparison issues
     let currentRect = this.getBoundingBoxForElements(allElements);
-    if (!currentRect) {
-      const domRect = blockElement.getBoundingClientRect();
+    if (!currentRect && blockElements?.[0]) {
+      const domRect = blockElements[0].getBoundingClientRect();
       currentRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
     }
     if (!this._lastBlockRect || this._lastBlockRectUid !== blockUid) {
@@ -4137,7 +4213,8 @@ export class Bridge {
           'new:', newRect.top, newRect.left, newRect.width, newRect.height);
 
         // Send updated BLOCK_SELECTED with new rect
-        this.sendBlockSelected('resizeObserver', blockElement);
+        // Pass blockUid so template instances use the correct UID (not the child element's UID)
+        this.sendBlockSelected('resizeObserver', null, { blockUid });
       }
     });
 
@@ -4151,7 +4228,7 @@ export class Bridge {
     this.observeBlockDomChanges(blockUid);
 
     // Also track position during CSS transitions (e.g., carousel slide animations)
-    this.observeBlockTransition(blockElement, blockUid);
+    this.observeBlockTransition(blockElements, blockUid);
   }
 
   /**
@@ -4277,7 +4354,7 @@ export class Bridge {
                   // Always clear after processing - drag is complete
                   this._justFinishedDragBlockId = null;
                 }
-                this.sendBlockSelected('domChange', freshElements[0]);
+                this.sendBlockSelected('domChange', null, { blockUid });
               }
             }, 150); // Wait for animation to settle
             // Drag handle position is now set in sendBlockSelected
@@ -4341,18 +4418,24 @@ export class Bridge {
   /**
    * Tracks block position during CSS transitions/animations.
    * ResizeObserver doesn't fire for transform changes, so we poll during transitions.
+   * For multi-element blocks, observes ALL elements and uses combined bounding box.
    *
-   * @param {Element} blockElement - The block element to observe.
+   * @param {Array} blockElements - Array of DOM elements to observe.
    * @param {string} blockUid - The block's UID.
    */
-  observeBlockTransition(blockElement, blockUid) {
+  observeBlockTransition(blockElements, blockUid) {
+    if (!blockElements || blockElements.length === 0) return;
+
     // Clean up existing transition tracking
     if (this._transitionAnimationFrame) {
       cancelAnimationFrame(this._transitionAnimationFrame);
       this._transitionAnimationFrame = null;
     }
-    if (this._transitionEndHandler) {
-      blockElement.removeEventListener('transitionend', this._transitionEndHandler);
+    // Remove listeners from previously tracked elements
+    if (this._transitionEndHandler && this._trackedBlockElements) {
+      for (const el of this._trackedBlockElements) {
+        el.removeEventListener('transitionend', this._transitionEndHandler);
+      }
     }
     if (this._initialTrackingTimeout) {
       clearTimeout(this._initialTrackingTimeout);
@@ -4373,9 +4456,12 @@ export class Bridge {
         return;
       }
 
-      const domRect = blockElement.getBoundingClientRect();
-      // Convert to plain object - DOMRect is live and would cause comparison issues
-      const newRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
+      // Use combined bounding box for multi-element blocks
+      const newRect = this.getBoundingBoxForElements(blockElements);
+      if (!newRect) {
+        this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
+        return;
+      }
       const lastRect = this._lastBlockRect;
 
       if (lastRect) {
@@ -4384,7 +4470,7 @@ export class Bridge {
 
         if (topChanged || leftChanged) {
           this._lastBlockRect = newRect;
-          this.sendBlockSelected('transitionTracker', blockElement);
+          this.sendBlockSelected('transitionTracker', blockElements[0]);
         }
       }
 
@@ -4408,29 +4494,30 @@ export class Bridge {
       }
       log('observeBlockTransition: stopped tracking for:', blockUid);
 
-      // Final position update
+      // Final position update using combined bounding box
       if (this.selectedBlockUid === blockUid) {
-        const domRect = blockElement.getBoundingClientRect();
-        // Convert to plain object - DOMRect is live and would cause comparison issues
-        const finalRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
-        if (this._lastBlockRect) {
+        const finalRect = this.getBoundingBoxForElements(blockElements);
+        if (finalRect && this._lastBlockRect) {
           const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
                         Math.abs(finalRect.top - this._lastBlockRect.top) > 1;
           if (moved) {
             this._lastBlockRect = finalRect;
-            this.sendBlockSelected('transitionEnd', blockElement);
+            this.sendBlockSelected('transitionEnd', blockElements[0]);
           }
         }
       }
     };
 
-    // Stop tracking when transition ends
+    // Stop tracking when transition ends on ANY element
     this._transitionEndHandler = stopTracking;
-    this._trackedBlockElement = blockElement;
+    this._trackedBlockElements = blockElements;
 
-    blockElement.addEventListener('transitionend', this._transitionEndHandler);
+    // Attach listeners to ALL elements
+    for (const el of blockElements) {
+      el.addEventListener('transitionend', this._transitionEndHandler);
+    }
 
-    // Use MutationObserver to detect when transform/translate classes change
+    // Use MutationObserver to detect when transform/translate classes change on ANY element
     if (this._transitionMutationObserver) {
       this._transitionMutationObserver.disconnect();
     }
@@ -4439,7 +4526,7 @@ export class Bridge {
       for (const mutation of mutations) {
         if (mutation.type === 'attributes' &&
             (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
-          const style = window.getComputedStyle(blockElement);
+          const style = window.getComputedStyle(mutation.target);
           // Check if element has a transition and transform
           if (style.transition && style.transition !== 'none' &&
               (style.transform !== 'none' || style.translate !== 'none')) {
@@ -4449,10 +4536,13 @@ export class Bridge {
       }
     });
 
-    this._transitionMutationObserver.observe(blockElement, {
-      attributes: true,
-      attributeFilter: ['class', 'style'],
-    });
+    // Observe ALL elements for attribute changes
+    for (const el of blockElements) {
+      this._transitionMutationObserver.observe(el, {
+        attributes: true,
+        attributeFilter: ['class', 'style'],
+      });
+    }
 
     // Always do initial position tracking for 500ms after selection
     // This catches animations on parent elements (e.g., Flowbite carousel)
@@ -4470,8 +4560,11 @@ export class Bridge {
   /**
    * Sets up mouse tracking to position drag handle dynamically.
    * The drag handle is positioned on mousemove to avoid being destroyed by re-renders.
+   *
+   * @param {Array} blockElements - Array of DOM elements for the selected block (not used directly,
+   *                                but included for API consistency - we use getAllBlockElements internally)
    */
-  createDragHandle() {
+  createDragHandle(blockElements) {
 
     // Remove any existing drag handle
     const existingDragHandle = document.querySelector('.volto-hydra-drag-button');
@@ -4549,22 +4642,14 @@ export class Bridge {
       // Set flag to suppress scrollHandler during drag
       this._isDragging = true;
 
-      // Get all elements for this block (multi-element blocks like listings)
-      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      // Get all elements for this block (multi-element blocks like listings, template instances)
+      // Convert NodeList to array for .map() and .includes() support
+      const allElements = [...this.getAllBlockElements(this.selectedBlockUid)];
       if (allElements.length === 0) return;
 
-      const blockElement = allElements[0]; // Primary element for reference
-
       // Compute bounding box for all elements
-      let rect;
-      if (allElements.length > 1) {
-        rect = this.getBoundingBoxForElements(allElements);
-        if (!rect) {
-          rect = blockElement.getBoundingClientRect();
-        }
-      } else {
-        rect = blockElement.getBoundingClientRect();
-      }
+      const rect = this.getBoundingBoxForElements(allElements);
+      if (!rect) return;
 
       document.querySelector('body').classList.add('grabbing');
 
@@ -4581,7 +4666,7 @@ export class Bridge {
         `;
       } else {
         // Single element: clone it as before
-        draggedBlock = blockElement.cloneNode(true);
+        draggedBlock = allElements[0].cloneNode(true);
         draggedBlock.classList.add('dragging');
         // Remove data-block-uid from shadow so it doesn't interfere with selectors
         draggedBlock.removeAttribute('data-block-uid');
@@ -4694,17 +4779,18 @@ export class Bridge {
           closestBlock = closestBlock.parentElement;
         }
 
-        // Exclude the dragged block and its ghost from being drop targets
-        const draggedBlockUid = blockElement.getAttribute('data-block-uid');
+        // Exclude the dragged block(s) and ghost from being drop targets
+        // For multi-element blocks (listings, template instances), exclude all elements
+        const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
         const isSelfOrGhost = closestBlock &&
-          (closestBlock === draggedBlock || closestBlock === blockElement ||
-           closestBlock.getAttribute('data-block-uid') === draggedBlockUid);
+          (closestBlock === draggedBlock || allElements.includes(closestBlock) ||
+           draggedBlockUids.includes(closestBlock.getAttribute('data-block-uid')));
         if (isSelfOrGhost) closestBlock = null;
 
         // Handle overshoot - find nearest block when cursor isn't over any block
         if (!closestBlock) {
           const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
-            .filter(el => el !== draggedBlock && el.getAttribute('data-block-uid') !== draggedBlockUid);
+            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(el.getAttribute('data-block-uid')));
 
           // Find nearest block by vertical distance to cursor
           let nearest = { el: null, dist: Infinity, above: false };
@@ -4725,10 +4811,10 @@ export class Bridge {
         }
 
         if (closestBlock) {
-          // Check if the dragged block type is allowed in the target container
+          // Check if the dragged block type(s) are allowed in the target container
           // If not, walk up the parent chain to find a valid drop target
-          const draggedBlockId = blockElement.getAttribute('data-block-uid');
-          const draggedBlockType = this.getBlockType(draggedBlockId);
+          // For template instances, check all child block types are allowed
+          const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -4738,8 +4824,10 @@ export class Bridge {
             const targetPathInfo = this.blockPathMap?.[validDropTargetUid];
             const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
 
-            // Check if drop is allowed here
-            if (!allowedSiblingTypes || !draggedBlockType || allowedSiblingTypes.includes(draggedBlockType)) {
+            // Check if drop is allowed here - all dragged block types must be allowed
+            const allTypesAllowed = !allowedSiblingTypes || draggedBlockTypes.length === 0 ||
+              draggedBlockTypes.every(type => allowedSiblingTypes.includes(type));
+            if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
             }
@@ -4756,8 +4844,8 @@ export class Bridge {
             validDropTarget = parentElement;
             validDropTargetUid = validDropTarget.getAttribute('data-block-uid');
 
-            // Don't allow dropping on the block we're dragging
-            if (validDropTargetUid === draggedBlockId) {
+            // Don't allow dropping on any of the blocks we're dragging
+            if (draggedBlockUids.includes(validDropTargetUid)) {
               validDropTarget = null;
               validDropTargetUid = null;
               break;
@@ -4808,7 +4896,32 @@ export class Bridge {
           // Determine insertion point based on mouse position relative to block center
           const mousePos = isHorizontal ? e.clientX - rect.left : e.clientY - rect.top;
           const blockSize = isHorizontal ? rect.width : rect.height;
-          insertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
+          const preferredInsertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
+
+          // Check if insert position is allowed (not between two fixed template blocks)
+          const targetPathInfo = this.blockPathMap?.[closestBlockUid];
+          const canInsertBefore = targetPathInfo?.canInsertBefore !== false;
+          const canInsertAfter = targetPathInfo?.canInsertAfter !== false;
+
+          // Use preferred position if allowed, otherwise try the other side
+          if (preferredInsertAt === 0 && canInsertBefore) {
+            insertAt = 0;
+          } else if (preferredInsertAt === 1 && canInsertAfter) {
+            insertAt = 1;
+          } else if (canInsertBefore) {
+            insertAt = 0;
+          } else if (canInsertAfter) {
+            insertAt = 1;
+          } else {
+            // Neither side is allowed - hide indicator
+            const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (existingIndicator) {
+              existingIndicator.style.display = 'none';
+            }
+            dropIndicatorVisible = false;
+            closestBlockUid = null;
+            return;
+          }
 
           // For multi-element blocks, use first or last element for indicator positioning
           if (isMultiElement) {
@@ -4897,7 +5010,9 @@ export class Bridge {
           // Only set on successful drop, not on cancelled drags.
           this._justFinishedDragBlockId = this.selectedBlockUid;
 
-          const draggedBlockId = blockElement.getAttribute('data-block-uid');
+          // Use selectedBlockUid (not blockElement's UID) to support template instances
+          // For template instances, selectedBlockUid is the instance ID, blockElement is first child
+          const draggedBlockId = this.selectedBlockUid;
           const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
@@ -4952,6 +5067,15 @@ export class Bridge {
         this.selectedBlockUid = uid;
         // Don't update formData here - it's managed via FORM_DATA messages
         // Don't post FORM_DATA - form data syncing is handled separately
+
+        // Handle template instances (virtual containers with no DOM element)
+        // selectBlock handles these by computing bounding box from child elements
+        if (this.blockPathMap?.[uid]?.isTemplateInstance) {
+          if (!alreadySelected) {
+            this.selectBlock(uid);
+          }
+          return;
+        }
 
         // console.log("select block", event.data?.method);
         let blockElement = document.querySelector(
@@ -5103,11 +5227,16 @@ export class Bridge {
               element = document.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
             }
           } else {
-            element = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+            // Use getAllBlockElements to handle template instances (virtual containers)
+            // which don't have their own DOM element but have child block elements
+            const elements = this.getAllBlockElements(this.selectedBlockUid);
+            element = elements[0] || null;
           }
 
           if (element) {
-            this.sendBlockSelected('scrollHandler', element);
+            // Pass blockUid explicitly to preserve template instance selection
+            // (element may be a child block with different UID)
+            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid });
           }
         }
       }, 150);
@@ -5123,12 +5252,13 @@ export class Bridge {
     const handleResize = () => {
       // After resize, re-send BLOCK_SELECTED with updated positions
       if (this.selectedBlockUid) {
-        const blockElement = document.querySelector(
-          `[data-block-uid="${this.selectedBlockUid}"]`,
-        );
+        // Use getAllBlockElements to handle template instances (virtual containers)
+        const elements = this.getAllBlockElements(this.selectedBlockUid);
+        const blockElement = elements[0] || null;
 
         if (blockElement) {
-          this.sendBlockSelected('resizeHandler', blockElement);
+          // Pass blockUid explicitly to preserve template instance selection
+          this.sendBlockSelected('resizeHandler', blockElement, { blockUid: this.selectedBlockUid });
         }
       }
     };
@@ -5160,6 +5290,11 @@ export class Bridge {
       // Use getOwnFirstEditableField to avoid getting nested blocks' fields
       blockUid = elementOrBlock.getAttribute('data-block-uid');
       editableField = this.getOwnFirstEditableField(elementOrBlock);
+    }
+
+    // Skip making readonly blocks editable
+    if (blockUid && this.isBlockReadonly(blockUid)) {
+      return;
     }
 
     if (editableField) {
@@ -8269,6 +8404,604 @@ export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0
   const top = Math.max(viewportOffset.top, viewportOffset.top + blockRect.top - HANDLE_OFFSET_TOP);
   const left = viewportOffset.left + blockRect.left;
   return { top, left };
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Template Utilities
+// For discovering, filtering, and merging templates.
+// Templates are Documents with blocks that have `_templateSource` markers.
+// Uses Volto's standard fixed/readOnly properties for block behavior.
+////////////////////////////////////////////////////////////////////////////////
+
+// Deprecated: old marker, kept for backwards compatibility
+export const TEMPLATE_MARKER = '_template';
+// Current marker: used on both template definitions (instanceId === templateId)
+// and pages using templates (instanceId !== templateId)
+export const TEMPLATE_SOURCE_MARKER = '_templateSource';
+
+/**
+ * Simple UUID generator for block IDs.
+ * @returns {string} UUID v4 format string
+ */
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Check if a template is a layout (has fixed blocks at edges).
+ * Layout = first or last block has fixed: true (Volto standard property).
+ *
+ * @param {Object} templateData - Template document with blocks and blocks_layout
+ * @returns {boolean}
+ */
+export function isLayoutTemplate(templateData) {
+  const { blocks, blocks_layout } = templateData;
+  const layout = blocks_layout?.items || [];
+  if (layout.length === 0) return false;
+
+  const firstBlock = blocks?.[layout[0]];
+  const lastBlock = blocks?.[layout[layout.length - 1]];
+
+  // If first or last block has fixed: true (Volto standard), it's a layout
+  const firstIsFixed = firstBlock?.fixed === true;
+  const lastIsFixed = lastBlock?.fixed === true;
+
+  return firstIsFixed || lastIsFixed;
+}
+
+/**
+ * Find placeholder regions in a template.
+ * Placeholder blocks (fixed: false) with same placeholderName form a region.
+ *
+ * @param {Object} templateData - Template document
+ * @returns {Object} { placeholderName: { blockIds: [], allowedBlocks: [] } }
+ */
+export function findPlaceholderRegions(templateData) {
+  const { blocks, blocks_layout } = templateData;
+  const layout = blocks_layout?.items || [];
+  const regions = {};
+
+  for (const blockId of layout) {
+    const block = blocks?.[blockId];
+    // Placeholder blocks have fixed: false (or undefined) and a placeholderName
+    if (block?.fixed) continue; // Skip fixed blocks
+
+    const placeholderName = block?.[TEMPLATE_SOURCE_MARKER]?.placeholderName;
+    if (placeholderName) {
+      if (!regions[placeholderName]) {
+        regions[placeholderName] = {
+          blockIds: [],
+          allowedBlocks: null, // Could add allowedBlocks to _templateSource if needed
+        };
+      }
+      regions[placeholderName].blockIds.push(blockId);
+    }
+  }
+  return regions;
+}
+
+/**
+ * Check if a template is allowed in a given container context.
+ *
+ * @param {Object} templateData - Template document
+ * @param {string} containerType - Block @type of container (e.g., "page", "columns")
+ * @param {string} fieldName - Container field name (e.g., "blocks")
+ * @returns {boolean}
+ */
+export function isTemplateAllowedIn(templateData, containerType, fieldName) {
+  const { allowed_container_types, allowed_field_names } = templateData;
+
+  // If no restrictions, allow everywhere
+  if (!allowed_container_types?.length && !allowed_field_names?.length) {
+    return true;
+  }
+
+  // Check restrictions
+  const typeOk =
+    !allowed_container_types?.length ||
+    allowed_container_types.includes(containerType);
+  const fieldOk =
+    !allowed_field_names?.length || allowed_field_names.includes(fieldName);
+
+  return typeOk && fieldOk;
+}
+
+/**
+ * Filter templates for "Apply Layout" UI.
+ * Returns templates that are layouts and allowed in the given context.
+ *
+ * @param {Array} templates - Array of template documents
+ * @param {string} containerType - Block @type of container
+ * @param {string} fieldName - Container field name
+ * @returns {Array} Filtered templates
+ */
+export function getLayoutTemplates(templates, containerType, fieldName) {
+  return templates.filter(
+    (t) => isLayoutTemplate(t) && isTemplateAllowedIn(t, containerType, fieldName),
+  );
+}
+
+/**
+ * Filter templates for block chooser (snippets).
+ * Returns templates that are NOT layouts and allowed in the given context.
+ *
+ * @param {Array} templates - Array of template documents
+ * @param {string} containerType - Block @type of container
+ * @param {string} fieldName - Container field name
+ * @returns {Array} Filtered templates
+ */
+export function getSnippetTemplates(templates, containerType, fieldName) {
+  return templates.filter(
+    (t) =>
+      !isLayoutTemplate(t) && isTemplateAllowedIn(t, containerType, fieldName),
+  );
+}
+
+/**
+ * Clone template blocks with fresh UUIDs.
+ *
+ * @param {Object} blocks - Template blocks object
+ * @param {Array} layout - Template blocks_layout.items array
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} { blocks, layout, idMap } where idMap tracks old->new IDs
+ */
+export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUUID) {
+  const idMap = {}; // oldId -> newId
+  const newBlocks = {};
+  const newLayout = [];
+
+  for (const oldId of layout) {
+    const newId = uuidGenerator();
+    idMap[oldId] = newId;
+
+    // Deep clone the block
+    const block = blocks[oldId];
+    if (block) {
+      newBlocks[newId] = JSON.parse(JSON.stringify(block));
+    }
+
+    newLayout.push(newId);
+  }
+
+  return { blocks: newBlocks, layout: newLayout, idMap };
+}
+
+/**
+ * Apply a layout template to existing page/container content.
+ * - Clones template blocks with new IDs
+ * - Adds _templateSource markers with instanceId
+ * - Preserves Volto's fixed/readOnly properties
+ * - Moves existing content into the "default" placeholder
+ *
+ * @param {Object} pageFormData - Existing page data with blocks and blocks_layout
+ * @param {Object} templateData - Template document
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} Merged formData with template applied
+ */
+export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = generateUUID) {
+  const result = { blocks: {}, blocks_layout: { items: [] } };
+  const templateId = templateData['@id'] || templateData.UID;
+  const instanceId = uuidGenerator(); // New instance ID for this application
+
+  // 1. Clone template blocks with new IDs
+  const { blocks: clonedBlocks, layout: clonedLayout, idMap } =
+    cloneBlocksWithNewIds(
+      templateData.blocks,
+      templateData.blocks_layout?.items || [],
+      uuidGenerator,
+    );
+
+  // 2. Add _templateSource to each cloned block, preserving fixed/readOnly
+  for (const [newId, block] of Object.entries(clonedBlocks)) {
+    const originalId = Object.entries(idMap).find(
+      ([_, v]) => v === newId,
+    )?.[0];
+    const originalBlock = templateData.blocks?.[originalId];
+    const originalSource = originalBlock?.[TEMPLATE_SOURCE_MARKER];
+
+    // Copy the block with updated _templateSource (new instanceId)
+    block[TEMPLATE_SOURCE_MARKER] = {
+      instanceId,
+      templateId,
+      placeholderName: originalSource?.placeholderName || originalId, // Use original placeholderName or blockId as fallback
+    };
+    // Preserve Volto's fixed/readOnly from template
+    if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
+    if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
+
+    result.blocks[newId] = block;
+  }
+
+  // 3. Get existing page blocks and mark them for the "default" placeholder
+  const existingBlockIds = pageFormData.blocks_layout?.items || [];
+  for (const existingId of existingBlockIds) {
+    const existingBlock = pageFormData.blocks?.[existingId];
+    if (existingBlock) {
+      result.blocks[existingId] = {
+        ...existingBlock,
+        [TEMPLATE_SOURCE_MARKER]: {
+          instanceId,
+          templateId,
+          placeholderName: 'default',
+        },
+        // Existing content is not fixed (can be edited/moved)
+      };
+      delete result.blocks[existingId].fixed;
+      delete result.blocks[existingId].readOnly;
+    }
+  }
+
+  // 4. Build final layout - insert existing blocks after "default" placeholder start
+  for (const newBlockId of clonedLayout) {
+    result.blocks_layout.items.push(newBlockId);
+
+    // If this block is the "default" placeholder, insert existing content after it
+    const block = result.blocks[newBlockId];
+    if (!block?.fixed && block?.[TEMPLATE_SOURCE_MARKER]?.placeholderName === 'default') {
+      result.blocks_layout.items.push(...existingBlockIds);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Insert snippet blocks at a specific position.
+ * - Clones snippet blocks with new IDs
+ * - Adds _templateSource markers with instanceId
+ * - Preserves Volto's fixed/readOnly properties
+ * - Inserts at the specified position
+ *
+ * @param {Object} pageFormData - Existing page data
+ * @param {Object} templateData - Snippet template document
+ * @param {number} position - Index to insert at
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} Updated formData with snippet inserted
+ */
+export function insertSnippetBlocks(pageFormData, templateData, position, uuidGenerator = generateUUID) {
+  const result = {
+    blocks: { ...pageFormData.blocks },
+    blocks_layout: {
+      items: [...(pageFormData.blocks_layout?.items || [])],
+    },
+  };
+  const templateId = templateData['@id'] || templateData.UID;
+  const instanceId = uuidGenerator(); // New instance ID for this insertion
+
+  // Clone snippet blocks
+  const { blocks: clonedBlocks, layout: clonedLayout, idMap } =
+    cloneBlocksWithNewIds(
+      templateData.blocks,
+      templateData.blocks_layout?.items || [],
+      uuidGenerator,
+    );
+
+  // Add _templateSource markers
+  for (const [newId, block] of Object.entries(clonedBlocks)) {
+    const originalId = Object.entries(idMap).find(
+      ([_, v]) => v === newId,
+    )?.[0];
+    const originalBlock = templateData.blocks?.[originalId];
+    const originalSource = originalBlock?.[TEMPLATE_SOURCE_MARKER];
+
+    block[TEMPLATE_SOURCE_MARKER] = {
+      instanceId,
+      templateId,
+      placeholderName: originalSource?.placeholderName || originalId,
+    };
+    // Preserve Volto's fixed/readOnly from template
+    if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
+    if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
+
+    result.blocks[newId] = block;
+  }
+
+  // Insert at position
+  result.blocks_layout.items.splice(position, 0, ...clonedLayout);
+
+  return result;
+}
+
+/**
+ * Get blocks that belong to a specific template.
+ *
+ * @param {Object} formData - Page form data
+ * @param {string} templateId - Template UID to find
+ * @returns {Array} Array of block IDs belonging to this template
+ */
+export function getTemplateBlocks(formData, templateId) {
+  const blockIds = [];
+  for (const blockId of formData.blocks_layout?.items || []) {
+    const block = formData.blocks?.[blockId];
+    if (block?.[TEMPLATE_SOURCE_MARKER]?.templateId === templateId) {
+      blockIds.push(blockId);
+    }
+  }
+  return blockIds;
+}
+
+/**
+ * Check if a block is a fixed template block (cannot be moved individually).
+ * Uses Volto's standard fixed property.
+ *
+ * @param {Object} block - Block data
+ * @returns {boolean}
+ */
+export function isFixedTemplateBlock(block) {
+  // Fixed if it has _templateSource AND fixed: true (Volto standard)
+  return block?.[TEMPLATE_SOURCE_MARKER] && block?.fixed === true;
+}
+
+/**
+ * Check if a block is placeholder content (can be moved freely).
+ * Placeholder blocks have _templateSource but fixed: false (or undefined).
+ *
+ * @param {Object} block - Block data
+ * @returns {boolean}
+ */
+export function isPlaceholderContent(block) {
+  const source = block?.[TEMPLATE_SOURCE_MARKER];
+  // Placeholder if it has _templateSource but is NOT fixed
+  return source && !block?.fixed;
+}
+
+/**
+ * Get unique template IDs (paths) from page data.
+ *
+ * @param {Object} formData - Page data with blocks
+ * @returns {Array<string>} Array of unique template paths
+ */
+export function getUniqueTemplateIds(formData) {
+  const templateIds = new Set();
+  for (const blockId of Object.keys(formData.blocks || {})) {
+    const block = formData.blocks[blockId];
+    const source = block?.[TEMPLATE_SOURCE_MARKER];
+    // Skip template definitions (instanceId === templateId)
+    // Only include pages using templates (instanceId !== templateId)
+    if (source?.templateId && source.instanceId !== source.templateId) {
+      templateIds.add(source.templateId);
+    }
+  }
+  return Array.from(templateIds);
+}
+
+/**
+ * Merge template content into page data.
+ * Fixed template blocks get their content updated from the template.
+ * Placeholder content (fixed: false) is preserved.
+ *
+ * IMPORTANT: Only blocks with _templateSource markers are processed.
+ * Blocks without _templateSource are ignored at all levels (not synced).
+ *
+ * Uses Volto's standard block properties:
+ * - fixed: true = position locked (merge content from template)
+ * - readOnly: true = content locked (set on merged blocks)
+ *
+ * @param {Object} formData - Page data with _templateSource markers
+ * @param {Object} templates - Map of templateId -> template document
+ * @returns {Object} Merged formData
+ */
+export function mergeTemplateContent(formData, templates) {
+  const mergedBlocks = { ...formData.blocks };
+  let mergedLayout = [...(formData.blocks_layout?.items || [])];
+
+  // Group page blocks by instanceId -> placeholderName -> blockId
+  const pageBlocksByInstance = new Map();
+  for (const [blockId, block] of Object.entries(mergedBlocks)) {
+    const source = block?.[TEMPLATE_SOURCE_MARKER];
+    if (!source || source.instanceId === source.templateId) continue;
+    const { instanceId, placeholderName } = source;
+    if (!pageBlocksByInstance.has(instanceId)) {
+      pageBlocksByInstance.set(instanceId, new Map());
+    }
+    pageBlocksByInstance.get(instanceId).set(placeholderName, blockId);
+  }
+
+  // Process each template instance
+  for (const [instanceId, placeholderMap] of pageBlocksByInstance) {
+    // Get templateId from any block in this instance
+    const anyBlockId = placeholderMap.values().next().value;
+    const templateId = mergedBlocks[anyBlockId]?.[TEMPLATE_SOURCE_MARKER]?.templateId;
+    const template = templates[templateId];
+    if (!template) continue;
+
+    const templateLayout = template.blocks_layout?.items || [];
+    const processedPlaceholders = new Set();
+
+    // Find first page block of this instance for insert position
+    const firstPageBlockIndex = mergedLayout.findIndex(id => placeholderMap.has(mergedBlocks[id]?.[TEMPLATE_SOURCE_MARKER]?.placeholderName));
+    let insertIndex = firstPageBlockIndex >= 0 ? firstPageBlockIndex : mergedLayout.length;
+
+    // Iterate template blocks in order
+    for (const templateBlockId of templateLayout) {
+      const templateBlock = template.blocks?.[templateBlockId];
+      if (!templateBlock?.fixed) continue; // Only process fixed blocks
+
+      const placeholderName = templateBlock[TEMPLATE_SOURCE_MARKER]?.placeholderName;
+      if (!placeholderName) continue;
+      processedPlaceholders.add(placeholderName);
+
+      const pageBlockId = placeholderMap.get(placeholderName);
+
+      if (pageBlockId) {
+        // Fixed block exists in both - merge content from template
+        mergedBlocks[pageBlockId] = mergeBlockContent(
+          mergedBlocks[pageBlockId],
+          templateBlock,
+          instanceId,
+          templateId,
+          templates
+        );
+        // Update insert position to after this existing block
+        const existingIndex = mergedLayout.indexOf(pageBlockId);
+        if (existingIndex >= 0) {
+          insertIndex = existingIndex + 1;
+        }
+      } else {
+        // Fixed block in template only - insert into page
+        const newBlockId = `template-${placeholderName}`;
+        mergedBlocks[newBlockId] = mergeBlockContent(
+          null, // No page block exists
+          templateBlock,
+          instanceId,
+          templateId,
+          templates
+        );
+        mergedLayout.splice(insertIndex, 0, newBlockId);
+        insertIndex++;
+      }
+    }
+
+    // Remove fixed blocks from page that aren't in template
+    for (const [placeholderName, pageBlockId] of placeholderMap) {
+      const block = mergedBlocks[pageBlockId];
+      if (block?.fixed && !processedPlaceholders.has(placeholderName)) {
+        delete mergedBlocks[pageBlockId];
+        mergedLayout = mergedLayout.filter(id => id !== pageBlockId);
+      }
+    }
+  }
+
+  return {
+    ...formData,
+    blocks: mergedBlocks,
+    blocks_layout: { ...formData.blocks_layout, items: mergedLayout },
+  };
+}
+
+/**
+ * Merge a single block's content from template to page.
+ * Only syncs properties and nested blocks that have _templateSource markers.
+ * Blocks/properties without markers are left untouched (page content preserved).
+ *
+ * @param {Object|null} pageBlock - Existing page block (null if inserting new)
+ * @param {Object} templateBlock - Template block to merge from
+ * @param {string} instanceId - Instance ID for this template usage
+ * @param {string} templateId - Template ID
+ * @param {Object} templates - Map of templateId -> template document
+ * @returns {Object} Merged block
+ */
+function mergeBlockContent(pageBlock, templateBlock, instanceId, templateId, templates) {
+  // Start with template block's non-container properties
+  const result = {};
+
+  for (const [key, value] of Object.entries(templateBlock)) {
+    if (key === 'blocks' || key === 'blocks_layout') {
+      // Handle container fields separately (recursive merge)
+      continue;
+    }
+    if (key === TEMPLATE_SOURCE_MARKER) {
+      // Update instanceId for page usage
+      result[key] = {
+        ...value,
+        instanceId,
+      };
+    } else {
+      result[key] = value;
+    }
+  }
+
+  // Handle nested blocks recursively
+  if (templateBlock.blocks) {
+    const templateNestedBlocks = templateBlock.blocks;
+    const templateNestedLayout = templateBlock.blocks_layout?.items || [];
+    const pageNestedBlocks = pageBlock?.blocks || {};
+    const pageNestedLayout = pageBlock?.blocks_layout?.items || [];
+
+    // Build map of page blocks by placeholderName (only those with _templateSource)
+    const pageByPlaceholder = new Map();
+    for (const [blockId, block] of Object.entries(pageNestedBlocks)) {
+      const source = block?.[TEMPLATE_SOURCE_MARKER];
+      if (source?.placeholderName) {
+        pageByPlaceholder.set(source.placeholderName, { blockId, block });
+      }
+    }
+
+    // Build map of template blocks by placeholderName (only those with _templateSource)
+    const templateByPlaceholder = new Map();
+    for (const blockId of templateNestedLayout) {
+      const block = templateNestedBlocks[blockId];
+      const source = block?.[TEMPLATE_SOURCE_MARKER];
+      if (source?.placeholderName) {
+        templateByPlaceholder.set(source.placeholderName, { blockId, block });
+      }
+    }
+
+    const mergedNestedBlocks = {};
+    const mergedNestedLayout = [];
+    const processedPageBlocks = new Set();
+
+    // Process template blocks in order
+    for (const templateBlockId of templateNestedLayout) {
+      const templateNestedBlock = templateNestedBlocks[templateBlockId];
+      const source = templateNestedBlock?.[TEMPLATE_SOURCE_MARKER];
+
+      if (!source?.placeholderName) {
+        // No _templateSource marker - skip this block entirely
+        // (don't copy from template, don't include in result)
+        continue;
+      }
+
+      const placeholderName = source.placeholderName;
+      const pageEntry = pageByPlaceholder.get(placeholderName);
+
+      if (templateNestedBlock.fixed) {
+        // Fixed nested block - sync from template (recursively)
+        const newBlockId = pageEntry?.blockId || `template-${placeholderName}`;
+        mergedNestedBlocks[newBlockId] = mergeBlockContent(
+          pageEntry?.block || null,
+          templateNestedBlock,
+          instanceId,
+          templateId,
+          templates
+        );
+        mergedNestedLayout.push(newBlockId);
+        if (pageEntry) {
+          processedPageBlocks.add(pageEntry.blockId);
+        }
+      } else {
+        // Placeholder nested block - keep page content if exists
+        if (pageEntry) {
+          mergedNestedBlocks[pageEntry.blockId] = pageEntry.block;
+          mergedNestedLayout.push(pageEntry.blockId);
+          processedPageBlocks.add(pageEntry.blockId);
+        } else {
+          // No page content - use template default
+          const newBlockId = `template-${placeholderName}`;
+          mergedNestedBlocks[newBlockId] = {
+            ...templateNestedBlock,
+            [TEMPLATE_SOURCE_MARKER]: {
+              ...source,
+              instanceId,
+            },
+          };
+          mergedNestedLayout.push(newBlockId);
+        }
+      }
+    }
+
+    // Keep page blocks without _templateSource (user content not in template)
+    for (const blockId of pageNestedLayout) {
+      if (!processedPageBlocks.has(blockId)) {
+        const block = pageNestedBlocks[blockId];
+        if (!block?.[TEMPLATE_SOURCE_MARKER]) {
+          // No marker - this is user content, keep it
+          mergedNestedBlocks[blockId] = block;
+          mergedNestedLayout.push(blockId);
+        }
+        // If it has a marker but wasn't processed, it's a stale template block - remove it
+      }
+    }
+
+    result.blocks = mergedNestedBlocks;
+    result.blocks_layout = { items: mergedNestedLayout };
+  }
+
+  return result;
 }
 
 // Make initBridge available globally

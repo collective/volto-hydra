@@ -1,0 +1,115 @@
+{
+  "@id": "/template-test-page",
+  "@type": "Document",
+  "id": "template-test-page",
+  "title": "Template Test Page",
+  "description": "A test page with pre-applied layout template",
+  "blocks": {
+    "standalone-block-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "This is a standalone block before the template" }]
+        }
+      ],
+      "plaintext": "This is a standalone block before the template"
+    },
+    "template-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        {
+          "type": "h1",
+          "children": [{ "text": "Stale Header - Should Be Replaced By Merge" }]
+        }
+      ],
+      "plaintext": "Stale Header - Should Be Replaced By Merge",
+      "_templateSource": {
+        "instanceId": "tpl-instance-1",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "header"
+      }
+    },
+    "user-content-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "User content - different from template default" }]
+        }
+      ],
+      "plaintext": "User content - different from template default",
+      "_templateSource": {
+        "instanceId": "tpl-instance-1",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "primary"
+      }
+    },
+    "user-content-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Second user content block in placeholder" }]
+        }
+      ],
+      "plaintext": "Second user content block in placeholder",
+      "_templateSource": {
+        "instanceId": "tpl-instance-1",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "primary"
+      }
+    },
+    "template-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Stale Footer - Should Be Replaced By Merge" }]
+        }
+      ],
+      "plaintext": "Stale Footer - Should Be Replaced By Merge",
+      "_templateSource": {
+        "instanceId": "tpl-instance-1",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "footer"
+      }
+    },
+    "standalone-block-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "This is a standalone block after the template" }]
+        }
+      ],
+      "plaintext": "This is a standalone block after the template"
+    }
+  },
+  "blocks_layout": {
+    "items": ["standalone-block-1", "template-header", "user-content-1", "user-content-2", "template-footer", "standalone-block-2"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/template-test-page/@actions",
+      "object": [
+        {
+          "@id": "/template-test-page/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/template-test-page/@breadcrumbs",
+      "items": [
+        { "@id": "/template-test-page", "title": "Template Test Page" }
+      ]
+    }
+  }
+}

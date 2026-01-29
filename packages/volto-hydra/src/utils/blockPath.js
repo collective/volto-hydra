@@ -253,6 +253,8 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
   }
 
   const pathMap = {};
+  // Track created virtual containers for template instances
+  const createdTemplateInstances = new Set();
 
   // Get page schema from _page block type (registered at INIT time)
   // This contains the blocks container fields (blocks, footer_blocks, etc.)
@@ -366,7 +368,16 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     const layout = parent[layoutFieldName]?.items;
     if (!blocks || !layout) return;
 
+    // First pass: collect fixed status for all blocks to determine insert restrictions
+    const blockFixedStatus = {};
     layout.forEach(blockId => {
+      const block = blocks[blockId];
+      if (block) {
+        blockFixedStatus[blockId] = block.fixed === true;
+      }
+    });
+
+    layout.forEach((blockId, index) => {
       const block = blocks[blockId];
       if (!block) return;
 
@@ -374,14 +385,78 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const blockType = block['@type'];
       const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
 
+      // Check Volto's standard block properties (top-level, not in _templateSource)
+      const templateSource = block._templateSource;
+      const isFixed = block.fixed === true;        // Volto standard: position locked
+      const isReadonly = block.readOnly === true;  // Volto standard: content locked
+
+      // Check if inserting before/after this block is allowed
+      // Can't insert:
+      // 1. Between two adjacent fixed blocks
+      // 2. Before a fixed block at container start (no placeholder there)
+      // 3. After a fixed block at container end (no placeholder there)
+      const prevBlockId = layout[index - 1];
+      const nextBlockId = layout[index + 1];
+      const prevBlockIsFixed = prevBlockId ? blockFixedStatus[prevBlockId] : false;
+      const nextBlockIsFixed = nextBlockId ? blockFixedStatus[nextBlockId] : false;
+      const atContainerStart = index === 0;
+      const atContainerEnd = index === layout.length - 1;
+      // Fixed block at edge OR between two fixed blocks = can't insert
+      const canInsertBefore = !(isFixed && (atContainerStart || prevBlockIsFixed));
+      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed));
+
+      // Template instance virtual container
+      // Only FIRST-LEVEL template blocks get the virtual instance as parent
+      // Nested blocks (inside containers that are part of the template) keep their actual parent
+      let effectiveParentId = parentId;
+      if (templateSource?.instanceId) {
+        const instanceId = templateSource.instanceId;
+
+        // Check if parent container is also part of this template instance
+        // If so, this is a nested block - keep actual parent
+        const parentInSameInstance = parent._templateSource?.instanceId === instanceId;
+
+        if (!parentInSameInstance) {
+          // First-level template block - create/use virtual instance as parent
+          if (!createdTemplateInstances.has(instanceId)) {
+            createdTemplateInstances.add(instanceId);
+
+            // Derive display name from templateId path (e.g., "/templates/test-layout" -> "test-layout")
+            const templatePath = templateSource.templateId || '';
+            const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
+
+            const instanceBlockType = `Template: ${templateName}`;
+            pathMap[instanceId] = {
+              path: null, // Virtual - no actual storage path
+              parentId, // Template instance's parent is the original container
+              containerField: fieldName,
+              blockType: instanceBlockType, // Virtual type for sidebar display
+              isTemplateInstance: true,
+              templateId: templateSource.templateId,
+              // Virtual block data for components that need blockData (e.g., ParentBlocksWidget)
+              blockData: { '@type': instanceBlockType, '@uid': instanceId },
+              // Template instances can be moved/deleted as a unit (TODO: implement group operations)
+            };
+          }
+
+          // Block's parent is the template instance, not the original container
+          effectiveParentId = instanceId;
+        }
+      }
+
       pathMap[blockId] = {
         path: blockPath,
-        parentId,
+        parentId: effectiveParentId,
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
         allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
         maxSiblings: fieldDef.maxLength || null,
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
+        ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
+        ...(isReadonly && { isReadonly: true }), // Readonly template blocks can't be edited
+        // Insert restrictions for fixed block boundaries
+        ...(!canInsertBefore && { canInsertBefore: false }),
+        ...(!canInsertAfter && { canInsertAfter: false }),
       };
 
       // RECURSE: process this block's container fields
@@ -556,7 +631,8 @@ export function setBlockByPath(formData, path, value) {
 export function getBlockById(formData, blockPathMap, blockId) {
   const pathInfo = blockPathMap?.[blockId];
   if (!pathInfo?.path) {
-    return undefined;
+    // Virtual blocks (like template instances) have blockData in pathMap instead of formData
+    return pathInfo?.blockData;
   }
   // Return the raw block data - no @type injection
   // Callers should use blockPathMap[blockId].blockType for the block type
@@ -614,8 +690,15 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     return null;
   }
 
-  const parentId = pathInfo.parentId;
+  let parentId = pathInfo.parentId;
   const fieldName = pathInfo.containerField;
+
+  // If parent is a virtual template instance, use the instance's parent for storage operations
+  // Template blocks are stored flat, so the actual container is the instance's parent
+  const parentPathInfo = blockPathMap[parentId];
+  if (parentPathInfo?.isTemplateInstance) {
+    parentId = parentPathInfo.parentId;
+  }
 
   // Determine parent type: '_page' for page-level blocks, otherwise from blockPathMap
   const parentType = parentId === PAGE_BLOCK_UID ? '_page' : blockPathMap[parentId]?.blockType;
@@ -691,16 +774,41 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
- * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, defaultBlock, maxLength }]
+ * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlock, maxLength }]
  */
 export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl) {
+  const pathInfo = blockPathMap?.[blockId];
+
+  // Special handling for virtual template instances
+  // Template instances don't have a schema, but they contain child blocks
+  // tracked via parentId in the pathMap
+  if (pathInfo?.isTemplateInstance) {
+    // Find all direct children of this template instance
+    const childIds = Object.entries(blockPathMap)
+      .filter(([, info]) => info.parentId === blockId)
+      .map(([id]) => id);
+
+    if (childIds.length > 0) {
+      return [{
+        fieldName: 'blocks', // Virtual field name for template children
+        title: 'Blocks',
+        isTemplateInstance: true,
+        // Template children are managed specially - no add button for now
+        allowedBlocks: null,
+        defaultBlock: null,
+        maxLength: null,
+      }];
+    }
+    return [];
+  }
+
   // For page-level (blockId is PAGE_BLOCK_UID), use _page schema and formData as the block
   const block = blockId === PAGE_BLOCK_UID ? formData : getBlockById(formData, blockPathMap, blockId);
   if (!block) return [];
 
   // Use blockPathMap for type lookup (single source of truth)
   // For page-level, use '_page' as the type
-  const blockType = blockId === PAGE_BLOCK_UID ? '_page' : blockPathMap[blockId]?.blockType;
+  const blockType = blockId === PAGE_BLOCK_UID ? '_page' : pathInfo?.blockType;
   if (!blockType) return [];
   const schema = getBlockSchema(blockType, intl, blocksConfig);
 
@@ -718,6 +826,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
+          allowedTemplates: fieldDef.allowedTemplates || null,
           defaultBlock: fieldDef.defaultBlock || blockConfig?.defaultBlock || null,
           maxLength: fieldDef.maxLength || blockConfig?.maxLength || null,
         });

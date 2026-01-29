@@ -940,6 +940,9 @@ test.describe('Hierarchical Sidebar', () => {
     // Re-open sidebar
     const triggerButton = page.locator('.sidebar-container .trigger');
     await triggerButton.click();
+    // Wait for sidebar animation to complete (collapsed class removed)
+    const sidebarContainer = page.locator('.sidebar-container');
+    await expect(sidebarContainer).not.toHaveClass(/collapsed/, { timeout: 5000 });
     await helper.waitForQuantaToolbar('text-after'); // Wait for toolbar to reposition
 
     // Verify positioning is still correct after sidebar reopen

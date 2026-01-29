@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplateContent } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -548,6 +548,14 @@ const Iframe = (props) => {
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
   }));
 
+  // Template cache: stores loaded template documents keyed by templateId
+  // Used for comparison on save to detect template changes
+  const templateCacheRef = useRef({});
+
+  // Pending INITIAL_DATA: when templates are loading during INIT, store data here
+  // Sync effect will send INITIAL_DATA after templates are merged
+  const pendingInitialDataRef = useRef(null);
+
   // Handle Escape key in Admin UI to navigate to parent block
   // This is needed because when selecting via sidebar, focus stays in Admin UI,
   // not iframe, so the iframe's Escape handler doesn't receive the event.
@@ -673,6 +681,49 @@ const Iframe = (props) => {
     const blockPathMap = customBlockPathMap || iframeSyncState.blockPathMap;
     const mergedBlocksConfig = config.blocks.blocksConfig;
     const newBlockId = uuid();
+
+    // Handle template insertion - templates expand to multiple blocks
+    const templateConfig = mergedBlocksConfig[blockType];
+    if (templateConfig?.isTemplate && templateConfig?.templateUrl) {
+      // Fetch template data and insert (async)
+      (async () => {
+        try {
+          const response = await fetch(`/++api++${templateConfig.templateUrl}`);
+          if (!response.ok) throw new Error(`Failed to fetch template: ${response.status}`);
+          const templateData = await response.json();
+
+          const { applyLayoutTemplate } = require('@volto-hydra/hydra-js');
+          const newFormData = applyLayoutTemplate(formData, templateData, uuid);
+
+          // Merge with existing formData (preserve other fields like title, description)
+          onChangeFormData({
+            ...formData,
+            blocks: newFormData.blocks,
+            blocks_layout: newFormData.blocks_layout,
+          });
+
+          // Select the template virtual block (instance)
+          // Get instanceId from any template block's _templateSource
+          const firstBlockId = newFormData.blocks_layout?.items?.[0];
+          const firstBlock = newFormData.blocks?.[firstBlockId];
+          const instanceId = firstBlock?._templateSource?.instanceId;
+
+          if (instanceId) {
+            flushSync(() => {
+              setIframeSyncState((prev) => ({
+                ...prev,
+                pendingSelectBlockUid: instanceId,
+              }));
+            });
+          }
+          dispatch(setSidebarTab(1));
+        } catch (error) {
+          console.error('[VIEW] Failed to insert template:', error);
+        }
+      })();
+
+      return null; // Async - block ID not immediately available
+    }
 
     // Get container config and determine if object_list
     let containerConfig;
@@ -1352,27 +1403,63 @@ const Iframe = (props) => {
           const currentFormData = properties;
           const currentBlockPathMap = buildBlockPathMap(currentFormData, config.blocks.blocksConfig, intl);
 
+          // Check if this is a template instance (virtual container with child blocks)
+          const isTemplateInstance = currentBlockPathMap[blockId]?.isTemplateInstance;
+
+          // Get all blocks to move - for template instances, get all child blocks in order
+          let blocksToMove;
+          if (isTemplateInstance) {
+            // Get child blocks of the template instance, maintaining their relative order
+            // by filtering the parent's blocks_layout
+            const parentId = currentBlockPathMap[blockId]?.parentId || 'page';
+            const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
+            const containerField = currentBlockPathMap[blockId]?.containerField || 'blocks_layout';
+            const layoutItems = parentBlock?.[containerField]?.items || parentBlock?.blocks_layout?.items || [];
+
+            // Find all child blocks of this template instance in layout order
+            blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
+            console.log('[MOVE_BLOCK] template instance - moving blocks:', blocksToMove);
+          } else {
+            blocksToMove = [blockId];
+          }
+
           // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
           // Only needed when moving to a different container
+          const firstBlockId = blocksToMove[0];
           const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
-            ? getContainerFieldConfig(blockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
+            ? getContainerFieldConfig(firstBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
             : null;
 
-          // Use moveBlockBetweenContainers utility to handle all cases:
-          // - Same container reordering
-          // - Different container moves
-          // - Page ↔ container moves
-          let newFormData = moveBlockBetweenContainers(
-            currentFormData,
-            currentBlockPathMap,
-            blockId,
-            targetBlockId,
-            insertAfter,
-            sourceParentId,
-            targetParentId,
-            blocksConfig,
-            intl,
-          );
+          // Move all blocks in sequence, each one after the previous
+          let newFormData = currentFormData;
+          let currentTarget = targetBlockId;
+          let currentInsertAfter = insertAfter;
+
+          for (let i = 0; i < blocksToMove.length; i++) {
+            const moveBlockId = blocksToMove[i];
+            const updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+
+            newFormData = moveBlockBetweenContainers(
+              newFormData,
+              updatedPathMap,
+              moveBlockId,
+              currentTarget,
+              currentInsertAfter,
+              sourceParentId,
+              targetParentId,
+              blocksConfig,
+              intl,
+            );
+
+            if (!newFormData) {
+              console.log('[MOVE_BLOCK] moveBlockBetweenContainers failed for:', moveBlockId);
+              break;
+            }
+
+            // After first block, subsequent blocks go after the previous one
+            currentTarget = moveBlockId;
+            currentInsertAfter = true;
+          }
           console.log('[MOVE_BLOCK] moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
@@ -1452,6 +1539,7 @@ const Iframe = (props) => {
           }
 
           log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
+          console.log('[VIEW-DEBUG] BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect);
 
           // Update lastSentSelectBlockRef to match iframe's selection
           // This is critical: when iframe confirms a selection, our ref must match
@@ -1479,6 +1567,7 @@ const Iframe = (props) => {
           }
 
           // Now update blockUI state
+          console.log('[VIEW-DEBUG] About to call setBlockUI for:', event.data.blockUid);
           setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
             // IMPORTANT: Must compare mediaFields because they can change independently
@@ -1693,6 +1782,7 @@ const Iframe = (props) => {
               {
                 type: 'blocks',
                 allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
+                allowedTemplates: field.allowedTemplates || null, // Template objects from frontend
                 maxLength: field.maxLength || null,
                 title: field.title || field.fieldName,
               },
@@ -1703,6 +1793,32 @@ const Iframe = (props) => {
             schema: () => ({ properties: pageBlocksFieldsDef }),
             restricted: true, // Can't be added as a child block
           };
+
+          // 3b. Register template URLs as virtual block types
+          // Templates appear in BlockChooser immediately; data is fetched when user selects one
+          effectivePageBlocksFields.forEach(field => {
+            if (field.allowedTemplates?.length > 0) {
+              field.allowedTemplates.forEach(templateUrl => {
+                if (typeof templateUrl === 'string') {
+                  const templateName = templateUrl.split('/').filter(Boolean).pop() || 'unknown';
+                  const templateBlockType = `Template: ${templateName}`;
+
+                  // Register template as virtual block type (data fetched on selection)
+                  if (!config.blocks.blocksConfig[templateBlockType]) {
+                    config.blocks.blocksConfig[templateBlockType] = {
+                      id: templateBlockType,
+                      title: templateBlockType, // Full title with "Template:" prefix for sidebar display
+                      icon: config.blocks.blocksConfig.slate?.icon,
+                      isTemplate: true,
+                      templateUrl: templateUrl, // URL to fetch when selected
+                      group: 'templates',
+                      restricted: false,
+                    };
+                  }
+                }
+              });
+            }
+          });
 
           // 4. Extract block field types (now includes custom blocks and page-level fields)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
@@ -1740,6 +1856,21 @@ const Iframe = (props) => {
             log('INIT: form data not available yet, skipping INITIAL_DATA');
             break;
           }
+
+          // 8. Check if templates need loading - if so, defer INITIAL_DATA until after merge
+          const templateIds = getUniqueTemplateIds(formWithDefaults);
+          const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
+          if (unloadedTemplates.length > 0) {
+            log('[INIT] Templates loading, deferring INITIAL_DATA until merge completes');
+            pendingInitialDataRef.current = {
+              source: event.source,
+              origin: event.origin,
+              blockFieldTypes: initialBlockFieldTypes,
+            };
+            break;
+          }
+
+          // 9. Send INITIAL_DATA to iframe
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
           event.source.postMessage(
             {
@@ -1754,6 +1885,7 @@ const Iframe = (props) => {
             },
             event.origin,
           );
+
           break;
 
         // case 'OPEN_OBJECT_BROWSER':
@@ -1846,6 +1978,97 @@ const Iframe = (props) => {
         onChangeFormData(formWithoutSeq);
       });
       return;
+    }
+
+    // Template Merge on Access: Check if templates need loading and merging
+    // This runs BEFORE iframe check - templates can be fetched as soon as formData is available
+    // When fetch completes, onChangeFormData updates Redux, which triggers another sync
+    if (formToUse?.blocks) {
+      const templateIds = getUniqueTemplateIds(formToUse);
+      // Skip templates already in cache OR marked as failed (null)
+      const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
+
+      if (unloadedTemplates.length > 0) {
+        log('[TEMPLATE MERGE] Fetching unloaded templates:', unloadedTemplates);
+
+        // Derive API base URL from page @id
+        const pageId = formToUse['@id'] || '';
+        const pageUrl = new URL(pageId, window.location.origin);
+        const apiBaseUrl = `${pageUrl.protocol}//${pageUrl.host}`;
+
+        // Fetch templates async in background - don't block
+        (async () => {
+          const newTemplates = {};
+
+          await Promise.all(
+            unloadedTemplates.map(async (templateId) => {
+              const templateUrl = `${apiBaseUrl}${templateId}`;
+              try {
+                const response = await fetch(templateUrl, {
+                  headers: {
+                    Accept: 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
+                });
+                if (response.ok) {
+                  newTemplates[templateId] = await response.json();
+                } else {
+                  console.warn(`[TEMPLATE MERGE] Failed to fetch template ${templateId}: ${response.status}`);
+                  // Mark as failed so we don't retry indefinitely
+                  templateCacheRef.current[templateId] = null;
+                }
+              } catch (error) {
+                console.warn(`[TEMPLATE MERGE] Error fetching template ${templateId}:`, error);
+                // Mark as failed so we don't retry indefinitely
+                templateCacheRef.current[templateId] = null;
+              }
+            }),
+          );
+
+          if (Object.keys(newTemplates).length === 0) {
+            // No templates loaded, but check if INITIAL_DATA is pending
+            if (pendingInitialDataRef.current) {
+              const { source, origin, blockFieldTypes } = pendingInitialDataRef.current;
+              const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+              const blockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+              source.postMessage({
+                type: 'INITIAL_DATA',
+                data: formToUse,
+                blockFieldTypes,
+                blockPathMap,
+                slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+              }, origin);
+              pendingInitialDataRef.current = null;
+            }
+            return;
+          }
+
+          // Update template cache ref
+          templateCacheRef.current = { ...templateCacheRef.current, ...newTemplates };
+
+          // Merge template content
+          log('[TEMPLATE MERGE] Merging templates:', Object.keys(newTemplates));
+          const mergedFormData = mergeTemplateContent(formToUse, templateCacheRef.current);
+
+          // If INITIAL_DATA was deferred, send it now with merged data
+          if (pendingInitialDataRef.current) {
+            const { source, origin, blockFieldTypes } = pendingInitialDataRef.current;
+            const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+            const blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
+            source.postMessage({
+              type: 'INITIAL_DATA',
+              data: mergedFormData,
+              blockFieldTypes,
+              blockPathMap,
+              slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+            }, origin);
+            pendingInitialDataRef.current = null;
+          }
+
+          // Update Redux - triggers another sync cycle
+          onChangeFormData(mergedFormData);
+        })();
+      }
     }
 
     // Case 2: Form properties changed (sidebar edit, block add, etc.)
@@ -2040,16 +2263,33 @@ const Iframe = (props) => {
 
   // Compute allowedBlocks for BlockChooser based on pendingAdd context
   // Also applies variation filtering when parent has blocksField configured
+  // Includes templates from allowedTemplates as virtual block types
   const effectiveAllowedBlocks = useMemo(() => {
     let allowed = null;
+    let allowedTemplates = null;
     let parentBlockData = null;
     let parentType = null;
+
+    // Helper to convert template URL/object to block type ID
+    const getTemplateTypeId = (template) => {
+      const templatePath = typeof template === 'string' ? template : (template['@id'] || template.UID || '');
+      const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
+      return `Template: ${templateName}`;
+    };
 
     if (pendingAdd?.mode === 'sidebar') {
       // Sidebar add: get allowed blocks from the container's field schema
       const { parentBlockId, fieldName } = pendingAdd;
       if (parentBlockId === null) {
-        // Page-level - no parent filtering
+        // Page-level - get templates from _page schema
+        const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
+        const pageFieldDef = pageSchema?.properties?.blocks;
+        allowedTemplates = pageFieldDef?.allowedTemplates;
+        // Add template type IDs to allowed blocks
+        if (allowedTemplates?.length > 0) {
+          const templateTypeIds = allowedTemplates.map(getTemplateTypeId);
+          return allowedBlocks ? [...allowedBlocks, ...templateTypeIds] : templateTypeIds;
+        }
         return allowedBlocks;
       }
       parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
@@ -2059,6 +2299,7 @@ const Iframe = (props) => {
         ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
         : parentSchema;
       allowed = resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
+      allowedTemplates = resolvedSchema?.properties?.[fieldName]?.allowedTemplates || null;
     } else {
       // Iframe add: get allowed blocks from parent container of afterBlockId
       const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
@@ -2078,6 +2319,7 @@ const Iframe = (props) => {
             const layoutField = `${fieldName}_layout`;
             if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
               allowed = fieldDef.allowedBlocks || null;
+              allowedTemplates = fieldDef.allowedTemplates || null;
               break;
             }
           }
@@ -2088,6 +2330,11 @@ const Iframe = (props) => {
         if (!allowed && parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
           allowed = parentBlockConfig?.allowedBlocks || null;
         }
+      } else {
+        // No parent - page-level, get templates from _page schema
+        const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
+        const pageFieldDef = pageSchema?.properties?.blocks;
+        allowedTemplates = pageFieldDef?.allowedTemplates;
       }
     }
 
@@ -2096,7 +2343,15 @@ const Iframe = (props) => {
       allowed = filterByParentVariation(allowed, parentBlockData, parentType);
     }
 
-    return allowed || allowedBlocks;
+    let result = allowed || allowedBlocks;
+
+    // Add template type IDs to allowed blocks
+    if (allowedTemplates?.length > 0) {
+      const templateTypeIds = allowedTemplates.map(getTemplateTypeId);
+      result = result ? [...result, ...templateTypeIds] : templateTypeIds;
+    }
+
+    return result;
   }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation]);
 
   // ============================================================================
@@ -2507,8 +2762,15 @@ const Iframe = (props) => {
 
           {/* Add Button - positioned based on data-block-add direction */}
           {blockUI.addDirection !== 'hidden' && (() => {
-            // Check if container is at maxLength
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
+
+            // Don't show add button if inserting after this block is not allowed
+            // (e.g., between two fixed template blocks)
+            if (pathInfo?.canInsertAfter === false) {
+              return null;
+            }
+
+            // Check if container is at maxLength
             if (pathInfo?.maxSiblings) {
               // Count siblings in the same container field
               // Must match both parentId AND containerField (for multi-field containers like columns with top_images + columns)

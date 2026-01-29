@@ -428,6 +428,12 @@ const applyConfig = (config) => {
     deleteColumn: { label: 'Remove Column', icon: columnDeleteSVG },
   };
 
+  // Add "templates" group to block chooser
+  config.blocks.groupBlocksOrder = [
+    ...(config.blocks.groupBlocksOrder || []),
+    { id: 'templates', title: 'Templates' },
+  ];
+
   return config;
 };
 
