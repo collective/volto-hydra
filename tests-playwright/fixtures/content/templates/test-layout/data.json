@@ -1,0 +1,91 @@
+{
+  "@id": "/templates/test-layout",
+  "@type": "Document",
+  "id": "test-layout",
+  "title": "Test Layout Template",
+  "description": "A test template with header, grid, footer, and main placeholder",
+  "blocks": {
+    "header-block": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "header"
+      },
+      "value": [
+        {
+          "type": "h1",
+          "children": [{ "text": "Template Header - From Template" }]
+        }
+      ],
+      "plaintext": "Template Header - From Template"
+    },
+    "grid-block": {
+      "@type": "gridBlock",
+      "fixed": true,
+      "readOnly": true,
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "grid"
+      },
+      "blocks": {
+        "tpl-grid-cell-1": {
+          "@type": "slate",
+          "fixed": true,
+          "readOnly": true,
+          "_templateSource": {
+            "instanceId": "/templates/test-layout",
+            "templateId": "/templates/test-layout",
+            "placeholderName": "grid-cell-1"
+          },
+          "value": [{ "type": "p", "children": [{ "text": "Template Grid Cell 1" }] }],
+          "plaintext": "Template Grid Cell 1"
+        },
+        "tpl-grid-cell-2": {
+          "@type": "slate",
+          "value": [{ "type": "p", "children": [{ "text": "Template Grid Cell 2" }] }],
+          "plaintext": "Template Grid Cell 2"
+        }
+      },
+      "blocks_layout": { "items": ["tpl-grid-cell-1", "tpl-grid-cell-2"] }
+    },
+    "main-placeholder": {
+      "@type": "slate",
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "primary"
+      },
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Default placeholder content" }]
+        }
+      ],
+      "plaintext": "Default placeholder content"
+    },
+    "footer-block": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "_templateSource": {
+        "instanceId": "/templates/test-layout",
+        "templateId": "/templates/test-layout",
+        "placeholderName": "footer"
+      },
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Template Footer - From Template" }]
+        }
+      ],
+      "plaintext": "Template Footer - From Template"
+    }
+  },
+  "blocks_layout": {
+    "items": ["header-block", "grid-block", "main-placeholder", "footer-block"]
+  }
+}

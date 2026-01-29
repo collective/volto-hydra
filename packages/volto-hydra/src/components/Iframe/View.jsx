@@ -682,6 +682,49 @@ const Iframe = (props) => {
     const mergedBlocksConfig = config.blocks.blocksConfig;
     const newBlockId = uuid();
 
+    // Handle template insertion - templates expand to multiple blocks
+    const templateConfig = mergedBlocksConfig[blockType];
+    if (templateConfig?.isTemplate && templateConfig?.templateUrl) {
+      // Fetch template data and insert (async)
+      (async () => {
+        try {
+          const response = await fetch(`/++api++${templateConfig.templateUrl}`);
+          if (!response.ok) throw new Error(`Failed to fetch template: ${response.status}`);
+          const templateData = await response.json();
+
+          const { applyLayoutTemplate } = require('@volto-hydra/hydra-js');
+          const newFormData = applyLayoutTemplate(formData, templateData, uuid);
+
+          // Merge with existing formData (preserve other fields like title, description)
+          onChangeFormData({
+            ...formData,
+            blocks: newFormData.blocks,
+            blocks_layout: newFormData.blocks_layout,
+          });
+
+          // Select the template virtual block (instance)
+          // Get instanceId from any template block's _templateSource
+          const firstBlockId = newFormData.blocks_layout?.items?.[0];
+          const firstBlock = newFormData.blocks?.[firstBlockId];
+          const instanceId = firstBlock?._templateSource?.instanceId;
+
+          if (instanceId) {
+            flushSync(() => {
+              setIframeSyncState((prev) => ({
+                ...prev,
+                pendingSelectBlockUid: instanceId,
+              }));
+            });
+          }
+          dispatch(setSidebarTab(1));
+        } catch (error) {
+          console.error('[VIEW] Failed to insert template:', error);
+        }
+      })();
+
+      return null; // Async - block ID not immediately available
+    }
+
     // Get container config and determine if object_list
     let containerConfig;
     let isObjectList = false;
@@ -1739,6 +1782,7 @@ const Iframe = (props) => {
               {
                 type: 'blocks',
                 allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
+                allowedTemplates: field.allowedTemplates || null, // Template objects from frontend
                 maxLength: field.maxLength || null,
                 title: field.title || field.fieldName,
               },
@@ -1749,6 +1793,32 @@ const Iframe = (props) => {
             schema: () => ({ properties: pageBlocksFieldsDef }),
             restricted: true, // Can't be added as a child block
           };
+
+          // 3b. Register template URLs as virtual block types
+          // Templates appear in BlockChooser immediately; data is fetched when user selects one
+          effectivePageBlocksFields.forEach(field => {
+            if (field.allowedTemplates?.length > 0) {
+              field.allowedTemplates.forEach(templateUrl => {
+                if (typeof templateUrl === 'string') {
+                  const templateName = templateUrl.split('/').filter(Boolean).pop() || 'unknown';
+                  const templateBlockType = `Template: ${templateName}`;
+
+                  // Register template as virtual block type (data fetched on selection)
+                  if (!config.blocks.blocksConfig[templateBlockType]) {
+                    config.blocks.blocksConfig[templateBlockType] = {
+                      id: templateBlockType,
+                      title: templateBlockType, // Full title with "Template:" prefix for sidebar display
+                      icon: config.blocks.blocksConfig.slate?.icon,
+                      isTemplate: true,
+                      templateUrl: templateUrl, // URL to fetch when selected
+                      group: 'templates',
+                      restricted: false,
+                    };
+                  }
+                }
+              });
+            }
+          });
 
           // 4. Extract block field types (now includes custom blocks and page-level fields)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
@@ -2193,16 +2263,33 @@ const Iframe = (props) => {
 
   // Compute allowedBlocks for BlockChooser based on pendingAdd context
   // Also applies variation filtering when parent has blocksField configured
+  // Includes templates from allowedTemplates as virtual block types
   const effectiveAllowedBlocks = useMemo(() => {
     let allowed = null;
+    let allowedTemplates = null;
     let parentBlockData = null;
     let parentType = null;
+
+    // Helper to convert template URL/object to block type ID
+    const getTemplateTypeId = (template) => {
+      const templatePath = typeof template === 'string' ? template : (template['@id'] || template.UID || '');
+      const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
+      return `Template: ${templateName}`;
+    };
 
     if (pendingAdd?.mode === 'sidebar') {
       // Sidebar add: get allowed blocks from the container's field schema
       const { parentBlockId, fieldName } = pendingAdd;
       if (parentBlockId === null) {
-        // Page-level - no parent filtering
+        // Page-level - get templates from _page schema
+        const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
+        const pageFieldDef = pageSchema?.properties?.blocks;
+        allowedTemplates = pageFieldDef?.allowedTemplates;
+        // Add template type IDs to allowed blocks
+        if (allowedTemplates?.length > 0) {
+          const templateTypeIds = allowedTemplates.map(getTemplateTypeId);
+          return allowedBlocks ? [...allowedBlocks, ...templateTypeIds] : templateTypeIds;
+        }
         return allowedBlocks;
       }
       parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
@@ -2212,6 +2299,7 @@ const Iframe = (props) => {
         ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
         : parentSchema;
       allowed = resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
+      allowedTemplates = resolvedSchema?.properties?.[fieldName]?.allowedTemplates || null;
     } else {
       // Iframe add: get allowed blocks from parent container of afterBlockId
       const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
@@ -2231,6 +2319,7 @@ const Iframe = (props) => {
             const layoutField = `${fieldName}_layout`;
             if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
               allowed = fieldDef.allowedBlocks || null;
+              allowedTemplates = fieldDef.allowedTemplates || null;
               break;
             }
           }
@@ -2241,6 +2330,11 @@ const Iframe = (props) => {
         if (!allowed && parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
           allowed = parentBlockConfig?.allowedBlocks || null;
         }
+      } else {
+        // No parent - page-level, get templates from _page schema
+        const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
+        const pageFieldDef = pageSchema?.properties?.blocks;
+        allowedTemplates = pageFieldDef?.allowedTemplates;
       }
     }
 
@@ -2249,7 +2343,15 @@ const Iframe = (props) => {
       allowed = filterByParentVariation(allowed, parentBlockData, parentType);
     }
 
-    return allowed || allowedBlocks;
+    let result = allowed || allowedBlocks;
+
+    // Add template type IDs to allowed blocks
+    if (allowedTemplates?.length > 0) {
+      const templateTypeIds = allowedTemplates.map(getTemplateTypeId);
+      result = result ? [...result, ...templateTypeIds] : templateTypeIds;
+    }
+
+    return result;
   }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation]);
 
   // ============================================================================
