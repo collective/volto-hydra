@@ -2281,16 +2281,17 @@ const Iframe = (props) => {
       // Sidebar add: get allowed blocks from the container's field schema
       const { parentBlockId, fieldName } = pendingAdd;
       if (parentBlockId === null) {
-        // Page-level - get templates from _page schema
+        // Page-level - get allowedBlocks and templates from _page schema for this field
         const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
-        const pageFieldDef = pageSchema?.properties?.blocks;
+        const pageFieldDef = pageSchema?.properties?.[fieldName];
         allowedTemplates = pageFieldDef?.allowedTemplates;
+        allowed = pageFieldDef?.allowedBlocks;
         // Add template type IDs to allowed blocks
         if (allowedTemplates?.length > 0) {
           const templateTypeIds = allowedTemplates.map(getTemplateTypeId);
-          return allowedBlocks ? [...allowedBlocks, ...templateTypeIds] : templateTypeIds;
+          return allowed ? [...allowed, ...templateTypeIds] : templateTypeIds;
         }
-        return allowedBlocks;
+        return allowed;
       }
       parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
       parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;

@@ -240,6 +240,7 @@ const applyConfig = (config) => {
   // recipe doesn't lose it when it replaces the schemaEnhancer.
   config.blocks.blocksConfig.image = {
     ...config.blocks.blocksConfig.image,
+    mostUsed: true,
     blockSchema: (props) => {
       // applyBlockDefaults passes 'data', but ImageSchema expects 'formData'
       const formData = props.formData || props.data || {};
