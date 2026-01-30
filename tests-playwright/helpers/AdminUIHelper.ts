@@ -678,6 +678,30 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for a block to be shown as readonly (has hydra-locked class).
+   * Used to verify template edit mode is active (blocks outside template get locked).
+   * @param blockId - The block ID to check
+   * @param timeout - Maximum time to wait
+   */
+  async waitForBlockReadonly(blockId: string, timeout: number = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await expect(block).toHaveClass(/hydra-locked/, { timeout });
+  }
+
+  /**
+   * Wait for a block to NOT be shown as readonly (no hydra-locked class).
+   * Used to verify template edit mode is inactive.
+   * @param blockId - The block ID to check
+   * @param timeout - Maximum time to wait
+   */
+  async waitForBlockEditable(blockId: string, timeout: number = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await expect(block).not.toHaveClass(/hydra-locked/, { timeout });
+  }
+
+  /**
    * Wait for the sidebar to show a specific block type as the current block.
    * The current block in the sidebar has data-is-current="true" on its header.
    *
@@ -3334,6 +3358,26 @@ export class AdminUIHelper {
 
     // Step 4: Complete the drop
     await this.completeDrop();
+  }
+
+  /**
+   * Drag a block after another block by their IDs.
+   * First selects the source block, then drags it after the target block.
+   * @param sourceBlockId - The block ID to drag
+   * @param targetBlockId - The block ID to drop after
+   */
+  async dragBlockAfter(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    const iframe = this.getIframe();
+
+    // Select the source block first
+    await this.clickBlockInIframe(sourceBlockId);
+    await this.waitForQuantaToolbar(sourceBlockId);
+
+    // Get target block locator
+    const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
+
+    // Use dragBlockWithMouse (first param is unused)
+    await this.dragBlockWithMouse(targetBlock, targetBlock, true);
   }
 
   /**

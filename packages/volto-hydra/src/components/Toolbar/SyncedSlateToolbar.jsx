@@ -8,7 +8,7 @@ import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slat
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
-import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID, isBlockPositionLocked, isBlockReadonly } from '@volto-hydra/hydra-js';
 import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -143,6 +143,8 @@ const SyncedSlateToolbar = ({
   onFileUpload, // Handler for file uploads: (fieldName, file) => void
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  onMakeTemplate, // Handler for "Make Template" action
+  templateEditMode, // instanceId of template being edited, or null
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -831,12 +833,12 @@ const SyncedSlateToolbar = ({
   const fieldValue = block[fieldName];
 
   // Determine if we should show format buttons based on field type
-  // Also hide for readonly blocks (e.g., fixed template blocks)
+  // Also hide for readonly blocks (e.g., fixed template blocks, or blocks outside template in edit mode)
   const blockType = block?.['@type'];
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
-  const isBlockReadonly = block?.readOnly === true;
-  const showFormatButtons = isSlateFieldType(fieldType) && !isBlockReadonly;
+  const blockIsReadonly = isBlockReadonly(block, templateEditMode);
+  const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly;
 
   // Debug: Check what blockFieldTypes the toolbar is receiving
   if (blockType === 'hero') {
@@ -955,9 +957,10 @@ const SyncedSlateToolbar = ({
         if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
           return <div style={{ width: '8px' }} />; // Spacer for page-level fields
         }
-        // Block is position-locked if marked as isFixed in pathMap (template blocks)
-        const isPositionLocked = blockPathMap?.[selectedBlock]?.isFixed;
-        if (isPositionLocked) {
+        // Use shared utility to check position lock (handles template edit mode)
+        const block = getBlock(selectedBlock);
+        const isLocked = isBlockPositionLocked(block, templateEditMode);
+        if (isLocked) {
           return (
             <div
               className="lock-icon"
@@ -1042,7 +1045,8 @@ const SyncedSlateToolbar = ({
       )}
 
       {/* Field-specific buttons for linkable/media fields */}
-      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && (
+      {/* Skip for readonly blocks */}
+      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && (
         <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center', position: 'relative' }}>
           {blockUI?.focusedLinkableField && (
             <button
@@ -1191,6 +1195,8 @@ const SyncedSlateToolbar = ({
         convertibleTypes={convertibleTypes}
         onConvertBlock={onConvertBlock}
         isFixed={blockPathMap?.[selectedBlock]?.isFixed}
+        isInTemplate={!!block?._templateSource}
+        onMakeTemplate={onMakeTemplate}
       />
     )}
 
@@ -1250,7 +1256,8 @@ const SyncedSlateToolbar = ({
     })()}
 
     {/* Media Field Overlays - show when block is selected, for each media field */}
-    {blockUI?.mediaFields && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
+    {/* Skip for readonly blocks - they shouldn't show media editing UI */}
+    {blockUI?.mediaFields && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
       const mediaValue = getBlock(selectedBlock)?.[fieldName];
       const hasMediaValue = mediaValue && (
         (Array.isArray(mediaValue) && mediaValue.length > 0) ||

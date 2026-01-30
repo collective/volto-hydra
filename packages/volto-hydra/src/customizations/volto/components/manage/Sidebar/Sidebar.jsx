@@ -201,6 +201,11 @@ const Sidebar = (props) => {
             {/* Current block's sidebar content rendered here via SidebarPortal */}
           </div>
 
+          {/* Template block settings - shown when editing blocks inside a template */}
+          <div id="sidebar-template-settings" className="sidebar-section-content parent-block-settings">
+            {/* Template block settings form portaled here */}
+          </div>
+
           {/* Child blocks widget - portal target for nested blocks list */}
           {/* Note: id="sidebar-order" for backwards compatibility with tests */}
           <div className="sidebar-section child-blocks-section" id="sidebar-order">
