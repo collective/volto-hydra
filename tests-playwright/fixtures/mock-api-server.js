@@ -1554,8 +1554,9 @@ app.get('*', (req, res, next) => {
 
 /**
  * PATCH /:path
- * Update content - returns merged content but does NOT persist changes
- * This ensures test isolation (each test gets fresh fixture data)
+ * Update content - persists to session storage when X-Test-Session header is provided
+ * Default session ('_default') does NOT persist to ensure test isolation for tests
+ * that don't set a session header.
  */
 app.patch('*', (req, res) => {
   const urlPath = req.path;
@@ -1566,8 +1567,14 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
-    // Return merged content but don't persist - ensures test isolation
     const mergedContent = { ...content, ...req.body };
+
+    // Persist to session storage for test verification when session is provided
+    // Default session doesn't persist to maintain backward compatibility
+    if (sessionId && sessionId !== '_default') {
+      setSessionContent(sessionId, cleanPath, mergedContent);
+    }
+
     res.json(mergedContent);
   } else {
     res.status(404).json({

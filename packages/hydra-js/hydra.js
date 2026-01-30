@@ -161,6 +161,9 @@ export class Bridge {
     // Readonly registry - blocks marked readonly won't have fields collected
     // Set by expandListingBlocks() or frontend code, not persisted to backend
     this._readonlyBlocks = new Set();
+    // Template edit mode - when set to an instanceId, blocks inside that instance
+    // become editable (even if readOnly), and blocks outside become locked
+    this.templateEditMode = null; // instanceId of template being edited
     this.init(options); // Initialize the bridge
   }
 
@@ -182,27 +185,34 @@ export class Bridge {
 
   /**
    * Check if a block is readonly. Checks in order:
-   * 1. Readonly registry (set by setBlockReadonly)
-   * 2. Block data property (block.readOnly)
+   * 1. Template edit mode (uses shared isBlockReadonly function)
+   * 2. Readonly registry (set by setBlockReadonly) - Bridge-specific
+   * 3. Block data property (block.readOnly) - via shared function
    * DOM attribute (data-block-readonly) is checked separately in collectBlockFields.
    *
    * @param {string} blockUid - The block UID to check
    * @returns {boolean} Whether the block is readonly
    */
   isBlockReadonly(blockUid) {
-    // 1. Check registry first (set by expander or frontend)
+    const blockData = this.getBlockData(blockUid);
+
+    // Use shared utility for template edit mode and block.readOnly checks
+    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
+
+    // In template edit mode, the shared function handles everything
+    if (this.templateEditMode) {
+      log('isBlockReadonly:', readonlyFromShared ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
+      return readonlyFromShared;
+    }
+
+    // Normal mode: also check Bridge-specific registry
     if (this._readonlyBlocks.has(blockUid)) {
       log('isBlockReadonly: TRUE (registry) for:', blockUid);
       return true;
     }
-    // 2. Fall back to block data property
-    const blockData = this.getBlockData(blockUid);
-    if (blockData?.readOnly) {
-      log('isBlockReadonly: TRUE (blockData) for:', blockUid);
-      return true;
-    }
-    log('isBlockReadonly: FALSE for:', blockUid, 'registry:', [...this._readonlyBlocks]);
-    return false;
+
+    log('isBlockReadonly:', readonlyFromShared ? 'TRUE (blockData)' : 'FALSE', 'for:', blockUid);
+    return readonlyFromShared;
   }
 
   /**
@@ -1099,12 +1109,15 @@ export class Bridge {
               // Support async callbacks (e.g., renderContentWithListings)
               if (this.onContentChangeCallback) {
                 const result = this.onContentChangeCallback(this.formData);
-                // If callback is async, wait for it before materializing comments
-                const materialize = () => requestAnimationFrame(() => this.materializeHydraComments());
+                // If callback is async, wait for it before materializing comments and applying visuals
+                const postRender = () => requestAnimationFrame(() => {
+                  this.materializeHydraComments();
+                  this.applyReadonlyVisuals();
+                });
                 if (result && typeof result.then === 'function') {
-                  result.then(materialize);
+                  result.then(postRender);
                 } else {
-                  materialize();
+                  postRender();
                 }
               }
 
@@ -1310,6 +1323,9 @@ export class Bridge {
 
                 // Mark empty blocks so they can be styled (must run on every render)
                 this.markEmptyBlocks();
+
+                // Apply readonly visuals (grey out readonly blocks)
+                this.applyReadonlyVisuals();
 
                 // IMPORTANT: Ensure ZWS in empty inline elements BEFORE restoring selection
                 // This allows cursor positioning inside empty formatting elements
@@ -1543,6 +1559,22 @@ export class Bridge {
                 firstEditable.focus();
                 log('Focused first editable field (fallback)');
               }
+            }
+          }
+        } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
+          // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
+          // instanceId: the template instance being edited, or null to exit edit mode
+          this.templateEditMode = event.data.instanceId;
+          log('Template edit mode:', this.templateEditMode ? `editing instance ${this.templateEditMode}` : 'disabled');
+
+          // Update visual state of all blocks (grey out readonly blocks)
+          this.applyReadonlyVisuals();
+
+          // Refresh contenteditable on the currently selected block
+          if (this.selectedBlockUid) {
+            const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+            if (blockElement) {
+              this.restoreContentEditableOnFields(blockElement, 'TEMPLATE_EDIT_MODE');
             }
           }
         }
@@ -2956,6 +2988,17 @@ export class Bridge {
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
     // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
     const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // If block is readonly, remove contenteditable from all its editable fields
+    if (blockUid && this.isBlockReadonly(blockUid)) {
+      const editableFields = blockElement.querySelectorAll('[data-editable-field][contenteditable="true"]');
+      editableFields.forEach((field) => {
+        field.removeAttribute('contenteditable');
+      });
+      log(`restoreContentEditableOnFields called from ${caller}: block ${blockUid} is readonly, removed contenteditable`);
+      return;
+    }
+
     // For multi-element blocks, collect fields from ALL elements with this UID
     const editableFields = [];
 
@@ -3279,6 +3322,27 @@ export class Bridge {
         blockElement.setAttribute('data-hydra-empty', 'true');
       } else {
         blockElement.removeAttribute('data-hydra-empty');
+      }
+    });
+  }
+
+  /**
+   * Applies visual styling to readonly blocks.
+   * Blocks where isBlockReadonly() returns true get the hydra-locked class.
+   * This visually greys out:
+   * - In normal mode: readonly template blocks
+   * - In template edit mode: blocks outside the template being edited
+   */
+  applyReadonlyVisuals() {
+    const allBlocks = document.querySelectorAll('[data-block-uid]');
+    allBlocks.forEach((blockElement) => {
+      const blockUid = blockElement.getAttribute('data-block-uid');
+      const blockData = this.getBlockData(blockUid);
+
+      if (isBlockReadonly(blockData, this.templateEditMode)) {
+        blockElement.classList.add('hydra-locked');
+      } else {
+        blockElement.classList.remove('hydra-locked');
       }
     });
   }
@@ -5431,6 +5495,17 @@ export class Bridge {
           return;
         }
 
+        // Handle Save (Ctrl+S / Cmd+S) - forward to parent for CMS save
+        // Note: strikethrough was moved to Ctrl+Shift+S to free this shortcut
+        if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
+          log('Save shortcut detected');
+          e.preventDefault();
+          this.sendMessageToParent({
+            type: 'SAVE_REQUEST',
+          });
+          return;
+        }
+
         // Handle Copy (Ctrl+C / Cmd+C) - strip ZWS from clipboard
         if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
           const selection = window.getSelection();
@@ -7519,6 +7594,19 @@ export class Bridge {
           border-radius: 4px;
           pointer-events: none;
         }
+        /* Readonly blocks - visually greyed out but still clickable for selection */
+        .hydra-locked {
+          opacity: 0.5;
+          position: relative;
+        }
+        .hydra-locked::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: rgba(128, 128, 128, 0.1);
+          pointer-events: none;
+          z-index: 1;
+        }
         .volto-hydra--outline {
           position: relative !important;
         }
@@ -8691,6 +8779,64 @@ export function isPlaceholderContent(block) {
 }
 
 /**
+ * Check if a block should be readonly based on template edit mode.
+ * This is the shared utility for both admin (sidebar/toolbar) and hydra.js Bridge.
+ *
+ * In template edit mode:
+ * - Blocks inside the template being edited are editable (return false)
+ * - Blocks outside the template are locked (return true)
+ *
+ * In normal mode:
+ * - Check the block's readOnly property (Volto standard)
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string|null} templateEditMode - The instanceId of the template being edited, or null
+ * @returns {boolean} True if the block should be readonly
+ */
+export function isBlockReadonly(blockData, templateEditMode) {
+  const blockInstanceId = blockData?.[TEMPLATE_SOURCE_MARKER]?.instanceId;
+
+  if (templateEditMode) {
+    // In template edit mode:
+    // - Blocks inside the template being edited are editable
+    // - Blocks outside the template are readonly
+    return blockInstanceId !== templateEditMode;
+  }
+
+  // Normal mode: check block's readOnly property (Volto standard)
+  return !!blockData?.readOnly;
+}
+
+/**
+ * Check if a block's position is locked (cannot be moved/dragged).
+ * This is the shared utility for both admin (toolbar) and hydra.js Bridge.
+ *
+ * In template edit mode:
+ * - Blocks inside the template being edited are movable (return false) - even if fixed
+ * - Blocks outside the template are locked (return true)
+ *
+ * In normal mode:
+ * - Check the block's fixed property (Volto standard)
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string|null} templateEditMode - The instanceId of the template being edited, or null
+ * @returns {boolean} True if the block's position is locked
+ */
+export function isBlockPositionLocked(blockData, templateEditMode) {
+  const blockInstanceId = blockData?.[TEMPLATE_SOURCE_MARKER]?.instanceId;
+
+  if (templateEditMode) {
+    // In template edit mode:
+    // - Blocks inside the template being edited are movable (can reorganize template)
+    // - Blocks outside the template are position-locked
+    return blockInstanceId !== templateEditMode;
+  }
+
+  // Normal mode: check block's fixed property (Volto standard)
+  return !!blockData?.fixed;
+}
+
+/**
  * Get unique template IDs (paths) from page data.
  *
  * @param {Object} formData - Page data with blocks
@@ -8711,235 +8857,203 @@ export function getUniqueTemplateIds(formData) {
 }
 
 /**
- * Merge template content into page data.
- * Fixed template blocks get their content updated from the template.
- * Placeholder content (fixed: false) is preserved.
+ * Merge template content between two documents.
+ * Symmetric operation - works for both load (template→page) and save (page→template).
  *
- * IMPORTANT: Only blocks with _templateSource markers are processed.
- * Blocks without _templateSource are ignored at all levels (not synced).
+ * Matching rules (based on placeholderName):
+ * - fixed + readonly: content replaced from source
+ * - fixed + editable: content replaced from source
+ * - placeholder (not fixed): kept in target, moved to source's position
+ * - blocks in source not in target: fixed blocks inserted, placeholders ignored
+ * - blocks in target not in source: moved to "default" placeholder or removed
  *
- * Uses Volto's standard block properties:
- * - fixed: true = position locked (merge content from template)
- * - readOnly: true = content locked (set on merged blocks)
+ * Container blocks are merged recursively.
  *
- * @param {Object} formData - Page data with _templateSource markers
- * @param {Object} templates - Map of templateId -> template document
- * @returns {Object} Merged formData
+ * @param {Object} target - Document to merge INTO (keeps its _templateSource markers)
+ * @param {Object} source - Document to merge FROM (provides content for fixed blocks)
+ * @param {string} [filterTemplateId] - Optional: only sync blocks with this templateId
+ * @returns {Object} { merged: mergedTarget, newTemplateIds: string[] }
  */
-export function mergeTemplateContent(formData, templates) {
-  const mergedBlocks = { ...formData.blocks };
-  let mergedLayout = [...(formData.blocks_layout?.items || [])];
+export function mergeTemplateContent(target, source, filterTemplateId = null) {
+  const newTemplateIds = new Set();
 
-  // Group page blocks by instanceId -> placeholderName -> blockId
-  const pageBlocksByInstance = new Map();
-  for (const [blockId, block] of Object.entries(mergedBlocks)) {
-    const source = block?.[TEMPLATE_SOURCE_MARKER];
-    if (!source || source.instanceId === source.templateId) continue;
-    const { instanceId, placeholderName } = source;
-    if (!pageBlocksByInstance.has(instanceId)) {
-      pageBlocksByInstance.set(instanceId, new Map());
+  // Build map of source blocks by placeholderName
+  const sourceByPlaceholder = new Map();
+  for (const [blockId, block] of Object.entries(source.blocks || {})) {
+    const marker = block?.[TEMPLATE_SOURCE_MARKER];
+    if (marker?.placeholderName) {
+      sourceByPlaceholder.set(marker.placeholderName, { blockId, block });
     }
-    pageBlocksByInstance.get(instanceId).set(placeholderName, blockId);
   }
 
-  // Process each template instance
-  for (const [instanceId, placeholderMap] of pageBlocksByInstance) {
-    // Get templateId from any block in this instance
-    const anyBlockId = placeholderMap.values().next().value;
-    const templateId = mergedBlocks[anyBlockId]?.[TEMPLATE_SOURCE_MARKER]?.templateId;
-    const template = templates[templateId];
-    if (!template) continue;
+  // Build map of target blocks by placeholderName
+  const targetByPlaceholder = new Map();
+  for (const [blockId, block] of Object.entries(target.blocks || {})) {
+    const marker = block?.[TEMPLATE_SOURCE_MARKER];
+    if (marker?.placeholderName) {
+      // If filtering by templateId, skip blocks that don't match
+      if (filterTemplateId && marker.templateId !== filterTemplateId) continue;
+      targetByPlaceholder.set(marker.placeholderName, { blockId, block });
 
-    const templateLayout = template.blocks_layout?.items || [];
-    const processedPlaceholders = new Set();
-
-    // Find first page block of this instance for insert position
-    const firstPageBlockIndex = mergedLayout.findIndex(id => placeholderMap.has(mergedBlocks[id]?.[TEMPLATE_SOURCE_MARKER]?.placeholderName));
-    let insertIndex = firstPageBlockIndex >= 0 ? firstPageBlockIndex : mergedLayout.length;
-
-    // Iterate template blocks in order
-    for (const templateBlockId of templateLayout) {
-      const templateBlock = template.blocks?.[templateBlockId];
-      if (!templateBlock?.fixed) continue; // Only process fixed blocks
-
-      const placeholderName = templateBlock[TEMPLATE_SOURCE_MARKER]?.placeholderName;
-      if (!placeholderName) continue;
-      processedPlaceholders.add(placeholderName);
-
-      const pageBlockId = placeholderMap.get(placeholderName);
-
-      if (pageBlockId) {
-        // Fixed block exists in both - merge content from template
-        mergedBlocks[pageBlockId] = mergeBlockContent(
-          mergedBlocks[pageBlockId],
-          templateBlock,
-          instanceId,
-          templateId,
-          templates
-        );
-        // Update insert position to after this existing block
-        const existingIndex = mergedLayout.indexOf(pageBlockId);
-        if (existingIndex >= 0) {
-          insertIndex = existingIndex + 1;
-        }
-      } else {
-        // Fixed block in template only - insert into page
-        const newBlockId = `template-${placeholderName}`;
-        mergedBlocks[newBlockId] = mergeBlockContent(
-          null, // No page block exists
-          templateBlock,
-          instanceId,
-          templateId,
-          templates
-        );
-        mergedLayout.splice(insertIndex, 0, newBlockId);
-        insertIndex++;
+      // Track any templateIds we haven't seen (for nested templates)
+      if (marker.templateId && marker.templateId !== filterTemplateId) {
+        newTemplateIds.add(marker.templateId);
       }
     }
+  }
 
-    // Remove fixed blocks from page that aren't in template
-    for (const [placeholderName, pageBlockId] of placeholderMap) {
-      const block = mergedBlocks[pageBlockId];
-      if (block?.fixed && !processedPlaceholders.has(placeholderName)) {
-        delete mergedBlocks[pageBlockId];
-        mergedLayout = mergedLayout.filter(id => id !== pageBlockId);
+  const mergedBlocks = { ...target.blocks };
+  let mergedLayout = [...(target.blocks_layout?.items || [])];
+  const processedPlaceholders = new Set();
+
+  // Process source blocks in layout order
+  const sourceLayout = source.blocks_layout?.items || [];
+  let insertIndex = 0;
+
+  // Find first target block position for inserting new blocks
+  for (const [placeholder] of targetByPlaceholder) {
+    const sourceEntry = sourceByPlaceholder.get(placeholder);
+    if (sourceEntry) {
+      const idx = mergedLayout.findIndex(id => {
+        const block = mergedBlocks[id];
+        return block?.[TEMPLATE_SOURCE_MARKER]?.placeholderName === placeholder;
+      });
+      if (idx >= 0) {
+        insertIndex = idx;
+        break;
+      }
+    }
+  }
+
+  for (const sourceBlockId of sourceLayout) {
+    const sourceBlock = source.blocks?.[sourceBlockId];
+    const sourceMarker = sourceBlock?.[TEMPLATE_SOURCE_MARKER];
+    if (!sourceMarker?.placeholderName) continue;
+
+    const placeholderName = sourceMarker.placeholderName;
+    processedPlaceholders.add(placeholderName);
+
+    const targetEntry = targetByPlaceholder.get(placeholderName);
+
+    if (targetEntry) {
+      // Block exists in both - merge based on fixed property
+      const targetBlock = targetEntry.block;
+      const targetBlockId = targetEntry.blockId;
+
+      if (targetBlock.fixed) {
+        // Fixed block - copy content from source, keep target's marker
+        mergedBlocks[targetBlockId] = mergeBlockContentSymmetric(
+          targetBlock,
+          sourceBlock,
+          newTemplateIds
+        );
+      }
+      // Placeholder blocks (not fixed) keep their content
+
+      // Update insert position
+      const existingIndex = mergedLayout.indexOf(targetBlockId);
+      if (existingIndex >= 0) {
+        insertIndex = existingIndex + 1;
+      }
+    } else if (sourceBlock.fixed) {
+      // Fixed block in source only - insert into target
+      const newBlockId = `merged-${placeholderName}`;
+      mergedBlocks[newBlockId] = {
+        ...sourceBlock,
+        // New blocks get source's marker (will be updated by caller if needed)
+      };
+      mergedLayout.splice(insertIndex, 0, newBlockId);
+      insertIndex++;
+    }
+    // Placeholder blocks in source but not target are ignored (no content to fill them)
+  }
+
+  // Handle target blocks not in source
+  for (const [placeholderName, { blockId, block }] of targetByPlaceholder) {
+    if (processedPlaceholders.has(placeholderName)) continue;
+
+    if (block.fixed) {
+      // Fixed block in target but not in source - remove it
+      delete mergedBlocks[blockId];
+      mergedLayout = mergedLayout.filter(id => id !== blockId);
+    }
+    // Placeholder blocks not in source: keep them (TODO: move to "default" placeholder)
+  }
+
+  return {
+    merged: {
+      ...target,
+      blocks: mergedBlocks,
+      blocks_layout: { ...target.blocks_layout, items: mergedLayout },
+    },
+    newTemplateIds: Array.from(newTemplateIds),
+  };
+}
+
+/**
+ * Merge multiple templates into a page.
+ * Convenience wrapper that calls mergeTemplateContent for each template.
+ *
+ * @param {Object} page - Page document to merge templates into
+ * @param {Object} templates - Map of templateId -> template document
+ * @returns {Object} { merged: mergedPage, newTemplateIds: string[] }
+ */
+export function mergeTemplatesIntoPage(page, templates) {
+  let result = page;
+  const allNewTemplateIds = new Set();
+
+  for (const [templateId, template] of Object.entries(templates)) {
+    const { merged, newTemplateIds } = mergeTemplateContent(result, template);
+    result = merged;
+    for (const tid of newTemplateIds) {
+      if (!templates[tid]) {
+        allNewTemplateIds.add(tid);
       }
     }
   }
 
   return {
-    ...formData,
-    blocks: mergedBlocks,
-    blocks_layout: { ...formData.blocks_layout, items: mergedLayout },
+    merged: result,
+    newTemplateIds: Array.from(allNewTemplateIds),
   };
 }
 
 /**
- * Merge a single block's content from template to page.
- * Only syncs properties and nested blocks that have _templateSource markers.
- * Blocks/properties without markers are left untouched (page content preserved).
+ * Merge a single block's content symmetrically.
+ * Copies content from source, keeps target's _templateSource marker.
  *
- * @param {Object|null} pageBlock - Existing page block (null if inserting new)
- * @param {Object} templateBlock - Template block to merge from
- * @param {string} instanceId - Instance ID for this template usage
- * @param {string} templateId - Template ID
- * @param {Object} templates - Map of templateId -> template document
+ * @param {Object} targetBlock - Block in target document
+ * @param {Object} sourceBlock - Block in source document
+ * @param {Set} newTemplateIds - Set to collect newly discovered templateIds
  * @returns {Object} Merged block
  */
-function mergeBlockContent(pageBlock, templateBlock, instanceId, templateId, templates) {
-  // Start with template block's non-container properties
-  const result = {};
+function mergeBlockContentSymmetric(targetBlock, sourceBlock, newTemplateIds) {
+  const targetMarker = targetBlock[TEMPLATE_SOURCE_MARKER];
 
-  for (const [key, value] of Object.entries(templateBlock)) {
-    if (key === 'blocks' || key === 'blocks_layout') {
-      // Handle container fields separately (recursive merge)
-      continue;
-    }
-    if (key === TEMPLATE_SOURCE_MARKER) {
-      // Update instanceId for page usage
-      result[key] = {
-        ...value,
-        instanceId,
-      };
-    } else {
-      result[key] = value;
-    }
+  // Copy all properties from source except _templateSource
+  const result = {};
+  for (const [key, value] of Object.entries(sourceBlock)) {
+    if (key === TEMPLATE_SOURCE_MARKER) continue;
+    if (key === 'blocks' || key === 'blocks_layout') continue; // Handle separately
+    result[key] = value;
   }
 
+  // Keep target's marker
+  result[TEMPLATE_SOURCE_MARKER] = targetMarker;
+
   // Handle nested blocks recursively
-  if (templateBlock.blocks) {
-    const templateNestedBlocks = templateBlock.blocks;
-    const templateNestedLayout = templateBlock.blocks_layout?.items || [];
-    const pageNestedBlocks = pageBlock?.blocks || {};
-    const pageNestedLayout = pageBlock?.blocks_layout?.items || [];
+  if (sourceBlock.blocks || targetBlock.blocks) {
+    const nestedResult = mergeTemplateContent(
+      { blocks: targetBlock.blocks || {}, blocks_layout: targetBlock.blocks_layout || { items: [] } },
+      { blocks: sourceBlock.blocks || {}, blocks_layout: sourceBlock.blocks_layout || { items: [] } }
+    );
+    result.blocks = nestedResult.merged.blocks;
+    result.blocks_layout = nestedResult.merged.blocks_layout;
 
-    // Build map of page blocks by placeholderName (only those with _templateSource)
-    const pageByPlaceholder = new Map();
-    for (const [blockId, block] of Object.entries(pageNestedBlocks)) {
-      const source = block?.[TEMPLATE_SOURCE_MARKER];
-      if (source?.placeholderName) {
-        pageByPlaceholder.set(source.placeholderName, { blockId, block });
-      }
+    // Collect any new templateIds from nested merge
+    for (const tid of nestedResult.newTemplateIds) {
+      newTemplateIds.add(tid);
     }
-
-    // Build map of template blocks by placeholderName (only those with _templateSource)
-    const templateByPlaceholder = new Map();
-    for (const blockId of templateNestedLayout) {
-      const block = templateNestedBlocks[blockId];
-      const source = block?.[TEMPLATE_SOURCE_MARKER];
-      if (source?.placeholderName) {
-        templateByPlaceholder.set(source.placeholderName, { blockId, block });
-      }
-    }
-
-    const mergedNestedBlocks = {};
-    const mergedNestedLayout = [];
-    const processedPageBlocks = new Set();
-
-    // Process template blocks in order
-    for (const templateBlockId of templateNestedLayout) {
-      const templateNestedBlock = templateNestedBlocks[templateBlockId];
-      const source = templateNestedBlock?.[TEMPLATE_SOURCE_MARKER];
-
-      if (!source?.placeholderName) {
-        // No _templateSource marker - skip this block entirely
-        // (don't copy from template, don't include in result)
-        continue;
-      }
-
-      const placeholderName = source.placeholderName;
-      const pageEntry = pageByPlaceholder.get(placeholderName);
-
-      if (templateNestedBlock.fixed) {
-        // Fixed nested block - sync from template (recursively)
-        const newBlockId = pageEntry?.blockId || `template-${placeholderName}`;
-        mergedNestedBlocks[newBlockId] = mergeBlockContent(
-          pageEntry?.block || null,
-          templateNestedBlock,
-          instanceId,
-          templateId,
-          templates
-        );
-        mergedNestedLayout.push(newBlockId);
-        if (pageEntry) {
-          processedPageBlocks.add(pageEntry.blockId);
-        }
-      } else {
-        // Placeholder nested block - keep page content if exists
-        if (pageEntry) {
-          mergedNestedBlocks[pageEntry.blockId] = pageEntry.block;
-          mergedNestedLayout.push(pageEntry.blockId);
-          processedPageBlocks.add(pageEntry.blockId);
-        } else {
-          // No page content - use template default
-          const newBlockId = `template-${placeholderName}`;
-          mergedNestedBlocks[newBlockId] = {
-            ...templateNestedBlock,
-            [TEMPLATE_SOURCE_MARKER]: {
-              ...source,
-              instanceId,
-            },
-          };
-          mergedNestedLayout.push(newBlockId);
-        }
-      }
-    }
-
-    // Keep page blocks without _templateSource (user content not in template)
-    for (const blockId of pageNestedLayout) {
-      if (!processedPageBlocks.has(blockId)) {
-        const block = pageNestedBlocks[blockId];
-        if (!block?.[TEMPLATE_SOURCE_MARKER]) {
-          // No marker - this is user content, keep it
-          mergedNestedBlocks[blockId] = block;
-          mergedNestedLayout.push(blockId);
-        }
-        // If it has a marker but wasn't processed, it's a stale template block - remove it
-      }
-    }
-
-    result.blocks = mergedNestedBlocks;
-    result.blocks_layout = { items: mergedNestedLayout };
   }
 
   return result;

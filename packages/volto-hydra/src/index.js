@@ -90,6 +90,16 @@ const applyConfig = (config) => {
     mostUsed: true,
   };
 
+  // Override Slate hotkeys: use Ctrl+Shift+S for strikethrough (del) instead of Ctrl+S
+  // This frees Ctrl+S for the standard "save" action that users expect
+  if (config.settings.slate?.hotkeys) {
+    const { 'mod+s': removed, ...otherHotkeys } = config.settings.slate.hotkeys;
+    config.settings.slate.hotkeys = {
+      ...otherHotkeys,
+      'mod+shift+s': { format: 'del', type: 'inline' },
+    };
+  }
+
   // Image block: url field is added to blockSchema (not schemaEnhancer) so that
   // frontend's childBlockConfig recipe doesn't overwrite it.
   // The schemaEnhancer from frontend config adds childBlockConfig behavior.

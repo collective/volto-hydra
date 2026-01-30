@@ -135,8 +135,9 @@ export default defineConfig({
   webServer: [
     {
       // Mock Plone API server - must start BEFORE Volto
+      // Uses --watch for auto-reload on code changes during development
       name: 'Mock API + Frontend',
-      command: `node ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
+      command: `node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
       url: 'http://localhost:8888/health',
       timeout: 50 * 1000,
       reuseExistingServer: true, // Always reuse if running - CI starts in advance, local dev starts manually

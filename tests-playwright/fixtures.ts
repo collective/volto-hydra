@@ -23,7 +23,18 @@ const baseTest = process.env.COVERAGE
 
 // Extend test to capture console logs from page and iframe
 const test = baseTest.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, use, testInfo) => {
+    // Add session header to API requests for mock API persistence
+    // Requests go through Volto proxy at /++api++/ which forwards to mock API
+    const sessionId = `test-${testInfo.title.replace(/\s+/g, '-').slice(0, 50)}-${Date.now()}`;
+    await page.route('**/++api++/**', async (route) => {
+      const headers = {
+        ...route.request().headers(),
+        'X-Test-Session': sessionId,
+      };
+      await route.continue({ headers });
+    });
+
     // Capture main page console logs
     page.on('console', (msg) => {
       console.log(`[log] ${msg.text()}`);

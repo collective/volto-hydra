@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplateContent } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage } from '@volto-hydra/hydra-js';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -546,6 +546,7 @@ const Iframe = (props) => {
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
+    templateEditMode: null, // instanceId of template being edited, or null if not in edit mode
   }));
 
   // Template cache: stores loaded template documents keyed by templateId
@@ -1345,6 +1346,17 @@ const Iframe = (props) => {
           document.dispatchEvent(redoEvent);
           break;
 
+        case 'SAVE_REQUEST':
+          // Dispatch a synthetic Ctrl+S event to trigger Form.jsx save handler
+          const saveEvent = new KeyboardEvent('keydown', {
+            key: 's',
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(saveEvent);
+          break;
+
         case 'ACTION_REQUEST': {
           // Generic action handler for custom operations like delete row/column
           const { action, blockId: actionBlockId } = event.data;
@@ -2048,7 +2060,11 @@ const Iframe = (props) => {
 
           // Merge template content
           log('[TEMPLATE MERGE] Merging templates:', Object.keys(newTemplates));
-          const mergedFormData = mergeTemplateContent(formToUse, templateCacheRef.current);
+          const { merged: mergedFormData, newTemplateIds: moreTemplateIds } = mergeTemplatesIntoPage(formToUse, templateCacheRef.current);
+          if (moreTemplateIds.length > 0) {
+            log('[TEMPLATE MERGE] Discovered nested templates:', moreTemplateIds);
+            // TODO: Load nested templates and merge again
+          }
 
           // If INITIAL_DATA was deferred, send it now with merged data
           if (pendingInitialDataRef.current) {
@@ -2759,6 +2775,67 @@ const Iframe = (props) => {
                 toolbarRequestDone: `convert-block-${Date.now()}`,
               }));
             }}
+            templateEditMode={iframeSyncState.templateEditMode}
+            onMakeTemplate={() => {
+              // Create a new template from the selected block
+              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+              if (!blockData) return;
+
+              // Generate a unique template ID and instance ID
+              const templateCount = Object.values(properties.blocks || {})
+                .filter(b => b._templateSource?.instanceId === b._templateSource?.templateId)
+                .length;
+              const defaultName = `untitled-template-${templateCount + 1}`;
+              const templateId = `/templates/${defaultName}`;
+              const instanceId = templateId; // For new template, instanceId === templateId
+
+              // Add _templateSource to the block
+              const updatedBlock = {
+                ...blockData,
+                _templateSource: {
+                  instanceId,
+                  templateId,
+                  placeholderName: 'primary', // Default placeholder name
+                },
+              };
+
+              // Update the block in formData
+              const updatedProperties = updateBlockById(
+                properties,
+                iframeSyncState.blockPathMap,
+                selectedBlock,
+                updatedBlock
+              );
+
+              // Create a template document structure in cache
+              // (will be saved when page is saved)
+              templateCacheRef.current[templateId] = {
+                '@id': templateId,
+                '@type': 'Document',
+                'title': defaultName,
+                'blocks': {
+                  [selectedBlock]: updatedBlock,
+                },
+                'blocks_layout': { items: [selectedBlock] },
+              };
+
+              // Update Redux
+              onChangeFormData(updatedProperties);
+
+              // Rebuild blockPathMap
+              const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+
+              // Find the template instance ID in the new pathMap
+              // (it will be created as a virtual container)
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: updatedProperties,
+                blockPathMap: newBlockPathMap,
+                toolbarRequestDone: `make-template-${Date.now()}`,
+                pendingSelectBlockUid: instanceId, // Select the template instance
+                templateEditMode: instanceId, // Activate template edit mode
+              }));
+            }}
           />
 
           {/* Add Button - positioned based on data-block-add direction */}
@@ -3031,6 +3108,46 @@ const Iframe = (props) => {
           // Validate data from sidebar before using it
           validateAndLog(newFormData, 'onChangeBlock (sidebar)', blockFieldTypes);
           onChangeFormData(newFormData);
+        }}
+        templateEditMode={iframeSyncState.templateEditMode}
+        onChangeTemplateSettings={(instanceId, settings) => {
+          // Update template settings in templateCache
+          const pathInfo = iframeSyncState.blockPathMap?.[instanceId];
+          const templateId = pathInfo?.templateId || instanceId;
+          if (templateCacheRef.current[templateId]) {
+            templateCacheRef.current[templateId] = {
+              ...templateCacheRef.current[templateId],
+              ...settings,
+            };
+          }
+          // Update blockData for the virtual template instance
+          const newBlockPathMap = { ...iframeSyncState.blockPathMap };
+          if (newBlockPathMap[instanceId]) {
+            newBlockPathMap[instanceId] = {
+              ...newBlockPathMap[instanceId],
+              blockData: {
+                ...newBlockPathMap[instanceId].blockData,
+                ...settings,
+              },
+            };
+            setIframeSyncState(prev => ({
+              ...prev,
+              blockPathMap: newBlockPathMap,
+            }));
+          }
+        }}
+        onToggleTemplateEditMode={(instanceId) => {
+          setIframeSyncState(prev => ({
+            ...prev,
+            templateEditMode: instanceId,
+          }));
+          // Send template edit mode to iframe so it knows which blocks to make editable
+          if (referenceElement?.contentWindow) {
+            referenceElement.contentWindow.postMessage(
+              { type: 'TEMPLATE_EDIT_MODE', instanceId },
+              '*'
+            );
+          }
         }}
       />
       <ChildBlocksWidget

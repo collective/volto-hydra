@@ -392,6 +392,28 @@ class Form extends Component {
    */
   componentDidMount() {
     this.setState({ isClient: true });
+
+    // Add Ctrl+S / Cmd+S save shortcut
+    this.handleSaveShortcut = (event) => {
+      const keyName = event.key?.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && keyName === 's') {
+        event.preventDefault();
+        event.stopPropagation();
+        this.onSubmit(event);
+      }
+    };
+    document.addEventListener('keydown', this.handleSaveShortcut);
+  }
+
+  /**
+   * Component will unmount
+   * @method componentWillUnmount
+   * @returns {undefined}
+   */
+  componentWillUnmount() {
+    if (this.handleSaveShortcut) {
+      document.removeEventListener('keydown', this.handleSaveShortcut);
+    }
   }
 
   /**
