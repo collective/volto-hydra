@@ -53,6 +53,7 @@ import {
   setSidebarTab,
   setFormData,
   setUIState,
+  updateContent,
 } from '@plone/volto/actions';
 import { compose } from 'redux';
 import config from '@plone/volto/registry';
@@ -257,6 +258,9 @@ class Form extends Component {
     this.onBlurField = this.onBlurField.bind(this);
     this.onClickInput = this.onClickInput.bind(this);
     this.onToggleMetadataFieldset = this.onToggleMetadataFieldset.bind(this);
+
+    // Ref for Iframe to provide template save function
+    this.saveTemplatesRef = { current: null };
   }
 
   /**
@@ -541,7 +545,7 @@ class Form extends Component {
    * @param {Object} event Event object.
    * @returns {undefined}
    */
-  onSubmit(event) {
+  async onSubmit(event) {
     const formData = this.state.formData;
 
     if (event) {
@@ -581,8 +585,13 @@ class Form extends Component {
       // Changes the focus to the metadata tab in the sidebar if error
       this.props.setSidebarTab(0);
     } else {
-      // Get only the values that have been modified (Edit forms), send all in case that
-      // it's an add form
+      // Save templates first if the Iframe has set up the save function
+      if (this.props.isEditForm && this.saveTemplatesRef.current) {
+        const currentPath = this.props.pathname;
+        await this.saveTemplatesRef.current(formData, currentPath);
+      }
+
+      // Then save the page
       if (this.props.isEditForm) {
         this.props.onSubmit(this.getOnlyFormModifiedValues());
       } else {
@@ -760,6 +769,7 @@ class Form extends Component {
             history={this.props.history}
             location={this.props.location}
             token={this.props.token}
+            saveTemplatesRef={this.saveTemplatesRef}
           />
           {/* BlocksForm removed - Hydra uses Iframe for block editing */}
           {this.state.isClient &&
@@ -1016,6 +1026,7 @@ export default compose(
       setFormData,
       setUIState,
       resetMetadataFocus,
+      updateContent,
     },
     null,
     { forwardRef: true },

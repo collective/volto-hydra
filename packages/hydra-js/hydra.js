@@ -9019,6 +9019,40 @@ export function mergeTemplatesIntoPage(page, templates) {
 }
 
 /**
+ * Load templates and merge them into page data.
+ *
+ * @param {Object} pageData - Page data from API
+ * @param {Function} fetchContent - Callback to fetch content by path: (path) => Promise<Object>
+ * @returns {Promise<Object>} Merged page data with template content
+ */
+export async function loadAndMergeTemplates(pageData, fetchContent) {
+  const templateIds = getUniqueTemplateIds(pageData);
+  if (templateIds.length === 0) {
+    return pageData;
+  }
+
+  // Fetch all templates in parallel
+  const templates = {};
+  await Promise.all(
+    templateIds.map(async (templateId) => {
+      try {
+        templates[templateId] = await fetchContent(templateId);
+      } catch (error) {
+        console.warn(`[HYDRA] Error fetching template ${templateId}:`, error);
+      }
+    })
+  );
+
+  if (Object.keys(templates).length === 0) {
+    return pageData;
+  }
+
+  // Merge and handle nested templates recursively
+  const { merged, newTemplateIds } = mergeTemplatesIntoPage(pageData, templates);
+  return newTemplateIds.length > 0 ? loadAndMergeTemplates(merged, fetchContent) : merged;
+}
+
+/**
  * Merge a single block's content symmetrically.
  * Copies content from source, keeps target's _templateSource marker.
  *

@@ -62,7 +62,7 @@
 
     <script src="renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks } from './hydra.js';
+        import { initBridge, expandListingBlocks, loadAndMergeTemplates } from './hydra.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
         function getPagesFromUrl() {
@@ -207,7 +207,14 @@
 
                 // Fetch content from mock API using ++api++ prefix
                 const response = await fetch(`/++api++${contentPath}`);
-                const content = await response.json();
+                let content = await response.json();
+
+                // Merge templates into content (for view mode template support)
+                const fetchContent = async (path) => {
+                    const res = await fetch(`/++api++${path}`);
+                    return res.json();
+                };
+                content = await loadAndMergeTemplates(content, fetchContent);
 
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];

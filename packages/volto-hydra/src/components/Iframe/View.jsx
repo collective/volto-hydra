@@ -9,7 +9,8 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, mergeTemplateContent } from '@volto-hydra/hydra-js';
+import Api from '@plone/volto/helpers/Api/Api';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
@@ -429,6 +430,7 @@ const Iframe = (props) => {
     openObjectBrowser,
     closeObjectBrowser,
     schema, // Content type schema for page-level field types
+    saveTemplatesRef, // Ref that Form.jsx uses to trigger template save
   } = props;
 
   const dispatch = useDispatch();
@@ -552,6 +554,63 @@ const Iframe = (props) => {
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes
   const templateCacheRef = useRef({});
+
+  // Set up saveTemplatesRef function for Form.jsx to call before page save
+  useEffect(() => {
+    if (!saveTemplatesRef) return;
+
+    console.log('[TEMPLATE SAVE] Setting up saveTemplatesRef');
+    saveTemplatesRef.current = async (formData, currentPath) => {
+      console.log('[TEMPLATE SAVE] Called with currentPath:', currentPath);
+      const templateCache = templateCacheRef.current;
+      console.log('[TEMPLATE SAVE] Template cache keys:', Object.keys(templateCache));
+      const templateIds = getUniqueTemplateIds(formData).filter(
+        id => id !== currentPath && templateCache[id]
+      );
+      console.log('[TEMPLATE SAVE] Template IDs to save:', templateIds);
+
+      if (templateIds.length === 0) {
+        console.log('[TEMPLATE SAVE] No templates to save');
+        return;
+      }
+
+      console.log('[TEMPLATE SAVE] Saving templates:', templateIds);
+
+      // Use Volto's Api helper which handles auth and URL formatting
+      const api = new Api();
+
+      await Promise.all(templateIds.map(async (templateId) => {
+        const template = templateCache[templateId];
+        if (!template) return;
+
+        console.log('[TEMPLATE SAVE] Template before merge:', JSON.stringify(template.blocks?.['header-block']?.value));
+        console.log('[TEMPLATE SAVE] Page block value:', JSON.stringify(formData.blocks?.['template-header']?.value));
+
+        // Merge page content INTO template (page → template)
+        const { merged } = mergeTemplateContent(template, formData, templateId);
+
+        console.log('[TEMPLATE SAVE] Template after merge:', JSON.stringify(merged.blocks?.['header-block']?.value));
+
+        // Update cache with merged template
+        templateCacheRef.current[templateId] = merged;
+
+        // PATCH the template using Volto's Api helper
+        console.log('[TEMPLATE SAVE] PATCH path:', templateId);
+        try {
+          const response = await api.patch(templateId, {
+            data: {
+              blocks: merged.blocks,
+              blocks_layout: merged.blocks_layout,
+            },
+          });
+          console.log('[TEMPLATE SAVE] PATCH response:', response.status);
+          console.log('[TEMPLATE SAVE] Saved template:', templateId);
+        } catch (error) {
+          console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
+        }
+      }));
+    };
+  }, [saveTemplatesRef]);
 
   // Pending INITIAL_DATA: when templates are loading during INIT, store data here
   // Sync effect will send INITIAL_DATA after templates are merged
@@ -2003,10 +2062,8 @@ const Iframe = (props) => {
       if (unloadedTemplates.length > 0) {
         log('[TEMPLATE MERGE] Fetching unloaded templates:', unloadedTemplates);
 
-        // Derive API base URL from page @id
-        const pageId = formToUse['@id'] || '';
-        const pageUrl = new URL(pageId, window.location.origin);
-        const apiBaseUrl = `${pageUrl.protocol}//${pageUrl.host}`;
+        // Use Volto's Api helper which handles auth and URL formatting
+        const api = new Api();
 
         // Fetch templates async in background - don't block
         (async () => {
@@ -2014,23 +2071,12 @@ const Iframe = (props) => {
 
           await Promise.all(
             unloadedTemplates.map(async (templateId) => {
-              const templateUrl = `${apiBaseUrl}${templateId}`;
               try {
-                const response = await fetch(templateUrl, {
-                  headers: {
-                    Accept: 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                  },
-                });
-                if (response.ok) {
-                  newTemplates[templateId] = await response.json();
-                } else {
-                  console.warn(`[TEMPLATE MERGE] Failed to fetch template ${templateId}: ${response.status}`);
-                  // Mark as failed so we don't retry indefinitely
-                  templateCacheRef.current[templateId] = null;
-                }
+                // Api helper returns response.body directly
+                const template = await api.get(templateId);
+                newTemplates[templateId] = template;
               } catch (error) {
-                console.warn(`[TEMPLATE MERGE] Error fetching template ${templateId}:`, error);
+                console.warn(`[TEMPLATE MERGE] Failed to fetch template ${templateId}:`, error.status || error);
                 // Mark as failed so we don't retry indefinitely
                 templateCacheRef.current[templateId] = null;
               }

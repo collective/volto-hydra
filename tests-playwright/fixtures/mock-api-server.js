@@ -279,13 +279,27 @@ function formatSearchItem(content, baseUrl) {
  * @returns {Object|null} The raw content object or null if not found
  */
 function loadRawContentFromDisk(urlPath) {
+  // First check contentDirMap (for pre-scanned content)
   const dirInfo = contentDirMap[urlPath];
-  if (!dirInfo) return null;
+  if (dirInfo) {
+    const dataPath = path.join(dirInfo.dirPath, 'data.json');
+    if (fs.existsSync(dataPath)) {
+      return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    }
+  }
 
-  const dataPath = path.join(dirInfo.dirPath, 'data.json');
-  if (!fs.existsSync(dataPath)) return null;
+  // Fallback: try to find content directly from disk for paths not in map
+  // This allows new content files added during tests to be found
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const relativePath = mountPath === '/' ? urlPath : urlPath.replace(mountPath, '');
+    const contentDir = path.join(dirPath, relativePath.replace(/^\//, ''));
+    const dataPath = path.join(contentDir, 'data.json');
+    if (fs.existsSync(dataPath)) {
+      return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    }
+  }
 
-  return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+  return null;
 }
 
 /**
@@ -1563,6 +1577,11 @@ app.patch('*', (req, res) => {
   const cleanPath = urlPath.replace('/++api++', '');
   const sessionId = getSessionId(req);
 
+  const fs = require('fs');
+  const logMsg = `[PATCH] ${cleanPath} sessionId: ${sessionId || 'none'} x-test-session: ${req.headers['x-test-session'] || 'none'}\n`;
+  fs.appendFileSync('/tmp/mock-api-patch.log', logMsg);
+  console.log(logMsg);
+
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
 
@@ -1572,7 +1591,10 @@ app.patch('*', (req, res) => {
     // Persist to session storage for test verification when session is provided
     // Default session doesn't persist to maintain backward compatibility
     if (sessionId && sessionId !== '_default') {
+      console.log(`[PATCH] Persisting to session: ${sessionId} path: ${cleanPath}`);
       setSessionContent(sessionId, cleanPath, mergedContent);
+    } else {
+      console.log(`[PATCH] NOT persisting (no session or default)`);
     }
 
     res.json(mergedContent);

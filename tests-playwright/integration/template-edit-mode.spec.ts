@@ -367,6 +367,12 @@ test.describe('Template Edit Mode - Validation', () => {
 
     // Content should be preserved in view mode
     await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('edited', { timeout: 15000 });
+
+    // Verify template was actually saved by loading another page using the same template
+    // Navigate to view mode (not edit) to also test that view mode loads templates
+    await helper.navigateToView('/template-test-page-2');
+    const page2Header = iframe.locator('[data-block-uid="page2-template-header"]');
+    await expect(page2Header).toContainText('edited', { timeout: 15000 });
   });
 });
 
