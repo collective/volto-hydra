@@ -2445,11 +2445,9 @@ test.describe('Container Block Drag and Drop', () => {
     await page.mouse.move(text1bBox!.x + text1bBox!.width / 2, targetY, { steps: 10 });
     await page.waitForTimeout(100);
     await page.mouse.up();
-    await page.waitForTimeout(500);
 
-    // Verify text-2a moved to col-1
-    const text2aInCol1 = await col1.locator('[data-block-uid="text-2a"]').count();
-    expect(text2aInCol1).toBe(1);
+    // Wait for text-2a to actually move to col-1 (don't rely on fixed timeout)
+    await expect(col1.locator('[data-block-uid="text-2a"]')).toBeVisible({ timeout: 5000 });
 
     // CRITICAL: col-2 should now have a new default block, not be completely empty
     // Since column has defaultBlock: 'slate', it creates a properly initialized slate block
