@@ -58,9 +58,6 @@ test.describe('Template Insertion', () => {
     const templateOption = blockChooser.locator('button').filter({ hasText: /test-layout/ });
     await templateOption.click();
 
-    // Wait for template to be applied
-    await page.waitForTimeout(500);
-
     // Template blocks should be inserted
     // test-layout has: header, main-placeholder, footer
     await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' })).toBeVisible({ timeout: 5000 });
@@ -84,10 +81,12 @@ test.describe('Template Insertion', () => {
     await blockChooser.locator('text=Templates').first().click();
     const templateOption = blockChooser.locator('button').filter({ hasText: /test-layout/ });
     await templateOption.click();
-    await page.waitForTimeout(500);
+
+    // Wait for template to be inserted
+    const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' });
+    await expect(headerBlock).toBeVisible({ timeout: 5000 });
 
     // Click on the template header block
-    const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' });
     await headerBlock.click();
     await helper.waitForSidebarOpen();
 
@@ -114,10 +113,12 @@ test.describe('Template Insertion', () => {
     await blockChooser.locator('text=Templates').first().click();
     const templateOption = blockChooser.locator('button').filter({ hasText: /test-layout/ });
     await templateOption.click();
-    await page.waitForTimeout(500);
+
+    // Wait for template to be inserted
+    const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' });
+    await expect(headerBlock).toBeVisible({ timeout: 5000 });
 
     // Click the template header block (which is fixed)
-    const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' });
     await headerBlock.click();
     await helper.waitForSidebarOpen();
 
