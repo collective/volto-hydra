@@ -8960,11 +8960,27 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
       }
     } else if (sourceBlock.fixed) {
       // Fixed block in source only - insert into target
-      const newBlockId = `merged-${placeholder}`;
-      mergedBlocks[newBlockId] = {
-        ...sourceBlock,
-        // New blocks get source's fields (will be updated by caller if needed)
-      };
+      // Use UUID for unique block ID (same template can be inserted multiple times)
+      const newBlockId = crypto.randomUUID();
+      const newBlock = { ...sourceBlock };
+
+      // Filter nested blocks - only keep those with template markers (placeholder field)
+      if (newBlock.blocks && newBlock.blocks_layout?.items) {
+        const filteredBlocks = {};
+        const filteredItems = [];
+        for (const nestedId of newBlock.blocks_layout.items) {
+          const nestedBlock = newBlock.blocks[nestedId];
+          // Keep nested blocks that have placeholder (template markers)
+          if (nestedBlock?.placeholder) {
+            filteredBlocks[nestedId] = nestedBlock;
+            filteredItems.push(nestedId);
+          }
+        }
+        newBlock.blocks = filteredBlocks;
+        newBlock.blocks_layout = { ...newBlock.blocks_layout, items: filteredItems };
+      }
+
+      mergedBlocks[newBlockId] = newBlock;
       mergedLayout.splice(insertIndex, 0, newBlockId);
       insertIndex++;
     }
