@@ -15,6 +15,134 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 // Block IDs for the template instance in template-test-page
 const TEMPLATE_BLOCK_IDS = ['template-header', 'template-grid', 'user-content-1', 'user-content-2', 'template-footer'];
 
+test.describe('Template Creation', () => {
+  test('"Make Template" option appears in toolbar menu for regular blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a regular block (not part of a template)
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForQuantaToolbar('block-1-uuid');
+
+    // Open toolbar menu
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    const menuOptions = await helper.getQuantaToolbarMenuOptions('block-1-uuid');
+    const optionLabels = menuOptions.map(o => o.toLowerCase());
+
+    // Should have "Make Template" option
+    expect(optionLabels.some(o => o.includes('make') && o.includes('template'))).toBe(true);
+  });
+
+  test('"Make Template" does NOT appear for blocks already in a template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for template block
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+
+    // Click template block
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForQuantaToolbar('template-header');
+
+    // Open toolbar menu
+    await helper.openQuantaToolbarMenu('template-header');
+    const menuOptions = await helper.getQuantaToolbarMenuOptions('template-header');
+    const optionLabels = menuOptions.map(o => o.toLowerCase());
+
+    // Should NOT have "Make Template" option for blocks already in a template
+    expect(optionLabels.some(o => o.includes('make') && o.includes('template'))).toBe(false);
+  });
+
+  test('clicking "Make Template" wraps block in template instance and shows settings', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a regular block
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForQuantaToolbar('block-1-uuid');
+
+    // Open toolbar menu and click "Make Template"
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    const makeTemplateOption = page.locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
+      .filter({ hasText: /make.*template/i });
+    await makeTemplateOption.click();
+
+    // Wait for sidebar to update
+    await helper.waitForSidebarOpen();
+
+    // Block should now be inside a template instance
+    // Sidebar should show hierarchy: Page > Template Instance > Block
+    const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
+    await expect(stickyHeaders).toHaveCount(3, { timeout: 5000 }); // Page > Template > Block
+    await expect(stickyHeaders.nth(1)).toContainText(/Template:/i);
+
+    // Should have a name/title field for the template visible in sidebar
+    const nameField = page.locator('.field-wrapper-title, .field').filter({ hasText: /Template Name/i });
+    await expect(nameField).toBeVisible({ timeout: 5000 });
+
+    // Should also have save location field
+    const locationField = page.locator('.field-wrapper-folder, .field').filter({ hasText: /Save Location/i });
+    await expect(locationField).toBeVisible({ timeout: 5000 });
+  });
+
+  test.skip('template edit mode is automatically activated when creating template', async ({ page }) => {
+    // Skipped: auto-activation feature not yet implemented
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a regular block and make it a template
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForQuantaToolbar('block-1-uuid');
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    const makeTemplateOption = page.locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
+      .filter({ hasText: /make.*template/i });
+    await makeTemplateOption.click();
+
+    // Template edit mode should be active (indicated by toggle in sidebar)
+    await helper.waitForSidebarOpen();
+    const editModeToggle = page.locator('.edit-template-toggle input, [data-field-id="editTemplate"] input');
+    await expect(editModeToggle).toBeChecked({ timeout: 5000 });
+  });
+
+  test('can toggle template edit mode from sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for template block and click it
+    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForSidebarOpen();
+
+    // Navigate up to template instance
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+
+    // Sidebar should have "Edit Template" toggle
+    const editTemplateToggle = page.locator('.edit-template-toggle, [data-field-id="editTemplate"] input, label').filter({ hasText: /edit.*template/i });
+    await expect(editTemplateToggle).toBeVisible();
+
+    // Toggle edit mode on
+    await editTemplateToggle.click();
+
+    // Edit mode should be active - blocks outside template should be locked (greyed out)
+    await helper.waitForBlockReadonly('standalone-block-1');
+  });
+});
+
 test.describe('Template Edit Mode - Editability', () => {
   test('fixed readonly blocks inside template become editable in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -401,7 +529,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
   });
 
-  test('valid template structure allows save', async ({ page }) => {
+  test('saved template changes persist and appear on other pages using the template', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
