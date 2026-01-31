@@ -1,4 +1,4 @@
-import { getAccessToken } from '@hydra-js/hydra.js';
+import { getAccessToken, loadAndMergeTemplates } from '@hydra-js/hydra.js';
 
 export default async function ploneApi({
   path,
@@ -30,6 +30,22 @@ export default async function ploneApi({
     headers,
   });
 
+  // Helper to fetch content by path (for template loading)
+  const fetchContent = async (templatePath) => {
+    const baseUrl = runtimeConfig.public.backendBaseUrl;
+    const url = `${baseUrl}/++api++${templatePath}`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: 'Bearer ' + token } : {}),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch template: ${templatePath}`);
+    }
+    return response.json();
+  };
+
   return useFetch(api, {
     key,
     method: query ? 'POST' : 'GET',
@@ -51,7 +67,7 @@ export default async function ploneApi({
         '@components': { navigation: { items: [] } },
       };
     },
-    transform: (data) => {
+    transform: async (data) => {
       // if (error!==undefined  ) {
       //     showError(error);
       //        // throw new error;
@@ -64,8 +80,17 @@ export default async function ploneApi({
       } else {
         const comp = data['@components'];
         delete data['@components'];
+
+        // Merge templates into page data (for view mode template support)
+        let pageData = data;
+        try {
+          pageData = await loadAndMergeTemplates(data, fetchContent);
+        } catch (error) {
+          console.warn('[NUXT] Error loading templates:', error);
+        }
+
         return {
-          page: data,
+          page: pageData,
           _listing_pages: pages,
           navigation: comp.navigation,
           breadcrumbs: comp.breadcrumbs,
