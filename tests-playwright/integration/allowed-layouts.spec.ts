@@ -345,4 +345,90 @@ test.describe('allowedLayouts', () => {
       expect(contentPreserved).toBe(true);
     });
   });
+
+  test.describe('Single Fixed Edge (Header Only)', () => {
+    test('fixed header at top, content flows to free bottom edge', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      // Apply header-only layout
+      await page.keyboard.press('Escape');
+      const layoutSelector = page.locator('.layout-selector select');
+      await layoutSelector.selectOption('Header Only Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for layout - sidebar shows stable state
+      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+
+      // Verify structure: header at top, content after, NO fixed footer
+      const allBlocks = await iframe.locator('#content [data-block-uid]').allTextContents();
+      const headerIndex = allBlocks.findIndex(t => t.includes('Header Only'));
+      const footerIndex = allBlocks.findIndex(t => t.includes('Layout Footer'));
+
+      expect(headerIndex).toBe(0); // Header at start
+      expect(footerIndex).toBe(-1); // No footer
+      expect(allBlocks.length).toBeGreaterThan(1); // Header + content
+    });
+
+    test('cannot add block before fixed header (constrained edge)', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      // Apply header-only layout
+      await page.keyboard.press('Escape');
+      const layoutSelector = page.locator('.layout-selector select');
+      await layoutSelector.selectOption('Header Only Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for layout
+      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+
+      // Click header block
+      const headerBlock = iframe.locator('#content [data-block-uid]').filter({ hasText: 'Header Only' });
+      await headerBlock.click();
+      await helper.waitForSidebarOpen();
+
+      // Check that "add before" is not available for fixed header at edge
+      const toolbar = page.locator('.quanta-toolbar');
+      const addBeforeButton = toolbar.locator('[aria-label*="before"], [title*="before"]');
+      await expect(addBeforeButton).not.toBeVisible();
+    });
+
+    test('CAN add block after last block (free bottom edge)', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      // Apply header-only layout
+      await page.keyboard.press('Escape');
+      const layoutSelector = page.locator('.layout-selector select');
+      await layoutSelector.selectOption('Header Only Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for layout
+      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+
+      // Click last block (should be content, not header)
+      const allBlocks = iframe.locator('#content [data-block-uid]');
+      const lastBlock = allBlocks.last();
+      await lastBlock.click();
+      await helper.waitForSidebarOpen();
+
+      // Should be able to add block after (free edge)
+      await helper.clickAddBlockButton();
+      const chooserVisible = await helper.isBlockChooserVisible();
+      expect(chooserVisible).toBe(true);
+    });
+  });
 });
