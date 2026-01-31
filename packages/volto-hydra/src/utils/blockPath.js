@@ -385,8 +385,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const blockType = block['@type'];
       const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
 
-      // Check Volto's standard block properties (top-level, not in _templateSource)
-      const templateSource = block._templateSource;
+      // Check Volto's standard block properties
       const isFixed = block.fixed === true;        // Volto standard: position locked
       const isReadonly = block.readOnly === true;  // Volto standard: content locked
 
@@ -409,12 +408,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       // Only FIRST-LEVEL template blocks get the virtual instance as parent
       // Nested blocks (inside containers that are part of the template) keep their actual parent
       let effectiveParentId = parentId;
-      if (templateSource?.instanceId) {
-        const instanceId = templateSource.instanceId;
+      if (block.templateInstanceId) {
+        const instanceId = block.templateInstanceId;
 
         // Check if parent container is also part of this template instance
         // If so, this is a nested block - keep actual parent
-        const parentInSameInstance = parent._templateSource?.instanceId === instanceId;
+        const parentInSameInstance = parent.templateInstanceId === instanceId;
 
         if (!parentInSameInstance) {
           // First-level template block - create/use virtual instance as parent
@@ -422,7 +421,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
             createdTemplateInstances.add(instanceId);
 
             // Derive display name from templateId path (e.g., "/templates/test-layout" -> "test-layout")
-            const templatePath = templateSource.templateId || '';
+            const templatePath = block.templateId || '';
             const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
 
             const instanceBlockType = `Template: ${templateName}`;
@@ -432,7 +431,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
               containerField: fieldName,
               blockType: instanceBlockType, // Virtual type for sidebar display
               isTemplateInstance: true,
-              templateId: templateSource.templateId,
+              templateId: block.templateId,
               // Virtual block data for components that need blockData (e.g., ParentBlocksWidget)
               blockData: { '@type': instanceBlockType, '@uid': instanceId },
               // Template instances can be moved/deleted as a unit (TODO: implement group operations)

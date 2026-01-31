@@ -59,6 +59,7 @@ import { compose } from 'redux';
 import config from '@plone/volto/registry';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
 import Iframe from '../../../../../components/Iframe/View';
+import { validateTemplatePlaceholders } from '../../../../../utils/formDataValidation';
 import './styles.css';
 
 /**
@@ -560,6 +561,10 @@ class Form extends Component {
         })
       : {};
 
+    // Validate template placeholder contiguity
+    const templateValidation = validateTemplatePlaceholders(formData);
+    const blocksErrors = templateValidation.blocksErrors;
+
     if (keys(errors).length > 0) {
       const activeIndex = FormValidation.showFirstTabWithErrors({
         errors,
@@ -567,7 +572,10 @@ class Form extends Component {
       });
       this.setState(
         {
-          errors,
+          errors: {
+            ...errors,
+            ...(!isEmpty(blocksErrors) && { blocks: blocksErrors }),
+          },
           activeIndex,
         },
         () => {
@@ -584,6 +592,30 @@ class Form extends Component {
       );
       // Changes the focus to the metadata tab in the sidebar if error
       this.props.setSidebarTab(0);
+    } else if (keys(blocksErrors).length > 0) {
+      // Template validation errors - show toast and highlight blocks
+      const firstBlockId = Object.keys(blocksErrors)[0];
+      const firstError = Object.values(blocksErrors[firstBlockId])[0];
+
+      this.setState({
+        errors: { blocks: blocksErrors },
+      });
+
+      toast.error(
+        <Toast
+          error
+          title={firstError.title || 'Template Error'}
+          content={firstError.message}
+        />,
+      );
+
+      // Select the first block with error
+      this.props.setUIState({
+        selected: firstBlockId,
+        multiSelected: [],
+        hovered: null,
+      });
+      this.props.setSidebarTab(1);
     } else {
       // Save templates first if the Iframe has set up the save function
       if (this.props.isEditForm && this.saveTemplatesRef.current) {

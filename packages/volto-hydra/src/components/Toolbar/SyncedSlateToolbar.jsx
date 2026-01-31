@@ -1195,7 +1195,7 @@ const SyncedSlateToolbar = ({
         convertibleTypes={convertibleTypes}
         onConvertBlock={onConvertBlock}
         isFixed={blockPathMap?.[selectedBlock]?.isFixed}
-        isInTemplate={!!block?._templateSource}
+        isInTemplate={!!block?.templateId}
         onMakeTemplate={onMakeTemplate}
       />
     )}

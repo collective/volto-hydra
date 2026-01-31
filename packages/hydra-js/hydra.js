@@ -8438,15 +8438,17 @@ export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0
 ////////////////////////////////////////////////////////////////////////////////
 // Template Utilities
 // For discovering, filtering, and merging templates.
-// Templates are Documents with blocks that have `_templateSource` markers.
+// Templates are Documents with blocks that have template fields (templateId, templateInstanceId, placeholder).
 // Uses Volto's standard fixed/readOnly properties for block behavior.
 ////////////////////////////////////////////////////////////////////////////////
 
 // Deprecated: old marker, kept for backwards compatibility
 export const TEMPLATE_MARKER = '_template';
-// Current marker: used on both template definitions (instanceId === templateId)
-// and pages using templates (instanceId !== templateId)
-export const TEMPLATE_SOURCE_MARKER = '_templateSource';
+
+// Template blocks use flat fields directly on the block:
+// - templateId: string - the template document path (e.g., '/templates/test-layout')
+// - templateInstanceId: string - unique ID for this template application instance
+// - placeholder: string - placeholder region name (e.g., 'primary', 'header')
 
 /**
  * Simple UUID generator for block IDs.
@@ -8484,10 +8486,10 @@ export function isLayoutTemplate(templateData) {
 
 /**
  * Find placeholder regions in a template.
- * Placeholder blocks (fixed: false) with same placeholderName form a region.
+ * Placeholder blocks (fixed: false) with same placeholder form a region.
  *
  * @param {Object} templateData - Template document
- * @returns {Object} { placeholderName: { blockIds: [], allowedBlocks: [] } }
+ * @returns {Object} { placeholder: { blockIds: [], allowedBlocks: [] } }
  */
 export function findPlaceholderRegions(templateData) {
   const { blocks, blocks_layout } = templateData;
@@ -8496,18 +8498,18 @@ export function findPlaceholderRegions(templateData) {
 
   for (const blockId of layout) {
     const block = blocks?.[blockId];
-    // Placeholder blocks have fixed: false (or undefined) and a placeholderName
+    // Placeholder blocks have fixed: false (or undefined) and a placeholder
     if (block?.fixed) continue; // Skip fixed blocks
 
-    const placeholderName = block?.[TEMPLATE_SOURCE_MARKER]?.placeholderName;
-    if (placeholderName) {
-      if (!regions[placeholderName]) {
-        regions[placeholderName] = {
+    const placeholder = block?.placeholder;
+    if (placeholder) {
+      if (!regions[placeholder]) {
+        regions[placeholder] = {
           blockIds: [],
-          allowedBlocks: null, // Could add allowedBlocks to _templateSource if needed
+          allowedBlocks: null,
         };
       }
-      regions[placeholderName].blockIds.push(blockId);
+      regions[placeholder].blockIds.push(blockId);
     }
   }
   return regions;
@@ -8602,7 +8604,7 @@ export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUU
 /**
  * Apply a layout template to existing page/container content.
  * - Clones template blocks with new IDs
- * - Adds _templateSource markers with instanceId
+ * - Adds template fields (templateId, templateInstanceId, placeholder)
  * - Preserves Volto's fixed/readOnly properties
  * - Moves existing content into the "default" placeholder
  *
@@ -8624,20 +8626,18 @@ export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = 
       uuidGenerator,
     );
 
-  // 2. Add _templateSource to each cloned block, preserving fixed/readOnly
+  // 2. Add template fields to each cloned block, preserving fixed/readOnly
   for (const [newId, block] of Object.entries(clonedBlocks)) {
     const originalId = Object.entries(idMap).find(
       ([_, v]) => v === newId,
     )?.[0];
     const originalBlock = templateData.blocks?.[originalId];
-    const originalSource = originalBlock?.[TEMPLATE_SOURCE_MARKER];
 
-    // Copy the block with updated _templateSource (new instanceId)
-    block[TEMPLATE_SOURCE_MARKER] = {
-      instanceId,
-      templateId,
-      placeholderName: originalSource?.placeholderName || originalId, // Use original placeholderName or blockId as fallback
-    };
+    // Set flat template fields
+    block.templateId = templateId;
+    block.templateInstanceId = instanceId;
+    block.placeholder = originalBlock?.placeholder || originalId; // Use original placeholder or blockId as fallback
+
     // Preserve Volto's fixed/readOnly from template
     if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
     if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
@@ -8652,11 +8652,9 @@ export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = 
     if (existingBlock) {
       result.blocks[existingId] = {
         ...existingBlock,
-        [TEMPLATE_SOURCE_MARKER]: {
-          instanceId,
-          templateId,
-          placeholderName: 'default',
-        },
+        templateId,
+        templateInstanceId: instanceId,
+        placeholder: 'default',
         // Existing content is not fixed (can be edited/moved)
       };
       delete result.blocks[existingId].fixed;
@@ -8670,7 +8668,7 @@ export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = 
 
     // If this block is the "default" placeholder, insert existing content after it
     const block = result.blocks[newBlockId];
-    if (!block?.fixed && block?.[TEMPLATE_SOURCE_MARKER]?.placeholderName === 'default') {
+    if (!block?.fixed && block?.placeholder === 'default') {
       result.blocks_layout.items.push(...existingBlockIds);
     }
   }
@@ -8681,7 +8679,7 @@ export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = 
 /**
  * Insert snippet blocks at a specific position.
  * - Clones snippet blocks with new IDs
- * - Adds _templateSource markers with instanceId
+ * - Adds template fields (templateId, templateInstanceId, placeholder)
  * - Preserves Volto's fixed/readOnly properties
  * - Inserts at the specified position
  *
@@ -8709,19 +8707,18 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
       uuidGenerator,
     );
 
-  // Add _templateSource markers
+  // Add template fields
   for (const [newId, block] of Object.entries(clonedBlocks)) {
     const originalId = Object.entries(idMap).find(
       ([_, v]) => v === newId,
     )?.[0];
     const originalBlock = templateData.blocks?.[originalId];
-    const originalSource = originalBlock?.[TEMPLATE_SOURCE_MARKER];
 
-    block[TEMPLATE_SOURCE_MARKER] = {
-      instanceId,
-      templateId,
-      placeholderName: originalSource?.placeholderName || originalId,
-    };
+    // Set flat template fields
+    block.templateId = templateId;
+    block.templateInstanceId = instanceId;
+    block.placeholder = originalBlock?.placeholder || originalId;
+
     // Preserve Volto's fixed/readOnly from template
     if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
     if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
@@ -8739,14 +8736,14 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
  * Get blocks that belong to a specific template.
  *
  * @param {Object} formData - Page form data
- * @param {string} templateId - Template UID to find
+ * @param {string} tplId - Template UID to find
  * @returns {Array} Array of block IDs belonging to this template
  */
-export function getTemplateBlocks(formData, templateId) {
+export function getTemplateBlocks(formData, tplId) {
   const blockIds = [];
   for (const blockId of formData.blocks_layout?.items || []) {
     const block = formData.blocks?.[blockId];
-    if (block?.[TEMPLATE_SOURCE_MARKER]?.templateId === templateId) {
+    if (block?.templateId === tplId) {
       blockIds.push(blockId);
     }
   }
@@ -8761,21 +8758,33 @@ export function getTemplateBlocks(formData, templateId) {
  * @returns {boolean}
  */
 export function isFixedTemplateBlock(block) {
-  // Fixed if it has _templateSource AND fixed: true (Volto standard)
-  return block?.[TEMPLATE_SOURCE_MARKER] && block?.fixed === true;
+  // Fixed if it has templateId AND fixed: true (Volto standard)
+  return block?.templateId && block?.fixed === true;
 }
 
 /**
  * Check if a block is placeholder content (can be moved freely).
- * Placeholder blocks have _templateSource but fixed: false (or undefined).
+ * Placeholder blocks have templateId but fixed: false (or undefined).
  *
  * @param {Object} block - Block data
  * @returns {boolean}
  */
 export function isPlaceholderContent(block) {
-  const source = block?.[TEMPLATE_SOURCE_MARKER];
-  // Placeholder if it has _templateSource but is NOT fixed
-  return source && !block?.fixed;
+  // Placeholder if it has templateId but is NOT fixed
+  return block?.templateId && !block?.fixed;
+}
+
+/**
+ * Check if a block is inside the template currently being edited.
+ * A block is inside if its templateInstanceId matches the templateEditMode.
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
+ * @returns {boolean} True if the block is inside the edited template, false otherwise
+ */
+export function isBlockInEditedTemplate(blockData, templateEditMode) {
+  if (!templateEditMode) return false;
+  return blockData?.templateInstanceId === templateEditMode;
 }
 
 /**
@@ -8790,17 +8799,15 @@ export function isPlaceholderContent(block) {
  * - Check the block's readOnly property (Volto standard)
  *
  * @param {Object} blockData - The block data object
- * @param {string|null} templateEditMode - The instanceId of the template being edited, or null
+ * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
  * @returns {boolean} True if the block should be readonly
  */
 export function isBlockReadonly(blockData, templateEditMode) {
-  const blockInstanceId = blockData?.[TEMPLATE_SOURCE_MARKER]?.instanceId;
-
   if (templateEditMode) {
     // In template edit mode:
     // - Blocks inside the template being edited are editable
     // - Blocks outside the template are readonly
-    return blockInstanceId !== templateEditMode;
+    return !isBlockInEditedTemplate(blockData, templateEditMode);
   }
 
   // Normal mode: check block's readOnly property (Volto standard)
@@ -8819,22 +8826,22 @@ export function isBlockReadonly(blockData, templateEditMode) {
  * - Check the block's fixed property (Volto standard)
  *
  * @param {Object} blockData - The block data object
- * @param {string|null} templateEditMode - The instanceId of the template being edited, or null
+ * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
  * @returns {boolean} True if the block's position is locked
  */
 export function isBlockPositionLocked(blockData, templateEditMode) {
-  const blockInstanceId = blockData?.[TEMPLATE_SOURCE_MARKER]?.instanceId;
-
   if (templateEditMode) {
-    // In template edit mode:
-    // - Blocks inside the template being edited are movable (can reorganize template)
-    // - Blocks outside the template are position-locked
-    return blockInstanceId !== templateEditMode;
+    // In template edit mode, ALL blocks are draggable (not position-locked)
+    // This allows dragging outside blocks into the template
+    // Drop zone restriction (where blocks can be dropped) is handled
+    // separately in the drag handler via isDropAllowedInTemplateEditMode
+    return false;
   }
 
   // Normal mode: check block's fixed property (Volto standard)
   return !!blockData?.fixed;
 }
+
 
 /**
  * Get unique template IDs (paths) from page data.
@@ -8846,11 +8853,10 @@ export function getUniqueTemplateIds(formData) {
   const templateIds = new Set();
   for (const blockId of Object.keys(formData.blocks || {})) {
     const block = formData.blocks[blockId];
-    const source = block?.[TEMPLATE_SOURCE_MARKER];
-    // Skip template definitions (instanceId === templateId)
-    // Only include pages using templates (instanceId !== templateId)
-    if (source?.templateId && source.instanceId !== source.templateId) {
-      templateIds.add(source.templateId);
+    // Skip template definitions (templateInstanceId === templateId)
+    // Only include pages using templates (templateInstanceId !== templateId)
+    if (block?.templateId && block.templateInstanceId !== block.templateId) {
+      templateIds.add(block.templateId);
     }
   }
   return Array.from(templateIds);
@@ -8860,7 +8866,7 @@ export function getUniqueTemplateIds(formData) {
  * Merge template content between two documents.
  * Symmetric operation - works for both load (template→page) and save (page→template).
  *
- * Matching rules (based on placeholderName):
+ * Matching rules (based on placeholder):
  * - fixed + readonly: content replaced from source
  * - fixed + editable: content replaced from source
  * - placeholder (not fixed): kept in target, moved to source's position
@@ -8869,7 +8875,7 @@ export function getUniqueTemplateIds(formData) {
  *
  * Container blocks are merged recursively.
  *
- * @param {Object} target - Document to merge INTO (keeps its _templateSource markers)
+ * @param {Object} target - Document to merge INTO (keeps its template fields)
  * @param {Object} source - Document to merge FROM (provides content for fixed blocks)
  * @param {string} [filterTemplateId] - Optional: only sync blocks with this templateId
  * @returns {Object} { merged: mergedTarget, newTemplateIds: string[] }
@@ -8877,27 +8883,25 @@ export function getUniqueTemplateIds(formData) {
 export function mergeTemplateContent(target, source, filterTemplateId = null) {
   const newTemplateIds = new Set();
 
-  // Build map of source blocks by placeholderName
+  // Build map of source blocks by placeholder
   const sourceByPlaceholder = new Map();
   for (const [blockId, block] of Object.entries(source.blocks || {})) {
-    const marker = block?.[TEMPLATE_SOURCE_MARKER];
-    if (marker?.placeholderName) {
-      sourceByPlaceholder.set(marker.placeholderName, { blockId, block });
+    if (block?.placeholder) {
+      sourceByPlaceholder.set(block.placeholder, { blockId, block });
     }
   }
 
-  // Build map of target blocks by placeholderName
+  // Build map of target blocks by placeholder
   const targetByPlaceholder = new Map();
   for (const [blockId, block] of Object.entries(target.blocks || {})) {
-    const marker = block?.[TEMPLATE_SOURCE_MARKER];
-    if (marker?.placeholderName) {
+    if (block?.placeholder) {
       // If filtering by templateId, skip blocks that don't match
-      if (filterTemplateId && marker.templateId !== filterTemplateId) continue;
-      targetByPlaceholder.set(marker.placeholderName, { blockId, block });
+      if (filterTemplateId && block.templateId !== filterTemplateId) continue;
+      targetByPlaceholder.set(block.placeholder, { blockId, block });
 
       // Track any templateIds we haven't seen (for nested templates)
-      if (marker.templateId && marker.templateId !== filterTemplateId) {
-        newTemplateIds.add(marker.templateId);
+      if (block.templateId && block.templateId !== filterTemplateId) {
+        newTemplateIds.add(block.templateId);
       }
     }
   }
@@ -8916,7 +8920,7 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
     if (sourceEntry) {
       const idx = mergedLayout.findIndex(id => {
         const block = mergedBlocks[id];
-        return block?.[TEMPLATE_SOURCE_MARKER]?.placeholderName === placeholder;
+        return block?.placeholder === placeholder;
       });
       if (idx >= 0) {
         insertIndex = idx;
@@ -8927,13 +8931,12 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
 
   for (const sourceBlockId of sourceLayout) {
     const sourceBlock = source.blocks?.[sourceBlockId];
-    const sourceMarker = sourceBlock?.[TEMPLATE_SOURCE_MARKER];
-    if (!sourceMarker?.placeholderName) continue;
+    if (!sourceBlock?.placeholder) continue;
 
-    const placeholderName = sourceMarker.placeholderName;
-    processedPlaceholders.add(placeholderName);
+    const placeholder = sourceBlock.placeholder;
+    processedPlaceholders.add(placeholder);
 
-    const targetEntry = targetByPlaceholder.get(placeholderName);
+    const targetEntry = targetByPlaceholder.get(placeholder);
 
     if (targetEntry) {
       // Block exists in both - merge based on fixed property
@@ -8941,7 +8944,7 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
       const targetBlockId = targetEntry.blockId;
 
       if (targetBlock.fixed) {
-        // Fixed block - copy content from source, keep target's marker
+        // Fixed block - copy content from source, keep target's template fields
         mergedBlocks[targetBlockId] = mergeBlockContentSymmetric(
           targetBlock,
           sourceBlock,
@@ -8957,10 +8960,10 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
       }
     } else if (sourceBlock.fixed) {
       // Fixed block in source only - insert into target
-      const newBlockId = `merged-${placeholderName}`;
+      const newBlockId = `merged-${placeholder}`;
       mergedBlocks[newBlockId] = {
         ...sourceBlock,
-        // New blocks get source's marker (will be updated by caller if needed)
+        // New blocks get source's fields (will be updated by caller if needed)
       };
       mergedLayout.splice(insertIndex, 0, newBlockId);
       insertIndex++;
@@ -8969,8 +8972,8 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
   }
 
   // Handle target blocks not in source
-  for (const [placeholderName, { blockId, block }] of targetByPlaceholder) {
-    if (processedPlaceholders.has(placeholderName)) continue;
+  for (const [placeholder, { blockId, block }] of targetByPlaceholder) {
+    if (processedPlaceholders.has(placeholder)) continue;
 
     if (block.fixed) {
       // Fixed block in target but not in source - remove it
@@ -9054,7 +9057,7 @@ export async function loadAndMergeTemplates(pageData, fetchContent) {
 
 /**
  * Merge a single block's content symmetrically.
- * Copies content from source, keeps target's _templateSource marker.
+ * Copies content from source, keeps target's template fields.
  *
  * @param {Object} targetBlock - Block in target document
  * @param {Object} sourceBlock - Block in source document
@@ -9062,18 +9065,21 @@ export async function loadAndMergeTemplates(pageData, fetchContent) {
  * @returns {Object} Merged block
  */
 function mergeBlockContentSymmetric(targetBlock, sourceBlock, newTemplateIds) {
-  const targetMarker = targetBlock[TEMPLATE_SOURCE_MARKER];
+  // Save target's template fields
+  const { templateId, templateInstanceId, placeholder } = targetBlock;
 
-  // Copy all properties from source except _templateSource
+  // Copy all properties from source except template fields
   const result = {};
   for (const [key, value] of Object.entries(sourceBlock)) {
-    if (key === TEMPLATE_SOURCE_MARKER) continue;
+    if (key === 'templateId' || key === 'templateInstanceId' || key === 'placeholder') continue;
     if (key === 'blocks' || key === 'blocks_layout') continue; // Handle separately
     result[key] = value;
   }
 
-  // Keep target's marker
-  result[TEMPLATE_SOURCE_MARKER] = targetMarker;
+  // Keep target's template fields
+  result.templateId = templateId;
+  result.templateInstanceId = templateInstanceId;
+  result.placeholder = placeholder;
 
   // Handle nested blocks recursively
   if (sourceBlock.blocks || targetBlock.blocks) {

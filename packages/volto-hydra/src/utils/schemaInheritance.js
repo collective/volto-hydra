@@ -14,6 +14,175 @@ import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '
 export { getBlockSchema };
 
 /**
+ * Generate a unique placeholder name based on block type.
+ * Format: "blocktype-N" where N is the next available number.
+ */
+function generatePlaceholder(blockType, allBlocks) {
+  const baseType = blockType || 'block';
+  const existingNames = new Set();
+
+  for (const block of Object.values(allBlocks || {})) {
+    if (block?.placeholder) existingNames.add(block.placeholder);
+  }
+
+  let counter = 1;
+  while (existingNames.has(`${baseType}-${counter}`)) {
+    counter++;
+  }
+
+  return `${baseType}-${counter}`;
+}
+
+/**
+ * Check if a position is inside a template by looking at neighbor blocks.
+ * Returns { templateId, templateInstanceId, placeholder } if inside a template, undefined otherwise.
+ * The placeholder is inherited from adjacent non-fixed placeholder blocks.
+ */
+function getTemplateInfoFromNeighbors(context) {
+  const { position, layoutItems, allBlocks } = context;
+  if (!allBlocks || !layoutItems || layoutItems.length === 0) return undefined;
+
+  // Check neighbor at position-1 (before) and position (after insertion point)
+  const neighborIds = [
+    position > 0 ? layoutItems[position - 1] : null,
+    position < layoutItems.length ? layoutItems[position] : null,
+  ].filter(Boolean);
+
+  let templateInfo = null;
+  let inheritedPlaceholder = null;
+
+  for (const neighborId of neighborIds) {
+    const neighbor = allBlocks[neighborId];
+    if (neighbor?.templateId) {
+      // Found a template block - capture template info
+      if (!templateInfo) {
+        templateInfo = {
+          templateId: neighbor.templateId,
+          templateInstanceId: neighbor.templateInstanceId,
+        };
+      }
+      // Inherit placeholder from non-fixed neighbors (placeholder blocks)
+      // Fixed blocks don't contribute their placeholder - new blocks join the placeholder region
+      if (!neighbor.fixed && neighbor.placeholder && !inheritedPlaceholder) {
+        inheritedPlaceholder = neighbor.placeholder;
+      }
+    }
+  }
+
+  if (templateInfo) {
+    return {
+      ...templateInfo,
+      placeholder: inheritedPlaceholder,
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * Apply block defaults with extended context for dynamic defaults.
+ * This is used when adding/moving blocks to pass position context
+ * that schemaEnhancers and function defaults can use.
+ *
+ * Also handles template field inheritance: if adding a block inside
+ * a template (adjacent to blocks with templateId), inherits
+ * the template fields with a generated placeholder name.
+ *
+ * @param {Object} blockData - The new block's data (with @type)
+ * @param {Object} context - Extended context for defaults
+ * @param {string} context.containerId - Parent container ID ('page' or block ID)
+ * @param {string} context.field - Container field name ('blocks_layout', 'items', etc.)
+ * @param {number} context.position - Index where block is being inserted
+ * @param {Object} context.allBlocks - All blocks in the form (formData.blocks)
+ * @param {Object} context.blockPathMap - Block path map
+ * @param {Object} context.blocksConfig - Blocks configuration
+ * @param {Object} context.intl - Intl object
+ * @returns {Object} - Block data with defaults applied
+ */
+export function applyBlockDefaultsWithContext(blockData, context) {
+  const { blocksConfig, intl, allBlocks } = context;
+  const blockType = blockData?.['@type'];
+  if (!blockType || !blocksConfig) return blockData;
+
+  const blockConfig = blocksConfig[blockType];
+
+  // Get base schema
+  let schema = null;
+  if (blockConfig) {
+    if (typeof blockConfig.blockSchema === 'function') {
+      schema = blockConfig.blockSchema({ formData: blockData, intl });
+    } else if (blockConfig.blockSchema) {
+      schema = blockConfig.blockSchema;
+    }
+  }
+
+  // Ensure schema with properties exists
+  schema = schema
+    ? { ...schema, properties: { ...schema.properties } }
+    : { properties: {} };
+
+  // Compute derived template fields based on neighbors using choices pattern
+  // These are calculated fields - values are always determined by position
+  const neighborTemplateInfo = getTemplateInfoFromNeighbors(context);
+  if (neighborTemplateInfo) {
+    // Inside a template - derive the template fields
+    const derivedTemplateId = neighborTemplateInfo.templateId;
+    const derivedInstanceId = neighborTemplateInfo.templateInstanceId;
+    // Priority: keep existing placeholder > inherit from neighbors > generate new
+    const derivedPlaceholder = blockData.placeholder || neighborTemplateInfo.placeholder || generatePlaceholder(blockType, allBlocks);
+
+    schema.properties.templateId = {
+      choices: [derivedTemplateId],
+      default: derivedTemplateId,
+    };
+    schema.properties.templateInstanceId = {
+      choices: [derivedInstanceId],
+      default: derivedInstanceId,
+    };
+    schema.properties.placeholder = {
+      choices: [derivedPlaceholder],
+      default: derivedPlaceholder,
+    };
+  } else {
+    // Outside a template - values should be undefined
+    schema.properties.templateId = {
+      choices: [undefined],
+      default: undefined,
+    };
+    schema.properties.templateInstanceId = {
+      choices: [undefined],
+      default: undefined,
+    };
+    schema.properties.placeholder = {
+      choices: [undefined],
+      default: undefined,
+    };
+  }
+
+  // Apply block-specific schemaEnhancer with extended context
+  if (blockConfig?.schemaEnhancer) {
+    let enhancer = blockConfig.schemaEnhancer;
+    if (typeof enhancer === 'function') {
+      schema = enhancer({
+        schema,
+        formData: blockData,
+        intl,
+        // Extended context for dynamic values
+        containerId: context.containerId,
+        field: context.field,
+        position: context.position,
+        layoutItems: context.layoutItems,
+        allBlocks: context.allBlocks,
+        blockPathMap: context.blockPathMap,
+      });
+    }
+  }
+
+  // Apply defaults with context (supports function defaults)
+  return applySchemaDefaultsToBlockWithContext(blockData, schema, context);
+}
+
+/**
  * Creates a schemaEnhancer that inherits fields from a referenced block type.
  *
  * Use this for blocks that reference another block type (e.g., listing → teaser).
@@ -618,6 +787,63 @@ export function applySchemaDefaultsToBlock(blockData, schema) {
     if (needsDefault) {
       newData[fieldName] = fieldDef.default;
       modified = true;
+    }
+  }
+
+  return modified ? newData : blockData;
+}
+
+/**
+ * Apply schema defaults to a block, with support for function defaults.
+ * Function defaults receive context: { containerId, field, position, allBlocks, blockPathMap }
+ *
+ * @param {Object} blockData - The block's current data
+ * @param {Object} schema - The block's schema (with enhancers applied)
+ * @param {Object} context - Context for function defaults { containerId, field, position, allBlocks, blockPathMap }
+ * @returns {Object} - Block data with defaults applied (or original if no changes)
+ */
+export function applySchemaDefaultsToBlockWithContext(blockData, schema, context = {}) {
+  if (!schema?.properties || !blockData) return blockData;
+
+  let modified = false;
+  const newData = { ...blockData };
+
+  // First: validate current value - clear if invalid
+  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    const currentValue = blockData[fieldName];
+    if (currentValue !== undefined && currentValue !== null) {
+      if (!isValidValue(currentValue, fieldDef)) {
+        newData[fieldName] = null;
+        modified = true;
+      }
+    }
+  }
+
+  // Second pass: apply defaults to empty/null fields
+  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    if (fieldDef.default === undefined) continue;
+
+    const currentValue = newData[fieldName];
+
+    // Check if current value is "empty" (needs default)
+    const needsDefault =
+      currentValue === undefined ||
+      currentValue === null ||
+      (typeof currentValue === 'object' &&
+        !Array.isArray(currentValue) &&
+        Object.keys(currentValue).length === 0);
+
+    if (needsDefault) {
+      // Support function defaults - call with context
+      const defaultValue = typeof fieldDef.default === 'function'
+        ? fieldDef.default(context)
+        : fieldDef.default;
+
+      // Only set if function returned a value (undefined means "no default")
+      if (defaultValue !== undefined) {
+        newData[fieldName] = defaultValue;
+        modified = true;
+      }
     }
   }
 

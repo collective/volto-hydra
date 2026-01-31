@@ -50,7 +50,7 @@ test.describe('Templates', () => {
     const gridBlock = iframe.locator('[data-block-uid="template-grid"]');
     await expect(gridBlock).toBeVisible();
 
-    // Grid should have content from template cell 1 (which has _templateSource)
+    // Grid should have content from template cell 1 (which has template fields)
     await expect(gridBlock).toContainText('Template Grid Cell 1');
 
     // Verify block order: header, grid, user-content-1, user-content-2, footer
@@ -66,7 +66,7 @@ test.describe('Templates', () => {
     expect(footerIndex).toBeGreaterThan(userContent1Index);
   });
 
-  test('nested blocks without _templateSource are NOT synced from template', async ({ page }) => {
+  test('nested blocks without template fields are NOT synced from template', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -81,11 +81,11 @@ test.describe('Templates', () => {
     const gridBlock = iframe.locator('[data-block-uid="template-grid"]');
     await expect(gridBlock).toBeVisible();
 
-    // Grid cell 1 HAS _templateSource marker - should be synced
+    // Grid cell 1 HAS template fields marker - should be synced
     await expect(gridBlock).toContainText('Template Grid Cell 1');
 
-    // Grid cell 2 does NOT have _templateSource marker - should NOT be synced
-    // The merge logic ignores blocks without placeholderName
+    // Grid cell 2 does NOT have template fields marker - should NOT be synced
+    // The merge logic ignores blocks without placeholder
     await expect(gridBlock).not.toContainText('Template Grid Cell 2');
   });
 

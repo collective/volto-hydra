@@ -155,7 +155,7 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
 
 /**
  * Schema for block settings in template edit mode
- * Adds placeholderName, fixed, and readOnly fields to control template behavior
+ * Adds placeholder, fixed, and readOnly fields to control template behavior
  */
 const getTemplateBlockSettingsSchema = () => ({
   title: 'Template Block Settings',
@@ -168,11 +168,11 @@ const getTemplateBlockSettingsSchema = () => ({
     {
       id: 'template',
       title: 'Template Settings',
-      fields: ['placeholderName', 'fixed', 'readOnly'],
+      fields: ['placeholder', 'fixed', 'readOnly'],
     },
   ],
   properties: {
-    placeholderName: {
+    placeholder: {
       title: 'Placeholder Name',
       description: 'Identifier for this slot in the template (e.g., "header", "main-content")',
       type: 'string',
@@ -188,7 +188,7 @@ const getTemplateBlockSettingsSchema = () => ({
       type: 'boolean',
     },
   },
-  required: [],
+  required: ['placeholder'],
 });
 
 /**
@@ -395,7 +395,7 @@ const ParentBlockSection = ({
                 onConvertBlock={handleConvertBlock}
                 isFixed={!!blockData?.fixed}
                 isReadonly={!!blockData?.readOnly}
-                isInTemplate={!!blockData?._templateSource}
+                isInTemplate={!!blockData?.templateId}
                 onMakeTemplate={onBlockAction ? () => onBlockAction('makeTemplate', blockId) : null}
               />
             );
@@ -517,14 +517,14 @@ const ParentBlockSection = ({
         const isBlockInEditedTemplate = templateEditMode &&
           !pathInfo?.isTemplateInstance &&
           blockData &&
-          blockData._templateSource &&
-          blockData._templateSource.instanceId === templateEditMode;
+          blockData.templateId &&
+          blockData.templateInstanceId === templateEditMode;
 
         if (!isBlockInEditedTemplate) return null;
 
         // Build form data with current template block settings
         const templateBlockFormData = {
-          placeholderName: blockData._templateSource.placeholderName || '',
+          placeholder: blockData.placeholder || '',
           fixed: blockData.fixed || false,
           readOnly: blockData.readOnly || false,
         };
@@ -535,16 +535,8 @@ const ParentBlockSection = ({
               schema={templateBlockSchema}
               onChangeField={(fieldId, value) => {
                 const newBlockData = cloneDeep(blockData);
-                if (fieldId === 'placeholderName') {
-                  // Update _templateSource.placeholderName
-                  if (!newBlockData._templateSource) {
-                    newBlockData._templateSource = {};
-                  }
-                  newBlockData._templateSource.placeholderName = value;
-                } else {
-                  // Update top-level property (fixed, readOnly)
-                  newBlockData[fieldId] = value;
-                }
+                // All fields are now top-level (placeholder, fixed, readOnly)
+                newBlockData[fieldId] = value;
                 onChangeBlock(blockId, newBlockData);
               }}
               formData={templateBlockFormData}

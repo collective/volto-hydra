@@ -173,7 +173,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(lockIcon).not.toBeVisible();
   });
 
-  test('dragging block out of template removes _templateSource', async ({ page }) => {
+  test('dragging block out of template removes template fields', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -192,24 +192,36 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await editToggle.click();
     await helper.waitForBlockReadonly('standalone-block-1');
 
-    // Get initial block order - user-content-1 is inside template
-    const templateInstanceId = await iframe.locator('[data-block-uid="user-content-1"]').evaluate(el => {
-      // Check if block has _templateSource via data attribute or other means
-      return el.closest('[data-template-instance]')?.getAttribute('data-template-instance');
-    });
-    expect(templateInstanceId).toBeTruthy();
+    // Verify user-content-1 is inside template (shows placeholder field in sidebar)
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForSidebarOpen();
+    const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderFieldBefore).toBeVisible({ timeout: 5000 });
 
     // Drag user-content-1 outside the template (after standalone-block-1)
     await helper.dragBlockAfter('user-content-1', 'standalone-block-1');
 
-    // Block should no longer be part of template
-    const newTemplateInstanceId = await iframe.locator('[data-block-uid="user-content-1"]').evaluate(el => {
-      return el.closest('[data-template-instance]')?.getAttribute('data-template-instance');
-    });
-    expect(newTemplateInstanceId).toBeFalsy();
+    // Exit template edit mode
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await editToggle.uncheck();
+    await helper.waitForBlockEditable('standalone-block-1');
+
+    // Select the moved block - it should be editable (no longer locked by template)
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForSidebarOpen();
+
+    // Block should be editable (not readonly)
+    const editor = helper.getSlateField(iframe.locator('[data-block-uid="user-content-1"]'));
+    const isEditable = await editor.getAttribute('contenteditable');
+    expect(isEditable).toBe('true');
+
+    // Placeholder field should NOT be visible (block is no longer in template)
+    const placeholderFieldAfter = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderFieldAfter).not.toBeVisible();
   });
 
-  test('dragging block into template adds _templateSource', async ({ page }) => {
+  test('dragging block into template adds template fields', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -228,23 +240,32 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await editToggle.click();
     await helper.waitForBlockReadonly('standalone-block-1');
 
-    // Verify standalone-block-1 is NOT in template
-    const initialTemplateId = await iframe.locator('[data-block-uid="standalone-block-1"]').evaluate(el => {
-      return el.closest('[data-template-instance]')?.getAttribute('data-template-instance');
-    });
-    expect(initialTemplateId).toBeFalsy();
+    // Verify standalone-block-1 is NOT in template (no placeholder field)
+    // First exit template edit mode to check
+    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.waitForSidebarOpen();
+    // Outside template blocks are locked in template edit mode, so no placeholder field
+    const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderFieldBefore).not.toBeVisible();
 
-    // Drag standalone-block-1 into the template (after template-header)
-    await helper.dragBlockAfter('standalone-block-1', 'template-header');
+    // Drag standalone-block-1 into the template (between placeholder blocks)
+    await helper.dragBlockAfter('standalone-block-1', 'user-content-1');
 
-    // Block should now be part of template
-    const newTemplateId = await iframe.locator('[data-block-uid="standalone-block-1"]').evaluate(el => {
-      return el.closest('[data-template-instance]')?.getAttribute('data-template-instance');
-    });
-    expect(newTemplateId).toBeTruthy();
+    // Select the moved block
+    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.waitForSidebarOpen();
+
+    // Block should now show placeholder field (it's now in template)
+    const placeholderFieldAfter = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderFieldAfter).toBeVisible({ timeout: 5000 });
+
+    // Block should be editable (since we're in template edit mode)
+    const editor = helper.getSlateField(iframe.locator('[data-block-uid="standalone-block-1"]'));
+    const isEditable = await editor.getAttribute('contenteditable');
+    expect(isEditable).toBe('true');
   });
 
-  test('block dragged into template gets default placeholderName', async ({ page }) => {
+  test('block dragged into template inherits placeholder from neighbors', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -263,22 +284,33 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await editToggle.click();
     await helper.waitForBlockReadonly('standalone-block-1');
 
-    // Drag standalone block into template
+    // First check what placeholder value user-content-1 has (should be "primary")
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForSidebarOpen();
+    const neighborPlaceholder = page.locator('.field-wrapper-placeholder input');
+    const expectedPlaceholder = await neighborPlaceholder.inputValue();
+    expect(expectedPlaceholder).toBe('primary');
+
+    // Drag standalone block into template (between user-content-1 and user-content-2)
     await helper.dragBlockAfter('standalone-block-1', 'user-content-1');
 
     // Select the newly added block
     await helper.clickBlockInIframe('standalone-block-1');
     await helper.waitForSidebarOpen();
 
-    // Should show placeholderName field in sidebar (in edit mode)
-    const placeholderField = page.locator('.field-wrapper-placeholderName, .field').filter({ hasText: /placeholder/i });
-    await expect(placeholderField).toBeVisible({ timeout: 5000 });
+    // Should show placeholder field with inherited value from neighbors
+    const placeholderInput = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderInput).toBeVisible({ timeout: 5000 });
+
+    // The placeholder should match the neighbors (all are "primary" in this region)
+    const actualPlaceholder = await placeholderInput.inputValue();
+    expect(actualPlaceholder).toBe(expectedPlaceholder);
   });
 });
 
 test.describe('Template Edit Mode - Validation', () => {
   test('non-contiguous placeholder groups prevent save', async ({ page }) => {
-    // Rule: All blocks with the same placeholderName must be adjacent.
+    // Rule: All blocks with the same placeholder must be adjacent.
     // Having two separate groups with the same name is invalid.
     //
     // Valid:   [header] [content] [content] [footer]
@@ -319,6 +351,53 @@ test.describe('Template Edit Mode - Validation', () => {
 
     // Should show validation error about non-contiguous placeholders
     const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|contiguous|adjacent/i });
+    await expect(errorMessage).toBeVisible({ timeout: 5000 });
+  });
+
+  test('adjacent placeholder groups without fixed block prevent save', async ({ page }) => {
+    // Rule: Different placeholder groups must be separated by a fixed block.
+    // Having two different placeholder groups adjacent is invalid.
+    //
+    // Valid:   [header-fixed] [primary] [primary] [footer-fixed]
+    // Invalid: [header-fixed] [primary] [secondary] [footer-fixed]  <- no fixed block between groups
+
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Enter template edit mode
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await editToggle.click();
+    await helper.waitForBlockReadonly('standalone-block-1');
+
+    // Select user-content-2 and change its placeholder to create a different group
+    await helper.clickBlockInIframe('user-content-2');
+    await helper.waitForSidebarOpen();
+
+    // Change placeholder in sidebar from "primary" to "secondary"
+    const placeholderField = page.locator('.field-wrapper-placeholder input');
+    await placeholderField.fill('secondary');
+
+    // Exit edit mode
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await editToggle.uncheck();
+    await helper.waitForBlockEditable('standalone-block-1');
+
+    // Try to save
+    await page.keyboard.press('Control+s');
+
+    // Should show validation error about adjacent placeholder groups needing fixed block
+    const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|fixed|separated/i });
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
   });
 
@@ -377,7 +456,7 @@ test.describe('Template Edit Mode - Validation', () => {
 });
 
 test.describe('Template Edit Mode - Block Settings', () => {
-  test('can change block placeholderName in edit mode', async ({ page }) => {
+  test('can change block placeholder in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -400,8 +479,8 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await helper.clickBlockInIframe('user-content-1');
     await helper.waitForSidebarOpen();
 
-    // placeholderName input should be visible
-    const placeholderInput = page.locator('.field-wrapper-placeholderName input');
+    // placeholder input should be visible
+    const placeholderInput = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderInput).toBeVisible({ timeout: 5000 });
     await placeholderInput.clear();
     await placeholderInput.fill('new-slot-name');

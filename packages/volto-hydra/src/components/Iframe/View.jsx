@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, mergeTemplateContent } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, mergeTemplateContent, isBlockInEditedTemplate } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
@@ -93,6 +93,7 @@ import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
 import {
   applySchemaDefaultsToFormData,
+  applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
   syncChildBlockTypes,
   getConvertibleTypes,
@@ -548,7 +549,7 @@ const Iframe = (props) => {
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
-    templateEditMode: null, // instanceId of template being edited, or null if not in edit mode
+    templateEditMode: null, // templateInstanceId of template being edited, or null if not in edit mode
   }));
 
   // Template cache: stores loaded template documents keyed by templateId
@@ -763,16 +764,16 @@ const Iframe = (props) => {
           });
 
           // Select the template virtual block (instance)
-          // Get instanceId from any template block's _templateSource
+          // Get templateInstanceId from any template block
           const firstBlockId = newFormData.blocks_layout?.items?.[0];
           const firstBlock = newFormData.blocks?.[firstBlockId];
-          const instanceId = firstBlock?._templateSource?.instanceId;
+          const tplInstanceId = firstBlock?.templateInstanceId;
 
-          if (instanceId) {
+          if (tplInstanceId) {
             flushSync(() => {
               setIframeSyncState((prev) => ({
                 ...prev,
-                pendingSelectBlockUid: instanceId,
+                pendingSelectBlockUid: tplInstanceId,
               }));
             });
           }
@@ -908,6 +909,28 @@ const Iframe = (props) => {
       if (blockType === 'slate') {
         blockData.value = [{ type: 'p', children: [{ text: '' }] }];
       }
+
+      // Calculate position for context
+      const containerId = containerConfig?.parentId || 'page';
+      const containerField = containerConfig?.fieldName || 'blocks_layout';
+      const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
+      const layoutItems = container?.[containerField]?.items || container?.blocks_layout?.items || [];
+      const refIndex = layoutItems.indexOf(blockId);
+      const position = action === 'after' ? refIndex + 1 : refIndex;
+
+      // Apply defaults with extended context for dynamic defaults
+      blockData = applyBlockDefaultsWithContext(blockData, {
+        containerId,
+        field: containerField,
+        position,
+        layoutItems,
+        allBlocks: formData.blocks,
+        blockPathMap,
+        blocksConfig: mergedBlocksConfig,
+        intl,
+      });
+
+      // Also apply regular applyBlockDefaults for non-context-aware schemas
       blockData = applyBlockDefaults({ data: blockData, formData: blockData, intl, metadata, properties });
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties });
     }
@@ -1534,6 +1557,45 @@ const Iframe = (props) => {
           console.log('[MOVE_BLOCK] moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
+            // Apply defaults to moved blocks based on their new position
+            // This updates template fields (templateId, templateInstanceId, placeholder)
+            // based on neighboring blocks at the new location
+            let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+            for (const moveBlockId of blocksToMove) {
+              const blockData = getBlockById(newFormData, updatedPathMap, moveBlockId);
+              if (!blockData) continue;
+
+              // Get container info for the new position
+              const targetContainerConfig = getContainerFieldConfig(moveBlockId, updatedPathMap, newFormData, blocksConfig, intl);
+              if (!targetContainerConfig) continue;
+
+              const { parentId: containerId, fieldName: containerField } = targetContainerConfig;
+              const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
+              const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
+              const layoutFieldName = `${containerField}_layout`;
+              const layoutItems = container?.[layoutFieldName]?.items || [];
+              const position = layoutItems.indexOf(moveBlockId);
+
+              // Apply defaults with context - this derives template fields from neighbors
+              const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
+                containerId,
+                field: containerField,
+                position,
+                layoutItems,
+                allBlocks: newFormData.blocks,
+                blockPathMap: updatedPathMap,
+                blocksConfig,
+                intl,
+              });
+
+              // Update block if defaults changed it
+              if (updatedBlockData !== blockData) {
+                newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
+                updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+                console.log('[MOVE_BLOCK] Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'placeholder:', updatedBlockData.placeholder);
+              }
+            }
+
             // If we moved to a different container, ensure source container has at least one block
             if (sourceParentId !== targetParentId && sourceContainerConfig) {
               newFormData = ensureEmptyBlockIfEmpty(
@@ -2829,20 +2891,18 @@ const Iframe = (props) => {
 
               // Generate a unique template ID and instance ID
               const templateCount = Object.values(properties.blocks || {})
-                .filter(b => b._templateSource?.instanceId === b._templateSource?.templateId)
+                .filter(b => b.templateInstanceId === b.templateId)
                 .length;
               const defaultName = `untitled-template-${templateCount + 1}`;
-              const templateId = `/templates/${defaultName}`;
-              const instanceId = templateId; // For new template, instanceId === templateId
+              const newTemplateId = `/templates/${defaultName}`;
+              const newInstanceId = newTemplateId; // For new template, templateInstanceId === templateId
 
-              // Add _templateSource to the block
+              // Add template fields to the block
               const updatedBlock = {
                 ...blockData,
-                _templateSource: {
-                  instanceId,
-                  templateId,
-                  placeholderName: 'primary', // Default placeholder name
-                },
+                templateId: newTemplateId,
+                templateInstanceId: newInstanceId,
+                placeholder: 'primary', // Default placeholder name
               };
 
               // Update the block in formData
@@ -2855,8 +2915,8 @@ const Iframe = (props) => {
 
               // Create a template document structure in cache
               // (will be saved when page is saved)
-              templateCacheRef.current[templateId] = {
-                '@id': templateId,
+              templateCacheRef.current[newTemplateId] = {
+                '@id': newTemplateId,
                 '@type': 'Document',
                 'title': defaultName,
                 'blocks': {
@@ -2878,8 +2938,8 @@ const Iframe = (props) => {
                 formData: updatedProperties,
                 blockPathMap: newBlockPathMap,
                 toolbarRequestDone: `make-template-${Date.now()}`,
-                pendingSelectBlockUid: instanceId, // Select the template instance
-                templateEditMode: instanceId, // Activate template edit mode
+                pendingSelectBlockUid: newInstanceId, // Select the template instance
+                templateEditMode: newInstanceId, // Activate template edit mode
               }));
             }}
           />
@@ -2892,6 +2952,14 @@ const Iframe = (props) => {
             // (e.g., between two fixed template blocks)
             if (pathInfo?.canInsertAfter === false) {
               return null;
+            }
+
+            // In template edit mode, don't show add button for blocks outside the template
+            if (iframeSyncState.templateEditMode) {
+              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+              if (!isBlockInEditedTemplate(blockData, iframeSyncState.templateEditMode)) {
+                return null;
+              }
             }
 
             // Check if container is at maxLength

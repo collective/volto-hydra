@@ -3,7 +3,7 @@
  *
  * Tests that:
  * 1. Templates appear in BlockChooser when allowedTemplates is configured
- * 2. Selecting a template inserts blocks with proper _templateSource markers
+ * 2. Selecting a template inserts blocks with proper template fields
  * 3. Existing content is preserved in the placeholder region
  */
 import { test, expect } from '../fixtures';
@@ -38,7 +38,7 @@ test.describe('Template Insertion', () => {
     await expect(templateOption).toBeVisible();
   });
 
-  test('selecting template inserts blocks with _templateSource markers', async ({ page }) => {
+  test('selecting template inserts blocks with template fields', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 

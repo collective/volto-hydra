@@ -83,7 +83,10 @@ const applyConfig = (config) => {
         title: 'Body',
         widget: 'slate',
       };
-      schema.fieldsets[0].fields.unshift('value');
+      // Defensive check - fieldsets may not exist when called from applyBlockDefaultsWithContext
+      if (schema.fieldsets?.[0]?.fields) {
+        schema.fieldsets[0].fields.unshift('value');
+      }
       return schema;
     },
     sidebarTab: 1,
