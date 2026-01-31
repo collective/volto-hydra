@@ -1208,21 +1208,25 @@ test.describe('Teaser starter UI and overwrite', () => {
 
     const iframe = helper.getIframe();
 
-    // Click the empty teaser (scroll into center of view so overlay has room)
+    // Click the empty teaser (scroll into view first)
     const emptyTeaser = iframe.locator('[data-block-uid="block-6-empty-teaser"]');
     await expect(emptyTeaser).toBeVisible({ timeout: 10000 });
     await emptyTeaser.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(200); // Wait for scroll to settle
+    await expect(emptyTeaser).toBeInViewport();
     await emptyTeaser.click();
 
-    // Wait for starter UI
+    // Wait for starter UI to be fully rendered
     const starterOverlay = page.locator('.starter-ui-overlay');
-    await expect(starterOverlay).toBeVisible({ timeout: 5000 });
+    await expect(starterOverlay).toBeVisible();
 
-    // Open object browser from starter UI (use force since it may be at edge of viewport)
+    // Wait for the AddLinkForm inside to be fully rendered (browse button + input)
     const browseButton = starterOverlay.locator('button[aria-label="Open object browser"]');
-    await expect(browseButton).toBeVisible({ timeout: 5000 });
-    await browseButton.click({ force: true });
+    const urlInput = starterOverlay.locator('input[placeholder*="URL"], input[placeholder*="select"]');
+    await expect(browseButton).toBeVisible();
+    await expect(urlInput).toBeVisible();
+
+    // Click the browse button to open object browser
+    await browseButton.click();
     const objectBrowser = await helper.waitForObjectBrowser();
 
     // Select "Another Page" from the object browser (helper closes it if needed)

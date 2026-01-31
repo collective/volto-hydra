@@ -4113,48 +4113,37 @@ export class AdminUIHelper {
    * @returns Locator for the object browser popup
    */
   async waitForObjectBrowser(timeout: number = 5000): Promise<Locator> {
-    // Wait for either type of object browser:
-    // - aside[role="presentation"] for link editor
-    // - Element with "Choose Image" heading for toolbar image selection
+    // Wait for the Home button which appears inside the object browser when it's ready
+    // This is more reliable than waiting for the container, which may appear before content loads
+    const homeButton = this.page.getByRole('button', { name: 'Home' });
+    await expect(homeButton).toBeVisible({ timeout });
 
-    // Try aside first (link editor)
+    // Find the object browser container (aside for link editor, or image browser container)
     const aside = this.page.locator('aside[role="presentation"]').last();
-
-    // Also look for image browser by finding "Choose Image" heading and going to parent container
     const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
 
-    // Wait for either to appear
-    await Promise.race([
-      aside.waitFor({ state: 'visible', timeout }).catch(() => null),
-      chooseImageHeading.waitFor({ state: 'visible', timeout }).catch(() => null),
-    ]);
-
-    // Determine which one is visible
     let locator: Locator;
     if (await aside.isVisible().catch(() => false)) {
       locator = aside;
-    } else if (await chooseImageHeading.isVisible()) {
-      // Get the parent container (2 levels up from heading -> header -> container)
+    } else if (await chooseImageHeading.isVisible().catch(() => false)) {
+      // Get the parent container for image browser
       locator = chooseImageHeading.locator('xpath=ancestor::*[.//ul or .//list]').first();
-      // Fallback to just finding the list nearby
       if (!(await locator.count())) {
         locator = this.page.locator('ul:has(li)').filter({ hasText: /Document|Image/ }).last();
       }
     } else {
-      throw new Error('Object browser did not appear');
+      // Fallback to aside even if not detected (Home button was visible so browser is open)
+      locator = aside;
     }
 
     // Object browser may open at current page path (e.g., /test-page) which has no children.
     // Check if we need to navigate to Home (list is empty or no matching items)
     const listItems = this.page.locator('li').filter({ hasText: /Document|Image|Folder/ });
-    const hasItems = await listItems.first().isVisible({ timeout: 1000 }).catch(() => false);
+    const hasItems = await listItems.first().isVisible().catch(() => false);
 
     if (!hasItems) {
-      const homeButton = this.page.getByRole('button', { name: 'Home' });
-      // Wait for the button to be in viewport (page may be scrolling)
-      await expect(homeButton).toBeInViewport({ timeout: 5000 });
+      // Click Home to navigate to root where items are available
       await homeButton.click();
-      await this.page.waitForTimeout(500);
     }
 
     // Wait for list items to appear
