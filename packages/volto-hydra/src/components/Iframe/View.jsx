@@ -1915,7 +1915,8 @@ const Iframe = (props) => {
               {
                 type: 'blocks',
                 allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
-                allowedTemplates: field.allowedTemplates || null, // Template objects from frontend
+                allowedTemplates: field.allowedTemplates || null, // Template URLs for BlockChooser
+                allowedLayouts: field.allowedLayouts || null, // Template URLs for LayoutSelector dropdown
                 maxLength: field.maxLength || null,
                 title: field.title || field.fieldName,
               },
@@ -3284,6 +3285,7 @@ const Iframe = (props) => {
           );
           onChangeFormData(newFormData);
         }}
+        onChangeFormData={onChangeFormData}
       />
     </div>
   );

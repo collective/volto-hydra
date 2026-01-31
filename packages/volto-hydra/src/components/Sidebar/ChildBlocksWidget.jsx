@@ -111,6 +111,7 @@ const ContainerFieldSection = ({
   childBlocks,
   allowedBlocks,
   allowedTemplates,
+  allowedLayouts,
   maxLength,
   onSelectBlock,
   onAddBlock,
@@ -162,11 +163,11 @@ const ContainerFieldSection = ({
       <div className="widget-header">
         <span className="widget-title">{fieldTitle}</span>
         <div className="widget-actions">
-          {onChangeFormData && allowedTemplates?.length > 0 && (
+          {onChangeFormData && allowedLayouts?.length > 0 && (
             <LayoutSelector
               formData={formData}
               onChangeFormData={onChangeFormData}
-              allowedTemplates={allowedTemplates}
+              allowedLayouts={allowedLayouts}
               targetBlockId={parentBlockId}
             />
           )}
@@ -284,6 +285,7 @@ const ChildBlocksWidget = ({
               childBlocks={childBlocks}
               allowedBlocks={fieldConfig.allowedBlocks}
               allowedTemplates={fieldConfig.allowedTemplates}
+              allowedLayouts={fieldConfig.allowedLayouts}
               maxLength={fieldConfig.maxLength}
               onSelectBlock={onSelectBlock}
               onAddBlock={onAddBlock}
@@ -350,6 +352,7 @@ const ChildBlocksWidget = ({
             childBlocks={childBlocks}
             allowedBlocks={field.allowedBlocks}
             allowedTemplates={field.allowedTemplates}
+            allowedLayouts={field.allowedLayouts}
             maxLength={field.maxLength}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}

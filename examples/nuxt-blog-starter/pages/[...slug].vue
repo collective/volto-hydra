@@ -393,6 +393,7 @@ onMounted(() => {
                         title: 'Blocks',
                         allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
                         allowedTemplates: ['/templates/test-layout'],
+                        allowedLayouts: ['/templates/test-layout', '/templates/header-footer-layout'],
                     },
                 ],
                 voltoConfig: {

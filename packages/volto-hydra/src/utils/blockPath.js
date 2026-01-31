@@ -826,6 +826,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           title: fieldDef.title || fieldName,
           allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
           allowedTemplates: fieldDef.allowedTemplates || null,
+          allowedLayouts: fieldDef.allowedLayouts || null,
           defaultBlock: fieldDef.defaultBlock || blockConfig?.defaultBlock || null,
           maxLength: fieldDef.maxLength || blockConfig?.maxLength || null,
         });
