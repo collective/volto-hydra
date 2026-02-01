@@ -855,6 +855,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await expect(heroBlock).toBeVisible();
     await heroBlock.scrollIntoViewIfNeeded();
     await heroBlock.click();
+    await helper.waitForSidebarOpen();
 
     // Get iframe image
     const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
