@@ -1,0 +1,73 @@
+{
+  "@id": "/templates/editable-fixed-layout",
+  "@type": "Document",
+  "id": "editable-fixed-layout",
+  "title": "Editable Fixed Layout",
+  "description": "A layout with fixed blocks that can be edited but not moved",
+  "blocks": {
+    "editable-header": {
+      "@type": "slate",
+      "fixed": true,
+      "templateId": "/templates/editable-fixed-layout",
+      "templateInstanceId": "/templates/editable-fixed-layout",
+      "placeholder": "header",
+      "value": [
+        {
+          "type": "h1",
+          "children": [{ "text": "Editable Header" }]
+        }
+      ],
+      "plaintext": "Editable Header"
+    },
+    "default-slot": {
+      "@type": "slate",
+      "templateId": "/templates/editable-fixed-layout",
+      "templateInstanceId": "/templates/editable-fixed-layout",
+      "placeholder": "default",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "" }]
+        }
+      ],
+      "plaintext": ""
+    },
+    "editable-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "templateId": "/templates/editable-fixed-layout",
+      "templateInstanceId": "/templates/editable-fixed-layout",
+      "placeholder": "footer",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Editable Footer" }]
+        }
+      ],
+      "plaintext": "Editable Footer"
+    }
+  },
+  "blocks_layout": {
+    "items": ["editable-header", "default-slot", "editable-footer"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/templates/editable-fixed-layout/@actions",
+      "object": [
+        {
+          "@id": "/templates/editable-fixed-layout/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/templates/editable-fixed-layout/@breadcrumbs",
+      "items": [
+        { "@id": "/templates", "title": "Templates" },
+        { "@id": "/templates/editable-fixed-layout", "title": "Editable Fixed Layout" }
+      ]
+    }
+  }
+}

@@ -1151,6 +1151,77 @@ The steps involved in creating a frontend are roughly the same for all these fra
    - handle field validation errors
    - handle thank you page
 
+## Templates
+
+Templates are reusable, mergeable content structures that can be applied to pages or containers. They define fixed structure with slots (placeholders) for editor content, and template changes propagate to all pages using them.
+
+### Template Concepts
+
+Templates consist of blocks with special properties:
+- **Fixed + ReadOnly**: Can't be edited or moved (e.g., branded headers/footers)
+- **Fixed**: Can be edited but not moved (e.g., required sections)
+- **Placeholder**: Named slots where editors can add their own blocks
+
+```json
+{
+  "blocks": {
+    "header": { "@type": "slate", "fixed": true, "readOnly": true, "placeholder": "header" },
+    "content": { "@type": "slate", "placeholder": "default" },
+    "footer": { "@type": "slate", "fixed": true, "readOnly": true, "placeholder": "footer" }
+  }
+}
+```
+
+### allowedTemplates vs allowedLayouts
+
+Configure templates in `pageBlocksFields`:
+
+```js
+initBridge({
+  pageBlocksFields: [{
+    fieldName: 'blocks',
+    allowedTemplates: ['/templates/form-snippet'],   // Insert via BlockChooser
+    allowedLayouts: ['/templates/article-layout'],   // Apply via Layout dropdown
+  }]
+});
+```
+
+- **allowedTemplates**: Templates shown in BlockChooser's "Templates" group, inserted as blocks
+- **allowedLayouts**: Templates shown in Layout dropdown, replace/merge entire container content
+
+### Applying Layouts
+
+When a layout is applied:
+1. Fixed blocks from template are inserted at their positions
+2. Existing page content moves into the "default" placeholder
+3. Fixed edge blocks prevent insertion outside them
+
+```
+Before:  [User Block A] [User Block B]
+Layout:  [Fixed Header] [default] [Fixed Footer]
+After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
+```
+
+### Template Edit Mode
+
+Editors with permission can enter "template edit mode" to modify the template itself:
+- Fixed/readonly blocks become editable
+- Blocks outside the template become locked
+- Changes save to the template and propagate to all instances
+
+### Merging
+
+Templates merge on page load via `loadAndMergeTemplates()`:
+- Fixed blocks: replaced from template (keeps content in sync)
+- Placeholders: page content preserved in matching slots
+- Non-matching content: goes to "default" placeholder
+
+```js
+import { loadAndMergeTemplates } from '@hydra-js/hydra.js';
+
+const pageData = await loadAndMergeTemplates(rawPageData, fetchTemplate);
+```
+
 ## Advanced
 
 #### Lazy Load the Hydra.js Bridge
