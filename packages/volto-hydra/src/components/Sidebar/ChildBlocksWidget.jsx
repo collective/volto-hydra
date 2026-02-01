@@ -112,7 +112,7 @@ const ContainerFieldSection = ({
   allowedBlocks,
   allowedTemplates,
   allowedLayouts,
-  maxLength,
+  canAdd, // From getAllContainerFields - considers readonly, maxLength, etc.
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
@@ -122,25 +122,6 @@ const ContainerFieldSection = ({
   blockPathMap,
 }) => {
   const intl = useIntl();
-
-  // Check if we can add based on maxLength
-  const maxLengthOk = !maxLength || childBlocks.length < maxLength;
-
-  // Check if there are any valid insertion points
-  // If container is empty, we can add. Otherwise, check if any block allows insertion.
-  let hasInsertionPoint = childBlocks.length === 0;
-  if (!hasInsertionPoint && blockPathMap) {
-    for (const child of childBlocks) {
-      const pathInfo = blockPathMap[child.id];
-      // Can insert after this block OR can insert before first block
-      if (pathInfo?.canInsertAfter !== false || pathInfo?.canInsertBefore !== false) {
-        hasInsertionPoint = true;
-        break;
-      }
-    }
-  }
-
-  const canAdd = maxLengthOk && hasInsertionPoint;
 
   // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
   const childList = childBlocks.map((child) => [child.id, child]);
@@ -253,6 +234,7 @@ const ChildBlocksWidget = ({
   onAddBlock,
   onMoveBlock,
   onChangeFormData,
+  templateEditMode,
 }) => {
   const intl = useIntl();
   const blocksConfig = config.blocks?.blocksConfig;
@@ -265,7 +247,7 @@ const ChildBlocksWidget = ({
   // If no block selected, show page-level blocks for each page field
   // Uses getAllContainerFields(PAGE_BLOCK_UID, ...) to get _page container fields
   if (!selectedBlock) {
-    const fieldsConfig = getAllContainerFields(PAGE_BLOCK_UID, blockPathMap, formData, blocksConfig, intl);
+    const fieldsConfig = getAllContainerFields(PAGE_BLOCK_UID, blockPathMap, formData, blocksConfig, intl, templateEditMode);
 
     if (!isClient) return null;
 
@@ -286,7 +268,7 @@ const ChildBlocksWidget = ({
               allowedBlocks={fieldConfig.allowedBlocks}
               allowedTemplates={fieldConfig.allowedTemplates}
               allowedLayouts={fieldConfig.allowedLayouts}
-              maxLength={fieldConfig.maxLength}
+              canAdd={fieldConfig.canAdd}
               onSelectBlock={onSelectBlock}
               onAddBlock={onAddBlock}
               onMoveBlock={onMoveBlock}
@@ -309,6 +291,7 @@ const ChildBlocksWidget = ({
     formData,
     blocksConfig,
     intl,
+    templateEditMode,
   );
 
   // If no container fields, don't render anything
@@ -353,7 +336,7 @@ const ChildBlocksWidget = ({
             allowedBlocks={field.allowedBlocks}
             allowedTemplates={field.allowedTemplates}
             allowedLayouts={field.allowedLayouts}
-            maxLength={field.maxLength}
+            canAdd={field.canAdd}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
             onMoveBlock={onMoveBlock}
@@ -377,6 +360,7 @@ ChildBlocksWidget.propTypes = {
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
   onChangeFormData: PropTypes.func,
+  templateEditMode: PropTypes.string,
 };
 
 export default ChildBlocksWidget;

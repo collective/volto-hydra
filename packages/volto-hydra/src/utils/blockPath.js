@@ -6,7 +6,7 @@
 import { produce } from 'immer';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
-import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 
 /**
  * Strip functions from a schema object for postMessage serialization.
@@ -450,6 +450,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
         blockType, // Block type for uniform lookups (single source of truth)
         allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
         maxSiblings: fieldDef.maxLength || null,
+        siblingCount: layout.length, // Total siblings in this container
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
         ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
         ...(isReadonly && { isReadonly: true }), // Readonly template blocks can't be edited
@@ -773,9 +774,10 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
- * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlock, maxLength }]
+ * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
+ * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlock, maxLength, currentCount, canAdd }]
  */
-export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl) {
+export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl, templateEditMode = null) {
   const pathInfo = blockPathMap?.[blockId];
 
   // Special handling for virtual template instances
@@ -796,6 +798,8 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         allowedBlocks: null,
         defaultBlock: null,
         maxLength: null,
+        currentCount: childIds.length,
+        canAdd: false, // Template instances don't support adding via sidebar
       }];
     }
     return [];
@@ -804,6 +808,9 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   // For page-level (blockId is PAGE_BLOCK_UID), use _page schema and formData as the block
   const block = blockId === PAGE_BLOCK_UID ? formData : getBlockById(formData, blockPathMap, blockId);
   if (!block) return [];
+
+  // Check if parent block is readonly (can't add to readonly containers)
+  const parentIsReadonly = isBlockReadonly(block, templateEditMode);
 
   // Use blockPathMap for type lookup (single source of truth)
   // For page-level, use '_page' as the type
@@ -815,12 +822,31 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const blockConfig = blocksConfig?.[blockType];
   const defaultAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
+  // Helper to get current count for a container field
+  const getFieldCount = (fieldName, isObjectList = false, dataPath = null) => {
+    if (isObjectList) {
+      // object_list: navigate via dataPath or fieldName
+      const path = dataPath || [fieldName];
+      let data = block;
+      for (const key of path) {
+        data = data?.[key];
+      }
+      return Array.isArray(data) ? data.length : 0;
+    }
+    // blocks container: count items in layout
+    const layoutField = `${fieldName}_layout`;
+    return block[layoutField]?.items?.length || 0;
+  };
+
   const containerFields = [];
 
   // Check for schema-defined container fields (type: 'blocks' or widget: 'object_list')
   if (schema?.properties) {
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
       if (fieldDef.type === 'blocks') {
+        const maxLength = fieldDef.maxLength || blockConfig?.maxLength || null;
+        const currentCount = getFieldCount(fieldName);
+        const maxLengthOk = !maxLength || currentCount < maxLength;
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
@@ -828,21 +854,27 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           allowedTemplates: fieldDef.allowedTemplates || null,
           allowedLayouts: fieldDef.allowedLayouts || null,
           defaultBlock: fieldDef.defaultBlock || blockConfig?.defaultBlock || null,
-          maxLength: fieldDef.maxLength || blockConfig?.maxLength || null,
+          maxLength,
+          currentCount,
+          canAdd: !parentIsReadonly && maxLengthOk,
         });
       } else if (fieldDef.widget === 'object_list') {
         // object_list: items stored as array, virtual type is blockType:fieldName
         const itemType = `${blockType}:${fieldName}`;
+        const dataPath = fieldDef.dataPath || null;
+        const currentCount = getFieldCount(fieldName, true, dataPath);
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: [itemType], // Single virtual type
           defaultBlock: itemType,
           maxLength: null,
+          currentCount,
+          canAdd: !parentIsReadonly, // object_list has no maxLength
           isObjectList: true,
           itemSchema: stripFunctionsFromSchema(fieldDef.schema), // Store itemSchema for editing (stripped for postMessage)
           idField: fieldDef.idField || '@id', // ID field name for items
-          dataPath: fieldDef.dataPath || null, // Path to actual data location
+          dataPath,
         });
       }
     }
@@ -854,12 +886,17 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
   if (containerFields.length === 0 && isImplicitContainer) {
+    const maxLength = blockConfig?.maxLength || null;
+    const currentCount = getFieldCount('blocks');
+    const maxLengthOk = !maxLength || currentCount < maxLength;
     containerFields.push({
       fieldName: 'blocks',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
       defaultBlock: blockConfig?.defaultBlock || null,
-      maxLength: blockConfig?.maxLength || null,
+      maxLength,
+      currentCount,
+      canAdd: !parentIsReadonly && maxLengthOk,
     });
   }
 

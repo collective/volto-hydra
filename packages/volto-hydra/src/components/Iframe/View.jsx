@@ -9,7 +9,7 @@ import {
 } from '@plone/volto/helpers';
 import { validateAndLog } from '../../utils/formDataValidation';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, mergeTemplateContent, isBlockInEditedTemplate } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, mergeTemplateContent, getBlockAddability } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
@@ -555,6 +555,10 @@ const Iframe = (props) => {
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes
   const templateCacheRef = useRef({});
+
+  // Trigger for template sync effect - INIT increments this when templates need loading
+  // This causes the effect to run and fetch templates, then send deferred INITIAL_DATA
+  const [templateSyncTrigger, setTemplateSyncTrigger] = useState(0);
 
   // Set up saveTemplatesRef function for Form.jsx to call before page save
   useEffect(() => {
@@ -1687,7 +1691,7 @@ const Iframe = (props) => {
             onSelectBlock(event.data.blockUid);
           }
 
-          // Check if selected block is an empty block - if so, open block chooser
+          // Check if we can add/replace at this block - if so, open block chooser for empty blocks
           // This should happen on every click of an empty block, not just "new" selections
           // BlockChooser will dynamically decide to mutate vs insert based on selected block type
           // IMPORTANT: Rebuild blockPathMap from properties instead of using iframeSyncState.blockPathMap
@@ -1695,7 +1699,8 @@ const Iframe = (props) => {
           // shortly after a delete operation creates an empty block
           const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
           const selectedBlockData = getBlockById(properties, currentBlockPathMap, event.data.blockUid);
-          if (selectedBlockData?.['@type'] === 'empty') {
+          const addability = getBlockAddability(event.data.blockUid, currentBlockPathMap, selectedBlockData, iframeSyncState.templateEditMode);
+          if (addability.canReplace) {
             setAddNewBlockOpened(true);
           }
 
@@ -1959,7 +1964,24 @@ const Iframe = (props) => {
           setBlockFieldTypes(initialBlockFieldTypes);
 
           // 5. Build blockPathMap (now has complete schema knowledge from _page registration)
-          const initialBlockPathMap = buildBlockPathMap(
+          let initialBlockPathMap = buildBlockPathMap(
+            formWithPageFields,
+            config.blocks.blocksConfig,
+            intl,
+          );
+
+          // 5b. Ensure empty page blocks fields have at least one empty block
+          // No fieldName = process ALL page-level container fields (blocks, footer_blocks, etc.)
+          formWithPageFields = ensureEmptyBlockIfEmpty(
+            formWithPageFields,
+            { parentId: PAGE_BLOCK_UID },
+            initialBlockPathMap,
+            uuid,
+            config.blocks.blocksConfig,
+            { intl, metadata, properties: formWithPageFields },
+          );
+          // Rebuild blockPathMap if empty blocks were added
+          initialBlockPathMap = buildBlockPathMap(
             formWithPageFields,
             config.blocks.blocksConfig,
             intl,
@@ -1991,20 +2013,27 @@ const Iframe = (props) => {
             break;
           }
 
-          // 8. Check if templates need loading - if so, defer INITIAL_DATA until after merge
+          // 8. Check if templates need loading
           const templateIds = getUniqueTemplateIds(formWithDefaults);
           const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
+
           if (unloadedTemplates.length > 0) {
-            log('[INIT] Templates loading, deferring INITIAL_DATA until merge completes');
+            // Templates need loading - store pending data for effect to send after fetch
+            log('[INIT] Templates need loading, deferring INITIAL_DATA');
             pendingInitialDataRef.current = {
               source: event.source,
               origin: event.origin,
               blockFieldTypes: initialBlockFieldTypes,
+              // Store prepared formData with empty blocks already added
+              formData: formWithDefaults,
+              blockPathMap: initialBlockPathMap,
             };
+            // Trigger the sync effect to fetch templates and send INITIAL_DATA
+            setTemplateSyncTrigger(prev => prev + 1);
             break;
           }
 
-          // 9. Send INITIAL_DATA to iframe
+          // 9. No templates to load - send INITIAL_DATA directly
           const toolbarButtons = config.settings.slate?.toolbarButtons || [];
           event.source.postMessage(
             {
@@ -2114,86 +2143,122 @@ const Iframe = (props) => {
       return;
     }
 
-    // Template Merge on Access: Check if templates need loading and merging
-    // This runs BEFORE iframe check - templates can be fetched as soon as formData is available
-    // When fetch completes, onChangeFormData updates Redux, which triggers another sync
-    if (formToUse?.blocks) {
-      const templateIds = getUniqueTemplateIds(formToUse);
-      // Skip templates already in cache OR marked as failed (null)
+    // INITIAL_DATA sending - consolidated to this ONE place
+    // Handles: no templates, templates loading, templates already cached
+    if (pendingInitialDataRef.current) {
+      const { source, origin, blockFieldTypes, formData: preparedFormData, blockPathMap: preparedBlockPathMap } = pendingInitialDataRef.current;
+      const templateIds = getUniqueTemplateIds(preparedFormData);
       const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
 
-      if (unloadedTemplates.length > 0) {
-        log('[TEMPLATE MERGE] Fetching unloaded templates:', unloadedTemplates);
+      if (unloadedTemplates.length === 0) {
+        // No templates to load - send INITIAL_DATA immediately with prepared data
+        log('[INITIAL_DATA] No templates to load, sending immediately');
+        const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
-        // Use Volto's Api helper which handles auth and URL formatting
-        const api = new Api();
+        // Check if any templates need merging (already in cache)
+        const cachedTemplateIds = templateIds.filter(id => templateCacheRef.current[id]);
+        let formDataToSend = preparedFormData;
+        let blockPathMap = preparedBlockPathMap;
 
-        // Fetch templates async in background - don't block
-        (async () => {
-          const newTemplates = {};
+        if (cachedTemplateIds.length > 0) {
+          // Templates in cache - merge them
+          log('[INITIAL_DATA] Merging cached templates:', cachedTemplateIds);
+          const { merged: mergedFormData } = mergeTemplatesIntoPage(preparedFormData, templateCacheRef.current);
+          blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
-          await Promise.all(
-            unloadedTemplates.map(async (templateId) => {
-              try {
-                // Api helper returns response.body directly
-                const template = await api.get(templateId);
-                newTemplates[templateId] = template;
-              } catch (error) {
-                console.warn(`[TEMPLATE MERGE] Failed to fetch template ${templateId}:`, error.status || error);
-                // Mark as failed so we don't retry indefinitely
-                templateCacheRef.current[templateId] = null;
-              }
-            }),
+          // Ensure empty page blocks fields have at least one empty block (template merge may add containers)
+          formDataToSend = ensureEmptyBlockIfEmpty(
+            mergedFormData,
+            { parentId: PAGE_BLOCK_UID },
+            blockPathMap,
+            uuid,
+            config.blocks.blocksConfig,
+            { intl, metadata, properties: mergedFormData },
           );
-
-          if (Object.keys(newTemplates).length === 0) {
-            // No templates loaded, but check if INITIAL_DATA is pending
-            if (pendingInitialDataRef.current) {
-              const { source, origin, blockFieldTypes } = pendingInitialDataRef.current;
-              const toolbarButtons = config.settings.slate?.toolbarButtons || [];
-              const blockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
-              source.postMessage({
-                type: 'INITIAL_DATA',
-                data: formToUse,
-                blockFieldTypes,
-                blockPathMap,
-                slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
-              }, origin);
-              pendingInitialDataRef.current = null;
-            }
-            return;
+          if (formDataToSend !== mergedFormData) {
+            blockPathMap = buildBlockPathMap(formDataToSend, config.blocks.blocksConfig, intl);
           }
 
-          // Update template cache ref
-          templateCacheRef.current = { ...templateCacheRef.current, ...newTemplates };
-
-          // Merge template content
-          log('[TEMPLATE MERGE] Merging templates:', Object.keys(newTemplates));
-          const { merged: mergedFormData, newTemplateIds: moreTemplateIds } = mergeTemplatesIntoPage(formToUse, templateCacheRef.current);
-          if (moreTemplateIds.length > 0) {
-            log('[TEMPLATE MERGE] Discovered nested templates:', moreTemplateIds);
-            // TODO: Load nested templates and merge again
-          }
-
-          // If INITIAL_DATA was deferred, send it now with merged data
-          if (pendingInitialDataRef.current) {
-            const { source, origin, blockFieldTypes } = pendingInitialDataRef.current;
-            const toolbarButtons = config.settings.slate?.toolbarButtons || [];
-            const blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
-            source.postMessage({
-              type: 'INITIAL_DATA',
-              data: mergedFormData,
-              blockFieldTypes,
-              blockPathMap,
-              slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
-            }, origin);
-            pendingInitialDataRef.current = null;
-          }
-
-          // Update Redux - triggers another sync cycle
+          // Update Redux with merged data
           onChangeFormData(mergedFormData);
-        })();
+        }
+
+        source.postMessage({
+          type: 'INITIAL_DATA',
+          data: formDataToSend,
+          blockFieldTypes,
+          blockPathMap,
+          slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+        }, origin);
+        pendingInitialDataRef.current = null;
+        return;
       }
+
+      // Templates need loading - fetch them
+      const api = new Api();
+
+      (async () => {
+        const newTemplates = {};
+
+        await Promise.all(
+          unloadedTemplates.map(async (templateId) => {
+            try {
+              const template = await api.get(templateId);
+              newTemplates[templateId] = template;
+            } catch (error) {
+              console.warn(`[INITIAL_DATA] Failed to fetch template ${templateId}:`, error.status || error);
+              templateCacheRef.current[templateId] = null;
+            }
+          }),
+        );
+
+        // Re-check pending ref - it might have been cleared if user navigated away
+        if (!pendingInitialDataRef.current) {
+          return;
+        }
+
+        const { source, origin, blockFieldTypes, formData: baseFormData } = pendingInitialDataRef.current;
+        const toolbarButtons = config.settings.slate?.toolbarButtons || [];
+
+        // Update template cache
+        templateCacheRef.current = { ...templateCacheRef.current, ...newTemplates };
+
+        // Merge templates (both newly fetched and already cached)
+        const { merged: mergedFormData, newTemplateIds: moreTemplateIds } = mergeTemplatesIntoPage(baseFormData, templateCacheRef.current);
+        if (moreTemplateIds.length > 0) {
+          log('[INITIAL_DATA] Discovered nested templates:', moreTemplateIds);
+          // TODO: Load nested templates and merge again
+        }
+
+        // Build blockPathMap and ensure empty blocks
+        let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
+        let formDataToSend = ensureEmptyBlockIfEmpty(
+          mergedFormData,
+          { parentId: PAGE_BLOCK_UID },
+          blockPathMap,
+          uuid,
+          config.blocks.blocksConfig,
+          { intl, metadata, properties: mergedFormData },
+        );
+        if (formDataToSend !== mergedFormData) {
+          blockPathMap = buildBlockPathMap(formDataToSend, config.blocks.blocksConfig, intl);
+        }
+
+        // Send INITIAL_DATA
+        source.postMessage({
+          type: 'INITIAL_DATA',
+          data: formDataToSend,
+          blockFieldTypes,
+          blockPathMap,
+          slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+        }, origin);
+        pendingInitialDataRef.current = null;
+
+        // Update Redux with merged data (without empty block additions - those are UI-only)
+        onChangeFormData(mergedFormData);
+      })();
+
+      return; // Don't continue to Case 2 while templates are loading
     }
 
     // Case 2: Form properties changed (sidebar edit, block add, etc.)
@@ -2286,7 +2351,7 @@ const Iframe = (props) => {
       iframeOriginRef.current,
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [properties, iframeSyncState.toolbarRequestDone]);
+  }, [properties, iframeSyncState.toolbarRequestDone, templateSyncTrigger]);
 
   const sidebarFocusEventListenerRef = useRef(null);
 
@@ -2510,7 +2575,7 @@ const Iframe = (props) => {
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
     // Use getAllContainerFields to get container config (handles _page and nested blocks uniformly)
     const blocksConfig = config.blocks.blocksConfig;
-    const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
+    const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl, iframeSyncState.templateEditMode);
     const fieldConfig = containerFields.find(f => f.fieldName === fieldName);
 
     const isObjectList = fieldConfig?.isObjectList || false;
@@ -2524,7 +2589,7 @@ const Iframe = (props) => {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
       setAddNewBlockOpened(true);
     }
-  }, [properties, iframeSyncState.blockPathMap, insertAndSelectBlock, intl]);
+  }, [properties, iframeSyncState.blockPathMap, iframeSyncState.templateEditMode, insertAndSelectBlock, intl]);
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -2649,6 +2714,7 @@ const Iframe = (props) => {
           properties,
           config.blocks.blocksConfig,
           intl,
+          iframeSyncState.templateEditMode,
         ).length > 0;
         // Multi-element blocks (e.g., listings) always get full border to show combined bounding box
         const showBottomLine = editableFieldCount === 1 && !isContainer && !blockUI.isMultiElement;
@@ -2946,38 +3012,9 @@ const Iframe = (props) => {
           />
 
           {/* Add Button - positioned based on data-block-add direction */}
+          {/* addDirection is 'hidden' when getBlockAddability returns canInsertBefore/After both false */}
+          {/* This handles: readonly blocks, template edit mode, maxLength, fixed blocks */}
           {blockUI.addDirection !== 'hidden' && (() => {
-            const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
-
-            // Don't show add button if inserting after this block is not allowed
-            // (e.g., between two fixed template blocks)
-            if (pathInfo?.canInsertAfter === false) {
-              return null;
-            }
-
-            // In template edit mode, don't show add button for blocks outside the template
-            if (iframeSyncState.templateEditMode) {
-              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              if (!isBlockInEditedTemplate(blockData, iframeSyncState.templateEditMode)) {
-                return null;
-              }
-            }
-
-            // Check if container is at maxLength
-            if (pathInfo?.maxSiblings) {
-              // Count siblings in the same container field
-              // Must match both parentId AND containerField (for multi-field containers like columns with top_images + columns)
-              const siblingCount = Object.values(iframeSyncState.blockPathMap || {})
-                .filter((info) =>
-                  info.parentId === pathInfo.parentId &&
-                  info.containerField === pathInfo.containerField
-                )
-                .length;
-              if (siblingCount >= pathInfo.maxSiblings) {
-                return null; // Don't show add button when at maxLength
-              }
-            }
-
             const iframeRect = referenceElement.getBoundingClientRect();
             log('Add button render, blockUI.addDirection:', blockUI.addDirection, 'blockUid:', blockUI.blockUid);
             const isRightDirection = blockUI.addDirection === 'right';
@@ -3025,6 +3062,7 @@ const Iframe = (props) => {
             }
 
             // Check if this is a table mode block (row or cell)
+            const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
             const isTableMode = pathInfo?.addMode === 'table' || pathInfo?.parentAddMode === 'table';
 
             // Icon and title depend on table mode and direction
@@ -3286,6 +3324,7 @@ const Iframe = (props) => {
           onChangeFormData(newFormData);
         }}
         onChangeFormData={onChangeFormData}
+        templateEditMode={iframeSyncState.templateEditMode}
       />
     </div>
   );

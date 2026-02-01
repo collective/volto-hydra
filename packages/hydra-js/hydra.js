@@ -643,6 +643,7 @@ export class Bridge {
    * Get the add direction for a block element.
    * Uses data-block-add attribute if set, otherwise infers from nesting depth.
    * Even depths (0, 2, ...) → 'bottom' (vertical), odd depths (1, 3, ...) → 'right' (horizontal)
+   * Returns 'hidden' if block cannot have siblings added (empty, readonly, no insertion points).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {string} 'right', 'bottom', or 'hidden'
@@ -655,9 +656,12 @@ export class Bridge {
       return 'hidden';
     }
 
-    // Empty blocks should not have an add button - they are meant to be replaced
-    // via block chooser, not have blocks added after them
-    if (this.getBlockType(blockUid) === 'empty') {
+    // Use centralized addability logic to check if adding is allowed
+    const blockData = this.getBlockData(blockUid);
+    const addability = getBlockAddability(blockUid, this.blockPathMap, blockData, this.templateEditMode);
+
+    // If neither before nor after is allowed, hide the add button
+    if (!addability.canInsertBefore && !addability.canInsertAfter) {
       return 'hidden';
     }
 
@@ -4958,19 +4962,19 @@ export class Bridge {
           const blockSize = isHorizontal ? rect.width : rect.height;
           const preferredInsertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
 
-          // Check if insert position is allowed (not between two fixed template blocks)
-          const targetPathInfo = this.blockPathMap?.[closestBlockUid];
-          const canInsertBefore = targetPathInfo?.canInsertBefore !== false;
-          const canInsertAfter = targetPathInfo?.canInsertAfter !== false;
+          // Check if insert position is allowed using centralized addability logic
+          // This handles fixed blocks, readonly blocks, and templateEditMode
+          const targetBlockData = this.getBlockData(closestBlockUid);
+          const addability = getBlockAddability(closestBlockUid, this.blockPathMap, targetBlockData, this.templateEditMode);
 
           // Use preferred position if allowed, otherwise try the other side
-          if (preferredInsertAt === 0 && canInsertBefore) {
+          if (preferredInsertAt === 0 && addability.canInsertBefore) {
             insertAt = 0;
-          } else if (preferredInsertAt === 1 && canInsertAfter) {
+          } else if (preferredInsertAt === 1 && addability.canInsertAfter) {
             insertAt = 1;
-          } else if (canInsertBefore) {
+          } else if (addability.canInsertBefore) {
             insertAt = 0;
-          } else if (canInsertAfter) {
+          } else if (addability.canInsertAfter) {
             insertAt = 1;
           } else {
             // Neither side is allowed - hide indicator
@@ -8842,6 +8846,76 @@ export function isBlockPositionLocked(blockData, templateEditMode) {
   return !!blockData?.fixed;
 }
 
+/**
+ * Get block addability - centralized logic for whether blocks can be added
+ * before/after/into a block. Used by DnD, add buttons, and BlockChooser.
+ *
+ * @param {string} blockId - The block ID to check addability for
+ * @param {Object} blockPathMap - Map of blockId -> pathInfo
+ * @param {Object} blockData - The block data object (can be null for pathMap-only checks)
+ * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
+ * @returns {Object} Addability info:
+ *   - canInsertBefore: Can add a sibling before this block
+ *   - canInsertAfter: Can add a sibling after this block
+ *   - canReplace: Can replace this block (for empty blocks)
+ *   - allowedTypes: Array of allowed block types, or null for all types
+ *   - maxReached: Whether container is at maxLength
+ */
+export function getBlockAddability(blockId, blockPathMap, blockData, templateEditMode) {
+  const pathInfo = blockPathMap?.[blockId];
+
+  // Default: can't add anywhere
+  const result = {
+    canInsertBefore: false,
+    canInsertAfter: false,
+    canReplace: false,
+    allowedTypes: null,
+    maxReached: false,
+  };
+
+  if (!pathInfo) {
+    return result;
+  }
+
+  // Get static insert restrictions from pathMap (based on fixed blocks)
+  const staticCanInsertBefore = pathInfo.canInsertBefore !== false;
+  const staticCanInsertAfter = pathInfo.canInsertAfter !== false;
+
+  // Check if block is readonly (static readOnly or dynamic via templateEditMode)
+  const blockIsReadonly = isBlockReadonly(blockData, templateEditMode);
+
+  // Readonly blocks: can't add before/after/replace
+  if (blockIsReadonly) {
+    return result;
+  }
+
+  // Check if container is at maxLength
+  const maxReached = pathInfo.maxSiblings != null &&
+    pathInfo.siblingCount >= pathInfo.maxSiblings;
+  result.maxReached = maxReached;
+
+  // If max is reached, can't add more blocks
+  if (maxReached) {
+    return result;
+  }
+
+  // Apply static restrictions
+  result.canInsertBefore = staticCanInsertBefore;
+  result.canInsertAfter = staticCanInsertAfter;
+
+  // For empty blocks: can replace but NOT add after (empty blocks are meant to be replaced)
+  const isEmptyBlock = blockData?.['@type'] === 'empty';
+  if (isEmptyBlock) {
+    result.canReplace = true;
+    result.canInsertBefore = false;
+    result.canInsertAfter = false;
+  }
+
+  // Include allowed types from pathInfo
+  result.allowedTypes = pathInfo.allowedSiblingTypes || null;
+
+  return result;
+}
 
 /**
  * Get unique template IDs (paths) from page data.
