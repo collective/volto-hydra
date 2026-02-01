@@ -329,13 +329,24 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Drag user-content-1 outside the template (after standalone-block-1)
     await helper.dragBlockAfter('user-content-1', 'standalone-block-1');
 
-    // Exit template edit mode
-    await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    // Verify block moved - it should now be after standalone-block-1 (position 1 in DOM)
+    const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').all();
+    const blockIds = await Promise.all(allBlocks.map(b => b.getAttribute('data-block-uid')));
+    const movedIndex = blockIds.indexOf('user-content-1');
+    const standaloneIndex = blockIds.indexOf('standalone-block-1');
+    expect(movedIndex).toBe(standaloneIndex + 1);
+
+    // Verify block is now OUTSIDE template - it should be readonly in template edit mode
+    // (blocks outside the template being edited are greyed out)
+    await helper.waitForBlockReadonly('user-content-1');
+
+    // Exit template edit mode - click template-header to access the edit toggle
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForSidebarOpen();
     await editToggle.uncheck();
     await helper.waitForBlockEditable('standalone-block-1');
 
-    // Select the moved block - it should be editable (no longer locked by template)
+    // Select the moved block - it should be editable now (template edit mode is off)
     await helper.clickBlockInIframe('user-content-1');
     await helper.waitForSidebarOpen();
 
@@ -347,6 +358,58 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Placeholder field should NOT be visible (block is no longer in template)
     const placeholderFieldAfter = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldAfter).not.toBeVisible();
+  });
+
+  test('moving placeholder before first fixed block keeps it in template', async ({ page }) => {
+    // Placeholders at template edges must be allowed - needed for layout switching
+    // where content needs to be tracked even at edges
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Enter template edit mode
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe('template-header');
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await editToggle.click();
+    await helper.waitForBlockReadonly('standalone-block-1');
+
+    // Move user-content-1 BEFORE the first fixed block (template-header)
+    // This puts a placeholder at the template edge
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForSidebarOpen();
+    const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderFieldBefore).toBeVisible({ timeout: 5000 });
+
+    await helper.dragBlockBefore('user-content-1', 'template-header');
+
+    // Verify block moved - it should now be before template-header
+    const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').all();
+    const blockIds = await Promise.all(allBlocks.map(b => b.getAttribute('data-block-uid')));
+    const movedIndex = blockIds.indexOf('user-content-1');
+    const headerIndex = blockIds.indexOf('template-header');
+    expect(movedIndex).toBeLessThan(headerIndex);
+
+    // Verify block is still IN the template - it should still be editable in template edit mode
+    // (blocks outside the template are readonly in edit mode)
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.waitForSidebarOpen();
+
+    // Placeholder field should still be visible (block is still in template)
+    const placeholderFieldAfter = page.locator('.field-wrapper-placeholder input');
+    await expect(placeholderFieldAfter).toBeVisible({ timeout: 5000 });
+
+    // Block should be editable (not readonly, since it's in the template being edited)
+    const editor = helper.getSlateField(iframe.locator('[data-block-uid="user-content-1"]'));
+    const isEditable = await editor.getAttribute('contenteditable');
+    expect(isEditable).toBe('true');
   });
 
   test('dragging block into template adds template fields', async ({ page }) => {
@@ -607,9 +670,10 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await helper.clickBlockInIframe('user-content-1');
     await helper.waitForSidebarOpen();
 
-    // placeholder input should be visible
+    // placeholder input should be visible and have initial value from block data
     const placeholderInput = page.locator('.field-wrapper-placeholder input');
-    await expect(placeholderInput).toBeVisible({ timeout: 5000 });
+    await expect(placeholderInput).toHaveValue('primary', { timeout: 5000 });
+    // Now clear and fill with new value
     await placeholderInput.clear();
     await placeholderInput.fill('new-slot-name');
     await expect(placeholderInput).toHaveValue('new-slot-name');

@@ -4964,8 +4964,10 @@ export class Bridge {
 
           // Check if insert position is allowed using centralized addability logic
           // This handles fixed blocks, readonly blocks, and templateEditMode
+          // Pass source block data to enable dragging blocks into templates
           const targetBlockData = this.getBlockData(closestBlockUid);
-          const addability = getBlockAddability(closestBlockUid, this.blockPathMap, targetBlockData, this.templateEditMode);
+          const sourceBlockData = this.getBlockData(this.selectedBlockUid);
+          const addability = getBlockAddability(closestBlockUid, this.blockPathMap, targetBlockData, this.templateEditMode, sourceBlockData);
 
           // Use preferred position if allowed, otherwise try the other side
           if (preferredInsertAt === 0 && addability.canInsertBefore) {
@@ -8850,10 +8852,11 @@ export function isBlockPositionLocked(blockData, templateEditMode) {
  * Get block addability - centralized logic for whether blocks can be added
  * before/after/into a block. Used by DnD, add buttons, and BlockChooser.
  *
- * @param {string} blockId - The block ID to check addability for
+ * @param {string} blockId - The block ID to check addability for (target block)
  * @param {Object} blockPathMap - Map of blockId -> pathInfo
- * @param {Object} blockData - The block data object (can be null for pathMap-only checks)
+ * @param {Object} blockData - The target block data object (can be null for pathMap-only checks)
  * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
+ * @param {Object|null} sourceBlockData - For DnD: the source block being moved. Enables template-aware logic.
  * @returns {Object} Addability info:
  *   - canInsertBefore: Can add a sibling before this block
  *   - canInsertAfter: Can add a sibling after this block
@@ -8861,7 +8864,7 @@ export function isBlockPositionLocked(blockData, templateEditMode) {
  *   - allowedTypes: Array of allowed block types, or null for all types
  *   - maxReached: Whether container is at maxLength
  */
-export function getBlockAddability(blockId, blockPathMap, blockData, templateEditMode) {
+export function getBlockAddability(blockId, blockPathMap, blockData, templateEditMode, sourceBlockData = null) {
   const pathInfo = blockPathMap?.[blockId];
 
   // Default: can't add anywhere
@@ -8881,14 +8884,6 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
   const staticCanInsertBefore = pathInfo.canInsertBefore !== false;
   const staticCanInsertAfter = pathInfo.canInsertAfter !== false;
 
-  // Check if block is readonly (static readOnly or dynamic via templateEditMode)
-  const blockIsReadonly = isBlockReadonly(blockData, templateEditMode);
-
-  // Readonly blocks: can't add before/after/replace
-  if (blockIsReadonly) {
-    return result;
-  }
-
   // Check if container is at maxLength
   const maxReached = pathInfo.maxSiblings != null &&
     pathInfo.siblingCount >= pathInfo.maxSiblings;
@@ -8899,14 +8894,45 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
     return result;
   }
 
-  // Apply static restrictions
-  result.canInsertBefore = staticCanInsertBefore;
-  result.canInsertAfter = staticCanInsertAfter;
+  // Template edit mode handling:
+  // - For add button (no sourceBlockData): Only allow if target is in the edited template
+  // - For DnD (sourceBlockData provided): Allow if source OR target is in the template
+  //   This enables dragging blocks from outside INTO the template
+  let targetInTemplate = false;
+  if (templateEditMode) {
+    targetInTemplate = isBlockInEditedTemplate(blockData, templateEditMode);
+    const sourceInTemplate = sourceBlockData ? isBlockInEditedTemplate(sourceBlockData, templateEditMode) : false;
 
-  // For empty blocks: can replace but NOT add after (empty blocks are meant to be replaced)
+    // For DnD: allow if either source or target is in the template
+    // For add button: only allow if target is in the template
+    const allowedByTemplateMode = sourceBlockData
+      ? (sourceInTemplate || targetInTemplate)
+      : targetInTemplate;
+
+    if (!allowedByTemplateMode) {
+      // Neither block is in the template being edited - can't add here
+      return result;
+    }
+  }
+
+  // Apply static restrictions
+  // In template edit mode, ignore restrictions for blocks in the template being edited
+  // (the restrictions are for normal mode to prevent adding outside placeholders)
+  if (templateEditMode && targetInTemplate) {
+    result.canInsertBefore = true;
+    result.canInsertAfter = true;
+  } else {
+    result.canInsertBefore = staticCanInsertBefore;
+    result.canInsertAfter = staticCanInsertAfter;
+  }
+
+  // For empty blocks: can replace (unless readonly), but NOT add before/after
+  // Empty blocks are meant to be replaced via block chooser
   const isEmptyBlock = blockData?.['@type'] === 'empty';
   if (isEmptyBlock) {
-    result.canReplace = true;
+    // In template edit mode, check if block is in the edited template for replace permission
+    const blockIsReadonly = isBlockReadonly(blockData, templateEditMode);
+    result.canReplace = !blockIsReadonly;
     result.canInsertBefore = false;
     result.canInsertAfter = false;
   }

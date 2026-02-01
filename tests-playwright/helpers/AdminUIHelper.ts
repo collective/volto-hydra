@@ -3397,6 +3397,26 @@ export class AdminUIHelper {
   }
 
   /**
+   * Drag a block before another block by their IDs.
+   * First selects the source block, then drags it before the target block.
+   * @param sourceBlockId - The block ID to drag
+   * @param targetBlockId - The block ID to drop before
+   */
+  async dragBlockBefore(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    const iframe = this.getIframe();
+
+    // Select the source block first
+    await this.clickBlockInIframe(sourceBlockId);
+    await this.waitForQuantaToolbar(sourceBlockId);
+
+    // Get target block locator
+    const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
+
+    // Use dragBlockWithMouse with insertAfter=false
+    await this.dragBlockWithMouse(targetBlock, targetBlock, false);
+  }
+
+  /**
    * Drag a block to target position but DON'T complete the drop.
    * Use this to inspect drop indicator position during drag.
    * Call page.mouse.up() to release when done inspecting.

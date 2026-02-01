@@ -923,10 +923,12 @@ const Iframe = (props) => {
       const position = action === 'after' ? refIndex + 1 : refIndex;
 
       // Apply defaults with extended context for dynamic defaults
+      // insertAfter tells inheritance logic which neighbor to inherit template membership from
       blockData = applyBlockDefaultsWithContext(blockData, {
         containerId,
         field: containerField,
         position,
+        insertAfter: action === 'after',
         layoutItems,
         allBlocks: formData.blocks,
         blockPathMap,
@@ -1529,12 +1531,15 @@ const Iframe = (props) => {
             : null;
 
           // Move all blocks in sequence, each one after the previous
+          // Track insertAfter for each block (needed for template inheritance)
           let newFormData = currentFormData;
           let currentTarget = targetBlockId;
           let currentInsertAfter = insertAfter;
+          const blockInsertAfterMap = {};
 
           for (let i = 0; i < blocksToMove.length; i++) {
             const moveBlockId = blocksToMove[i];
+            blockInsertAfterMap[moveBlockId] = currentInsertAfter;
             const updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
 
             newFormData = moveBlockBetweenContainers(
@@ -1581,10 +1586,12 @@ const Iframe = (props) => {
               const position = layoutItems.indexOf(moveBlockId);
 
               // Apply defaults with context - this derives template fields from neighbors
+              // insertAfter determines which neighbor's template membership to inherit
               const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
                 containerId,
                 field: containerField,
                 position,
+                insertAfter: blockInsertAfterMap[moveBlockId],
                 layoutItems,
                 allBlocks: newFormData.blocks,
                 blockPathMap: updatedPathMap,
@@ -2573,6 +2580,10 @@ const Iframe = (props) => {
 
   // Handle sidebar add - adds inside a container's field as last child
   const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
+    // Validate parentBlockId - must be PAGE_BLOCK_UID or a valid block ID
+    if (parentBlockId == null) {
+      throw new Error('[HYDRA] handleSidebarAdd: parentBlockId is required. Use PAGE_BLOCK_UID for page-level blocks.');
+    }
     // Use getAllContainerFields to get container config (handles _page and nested blocks uniformly)
     const blocksConfig = config.blocks.blocksConfig;
     const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl, iframeSyncState.templateEditMode);

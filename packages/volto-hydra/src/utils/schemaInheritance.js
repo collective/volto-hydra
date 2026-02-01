@@ -37,46 +37,57 @@ function generatePlaceholder(blockType, allBlocks) {
  * Check if a position is inside a template by looking at neighbor blocks.
  * Returns { templateId, templateInstanceId, placeholder } if inside a template, undefined otherwise.
  * The placeholder is inherited from adjacent non-fixed placeholder blocks.
+ *
+ * Template membership is determined by the TARGET block of the insertion:
+ * - "insert after X" → inherit from X (the block we're inserting after)
+ * - "insert before Y" → inherit from Y (the block we're inserting before)
+ * This ensures that inserting after a non-template block stays outside the template,
+ * even if the next block is a template block.
  */
 function getTemplateInfoFromNeighbors(context) {
-  const { position, layoutItems, allBlocks } = context;
+  const { position, layoutItems, allBlocks, insertAfter } = context;
   if (!allBlocks || !layoutItems || layoutItems.length === 0) return undefined;
 
-  // Check neighbor at position-1 (before) and position (after insertion point)
-  const neighborIds = [
-    position > 0 ? layoutItems[position - 1] : null,
-    position < layoutItems.length ? layoutItems[position] : null,
-  ].filter(Boolean);
+  // Determine the primary neighbor based on insertion direction
+  // insertAfter=true: we're inserting AFTER the block at position-1, so inherit from it
+  // insertAfter=false: we're inserting BEFORE the block at position, so inherit from it
+  const prevNeighborId = position > 0 ? layoutItems[position - 1] : null;
+  const nextNeighborId = position < layoutItems.length ? layoutItems[position] : null;
 
-  let templateInfo = null;
+  // The "target" block determines template membership
+  const primaryNeighborId = insertAfter ? prevNeighborId : nextNeighborId;
+  const primaryNeighbor = primaryNeighborId ? allBlocks[primaryNeighborId] : null;
+
+  // If the primary neighbor (target of insertion) is not in a template, stay outside
+  if (!primaryNeighbor?.templateId) {
+    return undefined;
+  }
+
+  // Primary neighbor is in a template - inherit template info
+  const templateInfo = {
+    templateId: primaryNeighbor.templateId,
+    templateInstanceId: primaryNeighbor.templateInstanceId,
+  };
+
+  // Inherit placeholder from the primary neighbor if it's not fixed
+  // For placeholder inheritance, also check the secondary neighbor
   let inheritedPlaceholder = null;
+  const secondaryNeighborId = insertAfter ? nextNeighborId : prevNeighborId;
+  const secondaryNeighbor = secondaryNeighborId ? allBlocks[secondaryNeighborId] : null;
 
-  for (const neighborId of neighborIds) {
-    const neighbor = allBlocks[neighborId];
-    if (neighbor?.templateId) {
-      // Found a template block - capture template info
-      if (!templateInfo) {
-        templateInfo = {
-          templateId: neighbor.templateId,
-          templateInstanceId: neighbor.templateInstanceId,
-        };
-      }
-      // Inherit placeholder from non-fixed neighbors (placeholder blocks)
-      // Fixed blocks don't contribute their placeholder - new blocks join the placeholder region
+  for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
+    if (neighbor?.templateId === templateInfo.templateId) {
+      // Same template - can inherit placeholder
       if (!neighbor.fixed && neighbor.placeholder && !inheritedPlaceholder) {
         inheritedPlaceholder = neighbor.placeholder;
       }
     }
   }
 
-  if (templateInfo) {
-    return {
-      ...templateInfo,
-      placeholder: inheritedPlaceholder,
-    };
-  }
-
-  return undefined;
+  return {
+    ...templateInfo,
+    placeholder: inheritedPlaceholder,
+  };
 }
 
 /**
@@ -858,7 +869,11 @@ function isValidValue(value, fieldDef) {
   // For choice fields: check if value is one of the allowed choices
   if (fieldDef.choices) {
     const validValues = new Set(
-      fieldDef.choices.map((c) => (Array.isArray(c) ? c[0] : c.value ?? c.token ?? c)),
+      fieldDef.choices.map((c) => {
+        if (c === undefined || c === null) return c;
+        if (Array.isArray(c)) return c[0];
+        return c.value ?? c.token ?? c;
+      }),
     );
     return validValues.has(value);
   }
