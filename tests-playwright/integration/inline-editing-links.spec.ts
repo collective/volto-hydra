@@ -246,6 +246,8 @@ test.describe('Inline Editing - Links', () => {
 
     // Click inside the link to edit it
     await link.click();
+    // Wait for selection to be within the link
+    await expect(editor).toBeFocused({ timeout: 2000 });
 
     // Click link button again to open editor
     await helper.clickFormatButton('link');
@@ -266,9 +268,11 @@ test.describe('Inline Editing - Links', () => {
     // Wait for popup to close
     await helper.waitForLinkEditorToClose();
 
-    // Verify link was updated
-    expect(await link.getAttribute('href')).toBe('https://newurl.com');
-    expect(await link.textContent()).toBe('Click here');
+    // Verify link was updated (poll to allow time for sync)
+    await expect(async () => {
+      expect(await link.getAttribute('href')).toBe('https://newurl.com');
+      expect(await link.textContent()).toBe('Click here');
+    }).toPass({ timeout: 5000 });
   });
 
   test('LinkEditor closes when focusing back on editor', async ({ page }) => {

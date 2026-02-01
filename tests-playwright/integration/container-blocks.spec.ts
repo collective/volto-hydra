@@ -346,13 +346,8 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Count initial page-level blocks (blocks without a [data-block-uid] ancestor)
-    const initialPageBlocks = await iframe.locator('body').evaluate((body) => {
-      return Array.from(body.querySelectorAll('[data-block-uid]'))
-        .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
-    });
+    // Get initial block count using helper (waits for stability)
+    const initialBlockCount = await helper.getStableBlockCount();
 
     // Select a top-level block then deselect by clicking parent arrow
     await helper.clickBlockInIframe('columns-1');
@@ -395,22 +390,12 @@ test.describe('Adding Blocks to Containers', () => {
     // Wait for block chooser to close and block to be added
     await expect(blockChooser).not.toBeVisible({ timeout: 5000 });
 
-    // Page-level blocks should have increased by 1
-    await expect
-      .poll(async () => {
-        return await iframe.locator('body').evaluate((body) => {
-          return Array.from(body.querySelectorAll('[data-block-uid]'))
-            .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
-        });
-      }, { timeout: 5000 })
-      .toBe(initialPageBlocks + 1);
+    // Block count should have increased by 1
+    await helper.waitForBlockCountToBe(initialBlockCount + 1);
 
-    // The new block should be the LAST page-level block (added at bottom)
-    const lastBlockUid = await iframe.locator('body').evaluate((body) => {
-      const pageLevelBlocks = Array.from(body.querySelectorAll('[data-block-uid]'))
-        .filter(el => !el.parentElement?.closest('[data-block-uid]'));
-      return pageLevelBlocks[pageLevelBlocks.length - 1]?.getAttribute('data-block-uid');
-    });
+    // The new block should be the LAST block (added at bottom)
+    const blockOrder = await helper.getBlockOrder();
+    const lastBlockUid = blockOrder[blockOrder.length - 1];
     expect(lastBlockUid).not.toBe('grid-1'); // Not the original last block
 
     // The new block should be selected (toolbar visible for it)
@@ -833,10 +818,12 @@ test.describe('Hierarchical Sidebar', () => {
     // Select the deepest nested block (text-1a inside col-1 inside columns-1)
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
+    // Wait for quanta toolbar to ensure block is fully selected
+    await helper.waitForQuantaToolbar('text-1a');
 
     // Should see parent block headers in sidebar-parents
     const sidebarParents = page.locator('#sidebar-parents');
-    await expect(sidebarParents).toBeVisible();
+    await expect(sidebarParents).toBeVisible({ timeout: 5000 });
 
     // Find all title input fields in the parent blocks sidebar
     // Each parent block (Columns, Column) should have a title field
@@ -919,7 +906,7 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Select a block to show toolbar
     await helper.clickBlockInIframe('text-after');
-    await page.waitForTimeout(300);
+    await helper.waitForQuantaToolbar('text-after');
 
     // Verify block is properly selected with correct positioning
     const initialResult = await helper.isBlockSelectedInIframe('text-after');
@@ -928,7 +915,9 @@ test.describe('Hierarchical Sidebar', () => {
     // Close sidebar
     const closeButton = page.locator('.sidebar-close-button');
     await closeButton.click();
-    await page.waitForTimeout(500); // Wait for resize
+    // Wait for sidebar to collapse
+    const sidebarContainer = page.locator('.sidebar-container');
+    await expect(sidebarContainer).toHaveClass(/collapsed/, { timeout: 5000 });
 
     // Verify positioning is still correct after sidebar close
     const afterCloseResult = await helper.isBlockSelectedInIframe('text-after');
@@ -941,7 +930,6 @@ test.describe('Hierarchical Sidebar', () => {
     const triggerButton = page.locator('.sidebar-container .trigger');
     await triggerButton.click();
     // Wait for sidebar animation to complete (collapsed class removed)
-    const sidebarContainer = page.locator('.sidebar-container');
     await expect(sidebarContainer).not.toHaveClass(/collapsed/, { timeout: 5000 });
     await helper.waitForQuantaToolbar('text-after'); // Wait for toolbar to reposition
 
