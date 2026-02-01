@@ -431,4 +431,71 @@ test.describe('allowedLayouts', () => {
       expect(chooserVisible).toBe(true);
     });
   });
+
+  test.describe('Empty Page Blocks Fields', () => {
+    test('page without footer_blocks data gets empty block injected', async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend has different page field config');
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      // template-test-page has no footer_blocks in its data, but schema defines footer_blocks field
+      await helper.navigateToEdit('/template-test-page');
+      await helper.waitForIframeReady();
+
+      // Debug: Check if footer_blocks is being rendered
+      const footerContent = iframe.locator('#footer-content');
+      const footerBlocks = footerContent.locator('[data-block-uid]');
+      const footerBlockCount = await footerBlocks.count();
+      console.log('[TEST] Footer blocks count:', footerBlockCount);
+
+      if (footerBlockCount > 0) {
+        const blockId = await footerBlocks.first().getAttribute('data-block-uid');
+        const hasEmptyAttr = await footerBlocks.first().getAttribute('data-hydra-empty');
+        console.log('[TEST] First footer block ID:', blockId, 'has data-hydra-empty:', hasEmptyAttr);
+      }
+
+      // Verify empty block is rendered in iframe's footer section with data-hydra-empty attribute
+      const emptyBlock = await helper.waitForEmptyBlock('#footer-content');
+
+      // Click the empty block - should open BlockChooser
+      await emptyBlock.click();
+      const chooserVisible = await helper.isBlockChooserVisible();
+      expect(chooserVisible).toBe(true);
+    });
+
+    test('readonly empty block (in template edit mode) does NOT open BlockChooser', async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend has different page field config');
+      const helper = new AdminUIHelper(page);
+
+      await helper.login();
+      await helper.navigateToEdit('/template-test-page');
+      await helper.waitForIframeReady();
+
+      // Select a template block to show template settings in sidebar
+      await helper.clickBlockInIframe('template-header');
+      await helper.waitForQuantaToolbar('template-header');
+
+      // Enter template edit mode by clicking "Edit Template" checkbox in sidebar
+      // This makes all blocks outside the template readonly
+      const editTemplateCheckbox = page.locator('input[type="checkbox"]').filter({ has: page.locator('~ *', { hasText: /Edit Template/i }) });
+      // Alternative: find by the label text
+      const editTemplateLabel = page.getByText('Edit Template', { exact: true });
+      await editTemplateLabel.click();
+
+      // Wait for template edit mode to be active (blocks outside template get locked class)
+      const iframe = helper.getIframe();
+      await expect(iframe.locator('#footer-content [data-hydra-empty].hydra-locked')).toBeVisible({ timeout: 5000 });
+
+      // Now footer_blocks empty block should be readonly (outside the template)
+      const emptyBlock = iframe.locator('#footer-content [data-hydra-empty]');
+
+      // Click the readonly empty block
+      await emptyBlock.click();
+
+      // Verify BlockChooser did NOT open for readonly empty block
+      const chooserVisible = await helper.isBlockChooserVisible();
+      expect(chooserVisible).toBe(false);
+    });
+  });
 });

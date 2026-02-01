@@ -2522,6 +2522,22 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for an empty block to appear in the iframe.
+   * Empty blocks have the data-hydra-empty attribute set by hydra.js.
+   * @param parentSelector - Optional parent selector to scope the search
+   * @returns Locator for the empty block
+   */
+  async waitForEmptyBlock(parentSelector?: string): Promise<Locator> {
+    const iframe = this.getIframe();
+    const selector = parentSelector
+      ? `${parentSelector} [data-hydra-empty]`
+      : '[data-hydra-empty]';
+    const emptyBlock = iframe.locator(selector);
+    await expect(emptyBlock).toBeVisible({ timeout: 5000 });
+    return emptyBlock;
+  }
+
+  /**
    * Check if the block chooser modal is visible in the Admin UI.
    */
   async isBlockChooserVisible(): Promise<boolean> {
