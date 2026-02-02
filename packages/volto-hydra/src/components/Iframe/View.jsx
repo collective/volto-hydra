@@ -90,7 +90,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
 import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
@@ -1070,6 +1070,29 @@ const Iframe = (props) => {
   const onDeleteBlock = (id, selectPrev) => {
     // Use merged config from registry (includes frontend's custom blocks after INIT)
     const mergedBlocksConfig = config.blocks.blocksConfig;
+
+    // Check if this is a template instance (virtual block)
+    const pathInfo = iframeSyncState.blockPathMap?.[id];
+    if (pathInfo?.isTemplateInstance) {
+      // Remove template instance: delete fixed blocks, strip template fields from user content
+      let newFormData = removeTemplateInstance(
+        properties,
+        iframeSyncState.blockPathMap,
+        id,
+      );
+
+      // Rebuild blockPathMap to reflect the removed template
+      const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+      setIframeSyncState(prev => ({
+        ...prev,
+        blockPathMap: newBlockPathMap,
+      }));
+      onChangeFormData(newFormData);
+      onSelectBlock(null);
+      setAddNewBlockOpened(false);
+      dispatch(setSidebarTab(1));
+      return;
+    }
 
     // Check if deleting from a container (null means page-level)
     const containerConfig = getContainerFieldConfig(

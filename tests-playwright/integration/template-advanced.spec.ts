@@ -152,8 +152,9 @@ test.describe('Delete Template Instance', () => {
     await expect(headerBlock).not.toBeVisible();
 
     // Verify user content is preserved (moved out of template)
+    // Both user content blocks should still be visible
     const userContent = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'User content' });
-    await expect(userContent).toBeVisible();
+    await expect(userContent).toHaveCount(2);
   });
 });
 

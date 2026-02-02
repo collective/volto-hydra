@@ -4,6 +4,7 @@
  */
 
 import { produce } from 'immer';
+import { get } from 'lodash';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
@@ -997,6 +998,91 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
     const { [blockId]: removed, ...remainingBlocks } = parentBlock[fieldName];
     const filteredItems = items.filter(id => id !== blockId);
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, filteredItems, remainingBlocks);
+  }
+
+  return setBlockByPath(formData, parentPath, updatedParentBlock);
+}
+
+/**
+ * Remove a template instance from the page.
+ * - Fixed blocks are deleted entirely
+ * - Non-fixed (placeholder) blocks have template fields stripped and become regular blocks
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId, isTemplateInstance, ... }
+ * @param {string} templateInstanceId - The templateInstanceId to remove
+ * @returns {Object} New formData with template instance removed
+ */
+export function removeTemplateInstance(formData, blockPathMap, templateInstanceId) {
+  // Find the template instance entry in pathMap to get container info
+  const instanceInfo = blockPathMap[templateInstanceId];
+  if (!instanceInfo?.isTemplateInstance) {
+    throw new Error(`[HYDRA] removeTemplateInstance: ${templateInstanceId} is not a template instance`);
+  }
+
+  const { parentId, containerField } = instanceInfo;
+
+  // Get the parent container
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] removeTemplateInstance: could not find parent block ${parentId}`);
+  }
+
+  // Get current layout
+  const layoutPath = containerField === 'blocks'
+    ? 'blocks_layout.items'
+    : `${containerField}.blocks_layout.items`;
+  const blocksPath = containerField === 'blocks' ? 'blocks' : `${containerField}.blocks`;
+
+  const layout = get(parentBlock, layoutPath, []);
+  const blocks = get(parentBlock, blocksPath, {});
+
+  // Separate blocks into: fixed (to delete), placeholder (to keep but strip), and unrelated
+  const newLayout = [];
+  const newBlocks = { ...blocks };
+
+  for (const blockId of layout) {
+    const block = blocks[blockId];
+    if (!block) {
+      newLayout.push(blockId);
+      continue;
+    }
+
+    // Check if this block belongs to the template instance being removed
+    if (block.templateInstanceId === templateInstanceId) {
+      if (block.fixed) {
+        // Fixed blocks are deleted - don't add to newLayout, remove from newBlocks
+        delete newBlocks[blockId];
+      } else {
+        // Non-fixed blocks: strip template fields and keep them
+        const { templateId, templateInstanceId: _, placeholder, fixed, readOnly, ...cleanBlock } = block;
+        newBlocks[blockId] = cleanBlock;
+        newLayout.push(blockId);
+      }
+    } else {
+      // Block doesn't belong to this template instance - keep as-is
+      newLayout.push(blockId);
+    }
+  }
+
+  // Build updated parent block
+  let updatedParentBlock;
+  if (containerField === 'blocks') {
+    updatedParentBlock = {
+      ...parentBlock,
+      blocks: newBlocks,
+      blocks_layout: { ...parentBlock.blocks_layout, items: newLayout },
+    };
+  } else {
+    updatedParentBlock = {
+      ...parentBlock,
+      [containerField]: {
+        ...parentBlock[containerField],
+        blocks: newBlocks,
+        blocks_layout: { ...parentBlock[containerField].blocks_layout, items: newLayout },
+      },
+    };
   }
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
