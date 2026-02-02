@@ -8,12 +8,23 @@
  * - DnD out of template removes block from template
  * - DnD into template adds block to template
  * - Save validates template structure (no split placeholder groups)
+ *
+ * Note: Fixed template blocks get random UUIDs from template merge, so we find them by content.
+ * User content blocks keep their original IDs from the page fixture.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
-// Block IDs for the template instance in template-test-page
-const TEMPLATE_BLOCK_IDS = ['template-header', 'template-grid', 'user-content-1', 'user-content-2', 'template-footer'];
+// Content strings to find fixed template blocks (they have random UUIDs after merge)
+const TEMPLATE_HEADER_CONTENT = 'Template Header - From Template';
+const TEMPLATE_FOOTER_CONTENT = 'Template Footer - From Template';
+
+// User content blocks keep their IDs from the page fixture
+const USER_CONTENT_1 = 'user-content-1';
+const USER_CONTENT_2 = 'user-content-2';
+const STANDALONE_BLOCK_1 = 'standalone-block-1';
+const STANDALONE_BLOCK_2 = 'standalone-block-2';
+
 
 test.describe('Template Creation', () => {
   test('"Make Template" option appears in toolbar menu for regular blocks', async ({ page }) => {
@@ -41,18 +52,14 @@ test.describe('Template Creation', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for template block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click template block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Click template header block (merged from template, has random UUID)
+    // Content is "Template Header - From Template" after merge replaces stale content
+    const headerBlockId = await helper.clickBlockByContent('Template Header - From Template');
+    await helper.waitForQuantaToolbar(headerBlockId);
 
     // Open toolbar menu
-    await helper.openQuantaToolbarMenu('template-header');
-    const menuOptions = await helper.getQuantaToolbarMenuOptions('template-header');
+    await helper.openQuantaToolbarMenu(headerBlockId);
+    const menuOptions = await helper.getQuantaToolbarMenuOptions(headerBlockId);
     const optionLabels = menuOptions.map(o => o.toLowerCase());
 
     // Should NOT have "Make Template" option for blocks already in a template
@@ -120,16 +127,18 @@ test.describe('Template Creation', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
+    // Find template block IDs (fixed blocks have random UUIDs, user content keeps original IDs)
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
-    // Wait for template block and click it
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    // Click template block
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
 
     // Navigate up to template instance
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Sidebar should have "Edit Template" toggle
     const editTemplateToggle = page.locator('.edit-template-toggle, [data-field-id="editTemplate"] input, label').filter({ hasText: /edit.*template/i });
@@ -139,7 +148,7 @@ test.describe('Template Creation', () => {
     await editTemplateToggle.click();
 
     // Edit mode should be active - blocks outside template should be locked (greyed out)
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
   });
 });
 
@@ -152,9 +161,10 @@ test.describe('Template Edit Mode - Editability', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for template block (fixed + readonly)
-    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
-    await expect(headerBlock).toContainText('Template Header', { timeout: 15000 });
+    // Find template block by content (fixed blocks have random UUIDs after merge)
+    const { blockId: headerBlockId, locator: headerBlock } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
     // Initially, the fixed template block should NOT be editable
     const editor = helper.getSlateField(headerBlock);
@@ -162,23 +172,22 @@ test.describe('Template Edit Mode - Editability', () => {
     expect(isEditable).not.toBe('true');
 
     // Enter template edit mode via sidebar
-    await helper.clickBlockInIframe('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
 
     // Navigate to template instance
     await page.keyboard.press('Escape');
-    const templateBlockIds = ['template-header', 'template-grid', 'user-content-1', 'user-content-2', 'template-footer'];
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Toggle edit mode on
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
     // Wait for edit mode to activate (blocks outside template get locked)
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Click the fixed block again
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForQuantaToolbar(headerBlockId);
 
     // Now the fixed block should be editable
     isEditable = await editor.getAttribute('contenteditable');
@@ -193,30 +202,32 @@ test.describe('Template Edit Mode - Editability', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for both template and standalone blocks
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-    await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible();
+    // Find template block by content and wait for standalone block
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await expect(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`)).toBeVisible();
 
     // Initially, standalone block should be editable
-    await helper.clickBlockInIframe('standalone-block-1');
-    await helper.waitForQuantaToolbar('standalone-block-1');
-    const standaloneEditor = helper.getSlateField(iframe.locator('[data-block-uid="standalone-block-1"]'));
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
+    await helper.waitForQuantaToolbar(STANDALONE_BLOCK_1);
+    const standaloneEditor = helper.getSlateField(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`));
     let isEditable = await standaloneEditor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
 
     // Enter template edit mode
-    await helper.clickBlockInIframe('template-header');
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
     // Wait for edit mode to activate (blocks outside template get locked)
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Click standalone block (outside template)
-    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
 
     // Standalone block should now be locked (not editable)
     isEditable = await standaloneEditor.getAttribute('contenteditable');
@@ -231,37 +242,41 @@ test.describe('Template Edit Mode - Editability', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId, locator: headerLocator } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
     // Wait for edit mode to activate
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Verify template block is editable
-    await helper.clickBlockInIframe('template-header');
-    const templateEditor = helper.getSlateField(iframe.locator('[data-block-uid="template-header"]'));
+    await helper.clickBlockInIframe(headerBlockId);
+    const templateEditor = helper.getSlateField(headerLocator);
     expect(await templateEditor.getAttribute('contenteditable')).toBe('true');
 
     // Exit edit mode
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
     await editToggle.uncheck();
     // Wait for edit mode to deactivate
-    await helper.waitForBlockEditable('standalone-block-1');
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Template block should be locked again
-    await helper.clickBlockInIframe('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
     expect(await templateEditor.getAttribute('contenteditable')).not.toBe('true');
 
     // Standalone block should be editable again
-    await helper.clickBlockInIframe('standalone-block-1');
-    const standaloneEditor = helper.getSlateField(iframe.locator('[data-block-uid="standalone-block-1"]'));
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
+    const standaloneEditor = helper.getSlateField(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`));
     expect(await standaloneEditor.getAttribute('contenteditable')).toBe('true');
   });
 });
@@ -273,23 +288,25 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
     // Wait for edit mode to activate
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Select the fixed header block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForQuantaToolbar(headerBlockId);
 
     // In edit mode, fixed blocks should show drag handle (not lock icon)
     const toolbar = page.locator('.quanta-toolbar');
@@ -309,49 +326,54 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Verify user-content-1 is inside template (shows placeholder field in sidebar)
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
     const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldBefore).toBeVisible({ timeout: 5000 });
 
     // Drag user-content-1 outside the template (after standalone-block-1)
-    await helper.dragBlockAfter('user-content-1', 'standalone-block-1');
+    await helper.dragBlockAfter(USER_CONTENT_1, STANDALONE_BLOCK_1);
 
     // Verify block moved - it should now be after standalone-block-1 (position 1 in DOM)
     const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').all();
     const blockIds = await Promise.all(allBlocks.map(b => b.getAttribute('data-block-uid')));
-    const movedIndex = blockIds.indexOf('user-content-1');
-    const standaloneIndex = blockIds.indexOf('standalone-block-1');
+    const movedIndex = blockIds.indexOf(USER_CONTENT_1);
+    const standaloneIndex = blockIds.indexOf(STANDALONE_BLOCK_1);
     expect(movedIndex).toBe(standaloneIndex + 1);
 
     // Verify block is now OUTSIDE template - it should be readonly in template edit mode
     // (blocks outside the template being edited are greyed out)
-    await helper.waitForBlockReadonly('user-content-1');
+    await helper.waitForBlockReadonly(USER_CONTENT_1);
 
-    // Exit template edit mode - click template-header to access the edit toggle
-    await helper.clickBlockInIframe('template-header');
+    // Exit template edit mode - click header to access the edit toggle
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await editToggle.uncheck();
-    await helper.waitForBlockEditable('standalone-block-1');
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Select the moved block - it should be editable now (template edit mode is off)
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
     // Block should be editable (not readonly)
-    const editor = helper.getSlateField(iframe.locator('[data-block-uid="user-content-1"]'));
+    const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`));
     const isEditable = await editor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
 
@@ -370,36 +392,41 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
-    // Move user-content-1 BEFORE the first fixed block (template-header)
+    // Move user-content-1 BEFORE the first fixed block (header)
     // This puts a placeholder at the template edge
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
     const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldBefore).toBeVisible({ timeout: 5000 });
 
-    await helper.dragBlockBefore('user-content-1', 'template-header');
+    await helper.dragBlockBefore(USER_CONTENT_1, headerBlockId);
 
-    // Verify block moved - it should now be before template-header
+    // Verify block moved - it should now be before header
     const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').all();
     const blockIds = await Promise.all(allBlocks.map(b => b.getAttribute('data-block-uid')));
-    const movedIndex = blockIds.indexOf('user-content-1');
-    const headerIndex = blockIds.indexOf('template-header');
+    const movedIndex = blockIds.indexOf(USER_CONTENT_1);
+    const headerIndex = blockIds.indexOf(headerBlockId);
     expect(movedIndex).toBeLessThan(headerIndex);
 
     // Verify block is still IN the template - it should still be editable in template edit mode
     // (blocks outside the template are readonly in edit mode)
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
     // Placeholder field should still be visible (block is still in template)
@@ -407,7 +434,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(placeholderFieldAfter).toBeVisible({ timeout: 5000 });
 
     // Block should be editable (not readonly, since it's in the template being edited)
-    const editor = helper.getSlateField(iframe.locator('[data-block-uid="user-content-1"]'));
+    const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`));
     const isEditable = await editor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
   });
@@ -420,30 +447,35 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Verify standalone-block-1 is NOT in template (no placeholder field)
     // First exit template edit mode to check
-    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
     await helper.waitForSidebarOpen();
     // Outside template blocks are locked in template edit mode, so no placeholder field
     const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldBefore).not.toBeVisible();
 
     // Drag standalone-block-1 into the template (between placeholder blocks)
-    await helper.dragBlockAfter('standalone-block-1', 'user-content-1');
+    await helper.dragBlockAfter(STANDALONE_BLOCK_1, USER_CONTENT_1);
 
     // Select the moved block
-    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
     await helper.waitForSidebarOpen();
 
     // Block should now show placeholder field (it's now in template)
@@ -451,7 +483,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(placeholderFieldAfter).toBeVisible({ timeout: 5000 });
 
     // Block should be editable (since we're in template edit mode)
-    const editor = helper.getSlateField(iframe.locator('[data-block-uid="standalone-block-1"]'));
+    const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`));
     const isEditable = await editor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
   });
@@ -464,29 +496,34 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // First check what placeholder value user-content-1 has (should be "primary")
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
     const neighborPlaceholder = page.locator('.field-wrapper-placeholder input');
     const expectedPlaceholder = await neighborPlaceholder.inputValue();
     expect(expectedPlaceholder).toBe('primary');
 
     // Drag standalone block into template (between user-content-1 and user-content-2)
-    await helper.dragBlockAfter('standalone-block-1', 'user-content-1');
+    await helper.dragBlockAfter(STANDALONE_BLOCK_1, USER_CONTENT_1);
 
     // Select the newly added block
-    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
     await helper.waitForSidebarOpen();
 
     // Should show placeholder field with inherited value from neighbors
@@ -514,28 +551,33 @@ test.describe('Template Edit Mode - Validation', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
-    // Create invalid structure: move user-content-2 after template-footer
+    // Create invalid structure: move user-content-2 after footer
     // This splits the "primary" placeholder group:
     // Before: [header] [content-1] [content-2] [footer]  <- valid, "primary" blocks adjacent
     // After:  [header] [content-1] [footer] [content-2]  <- invalid, "primary" blocks separated
-    await helper.dragBlockAfter('user-content-2', 'template-footer');
+    await helper.dragBlockAfter(USER_CONTENT_2, footerBlockId);
 
     // Exit edit mode
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
     await editToggle.uncheck();
-    await helper.waitForBlockEditable('standalone-block-1');
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Try to save
     await page.keyboard.press('Control+s');
@@ -559,19 +601,24 @@ test.describe('Template Edit Mode - Validation', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Select user-content-2 and change its placeholder to create a different group
-    await helper.clickBlockInIframe('user-content-2');
+    await helper.clickBlockInIframe(USER_CONTENT_2);
     await helper.waitForSidebarOpen();
 
     // Change placeholder in sidebar from "primary" to "secondary"
@@ -580,9 +627,9 @@ test.describe('Template Edit Mode - Validation', () => {
 
     // Exit edit mode
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
     await editToggle.uncheck();
-    await helper.waitForBlockEditable('standalone-block-1');
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Try to save
     await page.keyboard.press('Control+s');
@@ -600,20 +647,24 @@ test.describe('Template Edit Mode - Validation', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId, locator: headerLocator } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Make a valid change - edit template header content
-    await helper.clickBlockInIframe('template-header');
-    const editor = helper.getSlateField(iframe.locator('[data-block-uid="template-header"]'));
+    await helper.clickBlockInIframe(headerBlockId);
+    const editor = helper.getSlateField(headerLocator);
     await editor.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' - edited');
@@ -622,9 +673,9 @@ test.describe('Template Edit Mode - Validation', () => {
 
     // Exit edit mode
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
     await editToggle.uncheck();
-    await helper.waitForBlockEditable('standalone-block-1');
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Save should succeed - wait for pencil icon (view mode) indicating save completed
     await page.keyboard.press('Control+s');
@@ -635,13 +686,14 @@ test.describe('Template Edit Mode - Validation', () => {
     const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|split|contiguous/i });
     await expect(errorMessage).not.toBeVisible();
 
-    // Content should be preserved in view mode
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('edited', { timeout: 15000 });
+    // Content should be preserved in view mode - find by content since ID changed
+    await expect(headerLocator).toContainText('edited', { timeout: 15000 });
 
     // Verify template was actually saved by loading another page using the same template
     // Navigate to view mode (not edit) to also test that view mode loads templates
     await helper.navigateToView('/template-test-page-2');
-    const page2Header = iframe.locator('[data-block-uid="page2-template-header"]');
+    // Find header by content on page 2 as well
+    const { locator: page2Header } = await helper.waitForBlockByContent('edited');
     await expect(page2Header).toContainText('edited', { timeout: 15000 });
   });
 });
@@ -655,19 +707,24 @@ test.describe('Template Edit Mode - Block Settings', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Select a placeholder block
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
     // placeholder input should be visible and have initial value from block data
@@ -687,19 +744,24 @@ test.describe('Template Edit Mode - Block Settings', () => {
 
     const iframe = helper.getIframe();
 
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await editToggle.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Select a placeholder block (not fixed)
-    await helper.clickBlockInIframe('user-content-1');
+    await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
     // Scroll sidebar to make Template Settings visible
@@ -730,14 +792,9 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for fixed readonly block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click the readonly block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Find template header by content (has random UUID after merge)
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForQuantaToolbar(headerBlockId);
 
     // Format buttons (bold, italic, etc.) should NOT be visible
     const toolbar = page.locator('.quanta-toolbar');
@@ -751,14 +808,9 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for fixed readonly block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click the readonly block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Find template header by content (has random UUID after merge)
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForQuantaToolbar(headerBlockId);
 
     // Media overlay (X button to clear image) should NOT be visible
     const mediaOverlay = page.locator('.empty-image-overlay, button[title="Clear image"]');
@@ -771,14 +823,9 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for fixed readonly block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click the readonly block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Find template header by content (has random UUID after merge)
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForQuantaToolbar(headerBlockId);
 
     // Link and media field buttons should NOT be visible
     const toolbar = page.locator('.quanta-toolbar');
@@ -794,14 +841,9 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for fixed block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click the fixed block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Find template header by content (has random UUID after merge)
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForQuantaToolbar(headerBlockId);
     await helper.waitForSidebarOpen();
 
     // Open the dropdown menu (scroll to it first as it may be below the fold)
@@ -823,14 +865,9 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for fixed block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click the fixed block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Find template header by content (has random UUID after merge)
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForQuantaToolbar(headerBlockId);
     await helper.waitForSidebarOpen();
 
     // Open the dropdown menu (scroll to it first as it may be below the fold)
@@ -852,14 +889,9 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Wait for fixed readonly block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-
-    // Click the readonly block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    // Find template header by content (has random UUID after merge)
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForQuantaToolbar(headerBlockId);
     await helper.waitForSidebarOpen();
 
     // Open the dropdown menu (scroll to it first as it may be below the fold)
@@ -881,23 +913,25 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
-    const iframe = helper.getIframe();
+    // Find template blocks by content
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
     // Enter template edit mode
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
-    await helper.clickBlockInIframe('template-header');
+    await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar(TEMPLATE_BLOCK_IDS);
+    await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Click the label instead of the hidden checkbox input
     const editToggleLabel = page.locator('label[for="field-editTemplate"]');
     await editToggleLabel.click();
-    await helper.waitForBlockReadonly('standalone-block-1');
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Click a block outside the template
-    await helper.clickBlockInIframe('standalone-block-1');
-    await helper.waitForQuantaToolbar('standalone-block-1');
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
+    await helper.waitForQuantaToolbar(STANDALONE_BLOCK_1);
 
     // Add button should NOT be visible for blocks outside the template
     const addButton = page.locator('button[title*="Add block"]');

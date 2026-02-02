@@ -9299,18 +9299,40 @@ export function mergeTemplateContent(target, source, filterTemplateId = null, so
 
 /**
  * Merge multiple templates into a page.
- * Convenience wrapper that calls mergeTemplateContent for each template.
+ * Clones template blocks with new UUIDs before merging to avoid literal template IDs in page.
  *
  * @param {Object} page - Page document to merge templates into
  * @param {Object} templates - Map of templateId -> template document
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
  * @returns {Object} { merged: mergedPage, newTemplateIds: string[] }
  */
-export function mergeTemplatesIntoPage(page, templates) {
+export function mergeTemplatesIntoPage(page, templates, uuidGenerator = generateUUID) {
   let result = page;
   const allNewTemplateIds = new Set();
 
   for (const [templateId, template] of Object.entries(templates)) {
-    const { merged, newTemplateIds } = mergeTemplateContent(result, template);
+    // Clone template blocks with new UUIDs (like applyLayoutTemplate does)
+    // This prevents literal template IDs (e.g., 'header-block') from leaking into the page
+    const { blocks: clonedBlocks, layout: clonedLayout } = cloneBlocksWithNewIds(
+      template.blocks,
+      template.blocks_layout?.items || [],
+      uuidGenerator,
+    );
+
+    // Build cloned template with proper template fields
+    const clonedTemplate = {
+      ...template,
+      blocks: {},
+      blocks_layout: { items: clonedLayout },
+    };
+    for (const [newId, block] of Object.entries(clonedBlocks)) {
+      clonedTemplate.blocks[newId] = {
+        ...block,
+        templateId: templateId,
+      };
+    }
+
+    const { merged, newTemplateIds } = mergeTemplateContent(result, clonedTemplate);
     result = merged;
     for (const tid of newTemplateIds) {
       if (!templates[tid]) {
