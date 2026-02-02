@@ -1153,14 +1153,36 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 ## Templates
 
-Templates are reusable, mergeable content structures that can be applied to pages or containers. They define fixed structure with slots (placeholders) for editor content, and template changes propagate to all pages using them.
+Templates allow editors to centrally control content and reuse content. They allow
+a developer to not have to hard code some layout decisions and instead can use rules
+to apply user layouts in template content stored seperate from the page, or give the 
+user a choice on which layout they want.
+
+Templates 
+- can be created from any blocks
+- are always edited in-context in the current page 
+  (user can switch in and out of template edit mode)
+- are saved along side the page into normal content so editing template
+  permissions can use content permissions
+- allowedTemplates and allowedLayouts applied to the blocks schema let the 
+  developer control loading templates, which templates are available for use 
+  which templates are automatically applied as layouts or available for switching.
+- During rendering frontend can use the provided helper to refresh templates found 
+  in the page content from the template content, apply layouts based on rules (such 
+  as fixing a layout based on content type, or metadata. Alternively they can write
+  their own merge logic.
+
 
 ### Template Concepts
 
-Templates consist of blocks with special properties:
+Templates are alagous to blocks themselves but are made up of blocks themselves 
+with special properties:
 - **Fixed + ReadOnly**: Can't be edited or moved (e.g., branded headers/footers)
+  - similar to a blocks fixed hard coded html 
 - **Fixed**: Can be edited but not moved (e.g., required sections)
+  - similar to a block field 
 - **Placeholder**: Named slots where editors can add their own blocks
+  - similar to a block field 
 
 ```json
 {
@@ -1189,38 +1211,51 @@ initBridge({
 - **allowedTemplates**: Templates shown in BlockChooser's "Templates" group, inserted as blocks
 - **allowedLayouts**: Templates shown in Layout dropdown, replace/merge entire container content
 
-### Applying Layouts
+### Applying Merge rules
 
-When a layout is applied:
-1. Fixed blocks from template are inserted at their positions
-2. Existing page content moves into the "default" placeholder
-3. Fixed edge blocks prevent insertion outside them
+To refresh page content call loadAndMergeTemplates() with a callback function to load
+the template content. 
 
-```
-Before:  [User Block A] [User Block B]
-Layout:  [Fixed Header] [default] [Fixed Footer]
-After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
-```
-
-### Template Edit Mode
-
-Editors with permission can enter "template edit mode" to modify the template itself:
-- Fixed/readonly blocks become editable
-- Blocks outside the template become locked
-- Changes save to the template and propagate to all instances
-
-### Merging
-
-Templates merge on page load via `loadAndMergeTemplates()`:
-- Fixed blocks: replaced from template (keeps content in sync)
-- Placeholders: page content preserved in matching slots
-- Non-matching content: goes to "default" placeholder
 
 ```js
 import { loadAndMergeTemplates } from '@hydra-js/hydra.js';
 
 const pageData = await loadAndMergeTemplates(rawPageData, fetchTemplate);
 ```
+
+The merge algorithm follows these rules
+
+1. Remove the blocks with the templateid to replace, storing any that aren't fixed and
+   readonly by placeholder name.
+2. insert in their place the template content
+   - if fixed and readonly just insert it
+   - if fixed, copy the block content not including block fields from a page block with 
+    the same placeholder name
+   - if a placeholder then don't insert it, but insert the previous blocks with the same
+    placeholder name
+3. Recursivly replace any block fields using the same rules.
+4. Any placeholder blocks left over are inserted at the end of a special placeholder called
+  ```default``` if it exits, otherwise are dropped.
+
+When are layout is applied the rules are the same but applied across a whole blocks field.
+So any content in the blocks field is removed first and if it doesn't already have a 
+placeholder name (due to a different template previously applied), then it will end up
+- in the default placeholder if it exists, else
+- in the bottom placeholder outside the last fixed template block if it exists, else
+- in the the top placeholder outside the first fixed template block if it exists, else
+- it is dropped
+
+This allows for templates with shared placeholder names to rearrange user content.
+
+```
+Before:  [User Block A] [User Block B]
+Layout:  [Fixed Header] [default] [Fixed Footer] [post_footer]
+After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
+```
+
+To apply a layout automatically
+
+... TODO
 
 ## Advanced
 
