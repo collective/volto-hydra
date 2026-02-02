@@ -660,8 +660,8 @@ export class Bridge {
     const blockData = this.getBlockData(blockUid);
     const addability = getBlockAddability(blockUid, this.blockPathMap, blockData, this.templateEditMode);
 
-    // If neither before nor after is allowed, hide the add button
-    if (!addability.canInsertBefore && !addability.canInsertAfter) {
+    // Hide add button if can't insert after (add button only adds after the selected block)
+    if (!addability.canInsertAfter) {
       return 'hidden';
     }
 
@@ -8580,6 +8580,7 @@ export function getSnippetTemplates(templates, containerType, fieldName) {
 
 /**
  * Clone template blocks with fresh UUIDs.
+ * Recursively filters nested blocks to only include those with template markers.
  *
  * @param {Object} blocks - Template blocks object
  * @param {Array} layout - Template blocks_layout.items array
@@ -8595,16 +8596,53 @@ export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUU
     const newId = uuidGenerator();
     idMap[oldId] = newId;
 
-    // Deep clone the block
+    // Deep clone the block, filtering nested blocks without template markers
     const block = blocks[oldId];
     if (block) {
-      newBlocks[newId] = JSON.parse(JSON.stringify(block));
+      newBlocks[newId] = cloneBlockFilteringNested(block, uuidGenerator);
     }
 
     newLayout.push(newId);
   }
 
   return { blocks: newBlocks, layout: newLayout, idMap };
+}
+
+/**
+ * Clone a block, recursively filtering nested blocks without template markers.
+ * Only nested blocks with `placeholder` or `templateId` are included.
+ *
+ * @param {Object} block - Block to clone
+ * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @returns {Object} Cloned block with filtered nested blocks
+ */
+function cloneBlockFilteringNested(block, uuidGenerator) {
+  // Start with a shallow clone
+  const cloned = { ...block };
+
+  // Check for nested blocks field (blocks + blocks_layout pattern)
+  if (cloned.blocks && cloned.blocks_layout?.items) {
+    const nestedBlocks = {};
+    const nestedLayout = [];
+
+    for (const nestedId of cloned.blocks_layout.items) {
+      const nestedBlock = cloned.blocks[nestedId];
+      if (!nestedBlock) continue;
+
+      // Only include nested blocks that have template markers
+      if (nestedBlock.placeholder || nestedBlock.templateId) {
+        const newNestedId = uuidGenerator();
+        // Recursively filter this nested block's children too
+        nestedBlocks[newNestedId] = cloneBlockFilteringNested(nestedBlock, uuidGenerator);
+        nestedLayout.push(newNestedId);
+      }
+    }
+
+    cloned.blocks = nestedBlocks;
+    cloned.blocks_layout = { ...cloned.blocks_layout, items: nestedLayout };
+  }
+
+  return cloned;
 }
 
 /**
