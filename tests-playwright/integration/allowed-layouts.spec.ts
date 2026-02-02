@@ -345,6 +345,90 @@ test.describe('allowedLayouts', () => {
       const contentPreserved = contentAfterLayout.some(t => t.includes(initialContent || 'Block'));
       expect(contentPreserved).toBe(true);
     });
+
+    test('multiple blocks in matching placeholder preserved when switching layouts', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      // test-page has multiple blocks - including "Block 1" and "Welcome" (hero heading)
+      await helper.navigateToEdit('/test-page');
+      await helper.waitForIframeReady();
+
+      // Verify multiple user blocks exist before layout
+      const block1 = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'test paragraph' });
+      const block2 = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Another paragraph' });
+      await expect(block1).toBeVisible();
+      await expect(block2).toBeVisible();
+
+      // Apply header-footer layout
+      await page.keyboard.press('Escape');
+      const layoutSelector = page.locator('.layout-selector select');
+      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+      await layoutSelector.selectOption('Header Footer Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for layout
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+
+      // Verify both user blocks still exist after first layout
+      await expect(block1).toBeVisible();
+      await expect(block2).toBeVisible();
+
+      // Switch to editable-fixed layout
+      await page.keyboard.press('Escape');
+      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+      await layoutSelector.selectOption('Editable Fixed Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for new layout
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' })).toBeVisible({ timeout: 5000 });
+
+      // Old fixed blocks should be replaced
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).not.toBeVisible();
+
+      // BOTH user blocks should still be preserved after switching
+      await expect(block1).toBeVisible();
+      await expect(block2).toBeVisible();
+    });
+
+    test('non-matching placeholder content goes to default', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      const originalContent = 'another test page';
+
+      // Apply header-footer layout (has header, default, footer placeholders)
+      await page.keyboard.press('Escape');
+      const layoutSelector = page.locator('.layout-selector select');
+      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+      await layoutSelector.selectOption('Header Footer Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for layout
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+
+      // Switch to header-only layout (has header, default but NO footer placeholder)
+      await page.keyboard.press('Escape');
+      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+      await layoutSelector.selectOption('Header Only Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for new layout
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+
+      // Old fixed blocks gone (no matching footer placeholder in new layout)
+      const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
+      expect(allBlocks.some(t => t.includes('Layout Footer'))).toBe(false);
+      expect(allBlocks.some(t => t.includes('Layout Header'))).toBe(false);
+
+      // User content preserved in default placeholder
+      expect(allBlocks.some(t => t.includes(originalContent))).toBe(true);
+    });
   });
 
   test.describe('Single Fixed Edge (Header Only)', () => {
@@ -468,24 +552,28 @@ test.describe('allowedLayouts', () => {
     test('readonly empty block (in template edit mode) does NOT open BlockChooser', async ({ page }, testInfo) => {
       test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend has different page field config');
       const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
 
       await helper.login();
       await helper.navigateToEdit('/template-test-page');
       await helper.waitForIframeReady();
 
       // Select a template block to show template settings in sidebar
-      await helper.clickBlockInIframe('template-header');
-      await helper.waitForQuantaToolbar('template-header');
+      // After template merge, the header has content "Template Header - From Template"
+      // and a new UUID, so we find it by content
+      const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
+      await expect(headerBlock).toBeVisible();
+      await headerBlock.click();
+      // Get the block's UID for the toolbar wait
+      const headerBlockId = await headerBlock.getAttribute('data-block-uid');
+      await helper.waitForQuantaToolbar(headerBlockId!);
 
       // Enter template edit mode by clicking "Edit Template" checkbox in sidebar
       // This makes all blocks outside the template readonly
-      const editTemplateCheckbox = page.locator('input[type="checkbox"]').filter({ has: page.locator('~ *', { hasText: /Edit Template/i }) });
-      // Alternative: find by the label text
       const editTemplateLabel = page.getByText('Edit Template', { exact: true });
       await editTemplateLabel.click();
 
       // Wait for template edit mode to be active (blocks outside template get locked class)
-      const iframe = helper.getIframe();
       await expect(iframe.locator('#footer-content [data-hydra-empty].hydra-locked')).toBeVisible({ timeout: 5000 });
 
       // Now footer_blocks empty block should be readonly (outside the template)

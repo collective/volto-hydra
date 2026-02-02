@@ -40,10 +40,9 @@ test.describe('Fixed Editable Blocks', () => {
     const lockIcon = toolbar.locator('.lock-icon');
     await expect(lockIcon).toBeVisible();
 
-    // But the block should be editable (no readonly indicator, can type)
-    // The text should be in a contenteditable element
-    const editableElement = headerBlock.locator('[contenteditable="true"]');
-    await expect(editableElement).toBeVisible({ timeout: 5000 });
+    // But the block should be editable - verify the editable field is present
+    const editableField = helper.getSlateField(headerBlock);
+    await expect(editableField).toBeVisible({ timeout: 5000 });
   });
 
   test('fixed block without readOnly cannot be moved', async ({ page }) => {
@@ -126,27 +125,35 @@ test.describe('Delete Template Instance', () => {
     await helper.navigateToEdit('/template-test-page');
     await helper.waitForIframeReady();
 
-    // template-test-page should have a template instance
-    // Find the template instance header in the sidebar
-    await page.keyboard.press('Escape');
+    // Click on a template block to select it - this shows the template instance in breadcrumbs
+    const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' });
+    await expect(headerBlock).toBeVisible();
+    await headerBlock.click();
     await helper.waitForSidebarOpen();
 
-    // Check for template blocks in sidebar
-    const templateHeader = page.locator('.child-block-item', { hasText: 'Template Header' });
-    const isTemplatePresent = await templateHeader.isVisible().catch(() => false);
+    // The template block is selected, which shows template settings in sidebar
+    // The template breadcrumb button shows "Template: test-layout"
+    const templateBreadcrumb = page.locator('button', { hasText: 'Template: test-layout' });
+    await expect(templateBreadcrumb).toBeVisible({ timeout: 5000 });
 
-    if (isTemplatePresent) {
-      // Click the template instance block to select it
-      await templateHeader.click();
-      await helper.waitForSidebarOpen();
+    // Click the "•••" dropdown button next to the template breadcrumb to access Remove option
+    // The dropdown is a sibling of the template breadcrumb in the same container
+    const templateSection = templateBreadcrumb.locator('xpath=..');
+    const dropdownTrigger = templateSection.locator('button', { hasText: '•••' });
+    await expect(dropdownTrigger).toBeVisible();
+    await dropdownTrigger.click();
 
-      // Look for placeholder content before deletion
-      const placeholderContent = page.locator('.child-block-item').filter({ hasText: /placeholder|content/i });
-      const hasPlaceholder = await placeholderContent.count() > 0;
+    // Click Remove to delete the template instance
+    const removeButton = page.locator('.volto-hydra-dropdown-item', { hasText: 'Remove' });
+    await expect(removeButton).toBeVisible();
+    await removeButton.click();
 
-      // Note: The actual deletion behavior depends on implementation
-      // This test documents the expected behavior
-    }
+    // Verify the template header is gone
+    await expect(headerBlock).not.toBeVisible();
+
+    // Verify user content is preserved (moved out of template)
+    const userContent = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'User content' });
+    await expect(userContent).toBeVisible();
   });
 });
 

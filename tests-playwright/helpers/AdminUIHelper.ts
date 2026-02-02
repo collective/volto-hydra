@@ -453,6 +453,62 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for a block with specific content to be visible in the iframe.
+   * Returns both the locator and the block's UID.
+   *
+   * @param content - Text content to search for within blocks
+   * @param timeout - Timeout in milliseconds (default 15000)
+   * @returns Object with locator and blockId
+   */
+  async waitForBlockByContent(
+    content: string,
+    timeout: number = 15000,
+  ): Promise<{ locator: Locator; blockId: string }> {
+    const iframe = this.getIframe();
+
+    // Find block by content - search in main or #content areas
+    const blockLocator = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: content }).first();
+
+    // Wait for the block to be visible
+    await expect(blockLocator).toBeVisible({ timeout });
+
+    // Get the block ID
+    const blockId = await blockLocator.getAttribute('data-block-uid');
+    if (!blockId) {
+      throw new Error(`Block with content "${content}" found but has no data-block-uid attribute`);
+    }
+
+    return { locator: blockLocator, blockId };
+  }
+
+  /**
+   * Click on a block within the preview iframe by finding it by text content.
+   * Returns the block's UID for use in subsequent operations.
+   *
+   * @param content - Text content to search for within blocks
+   * @param options.waitForToolbar - If true (default), waits for Volto's quanta-toolbar
+   * @returns The block's data-block-uid attribute value
+   */
+  async clickBlockByContent(
+    content: string,
+    options: { waitForToolbar?: boolean } = {},
+  ): Promise<string> {
+    const { waitForToolbar = true } = options;
+
+    const { locator: blockLocator, blockId } = await this.waitForBlockByContent(content);
+
+    // Scroll into view and click
+    await blockLocator.scrollIntoViewIfNeeded();
+    await blockLocator.click();
+
+    if (waitForToolbar) {
+      await this.waitForQuantaToolbar(blockId);
+    }
+
+    return blockId;
+  }
+
+  /**
    * Navigate up through parent blocks in the sidebar until reaching the target block.
    * Used when clicking on a container block selects a child instead.
    *

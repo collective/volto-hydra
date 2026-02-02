@@ -8608,21 +8608,24 @@ export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUU
 }
 
 /**
- * Apply a layout template to existing page/container content.
- * - Clones template blocks with new IDs
- * - Adds template fields (templateId, templateInstanceId, placeholder)
- * - Preserves Volto's fixed/readOnly properties
- * - Moves existing content into the "default" placeholder
+ * Apply a layout template to a page.
  *
- * @param {Object} pageFormData - Existing page data with blocks and blocks_layout
- * @param {Object} templateData - Template document
+ * This works by:
+ * 1. Wrapping existing content with dummy fixed blocks at start/end
+ * 2. Marking all existing content with templateId and placeholder='default'
+ * 3. Calling mergeTemplateContent to replace dummies with real template blocks
+ *
+ * The merge will place 'default' content into the template's default placeholder,
+ * or into the bottom/top slot outside fixed blocks if no default exists.
+ *
+ * @param {Object} pageFormData - Existing page data
+ * @param {Object} templateData - Layout template document
  * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
  * @returns {Object} Merged formData with template applied
  */
 export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = generateUUID) {
-  const result = { blocks: {}, blocks_layout: { items: [] } };
-  const templateId = templateData['@id'] || templateData.UID;
-  const instanceId = uuidGenerator(); // New instance ID for this application
+  const newTemplateId = templateData['@id'] || templateData.UID;
+  const instanceId = uuidGenerator();
 
   // 1. Clone template blocks with new IDs
   const { blocks: clonedBlocks, layout: clonedLayout, idMap } =
@@ -8632,54 +8635,95 @@ export function applyLayoutTemplate(pageFormData, templateData, uuidGenerator = 
       uuidGenerator,
     );
 
-  // 2. Add template fields to each cloned block, preserving fixed/readOnly
+  // 2. Build source (template) with proper template fields
+  const source = { blocks: {}, blocks_layout: { items: [...clonedLayout] } };
   for (const [newId, block] of Object.entries(clonedBlocks)) {
-    const originalId = Object.entries(idMap).find(
-      ([_, v]) => v === newId,
-    )?.[0];
+    const originalId = Object.entries(idMap).find(([_, v]) => v === newId)?.[0];
     const originalBlock = templateData.blocks?.[originalId];
 
-    // Set flat template fields
-    block.templateId = templateId;
+    block.templateId = newTemplateId;
     block.templateInstanceId = instanceId;
-    block.placeholder = originalBlock?.placeholder || originalId; // Use original placeholder or blockId as fallback
+    block.placeholder = originalBlock?.placeholder || originalId;
 
-    // Preserve Volto's fixed/readOnly from template
     if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
     if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
 
-    result.blocks[newId] = block;
+    source.blocks[newId] = block;
   }
 
-  // 3. Get existing page blocks and mark them for the "default" placeholder
+  // 3. Build target - wrap existing content with dummy boundaries and mark as 'default'
   const existingBlockIds = pageFormData.blocks_layout?.items || [];
-  for (const existingId of existingBlockIds) {
-    const existingBlock = pageFormData.blocks?.[existingId];
-    if (existingBlock) {
-      result.blocks[existingId] = {
-        ...existingBlock,
-        templateId,
+  const dummyStartId = uuidGenerator();
+  const dummyEndId = uuidGenerator();
+
+  const target = {
+    blocks: {
+      // Dummy start block - will be replaced by template's first fixed block
+      [dummyStartId]: {
+        '@type': 'slate',
+        fixed: true,
+        readOnly: true,
+        templateId: newTemplateId,
         templateInstanceId: instanceId,
-        placeholder: 'default',
-        // Existing content is not fixed (can be edited/moved)
+        placeholder: '__boundary_start__',
+        value: [],
+      },
+      // Dummy end block - will be replaced by template's last fixed block
+      [dummyEndId]: {
+        '@type': 'slate',
+        fixed: true,
+        readOnly: true,
+        templateId: newTemplateId,
+        templateInstanceId: instanceId,
+        placeholder: '__boundary_end__',
+        value: [],
+      },
+    },
+    blocks_layout: { items: [dummyStartId] },
+  };
+
+  // Add existing content with templateId and placeholder='default' (or preserve existing placeholder)
+  for (const blockId of existingBlockIds) {
+    const block = pageFormData.blocks?.[blockId];
+    if (block) {
+      target.blocks[blockId] = {
+        ...block,
+        templateId: newTemplateId,
+        templateInstanceId: instanceId,
+        placeholder: block.placeholder || 'default',
       };
-      delete result.blocks[existingId].fixed;
-      delete result.blocks[existingId].readOnly;
+      target.blocks_layout.items.push(blockId);
     }
   }
 
-  // 4. Build final layout - insert existing blocks after "default" placeholder start
-  for (const newBlockId of clonedLayout) {
-    result.blocks_layout.items.push(newBlockId);
+  // Add dummy end
+  target.blocks_layout.items.push(dummyEndId);
 
-    // If this block is the "default" placeholder, insert existing content after it
-    const block = result.blocks[newBlockId];
-    if (!block?.fixed && block?.placeholder === 'default') {
-      result.blocks_layout.items.push(...existingBlockIds);
+  // 4. Merge: template structure replaces dummies, content goes to appropriate slots
+  const { merged } = mergeTemplateContent(target, source);
+
+  // 5. Clean up: remove any remaining dummy blocks and update template fields
+  delete merged.blocks[dummyStartId];
+  delete merged.blocks[dummyEndId];
+  merged.blocks_layout.items = merged.blocks_layout.items.filter(
+    id => id !== dummyStartId && id !== dummyEndId
+  );
+
+  // Update all blocks with final template fields
+  for (const blockId of merged.blocks_layout.items) {
+    const block = merged.blocks[blockId];
+    if (block) {
+      block.templateId = newTemplateId;
+      block.templateInstanceId = instanceId;
+      // Clear fixed/readOnly for user content blocks
+      if (!source.blocks[blockId]?.fixed) {
+        delete block.fixed;
+        delete block.readOnly;
+      }
     }
   }
 
-  return result;
+  return merged;
 }
 
 /**
@@ -8980,29 +9024,45 @@ export function getUniqueTemplateIds(formData) {
  * @param {string} [filterTemplateId] - Optional: only sync blocks with this templateId
  * @returns {Object} { merged: mergedTarget, newTemplateIds: string[] }
  */
-export function mergeTemplateContent(target, source, filterTemplateId = null) {
+export function mergeTemplateContent(target, source, filterTemplateId = null, sourceTemplateId = null) {
   const newTemplateIds = new Set();
 
-  // Build map of source blocks by placeholder
+  // Build map of source blocks by placeholder - collect ALL blocks per placeholder
   const sourceByPlaceholder = new Map();
-  for (const [blockId, block] of Object.entries(source.blocks || {})) {
-    if (block?.placeholder) {
-      sourceByPlaceholder.set(block.placeholder, { blockId, block });
+  const sourceLayout = source.blocks_layout?.items || [];
+  for (const blockId of sourceLayout) {
+    const block = source.blocks?.[blockId];
+    if (!block?.placeholder) continue;
+
+    // If sourceTemplateId provided, only include blocks from that template (for layout switching)
+    if (sourceTemplateId && block.templateId !== sourceTemplateId) continue;
+
+    const placeholder = block.placeholder;
+    if (!sourceByPlaceholder.has(placeholder)) {
+      sourceByPlaceholder.set(placeholder, []);
     }
+    sourceByPlaceholder.get(placeholder).push({ blockId, block });
   }
 
-  // Build map of target blocks by placeholder
+  // Build map of target blocks by placeholder - collect ALL blocks per placeholder
   const targetByPlaceholder = new Map();
-  for (const [blockId, block] of Object.entries(target.blocks || {})) {
-    if (block?.placeholder) {
-      // If filtering by templateId, skip blocks that don't match
-      if (filterTemplateId && block.templateId !== filterTemplateId) continue;
-      targetByPlaceholder.set(block.placeholder, { blockId, block });
+  const targetLayout = target.blocks_layout?.items || [];
+  for (const blockId of targetLayout) {
+    const block = target.blocks?.[blockId];
+    if (!block?.placeholder) continue;
 
-      // Track any templateIds we haven't seen (for nested templates)
-      if (block.templateId && block.templateId !== filterTemplateId) {
-        newTemplateIds.add(block.templateId);
-      }
+    // If filtering by templateId, skip blocks that don't match
+    if (filterTemplateId && block.templateId !== filterTemplateId) continue;
+
+    const placeholder = block.placeholder;
+    if (!targetByPlaceholder.has(placeholder)) {
+      targetByPlaceholder.set(placeholder, []);
+    }
+    targetByPlaceholder.get(placeholder).push({ blockId, block });
+
+    // Track any templateIds we haven't seen (for nested templates)
+    if (block.templateId && block.templateId !== filterTemplateId) {
+      newTemplateIds.add(block.templateId);
     }
   }
 
@@ -9010,100 +9070,228 @@ export function mergeTemplateContent(target, source, filterTemplateId = null) {
   let mergedLayout = [...(target.blocks_layout?.items || [])];
   const processedPlaceholders = new Set();
 
-  // Process source blocks in layout order
-  const sourceLayout = source.blocks_layout?.items || [];
-  let insertIndex = 0;
+  // Process each placeholder from source
+  for (const [placeholder, sourceEntries] of sourceByPlaceholder) {
+    processedPlaceholders.add(placeholder);
+    const targetEntries = targetByPlaceholder.get(placeholder) || [];
 
-  // Find first target block position for inserting new blocks
-  for (const [placeholder] of targetByPlaceholder) {
-    const sourceEntry = sourceByPlaceholder.get(placeholder);
-    if (sourceEntry) {
-      const idx = mergedLayout.findIndex(id => {
-        const block = mergedBlocks[id];
-        return block?.placeholder === placeholder;
-      });
-      if (idx >= 0) {
-        insertIndex = idx;
-        break;
+    // Find the first fixed block in source and target for this placeholder
+    const sourceFixedEntry = sourceEntries.find(e => e.block.fixed);
+    const targetFixedEntry = targetEntries.find(e => e.block.fixed);
+
+    // Get non-fixed (user content) blocks from source
+    const sourceUserEntries = sourceEntries.filter(e => !e.block.fixed);
+
+    if (sourceFixedEntry) {
+      // Source has fixed block - use it (replaces any target fixed block)
+      if (targetFixedEntry && !sourceFixedEntry.block.readOnly && !targetFixedEntry.block.readOnly) {
+        // Source is editable AND target was editable - preserve target's content (user may have edited)
+        mergedBlocks[sourceFixedEntry.blockId] = mergeBlockContentSymmetric(
+          sourceFixedEntry.block,
+          targetFixedEntry.block,
+          newTemplateIds
+        );
+      } else {
+        // Source is readOnly OR target was readOnly (never edited) - use source's content
+        mergedBlocks[sourceFixedEntry.blockId] = { ...sourceFixedEntry.block };
+      }
+      // Remove target's old fixed block if it exists (replaced by source's)
+      if (targetFixedEntry) {
+        delete mergedBlocks[targetFixedEntry.blockId];
+      }
+    }
+
+    // Handle source's non-fixed blocks (user content or placeholder slots)
+    for (const { blockId, block } of sourceUserEntries) {
+      // Check if this is an empty placeholder slot or actual content
+      const hasContent = block.value && block.value.length > 0 &&
+        block.value.some(v => v.text || v.children?.length > 0);
+
+      if (hasContent) {
+        // Source has actual content - include it
+        mergedBlocks[blockId] = { ...block };
+      }
+      // Empty placeholder slots are skipped - target's content fills them
+    }
+  }
+
+  // Remove target blocks whose placeholders aren't in source
+  // EXCEPT for 'default' placeholder blocks - these are handled by fallback logic
+  // (they'll be placed in bottom/top slot if available, or dropped if not)
+  for (const [placeholder, targetEntries] of targetByPlaceholder) {
+    if (!processedPlaceholders.has(placeholder) && placeholder !== 'default') {
+      // This placeholder doesn't exist in source - remove target blocks
+      for (const { blockId } of targetEntries) {
+        delete mergedBlocks[blockId];
       }
     }
   }
+
+  // First pass: analyze source layout to find slot positions relative to fixed blocks
+  let firstFixedSourceIndex = -1;
+  let lastFixedSourceIndex = -1;
+  const slotPositions = {}; // placeholder -> { sourceIndex, position: 'top' | 'middle' | 'bottom' }
+
+  for (let i = 0; i < sourceLayout.length; i++) {
+    const sourceBlock = source.blocks?.[sourceLayout[i]];
+    if (!sourceBlock?.placeholder) continue;
+
+    if (sourceBlock.fixed) {
+      if (firstFixedSourceIndex === -1) firstFixedSourceIndex = i;
+      lastFixedSourceIndex = i;
+    } else {
+      slotPositions[sourceBlock.placeholder] = { sourceIndex: i };
+    }
+  }
+
+  // Determine position relative to fixed blocks
+  for (const [placeholder, info] of Object.entries(slotPositions)) {
+    if (firstFixedSourceIndex === -1) {
+      // No fixed blocks - everything is middle
+      info.position = 'middle';
+    } else if (info.sourceIndex < firstFixedSourceIndex) {
+      info.position = 'top';
+    } else if (info.sourceIndex > lastFixedSourceIndex) {
+      info.position = 'bottom';
+    } else {
+      info.position = 'middle';
+    }
+  }
+
+  // Second pass: rebuild layout based on source's order
+  const finalLayout = [];
+  let defaultInsertIndex = -1;
+  let bottomSlotInsertIndex = -1;
+  let topSlotInsertIndex = -1;
 
   for (const sourceBlockId of sourceLayout) {
     const sourceBlock = source.blocks?.[sourceBlockId];
     if (!sourceBlock?.placeholder) continue;
 
     const placeholder = sourceBlock.placeholder;
-    processedPlaceholders.add(placeholder);
 
-    const targetEntry = targetByPlaceholder.get(placeholder);
-
-    if (targetEntry) {
-      // Block exists in both - merge based on fixed property
-      const targetBlock = targetEntry.block;
-      const targetBlockId = targetEntry.blockId;
-
-      if (targetBlock.fixed) {
-        // Fixed block - copy content from source, keep target's template fields
-        mergedBlocks[targetBlockId] = mergeBlockContentSymmetric(
-          targetBlock,
-          sourceBlock,
-          newTemplateIds
-        );
+    if (sourceBlock.fixed) {
+      // Fixed block from source - add it
+      const mergedFixedId = Object.keys(mergedBlocks).find(id =>
+        mergedBlocks[id]?.placeholder === placeholder && mergedBlocks[id]?.fixed
+      );
+      if (mergedFixedId && !finalLayout.includes(mergedFixedId)) {
+        finalLayout.push(mergedFixedId);
       }
-      // Placeholder blocks (not fixed) keep their content
+    } else {
+      // Non-fixed placeholder slot - track insert position BEFORE adding content
+      const insertPos = finalLayout.length;
 
-      // Update insert position
-      const existingIndex = mergedLayout.indexOf(targetBlockId);
-      if (existingIndex >= 0) {
-        insertIndex = existingIndex + 1;
+      // Track default and outside-fixed slots for fallback
+      if (placeholder === 'default') {
+        defaultInsertIndex = insertPos;
       }
-    } else if (sourceBlock.fixed) {
-      // Fixed block in source only - insert into target
-      // Use UUID for unique block ID (same template can be inserted multiple times)
-      const newBlockId = crypto.randomUUID();
-      const newBlock = { ...sourceBlock };
+      const slotInfo = slotPositions[placeholder];
+      if (slotInfo?.position === 'bottom' && bottomSlotInsertIndex === -1) {
+        bottomSlotInsertIndex = insertPos;
+      } else if (slotInfo?.position === 'top' && topSlotInsertIndex === -1) {
+        topSlotInsertIndex = insertPos;
+      }
 
-      // Filter nested blocks - only keep those with template markers (placeholder field)
-      if (newBlock.blocks && newBlock.blocks_layout?.items) {
-        const filteredBlocks = {};
-        const filteredItems = [];
-        for (const nestedId of newBlock.blocks_layout.items) {
-          const nestedBlock = newBlock.blocks[nestedId];
-          // Keep nested blocks that have placeholder (template markers)
-          if (nestedBlock?.placeholder) {
-            filteredBlocks[nestedId] = nestedBlock;
-            filteredItems.push(nestedId);
-          }
+      // Insert target's user content for this placeholder
+      const targetEntries = targetByPlaceholder.get(placeholder) || [];
+      const targetUserEntries = targetEntries.filter(e => !e.block.fixed);
+      for (const { blockId } of targetUserEntries) {
+        if (mergedBlocks[blockId] && !finalLayout.includes(blockId)) {
+          finalLayout.push(blockId);
         }
-        newBlock.blocks = filteredBlocks;
-        newBlock.blocks_layout = { ...newBlock.blocks_layout, items: filteredItems };
       }
-
-      mergedBlocks[newBlockId] = newBlock;
-      mergedLayout.splice(insertIndex, 0, newBlockId);
-      insertIndex++;
     }
-    // Placeholder blocks in source but not target are ignored (no content to fill them)
   }
 
-  // Handle target blocks not in source
-  for (const [placeholder, { blockId, block }] of targetByPlaceholder) {
-    if (processedPlaceholders.has(placeholder)) continue;
-
-    if (block.fixed) {
-      // Fixed block in target but not in source - remove it
-      delete mergedBlocks[blockId];
-      mergedLayout = mergedLayout.filter(id => id !== blockId);
+  // Track standalone blocks (blocks without placeholder - outside template structure)
+  // These should be preserved at their original positions relative to template blocks
+  const standaloneBlocks = []; // { blockId, block, positionBefore: blockId | null }
+  for (let i = 0; i < targetLayout.length; i++) {
+    const blockId = targetLayout[i];
+    const block = target.blocks?.[blockId];
+    // Block is standalone if it has no placeholder (not part of any template)
+    if (block && !block.placeholder) {
+      // Track position relative to next template block (block with placeholder)
+      const nextTemplateBlockId = targetLayout.slice(i + 1).find(
+        id => target.blocks?.[id]?.placeholder
+      );
+      standaloneBlocks.push({ blockId, block, positionBefore: nextTemplateBlockId || null });
     }
-    // Placeholder blocks not in source: keep them (TODO: move to "default" placeholder)
+  }
+
+  // Add remaining blocks WITH placeholder (content that doesn't match source placeholders)
+  // Fallback order: default → bottom slot (after last fixed) → top slot (before first fixed) → drop
+  const remainingBlocks = Object.keys(mergedBlocks).filter(id =>
+    !finalLayout.includes(id) && mergedBlocks[id]?.placeholder
+  );
+  if (remainingBlocks.length > 0) {
+    let insertIndex = -1;
+
+    if (defaultInsertIndex >= 0) {
+      // Insert at default placeholder position
+      insertIndex = defaultInsertIndex;
+    } else if (bottomSlotInsertIndex >= 0) {
+      // Insert at bottom placeholder (after last fixed block)
+      insertIndex = bottomSlotInsertIndex;
+    } else if (topSlotInsertIndex >= 0) {
+      // Insert at top placeholder (before first fixed block)
+      insertIndex = topSlotInsertIndex;
+    }
+    // else: drop (insertIndex stays -1)
+
+    if (insertIndex >= 0) {
+      finalLayout.splice(insertIndex, 0, ...remainingBlocks);
+    }
+    // If insertIndex is -1, blocks with placeholder are dropped (no place in template)
+  }
+
+  // Re-insert standalone blocks at their original positions
+  for (const { blockId, block, positionBefore } of standaloneBlocks) {
+    // Keep the block in mergedBlocks
+    mergedBlocks[blockId] = block;
+
+    if (positionBefore) {
+      // Find where the reference block is now in finalLayout
+      const refIndex = finalLayout.indexOf(positionBefore);
+      if (refIndex >= 0) {
+        finalLayout.splice(refIndex, 0, blockId);
+      } else {
+        // Reference moved/renamed - try to find equivalent by placeholder
+        const refBlock = target.blocks?.[positionBefore];
+        const refPlaceholder = refBlock?.placeholder;
+        if (refPlaceholder) {
+          const newRefIndex = finalLayout.findIndex(id =>
+            mergedBlocks[id]?.placeholder === refPlaceholder
+          );
+          if (newRefIndex >= 0) {
+            finalLayout.splice(newRefIndex, 0, blockId);
+          } else {
+            finalLayout.push(blockId);
+          }
+        } else {
+          finalLayout.push(blockId);
+        }
+      }
+    } else {
+      // Was at end originally
+      finalLayout.push(blockId);
+    }
+  }
+
+  // Clean up: remove blocks from mergedBlocks that aren't in finalLayout
+  // (these are dropped template blocks that have no place in the final structure)
+  for (const blockId of Object.keys(mergedBlocks)) {
+    if (!finalLayout.includes(blockId)) {
+      delete mergedBlocks[blockId];
+    }
   }
 
   return {
     merged: {
       ...target,
       blocks: mergedBlocks,
-      blocks_layout: { ...target.blocks_layout, items: mergedLayout },
+      blocks_layout: { ...target.blocks_layout, items: finalLayout },
     },
     newTemplateIds: Array.from(newTemplateIds),
   };

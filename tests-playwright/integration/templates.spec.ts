@@ -19,13 +19,12 @@ test.describe('Templates', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for the fixed template block (header) to be visible
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    // Wait for the fixed template block (header) to be visible - find by content since block IDs are UUIDs
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
 
     // The header should show content from the TEMPLATE, not the stale page content
     // Page has "Stale Header - Should Be Replaced By Merge"
     // Template has "Template Header - From Template"
-    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
     await expect(headerBlock).toContainText('Template Header - From Template');
     await expect(headerBlock).not.toContainText('Stale Header');
 
@@ -42,8 +41,9 @@ test.describe('Templates', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for merge to complete (header gets template content)
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+    // Wait for merge to complete (header gets template content) - find by content
+    const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
+    await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
 
     // The grid block exists in the template but NOT in the page's original data
     // It should be inserted during merge - find by .grid-row parent (grid block contains grid-row)
@@ -52,10 +52,10 @@ test.describe('Templates', () => {
 
     // Verify the grid block is positioned between header and user content
     // by checking the visual order on the page
-    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    const { locator: header } = await helper.waitForBlockByContent('Template Header');
     const userContent1 = iframe.locator('[data-block-uid="user-content-1"]');
 
-    const headerBox = await headerBlock.boundingBox();
+    const headerBox = await header.boundingBox();
     const gridBox = await gridBlock.boundingBox();
     const userContentBox = await userContent1.boundingBox();
 
@@ -72,8 +72,9 @@ test.describe('Templates', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for merge to complete
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+    // Wait for merge to complete - find by content
+    const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
+    await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
 
     // The grid block should be visible - find by .grid-row parent (grid block contains grid-row)
     const gridBlock = iframe.locator('[data-block-uid]:has(.grid-row)').filter({ hasText: 'Template Grid Cell 1' });
@@ -95,8 +96,9 @@ test.describe('Templates', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for merge to complete
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+    // Wait for merge to complete - find by content
+    const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
+    await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
 
     // User content should have the PAGE's content, not the template default
     // Page has "User content - different from template default"
@@ -119,7 +121,7 @@ test.describe('Templates', () => {
     const iframe = helper.getIframe();
 
     // Wait for merged content to appear
-    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    const { locator: headerBlock, blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header');
     await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
 
     // Edit the placeholder content (user-content-1)
@@ -143,7 +145,7 @@ test.describe('Templates', () => {
     await expect(headerBlock).not.toContainText('Stale Header');
 
     // Footer should also still have merged content
-    const footerBlock = iframe.locator('[data-block-uid="template-footer"]');
+    const { locator: footerBlock, blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
     await expect(footerBlock).toContainText('Template Footer - From Template');
     await expect(footerBlock).not.toContainText('Stale Footer');
   });
@@ -158,11 +160,10 @@ test.describe('Templates', () => {
 
     // Wait for the fixed template block (header) to be visible
     // The template-test-page has pre-applied template with fixed header block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    await helper.waitForBlockByContent('Template Header');
 
     // Click the fixed template block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    const headerBlockId = await helper.clickBlockByContent('Template Header');
 
     // The toolbar is rendered in admin UI
     const toolbar = page.locator('.quanta-toolbar');
@@ -186,12 +187,11 @@ test.describe('Templates', () => {
     const iframe = helper.getIframe();
 
     // Wait for merged content to appear (template merge must complete)
-    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
 
     // Click the fixed template block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    await helper.clickBlockByContent('Template Header');
 
     // 1. Check inline editing is disabled (contenteditable should not be true)
     const h1Element = headerBlock.locator('h1');
@@ -234,15 +234,14 @@ test.describe('Templates', () => {
     const iframe = helper.getIframe();
 
     // Wait for the fixed template block
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    await helper.waitForBlockByContent('Template Header');
 
     // Click the fixed template block
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    const headerBlockId = await helper.clickBlockByContent('Template Header');
 
     // Open the toolbar menu
-    await helper.openQuantaToolbarMenu('template-header');
-    const menuOptions = await helper.getQuantaToolbarMenuOptions('template-header');
+    await helper.openQuantaToolbarMenu(headerBlockId);
+    const menuOptions = await helper.getQuantaToolbarMenuOptions(headerBlockId);
     const optionLabels = menuOptions.map(o => o.toLowerCase());
 
     // Should NOT have delete/remove option
@@ -295,10 +294,11 @@ test.describe('Templates', () => {
     await helper.navigateToEdit('/template-test-page');
 
     const iframe = helper.getIframe();
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    // Find header block by content - block IDs are UUIDs after template merge
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
 
     // Click the template header block
-    await helper.clickBlockInIframe('template-header');
+    await headerBlock.click();
     await helper.waitForSidebarOpen();
 
     // Sidebar should show hierarchy: Page > Template Instance > Text (block title)
@@ -318,10 +318,11 @@ test.describe('Templates', () => {
     await helper.navigateToEdit('/template-test-page');
 
     const iframe = helper.getIframe();
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    // Find header block by content - block IDs are UUIDs after template merge
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
 
     // Click the template header block
-    await helper.clickBlockInIframe('template-header');
+    await headerBlock.click();
     await helper.waitForSidebarOpen();
 
     // Initially 3 headers: Page > Template Instance > Slate
@@ -348,30 +349,31 @@ test.describe('Templates', () => {
     await helper.navigateToEdit('/template-test-page');
 
     const iframe = helper.getIframe();
-    // Wait for all blocks to be visible
+    // Wait for blocks to be visible - find by content since template blocks get new UUIDs
     await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible({ timeout: 15000 });
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
+    const headerBlockId = await headerBlock.getAttribute('data-block-uid');
 
     // Find the grid block ID dynamically (it's a UUID generated during merge)
     const gridBlock = iframe.locator('[data-block-uid]:has(.grid-row)');
     await expect(gridBlock).toBeVisible({ timeout: 5000 });
     const gridBlockId = await gridBlock.getAttribute('data-block-uid');
 
-    // Find the grid cell ID - use .grid-cell class to distinguish from parent grid block
-    const gridCell = iframe.locator('.grid-cell[data-block-uid]').filter({ hasText: 'Template Grid Cell 1' });
-    const gridCellId = await gridCell.getAttribute('data-block-uid');
+    // Find the footer block ID dynamically
+    const footerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Footer' }).first();
+    const footerBlockId = await footerBlock.getAttribute('data-block-uid');
 
     // Get initial block order - verify key positions
     const initialOrder = await helper.getBlockOrder();
     expect(initialOrder[0]).toBe('standalone-block-1');
-    expect(initialOrder[1]).toBe('template-header');
+    expect(initialOrder[1]).toBe(headerBlockId);
     expect(initialOrder).toContain(gridBlockId);
     expect(initialOrder).toContain('user-content-1');
-    expect(initialOrder).toContain('template-footer');
+    expect(initialOrder).toContain(footerBlockId);
 
     // Select template header, then navigate up to template instance
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    await headerBlock.click();
+    await helper.waitForQuantaToolbar(headerBlockId!);
     await page.keyboard.press('Escape');
 
     // Wait for the template instance toolbar to appear with a drag handle
@@ -388,10 +390,10 @@ test.describe('Templates', () => {
     // Get new block order - template blocks should all be at the top now
     const newOrder = await helper.getBlockOrder();
     // Template blocks should be first, followed by standalone blocks
-    expect(newOrder[0]).toBe('template-header');
+    expect(newOrder[0]).toBe(headerBlockId);
     // Grid and grid cell positions may vary, but they should be before standalone-block-1
     const standaloneIndex = newOrder.indexOf('standalone-block-1');
-    expect(newOrder.indexOf('template-footer')).toBeLessThan(standaloneIndex);
+    expect(newOrder.indexOf(footerBlockId!)).toBeLessThan(standaloneIndex);
     expect(newOrder.indexOf('user-content-1')).toBeLessThan(standaloneIndex);
     expect(newOrder.indexOf('user-content-2')).toBeLessThan(standaloneIndex);
   });
@@ -405,7 +407,7 @@ test.describe('Templates', () => {
     const iframe = helper.getIframe();
 
     // Wait for merged content to appear
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toContainText('Template Header - From Template', { timeout: 15000 });
+    const { locator: templateHeader } = await helper.waitForBlockByContent('Template Header - From Template');
 
     // Find the grid block (UUID-based ID)
     const gridBlock = iframe.locator('[data-block-uid]:has(.grid-row)');
@@ -414,8 +416,7 @@ test.describe('Templates', () => {
 
     // Select the template header (first fixed block)
     // template-header is followed by the grid block (both fixed)
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    const headerBlockId = await helper.clickBlockByContent('Template Header');
 
     // The add button should NOT be visible because you can't insert
     // between two adjacent fixed blocks
@@ -424,7 +425,7 @@ test.describe('Templates', () => {
 
     // Verify blocks are still adjacent (no blocks in between)
     const blockOrder = await helper.getBlockOrder();
-    const headerIndex = blockOrder.indexOf('template-header');
+    const headerIndex = blockOrder.indexOf(headerBlockId);
     const gridIndex = blockOrder.indexOf(gridBlockId!);
     expect(gridIndex).toBe(headerIndex + 1);
   });
@@ -467,7 +468,7 @@ test.describe('Templates', () => {
 
     // Wait for blocks to be visible
     await expect(iframe.locator('[data-block-uid="standalone-block-1"]')).toBeVisible({ timeout: 15000 });
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible();
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header');
 
     // Find the grid block (UUID-based ID)
     const gridBlock = iframe.locator('[data-block-uid]:has(.grid-row)');
@@ -476,7 +477,7 @@ test.describe('Templates', () => {
 
     // Get initial block order - header and grid should be adjacent
     const initialOrder = await helper.getBlockOrder();
-    expect(initialOrder.indexOf('template-header') + 1).toBe(initialOrder.indexOf(gridBlockId!));
+    expect(initialOrder.indexOf(headerBlockId) + 1).toBe(initialOrder.indexOf(gridBlockId!));
 
     // Select the standalone block (not fixed)
     await helper.clickBlockInIframe('standalone-block-1');
@@ -491,7 +492,7 @@ test.describe('Templates', () => {
     await page.mouse.down();
 
     // Move to after template-header (which is followed by the grid block, also fixed)
-    const headerBlock = iframe.locator('[data-block-uid="template-header"]');
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     const headerBox = await headerBlock.boundingBox();
     expect(headerBox).not.toBeNull();
 
@@ -551,7 +552,7 @@ test.describe('Templates', () => {
 
     // Verify block order - template-header and grid should still be adjacent
     const newOrder = await helper.getBlockOrder();
-    const headerIndex = newOrder.indexOf('template-header');
+    const headerIndex = newOrder.indexOf(headerBlockId);
     const gridIndex = newOrder.indexOf(gridBlockId!);
 
     // The key assertion: header and grid must remain adjacent
@@ -570,9 +571,12 @@ test.describe('Templates', () => {
     await expect(iframe.locator('[data-block-uid="standalone-block-2"]')).toBeVisible({ timeout: 15000 });
     await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible();
 
+    // Get the footer block ID dynamically (template blocks get new UUIDs)
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
+
     // Get initial block order - standalone-block-2 should be after template-footer
     const initialOrder = await helper.getBlockOrder();
-    expect(initialOrder.indexOf('standalone-block-2')).toBeGreaterThan(initialOrder.indexOf('template-footer'));
+    expect(initialOrder.indexOf('standalone-block-2')).toBeGreaterThan(initialOrder.indexOf(footerBlockId));
 
     // Select standalone-block-2
     await helper.clickBlockInIframe('standalone-block-2');
@@ -606,15 +610,18 @@ test.describe('Templates', () => {
     const iframe = helper.getIframe();
 
     // Wait for template blocks to be visible
-    await expect(iframe.locator('[data-block-uid="template-header"]')).toBeVisible({ timeout: 15000 });
+    await helper.waitForBlockByContent('Template Header');
 
     // Select template header, then Escape to navigate up to template instance
-    await helper.clickBlockInIframe('template-header');
-    await helper.waitForQuantaToolbar('template-header');
+    const headerBlockId = await helper.clickBlockByContent('Template Header');
     await page.keyboard.press('Escape');
 
+    // Find the footer block to get its ID for toolbar positioning
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
+
     // Template instance child block IDs (the outline should cover all of these)
-    const templateChildBlocks = ['template-header', 'template-grid', 'user-content-1', 'user-content-2', 'template-footer'];
+    // Use the dynamic IDs we found, plus the user content blocks which have fixed IDs
+    const templateChildBlocks = [headerBlockId, 'user-content-1', 'user-content-2', footerBlockId];
 
     // Wait for template instance toolbar to be positioned correctly
     await helper.waitForQuantaToolbar(templateChildBlocks);
@@ -622,9 +629,8 @@ test.describe('Templates', () => {
     // Scroll the iframe content down
     await iframe.locator('body').evaluate((body) => body.ownerDocument.defaultView?.scrollBy(0, 200));
 
-    // BUG: After scrolling, the toolbar should still be visible and positioned
-    // correctly for the template instance. The instance is still selected
-    // (shows in sidebar) but toolbar/outline disappears from iframe.
+    // After scrolling, the toolbar should still be visible and positioned
+    // correctly for the template instance.
     await helper.waitForQuantaToolbar(templateChildBlocks);
   });
 });
