@@ -9311,6 +9311,20 @@ export function mergeTemplatesIntoPage(page, templates, uuidGenerator = generate
   const allNewTemplateIds = new Set();
 
   for (const [templateId, template] of Object.entries(templates)) {
+    // Find existing templateInstanceId for this template in the page, or generate new one
+    // This ensures user content blocks keep the same instance ID as fixed blocks
+    let instanceId = null;
+    for (const blockId of result.blocks_layout?.items || []) {
+      const block = result.blocks?.[blockId];
+      if (block?.templateId === templateId && block?.templateInstanceId) {
+        instanceId = block.templateInstanceId;
+        break;
+      }
+    }
+    if (!instanceId) {
+      instanceId = uuidGenerator();
+    }
+
     // Clone template blocks with new UUIDs (like applyLayoutTemplate does)
     // This prevents literal template IDs (e.g., 'header-block') from leaking into the page
     const { blocks: clonedBlocks, layout: clonedLayout } = cloneBlocksWithNewIds(
@@ -9329,6 +9343,7 @@ export function mergeTemplatesIntoPage(page, templates, uuidGenerator = generate
       clonedTemplate.blocks[newId] = {
         ...block,
         templateId: templateId,
+        templateInstanceId: instanceId,
       };
     }
 

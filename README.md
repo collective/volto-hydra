@@ -737,22 +737,20 @@ In your frontend, render each item with ```data-block-uid``` set to the item's I
 Note: 
 
 - You don't need to mark where the element that contains the child blocks is, or even have one.
-- ```data-block-add="<<direction>>"``` is useful if blocks are going to be added in a non standard direction. By default it will alternate between 
-  ```bottom``` and ```right``` depending on the parent container.
-- You can use ```data-block-selector="<<block_uid>>>"``` on buttons or links anywhere to enable sidebar block selection. You can also use -1, +1 etc 
-  to select the previous or next block (if the selector is in the container), otherwise use ```data-block-selector="<<block_uid>>>:+1|-1"``` to specify next/prev from the given block.
-- When a block is selected in the sidebar hydra will send fake clicks on  ```data-block-selector``` elements to ensure a hidden block is visible
-   - but you can override this by setting a ```onHandleBlockSelection``` callback.
-
+- ```data-block-add="bottom|right"``` is useful if blocks are going to be added in a non standard direction. By default it will be the opposite of its parent.
+- If you blocks are rendered with paging you can enable the UI allow selection of a block
+  from the sidebar by tagging your paging buttons with 
+  ```data-block-selector="-x|+y|<<block_uid>>>"```
 
 ##### Empty Blocks
 
 For the UI work a blocks field can never be left empty. If the last child block
 is deleted then while editing either the defaultBlock type will be added,
 or if not defined a special block of type "empty" will be added.
+
 - These will be stripped out before saving.
 - they will have @type: "empty" and have a random id like any other block.
-- You should render them as empty but ensure they table up teh space of a typical subblock would
+- You should render them as empty but ensure they table up teh space of a typical sub-block would
 - hydra will put a "+" button in it's middle which the user can use to replace this block with 
   the block type of their choice.
   - you can override the look of this button by rendering something else inside the empty block and adding ```data-block-add="button"``` to it.
@@ -761,7 +759,7 @@ or if not defined a special block of type "empty" will be added.
 
 #### Table Mode (addMode: 'table')
 
-For table-like structures where rows contain cells, use `addMode: 'table'` to enable column-aware operations:
+For table like structures (rows then cells, or columns then cells) you can enable table mode to make it easy for the user to add and remove columns as easily as they can add rows.
 
 ```js
 rows: {
@@ -785,30 +783,6 @@ rows: {
 }
 ```
 
-Table mode enables:
-- **Column operations**: Adding a cell adds a column (inserts cell into ALL rows at the same position)
-- **Row defaults**: New rows automatically get the same number of cells as existing rows
-- **Toolbar actions**: Add Row Before/After, Add Column Before/After, Remove Row, Remove Column
-- **Selection after delete**: Removing a row/column selects the corresponding cell in the previous row/column
-
-In your frontend, render the table structure:
-```html
-<table data-block-uid="table-1">
-  <tr data-block-uid="row-1">
-    <td data-block-uid="cell-1-1" data-editable-field="value">Header 1</td>
-    <td data-block-uid="cell-1-2" data-editable-field="value">Header 2</td>
-  </tr>
-  <tr data-block-uid="row-2">
-    <td data-block-uid="cell-2-1" data-editable-field="value">Data 1</td>
-    <td data-block-uid="cell-2-2" data-editable-field="value">Data 2</td>
-  </tr>
-</table>
-```
-
-The Quanta toolbar will show table-specific actions when a cell or row is selected:
-- For cells: formatting buttons + Add Column Before/After in toolbar, Remove Column in dropdown
-- For rows: Add Row Before/After in toolbar, Remove Row in dropdown
-
 
 #### Schema Enhancers
 
@@ -819,28 +793,6 @@ const bridge = initBridge({
   voltoConfig: {
     blocks: {
       blocksConfig: {
-        // Parent container: controls child type via 'variation' field
-        // inheritSchemaFrom creates the typeField with computed choices
-        gridBlock: {
-          allowedBlocks: ['teaser', 'image'],  // Allowed child block types
-          schemaEnhancer: {
-            inheritSchemaFrom: {
-              typeField: 'variation',
-              defaultsField: 'itemDefaults',
-              blocksField: 'blocks',  // Derive choices from blocks field
-              title: 'Item Type',
-            },
-          },
-        },
-        // Child block: hides fields that parent controls
-        teaser: {
-          schemaEnhancer: {
-            childBlockConfig: {
-              defaultsField: 'itemDefaults',
-              editableFields: ['href', 'title', 'description'],
-            },
-          },
-        },
         // Conditional field visibility
         myBlock: {
           blockSchema: {
@@ -861,23 +813,15 @@ const bridge = initBridge({
 });
 ```
 
-**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
-- `typeField`: Field name for selecting child type (e.g., `'variation'`)
-- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
-- `blocksField`: Where to derive type choices:
-  - `'blocks'` or `'items'`: Container use case - derive from own field's `allowedBlocks`
-  - `'..'`: Listing use case - derive from parent's sibling allowed types
-- `filterConvertibleFrom`: Filter types to only those with `fieldMappings[source]` (e.g., `'default'`)
-
-**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
-
 **`skiplogic`**: Conditionally show/hide fields based on other field values.
 - `field`: Field to check (use `../field` for parent/page fields)
 - Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
 
-#### Field Mappings
+#### Block conversion and synchronised block types
 
-`fieldMappings` is a top-level block config that defines how fields map when converting between block types:
+If a block type has a `fieldMappings` defined it will enable a "Convert to..." UI action.
+You specify either conversions to a specific type, or to a generic search result schema
+(@id, title, preview-image, description)
 
 ```js
 teaser: {
@@ -894,14 +838,60 @@ image: {
 },
 ```
 
-- **`default`**: Used for listings (query results → block fields) and as fallback for conversions
-- **`[sourceType]`**: Specific mapping when converting FROM that type (e.g., `image:` means "when converting from image")
-- **"Convert to" dropdown**: Shows only types with valid mappings from current type
-- **Transitive conversion**: Finds paths through intermediate types (hero → teaser → image)
-- **Roundtrip preservation**: Unmapped fields persist through conversions back to original type
+Note it will perform transitive conversions by using paths through intermediate types (hero → teaser → image). Any fields that don't match will still be kept in the data so if the block
+is converted back that data will reappear.
+
+You might want to have one container
+type that can hold different types of blocks but they all have to be the same type with the
+synchronised settings.
+A field on the parent will let the editor select the type and all the blocks will get
+converted to that new type using ```fieldMappings```.
 
 
-### Level 5: Enable Visual frontend editing of Text, Media and links ([TODO](https://github.com/collective/volto-hydra/issues/5))
+```js
+const bridge = initBridge({
+  voltoConfig: {
+    blocks: {
+      blocksConfig: {
+        // Parent container: controls child type via 'variation' field
+        // inheritSchemaFrom creates the typeField with computed choices
+        gridBlock: {
+          allowedBlocks: ['teaser', 'image'],  // Allowed child block types
+          schemaEnhancer: {
+            inheritSchemaFrom: {
+              typeField: 'variation',
+            },
+          },
+        },
+        // Child block: hides fields that parent controls
+        teaser: {
+          schemaEnhancer: {
+            childBlockConfig: {
+              editableFields: ['href', 'title', 'description'],
+            },
+          },
+        },
+        fieldMappings: {
+          default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' }
+        },
+      },
+    },
+  },
+});
+```
+
+**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
+- `typeField`: Field name for selecting child type (e.g., `'variation'`)
+- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
+- `blocksField`: Which blocks field the sub-blocks will be in. Used to get the list
+     of `allowedBlocks`. It can be set to ".." to use the parents `allowedBlocks`
+- `filterConvertibleFrom`: only allow selecting a block type which can convert from the specified type.
+
+**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+
+
+### Level 5: Enable Visual frontend editing of Text, Media and links
+
 
 If you want to make the editing experience the most intuitive, you can enable real-time visual block editing, where an editor
 can change text, links or media directly on your frontend page instead of via fields on the sidebar.
@@ -911,16 +901,16 @@ direct html changes in your frontend which are then sent back to the CMS and ref
 
 ``` html
 <div class="slide" data-block-uid="....">
-  <img data-editable-field="image" src="/big_news.jpg"/>
+  <img data-media-field="image" src="/big_news.jpg"/>
   <h2 data-editable-field="title">Big News</h2>
   <div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
-  <div><a data-editable-field="url" href="/big_news">Read more</a><div>
+  <div><a data-linkable-field="url" href="/big_news">Read more</a><div>
 </div>
 ```
 
 #### Path Syntax for Editing Parent or Page Fields
 
-The `data-editable-field` attribute supports Unix-style paths to edit fields outside the current block:
+The `data-editable|media|linkable-field` attribute supports Unix-style paths to edit fields outside the current block:
 
 - `fieldName` - edit the block's own field (default)
 - `../fieldName` - edit the parent block's field
@@ -951,7 +941,7 @@ If the widget is slate, then Editor can also :-
 - select text to see what formatting has been applied and can be applied via buttons on the quanta toolbar
 - select text and apply character styles (currently BOLD, ITALIC & STRIKETHROUGH)
 - create or edit linked text.
-- apply paragraph formatting ([TODO](https://github.com/collective/volto-hydra/issues/31))
+- apply paragraph formatting 
 - use markdown shortcuts like bullet and heading codes ([TODO](https://github.com/collective/volto-hydra/issues/105))
 - paste rich text from the clipboard (TODO)
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
@@ -988,26 +978,21 @@ Both `<strong>` and `<b>` have the same node-id, so they count as one Slate chil
 This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 
 Additionally your frontend can
-- add a callback of ```onBlockFieldChange``` to rerender just the editable fields more quickly while editing (TODO)
 - specify parts of the text that aren't editable by the user which could be needed for some use-cases where style includes text that needs to appear. (TODO)
 
 
-#### Visual media uploading ([TODO](https://github.com/collective/volto-hydra/issues/36))
+#### Visual media uploading
 
 This will enable an Editor to :-
-- Be presented with a empty media element on the frontend and and a prompt to upload or pick media ([TODO](https://github.com/collective/volto-hydra/issues/112))
-- Remove the currently selected media to pick a different one ([TODO](https://github.com/collective/volto-hydra/issues/36))
-- DND an image diretly only a media element on the frontend ([TODO](https://github.com/collective/volto-hydra/issues/108))
+- Be presented with a empty media element on the frontend and and a prompt to upload or pick media
+- Remove the currently selected media to pick a different one 
+- DND an image directly onto a media element on the frontend preview
 
+#### Visual link editing
 
-#### Visual link editing ([TODO](https://github.com/collective/volto-hydra/issues/68))
-
-This will enable an Editor to :-
-- Click on a link or button on the frontend to set or change the link with either an external or internal url ([TODO](https://github.com/collective/volto-hydra/issues/68))
-- Click on a link/button to optionally open the link in a new tab ([TODO](https://github.com/collective/volto-hydra/issues/111))
 
 You might have a block with a link field like the Slide block. You can also make this visually
-editable using ```data-editable-field```. In edit mode the click behaviour of that element will be altered and instead
+editable using ```data-linkable-field```. In edit mode the click behaviour of that element will be disabled and instead
 the editor can pick content to link to, enter an external url of open the url in a separate tab.
 
 ### Level 6: Custom UI
