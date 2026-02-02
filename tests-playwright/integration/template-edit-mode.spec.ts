@@ -668,8 +668,9 @@ test.describe('Template Edit Mode - Validation', () => {
     await editor.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' - edited');
-    // Wait for text to appear in editor
-    await expect(editor).toContainText('edited', { timeout: 5000 });
+    // Wait for text to appear - use fresh locator since text changed (stale locator won't match)
+    const headerBlock = iframe.locator(`[data-block-uid="${headerBlockId}"]`);
+    await expect(headerBlock).toContainText('edited', { timeout: 5000 });
 
     // Exit edit mode
     await page.keyboard.press('Escape');
@@ -686,8 +687,9 @@ test.describe('Template Edit Mode - Validation', () => {
     const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|split|contiguous/i });
     await expect(errorMessage).not.toBeVisible();
 
-    // Content should be preserved in view mode - find by content since ID changed
-    await expect(headerLocator).toContainText('edited', { timeout: 15000 });
+    // Content should be preserved in view mode - find by content since text and ID both changed
+    const editedHeader = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'edited' }).first();
+    await expect(editedHeader).toBeVisible({ timeout: 15000 });
 
     // Verify template was actually saved by loading another page using the same template
     // Navigate to view mode (not edit) to also test that view mode loads templates
