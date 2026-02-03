@@ -856,6 +856,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await heroBlock.scrollIntoViewIfNeeded();
     await heroBlock.click();
     await helper.waitForSidebarOpen();
+    await helper.waitForQuantaToolbar('block-4-hero');
 
     // Get iframe image
     const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
@@ -868,9 +869,14 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await expect(sidebarClearButton).toBeVisible({ timeout: 5000 });
     await sidebarClearButton.click();
 
-    // Wait for URL input to be visible
+    // Wait for block to resize after image cleared
+    await helper.waitForQuantaToolbar('block-4-hero');
+
+    // Wait for URL input to be visible, then click to focus
     const urlInput = sidebar.locator('input[name="link"]');
     await expect(urlInput).toBeVisible({ timeout: 5000 });
+    await urlInput.click();
+    await expect(urlInput).toBeFocused({ timeout: 5000 });
 
     // Enter URL
     await urlInput.fill('https://placehold.co/777x777');
