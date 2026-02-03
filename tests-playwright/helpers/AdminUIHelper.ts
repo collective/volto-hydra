@@ -2569,12 +2569,12 @@ export class AdminUIHelper {
    * This should open the block chooser.
    */
   async clickAddBlockButton(): Promise<void> {
-
     // The add button has class volto-hydra-add-button and is appended to the selected block element
     const addButton = this.page.locator('.volto-hydra-add-button');
 
+    // Scroll add button into view - it may be outside viewport if block is at edge
+    await addButton.scrollIntoViewIfNeeded();
     await addButton.click({ timeout: 10000 });
-    await this.page.waitForTimeout(500); // Wait for chooser to appear
   }
 
   /**
