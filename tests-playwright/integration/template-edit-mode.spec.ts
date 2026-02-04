@@ -537,7 +537,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
 });
 
 test.describe('Template Edit Mode - Validation', () => {
-  test('non-contiguous placeholder groups prevent save', async ({ page }) => {
+  test('non-contiguous placeholder groups prevent exit from edit mode', async ({ page }) => {
     // Rule: All blocks with the same placeholder must be adjacent.
     // Having two separate groups with the same name is invalid.
     //
@@ -573,21 +573,25 @@ test.describe('Template Edit Mode - Validation', () => {
     // After:  [header] [content-1] [footer] [content-2]  <- invalid, "primary" blocks separated
     await helper.dragBlockAfter(USER_CONTENT_2, footerBlockId);
 
-    // Exit edit mode
+    // Try to exit edit mode - should fail validation
     await page.keyboard.press('Escape');
     await helper.waitForQuantaToolbar(templateBlockIds);
-    await editToggle.uncheck();
-    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
-    // Try to save
-    await page.keyboard.press('Control+s');
+    // Click the label to try to exit (validation should prevent state change)
+    await editToggle.click();
 
-    // Should show validation error about non-contiguous placeholders
-    const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|contiguous|adjacent/i });
+    // Should show validation error about non-contiguous placeholders (prevents exit)
+    const errorMessage = page.locator('.toast-error, .Toastify__toast--error').filter({ hasText: /placeholder|contiguous|adjacent|position/i });
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
+
+    // Verify we're still in edit mode (checkbox should still be checked)
+    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
+    await expect(checkbox).toBeChecked();
+    // Verify standalone block is still readonly (template edit mode still active)
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
   });
 
-  test('adjacent placeholder groups without fixed block prevent save', async ({ page }) => {
+  test('adjacent placeholder groups without fixed block prevent exit from edit mode', async ({ page }) => {
     // Rule: Different placeholder groups must be separated by a fixed block.
     // Having two different placeholder groups adjacent is invalid.
     //
@@ -625,18 +629,22 @@ test.describe('Template Edit Mode - Validation', () => {
     const placeholderField = page.locator('.field-wrapper-placeholder input');
     await placeholderField.fill('secondary');
 
-    // Exit edit mode
+    // Try to exit edit mode - should fail validation
     await page.keyboard.press('Escape');
     await helper.waitForQuantaToolbar(templateBlockIds);
-    await editToggle.uncheck();
-    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
-    // Try to save
-    await page.keyboard.press('Control+s');
+    // Click the label to try to exit (validation should prevent state change)
+    await editToggle.click();
 
-    // Should show validation error about adjacent placeholder groups needing fixed block
-    const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|fixed|separated/i });
+    // Should show validation error about adjacent placeholder groups needing fixed block (prevents exit)
+    const errorMessage = page.locator('.toast-error, .Toastify__toast--error').filter({ hasText: /placeholder|fixed|separated/i });
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
+
+    // Verify we're still in edit mode (checkbox should still be checked)
+    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
+    await expect(checkbox).toBeChecked();
+    // Verify standalone block is still readonly (template edit mode still active)
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
   });
 
   test('saved template changes persist and appear on other pages using the template', async ({ page }) => {

@@ -7,7 +7,8 @@ import {
   applyBlockDefaults,
   previousBlockId,
 } from '@plone/volto/helpers';
-import { validateAndLog } from '../../utils/formDataValidation';
+import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
+import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, getBlockAddability } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
@@ -74,7 +75,7 @@ function isSelectionValidForValue(selection, slateValue) {
 import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
-import { BlockChooser, Icon } from '@plone/volto/components';
+import { BlockChooser, Icon, Toast } from '@plone/volto/components';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
@@ -3345,10 +3346,26 @@ const Iframe = (props) => {
         onToggleTemplateEditMode={async (instanceId) => {
           const prevInstanceId = iframeSyncState.templateEditMode;
 
-          // Exiting template edit mode - merge edits back to cached template
+          // Exiting template edit mode - validate and merge edits back to cached template
           if (prevInstanceId && !instanceId) {
-            // Find the templateId for this instance
             const formData = iframeSyncState.formData;
+
+            // Validate template placeholder structure before allowing exit
+            const validation = validateTemplatePlaceholders(formData);
+            if (!validation.valid) {
+              // Show validation error - user must fix structure before exiting
+              const firstError = Object.values(validation.blocksErrors)[0]?._layout;
+              toast.error(
+                <Toast
+                  error
+                  title={firstError?.title || 'Invalid Template Structure'}
+                  content={firstError?.message || 'Please fix the template structure before exiting edit mode.'}
+                />
+              );
+              return; // Don't exit edit mode
+            }
+
+            // Find the templateId for this instance
             let templateId = null;
             for (const block of Object.values(formData.blocks || {})) {
               if (block.templateInstanceId === prevInstanceId && block.templateId) {
@@ -3361,6 +3378,7 @@ const Iframe = (props) => {
               const template = templateCacheRef.current[templateId];
 
               // Merge edited instance back into template (reverse merge)
+              // This captures edits to fixed+readOnly blocks into the template cache
               const { merged: updatedTemplate } = await mergeTemplatesIntoPage(template, {
                 loadTemplate: async () => formData,
                 filterInstanceId: prevInstanceId,
@@ -3368,30 +3386,6 @@ const Iframe = (props) => {
 
               // Update cache with merged template
               templateCacheRef.current[templateId] = updatedTemplate;
-
-              // Re-apply updated template to page (forward merge)
-              const { merged: updatedPage } = await mergeTemplatesIntoPage(formData, {
-                loadTemplate: async () => updatedTemplate,
-              });
-
-              // Update formData with re-applied template
-              const newBlockPathMap = buildBlockPathMap(updatedPage, config.blocks.blocksConfig, intl);
-              onChangeFormData(updatedPage);
-              setIframeSyncState(prev => ({
-                ...prev,
-                formData: updatedPage,
-                blockPathMap: newBlockPathMap,
-                templateEditMode: null,
-              }));
-
-              // Send template edit mode to iframe
-              if (referenceElement?.contentWindow) {
-                referenceElement.contentWindow.postMessage(
-                  { type: 'TEMPLATE_EDIT_MODE', instanceId: null },
-                  '*'
-                );
-              }
-              return;
             }
           }
 
