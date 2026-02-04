@@ -125,8 +125,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for header to appear
-      const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Layout Header' });
-      await expect(headerBlock).toBeVisible({ timeout: 5000 });
+      const { locator: headerBlock } = await helper.waitForBlockByContent('Layout Header');
 
       // Click header block
       await headerBlock.click();
@@ -156,8 +155,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for header
-      const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Layout Header' });
-      await expect(headerBlock).toBeVisible({ timeout: 5000 });
+      const { locator: headerBlock } = await helper.waitForBlockByContent('Layout Header');
 
       // Click header block
       await headerBlock.click();
@@ -214,7 +212,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+      await helper.waitForBlockByContent('Layout Header');
 
       // Find the first non-fixed block (existing content that was moved)
       const allBlocks = iframe.locator('[data-block-uid]');
@@ -250,8 +248,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Layout Header' });
-      await expect(headerBlock).toBeVisible({ timeout: 5000 });
+      const { locator: headerBlock } = await helper.waitForBlockByContent('Layout Header');
 
       // Get block positions before drag
       const allBlocks = iframe.locator('[data-block-uid]');
@@ -338,7 +335,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+      await helper.waitForBlockByContent('Layout Header');
 
       // Verify original content is still there (moved to default placeholder)
       const contentAfterLayout = await iframe.locator('[data-block-uid]').allTextContents();
@@ -348,7 +345,6 @@ test.describe('allowedLayouts', () => {
 
     test('multiple blocks in matching placeholder preserved when switching layouts', async ({ page }) => {
       const helper = new AdminUIHelper(page);
-      const iframe = helper.getIframe();
 
       await helper.login();
       // test-page has multiple blocks - including "Block 1" and "Welcome" (hero heading)
@@ -356,8 +352,8 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Verify multiple user blocks exist before layout
-      const block1 = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'test paragraph' });
-      const block2 = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Another paragraph' });
+      const { locator: block1 } = await helper.waitForBlockByContent('test paragraph');
+      const { locator: block2 } = await helper.waitForBlockByContent('Another paragraph');
       await expect(block1).toBeVisible();
       await expect(block2).toBeVisible();
 
@@ -369,7 +365,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+      await helper.waitForBlockByContent('Layout Header');
 
       // Verify both user blocks still exist after first layout
       await expect(block1).toBeVisible();
@@ -382,10 +378,11 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for new layout
-      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' })).toBeVisible({ timeout: 5000 });
+      await helper.waitForBlockByContent('Editable Header');
 
       // Old fixed blocks should be replaced
-      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).not.toBeVisible();
+      const iframe = helper.getIframe();
+      await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'Layout Header' }).first()).not.toBeVisible();
 
       // BOTH user blocks should still be preserved after switching
       await expect(block1).toBeVisible();
@@ -658,8 +655,7 @@ test.describe('allowedLayouts', () => {
       await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).not.toBeVisible({ timeout: 5000 });
 
       // User content should still be there
-      const userContent = iframe.locator('[data-block-uid]').filter({ hasText: 'test paragraph' });
-      await expect(userContent).toBeVisible();
+      await helper.waitForBlockByContent('test paragraph');
     });
   });
 
