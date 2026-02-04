@@ -1067,8 +1067,8 @@ function createEnhancerByType(type, config) {
 
   switch (type) {
     case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField, filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = config;
-      if (!typeField || !defaultsField) return null;
+      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = config;
+      if (!typeField) return null;
       // Pass typeFieldOptions if any type field config is provided
       const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || blocksField || title || defaultValue)
         ? { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue }
@@ -1078,8 +1078,7 @@ function createEnhancerByType(type, config) {
       break;
     }
     case 'childBlockConfig': {
-      const { defaultsField, editableFields, parentControlledFields } = config;
-      if (!defaultsField) return null;
+      const { defaultsField = 'itemDefaults', editableFields, parentControlledFields } = config;
       enhancer = hideParentOwnedFields([defaultsField], { editableFields, parentControlledFields });
       enhancer.config = config;
       break;
@@ -1264,6 +1263,22 @@ function createSingleEnhancerLegacy(recipe) {
  * @param {Object} formData - Current block's formData (optional, for blocksField lookup)
  * @returns {Array} - Array of [value, label] tuples for choices
  */
+/**
+ * Get the first blocks field name for a container block from the pathMap.
+ * Only considers blocks fields (not object_list fields).
+ * Returns undefined if no children found or pathMap not available.
+ */
+function getFirstBlocksField(blockId, blockPathMap) {
+  if (!blockPathMap || !blockId) return undefined;
+  for (const pathInfo of Object.values(blockPathMap)) {
+    // Only consider blocks fields, not object_list items
+    if (pathInfo.parentId === blockId && pathInfo.containerField && !pathInfo.isObjectListItem) {
+      return pathInfo.containerField;
+    }
+  }
+  return undefined;
+}
+
 export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId, formData) {
   if (!blocksConfig) return [];
 
@@ -1272,11 +1287,17 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
   // Determine base types in order of precedence
   let types = allowedBlocks;
 
-  // Derive from container's blocks field schema if blocksField is set
+  // Derive from container's blocks field schema
   // blocksField specifies which container field to get allowedBlocks from
   // Special value '..' means get sibling allowed types from parent container
-  if (!types && blocksField) {
-    if (blocksField === '..') {
+  // If blocksField is undefined, default to the first blocks field from pathMap
+  let effectiveBlocksField = blocksField;
+  if (effectiveBlocksField === undefined) {
+    effectiveBlocksField = getFirstBlocksField(blockId, blockPathMap);
+  }
+
+  if (!types && effectiveBlocksField) {
+    if (effectiveBlocksField === '..') {
       // ".." means get sibling allowed types from parent container
       // This is available via blockPathMap[blockId].allowedSiblingTypes
       if (blockPathMap && blockId) {
@@ -1289,7 +1310,7 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
       // Regular field name - look at container's own field
       const blockType = formData['@type'];
       const blockSchema = getBlockSchema(blockType, null, blocksConfig);
-      const fieldDef = blockSchema?.properties?.[blocksField];
+      const fieldDef = blockSchema?.properties?.[effectiveBlocksField];
       if (fieldDef?.allowedBlocks) {
         // Get allowedBlocks from the field definition in schema
         types = fieldDef.allowedBlocks;
@@ -1557,9 +1578,17 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
     }
   }
 
-  // Get all child block IDs
-  const childIds = getChildBlockIds(blockId, blockPathMap);
-  console.log('[syncChildBlockTypes] childIds:', childIds);
+  // Determine which blocks field to sync
+  // Use configured blocksField or default to first blocks field from pathMap
+  const configuredBlocksField = enhancerConfig?.blocksField;
+  const effectiveBlocksField = configuredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
+
+  // Get child block IDs, filtered to the effective blocks field
+  const allChildIds = getChildBlockIds(blockId, blockPathMap);
+  const childIds = effectiveBlocksField
+    ? allChildIds.filter((id) => blockPathMap[id]?.containerField === effectiveBlocksField)
+    : allChildIds;
+  console.log('[syncChildBlockTypes] childIds:', childIds, 'in field:', effectiveBlocksField);
   if (childIds.length === 0) return result;
 
   // Transform each child
