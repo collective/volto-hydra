@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 
+// Check if we need Nuxt server (only for nuxt/nuxt-specific projects)
+const projectArg = process.argv.find(arg => arg.startsWith('--project='))?.split('=')[1]
+  || process.argv[process.argv.indexOf('--project') + 1];
+const needsNuxt = !projectArg || projectArg.includes('nuxt');
+
 // Only import coverage reporter when COVERAGE is enabled (CI)
 // This prevents V8 coverage collection overhead locally
 const coverageReporter = process.env.COVERAGE
@@ -196,8 +201,8 @@ export default defineConfig({
             CI: process.env.CI || 'true',
           },
         },
-    // Nuxt frontend for testing Nuxt-specific scenarios
-    {
+    // Nuxt frontend for testing Nuxt-specific scenarios (only started when running nuxt tests)
+    ...(needsNuxt ? [{
       name: 'Nuxt Frontend (Test)',
       command: 'npm run dev:test',
       url: 'http://localhost:3003',
@@ -206,6 +211,6 @@ export default defineConfig({
       cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
       stdout: 'pipe',
       stderr: 'pipe',
-    },
+    }] : []),
   ],
 });

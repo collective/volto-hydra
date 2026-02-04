@@ -42,6 +42,9 @@ jobs:
       - name: Check pnpm lockfile consistency
         run: |
           pnpm install --frozen-lockfile
+      - name: Run hydra-js unit tests
+        run: |
+          cd packages/hydra-js && pnpm test
       - name: Build Volto for production
         run: |
           pnpm build

@@ -1227,7 +1227,9 @@ Layout:  [Fixed Header] [default] [Fixed Footer] [post_footer]
 After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 ```
 
-To apply a layout automatically
+Your frontend might want to force a layout to apply regardless on if a template is there,
+for example to ensure there footer layout.
+During editing you can force a layout by only having a single choice with no "null" for `allowedLayouts`, but the schema is when not editing.
 
 ... TODO
 
