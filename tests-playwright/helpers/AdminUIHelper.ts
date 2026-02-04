@@ -2569,6 +2569,9 @@ export class AdminUIHelper {
    * This should open the block chooser.
    */
   async clickAddBlockButton(): Promise<void> {
+    // Wait for DOM to stabilize (block count settles after re-renders)
+    await this.getStableBlockCount();
+
     // The add button has class volto-hydra-add-button and is appended to the selected block element
     const addButton = this.page.locator('.volto-hydra-add-button');
 
