@@ -466,8 +466,8 @@ export class AdminUIHelper {
   ): Promise<{ locator: Locator; blockId: string }> {
     const iframe = this.getIframe();
 
-    // Find block by content - search in main or #content areas
-    const blockLocator = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: content }).first();
+    // Find the text element, then get the closest block ancestor
+    const blockLocator = iframe.getByText(content).first().locator('xpath=ancestor-or-self::*[@data-block-uid][1]');
 
     // Wait for the block to be visible
     await expect(blockLocator).toBeVisible({ timeout });

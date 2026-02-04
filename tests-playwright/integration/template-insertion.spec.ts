@@ -40,7 +40,6 @@ test.describe('Template Insertion', () => {
 
   test('selecting template inserts blocks with template fields', async ({ page }) => {
     const helper = new AdminUIHelper(page);
-    const iframe = helper.getIframe();
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -60,13 +59,12 @@ test.describe('Template Insertion', () => {
 
     // Template blocks should be inserted
     // test-layout has: header, main-placeholder, footer
-    await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' })).toBeVisible({ timeout: 5000 });
-    await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'Template Footer' })).toBeVisible();
+    await helper.waitForBlockByContent('Template Header');
+    await helper.waitForBlockByContent('Template Footer');
   });
 
   test('inserted template blocks show in sidebar hierarchy', async ({ page }) => {
     const helper = new AdminUIHelper(page);
-    const iframe = helper.getIframe();
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -82,11 +80,8 @@ test.describe('Template Insertion', () => {
     const templateOption = blockChooser.locator('button').filter({ hasText: /test-layout/ });
     await templateOption.click();
 
-    // Wait for template to be inserted
-    const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' });
-    await expect(headerBlock).toBeVisible({ timeout: 5000 });
-
-    // Click on the template header block
+    // Wait for template to be inserted and click the header block
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
 
@@ -98,7 +93,6 @@ test.describe('Template Insertion', () => {
 
   test('template fixed blocks show lock icon', async ({ page }) => {
     const helper = new AdminUIHelper(page);
-    const iframe = helper.getIframe();
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -114,11 +108,8 @@ test.describe('Template Insertion', () => {
     const templateOption = blockChooser.locator('button').filter({ hasText: /test-layout/ });
     await templateOption.click();
 
-    // Wait for template to be inserted
-    const headerBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header' });
-    await expect(headerBlock).toBeVisible({ timeout: 5000 });
-
-    // Click the template header block (which is fixed)
+    // Wait for template to be inserted and click the header block (which is fixed)
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
 
