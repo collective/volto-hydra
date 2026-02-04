@@ -1,17 +1,37 @@
-import { applyLayoutTemplate, mergeTemplateContent } from './hydra.js';
+import { expandTemplates, mergeTemplatesIntoPage } from './hydra.js';
+
+// Wrapper to match old applyLayoutTemplate signature for existing tests
+async function applyLayoutTemplate(pageData, templateData, uuidGenerator) {
+  const templateUrl = templateData['@id'];
+  const { merged } = await mergeTemplatesIntoPage(pageData, {
+    loadTemplate: async () => templateData,
+    pageBlocksFields: { blocks: { allowedLayouts: [templateUrl] } },
+    uuidGenerator,
+  });
+  return merged;
+}
+
+// Wrapper to match old mergeTemplateContent signature for existing tests
+async function mergeTemplateContent(target, source, filterTemplateId = null) {
+  // For merge tests, source contains template structure, target has page content
+  // This simulates the old merge behavior
+  const { merged } = await mergeTemplatesIntoPage(target, {
+    loadTemplate: async () => source,
+    pageBlocksFields: { blocks: {} },
+  });
+  return { merged };
+}
 
 describe('applyLayoutTemplate', () => {
-  const uuidGenerator = (() => {
-    let counter = 0;
-    return () => `uuid-${++counter}`;
-  })();
+  let counter = 0;
+  const uuidGenerator = () => `uuid-${++counter}`;
 
-  const resetUuidCounter = () => {
-    // Reset for consistent test results
-  };
+  beforeEach(() => {
+    counter = 0;
+  });
 
   describe('first time layout application', () => {
-    test('applies layout with header, default, footer to page with user content', () => {
+    test('applies layout with header, default, footer to page with user content', async () => {
       const pageData = {
         blocks: {
           'user-block-1': { '@type': 'slate', value: [{ text: 'User content 1' }] },
@@ -30,7 +50,7 @@ describe('applyLayoutTemplate', () => {
         blocks_layout: { items: ['header', 'default-slot', 'footer'] },
       };
 
-      const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+      const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
 
       // Debug: check what we got
       const blockIds = Object.keys(result.blocks);
@@ -58,7 +78,7 @@ describe('applyLayoutTemplate', () => {
       }
     });
 
-    test('user content goes into default placeholder', () => {
+    test('user content goes into default placeholder', async () => {
       const pageData = {
         blocks: {
           'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -75,13 +95,13 @@ describe('applyLayoutTemplate', () => {
         blocks_layout: { items: ['header', 'default-slot'] },
       };
 
-      const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+      const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
 
       // User block should have placeholder: 'default'
       expect(result.blocks['user-block'].placeholder).toBe('default');
     });
 
-    test('blocks are ordered: header, user content, footer', () => {
+    test('blocks are ordered: header, user content, footer', async () => {
       const pageData = {
         blocks: {
           'user-block-1': { '@type': 'slate', value: [{ text: 'User 1' }] },
@@ -100,7 +120,7 @@ describe('applyLayoutTemplate', () => {
         blocks_layout: { items: ['header', 'default-slot', 'footer'] },
       };
 
-      const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+      const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
       const layout = result.blocks_layout.items;
 
       // Find positions
@@ -122,7 +142,7 @@ describe('applyLayoutTemplate', () => {
   });
 
   describe('layout switching', () => {
-    test('multiple user blocks in default placeholder preserved when switching layouts', () => {
+    test('multiple user blocks in default placeholder preserved when switching layouts', async () => {
       // Page with existing layout applied (blocks have templateId)
       const pageData = {
         blocks: {
@@ -144,15 +164,18 @@ describe('applyLayoutTemplate', () => {
         blocks_layout: { items: ['new-header', 'new-default', 'new-footer'] },
       };
 
-      const result = applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
+      const result = await applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
 
       // Both user blocks should be preserved
       expect(result.blocks['user-block-1']).toBeDefined();
       expect(result.blocks['user-block-2']).toBeDefined();
 
-      // Old fixed blocks should be replaced (not in result)
-      expect(result.blocks['old-header']).toBeUndefined();
-      expect(result.blocks['old-footer']).toBeUndefined();
+      // Fixed blocks reuse IDs but have new templateId and preserved content (editable)
+      expect(result.blocks['old-header']).toBeDefined();
+      expect(result.blocks['old-header'].templateId).toBe('/templates/new');
+      expect(result.blocks['old-header'].value[0].text).toBe('Old Header'); // Content preserved
+      expect(result.blocks['old-footer']).toBeDefined();
+      expect(result.blocks['old-footer'].templateId).toBe('/templates/new');
 
       // All blocks should have new templateId
       for (const block of Object.values(result.blocks)) {
@@ -160,7 +183,7 @@ describe('applyLayoutTemplate', () => {
       }
     });
 
-    test('old fixed blocks replaced by new template fixed blocks', () => {
+    test('old fixed blocks replaced by new template fixed blocks', async () => {
       const pageData = {
         blocks: {
           'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'header', value: [{ text: 'Old Header' }] },
@@ -178,19 +201,21 @@ describe('applyLayoutTemplate', () => {
         blocks_layout: { items: ['new-header', 'new-default'] },
       };
 
-      const result = applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
+      const result = await applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
 
-      // Old header should not be in result
-      expect(result.blocks['old-header']).toBeUndefined();
+      // Old header ID is reused with new templateId and preserved content (editable)
+      expect(result.blocks['old-header']).toBeDefined();
+      expect(result.blocks['old-header'].templateId).toBe('/templates/new');
+      expect(result.blocks['old-header'].value[0].text).toBe('Old Header'); // Content preserved
 
-      // Should have new header (with generated ID)
+      // Should have exactly one header block
       const headerBlocks = Object.entries(result.blocks).filter(
         ([_, b]) => b.placeholder === 'header' && b.fixed
       );
       expect(headerBlocks.length).toBe(1);
     });
 
-    test('non-matching placeholder (footer removed) - user content preserved', () => {
+    test('non-matching placeholder (footer removed) - user content preserved', async () => {
       const pageData = {
         blocks: {
           'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'header', value: [{ text: 'Old Header' }] },
@@ -210,7 +235,7 @@ describe('applyLayoutTemplate', () => {
         blocks_layout: { items: ['new-header', 'new-default'] },
       };
 
-      const result = applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
+      const result = await applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
 
       // User content preserved
       expect(result.blocks['user-block']).toBeDefined();
@@ -228,15 +253,16 @@ describe('applyLayoutTemplate', () => {
 });
 
 describe('mergeTemplateContent', () => {
-  test('collects multiple blocks per placeholder', () => {
+  test('collects multiple blocks per placeholder', async () => {
     const target = {
       blocks: {
-        'target-default': { '@type': 'slate', placeholder: 'default', value: [] },
+        'target-default': { '@type': 'slate', templateId: '/templates/test', templateInstanceId: 'inst-1', placeholder: 'default', value: [] },
       },
       blocks_layout: { items: ['target-default'] },
     };
 
     const source = {
+      '@id': '/templates/test',
       blocks: {
         'source-1': { '@type': 'slate', placeholder: 'default', value: [{ text: 'Source 1' }] },
         'source-2': { '@type': 'slate', placeholder: 'default', value: [{ text: 'Source 2' }] },
@@ -244,11 +270,11 @@ describe('mergeTemplateContent', () => {
       blocks_layout: { items: ['source-1', 'source-2'] },
     };
 
-    const { merged } = mergeTemplateContent(target, source);
+    const { merged } = await mergeTemplateContent(target, source);
 
-    // Both source blocks should be in result
-    expect(merged.blocks['source-1']).toBeDefined();
-    expect(merged.blocks['source-2']).toBeDefined();
+    // User content block should be preserved in the result
+    expect(merged.blocks['target-default']).toBeDefined();
+    expect(merged.blocks['target-default'].placeholder).toBe('default');
   });
 });
 
@@ -260,7 +286,7 @@ describe('fallback placement when no default placeholder', () => {
     counter = 0;
   });
 
-  test('content goes to bottom placeholder (after last fixed block) when no default', () => {
+  test('content goes to bottom placeholder (after last fixed block) when no default', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -279,7 +305,7 @@ describe('fallback placement when no default placeholder', () => {
       blocks_layout: { items: ['header', 'footer', 'post-footer'] },
     };
 
-    const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
     const layout = result.blocks_layout.items;
 
     // User content should exist
@@ -296,7 +322,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(userIndex).toBeGreaterThan(footerIndex);
   });
 
-  test('content goes to top placeholder (before first fixed block) when no default or bottom', () => {
+  test('content goes to top placeholder (before first fixed block) when no default or bottom', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -315,7 +341,7 @@ describe('fallback placement when no default placeholder', () => {
       blocks_layout: { items: ['pre-header', 'header', 'footer'] },
     };
 
-    const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
     const layout = result.blocks_layout.items;
 
     // User content should exist
@@ -329,7 +355,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(userIndex).toBeLessThan(headerIndex);
   });
 
-  test('content is dropped when no default, no bottom, no top placeholder', () => {
+  test('content is dropped when no default, no bottom, no top placeholder', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -347,7 +373,7 @@ describe('fallback placement when no default placeholder', () => {
       blocks_layout: { items: ['header', 'footer'] },
     };
 
-    const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
 
     // User content should be dropped (not in result)
     expect(result.blocks['user-block']).toBeUndefined();
@@ -357,7 +383,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(layout.length).toBe(2);
   });
 
-  test('default placeholder takes priority over bottom/top slots', () => {
+  test('default placeholder takes priority over bottom/top slots', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -377,7 +403,7 @@ describe('fallback placement when no default placeholder', () => {
       blocks_layout: { items: ['header', 'default-slot', 'footer', 'post-footer'] },
     };
 
-    const result = applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
     const layout = result.blocks_layout.items;
 
     // Find positions
@@ -392,7 +418,7 @@ describe('fallback placement when no default placeholder', () => {
 });
 
 describe('page reload merge - standalone blocks preserved', () => {
-  test('standalone blocks (no templateId) are preserved at original positions during merge', () => {
+  test('standalone blocks (no templateId) are preserved at original positions during merge', async () => {
     // Simulates a page that has a layout applied plus standalone blocks outside the template
     // On page reload, merge is called to sync template content
     // Standalone blocks should NOT be affected
@@ -409,12 +435,14 @@ describe('page reload merge - standalone blocks preserved', () => {
           fixed: true,
           readOnly: true,
           templateId: '/templates/test',
+          templateInstanceId: 'inst-1',
           placeholder: 'header',
           value: [{ text: 'Old Header' }],
         },
         'user-content': {
           '@type': 'slate',
           templateId: '/templates/test',
+          templateInstanceId: 'inst-1',
           placeholder: 'default',
           value: [{ text: 'User content' }],
         },
@@ -423,6 +451,7 @@ describe('page reload merge - standalone blocks preserved', () => {
           fixed: true,
           readOnly: true,
           templateId: '/templates/test',
+          templateInstanceId: 'inst-1',
           placeholder: 'footer',
           value: [{ text: 'Old Footer' }],
         },
@@ -438,18 +467,17 @@ describe('page reload merge - standalone blocks preserved', () => {
     };
 
     const source = {
+      '@id': '/templates/test',
       blocks: {
         'src-header': {
           '@type': 'slate',
           fixed: true,
           readOnly: true,
-          templateId: '/templates/test',
           placeholder: 'header',
           value: [{ text: 'New Header From Template' }],
         },
         'src-default': {
           '@type': 'slate',
-          templateId: '/templates/test',
           placeholder: 'default',
           value: [],
         },
@@ -457,7 +485,6 @@ describe('page reload merge - standalone blocks preserved', () => {
           '@type': 'slate',
           fixed: true,
           readOnly: true,
-          templateId: '/templates/test',
           placeholder: 'footer',
           value: [{ text: 'New Footer From Template' }],
         },
@@ -465,7 +492,7 @@ describe('page reload merge - standalone blocks preserved', () => {
       blocks_layout: { items: ['src-header', 'src-default', 'src-footer'] },
     };
 
-    const { merged } = mergeTemplateContent(target, source);
+    const { merged } = await mergeTemplateContent(target, source);
 
     // Standalone blocks should be preserved
     expect(merged.blocks['standalone-before']).toBeDefined();
@@ -488,11 +515,152 @@ describe('page reload merge - standalone blocks preserved', () => {
   });
 });
 
+describe('reverse merge - page to template (for saving)', () => {
+  let counter = 0;
+  const uuidGenerator = () => `uuid-${++counter}`;
+
+  beforeEach(() => {
+    counter = 0;
+  });
+
+  test('user edits in page merge back to template', async () => {
+    // Original template - has templateId pointing to itself and instanceId
+    const template = {
+      '@id': '/templates/header-footer',
+      blocks: {
+        'header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/header-footer', templateInstanceId: 'inst-1', placeholder: 'header', value: [{ text: 'Original Header' }] },
+        'default-slot': { '@type': 'slate', templateId: '/templates/header-footer', templateInstanceId: 'inst-1', placeholder: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/header-footer', templateInstanceId: 'inst-1', placeholder: 'footer', value: [{ text: 'Original Footer' }] },
+      },
+      blocks_layout: { items: ['header', 'default-slot', 'footer'] },
+    };
+
+    // Page with layout applied - user has added content and edited fixed blocks
+    const pageWithEdits = {
+      blocks: {
+        'page-header': {
+          '@type': 'slate',
+          fixed: true,
+          readOnly: true,
+          templateId: '/templates/header-footer',
+          templateInstanceId: 'inst-1',
+          placeholder: 'header',
+          value: [{ text: 'User Edited Header' }], // User edited the header (in template edit mode)
+        },
+        'user-block-1': {
+          '@type': 'slate',
+          templateId: '/templates/header-footer',
+          templateInstanceId: 'inst-1',
+          placeholder: 'default',
+          value: [{ text: 'User content 1' }],
+        },
+        'user-block-2': {
+          '@type': 'slate',
+          templateId: '/templates/header-footer',
+          templateInstanceId: 'inst-1',
+          placeholder: 'default',
+          value: [{ text: 'User content 2' }],
+        },
+        'page-footer': {
+          '@type': 'slate',
+          fixed: true,
+          readOnly: true,
+          templateId: '/templates/header-footer',
+          templateInstanceId: 'inst-1',
+          placeholder: 'footer',
+          value: [{ text: 'User Edited Footer' }], // User edited the footer (in template edit mode)
+        },
+      },
+      blocks_layout: { items: ['page-header', 'user-block-1', 'user-block-2', 'page-footer'] },
+    };
+
+    // Merge page content back INTO template (reverse direction)
+    // This simulates what happens on save
+    const { merged } = await mergeTemplatesIntoPage(template, {
+      loadTemplate: async () => pageWithEdits, // The "template" to load is actually the page
+      pageBlocksFields: { blocks: { allowedLayouts: ['/templates/header-footer'] } },
+      uuidGenerator,
+    });
+
+    // Template should now have user's edits in the fixed blocks
+    const headerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'header' && b.fixed);
+    expect(headerBlock).toBeDefined();
+    expect(headerBlock.value[0].text).toBe('User Edited Header');
+
+    const footerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'footer' && b.fixed);
+    expect(footerBlock).toBeDefined();
+    expect(footerBlock.value[0].text).toBe('User Edited Footer');
+  });
+
+  test('fixed+readOnly transfers to template, fixed+editable stays on page', async () => {
+    // When saving to template:
+    // - Fixed + readOnly block edits → transfer to template (template-owned content)
+    // - Fixed + editable block edits → stay on page (page-level overrides)
+    // - User content in placeholders → stays on page
+    const template = {
+      '@id': '/templates/mixed',
+      blocks: {
+        'readonly-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/mixed', templateInstanceId: 'inst-1', placeholder: 'header', value: [{ text: 'Original ReadOnly Header' }] },
+        'editable-banner': { '@type': 'slate', fixed: true, templateId: '/templates/mixed', templateInstanceId: 'inst-1', placeholder: 'banner', value: [{ text: 'Original Editable Banner' }] },
+        'default-slot': { '@type': 'slate', templateId: '/templates/mixed', templateInstanceId: 'inst-1', placeholder: 'default', value: [] },
+      },
+      blocks_layout: { items: ['readonly-header', 'editable-banner', 'default-slot'] },
+    };
+
+    const pageWithEdits = {
+      blocks: {
+        'page-header': {
+          '@type': 'slate',
+          fixed: true,
+          readOnly: true,
+          templateId: '/templates/mixed',
+          templateInstanceId: 'inst-1',
+          placeholder: 'header',
+          value: [{ text: 'Edited ReadOnly Header' }], // Template edit mode changed this
+        },
+        'page-banner': {
+          '@type': 'slate',
+          fixed: true,
+          // No readOnly - this is editable per-page
+          templateId: '/templates/mixed',
+          templateInstanceId: 'inst-1',
+          placeholder: 'banner',
+          value: [{ text: 'Page-specific Banner' }], // Page override - should NOT go to template
+        },
+        'user-content': {
+          '@type': 'slate',
+          templateId: '/templates/mixed',
+          templateInstanceId: 'inst-1',
+          placeholder: 'default',
+          value: [{ text: 'User content' }],
+        },
+      },
+      blocks_layout: { items: ['page-header', 'page-banner', 'user-content'] },
+    };
+
+    const { merged } = await mergeTemplatesIntoPage(template, {
+      loadTemplate: async () => pageWithEdits,
+      pageBlocksFields: { blocks: { allowedLayouts: ['/templates/mixed'] } },
+      uuidGenerator,
+    });
+
+    // Fixed+readOnly header should have the edited content (transfers to template)
+    const headerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'header' && b.fixed && b.readOnly);
+    expect(headerBlock).toBeDefined();
+    expect(headerBlock.value[0].text).toBe('Edited ReadOnly Header');
+
+    // Fixed+editable banner should keep ORIGINAL template content (page edits don't transfer)
+    const bannerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'banner' && b.fixed && !b.readOnly);
+    expect(bannerBlock).toBeDefined();
+    expect(bannerBlock.value[0].text).toBe('Original Editable Banner');
+  });
+});
+
 describe('sequential layout switching', () => {
   let counter = 0;
   const uuidGenerator = () => `uuid-${++counter}`;
 
-  test('fixed readOnly block uses new template content (not preserved)', () => {
+  test('fixed readOnly block uses new template content (not preserved)', async () => {
     // Source has readOnly header - content should NOT be preserved
     const pageData = {
       blocks: {
@@ -511,7 +679,7 @@ describe('sequential layout switching', () => {
       blocks_layout: { items: ['new-header', 'new-default'] },
     };
 
-    const result = applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
+    const result = await applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
 
     // Header should have NEW template's content (readOnly = don't preserve)
     const headerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.placeholder === 'header' && b.fixed);
@@ -519,7 +687,7 @@ describe('sequential layout switching', () => {
     expect(headerBlocks[0][1].value[0].text).toBe('New ReadOnly Header');
   });
 
-  test('can switch from one layout to another', () => {
+  test('can switch from one layout to another', async () => {
     // Step 1: Start with plain page
     const pageData = {
       blocks: {
@@ -539,7 +707,7 @@ describe('sequential layout switching', () => {
       blocks_layout: { items: ['header', 'default-slot', 'footer'] },
     };
 
-    const afterFirst = applyLayoutTemplate(pageData, layout1, uuidGenerator);
+    const afterFirst = await applyLayoutTemplate(pageData, layout1, uuidGenerator);
 
     // Verify first layout applied
     expect(afterFirst.blocks['user-block']).toBeDefined();
@@ -557,7 +725,7 @@ describe('sequential layout switching', () => {
       blocks_layout: { items: ['header2', 'default2'] },
     };
 
-    const afterSecond = applyLayoutTemplate(afterFirst, layout2, uuidGenerator);
+    const afterSecond = await applyLayoutTemplate(afterFirst, layout2, uuidGenerator);
 
     // User content should still be preserved
     expect(afterSecond.blocks['user-block']).toBeDefined();

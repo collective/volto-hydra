@@ -9,8 +9,7 @@
 
 import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
-import { applyLayoutTemplate } from '@volto-hydra/hydra-js';
-import { v4 as uuid } from 'uuid';
+import { mergeTemplatesIntoPage } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 const messages = defineMessages({
@@ -22,10 +21,18 @@ const messages = defineMessages({
     id: 'Apply layout',
     defaultMessage: 'Apply',
   },
+  noLayout: {
+    id: 'No layout',
+    defaultMessage: 'None',
+  },
 });
 
 // Extract display name from template URL path
-const getDisplayName = (url) => {
+// Returns "None" for null (no layout option)
+const getDisplayName = (url, intl) => {
+  if (url === null) {
+    return intl ? intl.formatMessage(messages.noLayout) : 'None';
+  }
   const parts = url.split('/');
   const lastPart = parts[parts.length - 1] || parts[parts.length - 2];
   // Convert kebab-case to Title Case
@@ -49,12 +56,17 @@ const LayoutSelector = ({
 
     setLoading(true);
     try {
-      // Load template data on demand
       const api = new Api();
-      const templateData = await api.get(selectedUrl);
 
-      // Apply the layout template
-      const newFormData = applyLayoutTemplate(formData, templateData, uuid);
+      // Convert 'none' back to null for the allowedLayouts
+      const layoutToApply = selectedUrl === 'none' ? null : selectedUrl;
+
+      // Use mergeTemplatesIntoPage with the selected layout as the only allowedLayout
+      // This forces that layout to be applied (or removed if null)
+      const { merged: newFormData } = await mergeTemplatesIntoPage(formData, {
+        loadTemplate: async (templateId) => api.get(templateId),
+        pageBlocksFields: { blocks: { allowedLayouts: [layoutToApply] } },
+      });
 
       // Merge with existing formData (preserve other fields)
       onChangeFormData({
@@ -76,6 +88,21 @@ const LayoutSelector = ({
     return null;
   }
 
+  // Filter out null to count actual layouts
+  const actualLayouts = allowedLayouts.filter((l) => l !== null);
+  const hasNullOption = allowedLayouts.includes(null);
+
+  // If only one actual layout and no null option, it's forced - show which one (no dropdown needed)
+  if (actualLayouts.length === 1 && !hasNullOption) {
+    return (
+      <div className="layout-selector layout-forced">
+        <span className="forced-layout-label">
+          Layout: {getDisplayName(actualLayouts[0], intl)}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="layout-selector">
       <select
@@ -85,8 +112,8 @@ const LayoutSelector = ({
       >
         <option value="">{intl.formatMessage(messages.selectLayout)}</option>
         {allowedLayouts.map((url) => (
-          <option key={url} value={url}>
-            {getDisplayName(url)}
+          <option key={url === null ? 'none' : url} value={url === null ? 'none' : url}>
+            {getDisplayName(url, intl)}
           </option>
         ))}
       </select>
