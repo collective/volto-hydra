@@ -29,23 +29,23 @@ test.describe('allowedLayouts', () => {
       await expect(layoutSelector).toBeVisible();
     });
 
-    test('hides Layout dropdown when allowedLayouts is empty', async ({ page }, testInfo) => {
-      test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend has allowedLayouts configured');
+    test('hides Layout dropdown when allowedLayouts is empty', async ({ page }) => {
       const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
 
       await helper.login();
-      // footer_blocks field has no allowedLayouts
-      await helper.navigateToEdit('/test-page');
+      // template-test-page has a grid block from the template - grid containers don't have allowedLayouts
+      await helper.navigateToEdit('/template-test-page');
       await helper.waitForIframeReady();
 
-      // Click to show page-level sidebar
-      await page.keyboard.press('Escape');
+      // Click on a grid cell to select it and show the grid container in sidebar
+      await helper.clickBlockByContent('Template Grid Cell 1');
+      await helper.waitForSidebarOpen();
 
-      // Check the footer section - should not have layout selector
-      // Use exact match for the section title to avoid matching "Header Footer Layout" in Blocks section
-      const footerSection = page.locator('.container-field-section').filter({ has: page.locator('.widget-title', { hasText: /^Footer$/ }) });
-      const footerLayoutSelector = footerSection.locator('.layout-selector');
-      await expect(footerLayoutSelector).not.toBeVisible();
+      // The grid container section should not have a layout selector (no allowedLayouts configured)
+      const gridSection = page.locator('.container-field-section').filter({ has: page.locator('.widget-title', { hasText: /Grid/i }) });
+      const gridLayoutSelector = gridSection.locator('.layout-selector');
+      await expect(gridLayoutSelector).not.toBeVisible();
     });
   });
 
@@ -517,9 +517,154 @@ test.describe('allowedLayouts', () => {
     });
   });
 
+  test.describe('Forced Layouts', () => {
+    test('footer_blocks with allowedLayouts auto-applies layout in edit mode', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      // another-page has footer_blocks data (no template markers) and allowedLayouts forces footer-layout
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      // Verify the forced layout was applied - fixed branding block should appear
+      const footerContent = iframe.locator('#footer-content');
+      const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
+      await expect(brandingBlock).toBeVisible({ timeout: 10000 });
+
+      // User content should still be there (moved to default placeholder)
+      const userContent = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer user content' });
+      await expect(userContent).toBeVisible();
+
+      // Branding block should be first (fixed at top)
+      const allFooterBlocks = footerContent.locator('[data-block-uid]');
+      const firstBlockText = await allFooterBlocks.first().textContent();
+      expect(firstBlockText).toContain('Footer Branding');
+    });
+
+    test('footer_blocks with allowedLayouts auto-applies layout in view mode', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      // Navigate to view mode (not edit mode) through the admin UI
+      await helper.login();
+      await helper.navigateToView('/another-page');
+      await helper.waitForIframeReady();
+
+      // Wait for footer to render with forced layout in iframe
+      const footerContent = iframe.locator('#footer-content');
+      await footerContent.waitFor({ timeout: 10000 });
+
+      // Verify the forced layout was applied
+      const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
+      await expect(brandingBlock).toBeVisible({ timeout: 10000 });
+
+      // User content should still be there
+      const userContent = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer user content' });
+      await expect(userContent).toBeVisible();
+    });
+
+    test('fixed block from forced layout is locked', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      // Click the fixed branding block in the footer area
+      const footerContent = iframe.locator('#footer-content');
+      const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
+      await expect(brandingBlock).toBeVisible({ timeout: 10000 });
+      await brandingBlock.click();
+      await helper.waitForSidebarOpen();
+
+      // Wait for toolbar to appear and verify lock icon
+      const toolbar = page.locator('.quanta-toolbar');
+      await expect(toolbar).toBeVisible({ timeout: 5000 });
+      const lockIcon = toolbar.locator('.lock-icon');
+      await expect(lockIcon).toBeVisible({ timeout: 5000 });
+    });
+  });
+
+  test.describe('None Option in allowedLayouts', () => {
+    test('pages without template stay template-free when null is in allowedLayouts', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      // test-page has no template markers in its data, and allowedLayouts includes null
+      // so it should NOT auto-apply a template
+      await helper.navigateToEdit('/test-page');
+      await helper.waitForIframeReady();
+
+      // Verify NO template fixed blocks were auto-applied
+      // (test-layout has "Template Header - From Template" as fixed header)
+      const templateHeader = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Header - From Template' });
+      await expect(templateHeader).not.toBeVisible();
+
+      // User's original content should be at the top (not pushed down by template)
+      const firstBlock = iframe.locator('[data-block-uid]').first();
+      const firstBlockText = await firstBlock.textContent();
+      // First block should be user content, not template content
+      expect(firstBlockText).not.toContain('Template Header');
+      expect(firstBlockText).not.toContain('Layout Header');
+    });
+
+    test('Layout dropdown shows None option when null is in allowedLayouts', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+      await helper.waitForIframeReady();
+
+      // Show page-level sidebar
+      await page.keyboard.press('Escape');
+
+      // Open layout dropdown
+      const layoutSelector = page.locator('.layout-selector select');
+      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+
+      // Verify "None" option exists
+      const options = await layoutSelector.locator('option').allTextContents();
+      expect(options.some(o => o.toLowerCase() === 'none' || o.toLowerCase() === 'no layout')).toBe(true);
+    });
+
+    test('selecting None removes template and restores content', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+      await helper.waitForIframeReady();
+
+      // First apply a layout
+      await page.keyboard.press('Escape');
+      const layoutSelector = page.locator('.layout-selector select');
+      await layoutSelector.selectOption('Header Footer Layout');
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for layout to be applied - check sidebar shows the fixed blocks
+      await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+
+      // Now select None to remove the layout
+      await page.keyboard.press('Escape');
+      await layoutSelector.selectOption({ label: 'None' });
+      await page.locator('.apply-layout-btn').click();
+
+      // Wait for template fixed blocks to be removed from sidebar
+      await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).not.toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).not.toBeVisible({ timeout: 5000 });
+
+      // User content should still be there
+      const userContent = iframe.locator('[data-block-uid]').filter({ hasText: 'test paragraph' });
+      await expect(userContent).toBeVisible();
+    });
+  });
+
   test.describe('Empty Page Blocks Fields', () => {
-    test('page without footer_blocks data gets empty block injected', async ({ page }, testInfo) => {
-      test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend has different page field config');
+    test('page without footer_blocks data gets empty block injected', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();
 
@@ -549,8 +694,7 @@ test.describe('allowedLayouts', () => {
       expect(chooserVisible).toBe(true);
     });
 
-    test('readonly empty block (in template edit mode) does NOT open BlockChooser', async ({ page }, testInfo) => {
-      test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend has different page field config');
+    test('readonly empty block (in template edit mode) does NOT open BlockChooser', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();
 

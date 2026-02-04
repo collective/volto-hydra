@@ -62,7 +62,7 @@
 
     <script src="renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, loadAndMergeTemplates } from './hydra.js';
+        import { initBridge, expandListingBlocks, expandTemplates, loadAndMergeTemplates } from './hydra.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
         function getPagesFromUrl() {
@@ -143,14 +143,65 @@
             // Render main content with expanded items
             await renderContent({ ...content, items });
 
-            // Render footer_blocks if present
+            // Render footer_blocks if present (or if forced layout will inject content)
+            // Determine if we should force footer layout based on page path (same logic as bridge init)
+            const pagePath = contextPath.replace(/\/edit$/, '');
+            const forceFooterLayout = pagePath === '/another-page';
+            const footerAllowedLayouts = forceFooterLayout ? ['/templates/footer-layout'] : null;
+
             if (content.footer_blocks && content.footer_blocks_layout?.items?.length > 0) {
+                let footerBlocks = content.footer_blocks;
+                let footerLayout = content.footer_blocks_layout?.items || [];
+
+                // Apply forced layout if configured
+                if (footerAllowedLayouts) {
+                    const templateState = {};
+                    const loadTemplate = async (templateId) => {
+                        const res = await fetch(`${window.location.origin}${templateId}`, {
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        return res.json();
+                    };
+                    const expandedItems = await expandTemplates(footerBlocks, footerLayout, {
+                        templateState,
+                        loadTemplate,
+                        allowedLayouts: footerAllowedLayouts,
+                    });
+                    // Convert items back to blocks/layout format for expandListingBlocks
+                    footerBlocks = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
+                    footerLayout = expandedItems.map(item => item['@uid']);
+                }
+
                 const { items: footerItems } = await expandListingBlocks(
-                    content.footer_blocks,
-                    content.footer_blocks_layout?.items || [],
+                    footerBlocks,
+                    footerLayout,
                     { ...baseOptions, itemTypeField: 'variation' }
                 );
                 await renderContent({ items: footerItems }, 'footer-content');
+            } else if (footerAllowedLayouts) {
+                // No footer blocks but forced layout - apply layout to empty content
+                const templateState = {};
+                const loadTemplate = async (templateId) => {
+                    const res = await fetch(`${window.location.origin}${templateId}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    return res.json();
+                };
+                const expandedItems = await expandTemplates({}, [], {
+                    templateState,
+                    loadTemplate,
+                    allowedLayouts: footerAllowedLayouts,
+                });
+                if (expandedItems.length > 0) {
+                    const footerBlocks = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
+                    const footerLayout = expandedItems.map(item => item['@uid']);
+                    const { items: footerItems } = await expandListingBlocks(
+                        footerBlocks,
+                        footerLayout,
+                        { ...baseOptions, itemTypeField: 'variation' }
+                    );
+                    await renderContent({ items: footerItems }, 'footer-content');
+                }
             } else {
                 // Clear footer if no footer blocks
                 const footerContainer = document.getElementById('footer-content');
@@ -580,6 +631,10 @@
 
                     // Initialize bridge - admin origin auto-detected from referrer
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
+                    // Determine if we should force footer layout based on page path
+                    const pagePath = window.location.pathname.replace(/\/edit$/, '');
+                    const forceFooterLayout = pagePath === '/another-page';
+
                     window.bridge = initBridge({
                         pageBlocksFields: [
                             {
@@ -587,12 +642,14 @@
                                 title: 'Blocks',
                                 allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
                                 allowedTemplates: ['/templates/test-layout'],
-                                allowedLayouts: ['/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
+                                allowedLayouts: [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
                             },
                             {
                                 fieldName: 'footer_blocks',
                                 title: 'Footer',
                                 allowedBlocks: ['slate', 'image'],
+                                // Only force footer layout on /another-page
+                                ...(forceFooterLayout ? { allowedLayouts: ['/templates/footer-layout'] } : {}),
                             },
                         ],
                         voltoConfig: voltoConfig,
