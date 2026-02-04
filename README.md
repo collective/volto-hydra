@@ -896,7 +896,7 @@ const bridge = initBridge({
 If you want to make the editing experience the most intuitive, you can enable real-time visual block editing, where an editor
 can change text, links or media directly on your frontend page instead of via fields on the sidebar.
 
-This is done using the ```data-editable-field="<<fieldname>>"``` and a widget specified in your schema will be used to allow
+This is done using ```data-editable|media|linkable-field="<<fieldname>>"``` and the element it is applied will now allow
 direct html changes in your frontend which are then sent back to the CMS and reflected in the settings in the sidebar.
 
 ``` html
@@ -904,7 +904,7 @@ direct html changes in your frontend which are then sent back to the CMS and ref
   <img data-media-field="image" src="/big_news.jpg"/>
   <h2 data-editable-field="title">Big News</h2>
   <div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
-  <div><a data-linkable-field="url" href="/big_news">Read more</a><div>
+  <div><a data-linkable-field="url" href="/big_news" data-editable-field="buttonText">Read more</a><div>
 </div>
 ```
 
@@ -1129,10 +1129,11 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 Templates allow editors to centrally control content and reuse content. They allow
 a developer to not have to hard code some layout decisions and instead can use rules
-to apply user layouts in template content stored seperate from the page, or give the 
+to apply user layouts in template content stored separate from the page, or give the 
 user a choice on which layout they want.
 
-Templates 
+Templates
+
 - can be created from any blocks
 - are always edited in-context in the current page 
   (user can switch in and out of template edit mode)
@@ -1143,7 +1144,7 @@ Templates
   which templates are automatically applied as layouts or available for switching.
 - During rendering frontend can use the provided helper to refresh templates found 
   in the page content from the template content, apply layouts based on rules (such 
-  as fixing a layout based on content type, or metadata. Alternively they can write
+  as fixing a layout based on content type, or metadata. Alternatively they can write
   their own merge logic.
 
 
@@ -1183,19 +1184,32 @@ initBridge({
 ```
 
 - **allowedTemplates**: Templates shown in BlockChooser's "Templates" group, inserted as blocks
-- **allowedLayouts**: Templates shown in Layout dropdown, replace/merge entire container content
+- **allowedLayouts**: Templates shown in Layout dropdown, replace/merge entire container content. A value of `null` allows for a no template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.
 
 ### Applying Merge rules
 
-To refresh page content call loadAndMergeTemplates() with a callback function to load
-the template content. 
-
+Use `expandTemplates` to merge template content during rendering.
+This will refresh all template instances it finds from the template content.
 
 ```js
-import { loadAndMergeTemplates } from '@hydra-js/hydra.js';
+import { expandTemplates } from '@volto-hydra/hydra-js';
 
-const pageData = await loadAndMergeTemplates(rawPageData, fetchTemplate);
+const templateState = {};
+const items = await expandTemplates(blocks, layout, {
+  templateState,
+  loadTemplate: async (id) => fetch(id).then(r => r.json())
+});
+
+// Render items - each has @uid for the block ID
+for (const item of items) {
+  renderBlock(item['@uid'], item);
+}
 ```
+
+**Options:**
+- `templateState`: Pass `{}` - tracks state across calls for nested containers
+- `loadTemplate(id)`: Async function to fetch template content
+- `allowedLayouts`: Force a layout when container has no template applied
 
 The merge algorithm follows these rules
 
@@ -1207,7 +1221,7 @@ The merge algorithm follows these rules
     the same placeholder name
    - if a placeholder then don't insert it, but insert the previous blocks with the same
     placeholder name
-3. Recursivly replace any block fields using the same rules.
+3. Recursively replace any block fields using the same rules.
 4. Any placeholder blocks left over are inserted at the end of a special placeholder called
   ```default``` if it exits, otherwise are dropped.
 
@@ -1227,11 +1241,20 @@ Layout:  [Fixed Header] [default] [Fixed Footer] [post_footer]
 After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 ```
 
-Your frontend might want to force a layout to apply regardless on if a template is there,
-for example to ensure there footer layout.
-During editing you can force a layout by only having a single choice with no "null" for `allowedLayouts`, but the schema is when not editing.
+Your frontend might want to force a layout to apply regardless of whether one is saved,
+for example to ensure a footer layout. Pass `allowedLayouts` to `expandTemplates`:
 
-... TODO
+```js
+const items = await expandTemplates(blocks, layout, {
+  templateState: {},
+  loadTemplate,
+  allowedLayouts: ['/templates/footer-layout'],
+});
+```
+
+Note, during editing admin side will load the templates so in order to apply the 
+same rules of forcing a layout you will need to set `allowedLayouts` in `pageBlocksFields` 
+blocks fields to ensure the page loads with the right template.
 
 ## Advanced
 
