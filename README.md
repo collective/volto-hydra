@@ -1142,11 +1142,9 @@ The steps involved in creating a frontend are roughly the same for all these fra
    2. Generating a url for an image. The blocks have image data in many formats so a helper function for this is useful.
       1. You maybe also decide to use your framework or hosting solution for image resizing
 8. Listing Blocks
-   - You can come up with your own pagination scheme. 
-     - For example by embedding page into your url instead of as a query param you can having listings be statically generated.
-   - In your component setup take the page and listing block json and do a [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
-   - Render the items
-   - Render the pagination
+   - Use the [Listing Helpers](#listing-helpers) or do your own [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
+   - You can come up with your own pagination scheme (e.g., embed page in URL for static generation)
+   - Render the items and pagination
 9.  Redirects
    1.  if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
    2.  if you are using SSG then you will need to some special code to [query all the redirects](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json) at generate time add in redirect routes
@@ -1294,6 +1292,63 @@ const items = await expandTemplates(blocks, layout, {
 Note, during editing admin side will load the templates so in order to apply the 
 same rules of forcing a layout you will need to set `allowedLayouts` in `pageBlocksFields` 
 blocks fields to ensure the page loads with the right template.
+
+## Listing Helpers
+
+Helpers for expanding listing blocks and handling pagination.
+
+```js
+import { expandListingBlocks, staticBlocks } from '@volto-hydra/hydra-js';
+
+// Shared paging state across both helpers
+const paging = { start: 0, size: 10, total: 0, _seen: 0 };
+
+// staticBlocks handles non-listing blocks, tracking position in paging
+const { items: staticItems } = staticBlocks(blocks, layout, paging);
+
+// expandListingBlocks fetches and expands listings, continuing from paging position
+const { items: listingItems } = await expandListingBlocks(blocks, layout, {
+  contextPath: '/news',
+  paging,  // Same paging object - mutated to track combined totals
+  itemTypeField: 'variation',  // Field on listing block that holds item type (default: 'itemType')
+  defaultItemType: 'teaser',   // Fallback type if field not set (default: 'summaryItem')
+  // Either provide apiUrl for built-in fetch:
+  apiUrl: 'https://my-plone-site.com',
+  // Or provide custom fetcher callback:
+  fetcher: async (path, body, headers) => {
+    const res = await fetch(path, { method: 'POST', body: JSON.stringify(body), headers });
+    return res.json();
+  },
+});
+
+// Combine for rendering - paging now has correct totals for both
+const allItems = [...staticItems, ...listingItems];
+```
+
+**Mixed containers**: When a container has both static blocks and listing blocks, pass the same `paging` object to both helpers. `staticBlocks` processes non-listing blocks first, then `expandListingBlocks` continues from that position, giving you unified pagination across all content.
+
+**Schema enhancers**: Use `itemType` (or `variation`) on the listing block to control what block type expanded items become. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:
+
+```js
+listing: {
+  schemaEnhancer: ({ schema }) => {
+    schema.properties.itemType = { title: 'Display as', choices: [['teaser', 'Teaser'], ['card', 'Card']] };
+    return schema;
+  },
+  inheritSchemaFrom: { typeField: 'itemType', blocksField: null },  // Show item type's schema
+}
+```
+
+**Suspense/streaming**: Since `expandListingBlocks` is async, it works well with Vue/React Suspense for streaming SSR. Wrap listing blocks in Suspense so static content renders immediately while listings stream in:
+
+```vue
+<Suspense>
+  <template #default><AsyncExpandedItems :blocks="blocks" :paging="paging" /></template>
+  <template #fallback><LoadingSkeleton /></template>
+</Suspense>
+```
+
+Note: Expanded listing items all share the same `@uid` (the listing block's ID). When editing, selecting any item selects the listing block itself.
 
 ## Advanced
 
