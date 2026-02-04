@@ -2,8 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 
 // Check if we need Nuxt server (only for nuxt/nuxt-specific projects)
+const projectArgIndex = process.argv.indexOf('--project');
 const projectArg = process.argv.find(arg => arg.startsWith('--project='))?.split('=')[1]
-  || process.argv[process.argv.indexOf('--project') + 1];
+  || (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
 const needsNuxt = !projectArg || projectArg.includes('nuxt');
 
 // Only import coverage reporter when COVERAGE is enabled (CI)
