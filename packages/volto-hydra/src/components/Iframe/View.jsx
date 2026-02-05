@@ -194,44 +194,73 @@ const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
         const field = schema.properties[fieldName];
         blockFieldTypes[blockType][fieldName] = getFieldTypeString(field);
 
-        // Handle object_list widgets (e.g., slides in slider block)
-        if (field.widget === 'object_list' && field.schema?.properties) {
-          // object_list widget: extract field types from itemSchema
-          // Store under virtual type key: blockType:fieldName
-          const itemTypeKey = `${blockType}:${fieldName}`;
-          blockFieldTypes[itemTypeKey] = {};
+        // Handle object_list widgets (e.g., slides in slider block, form fields)
+        // Supports both single schema (field.schema) and multi-schema (field.schemas)
+        if (field.widget === 'object_list') {
+          const baseItemTypeKey = `${blockType}:${fieldName}`;
+          const hasMultiSchema = field.schemas && Object.keys(field.schemas).length > 0;
 
-          // Also register virtual type in blocksConfig so getAllContainerFields works
-          if (!config.blocks.blocksConfig[itemTypeKey]) {
-            config.blocks.blocksConfig[itemTypeKey] = {
-              blockSchema: field.schema,
-              sidebarSchemaOnly: true, // Virtual types use schema form in sidebar
-            };
-          }
+          // Get schemas to process - either multi-schema object or single schema wrapped
+          const schemasToProcess = hasMultiSchema
+            ? field.schemas
+            : field.schema?.properties
+              ? { _default: field.schema }
+              : null;
 
-          Object.keys(field.schema.properties).forEach((itemFieldName) => {
-            const itemField = field.schema.properties[itemFieldName];
-            blockFieldTypes[itemTypeKey][itemFieldName] = getFieldTypeString(itemField);
+          if (schemasToProcess) {
+            Object.entries(schemasToProcess).forEach(([schemaType, itemSchema]) => {
+              if (!itemSchema?.properties) return;
 
-            // Handle nested object_list (e.g., rows containing cells)
-            if (itemField.widget === 'object_list' && itemField.schema?.properties) {
-              const nestedItemTypeKey = `${itemTypeKey}:${itemFieldName}`;
-              blockFieldTypes[nestedItemTypeKey] = {};
+              // For multi-schema, include type in key (e.g., 'form:subblocks:text')
+              // For single schema, use base key (e.g., 'slider:slides')
+              const itemTypeKey = hasMultiSchema && schemaType !== '_default'
+                ? `${baseItemTypeKey}:${schemaType}`
+                : baseItemTypeKey;
 
-              // Register nested virtual type in blocksConfig
-              if (!config.blocks.blocksConfig[nestedItemTypeKey]) {
-                config.blocks.blocksConfig[nestedItemTypeKey] = {
-                  blockSchema: itemField.schema,
-                  sidebarSchemaOnly: true,
+              blockFieldTypes[itemTypeKey] = {};
+
+              // Register virtual type in blocksConfig so getAllContainerFields works
+              // Include title and icon for BlockChooser display
+              if (!config.blocks.blocksConfig[itemTypeKey]) {
+                config.blocks.blocksConfig[itemTypeKey] = {
+                  id: itemTypeKey,
+                  title: itemSchema.title || schemaType,
+                  icon: config.blocks.blocksConfig[blockType]?.icon || blockSVG,
+                  group: 'common',
+                  blockSchema: itemSchema,
+                  sidebarSchemaOnly: true, // Virtual types use schema form in sidebar
                 };
               }
 
-              Object.keys(itemField.schema.properties).forEach((nestedFieldName) => {
-                const nestedField = itemField.schema.properties[nestedFieldName];
-                blockFieldTypes[nestedItemTypeKey][nestedFieldName] = getFieldTypeString(nestedField);
+              Object.keys(itemSchema.properties).forEach((itemFieldName) => {
+                const itemField = itemSchema.properties[itemFieldName];
+                blockFieldTypes[itemTypeKey][itemFieldName] = getFieldTypeString(itemField);
+
+                // Handle nested object_list (e.g., rows containing cells)
+                if (itemField.widget === 'object_list' && itemField.schema?.properties) {
+                  const nestedItemTypeKey = `${itemTypeKey}:${itemFieldName}`;
+                  blockFieldTypes[nestedItemTypeKey] = {};
+
+                  // Register nested virtual type in blocksConfig
+                  if (!config.blocks.blocksConfig[nestedItemTypeKey]) {
+                    config.blocks.blocksConfig[nestedItemTypeKey] = {
+                      id: nestedItemTypeKey,
+                      title: itemField.schema.title || itemFieldName,
+                      icon: config.blocks.blocksConfig[blockType]?.icon || blockSVG,
+                      group: 'common',
+                      blockSchema: itemField.schema,
+                      sidebarSchemaOnly: true,
+                    };
+                  }
+
+                  Object.keys(itemField.schema.properties).forEach((nestedFieldName) => {
+                    const nestedField = itemField.schema.properties[nestedFieldName];
+                    blockFieldTypes[nestedItemTypeKey][nestedFieldName] = getFieldTypeString(nestedField);
+                  });
+                }
               });
-            }
-          });
+            });
+          }
         }
       });
 
@@ -2060,35 +2089,9 @@ const Iframe = (props) => {
         : parentSchema;
       allowed = resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
     } else {
-      // Iframe add: get allowed blocks from parent container of afterBlockId
-      const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
-      const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
-      if (parentId) {
-        parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
-        parentType = iframeSyncState.blockPathMap?.[parentId]?.blockType;
-        const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
-        const parentSchema = parentBlockConfig?.blockSchema;
-        const resolvedSchema = typeof parentSchema === 'function'
-          ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-          : parentSchema;
-
-        // First check schema-defined container fields (e.g., columns, accordion)
-        for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
-          if (fieldDef.type === 'blocks') {
-            const layoutField = `${fieldName}_layout`;
-            if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
-              allowed = fieldDef.allowedBlocks || null;
-              break;
-            }
-          }
-        }
-
-        // Check for implicit container (uses blocks/blocks_layout directly)
-        // These have allowedBlocks on the block config, not in schema
-        if (!allowed && parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
-          allowed = parentBlockConfig?.allowedBlocks || null;
-        }
-      }
+      // Iframe add: use already-computed iframeAllowedBlocks
+      // (handles type: 'blocks', widget: 'object_list', and implicit containers correctly)
+      return iframeAllowedBlocks;
     }
 
     // Apply variation filtering if parent has blocksField configured
@@ -2097,7 +2100,7 @@ const Iframe = (props) => {
     }
 
     return allowed || allowedBlocks;
-  }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation]);
+  }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation, iframeAllowedBlocks]);
 
   // ============================================================================
   // BLOCK ADD FLOW (Unified for Sidebar and Iframe)
@@ -2132,13 +2135,12 @@ const Iframe = (props) => {
     const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
     const fieldConfig = containerFields.find(f => f.fieldName === fieldName);
 
-    const isObjectList = fieldConfig?.isObjectList || false;
     const containerAllowed = fieldConfig?.allowedBlocks || null;
 
-    // Auto-insert if object_list or single allowedBlock
-    if (isObjectList || containerAllowed?.length === 1) {
-      const blockType = isObjectList ? null : containerAllowed[0];
-      insertAndSelectBlock(parentBlockId, blockType, 'inside', fieldName);
+    // Auto-insert if single allowedBlock (includes single-schema object_list)
+    // Show block chooser for multiple types (multi-schema object_list or multiple allowedBlocks)
+    if (containerAllowed?.length === 1) {
+      insertAndSelectBlock(parentBlockId, containerAllowed[0], 'inside', fieldName);
     } else {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
       setAddNewBlockOpened(true);

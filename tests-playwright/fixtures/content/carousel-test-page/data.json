@@ -20,18 +20,28 @@
       "slides": [
         {
           "@id": "slide-1",
+          "slide_type": "slide",
           "title": "Slide 1",
           "description": "First slide content",
           "head_title": "Welcome"
         },
         {
           "@id": "slide-2",
+          "slide_type": "slide",
           "title": "Slide 2",
           "description": "Second slide content",
           "head_title": "Features"
         },
         {
+          "@id": "image-1",
+          "slide_type": "image",
+          "image": "/test-image.jpg",
+          "alt": "Test image alt text",
+          "caption": "A beautiful image"
+        },
+        {
           "@id": "slide-3",
+          "slide_type": "slide",
           "title": "Slide 3",
           "description": "Third slide content",
           "head_title": "Get Started"

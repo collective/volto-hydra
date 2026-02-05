@@ -601,3 +601,68 @@ test.describe('Sidebar Forms - Field Validation', () => {
     }
   });
 });
+
+test.describe('Sidebar Forms - Multi-Schema object_list', () => {
+  test('different item types show different schema fields in sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // Click on slide-1 (slide type) - should show slide fields
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    expect(await helper.hasSidebarField('title')).toBe(true);
+    expect(await helper.hasSidebarField('description')).toBe(true);
+    expect(await helper.hasSidebarField('alt')).toBe(false);
+    expect(await helper.hasSidebarField('caption')).toBe(false);
+
+    // Navigate to image-1 (3rd slide at index 2) using carousel navigation
+    // image-1 is hidden until we navigate to it
+    const iframe = helper.getIframe();
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await nextButton.click();
+    await helper.waitForQuantaToolbar('slide-2');
+    await nextButton.click();
+    await helper.waitForQuantaToolbar('image-1');
+
+    // image-1 (image type) should now show image fields in sidebar
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    expect(await helper.hasSidebarField('alt')).toBe(true);
+    expect(await helper.hasSidebarField('caption')).toBe(true);
+    expect(await helper.hasSidebarField('title')).toBe(false);
+    expect(await helper.hasSidebarField('description')).toBe(false);
+
+    // Verify image field values match fixture data
+    expect(await helper.getSidebarFieldValue('alt')).toBe('Test image alt text');
+    expect(await helper.getSidebarFieldValue('caption')).toBe('A beautiful image');
+  });
+
+  test('add menu shows all available schema types', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+
+    // Click on slide-1 to select it
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Click the add button to open block chooser
+    await helper.clickAddBlockButton();
+
+    // Block chooser should show both Slide and Image options
+    const isChooserVisible = await helper.isBlockChooserVisible();
+    expect(isChooserVisible).toBe(true);
+
+    const hasSlideOption = await helper.isBlockTypeVisible('Slide');
+    const hasImageOption = await helper.isBlockTypeVisible('Image');
+
+    expect(hasSlideOption).toBe(true);
+    expect(hasImageOption).toBe(true);
+  });
+});

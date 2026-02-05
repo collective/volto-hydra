@@ -384,16 +384,28 @@
                                             slides: {
                                                 title: 'Slides',
                                                 widget: 'object_list',
-                                                schema: {
-                                                    title: 'Slide',
-                                                    fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
-                                                    properties: {
-                                                        head_title: { title: 'Kicker', type: 'string' },
-                                                        title: { title: 'Title', type: 'string' },
-                                                        description: { title: 'Description', type: 'string', widget: 'textarea' },
-                                                        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
-                                                        buttonText: { title: 'Button Text', type: 'string' },
-                                                        hideButton: { title: 'Hide Button', type: 'boolean' },
+                                                typeField: 'slide_type',
+                                                schemas: {
+                                                    slide: {
+                                                        title: 'Slide',
+                                                        fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+                                                        properties: {
+                                                            head_title: { title: 'Kicker', type: 'string' },
+                                                            title: { title: 'Title', type: 'string' },
+                                                            description: { title: 'Description', type: 'string', widget: 'textarea' },
+                                                            preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                                                            buttonText: { title: 'Button Text', type: 'string' },
+                                                            hideButton: { title: 'Hide Button', type: 'boolean' },
+                                                        },
+                                                    },
+                                                    image: {
+                                                        title: 'Image',
+                                                        fieldsets: [{ id: 'default', title: 'Default', fields: ['image', 'alt', 'caption'] }],
+                                                        properties: {
+                                                            image: { title: 'Image', widget: 'object_browser', mode: 'image', allowExternals: true },
+                                                            alt: { title: 'Alt Text', type: 'string' },
+                                                            caption: { title: 'Caption', type: 'string' },
+                                                        },
                                                     },
                                                 },
                                             },

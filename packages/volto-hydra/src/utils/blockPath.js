@@ -394,6 +394,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
   /**
    * Process a widget: 'object_list' container field.
    * Items are stored as array with configurable ID field.
+   * Supports multi-schema: different item types can have different schemas.
    * @param {Array} dataPath - Path to actual data location (defaults to [fieldName])
    */
   function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null) {
@@ -416,13 +417,24 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     }
 
     const idField = fieldDef.idField || '@id';
-    const itemSchema = fieldDef.schema;
+    // Support multi-schema: typeField determines which schema to use for each item
+    // - typeField: field containing item type (default '@type')
+    // - schemas: object keyed by type value, each containing a schema
+    // - schema: single schema for all items (legacy, wrapped as { _default: schema })
+    const typeField = fieldDef.typeField || '@type';
+    const schemas = fieldDef.schemas || (fieldDef.schema ? { _default: fieldDef.schema } : null);
+    const hasMultiSchema = fieldDef.schemas && Object.keys(fieldDef.schemas).length > 0;
 
-    // Compute virtual type for items in this container
+    // Compute base virtual type for items in this container
     // Parent type is either a real block type or a virtual type (for nested object_list)
     const parentPathInfo = pathMap[parentId];
     const parentType = parentPathInfo?.blockType || parent['@type'];
-    const blockType = `${parentType}:${fieldName}`;
+    const baseBlockType = `${parentType}:${fieldName}`;
+
+    // Compute allowed sibling types - all type variants for multi-schema
+    const allowedSiblingTypes = hasMultiSchema
+      ? Object.keys(schemas).map((type) => `${baseBlockType}:${type}`)
+      : [baseBlockType];
 
     // Track addMode for table-aware behavior
     // addMode comes from block config (e.g., blocksConfig.slateTable.addMode = 'table')
@@ -442,6 +454,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     itemsArray.forEach((item, index) => {
       const itemId = item[idField];
       if (!itemId) return;
+
+      // Determine item type and schema for multi-schema support
+      const itemType = hasMultiSchema ? item[typeField] : '_default';
+      const itemSchema = schemas?.[itemType] || schemas?._default;
+      // Virtual type includes item type for multi-schema (e.g., 'form:subblocks:text')
+      const blockType = hasMultiSchema ? `${baseBlockType}:${itemType}` : baseBlockType;
 
       // Build path using the actual data path (not schema field name)
       const itemPath = [...parentPath, ...effectiveDataPath, index];
@@ -470,12 +488,15 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
         path: itemPath,
         parentId,
         containerField: fieldName,
-        blockType, // Virtual type like 'slateTable:rows' or 'slateTable:rows:cells'
+        blockType, // Virtual type like 'form:subblocks:text' or 'slateTable:rows'
         isObjectListItem: true,
         idField,
-        itemSchema: stripFunctionsFromSchema(itemSchema), // For sidebar form rendering (stripped for postMessage)
+        typeField, // Field containing item type (for multi-schema)
+        itemType, // Actual type value (e.g., 'text', 'select')
+        itemSchema: stripFunctionsFromSchema(itemSchema), // Type-specific schema for sidebar
+        availableSchemas: hasMultiSchema ? stripFunctionsFromSchema(schemas) : null, // All schemas for Add menu
         dataPath: effectiveDataPath, // Store for later use
-        allowedSiblingTypes: [blockType], // Only allow same type as siblings
+        allowedSiblingTypes, // All type variants for multi-schema Add menu
         addMode, // Table mode for this container (e.g., rows)
         parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
         actions, // Available actions for toolbar/dropdown
@@ -723,17 +744,24 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         });
       } else if (fieldDef.widget === 'object_list') {
         // object_list: items stored as array, virtual type is blockType:fieldName
-        const itemType = `${blockType}:${fieldName}`;
+        const baseItemType = `${blockType}:${fieldName}`;
+        // Build schemas object - either multi-schema or wrap single schema as { _default: schema }
+        const schemas = fieldDef.schemas || (fieldDef.schema ? { _default: fieldDef.schema } : {});
+        // Create virtual type for each schema (e.g., 'slider:slides:slide', 'slider:slides:image')
+        // For single schema with _default, just use base type
+        const allowedBlocks = Object.keys(schemas).map((schemaType) =>
+          schemaType === '_default' ? baseItemType : `${baseItemType}:${schemaType}`
+        );
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
-          allowedBlocks: [itemType], // Single virtual type
-          defaultBlock: itemType,
+          allowedBlocks,
+          defaultBlock: allowedBlocks[0],
           maxLength: null,
           isObjectList: true,
-          itemSchema: stripFunctionsFromSchema(fieldDef.schema), // Store itemSchema for editing (stripped for postMessage)
-          idField: fieldDef.idField || '@id', // ID field name for items
-          dataPath: fieldDef.dataPath || null, // Path to actual data location
+          availableSchemas: stripFunctionsFromSchema(schemas),
+          idField: fieldDef.idField || '@id',
+          dataPath: fieldDef.dataPath || null,
         });
       }
     }
