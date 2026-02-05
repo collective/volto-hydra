@@ -49,6 +49,25 @@
     <!-- </div> -->
     </main>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
+        <!-- Dynamic footer_blocks content -->
+        <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
+            <Suspense>
+                <AsyncBlocksRenderer
+                    v-if="data.page?.footer_blocks || footerAllowedLayouts"
+                    :blocks="data.page?.footer_blocks || {}"
+                    :layout="data.page?.footer_blocks_layout?.items || []"
+                    :allowed-layouts="footerAllowedLayouts"
+                    :api-url="apiUrl"
+                    :context-path="route.path"
+                    v-slot="{ items }"
+                >
+                    <template v-for="item in items" :key="item['@uid']">
+                        <Block :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+                    </template>
+                </AsyncBlocksRenderer>
+            </Suspense>
+        </div>
+        <!-- Static footer content -->
         <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
         <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">© 2023 <a href="https://flowbite.com/" class="hover:underline">Flowbite™</a>. All Rights Reserved.
         </span>
@@ -395,6 +414,13 @@ onMounted(() => {
                         allowedTemplates: ['/templates/test-layout'],
                         allowedLayouts: [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
                     },
+                    {
+                        fieldName: 'footer_blocks',
+                        title: 'Footer',
+                        allowedBlocks: ['slate', 'image'],
+                        // Force footer layout on /another-page (same as mock frontend)
+                        allowedLayouts: route.path === '/another-page' ? ['/templates/footer-layout'] : null,
+                    },
                 ],
                 voltoConfig: {
                     blocks: {
@@ -418,6 +444,12 @@ onMounted(() => {
 
 // to get access to the "slug" dynamic param
 const route = useRoute()
+
+// Determine footer allowedLayouts based on path (same as mock frontend)
+const footerAllowedLayouts = computed(() => {
+    return route.path === '/another-page' ? ['/templates/footer-layout'] : null;
+});
+
 var path = [];
 var pages = {};
 console.log(route.params.slug);

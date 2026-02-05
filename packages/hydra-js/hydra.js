@@ -8212,23 +8212,36 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * Use for blocks without listings that render outside Suspense.
  * Shares paging object with expandBlocks for combined paging.
  *
- * @param {Object} blocks - Map of blockId -> block data
- * @param {Array} blocksLayout - Array of blockIds in order
- * @param {Object} paging - Paging object { start, size, total, _seen } - mutated
+ * @param {Array} inputItems - Array of block IDs or objects with @uid
+ * @param {Object} options - Configuration options
+ * @param {Object} options.blocks - Map of blockId -> block data (for ID lookups)
+ * @param {Object} options.paging - Paging object { start, size, total, _seen } - mutated
  * @returns {{ items: Array, paging: Object }} Items on current page + updated paging
  */
-export function staticBlocks(blocks, blocksLayout, paging) {
+export function staticBlocks(inputItems, options = {}) {
+  const { blocks: blocksDict, paging } = options;
+
+  // Normalize items: convert IDs to objects if blocksDict provided
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] staticBlocks: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    return item;
+  }).filter(Boolean);
+
   const items = [];
   const startingSeen = paging._seen;
 
-  for (const blockId of blocksLayout) {
-    const block = blocks[blockId];
-    if (block) {
-      paging._seen++;
-      // Only include items on current page
-      if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
-        items.push({ ...block, '@uid': blockId });
-      }
+  for (const item of normalizedItems) {
+    paging._seen++;
+    // Only include items on current page
+    if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
+      items.push(item);
     }
   }
 
@@ -8264,8 +8277,9 @@ function computePagingUI(paging) {
   }
 }
 
-export async function expandListingBlocks(blocks, blocksLayout, options) {
+export async function expandListingBlocks(inputItems, options = {}) {
   const {
+    blocks: blocksDict,  // Optional: lookup dict for when items are IDs
     apiUrl,
     contextPath = '/',
     paging: pagingIn,  // { start, size, total, _seen } - mutated to track position across calls
@@ -8274,6 +8288,26 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
     defaultItemType = 'summaryItem',  // Default item type when field is not set
   } = options;
+
+  // Normalize items: convert IDs to objects if blocksDict provided
+  // Items can be: objects with @uid, or string IDs (looked up in blocksDict)
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      // It's a block ID - look up in blocksDict
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] expandListingBlocks: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    // Already an object with @uid
+    return item;
+  }).filter(Boolean);
+
+  // Convert to blocks/layout format for internal processing
+  const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
+  const blocksLayout = normalizedItems.map(item => item['@uid']);
 
   // Create default paging if not provided
   const paging = pagingIn || { start: 0, size: 1000, total: 0, _seen: 0 };
@@ -9026,7 +9060,8 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
 
   // Helper to recursively process blocks and their nested containers
   async function processBlocksRecursive(blocks, layout, allowedLayouts, templateState) {
-    const items = await expandTemplates(blocks, layout, {
+    const items = await expandTemplates(layout, {
+      blocks,
       templateState,
       loadTemplate,
       allowedLayouts,
@@ -9112,48 +9147,6 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
   };
 }
 
-/**
- * Load templates and merge them into page data.
- * Templates are loaded on-demand as expandTemplates processes each blocks field.
- *
- * @param {Object} pageData - Page data from API
- * @param {Function} fetchContent - Callback to fetch content by path: (path) => Promise<Object>
- * @param {Object} [options] - Optional configuration
- * @param {Object} [options.pageBlocksFields] - Field configs { fieldName: { allowedLayouts, ... } }
- * @returns {Promise<Object>} Merged page data with template content
- */
-export async function loadAndMergeTemplates(pageData, fetchContent, options = {}) {
-  const { pageBlocksFields } = options;
-
-  // Create a caching loadTemplate function
-  const templateCache = {};
-  const loadTemplate = async (templateId) => {
-    if (templateCache[templateId]) {
-      return templateCache[templateId];
-    }
-    try {
-      const template = await fetchContent(templateId);
-      templateCache[templateId] = template;
-      return template;
-    } catch (error) {
-      console.warn(`[HYDRA] Error fetching template ${templateId}:`, error);
-      throw error;
-    }
-  };
-
-  // Merge templates - expandTemplates loads them on-demand
-  const { merged, newTemplateIds } = await mergeTemplatesIntoPage(pageData, {
-    loadTemplate,
-    pageBlocksFields,
-  });
-
-  // Handle nested templates recursively
-  if (newTemplateIds.length > 0) {
-    return loadAndMergeTemplates(merged, fetchContent, options);
-  }
-
-  return merged;
-}
 
 /**
  * Check if an object looks like a blocks map (string keys -> objects with @type).
@@ -9330,8 +9323,9 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
  * @param {Function} options.uuidGenerator - Optional UUID generator for materialization (admin). If not provided, uses synthetic IDs for render-time (frontend).
  * @returns {Promise<Array>} Items with @uid field
  */
-export async function expandTemplates(blocks, layout, options = {}) {
+export async function expandTemplates(inputItems, options = {}) {
   const {
+    blocks: blocksDict,  // Optional: lookup dict for when items are IDs
     templateState = {},
     loadTemplate,
     allowedLayouts,
@@ -9346,14 +9340,31 @@ export async function expandTemplates(blocks, layout, options = {}) {
     items.push({ ...block, '@uid': blockId });
   };
 
-  // Ensure blocks and layout are valid objects even if empty
-  blocks = blocks || {};
-  layout = layout || [];
+  // Normalize items: convert IDs to objects if blocksDict provided
+  // Items can be: objects with @uid, or string IDs (looked up in blocksDict)
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      // It's a block ID - look up in blocksDict
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] expandTemplates: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    // Already an object with @uid
+    return item;
+  }).filter(Boolean);
+
+  // Convert to blocks/layout format for internal processing
+  const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
+  const layout = normalizedItems.map(item => item['@uid']);
 
   // Check if we're inside a registered nested container (from a fixed template block)
   // This happens when processBlocksRecursive recurses into a container we emitted
-  if (templateState.nestedContainers?.has(blocks)) {
-    const nestedInfo = templateState.nestedContainers.get(blocks);
+  // Use blocksDict (original reference) for the check since nestedContainers stores object references
+  if (blocksDict && templateState.nestedContainers?.has(blocksDict)) {
+    const nestedInfo = templateState.nestedContainers.get(blocksDict);
     return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
   }
 

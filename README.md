@@ -1232,7 +1232,8 @@ This will refresh all template instances it finds from the template content.
 import { expandTemplates } from '@volto-hydra/hydra-js';
 
 const templateState = {};
-const items = await expandTemplates(blocks, layout, {
+const items = await expandTemplates(layout, {
+  blocks,
   templateState,
   loadTemplate: async (id) => fetch(id).then(r => r.json())
 });
@@ -1244,6 +1245,7 @@ for (const item of items) {
 ```
 
 **Options:**
+- `blocks`: Map of blockId -> block data (required when layout contains string IDs)
 - `templateState`: Pass `{}` - tracks state across calls for nested containers
 - `loadTemplate(id)`: Async function to fetch template content
 - `allowedLayouts`: Force a layout when container has no template applied
@@ -1282,7 +1284,8 @@ Your frontend might want to force a layout to apply regardless of whether one is
 for example to ensure a footer layout. Pass `allowedLayouts` to `expandTemplates`:
 
 ```js
-const items = await expandTemplates(blocks, layout, {
+const items = await expandTemplates(layout, {
+  blocks,
   templateState: {},
   loadTemplate,
   allowedLayouts: ['/templates/footer-layout'],
@@ -1304,10 +1307,11 @@ import { expandListingBlocks, staticBlocks } from '@volto-hydra/hydra-js';
 const paging = { start: 0, size: 10, total: 0, _seen: 0 };
 
 // staticBlocks handles non-listing blocks, tracking position in paging
-const { items: staticItems } = staticBlocks(blocks, layout, paging);
+const { items: staticItems } = staticBlocks(layout, { blocks, paging });
 
 // expandListingBlocks fetches and expands listings, continuing from paging position
-const { items: listingItems } = await expandListingBlocks(blocks, layout, {
+const { items: listingItems } = await expandListingBlocks(layout, {
+  blocks,
   contextPath: '/news',
   paging,  // Same paging object - mutated to track combined totals
   itemTypeField: 'variation',  // Field on listing block that holds item type (default: 'itemType')
