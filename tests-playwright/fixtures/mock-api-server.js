@@ -485,7 +485,7 @@ function enrichContent(content, urlPath, baseUrl) {
 }
 
 /**
- * Scan content directory and populate contentDirMap
+ * Scan content directory and populate contentDirMap (recursively)
  * Content is loaded from disk on-demand, not cached
  */
 function scanContentDir(contentDirPath, mountPath) {
@@ -516,6 +516,8 @@ function scanContentDir(contentDirPath, mountPath) {
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
         console.log(`Registered content: ${urlPath}`);
       }
+      // Always recurse into subdirectories to find nested content (e.g., templates/)
+      scanContentDir(fullDirPath, mountPath);
     }
   });
 }
