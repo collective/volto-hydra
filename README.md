@@ -1228,6 +1228,11 @@ initBridge({
 Use `expandTemplates` to merge template content during rendering.
 This will refresh all template instances it finds from the template content.
 
+**Edit Mode:** In edit mode (`_edit=true` or `window.name` starts with `hydra-edit:`),
+`expandTemplates` passes blocks through unchanged. This is because the admin handles
+template merging and adds `nodeId` attributes for inline editing. Re-expanding would
+overwrite the admin's data. Use `isEditMode()` to check the current mode if needed.
+
 ```js
 import { expandTemplates } from '@volto-hydra/hydra-js';
 

@@ -656,6 +656,68 @@ describe('reverse merge - page to template (for saving)', () => {
   });
 });
 
+describe('expandTemplates preserves untouched blocks', () => {
+  test('blocks without template pass through unchanged', async () => {
+    const blocks = {
+      'block-abc-123': { '@type': 'slate', value: [{ type: 'p', nodeId: '0', children: [{ text: 'Content' }] }] },
+    };
+    const layout = ['block-abc-123'];
+
+    const items = await expandTemplates(layout, { blocks });
+
+    expect(items.length).toBe(1);
+    expect(items[0]['@uid']).toBe('block-abc-123');
+    expect(items[0].value[0].nodeId).toBe('0');
+  });
+
+  test('blocks with template already applied preserve IDs when allowedLayouts matches', async () => {
+    // Simulates Nuxt scenario: page already has template, allowedLayouts is configured
+    const blocks = {
+      'existing-header-id': {
+        '@type': 'slate',
+        fixed: true,
+        templateId: '/templates/test',
+        templateInstanceId: 'inst-123',
+        placeholder: 'header',
+        value: [{ type: 'h1', nodeId: '0', children: [{ text: 'Header' }] }],
+      },
+      'existing-user-id': {
+        '@type': 'slate',
+        templateId: '/templates/test',
+        templateInstanceId: 'inst-123',
+        placeholder: 'default',
+        value: [{ type: 'p', nodeId: '0', children: [{ text: 'User content' }] }],
+      },
+    };
+    const layout = ['existing-header-id', 'existing-user-id'];
+
+    const templateData = {
+      '@id': '/templates/test',
+      blocks: {
+        'tpl-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ type: 'h1', children: [{ text: 'Template Header' }] }] },
+        'tpl-default': { '@type': 'slate', placeholder: 'default', value: [] },
+      },
+      blocks_layout: { items: ['tpl-header', 'tpl-default'] },
+    };
+
+    const items = await expandTemplates(layout, {
+      blocks,
+      loadTemplate: async () => templateData,
+      allowedLayouts: ['/templates/test'], // Same template as already applied
+    });
+
+    // Should preserve existing block IDs, not create synthetic ones
+    const uids = items.map(item => item['@uid']);
+    expect(uids).toContain('existing-header-id');
+    expect(uids).toContain('existing-user-id');
+    // Should NOT have synthetic IDs
+    expect(uids.every(uid => !uid.includes('::'))).toBe(true);
+    // nodeIds should be preserved
+    const headerItem = items.find(i => i['@uid'] === 'existing-header-id');
+    expect(headerItem.value[0].nodeId).toBe('0');
+  });
+});
+
 describe('sequential layout switching', () => {
   let counter = 0;
   const uuidGenerator = () => `uuid-${++counter}`;

@@ -557,6 +557,9 @@ const Iframe = (props) => {
   // Used for comparison on save to detect template changes
   const templateCacheRef = useRef({});
 
+  // Pending template edit exit - stores { requestId, prevInstanceId } when waiting for flush
+  const pendingTemplateEditExitRef = useRef(null);
+
   // Trigger for template sync effect - INIT increments this when templates need loading
   // This causes the effect to run and fetch templates, then send deferred INITIAL_DATA
   const [templateSyncTrigger, setTemplateSyncTrigger] = useState(0);
@@ -584,6 +587,15 @@ const Iframe = (props) => {
         const template = templateCache[templateId];
         if (!template) return;
 
+        console.log('[SAVE TEMPLATE] Saving template:', templateId);
+        console.log('[SAVE TEMPLATE] Template blocks:', Object.keys(template.blocks || {}));
+        // Log first block's value to check if edit is present
+        const firstBlockId = template.blocks_layout?.items?.[0];
+        if (firstBlockId && template.blocks[firstBlockId]) {
+          const block = template.blocks[firstBlockId];
+          console.log('[SAVE TEMPLATE] First block value:', JSON.stringify(block.value)?.substring(0, 200));
+        }
+
         // PATCH the template - cache already has merged content from edit mode exit
         try {
           await api.patch(templateId, {
@@ -598,6 +610,81 @@ const Iframe = (props) => {
       }));
     };
   }, [saveTemplatesRef]);
+
+  // Handle pending template edit exit after flush completes
+  // When exiting template edit mode, we first flush pending text updates,
+  // then do the reverse merge once the flush completes
+  useEffect(() => {
+    const pending = pendingTemplateEditExitRef.current;
+    if (!pending) return;
+
+    // Check if flush completed
+    if (iframeSyncState.completedFlushRequestId !== pending.requestId) return;
+
+    // Clear pending state
+    pendingTemplateEditExitRef.current = null;
+
+    // Now do the reverse merge with fresh formData
+    const { prevInstanceId } = pending;
+    const formData = iframeSyncState.formData;
+
+    // Find the templateId for this instance
+    let templateId = null;
+    for (const block of Object.values(formData.blocks || {})) {
+      if (block.templateInstanceId === prevInstanceId && block.templateId) {
+        templateId = block.templateId;
+        break;
+      }
+    }
+
+    if (templateId && templateCacheRef.current[templateId]) {
+      const template = templateCacheRef.current[templateId];
+
+      console.log('[REVERSE MERGE] Starting reverse merge for template:', templateId);
+      console.log('[REVERSE MERGE] prevInstanceId:', prevInstanceId);
+      console.log('[REVERSE MERGE] Template blocks:', Object.keys(template.blocks || {}));
+      console.log('[REVERSE MERGE] FormData blocks:', Object.keys(formData.blocks || {}));
+      // Log fixed blocks' content in formData
+      for (const [blockId, block] of Object.entries(formData.blocks || {})) {
+        if (block.fixed && block.templateInstanceId === prevInstanceId) {
+          console.log(`[REVERSE MERGE] Fixed block ${blockId}:`, JSON.stringify(block.value)?.substring(0, 200));
+        }
+      }
+
+      // Merge edited instance back into template (reverse merge)
+      // This captures edits to fixed+readOnly blocks into the template cache
+      mergeTemplatesIntoPage(template, {
+        loadTemplate: async () => formData,
+        filterInstanceId: prevInstanceId,
+      }).then(({ merged: updatedTemplate }) => {
+        console.log('[REVERSE MERGE] Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
+        // Log first block's value to check if edit is captured
+        const firstBlockId = updatedTemplate.blocks_layout?.items?.[0];
+        if (firstBlockId && updatedTemplate.blocks[firstBlockId]) {
+          const block = updatedTemplate.blocks[firstBlockId];
+          console.log('[REVERSE MERGE] First block value:', JSON.stringify(block.value)?.substring(0, 200));
+        }
+
+        // Update cache with merged template
+        templateCacheRef.current[templateId] = updatedTemplate;
+      });
+    }
+
+    // Update state to exit template edit mode
+    setIframeSyncState(prev => ({
+      ...prev,
+      templateEditMode: null,
+    }));
+
+    // Send template edit mode to iframe
+    const iframe = document.getElementById('previewIframe');
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage(
+        { type: 'TEMPLATE_EDIT_MODE', instanceId: null },
+        '*'
+      );
+    }
+  }, [iframeSyncState.completedFlushRequestId, iframeSyncState.formData]);
 
   // Pending INITIAL_DATA: when templates are loading during INIT, store data here
   // Sync effect will send INITIAL_DATA after templates are merged
@@ -2152,78 +2239,63 @@ const Iframe = (props) => {
       const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
 
       if (unloadedTemplates.length === 0) {
-        // No templates to load - send INITIAL_DATA immediately with prepared data
-        log('[INITIAL_DATA] No templates to load, sending immediately');
+        // No templates to load - but still need to merge for forced layouts
+        log('[INITIAL_DATA] No templates to load, merging for forced layouts');
         const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
         // Get pageBlocksFields from config (set during INIT)
         const pageBlocksFields = config.blocks.blocksConfig['_page']?.schema?.()?.properties || {};
 
-        // Check if any templates need merging (already in cache) or forced layouts need applying
-        const cachedTemplateIds = templateIds.filter(id => templateCacheRef.current[id]);
-        const hasForcedLayouts = Object.values(pageBlocksFields).some(f => f?.allowedLayouts?.length > 0);
+        // Always call mergeTemplatesIntoPage - it handles all cases:
+        // - No templates/layouts: returns data unchanged
+        // - Has templates: merges them
+        // - Has forced layouts: applies them
+        const api = new Api();
 
-        if (cachedTemplateIds.length > 0 || hasForcedLayouts) {
-          // Need to merge - use async IIFE since mergeTemplatesIntoPage is async
-          const api = new Api();
-
-          (async () => {
-            // Create loadTemplate that uses cache and falls back to API
-            const loadTemplate = async (templateId) => {
-              if (templateCacheRef.current[templateId]) {
-                return templateCacheRef.current[templateId];
-              }
-              // Load from API and cache
-              const template = await api.get(templateId);
-              templateCacheRef.current[templateId] = template;
-              return template;
-            };
-
-            // Merge templates with forced layouts
-            log('[INITIAL_DATA] Merging cached templates and forced layouts');
-            const { merged: mergedFormData } = await mergeTemplatesIntoPage(preparedFormData, {
-              loadTemplate,
-              pageBlocksFields,
-            });
-            let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
-
-            // Ensure empty page blocks fields have at least one empty block (template merge may add containers)
-            let formDataToSend = ensureEmptyBlockIfEmpty(
-              mergedFormData,
-              { parentId: PAGE_BLOCK_UID },
-              blockPathMap,
-              uuid,
-              config.blocks.blocksConfig,
-              { intl, metadata, properties: mergedFormData },
-            );
-            if (formDataToSend !== mergedFormData) {
-              blockPathMap = buildBlockPathMap(formDataToSend, config.blocks.blocksConfig, intl);
+        (async () => {
+          // Create loadTemplate that uses cache and falls back to API
+          const loadTemplate = async (templateId) => {
+            if (templateCacheRef.current[templateId]) {
+              return templateCacheRef.current[templateId];
             }
+            // Load from API and cache
+            const template = await api.get(templateId);
+            templateCacheRef.current[templateId] = template;
+            return template;
+          };
 
-            // Update Redux with merged data
-            onChangeFormData(mergedFormData);
+          // Merge templates with forced layouts
+          const { merged: mergedFormData } = await mergeTemplatesIntoPage(preparedFormData, {
+            loadTemplate,
+            pageBlocksFields,
+          });
+          let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
-            source.postMessage({
-              type: 'INITIAL_DATA',
-              data: formDataToSend,
-              blockFieldTypes,
-              blockPathMap,
-              slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
-            }, origin);
-            pendingInitialDataRef.current = null;
-          })();
-          return;
-        }
+          // Ensure empty page blocks fields have at least one empty block (template merge may add containers)
+          let formDataToSend = ensureEmptyBlockIfEmpty(
+            mergedFormData,
+            { parentId: PAGE_BLOCK_UID },
+            blockPathMap,
+            uuid,
+            config.blocks.blocksConfig,
+            { intl, metadata, properties: mergedFormData },
+          );
+          if (formDataToSend !== mergedFormData) {
+            blockPathMap = buildBlockPathMap(formDataToSend, config.blocks.blocksConfig, intl);
+          }
 
-        // No templates or forced layouts - send immediately
-        source.postMessage({
-          type: 'INITIAL_DATA',
-          data: preparedFormData,
-          blockFieldTypes,
-          blockPathMap: preparedBlockPathMap,
-          slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
-        }, origin);
-        pendingInitialDataRef.current = null;
+          // Update Redux with merged data
+          onChangeFormData(mergedFormData);
+
+          source.postMessage({
+            type: 'INITIAL_DATA',
+            data: formDataToSend,
+            blockFieldTypes,
+            blockPathMap,
+            slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
+          }, origin);
+          pendingInitialDataRef.current = null;
+        })();
         return;
       }
 
@@ -3346,7 +3418,7 @@ const Iframe = (props) => {
         onToggleTemplateEditMode={async (instanceId) => {
           const prevInstanceId = iframeSyncState.templateEditMode;
 
-          // Exiting template edit mode - validate and merge edits back to cached template
+          // Exiting template edit mode - need to flush pending text updates first
           if (prevInstanceId && !instanceId) {
             const formData = iframeSyncState.formData;
 
@@ -3365,30 +3437,21 @@ const Iframe = (props) => {
               return; // Don't exit edit mode
             }
 
-            // Find the templateId for this instance
-            let templateId = null;
-            for (const block of Object.values(formData.blocks || {})) {
-              if (block.templateInstanceId === prevInstanceId && block.templateId) {
-                templateId = block.templateId;
-                break;
-              }
+            // Send FLUSH_BUFFER to get latest text changes before reverse merge
+            const requestId = `tpl-exit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            pendingTemplateEditExitRef.current = { requestId, prevInstanceId };
+
+            if (referenceElement?.contentWindow) {
+              referenceElement.contentWindow.postMessage(
+                { type: 'FLUSH_BUFFER', requestId },
+                '*'
+              );
             }
-
-            if (templateId && templateCacheRef.current[templateId]) {
-              const template = templateCacheRef.current[templateId];
-
-              // Merge edited instance back into template (reverse merge)
-              // This captures edits to fixed+readOnly blocks into the template cache
-              const { merged: updatedTemplate } = await mergeTemplatesIntoPage(template, {
-                loadTemplate: async () => formData,
-                filterInstanceId: prevInstanceId,
-              });
-
-              // Update cache with merged template
-              templateCacheRef.current[templateId] = updatedTemplate;
-            }
+            // Effect will handle the rest when flush completes
+            return;
           }
 
+          // Entering template edit mode
           setIframeSyncState(prev => ({
             ...prev,
             templateEditMode: instanceId,

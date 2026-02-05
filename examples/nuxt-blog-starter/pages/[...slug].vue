@@ -12,26 +12,36 @@
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
 
-                <!-- Render blocks - listing-type blocks use AsyncListingBlock which handles its own Suspense -->
-                <template v-if="data.page?.blocks_layout">
-                    <section v-for="section in getSections(data.page)" :class="section.style">
-                        <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
-                            <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                                <template v-for="block in section.blocks" :key="block.id">
-                                    <!-- Listing-type blocks: use AsyncListingBlock (handles its own Suspense internally) -->
-                                    <div v-if="isListingType(block.block['@type'])" class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
-                                        <AsyncListingBlock :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl" />
-                                    </div>
-                                    <!-- Static blocks: render immediately -->
-                                    <!-- Pass apiUrl for search blocks that contain async listing children -->
-                                    <div v-else class="mx-auto" :class="{'max-w-4xl': block.block['@type'] !== 'slider'}">
-                                        <Block :block_uid="block.id" :block="block.block" :data="data.page" :api-url="apiUrl"></Block>
-                                    </div>
-                                </template>
+                <!-- Render blocks with template expansion -->
+                <Suspense v-if="data.page?.blocks_layout">
+                    <!-- Key forces re-mount when layout changes (e.g., when admin merges template) -->
+                    <AsyncBlocksRenderer
+                        :key="JSON.stringify(data.page?.blocks_layout?.items || [])"
+                        :blocks="data.page?.blocks || {}"
+                        :layout="data.page?.blocks_layout?.items || []"
+                        :allowed-layouts="mainBlocksAllowedLayouts"
+                        :api-url="apiUrl"
+                        :context-path="route.path"
+                        v-slot="{ items }"
+                    >
+                        <section v-for="section in getSectionsFromItems(items)" :key="section.key" :class="section.style">
+                            <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
+                                <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
+                                    <template v-for="block in section.blocks" :key="block['@uid']">
+                                        <!-- Listing-type blocks: use AsyncListingBlock (handles its own Suspense internally) -->
+                                        <div v-if="isListingType(block['@type'])" class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
+                                            <AsyncListingBlock :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
+                                        </div>
+                                        <!-- Static blocks: render immediately -->
+                                        <div v-else class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
+                                            <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl"></Block>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
-                        </div>
-                    </section>
-                </template>
+                        </section>
+                    </AsyncBlocksRenderer>
+                </Suspense>
 
                 <div v-else-if="data?.page">
                     <h1>{{ data.page?.title }}</h1>
@@ -52,8 +62,10 @@
         <!-- Dynamic footer_blocks content -->
         <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
             <Suspense>
+                <!-- Key forces re-mount when layout changes (e.g., when admin merges template) -->
                 <AsyncBlocksRenderer
                     v-if="data.page?.footer_blocks || footerAllowedLayouts"
+                    :key="JSON.stringify(data.page?.footer_blocks_layout?.items || [])"
                     :blocks="data.page?.footer_blocks || {}"
                     :layout="data.page?.footer_blocks_layout?.items || []"
                     :allowed-layouts="footerAllowedLayouts"
@@ -450,6 +462,11 @@ const footerAllowedLayouts = computed(() => {
     return route.path === '/another-page' ? ['/templates/footer-layout'] : null;
 });
 
+// Main blocks allowedLayouts (same as bridge config)
+const mainBlocksAllowedLayouts = computed(() => {
+    return [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'];
+});
+
 var path = [];
 var pages = {};
 console.log(route.params.slug);
@@ -497,6 +514,29 @@ function getSections(page) {
         }
         section.style = style;
         section.blocks.push({id:block_id, block:block});
+    }
+    return sections;
+}
+
+// Version of getSections that works with expanded items (from AsyncBlocksRenderer)
+// Items have @uid and block properties directly on the item
+function getSectionsFromItems(items) {
+    if (!items?.length) {
+        return []
+    }
+    var sectionIndex = 0;
+    var section = {blocks:[], style:null, key: `section-${sectionIndex}`};
+    var sections = [section];
+    // find all with the same styles and group them
+    for (const item of items) {
+        var style = item?.styles?.backgroundColor == 'grey'? {'bg-slate-300':true} : {};
+        if (section.style != null && JSON.stringify(section.style) !== JSON.stringify(style)) {
+            sectionIndex++;
+            section = {blocks:[], style:null, key: `section-${sectionIndex}`};
+            sections.push(section);
+        }
+        section.style = style;
+        section.blocks.push(item);
     }
     return sections;
 }

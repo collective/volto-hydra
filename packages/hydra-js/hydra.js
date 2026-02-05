@@ -5728,12 +5728,15 @@ export class Bridge {
     // We need a mechanism to distinguish user-initiated text changes from
     // programmatic updates caused by FORM_DATA messages.
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
+      log('MutationObserver fired, mutations:', mutations.length, 'isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
+        log('Mutation:', mutation.type, 'target:', mutation.target?.nodeName, 'text:', mutation.target?.textContent?.substring(0, 50));
         if (mutation.type === 'characterData' && this.isInlineEditing) {
           // Find the editable field element (works for both Slate and non-Slate fields)
           const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
           const targetElement = parentEl?.closest('[data-editable-field]');
+          log('characterData mutation: parentEl=', parentEl?.tagName, 'targetElement=', targetElement?.tagName, 'targetElement has attr:', targetElement?.hasAttribute?.('data-editable-field'));
 
           if (targetElement) {
             // Pass parentEl so handleTextChange can find the actual node that changed
@@ -8008,6 +8011,20 @@ export function getAccessToken() {
 }
 
 /**
+ * Check if we're in edit mode (hydra iframe connected to admin for editing).
+ * Uses window.name (set by admin) and _edit URL param as signals.
+ * @returns {boolean} True if in edit mode
+ */
+export function isEditMode() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const url = new URL(window.location.href);
+  const editParam = url.searchParams.get('_edit');
+  return window.name.startsWith('hydra-edit:') || editParam === 'true';
+}
+
+/**
  * Get the token from cookie (legacy method, prefer getAccessToken)
  * @returns {String|null} token
  */
@@ -9339,6 +9356,18 @@ export async function expandTemplates(inputItems, options = {}) {
   const addItem = (block, blockId) => {
     items.push({ ...block, '@uid': blockId });
   };
+
+  // In edit mode, admin handles template merging - pass blocks through as-is
+  // This preserves nodeIds and any edits made in template edit mode
+  if (isEditMode()) {
+    return (inputItems || []).map(item => {
+      if (typeof item === 'string') {
+        const block = blocksDict?.[item];
+        return block ? { ...block, '@uid': item } : null;
+      }
+      return item;
+    }).filter(Boolean);
+  }
 
   // Normalize items: convert IDs to objects if blocksDict provided
   // Items can be: objects with @uid, or string IDs (looked up in blocksDict)

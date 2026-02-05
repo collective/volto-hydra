@@ -254,7 +254,9 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editCheckbox = page.locator('#field-editTemplate');
     await editToggle.click();
+    await expect(editCheckbox).toBeChecked();
     // Wait for edit mode to activate
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -266,7 +268,8 @@ test.describe('Template Edit Mode - Editability', () => {
     // Exit edit mode
     await page.keyboard.press('Escape');
     await helper.waitForQuantaToolbar(templateBlockIds);
-    await editToggle.uncheck();
+    await editToggle.click();
+    await expect(editCheckbox).not.toBeChecked();
     // Wait for edit mode to deactivate
     await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
@@ -673,7 +676,11 @@ test.describe('Template Edit Mode - Validation', () => {
     // Make a valid change - edit template header content
     await helper.clickBlockInIframe(headerBlockId);
     const editor = helper.getSlateField(headerLocator);
+    // Wait for contenteditable to be set (template edit mode makes fixed blocks editable)
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
     await editor.click();
+    // Wait for element to be focused before typing
+    await expect(editor).toBeFocused({ timeout: 2000 });
     await page.keyboard.press('End');
     await page.keyboard.type(' - edited');
     // Wait for text to appear - use fresh locator since text changed (stale locator won't match)
@@ -683,7 +690,10 @@ test.describe('Template Edit Mode - Validation', () => {
     // Exit edit mode
     await page.keyboard.press('Escape');
     await helper.waitForQuantaToolbar(templateBlockIds);
-    await editToggle.uncheck();
+    // Click to exit template edit mode - waits for async flush before toggling
+    await editToggle.click();
+    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
+    await expect(checkbox).not.toBeChecked({ timeout: 5000 });
     await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Save should succeed - wait for pencil icon (view mode) indicating save completed
@@ -694,6 +704,9 @@ test.describe('Template Edit Mode - Validation', () => {
     // Should NOT show validation error
     const errorMessage = page.locator('.toast-error, .validation-error, [role="alert"]').filter({ hasText: /placeholder|split|contiguous/i });
     await expect(errorMessage).not.toBeVisible();
+
+    // Wait for iframe to refresh with new content (block count stabilizes after Nuxt re-renders)
+    await helper.getStableBlockCount();
 
     // Content should be preserved in view mode - find by content since text and ID both changed
     const editedHeader = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'edited' }).first();

@@ -44,12 +44,22 @@ const sessionContent = {};
 const contentDirMap = {};
 
 /**
- * Get session ID from request header
+ * Get session ID from request header.
+ * Uses auth token as session identifier - each test login generates a unique
+ * token (based on timestamp), providing session isolation between tests.
+ * Both admin (Volto) and Nuxt SSR include Authorization headers, so they
+ * share the same session when using the same auth token.
  * @param {Object} req - Express request
- * @returns {string} Session ID (defaults to '_default' if not provided)
+ * @returns {string} Session ID (defaults to '_default' for unauthenticated requests)
  */
 function getSessionId(req) {
-  return req.headers['x-test-session'] || '_default';
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    return `token:${token}`;
+  }
+  // Unauthenticated requests use default session (no persistence)
+  return '_default';
 }
 
 /**
@@ -1544,6 +1554,27 @@ app.get('*', (req, res, next) => {
   const urlPath = req.path;
   const cleanPath = urlPath.replace('/++api++', '');
   const sessionId = getSessionId(req);
+
+  // Debug logging for template/page requests
+  if (cleanPath.includes('template') || cleanPath.includes('test-page')) {
+    const fs = require('fs');
+    const hasInSession = sessionId && sessionContent[sessionId]?.[cleanPath];
+    let contentPreview = '';
+    if (hasInSession) {
+      // Log content to verify edited value is present
+      const sessionData = sessionContent[sessionId][cleanPath];
+      const blockIds = sessionData?.blocks_layout?.items || Object.keys(sessionData?.blocks || {});
+      const firstBlockId = blockIds[0];
+      if (firstBlockId && sessionData?.blocks?.[firstBlockId]) {
+        const val = JSON.stringify(sessionData.blocks[firstBlockId].value || '');
+        contentPreview = ` firstBlock: ${val.substring(0, 150)}`;
+      }
+    }
+    const logMsg = `[GET] ${cleanPath} sessionId: ${sessionId} inSession: ${!!hasInSession}${contentPreview}\n`;
+    fs.appendFileSync('/tmp/mock-api-get.log', logMsg);
+    console.log(logMsg);
+  }
+
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
 
@@ -1570,9 +1601,9 @@ app.get('*', (req, res, next) => {
 
 /**
  * PATCH /:path
- * Update content - persists to session storage when X-Test-Session header is provided
- * Default session ('_default') does NOT persist to ensure test isolation for tests
- * that don't set a session header.
+ * Update content - persists to session storage for authenticated requests.
+ * Default session ('_default') does NOT persist to ensure test isolation for
+ * unauthenticated requests.
  */
 app.patch('*', (req, res) => {
   const urlPath = req.path;
@@ -1580,7 +1611,7 @@ app.patch('*', (req, res) => {
   const sessionId = getSessionId(req);
 
   const fs = require('fs');
-  const logMsg = `[PATCH] ${cleanPath} sessionId: ${sessionId || 'none'} x-test-session: ${req.headers['x-test-session'] || 'none'}\n`;
+  const logMsg = `[PATCH] ${cleanPath} sessionId: ${sessionId}\n`;
   fs.appendFileSync('/tmp/mock-api-patch.log', logMsg);
   console.log(logMsg);
 
@@ -1595,6 +1626,11 @@ app.patch('*', (req, res) => {
     if (sessionId && sessionId !== '_default') {
       console.log(`[PATCH] Persisting to session: ${sessionId} path: ${cleanPath}`);
       setSessionContent(sessionId, cleanPath, mergedContent);
+      // Verify it was saved
+      const fs = require('fs');
+      const verifyInSession = sessionContent[sessionId]?.[cleanPath] ? 'YES' : 'NO';
+      const verifyMsg = `[PATCH VERIFY] ${cleanPath} in session: ${verifyInSession}\n`;
+      fs.appendFileSync('/tmp/mock-api-patch.log', verifyMsg);
     } else {
       console.log(`[PATCH] NOT persisting (no session or default)`);
     }

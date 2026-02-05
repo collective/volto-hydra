@@ -62,7 +62,7 @@
 
     <script src="renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, expandTemplates } from './hydra.js';
+        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from './hydra.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
         function getPagesFromUrl() {
@@ -155,9 +155,12 @@
                 // Expand templates (handles both existing content and forced layouts)
                 const templateState = {};
                 const loadTemplate = async (templateId) => {
-                    const res = await fetch(`${window.location.origin}${templateId}`, {
-                        headers: { 'Accept': 'application/json' }
-                    });
+                    const headers = { 'Accept': 'application/json' };
+                    const token = getAccessToken();
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    const res = await fetch(`${window.location.origin}${templateId}`, { headers });
                     return res.json();
                 };
                 const expandedItems = await expandTemplates(footerLayout, {
@@ -233,14 +236,22 @@
                 });
 
                 // Fetch content from mock API using ++api++ prefix
-                const response = await fetch(`/++api++${contentPath}`);
+                // Include auth token if available (for session-based content in tests)
+                const fetchHeaders = { 'Accept': 'application/json' };
+                const token = getAccessToken();
+                if (token) {
+                    fetchHeaders['Authorization'] = `Bearer ${token}`;
+                }
+                const response = await fetch(`/++api++${contentPath}`, { headers: fetchHeaders });
                 let content = await response.json();
 
                 // Helper to load templates
                 const loadTemplate = async (templateId) => {
-                    const res = await fetch(`/++api++${templateId}`, {
-                        headers: { 'Accept': 'application/json' }
-                    });
+                    const headers = { 'Accept': 'application/json' };
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    const res = await fetch(`/++api++${templateId}`, { headers });
                     return res.json();
                 };
 

@@ -8,10 +8,13 @@ export default async function ploneApi({
   pages = {},
 }) {
   const runtimeConfig = useRuntimeConfig();
+  const route = useRoute();
+
   var headers = {
     Accept: 'application/json',
   };
-  const token = getAccessToken();
+  // route.query works in SSR, getAccessToken() works client-side
+  const token = route.query.access_token || getAccessToken();
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
@@ -35,7 +38,9 @@ export default async function ploneApi({
     method: query ? 'POST' : 'GET',
     headers: headers,
     body: query,
-    cache: 'no-cache', // we probably don't need it
+    cache: 'no-cache',
+    // When authenticated, don't use cached data - always fetch fresh
+    getCachedData: token ? () => undefined : undefined,
     watch: watch,
     default: () => {
       return _default;
