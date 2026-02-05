@@ -1037,11 +1037,33 @@ function renderSliderBlock(block, blockId) {
 
 /**
  * Render a slide block (child of carousel/slider).
- * Supports both old format (title, content) and volto-slider-block format (title, description, head_title).
+ * Supports multiple slide types via slide_type field:
+ * - 'slide': title, description, head_title (default)
+ * - 'image': image, alt, caption
  * @param {Object} block - Slide block data
  * @returns {string} HTML string
  */
 function renderSlideBlock(block) {
+    const slideType = block.slide_type || 'slide';
+
+    // Image type slide
+    if (slideType === 'image') {
+        const imageSrc = getImageUrl(block.image);
+        const alt = block.alt || '';
+        const caption = block.caption || '';
+
+        let html = '';
+        if (imageSrc) {
+            html += `<img data-media-field="image" src="${imageSrc}" alt="${alt}" style="max-width: 100%; height: auto; border-radius: 4px;" />`;
+        } else {
+            html += `<div data-media-field="image" style="height: 150px; background: #ddd; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer;">Click to add image</div>`;
+        }
+        html += `<p data-editable-field="alt" style="font-size: 12px; color: #888; margin: 8px 0 4px 0;">Alt: ${alt}</p>`;
+        html += `<p data-editable-field="caption" style="margin: 0; color: #666; font-style: italic;">${caption}</p>`;
+        return html;
+    }
+
+    // Default slide type
     const title = block.title ?? '';
     // Support both old format (content) and new format (description)
     const description = block.description || block.content || '';
