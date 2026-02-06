@@ -1906,12 +1906,32 @@ export class AdminUIHelper {
     cursorOffset: number | undefined;
     cursorContainerText: string;
     isFocused: boolean;
+    insideNodeId: boolean;
   }> {
     return await editor.evaluate((el: HTMLElement) => {
       const doc = el.ownerDocument;
       const selection = doc.getSelection();
       const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
       const text = el.innerText || el.textContent || '';
+
+      // Check if cursor is inside a data-node-id element
+      let insideNodeId = false;
+      if (range?.startContainer) {
+        const node = range.startContainer;
+        // Check if this node or any ancestor (up to and including el) has data-node-id
+        let current: Node | null = node;
+        while (current) {
+          if (current.nodeType === Node.ELEMENT_NODE) {
+            const elem = current as Element;
+            if (elem.hasAttribute('data-node-id')) {
+              insideNodeId = true;
+              break;
+            }
+          }
+          if (current === el) break; // Include el in the check
+          current = current.parentNode;
+        }
+      }
 
       return {
         text: text,
@@ -1920,6 +1940,7 @@ export class AdminUIHelper {
         cursorOffset: range?.startOffset,
         cursorContainerText: range?.startContainer?.textContent || '',
         isFocused: doc.activeElement === el,
+        insideNodeId,
       };
     });
   }

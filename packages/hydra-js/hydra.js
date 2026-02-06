@@ -1493,6 +1493,18 @@ export class Bridge {
                   }
                 }
 
+                // When switching to a new block (e.g., after Enter creates new block),
+                // redirect buffered keystrokes to the new block instead of the old one
+                if (needsBlockSwitch && adminSelectedBlockUid) {
+                  if (this.pendingTransform) {
+                    log('Redirecting buffer from', this.pendingTransform.blockId, 'to new block:', adminSelectedBlockUid);
+                    this.pendingTransform.blockId = adminSelectedBlockUid;
+                  }
+                  if (this.eventBuffer.length > 0) {
+                    log('Redirecting eventBuffer to new block:', adminSelectedBlockUid);
+                  }
+                }
+
                 // Single replay point for all paths
                 this.replayBufferAndUnblock();
               });
@@ -2126,8 +2138,14 @@ export class Bridge {
         return false;
       }
 
-      // If this element is an editable field itself, it's valid
+      // If this element is an editable field itself, check if it has data-node-id children
+      // If so, cursor should be inside those children, not on the container
       if (node.hasAttribute?.('data-editable-field')) {
+        const hasNodeIdChildren = node.querySelector?.('[data-node-id]');
+        if (hasNodeIdChildren) {
+          log('isOnInvalidWhitespace: cursor on editable-field container but has nodeId children, needs correction');
+          return true;
+        }
         return false;
       }
 
@@ -2261,9 +2279,29 @@ export class Bridge {
     if (!returnEndPosition) {
       // Start position → start of first text node
       const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
-      const textNode = walker.nextNode();
+      let textNode = walker.nextNode();
+
+      // If no text node exists, create one with ZWS for cursor positioning
+      if (!textNode) {
+        textNode = document.createTextNode('\uFEFF');
+        firstNodeIdEl.appendChild(textNode);
+        log('getValidPositionForWhitespace: created ZWS text node in empty element');
+        return { textNode, offset: 1 }; // Position after ZWS
+      }
+
+      // If text node is empty, prepend ZWS for cursor positioning
+      // This ensures browser types into this node rather than creating a new one
+      const visibleText = textNode.textContent.replace(/[\uFEFF\u200B]/g, '');
+      if (visibleText === '') {
+        if (!textNode.textContent.includes('\uFEFF')) {
+          textNode.textContent = '\uFEFF' + textNode.textContent;
+          log('getValidPositionForWhitespace: prepended ZWS to empty text node');
+        }
+        return { textNode, offset: 1 }; // Position after ZWS
+      }
+
       log('getValidPositionForWhitespace: returning start of first text node:', textNode?.textContent?.substring(0, 20));
-      return textNode ? { textNode, offset: 0 } : null;
+      return { textNode, offset: 0 };
     } else {
       // End position → end of last text node
       const walker = document.createTreeWalker(lastNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
@@ -3113,15 +3151,45 @@ export class Bridge {
 
     // If field was already editable AND already focused, browser already handled
     // cursor positioning on click - don't redo it (causes race with typing)
+    // BUT: still check if cursor is on invalid whitespace (e.g., on DIV container
+    // instead of inside P element) and correct if needed
+    // NOTE: Use requestAnimationFrame to run after browser's default click positioning completes
     if (options.wasAlreadyEditable && isAlreadyFocused) {
-      log('activateEditableField: field already editable and focused, trusting browser positioning');
+      requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        const anchorNode = selection?.anchorNode;
+        const anchorNeedsCorrection = anchorNode && this.isOnInvalidWhitespace(anchorNode);
+        log('activateEditableField: deferred check -', {
+          anchorNodeName: anchorNode?.nodeName,
+          anchorOffset: selection?.anchorOffset,
+          needsCorrection: anchorNeedsCorrection,
+        });
+        if (anchorNeedsCorrection) {
+          log('activateEditableField: already focused but cursor on invalid whitespace, correcting');
+          this.correctInvalidWhitespaceSelection();
+        } else {
+          log('activateEditableField: field already editable and focused, browser positioning OK');
+        }
+      });
       this.lastClickPosition = null;
       return;
     }
 
     // Position cursor at click location if we have coordinates
     if (!this.lastClickPosition) {
-      log('activateEditableField: no lastClickPosition, skipping cursor positioning');
+      // No click position (e.g., new block created via Enter) - ensure cursor
+      // is inside a valid data-node-id element using the existing correction logic
+      const selection = window.getSelection();
+      const selectionInfo = selection?.rangeCount ? {
+        rangeCount: selection.rangeCount,
+        anchorNode: selection.anchorNode?.nodeName,
+        anchorOffset: selection.anchorOffset,
+        anchorNodeId: selection.anchorNode?.parentElement?.getAttribute?.('data-node-id') ||
+                      selection.anchorNode?.getAttribute?.('data-node-id'),
+      } : { noSelection: true };
+      log('activateEditableField: no lastClickPosition, selection state:', selectionInfo);
+      const corrected = this.correctInvalidWhitespaceSelection();
+      log('activateEditableField: correction result:', corrected);
       return;
     }
 
@@ -3156,7 +3224,17 @@ export class Bridge {
     } else {
       const range = document.caretRangeFromPoint(clientX, clientY);
       if (range) {
+        log('activateEditableField: caretRangeFromPoint result:', {
+          startContainer: range.startContainer.nodeName,
+          startOffset: range.startOffset,
+          isOnInvalid: this.isOnInvalidWhitespace(range.startContainer),
+        });
         const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+        log('activateEditableField: getValidatedPosition result:', {
+          nodeName: validPos.node?.nodeName,
+          offset: validPos.offset,
+          nodeId: validPos.node?.parentElement?.getAttribute?.('data-node-id') || validPos.node?.getAttribute?.('data-node-id'),
+        });
         const finalRange = document.createRange();
         finalRange.setStart(validPos.node, validPos.offset);
         finalRange.collapse(true);
@@ -3552,28 +3630,6 @@ export class Bridge {
           this.currentlySelectedBlock?.getAttribute('data-block-uid'),
           blockUid,
         );
-      }
-
-      // Add nodeIds for slate fields (skip for template instances - they're virtual)
-      if (this.formData && !isSelectingSameBlock && !isTemplateInstance) {
-        const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
-        const hasSlateField = Object.values(blockFieldTypes).some(
-          fieldType => this.fieldTypeIsSlate(fieldType)
-        );
-        if (hasSlateField) {
-          // Use getBlockData to handle nested blocks
-          const block = this.getBlockData(blockUid);
-          if (block) {
-            // Add nodeIds to each slate field, following the same pattern as addNodeIdsToAllSlateFields
-            Object.keys(blockFieldTypes).forEach((fieldName) => {
-              if (this.fieldTypeIsSlate(blockFieldTypes[fieldName]) && block[fieldName]) {
-                block[fieldName] = this.addNodeIds(block[fieldName]);
-              }
-            });
-          }
-          // NodeIds are now added to this.formData for internal use
-          // No need to send anywhere - they're already in memory for DOM manipulation
-        }
       }
 
       // For template instances, there's no single element to track
@@ -6057,6 +6113,12 @@ export class Bridge {
       throw new Error('[HYDRA] blockPathMap is required but was not provided by admin');
     }
 
+    // Debug: log all blocks in blockPathMap and formData.blocks
+    const pathMapBlocks = Object.keys(this.blockPathMap);
+    const formDataBlocks = Object.keys(this.formData.blocks || {});
+    const missingFromPathMap = formDataBlocks.filter(id => !pathMapBlocks.includes(id));
+    log('addNodeIdsToAllSlateFields: pathMap has', pathMapBlocks.length, 'blocks, formData has', formDataBlocks.length, 'blocks, missing:', missingFromPathMap.length > 0 ? missingFromPathMap : 'none');
+
     Object.entries(this.blockPathMap).forEach(([blockId, pathInfo]) => {
       const block = this.getBlockData(blockId);
       if (!block) return;
@@ -6074,9 +6136,15 @@ export class Bridge {
       // For regular blocks, use blockFieldTypes
       const blockType = pathInfo.blockType;
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
+      if (blockType === 'slate') {
+        log('addNodeIdsToAllSlateFields:', blockId, 'blockType:', blockType, 'fieldTypes:', Object.keys(fieldTypes), 'hasValue:', !!block.value);
+      }
       Object.keys(fieldTypes).forEach((fieldName) => {
         if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
+          if (blockType === 'slate') {
+            log('addNodeIdsToAllSlateFields: added nodeIds to', blockId, fieldName, 'value:', JSON.stringify(block[fieldName]));
+          }
         }
       });
     });
@@ -9359,14 +9427,20 @@ export async function expandTemplates(inputItems, options = {}) {
 
   // In edit mode, admin handles template merging - pass blocks through as-is
   // This preserves nodeIds and any edits made in template edit mode
-  if (isEditMode()) {
-    return (inputItems || []).map(item => {
+  const editMode = isEditMode();
+  console.log('[HYDRA] expandTemplates: isEditMode =', editMode, 'inputItems length:', inputItems?.length);
+  if (editMode) {
+    const result = (inputItems || []).map(item => {
       if (typeof item === 'string') {
         const block = blocksDict?.[item];
+        console.log('[HYDRA] expandTemplates edit mode: string item', item, 'block nodeId:', block?.value?.[0]?.nodeId);
         return block ? { ...block, '@uid': item } : null;
       }
+      console.log('[HYDRA] expandTemplates edit mode: object item', item['@uid'] || 'no uid', 'nodeId:', item.value?.[0]?.nodeId);
       return item;
     }).filter(Boolean);
+    console.log('[HYDRA] expandTemplates edit mode returning', result.length, 'items');
+    return result;
   }
 
   // Normalize items: convert IDs to objects if blocksDict provided

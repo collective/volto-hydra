@@ -452,6 +452,10 @@ test.describe('Inline Editing - Basic', () => {
     // Verify the new block contains 'Second line'
     const newBlockText = await newBlock.textContent();
     expect(newBlockText).toContain('Second line');
+
+    // Verify the sidebar also shows the typed text
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+    await expect(sidebarEditor).toContainText('Second line', { timeout: 5000 });
   });
 
   test('editing text in Admin UI updates iframe', async ({ page }) => {
@@ -934,5 +938,118 @@ test.describe('Inline Editing - Basic', () => {
     const cursorInfo = await helper.getCursorInfo(editor);
     expect(cursorInfo.isFocused).toBe(true);
     expect(cursorInfo.selectionCollapsed).toBe(true);
+  });
+
+  test('can select a newly added slate block via add button', async ({ page }) => {
+    // This test verifies that a new slate block added via the add button
+    // can be properly selected and focused for editing.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial block count
+    const initialCount = await helper.getBlockCount();
+
+    // Select a block and click Add
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.clickAddBlockButton();
+
+    // Select Slate block type
+    await helper.selectBlockType('slate');
+
+    // Wait for block to be added
+    await helper.waitForBlockCountToBe(initialCount + 1);
+
+    // Get the new block's UID
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf('block-1-uuid');
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Click the new block to select it
+    await helper.clickBlockInIframe(newBlockUid!);
+
+    // Verify the new block is selected
+    await helper.waitForBlockSelected(newBlockUid!);
+
+    // Verify the editor is focusable and has correct cursor placement
+    const newEditor = await helper.getEditorLocator(newBlockUid!);
+    const isContentEditable = await newEditor.getAttribute('contenteditable');
+    expect(isContentEditable).toBe('true');
+
+    // Verify cursor is inside the block (should be inside data-node-id element)
+    const cursorInfo = await helper.getCursorInfo(newEditor);
+    expect(cursorInfo.isFocused).toBe(true);
+
+    // Debug: check if data-node-id exists in DOM
+    const hasNodeId = await newEditor.evaluate((el: HTMLElement) => {
+      const nodeIdEl = el.querySelector('[data-node-id]');
+      const elHasNodeId = el.hasAttribute('data-node-id');
+      return {
+        hasNodeIdElement: !!nodeIdEl,
+        innerHTML: el.innerHTML,
+        outerHTML: el.outerHTML,
+        elTagName: el.tagName,
+        elHasNodeId,
+        elNodeIdValue: el.getAttribute('data-node-id'),
+        nodeIdValue: nodeIdEl?.getAttribute('data-node-id'),
+      };
+    });
+    console.log('[TEST] DOM check:', hasNodeId);
+
+    expect(cursorInfo.insideNodeId).toBe(true);
+  });
+
+  test('typing in newly added slate block syncs to sidebar', async ({ page }) => {
+    // This test verifies that typing in a new slate block (added via add button)
+    // properly syncs the content to the sidebar editor.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Get initial block count
+    const initialCount = await helper.getBlockCount();
+
+    // Select a block and click Add
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.clickAddBlockButton();
+
+    // Select Slate block type
+    await helper.selectBlockType('slate');
+
+    // Wait for block to be added
+    await helper.waitForBlockCountToBe(initialCount + 1);
+
+    // Get the new block's UID
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf('block-1-uuid');
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Click the new block to select it
+    await helper.clickBlockInIframe(newBlockUid!);
+    await helper.waitForBlockSelected(newBlockUid!);
+
+    // Get the editor and type some text
+    const newEditor = await helper.getEditorLocator(newBlockUid!);
+    await newEditor.click();
+    await newEditor.pressSequentially('Hello World', { delay: 10 });
+
+    // Wait for text to appear in iframe
+    await page.waitForTimeout(200);
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"]`);
+    await expect(newBlock).toContainText('Hello World', { timeout: 5000 });
+
+    // Verify the sidebar also shows the typed text
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+    await expect(sidebarEditor).toContainText('Hello World', { timeout: 5000 });
   });
 });
