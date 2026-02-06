@@ -12,36 +12,46 @@
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
 
-                <!-- Render blocks with template expansion -->
-                <Suspense v-if="data.page?.blocks_layout">
-                    <!-- Key forces re-mount when layout changes (e.g., when admin merges template) -->
-                    <AsyncBlocksRenderer
-                        :key="JSON.stringify(data.page?.blocks_layout?.items || [])"
-                        :blocks="data.page?.blocks || {}"
-                        :layout="data.page?.blocks_layout?.items || []"
-                        :allowed-layouts="mainBlocksAllowedLayouts"
-                        :api-url="apiUrl"
-                        :context-path="route.path"
-                        v-slot="{ items }"
-                    >
-                        <section v-for="section in getSectionsFromItems(items)" :key="section.key" :class="section.style">
-                            <div class="flex justify-between px-4 mx-auto max-w-screen-xl ">
-                                <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                                    <template v-for="block in section.blocks" :key="block['@uid']">
-                                        <!-- Listing-type blocks: use AsyncListingBlock (handles its own Suspense internally) -->
-                                        <div v-if="isListingType(block['@type'])" class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
-                                            <AsyncListingBlock :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                                        </div>
-                                        <!-- Static blocks: render immediately -->
-                                        <div v-else class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
-                                            <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl"></Block>
-                                        </div>
-                                    </template>
-                                </div>
+                <!-- Render blocks with template expansion (sync - templates pre-loaded) -->
+                <!-- In edit mode, wait for admin data (with nodeIds) before rendering -->
+                <BlocksRenderer
+                    v-if="data.page?.blocks_layout && shouldRenderBlocks"
+                    :key="JSON.stringify(data.page?.blocks_layout?.items || [])"
+                    :blocks="data.page?.blocks || {}"
+                    :layout="data.page?.blocks_layout?.items || []"
+                    :templates="data.templates || {}"
+                    :allowed-layouts="mainBlocksAllowedLayouts"
+                    v-slot="{ items }"
+                >
+                    <section v-for="styleGroup in groupByStyle(items)" :key="styleGroup.key" :class="styleGroup.style">
+                        <div class="flex justify-between px-4 mx-auto max-w-screen-xl">
+                            <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
+                                <template v-for="block in styleGroup.blocks" :key="block['@uid']">
+                                    <!-- Static blocks: render immediately -->
+                                    <div v-if="block['@type'] !== 'listing'" class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
+                                        <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
+                                    </div>
+                                    <!-- Listing blocks: expand async with own paging -->
+                                    <div v-else class="mx-auto max-w-4xl">
+                                        <Suspense>
+                                            <ListingExpander
+                                                :block="block"
+                                                :block-uid="block['@uid']"
+                                                :api-url="apiUrl"
+                                                :context-path="contextPath"
+                                                v-slot="{ items: expandedItems, paging: listingPaging, buildPagingUrl }"
+                                            >
+                                                <Block v-for="item in expandedItems" :key="item['@uid']"
+                                                       :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+                                                <Paging :paging="listingPaging" :build-url="buildPagingUrl" />
+                                            </ListingExpander>
+                                        </Suspense>
+                                    </div>
+                                </template>
                             </div>
-                        </section>
-                    </AsyncBlocksRenderer>
-                </Suspense>
+                        </div>
+                    </section>
+                </BlocksRenderer>
 
                 <div v-else-if="data?.page">
                     <h1>{{ data.page?.title }}</h1>
@@ -59,25 +69,37 @@
     <!-- </div> -->
     </main>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
-        <!-- Dynamic footer_blocks content -->
+        <!-- Dynamic footer_blocks content (sync - templates pre-loaded) -->
         <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
-            <Suspense>
-                <!-- Key forces re-mount when layout changes (e.g., when admin merges template) -->
-                <AsyncBlocksRenderer
-                    v-if="data.page?.footer_blocks || footerAllowedLayouts"
-                    :key="JSON.stringify(data.page?.footer_blocks_layout?.items || [])"
-                    :blocks="data.page?.footer_blocks || {}"
-                    :layout="data.page?.footer_blocks_layout?.items || []"
-                    :allowed-layouts="footerAllowedLayouts"
-                    :api-url="apiUrl"
-                    :context-path="route.path"
-                    v-slot="{ items }"
-                >
-                    <template v-for="item in items" :key="item['@uid']">
-                        <Block :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
-                    </template>
-                </AsyncBlocksRenderer>
-            </Suspense>
+            <BlocksRenderer
+                v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks"
+                :key="JSON.stringify(data.page?.footer_blocks_layout?.items || [])"
+                :blocks="data.page?.footer_blocks || {}"
+                :layout="data.page?.footer_blocks_layout?.items || []"
+                :templates="data.templates || {}"
+                :allowed-layouts="footerAllowedLayouts"
+                v-slot="{ items }"
+            >
+                <template v-for="block in items" :key="block['@uid']">
+                    <!-- Static blocks: render immediately -->
+                    <Block v-if="block['@type'] !== 'listing'"
+                           :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
+                    <!-- Listing blocks: expand async -->
+                    <Suspense v-else>
+                        <ListingExpander
+                            :block="block"
+                            :block-uid="block['@uid']"
+                            :api-url="apiUrl"
+                            :context-path="contextPath"
+                            v-slot="{ items: expandedItems, paging, buildPagingUrl }"
+                        >
+                            <Block v-for="item in expandedItems" :key="item['@uid']"
+                                   :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+                            <Paging :paging="paging" :build-url="buildPagingUrl" />
+                        </ListingExpander>
+                    </Suspense>
+                </template>
+            </BlocksRenderer>
         </div>
         <!-- Static footer content -->
         <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
@@ -98,25 +120,66 @@
 
 <script setup>
 
+import { ref, computed, provide } from 'vue';
 import { initBridge } from '@hydra-js/hydra.js';
 import { useRuntimeConfig } from "#imports"
 
 const runtimeConfig = useRuntimeConfig();
 const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
+const route = useRoute();
 
-// Block types that require async expansion (contain listings or queries)
-// Each gets its own Suspense at page level; inside containers they share paging
-// Note: 'search' blocks render via Block.vue which has the proper search UI (headline, facets)
-// The listing child inside search will be rendered by Block recursively
-const LISTING_BLOCK_TYPES = ['listing', 'gridBlock'];
+// Context path for paging URLs
+const contextPath = computed(() => {
+    const pageId = data.value?.page?.['@id'] || '/';
+    if (pageId.startsWith('http')) {
+        return new URL(pageId).pathname;
+    }
+    return pageId;
+});
+
+// Track if we've received admin data (with nodeIds) - needed for inline editing sync
+const hasAdminData = ref(false);
+
+// Detect edit mode - check URL param (works in SSR) and window.name (client only)
+const isInEditMode = computed(() => {
+    if (route.query._edit === 'true') return true;
+    if (typeof window !== 'undefined') {
+        return window.name.startsWith('hydra-edit:');
+    }
+    return false;
+});
+
+// Whether we should render blocks - in edit mode, wait for admin data
+const shouldRenderBlocks = computed(() => {
+    if (!isInEditMode.value) return true;  // View mode: render from API
+    return hasAdminData.value;  // Edit mode: wait for admin data with nodeIds
+});
 
 /**
- * Check if a block type requires async expansion.
- * @param {string} blockType - The @type of the block
- * @returns {boolean}
+ * Group blocks by their background style (for visual sectioning).
+ * Takes an array of expanded blocks and returns groups that share the same style.
  */
-function isListingType(blockType) {
-  return LISTING_BLOCK_TYPES.includes(blockType);
+function groupByStyle(items) {
+    if (!items?.length) {
+        return [];
+    }
+    let groupIndex = 0;
+    let currentGroup = { blocks: [], style: null, key: `style-${groupIndex}` };
+    const groups = [currentGroup];
+
+    for (const item of items) {
+        const style = item?.styles?.backgroundColor === 'grey' ? { 'bg-slate-300': true } : {};
+        const styleKey = JSON.stringify(style);
+
+        if (currentGroup.style !== null && JSON.stringify(currentGroup.style) !== styleKey) {
+            groupIndex++;
+            currentGroup = { blocks: [], style: null, key: `style-${groupIndex}` };
+            groups.push(currentGroup);
+        }
+        currentGroup.style = style;
+        currentGroup.blocks.push(item);
+    }
+    return groups;
 }
 
 // initialize components based on data attribute selectors
@@ -445,6 +508,8 @@ onMounted(() => {
             });
             bridge.onEditChange((page) => {
                 if (page) {
+                    // Mark that we have admin data with nodeIds
+                    hasAdminData.value = true;
                     // Update page data - AsyncListingBlock components will
                     // re-render and expand listings via their own Suspense
                     data.value.page = page;
@@ -454,18 +519,23 @@ onMounted(() => {
     }
 });
 
-// to get access to the "slug" dynamic param
-const route = useRoute()
-
 // Determine footer allowedLayouts based on path (same as mock frontend)
 const footerAllowedLayouts = computed(() => {
-    return route.path === '/another-page' ? ['/templates/footer-layout'] : null;
+    // Use startsWith to handle trailing slashes and normalize
+    const normalizedPath = route.path.replace(/\/$/, '');
+    return normalizedPath === '/another-page' ? ['/templates/footer-layout'] : null;
 });
 
 // Main blocks allowedLayouts (same as bridge config)
 const mainBlocksAllowedLayouts = computed(() => {
     return [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'];
 });
+
+// Collect all allowedLayouts for template pre-loading
+const allAllowedLayouts = [
+    ...(mainBlocksAllowedLayouts.value || []).filter(Boolean),
+    ...(footerAllowedLayouts.value || []).filter(Boolean),
+];
 
 var path = [];
 var pages = {};
@@ -480,14 +550,18 @@ for (var part of route.params.slug) {
 }
 
 // retrieve the data associated with an article
-// based on its slug
+// based on its slug (pre-loads templates for sync expansion)
 const { data, error } = await ploneApi({
   path: path,
-  pages: pages
+  pages: pages,
+  allowedLayouts: allAllowedLayouts,
 });
 
-// Note: Listing expansion is now handled by AsyncListingBlock component
-// which uses Suspense for streaming SSR
+// Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)
+provide('templates', computed(() => data.value?.templates || {}));
+provide('templateState', {});  // Shared across all expandTemplatesSync calls
+provide('apiUrl', apiUrl);
+provide('contextPath', contextPath);
 
 useSeoMeta({
   ogTitle: data.page?.title,
@@ -497,49 +571,6 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
 })
 
-function getSections(page) {
-    if (!page?.blocks_layout) {
-        return []
-    }
-    var section = {blocks:[], style:null};
-    var sections = [section];
-    // find all with the same styles and group them
-    for (let i in page.blocks_layout?.items) {
-        var block_id = page.blocks_layout?.items[i];
-        var block = page.blocks[block_id];
-        var style = block?.styles?.backgroundColor == 'grey'? {'bg-slate-300':true} : {};
-        if (section.style != null && JSON.stringify(section.style) !== JSON.stringify(style)) {
-            section = {blocks:[], style:null};
-            sections.push(section);
-        }
-        section.style = style;
-        section.blocks.push({id:block_id, block:block});
-    }
-    return sections;
-}
-
-// Version of getSections that works with expanded items (from AsyncBlocksRenderer)
-// Items have @uid and block properties directly on the item
-function getSectionsFromItems(items) {
-    if (!items?.length) {
-        return []
-    }
-    var sectionIndex = 0;
-    var section = {blocks:[], style:null, key: `section-${sectionIndex}`};
-    var sections = [section];
-    // find all with the same styles and group them
-    for (const item of items) {
-        var style = item?.styles?.backgroundColor == 'grey'? {'bg-slate-300':true} : {};
-        if (section.style != null && JSON.stringify(section.style) !== JSON.stringify(style)) {
-            sectionIndex++;
-            section = {blocks:[], style:null, key: `section-${sectionIndex}`};
-            sections.push(section);
-        }
-        section.style = style;
-        section.blocks.push(item);
-    }
-    return sections;
-}
 
 
 // if (error) {

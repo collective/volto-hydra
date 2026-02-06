@@ -368,7 +368,9 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Exit template edit mode - click header to access the edit toggle
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await editToggle.uncheck();
+    const editCheckbox = page.locator('#field-editTemplate');
+    await editToggle.click();
+    await expect(editCheckbox).not.toBeChecked();
     await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Select the moved block - it should be editable now (template edit mode is off)

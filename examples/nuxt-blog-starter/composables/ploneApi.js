@@ -1,4 +1,4 @@
-import { getAccessToken } from '@hydra-js/hydra.js';
+import { getAccessToken, loadTemplates } from '@hydra-js/hydra.js';
 
 export default async function ploneApi({
   path,
@@ -6,6 +6,7 @@ export default async function ploneApi({
   watch = [],
   _default = {},
   pages = {},
+  allowedLayouts = [],  // Optional: forced layouts to pre-load
 }) {
   const runtimeConfig = useRuntimeConfig();
   const route = useRoute();
@@ -57,12 +58,6 @@ export default async function ploneApi({
       };
     },
     transform: async (data) => {
-      // if (error!==undefined  ) {
-      //     showError(error);
-      //        // throw new error;
-      //     return {title:"Error"};
-      // }
-
       data['_listing_pages'] = pages;
       if (query) {
         return data;
@@ -70,8 +65,20 @@ export default async function ploneApi({
         const comp = data['@components'];
         delete data['@components'];
 
+        // Pre-load templates for SSR (avoids Suspense flicker)
+        const loadTemplate = async (templateId) => {
+          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${templateId}`;
+          const response = await fetch(url, { headers });
+          if (!response.ok) {
+            throw new Error(`Failed to fetch template: ${templateId}`);
+          }
+          return response.json();
+        };
+        const templates = await loadTemplates(data, loadTemplate, allowedLayouts);
+
         return {
           page: data,
+          templates,  // Pre-loaded templates for sync expansion
           _listing_pages: pages,
           navigation: comp.navigation,
           breadcrumbs: comp.breadcrumbs,

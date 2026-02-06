@@ -9385,6 +9385,97 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
 }
 
 /**
+ * Load all templates referenced in data, including nested templates.
+ * Recursively scans data for templateId references, loads them,
+ * then scans loaded templates for more references until all are loaded.
+ *
+ * @param {Object} data - Page data to scan for template references
+ * @param {Function} loadTemplate - Async function: (templateId) => Promise<templateData>
+ * @param {Array} allowedLayouts - Optional forced layouts to include
+ * @returns {Promise<Object>} Map of templateId -> template data
+ */
+export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
+  const templates = {};
+  const loaded = new Set();
+  const failed = new Set();
+
+  // Helper to scan an object for templateId references
+  function collectTemplateIds(obj, visited = new Set()) {
+    const ids = new Set();
+
+    function scan(o) {
+      if (!o || typeof o !== 'object') return;
+      if (visited.has(o)) return;
+      visited.add(o);
+
+      if (Array.isArray(o)) {
+        for (const item of o) scan(item);
+        return;
+      }
+
+      if (o.templateId && typeof o.templateId === 'string') {
+        ids.add(o.templateId);
+      }
+
+      for (const value of Object.values(o)) {
+        scan(value);
+      }
+    }
+
+    scan(obj);
+    return ids;
+  }
+
+  // Collect initial template IDs from data + allowedLayouts
+  let pending = collectTemplateIds(data);
+  for (const layoutId of allowedLayouts) {
+    if (layoutId) pending.add(layoutId);
+  }
+
+  // Keep loading until no new templates found
+  while (pending.size > 0) {
+    // Filter out already loaded/failed
+    const toLoad = Array.from(pending).filter(id => !loaded.has(id) && !failed.has(id));
+    pending.clear();
+
+    if (toLoad.length === 0) break;
+
+    // Load in parallel
+    const results = await Promise.all(
+      toLoad.map(async (id) => {
+        try {
+          const template = await loadTemplate(id);
+          return { id, template };
+        } catch (error) {
+          console.warn(`[HYDRA] Failed to load template ${id}:`, error);
+          return { id, template: null };
+        }
+      })
+    );
+
+    // Process results and collect nested template IDs
+    for (const { id, template } of results) {
+      if (template) {
+        loaded.add(id);
+        templates[id] = template;
+
+        // Scan this template for nested template references
+        const nestedIds = collectTemplateIds(template);
+        for (const nestedId of nestedIds) {
+          if (!loaded.has(nestedId) && !failed.has(nestedId)) {
+            pending.add(nestedId);
+          }
+        }
+      } else {
+        failed.add(id);
+      }
+    }
+  }
+
+  return templates;
+}
+
+/**
  * Expand blocks with template layout applied.
  * Returns items with @uid field (like expandListingBlocks).
  *
@@ -9626,12 +9717,19 @@ export async function expandTemplates(inputItems, options = {}) {
   }
 
   // Load template if needed
-  if (!templateState.template && loadTemplate) {
-    try {
-      templateState.template = await loadTemplate(templateId);
+  if (!templateState.template) {
+    // Check pre-loaded templates first
+    if (options.templates?.[templateId]) {
+      templateState.template = options.templates[templateId];
       templateState.instanceId = existingInstanceId || generateUUID();
-    } catch (error) {
-      console.warn(`[HYDRA] expandTemplates: Error loading template ${templateId}:`, error);
+    } else if (loadTemplate) {
+      // Fall back to async loading
+      try {
+        templateState.template = await loadTemplate(templateId);
+        templateState.instanceId = existingInstanceId || generateUUID();
+      } catch (error) {
+        console.warn(`[HYDRA] expandTemplates: Error loading template ${templateId}:`, error);
+      }
     }
   }
 
@@ -9793,6 +9891,348 @@ export async function expandTemplates(inputItems, options = {}) {
   }
 
   // Add trailing standalone blocks (blocks that appeared after template blocks)
+  for (const { blockId, block } of trailingStandaloneBlocks) {
+    addItem(block, blockId);
+  }
+
+  return items;
+}
+
+/**
+ * Synchronous version of expandTemplates.
+ * Requires all templates to be pre-loaded in options.templates.
+ * Throws if a required template is not found in the pre-loaded map.
+ *
+ * @param {Array} inputItems - Input items (block IDs or block objects)
+ * @param {Object} options - Configuration options
+ * @param {Object} options.templates - Map of templateId -> template data (REQUIRED)
+ * @param {Object} options.templateState - Mutable state object (pass {} on first call)
+ * @param {Array} options.allowedLayouts - Force layout from this list if no matching layout applied
+ * @returns {Array} Items with @uid field
+ */
+export function expandTemplatesSync(inputItems, options = {}) {
+  const {
+    blocks: blocksDict,
+    templateState = {},
+    templates,
+    allowedLayouts,
+    uuidGenerator,
+    filterInstanceId,
+  } = options;
+
+  if (!templates) {
+    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
+  }
+
+  const items = [];
+  const addItem = (block, blockId) => {
+    items.push({ ...block, '@uid': blockId });
+  };
+
+  // In edit mode, admin handles template merging - pass blocks through as-is
+  const editMode = isEditMode();
+  if (editMode) {
+    return (inputItems || []).map(item => {
+      if (typeof item === 'string') {
+        const block = blocksDict?.[item];
+        return block ? { ...block, '@uid': item } : null;
+      }
+      return item;
+    }).filter(Boolean);
+  }
+
+  // Normalize items
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] expandTemplatesSync: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    return item;
+  }).filter(Boolean);
+
+  const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
+  const layout = normalizedItems.map(item => item['@uid']);
+
+  // Check if inside a registered nested container
+  if (blocksDict && templateState.nestedContainers?.has(blocksDict)) {
+    const nestedInfo = templateState.nestedContainers.get(blocksDict);
+    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
+  }
+
+  if (layout.length === 0 && !allowedLayouts?.length) {
+    return items;
+  }
+
+  // Initialize state on first call
+  if (!templateState.initialized) {
+    templateState.initialized = true;
+    templateState.template = null;
+    templateState.instanceId = null;
+    templateState.emittedPlaceholders = new Set();
+    templateState.pendingContent = new Map();
+    templateState.existingFixedBlockIds = new Map();
+    templateState.leadingStandaloneBlocks = [];
+    templateState.trailingStandaloneBlocks = [];
+    templateState.newTemplateIds = new Set();
+    templateState.nestedContainers = new Map();
+
+    let templateId = null;
+    let existingInstanceId = filterInstanceId || null;
+    for (const blockId of layout) {
+      const block = blocks[blockId];
+      if (block?.templateId) {
+        templateId = block.templateId;
+        if (!filterInstanceId) {
+          existingInstanceId = block.templateInstanceId;
+        }
+        break;
+      }
+    }
+
+    if (allowedLayouts?.length > 0) {
+      if (!templateId || !allowedLayouts.includes(templateId)) {
+        templateId = allowedLayouts[0];
+        if (!filterInstanceId) {
+          existingInstanceId = null;
+        }
+      }
+    }
+
+    templateState.templateId = templateId;
+    templateState.existingInstanceId = existingInstanceId;
+
+    if (templateId) {
+      if (existingInstanceId) {
+        const allStandaloneBlocks = [];
+        collectContentFromTree(
+          { blocks, blocks_layout: { items: layout } },
+          existingInstanceId,
+          templateState.pendingContent,
+          allStandaloneBlocks,
+          templateState.existingFixedBlockIds
+        );
+
+        let foundFirstTemplateBlock = false;
+        let lastTemplateBlockIndex = -1;
+        for (let i = 0; i < layout.length; i++) {
+          const block = blocks[layout[i]];
+          if (block?.templateInstanceId === existingInstanceId) {
+            if (!foundFirstTemplateBlock) foundFirstTemplateBlock = true;
+            lastTemplateBlockIndex = i;
+          }
+        }
+
+        for (let i = 0; i < layout.length; i++) {
+          const blockId = layout[i];
+          const block = blocks[blockId];
+          if (!block) continue;
+          if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
+            if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
+              const b = blocks[id];
+              return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
+            }))) {
+              templateState.leadingStandaloneBlocks.push({ blockId, block });
+            } else if (i > lastTemplateBlockIndex) {
+              templateState.trailingStandaloneBlocks.push({ blockId, block });
+            }
+          }
+        }
+      } else {
+        for (const blockId of layout) {
+          const block = blocks[blockId];
+          if (!block) continue;
+          if (block.templateId && block.templateId !== templateId) {
+            templateState.newTemplateIds.add(block.templateId);
+          }
+          if (block.fixed && block.templateId && block.templateId !== templateId) {
+            if (block.readOnly) continue;
+            if (block.placeholder) {
+              templateState.existingFixedBlockIds.set(block.placeholder, { blockId, block });
+            }
+            continue;
+          }
+          if (block.placeholder) {
+            const placeholder = block.placeholder;
+            if (!templateState.pendingContent.has(placeholder)) {
+              templateState.pendingContent.set(placeholder, []);
+            }
+            templateState.pendingContent.get(placeholder).push({ blockId, block });
+          } else {
+            if (!templateState.pendingContent.has('default')) {
+              templateState.pendingContent.set('default', []);
+            }
+            templateState.pendingContent.get('default').push({ blockId, block });
+          }
+        }
+      }
+    }
+  }
+
+  const { templateId, existingInstanceId } = templateState;
+
+  if (!templateId) {
+    for (const blockId of layout) {
+      if (blocks[blockId]) {
+        addItem(blocks[blockId], blockId);
+      }
+    }
+    return items;
+  }
+
+  // Load template from pre-loaded map (sync - throw if not found)
+  if (!templateState.template) {
+    const template = templates[templateId];
+    if (!template) {
+      throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
+    }
+    templateState.template = template;
+    templateState.instanceId = existingInstanceId || generateUUID();
+  }
+
+  const { template, instanceId, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = templateState;
+
+  if (!template) {
+    for (const blockId of layout) {
+      if (blocks[blockId]) {
+        addItem(blocks[blockId], blockId);
+      }
+    }
+    return items;
+  }
+
+  // Process template (same as async version from here)
+  const templateLayout = template.blocks_layout?.items || [];
+  let firstFixedIndex = -1;
+  let lastFixedIndex = -1;
+  const slotPositions = {};
+
+  for (let i = 0; i < templateLayout.length; i++) {
+    const tplBlock = template.blocks?.[templateLayout[i]];
+    if (!tplBlock?.placeholder) continue;
+    if (tplBlock.fixed) {
+      if (firstFixedIndex === -1) firstFixedIndex = i;
+      lastFixedIndex = i;
+    } else {
+      if (firstFixedIndex === -1) {
+        slotPositions[tplBlock.placeholder] = 'top';
+      } else if (i > lastFixedIndex) {
+        slotPositions[tplBlock.placeholder] = 'bottom';
+      } else {
+        slotPositions[tplBlock.placeholder] = 'middle';
+      }
+    }
+  }
+
+  for (const { blockId, block } of leadingStandaloneBlocks) {
+    addItem(block, blockId);
+  }
+
+  let defaultInsertIndex = -1;
+  let bottomSlotInsertIndex = -1;
+  let topSlotInsertIndex = -1;
+
+  for (const tplBlockId of templateLayout) {
+    const tplBlock = template.blocks?.[tplBlockId];
+    if (!tplBlock) continue;
+
+    if (tplBlock.fixed) {
+      const placeholder = tplBlock.placeholder;
+      const existing = placeholder && existingFixedBlockIds?.get(placeholder);
+      const blockId = existing?.blockId
+        ? existing.blockId
+        : (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
+
+      let blockContent = tplBlock;
+      if (!tplBlock.readOnly && existing?.block) {
+        blockContent = { ...tplBlock, value: existing.block.value };
+      }
+
+      addItem(
+        {
+          ...blockContent,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+        },
+        blockId
+      );
+
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        templateState.nestedContainers.set(tplBlock.blocks, {
+          templateBlockId: tplBlockId,
+          templateBlocks: tplBlock.blocks,
+          templateLayout: nestedLayout,
+        });
+      }
+    } else {
+      const placeholder = tplBlock.placeholder || 'default';
+      const insertIndex = items.length;
+
+      if (placeholder === 'default') {
+        defaultInsertIndex = insertIndex;
+      }
+      const position = slotPositions[placeholder];
+      if (position === 'bottom' && bottomSlotInsertIndex === -1) {
+        bottomSlotInsertIndex = insertIndex;
+      } else if (position === 'top' && topSlotInsertIndex === -1) {
+        topSlotInsertIndex = insertIndex;
+      }
+
+      if (!emittedPlaceholders.has(placeholder)) {
+        emittedPlaceholders.add(placeholder);
+        const content = pendingContent.get(placeholder) || [];
+        for (const { blockId, block } of content) {
+          addItem(
+            {
+              ...block,
+              templateId: templateId,
+              templateInstanceId: instanceId,
+              placeholder: placeholder,
+            },
+            blockId
+          );
+        }
+        pendingContent.delete(placeholder);
+      }
+    }
+  }
+
+  const remainingContent = [];
+  for (const [placeholder, content] of pendingContent) {
+    if (!emittedPlaceholders.has(placeholder)) {
+      emittedPlaceholders.add(placeholder);
+      for (const { blockId, block } of content) {
+        remainingContent.push({
+          ...block,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+          placeholder: 'default',
+          _orphaned: true,
+          '@uid': blockId,
+        });
+      }
+    }
+  }
+
+  if (remainingContent.length > 0) {
+    let insertIndex = -1;
+    if (defaultInsertIndex >= 0) {
+      insertIndex = defaultInsertIndex;
+    } else if (bottomSlotInsertIndex >= 0) {
+      insertIndex = bottomSlotInsertIndex;
+    } else if (topSlotInsertIndex >= 0) {
+      insertIndex = topSlotInsertIndex;
+    }
+
+    if (insertIndex >= 0) {
+      items.splice(insertIndex, 0, ...remainingContent);
+    }
+  }
+
   for (const { blockId, block } of trailingStandaloneBlocks) {
     addItem(block, blockId);
   }

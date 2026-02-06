@@ -1225,21 +1225,26 @@ initBridge({
 
 ### Applying Merge rules
 
-Use `expandTemplates` to merge template content during rendering.
-This will refresh all template instances it finds from the template content.
+Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched templates) to merge template content during rendering.
 
-**Edit Mode:** In edit mode (`_edit=true` or `window.name` starts with `hydra-edit:`),
-`expandTemplates` passes blocks through unchanged. This is because the admin handles
-template merging and adds `nodeId` attributes for inline editing. Re-expanding would
-overwrite the admin's data. Use `isEditMode()` to check the current mode if needed.
+**Edit Mode:** These functions automatically detect edit mode via `isEditMode()` and pass blocks through unchanged (just adding `@uid`). This is because the admin handles template merging and adds `nodeId` attributes for inline editing. On SSR (no `window`), `isEditMode()` returns `false` so templates are expanded - this is correct since edit mode only exists in the browser iframe.
+
+**Sync vs Async:**
+- `expandTemplatesSync` - Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous.
+- `expandTemplates` - Use when you need to lazy-load templates on demand.
 
 ```js
-import { expandTemplates } from '@volto-hydra/hydra-js';
+import { expandTemplatesSync, expandTemplates } from '@hydra-js/hydra.js';
 
-const templateState = {};
+// Sync approach: pre-fetch templates at page level, use in computed properties
+const templates = await fetchTemplates(templateIds);  // Do once at page load
+const templateState = {};  // Share across all expandTemplatesSync calls
+const items = expandTemplatesSync(layout, { blocks, templateState, templates });
+
+// Async approach: load templates on demand
 const items = await expandTemplates(layout, {
   blocks,
-  templateState,
+  templateState: {},
   loadTemplate: async (id) => fetch(id).then(r => r.json())
 });
 
@@ -1250,9 +1255,10 @@ for (const item of items) {
 ```
 
 **Options:**
-- `blocks`: Map of blockId -> block data (required when layout contains string IDs)
-- `templateState`: Pass `{}` - tracks state across calls for nested containers
-- `loadTemplate(id)`: Async function to fetch template content
+- `blocks`: Map of blockId -> block data
+- `templateState`: Pass `{}` and share across calls - tracks state for nested containers
+- `templates`: (sync only) Pre-fetched map of templateId -> template data
+- `loadTemplate(id)`: (async only) Function to fetch template content
 - `allowedLayouts`: Force a layout when container has no template applied
 
 The merge algorithm follows these rules
@@ -1286,13 +1292,18 @@ After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 ```
 
 Your frontend might want to force a layout to apply regardless of whether one is saved,
-for example to ensure a footer layout. Pass `allowedLayouts` to `expandTemplates`:
+for example to ensure a footer layout. Pass `allowedLayouts`:
 
 ```js
+// Sync (with pre-fetched templates)
+const items = expandTemplatesSync(layout, {
+  blocks, templateState, templates,
+  allowedLayouts: ['/templates/footer-layout'],
+});
+
+// Async
 const items = await expandTemplates(layout, {
-  blocks,
-  templateState: {},
-  loadTemplate,
+  blocks, templateState: {}, loadTemplate,
   allowedLayouts: ['/templates/footer-layout'],
 });
 ```
@@ -1348,16 +1359,21 @@ listing: {
 }
 ```
 
-**Suspense/streaming**: Since `expandListingBlocks` is async, it works well with Vue/React Suspense for streaming SSR. Wrap listing blocks in Suspense so static content renders immediately while listings stream in:
+**Suspense/streaming**: Since `expandListingBlocks` is async, wrap listing blocks in Suspense. Create a `ListingExpander` component that calls `expandListingBlocks` and exposes results via scoped slot:
 
 ```vue
-<Suspense>
-  <template #default><AsyncExpandedItems :blocks="blocks" :paging="paging" /></template>
-  <template #fallback><LoadingSkeleton /></template>
+<!-- Usage in Block.vue -->
+<Suspense v-if="block['@type'] === 'listing'">
+  <ListingExpander :block="block" :block-uid="block_uid" v-slot="{ items, paging, buildPagingUrl }">
+    <Block v-for="item in items" :key="item['@uid']" :block="item" :block_uid="item['@uid']" />
+    <Paging :paging="paging" :build-url="buildPagingUrl" />
+  </ListingExpander>
 </Suspense>
 ```
 
-Note: Expanded listing items all share the same `@uid` (the listing block's ID). When editing, selecting any item selects the listing block itself.
+**Shared paging for containers**: For grids with mixed static and listing blocks, pass a shared `paging` object. Use `staticBlocks` for non-listings, `ListingExpander` with the same paging for listings. See the [Nuxt example](./examples/nuxt-blog-starter/components/Block.vue) for the full pattern.
+
+Note: Expanded listing items share the listing block's `@uid`. When editing, selecting any item selects the listing block.
 
 ## Advanced
 

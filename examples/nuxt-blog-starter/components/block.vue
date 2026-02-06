@@ -71,40 +71,36 @@
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
     class="mt-6 mb-6"
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
-    <!-- Grid that wraps to multiple rows -->
+    <!-- Grid: expand templates, then render items with shared paging -->
     <div class="grid-row grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      <template v-for="uid in (block.blocks_layout?.items || [])" :key="uid">
-        <Block v-if="block.blocks?.[uid]"
-          :block_uid="block.blocks[uid]._blockUid || uid"
-          :block="block.blocks[uid]" :data="data" :contained="true"
-          class="grid-cell p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+      <template v-for="item in expandTemplatesSync(block.blocks_layout?.items || [], { blocks: block.blocks || {}, templateState, templates })" :key="item['@uid']">
+        <!-- Static items: call staticBlocks to track paging -->
+        <template v-if="item['@type'] !== 'listing'">
+          <Block v-for="rendered in staticBlocks([item['@uid']], { blocks: { [item['@uid']]: item }, paging: getGridPaging(block_uid) })"
+            :key="rendered['@uid']"
+            :block_uid="rendered._blockUid || rendered['@uid']"
+            :block="rendered" :data="data" :contained="true"
+            class="grid-cell p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+        </template>
+        <!-- Listing items: expand async with shared paging -->
+        <Suspense v-else>
+          <ListingExpander
+            :block="item"
+            :block-uid="item['@uid']"
+            :api-url="effectiveApiUrl"
+            :context-path="effectiveContextPath"
+            :paging="getGridPaging(block_uid)"
+            v-slot="{ items: expandedItems }"
+          >
+            <Block v-for="expanded in expandedItems" :key="expanded['@uid']"
+              :block_uid="expanded['@uid']" :block="expanded" :data="data" :contained="true"
+              class="grid-cell p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
+          </ListingExpander>
+        </Suspense>
       </template>
     </div>
-    <!-- Paging controls using URL scheme @pg_blockId_pageNumber -->
-    <!-- data-linkable-allow tells hydra.js to allow navigation without beforeunload warning -->
-    <nav v-if="block._paging?.totalPages > 1" aria-label="Grid Navigation" class="grid-paging mt-4">
-      <ul class="inline-flex -space-x-px text-sm">
-        <li v-if="block._paging.prev !== null">
-          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${block._paging.prev}`" data-linkable-allow
-            class="paging-prev flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-s-lg hover:bg-gray-100">
-            Previous
-          </NuxtLink>
-        </li>
-        <li v-for="page in block._paging.pages" :key="page.page">
-          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${page.page - 1}`" data-linkable-allow
-            :class="['paging-page', block._paging.currentPage === page.page - 1 ? 'current bg-blue-100' : 'bg-white']"
-            class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 border border-gray-300 hover:bg-gray-100">
-            {{ page.page }}
-          </NuxtLink>
-        </li>
-        <li v-if="block._paging.next !== null">
-          <NuxtLink :to="`${getUrl(data)}/@pg_${block_uid}_${block._paging.next}`" data-linkable-allow
-            class="paging-next flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100">
-            Next
-          </NuxtLink>
-        </li>
-      </ul>
-    </nav>
+    <!-- Paging for the whole grid -->
+    <Paging :paging="getGridPaging(block_uid)" :build-url="(page) => page === 0 ? effectiveContextPath : `${effectiveContextPath}?pg_${block_uid}=${page}`" />
   </div>
 
   <!-- Columns container block -->
@@ -114,9 +110,17 @@
 
     <!-- Top images row - horizontal layout for images above columns -->
     <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4">
-      <Block v-for="imgId in block.top_images_layout.items" :key="imgId"
-             :block_uid="imgId" :block="block.top_images[imgId]" :data="data" :contained="true"
-             data-block-add="right" />
+      <template v-for="item in expandTemplatesSync(block.top_images_layout?.items || [], { blocks: block.top_images || {}, templateState, templates })" :key="item['@uid']">
+        <Block v-if="item['@type'] !== 'listing'"
+               :block_uid="item['@uid']" :block="item" :data="data" :contained="true" data-block-add="right" />
+        <Suspense v-else>
+          <ListingExpander :block="item" :block-uid="item['@uid']" :api-url="effectiveApiUrl" :context-path="effectiveContextPath"
+            v-slot="{ items: expanded, paging, buildPagingUrl }">
+            <Block v-for="exp in expanded" :key="exp['@uid']" :block_uid="exp['@uid']" :block="exp" :data="data" :contained="true" />
+            <Paging :paging="paging" :build-url="buildPagingUrl" />
+          </ListingExpander>
+        </Suspense>
+      </template>
     </div>
 
     <!-- Columns row - horizontal layout -->
@@ -127,9 +131,18 @@
         <!-- Column title -->
         <h4 v-if="block.columns?.[columnId]?.title" data-editable-field="title"
             class="column-title mb-2 text-sm font-medium">{{ block.columns[columnId].title }}</h4>
-        <!-- Column content blocks - vertical layout, Block component adds data-block-uid -->
-        <Block v-for="blockId in (block.columns?.[columnId]?.blocks_layout?.items || [])" :key="blockId"
-               :block_uid="blockId" :block="block.columns[columnId].blocks[blockId]" :data="data" :contained="true" />
+        <!-- Column content blocks -->
+        <template v-for="item in expandTemplatesSync(block.columns?.[columnId]?.blocks_layout?.items || [], { blocks: block.columns?.[columnId]?.blocks || {}, templateState, templates })" :key="item['@uid']">
+          <Block v-if="item['@type'] !== 'listing'"
+                 :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+          <Suspense v-else>
+            <ListingExpander :block="item" :block-uid="item['@uid']" :api-url="effectiveApiUrl" :context-path="effectiveContextPath"
+              v-slot="{ items: expanded, paging, buildPagingUrl }">
+              <Block v-for="exp in expanded" :key="exp['@uid']" :block_uid="exp['@uid']" :block="exp" :data="data" :contained="true" />
+              <Paging :paging="paging" :build-url="buildPagingUrl" />
+            </ListingExpander>
+          </Suspense>
+        </template>
       </div>
     </div>
   </div>
@@ -256,8 +269,16 @@
         :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
         :aria-controls="`accordion-collapse-body-${block_uid}`">
         <span>
-          <Block v-for="uid in (block.header_layout?.items || [])" :key="uid"
-                 :block_uid="uid" :block="block.header?.[uid]" :data="data" />
+          <template v-for="item in expandTemplatesSync(block.header_layout?.items || [], { blocks: block.header || {}, templateState, templates })" :key="item['@uid']">
+            <Block v-if="item['@type'] !== 'listing'" :block_uid="item['@uid']" :block="item" :data="data" />
+            <Suspense v-else>
+              <ListingExpander :block="item" :block-uid="item['@uid']" :api-url="effectiveApiUrl" :context-path="effectiveContextPath"
+                v-slot="{ items: expanded, paging, buildPagingUrl }">
+                <Block v-for="exp in expanded" :key="exp['@uid']" :block_uid="exp['@uid']" :block="exp" :data="data" />
+                <Paging :paging="paging" :build-url="buildPagingUrl" />
+              </ListingExpander>
+            </Suspense>
+          </template>
         </span>
         <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
@@ -268,8 +289,16 @@
     </h2>
     <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
       <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-        <Block v-for="uid in (block.content_layout?.items || [])" :key="uid"
-               :block_uid="uid" :block="block.content?.[uid]" :data="data" />
+        <template v-for="item in expandTemplatesSync(block.content_layout?.items || [], { blocks: block.content || {}, templateState, templates })" :key="item['@uid']">
+          <Block v-if="item['@type'] !== 'listing'" :block_uid="item['@uid']" :block="item" :data="data" />
+          <Suspense v-else>
+            <ListingExpander :block="item" :block-uid="item['@uid']" :api-url="effectiveApiUrl" :context-path="effectiveContextPath"
+              v-slot="{ items: expanded, paging, buildPagingUrl }">
+              <Block v-for="exp in expanded" :key="exp['@uid']" :block_uid="exp['@uid']" :block="exp" :data="data" />
+              <Paging :paging="paging" :build-url="buildPagingUrl" />
+            </ListingExpander>
+          </Suspense>
+        </template>
       </div>
     </div>
   </div>
@@ -340,9 +369,17 @@
 
       <!-- Results -->
       <div class="search-results">
-        <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
-          <AsyncListingBlock v-if="block.listing?.[uid]" :block_uid="uid" :block="block.listing[uid]"
-            :data="data" :api-url="apiUrl" />
+        <template v-for="item in expandTemplatesSync(block.listing_layout?.items || [], { blocks: block.listing || {}, templateState, templates })" :key="item['@uid']">
+          <template v-if="item['@type'] !== 'listing'">
+            <Block :block_uid="item['@uid']" :block="item" :data="data" />
+          </template>
+          <Suspense v-else>
+            <ListingExpander :block="item" :block-uid="item['@uid']" :api-url="effectiveApiUrl" :context-path="effectiveContextPath"
+              v-slot="{ items: expanded, paging, buildPagingUrl }">
+              <Block v-for="exp in expanded" :key="exp['@uid']" :block_uid="exp['@uid']" :block="exp" :data="data" />
+              <Paging :paging="paging" :build-url="buildPagingUrl" />
+            </ListingExpander>
+          </Suspense>
         </template>
       </div>
     </template>
@@ -392,9 +429,17 @@
               </select>
             </div>
           </div>
-          <template v-for="uid in (block.listing_layout?.items || [])" :key="uid">
-            <AsyncListingBlock v-if="block.listing?.[uid]" :block_uid="uid" :block="block.listing[uid]"
-              :data="data" :api-url="apiUrl" />
+          <template v-for="item in expandTemplatesSync(block.listing_layout?.items || [], { blocks: block.listing || {}, templateState, templates })" :key="item['@uid']">
+            <template v-if="item['@type'] !== 'listing'">
+              <Block :block_uid="item['@uid']" :block="item" :data="data" />
+            </template>
+            <Suspense v-else>
+              <ListingExpander :block="item" :block-uid="item['@uid']" :api-url="effectiveApiUrl" :context-path="effectiveContextPath"
+                v-slot="{ items: expanded, paging, buildPagingUrl }">
+                <Block v-for="exp in expanded" :key="exp['@uid']" :block_uid="exp['@uid']" :block="exp" :data="data" />
+                <Paging :paging="paging" :build-url="buildPagingUrl" />
+              </ListingExpander>
+            </Suspense>
           </template>
         </div>
       </div>
@@ -467,8 +512,15 @@
 
 </template>
 <script setup>
-import { ref, watch, nextTick, computed, toRefs } from 'vue';
+import { ref, watch, nextTick, computed, toRefs, inject } from 'vue';
+import { expandTemplatesSync, staticBlocks, isEditMode } from '@hydra-js/hydra.js';
 import RichText from './richtext.vue';
+
+// Inject page-level context for nested components
+const templates = inject('templates', {});
+const templateState = inject('templateState', {});
+const injectedApiUrl = inject('apiUrl', '');
+const injectedContextPath = inject('contextPath', '/');
 
 const props = defineProps({
   block_uid: {
@@ -496,6 +548,30 @@ const props = defineProps({
 
 // Use toRefs to maintain reactivity (destructuring props directly can lose reactivity in Vue 3)
 const { block_uid, block, data, contained, apiUrl } = toRefs(props);
+
+// Use prop apiUrl if provided, otherwise injected value
+const effectiveApiUrl = computed(() => apiUrl.value || injectedApiUrl);
+const effectiveContextPath = computed(() => {
+  const pageId = data.value?.['@id'] || injectedContextPath;
+  if (typeof pageId === 'string' && pageId.startsWith('http')) {
+    return new URL(pageId).pathname;
+  }
+  return pageId;
+});
+
+
+// Create paging object for grid (shared across static/listing items)
+// Cache paging objects so the same object is reused within a render
+const route = useRoute();
+const gridPageSize = 6;
+const gridPagingCache = new Map();
+const getGridPaging = (gridBlockUid) => {
+  if (!gridPagingCache.has(gridBlockUid)) {
+    const pageFromUrl = parseInt(route.query[`pg_${gridBlockUid}`] || '0', 10);
+    gridPagingCache.set(gridBlockUid, { start: pageFromUrl * gridPageSize, size: gridPageSize, total: 0, _seen: 0 });
+  }
+  return gridPagingCache.get(gridBlockUid);
+};
 
 // Slider state: track active slide and detect new slides
 const activeSlideIndex = ref(0);
