@@ -1448,15 +1448,26 @@ const Iframe = (props) => {
                 containerConfig,
               );
 
-              // Insert new block with content after cursor, using unified flow
+              // First sync the text changes to Redux (like toolbar onChange does for format)
+              // This ensures state is consistent before insert
+              const syncedBlockPathMap = buildBlockPathMap(mutatedFormData, config.blocks.blocksConfig, intl);
+              flushSync(() => {
+                setIframeSyncState(prev => ({
+                  ...prev,
+                  formData: mutatedFormData,
+                  blockPathMap: syncedBlockPathMap,
+                }));
+              });
+              onChangeFormData(mutatedFormData);
+
+              // Now insert new block using normal flow (like BlockChooser)
+              // Only pass blockData for new block content, not custom formData/blockPathMap
               const newBlockData = {
                 '@type': blockType,
                 [enterFieldName]: bottomValue,
               };
               insertAndSelectBlock(enterBlockId, blockType, 'after', null, {
                 blockData: newBlockData,
-                formData: mutatedFormData,
-                blockPathMap: enterBlockPathMap,
                 formatRequestId: enterRequestId,
               });
             } catch (error) {
