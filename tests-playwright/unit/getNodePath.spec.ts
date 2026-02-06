@@ -971,9 +971,10 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(result.focusOffset).toBe(11); // "Grid Cell 2".length
   });
 
-  test('element-based selection on editable field is not invalid whitespace', async () => {
-    // When browser's selectText() is used, it sets selection on the ELEMENT, not text nodes
-    // This is a valid "select all" selection and should NOT be flagged as invalid whitespace
+  test('element-based selection on editable field with nodeId children needs correction', async () => {
+    // When cursor lands on editable-field container (not inside data-node-id children),
+    // it needs to be corrected so typing goes into the right place.
+    // This happens when clicking at the edge of a block or after add button creates new block.
     const iframe = helper.getIframe();
     const body = iframe.locator('body');
 
@@ -987,7 +988,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       const bridge = (window as any).bridge;
 
       // Check if the editable field ELEMENT is flagged as invalid whitespace
-      // It should NOT be - element-based selections are valid
+      // It SHOULD be flagged - cursor needs to move inside data-node-id children
       const elementIsInvalid = bridge.isOnInvalidWhitespace(container);
 
       // Also check that a valid text node inside is not flagged
@@ -1002,8 +1003,8 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       };
     });
 
-    // Element-based selections should NOT be flagged as invalid
-    expect(result.elementIsInvalid).toBe(false);
+    // Container with nodeId children IS invalid - cursor needs correction into children
+    expect(result.elementIsInvalid).toBe(true);
     // Text inside a data-node-id element is valid
     expect(result.textIsInvalid).toBe(false);
   });
