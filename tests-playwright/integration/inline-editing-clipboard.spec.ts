@@ -65,10 +65,20 @@ test.describe('Inline Editing - Clipboard', () => {
     // Apply bold formatting to "world"
     // Use ControlOrMeta+b (Cmd+B on macOS) for formatting
     await editor.press('ControlOrMeta+b');
-    await page.waitForTimeout(100); // Wait for format operation to complete
+    // Wait for bold button to become active (indicates bold mode is on)
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+
     await editor.pressSequentially('world', { delay: 10 });
+
     await editor.press('ControlOrMeta+b'); // toggle bold off
-    await page.waitForTimeout(100); // Wait for format operation to complete
+    // Wait for bold button to become inactive
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     await editor.pressSequentially(' testing', { delay: 10 });
     await helper.waitForEditorText(editor, /Hello world testing/);
