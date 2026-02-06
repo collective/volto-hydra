@@ -9476,426 +9476,37 @@ export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
 }
 
 /**
- * Expand blocks with template layout applied.
- * Returns items with @uid field (like expandListingBlocks).
+ * Async version of expandTemplates.
+ * Loads templates on-demand using loadTemplate callback, then delegates to expandTemplatesSync.
  *
- * This function handles forced layouts via allowedLayouts parameter.
- * If allowedLayouts is provided and the data has no layout (or a different one),
- * the first layout from allowedLayouts is applied.
- *
- * State is managed via a mutable templateState object passed by caller.
- * Pass an empty {} on first call - the function will initialize and mutate it.
- * For recursive calls into nested containers, pass the same state object.
- *
- * On first encounter of a templateId, scans the entire current blocks field
- * (including nested containers) to collect all content by placeholder.
- *
- * @param {Object} blocks - Map of blockId -> block data
- * @param {Array} layout - Array of blockIds in order
+ * @param {Array} inputItems - Input items (block IDs or block objects)
  * @param {Object} options - Configuration options
+ * @param {Object} options.blocks - Blocks dict for ID lookup
  * @param {Object} options.templateState - Mutable state object (pass {} on first call)
  * @param {Function} options.loadTemplate - Async callback: (templateId) => Promise<templateData>
  * @param {Array} options.allowedLayouts - Force layout from this list if no matching layout applied
- * @param {Function} options.uuidGenerator - Optional UUID generator for materialization (admin). If not provided, uses synthetic IDs for render-time (frontend).
  * @returns {Promise<Array>} Items with @uid field
  */
 export async function expandTemplates(inputItems, options = {}) {
   const {
-    blocks: blocksDict,  // Optional: lookup dict for when items are IDs
-    templateState = {},
+    blocks: blocksDict,
     loadTemplate,
-    allowedLayouts,
-    uuidGenerator,
-    filterInstanceId, // Only consider blocks with this instanceId (for reverse merge)
+    allowedLayouts = [],
   } = options;
 
-  const items = [];
+  // Build data object for loadTemplates to scan
+  const data = blocksDict
+    ? { blocks: blocksDict, blocks_layout: { items: inputItems } }
+    : { items: inputItems };
 
-  // Helper to add item
-  const addItem = (block, blockId) => {
-    items.push({ ...block, '@uid': blockId });
-  };
+  // Load all templates (including nested) using existing helper
+  const templates = await loadTemplates(data, loadTemplate, allowedLayouts || []);
 
-  // In edit mode, admin handles template merging - pass blocks through as-is
-  // This preserves nodeIds and any edits made in template edit mode
-  const editMode = isEditMode();
-  console.log('[HYDRA] expandTemplates: isEditMode =', editMode, 'inputItems length:', inputItems?.length);
-  if (editMode) {
-    const result = (inputItems || []).map(item => {
-      if (typeof item === 'string') {
-        const block = blocksDict?.[item];
-        console.log('[HYDRA] expandTemplates edit mode: string item', item, 'block nodeId:', block?.value?.[0]?.nodeId);
-        return block ? { ...block, '@uid': item } : null;
-      }
-      console.log('[HYDRA] expandTemplates edit mode: object item', item['@uid'] || 'no uid', 'nodeId:', item.value?.[0]?.nodeId);
-      return item;
-    }).filter(Boolean);
-    console.log('[HYDRA] expandTemplates edit mode returning', result.length, 'items');
-    return result;
-  }
-
-  // Normalize items: convert IDs to objects if blocksDict provided
-  // Items can be: objects with @uid, or string IDs (looked up in blocksDict)
-  const normalizedItems = (inputItems || []).map(item => {
-    if (typeof item === 'string') {
-      // It's a block ID - look up in blocksDict
-      const block = blocksDict?.[item];
-      if (!block) {
-        console.warn(`[HYDRA] expandTemplates: block not found for ID: ${item}`);
-        return null;
-      }
-      return { ...block, '@uid': item };
-    }
-    // Already an object with @uid
-    return item;
-  }).filter(Boolean);
-
-  // Convert to blocks/layout format for internal processing
-  const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
-  const layout = normalizedItems.map(item => item['@uid']);
-
-  // Check if we're inside a registered nested container (from a fixed template block)
-  // This happens when processBlocksRecursive recurses into a container we emitted
-  // Use blocksDict (original reference) for the check since nestedContainers stores object references
-  if (blocksDict && templateState.nestedContainers?.has(blocksDict)) {
-    const nestedInfo = templateState.nestedContainers.get(blocksDict);
-    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
-  }
-
-  // No blocks to process - but continue if forced layout is configured
-  if (layout.length === 0 && !allowedLayouts?.length) {
-    return items;
-  }
-
-  // Initialize state on first call (root level)
-  if (!templateState.initialized) {
-    templateState.initialized = true;
-    templateState.template = null;
-    templateState.instanceId = null;
-    templateState.emittedPlaceholders = new Set();
-    templateState.pendingContent = new Map();
-    templateState.existingFixedBlockIds = new Map(); // placeholder -> existing blockId
-    templateState.leadingStandaloneBlocks = []; // Blocks before first template block
-    templateState.trailingStandaloneBlocks = []; // Blocks after last template block
-    templateState.newTemplateIds = new Set();
-    templateState.nestedContainers = new Map(); // blocks object -> { templateBlockId, templateBlocks, templateLayout }
-
-    // Find current templateId from blocks (if layout already applied)
-    let templateId = null;
-    let existingInstanceId = filterInstanceId || null; // Use explicit filter if provided
-    for (const blockId of layout) {
-      const block = blocks[blockId];
-      if (block?.templateId) {
-        templateId = block.templateId;
-        // Only auto-detect instanceId if not explicitly filtered
-        if (!filterInstanceId) {
-          existingInstanceId = block.templateInstanceId;
-        }
-        break;
-      }
-    }
-
-    // Handle forced layouts via allowedLayouts
-    if (allowedLayouts?.length > 0) {
-      if (!templateId || !allowedLayouts.includes(templateId)) {
-        // No template or current template not in allowed list - force first one
-        templateId = allowedLayouts[0];
-        if (!filterInstanceId) {
-          existingInstanceId = null; // New template, new instance
-        }
-      }
-    }
-
-    // Store templateId for later
-    templateState.templateId = templateId;
-    templateState.existingInstanceId = existingInstanceId;
-
-    // If we have a templateId, scan the tree for all content with matching instanceId
-    // For forced layouts (no instanceId yet), collect blocks without template markers
-    if (templateId) {
-      if (existingInstanceId) {
-        // Existing template - scan tree for blocks with this instanceId
-        // First collect all standalone blocks, then categorize by position
-        const allStandaloneBlocks = [];
-        collectContentFromTree(
-          { blocks, blocks_layout: { items: layout } },
-          existingInstanceId,
-          templateState.pendingContent,
-          allStandaloneBlocks,
-          templateState.existingFixedBlockIds
-        );
-
-        // Categorize standalone blocks based on their position in the layout
-        // relative to template-marked blocks
-        let foundFirstTemplateBlock = false;
-        let lastTemplateBlockIndex = -1;
-
-        // Find the range of template blocks in the layout
-        for (let i = 0; i < layout.length; i++) {
-          const block = blocks[layout[i]];
-          if (block?.templateInstanceId === existingInstanceId) {
-            if (!foundFirstTemplateBlock) foundFirstTemplateBlock = true;
-            lastTemplateBlockIndex = i;
-          }
-        }
-
-        // Now categorize standalone blocks
-        for (let i = 0; i < layout.length; i++) {
-          const blockId = layout[i];
-          const block = blocks[blockId];
-          if (!block) continue;
-
-          // Check if this is a standalone block (no template markers)
-          if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
-            if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
-              const b = blocks[id];
-              return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
-            }))) {
-              // Before first template block
-              templateState.leadingStandaloneBlocks.push({ blockId, block });
-            } else if (i > lastTemplateBlockIndex) {
-              // After last template block
-              templateState.trailingStandaloneBlocks.push({ blockId, block });
-            }
-            // Blocks between template blocks stay in their positions (handled differently)
-          }
-        }
-      } else {
-        // Forced layout (or new template) - collect all blocks as "default" placeholder content
-        for (const blockId of layout) {
-          const block = blocks[blockId];
-          if (!block) continue;
-
-          // Track nested templateIds
-          if (block.templateId && block.templateId !== templateId) {
-            templateState.newTemplateIds.add(block.templateId);
-          }
-
-          // Handle fixed blocks from a different template
-          if (block.fixed && block.templateId && block.templateId !== templateId) {
-            if (block.readOnly) {
-              // Fixed+readOnly blocks are pure template content - skip entirely
-              continue;
-            } else {
-              // Editable fixed blocks - preserve content for matching placeholders
-              // Don't add to pendingContent (not user content), just track for value preservation
-              if (block.placeholder) {
-                templateState.existingFixedBlockIds.set(block.placeholder, { blockId, block });
-              }
-              continue;
-            }
-          }
-
-          if (block.placeholder) {
-            const placeholder = block.placeholder;
-            if (!templateState.pendingContent.has(placeholder)) {
-              templateState.pendingContent.set(placeholder, []);
-            }
-            templateState.pendingContent.get(placeholder).push({ blockId, block });
-          } else {
-            // No placeholder - treat as default
-            if (!templateState.pendingContent.has('default')) {
-              templateState.pendingContent.set('default', []);
-            }
-            templateState.pendingContent.get('default').push({ blockId, block });
-          }
-        }
-      }
-    }
-  }
-
-  const { templateId, existingInstanceId } = templateState;
-
-  // No template to apply - yield blocks as-is
-  if (!templateId) {
-    for (const blockId of layout) {
-      if (blocks[blockId]) {
-        addItem(blocks[blockId], blockId);
-      }
-    }
-    return items;
-  }
-
-  // Load template if needed
-  if (!templateState.template) {
-    // Check pre-loaded templates first
-    if (options.templates?.[templateId]) {
-      templateState.template = options.templates[templateId];
-      templateState.instanceId = existingInstanceId || generateUUID();
-    } else if (loadTemplate) {
-      // Fall back to async loading
-      try {
-        templateState.template = await loadTemplate(templateId);
-        templateState.instanceId = existingInstanceId || generateUUID();
-      } catch (error) {
-        console.warn(`[HYDRA] expandTemplates: Error loading template ${templateId}:`, error);
-      }
-    }
-  }
-
-  const { template, instanceId, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = templateState;
-
-  if (!template) {
-    // Couldn't load template - yield blocks as-is
-    for (const blockId of layout) {
-      if (blocks[blockId]) {
-        addItem(blocks[blockId], blockId);
-      }
-    }
-    return items;
-  }
-
-  // Analyze template layout to find slot positions relative to fixed blocks
-  const templateLayout = template.blocks_layout?.items || [];
-  let firstFixedIndex = -1;
-  let lastFixedIndex = -1;
-  const slotPositions = {}; // placeholder -> 'top' | 'middle' | 'bottom'
-
-  for (let i = 0; i < templateLayout.length; i++) {
-    const tplBlock = template.blocks?.[templateLayout[i]];
-    if (!tplBlock?.placeholder) continue;
-
-    if (tplBlock.fixed) {
-      if (firstFixedIndex === -1) firstFixedIndex = i;
-      lastFixedIndex = i;
-    } else {
-      // Track position for fallback routing
-      if (firstFixedIndex === -1) {
-        slotPositions[tplBlock.placeholder] = 'top';
-      } else if (i > lastFixedIndex) {
-        slotPositions[tplBlock.placeholder] = 'bottom';
-      } else {
-        slotPositions[tplBlock.placeholder] = 'middle';
-      }
-    }
-  }
-
-  // First emit leading standalone blocks (blocks that appeared before template blocks)
-  for (const { blockId, block } of leadingStandaloneBlocks) {
-    addItem(block, blockId);
-  }
-
-  // Track insert indices for fallback routing
-  let defaultInsertIndex = -1;
-  let bottomSlotInsertIndex = -1;
-  let topSlotInsertIndex = -1;
-
-  // Process template layout - emit fixed blocks and fill placeholders
-  for (const tplBlockId of templateLayout) {
-    const tplBlock = template.blocks?.[tplBlockId];
-    if (!tplBlock) continue;
-
-    if (tplBlock.fixed) {
-      // Fixed template block - reuse existing ID if available, otherwise generate
-      const placeholder = tplBlock.placeholder;
-      const existing = placeholder && existingFixedBlockIds?.get(placeholder);
-      const blockId = existing?.blockId
-        ? existing.blockId
-        : (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
-
-      // For editable fixed blocks (not readOnly), preserve existing content
-      let blockContent = tplBlock;
-      if (!tplBlock.readOnly && existing?.block) {
-        // Preserve the user's edits - use existing value with template structure
-        blockContent = { ...tplBlock, value: existing.block.value };
-      }
-
-      addItem(
-        {
-          ...blockContent,
-          templateId: templateId,
-          templateInstanceId: instanceId,
-        },
-        blockId
-      );
-
-      // If this fixed block has nested blocks, register them for later processing
-      // When processBlocksRecursive recurses into this block, we'll recognize
-      // tplBlock.blocks by object identity and process it as a nested template level
-      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
-        templateState.nestedContainers.set(tplBlock.blocks, {
-          templateBlockId: tplBlockId,
-          templateBlocks: tplBlock.blocks,
-          templateLayout: nestedLayout,
-        });
-      }
-    } else {
-      // Placeholder slot - track position and emit user content
-      const placeholder = tplBlock.placeholder || 'default';
-      const insertIndex = items.length;
-
-      if (placeholder === 'default') {
-        defaultInsertIndex = insertIndex;
-      }
-      const position = slotPositions[placeholder];
-      if (position === 'bottom' && bottomSlotInsertIndex === -1) {
-        bottomSlotInsertIndex = insertIndex;
-      } else if (position === 'top' && topSlotInsertIndex === -1) {
-        topSlotInsertIndex = insertIndex;
-      }
-
-      if (!emittedPlaceholders.has(placeholder)) {
-        emittedPlaceholders.add(placeholder);
-        const content = pendingContent.get(placeholder) || [];
-        for (const { blockId, block } of content) {
-          // Add template markers to user content
-          addItem(
-            {
-              ...block,
-              templateId: templateId,
-              templateInstanceId: instanceId,
-              placeholder: placeholder,
-            },
-            blockId
-          );
-        }
-        pendingContent.delete(placeholder);
-      }
-    }
-  }
-
-  // Handle remaining content (placeholders not in template) - fallback routing
-  // Order: default → bottom → top → append at end
-  const remainingContent = [];
-  for (const [placeholder, content] of pendingContent) {
-    if (!emittedPlaceholders.has(placeholder)) {
-      emittedPlaceholders.add(placeholder);
-      for (const { blockId, block } of content) {
-        remainingContent.push({
-          ...block,
-          templateId: templateId,
-          templateInstanceId: instanceId,
-          placeholder: 'default',
-          _orphaned: true,
-          '@uid': blockId,
-        });
-      }
-    }
-  }
-
-  if (remainingContent.length > 0) {
-    let insertIndex = -1;
-    if (defaultInsertIndex >= 0) {
-      insertIndex = defaultInsertIndex;
-    } else if (bottomSlotInsertIndex >= 0) {
-      insertIndex = bottomSlotInsertIndex;
-    } else if (topSlotInsertIndex >= 0) {
-      insertIndex = topSlotInsertIndex;
-    }
-
-    if (insertIndex >= 0) {
-      items.splice(insertIndex, 0, ...remainingContent);
-    }
-    // No slot found - content is dropped (no placeholder to put it in)
-  }
-
-  // Add trailing standalone blocks (blocks that appeared after template blocks)
-  for (const { blockId, block } of trailingStandaloneBlocks) {
-    addItem(block, blockId);
-  }
-
-  return items;
+  // Delegate to sync version with loaded templates
+  return expandTemplatesSync(inputItems, {
+    ...options,
+    templates,
+  });
 }
 
 /**
@@ -9957,8 +9568,19 @@ export function expandTemplatesSync(inputItems, options = {}) {
   const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
   const layout = normalizedItems.map(item => item['@uid']);
 
+  // Initialize global state structures if needed
+  if (!templateState.instances) {
+    templateState.instances = {};
+  }
+  if (!templateState.nestedContainers) {
+    templateState.nestedContainers = new Map();
+  }
+  if (!templateState.generatedInstanceIds) {
+    templateState.generatedInstanceIds = new WeakMap(); // blocksDict -> generated instanceId
+  }
+
   // Check if inside a registered nested container
-  if (blocksDict && templateState.nestedContainers?.has(blocksDict)) {
+  if (blocksDict && templateState.nestedContainers.has(blocksDict)) {
     const nestedInfo = templateState.nestedContainers.get(blocksDict);
     return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
   }
@@ -9967,113 +9589,30 @@ export function expandTemplatesSync(inputItems, options = {}) {
     return items;
   }
 
-  // Initialize state on first call
-  if (!templateState.initialized) {
-    templateState.initialized = true;
-    templateState.template = null;
-    templateState.instanceId = null;
-    templateState.emittedPlaceholders = new Set();
-    templateState.pendingContent = new Map();
-    templateState.existingFixedBlockIds = new Map();
-    templateState.leadingStandaloneBlocks = [];
-    templateState.trailingStandaloneBlocks = [];
-    templateState.newTemplateIds = new Set();
-    templateState.nestedContainers = new Map();
-
-    let templateId = null;
-    let existingInstanceId = filterInstanceId || null;
-    for (const blockId of layout) {
-      const block = blocks[blockId];
-      if (block?.templateId) {
-        templateId = block.templateId;
-        if (!filterInstanceId) {
-          existingInstanceId = block.templateInstanceId;
-        }
-        break;
+  // Determine templateId and instanceId for this call
+  let templateId = null;
+  let existingInstanceId = filterInstanceId || null;
+  for (const blockId of layout) {
+    const block = blocks[blockId];
+    if (block?.templateId) {
+      templateId = block.templateId;
+      if (!filterInstanceId) {
+        existingInstanceId = block.templateInstanceId;
       }
+      break;
     }
+  }
 
-    if (allowedLayouts?.length > 0) {
-      if (!templateId || !allowedLayouts.includes(templateId)) {
-        templateId = allowedLayouts[0];
-        if (!filterInstanceId) {
-          existingInstanceId = null;
-        }
-      }
-    }
-
-    templateState.templateId = templateId;
-    templateState.existingInstanceId = existingInstanceId;
-
-    if (templateId) {
-      if (existingInstanceId) {
-        const allStandaloneBlocks = [];
-        collectContentFromTree(
-          { blocks, blocks_layout: { items: layout } },
-          existingInstanceId,
-          templateState.pendingContent,
-          allStandaloneBlocks,
-          templateState.existingFixedBlockIds
-        );
-
-        let foundFirstTemplateBlock = false;
-        let lastTemplateBlockIndex = -1;
-        for (let i = 0; i < layout.length; i++) {
-          const block = blocks[layout[i]];
-          if (block?.templateInstanceId === existingInstanceId) {
-            if (!foundFirstTemplateBlock) foundFirstTemplateBlock = true;
-            lastTemplateBlockIndex = i;
-          }
-        }
-
-        for (let i = 0; i < layout.length; i++) {
-          const blockId = layout[i];
-          const block = blocks[blockId];
-          if (!block) continue;
-          if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
-            if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
-              const b = blocks[id];
-              return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
-            }))) {
-              templateState.leadingStandaloneBlocks.push({ blockId, block });
-            } else if (i > lastTemplateBlockIndex) {
-              templateState.trailingStandaloneBlocks.push({ blockId, block });
-            }
-          }
-        }
-      } else {
-        for (const blockId of layout) {
-          const block = blocks[blockId];
-          if (!block) continue;
-          if (block.templateId && block.templateId !== templateId) {
-            templateState.newTemplateIds.add(block.templateId);
-          }
-          if (block.fixed && block.templateId && block.templateId !== templateId) {
-            if (block.readOnly) continue;
-            if (block.placeholder) {
-              templateState.existingFixedBlockIds.set(block.placeholder, { blockId, block });
-            }
-            continue;
-          }
-          if (block.placeholder) {
-            const placeholder = block.placeholder;
-            if (!templateState.pendingContent.has(placeholder)) {
-              templateState.pendingContent.set(placeholder, []);
-            }
-            templateState.pendingContent.get(placeholder).push({ blockId, block });
-          } else {
-            if (!templateState.pendingContent.has('default')) {
-              templateState.pendingContent.set('default', []);
-            }
-            templateState.pendingContent.get('default').push({ blockId, block });
-          }
-        }
+  if (allowedLayouts?.length > 0) {
+    if (!templateId || !allowedLayouts.includes(templateId)) {
+      templateId = allowedLayouts[0];
+      if (!filterInstanceId) {
+        existingInstanceId = null;
       }
     }
   }
 
-  const { templateId, existingInstanceId } = templateState;
-
+  // No template to apply - pass through
   if (!templateId) {
     for (const blockId of layout) {
       if (blocks[blockId]) {
@@ -10083,26 +9622,120 @@ export function expandTemplatesSync(inputItems, options = {}) {
     return items;
   }
 
+  // Get or generate instanceId
+  // For forced layouts (no existing instanceId), we use a WeakMap keyed by blocksDict
+  // to ensure idempotency - same blocks object returns same generated instanceId
+  let instanceId = existingInstanceId;
+  if (!instanceId) {
+    if (blocksDict && templateState.generatedInstanceIds.has(blocksDict)) {
+      instanceId = templateState.generatedInstanceIds.get(blocksDict);
+    } else {
+      instanceId = generateUUID();
+      if (blocksDict) {
+        templateState.generatedInstanceIds.set(blocksDict, instanceId);
+      }
+    }
+  }
+
+  // Get or create instance context
+  let ctx = templateState.instances[instanceId];
+
+  // Return cached results for idempotency (same blocksDict returns same results)
+  if (ctx?.cachedResults) {
+    return ctx.cachedResults;
+  }
+
+  if (!ctx) {
+    ctx = {
+      templateId,
+      template: null,
+      instanceId,
+      emittedPlaceholders: new Set(),
+      pendingContent: new Map(),
+      existingFixedBlockIds: new Map(),
+      leadingStandaloneBlocks: [],
+      trailingStandaloneBlocks: [],
+      newTemplateIds: new Set(),
+      cachedResults: null, // For idempotency
+    };
+    templateState.instances[instanceId] = ctx;
+
+    // Initialize content collection for this instance
+    if (existingInstanceId) {
+      const allStandaloneBlocks = [];
+      collectContentFromTree(
+        { blocks, blocks_layout: { items: layout } },
+        existingInstanceId,
+        ctx.pendingContent,
+        allStandaloneBlocks,
+        ctx.existingFixedBlockIds
+      );
+
+      let foundFirstTemplateBlock = false;
+      let lastTemplateBlockIndex = -1;
+      for (let i = 0; i < layout.length; i++) {
+        const block = blocks[layout[i]];
+        if (block?.templateInstanceId === existingInstanceId) {
+          if (!foundFirstTemplateBlock) foundFirstTemplateBlock = true;
+          lastTemplateBlockIndex = i;
+        }
+      }
+
+      for (let i = 0; i < layout.length; i++) {
+        const blockId = layout[i];
+        const block = blocks[blockId];
+        if (!block) continue;
+        if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
+          if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
+            const b = blocks[id];
+            return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
+          }))) {
+            ctx.leadingStandaloneBlocks.push({ blockId, block });
+          } else if (i > lastTemplateBlockIndex) {
+            ctx.trailingStandaloneBlocks.push({ blockId, block });
+          }
+        }
+      }
+    } else {
+      for (const blockId of layout) {
+        const block = blocks[blockId];
+        if (!block) continue;
+        if (block.templateId && block.templateId !== templateId) {
+          ctx.newTemplateIds.add(block.templateId);
+        }
+        if (block.fixed && block.templateId && block.templateId !== templateId) {
+          if (block.readOnly) continue;
+          if (block.placeholder) {
+            ctx.existingFixedBlockIds.set(block.placeholder, { blockId, block });
+          }
+          continue;
+        }
+        if (block.placeholder) {
+          const placeholder = block.placeholder;
+          if (!ctx.pendingContent.has(placeholder)) {
+            ctx.pendingContent.set(placeholder, []);
+          }
+          ctx.pendingContent.get(placeholder).push({ blockId, block });
+        } else {
+          if (!ctx.pendingContent.has('default')) {
+            ctx.pendingContent.set('default', []);
+          }
+          ctx.pendingContent.get('default').push({ blockId, block });
+        }
+      }
+    }
+  }
+
   // Load template from pre-loaded map (sync - throw if not found)
-  if (!templateState.template) {
+  if (!ctx.template) {
     const template = templates[templateId];
     if (!template) {
       throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
     }
-    templateState.template = template;
-    templateState.instanceId = existingInstanceId || generateUUID();
+    ctx.template = template;
   }
 
-  const { template, instanceId, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = templateState;
-
-  if (!template) {
-    for (const blockId of layout) {
-      if (blocks[blockId]) {
-        addItem(blocks[blockId], blockId);
-      }
-    }
-    return items;
-  }
+  const { template, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
 
   // Process template (same as async version from here)
   const templateLayout = template.blocks_layout?.items || [];
@@ -10236,6 +9869,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
   for (const { blockId, block } of trailingStandaloneBlocks) {
     addItem(block, blockId);
   }
+
+  // Cache results for idempotency
+  ctx.cachedResults = items;
 
   return items;
 }

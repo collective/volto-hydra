@@ -434,6 +434,7 @@ const bridge = initBridge({
           group: 'common', // The group (blocks can be grouped, displayed in the chooser)
           restricted: false,
           mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
+          sidebarSchemaOnly: false, // Set true to disable Edit component in sidebar (use schema form only)
           blockSchema: {
             properties: {
               slider_timing: {

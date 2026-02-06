@@ -1,4 +1,4 @@
-import { expandTemplates, mergeTemplatesIntoPage } from './hydra.js';
+import { expandTemplates, expandTemplatesSync, mergeTemplatesIntoPage } from './hydra.js';
 
 // Wrapper to match old applyLayoutTemplate signature for existing tests
 async function applyLayoutTemplate(pageData, templateData, uuidGenerator) {
@@ -805,5 +805,198 @@ describe('sequential layout switching', () => {
     for (const block of Object.values(afterSecond.blocks)) {
       expect(block.templateId).toBe('/templates/header-only');
     }
+  });
+});
+
+describe('multiple template instances with shared templateState', () => {
+  // Tests for when a page has multiple blocks fields (e.g., blocks and footer_blocks)
+  // Each should be able to have its own template/layout applied independently
+  // using the same shared templateState object
+
+  const mainTemplate = {
+    '@id': '/templates/main-layout',
+    blocks: {
+      'main-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Main Header' }] },
+      'main-default': { '@type': 'slate', placeholder: 'default', value: [] },
+    },
+    blocks_layout: { items: ['main-header', 'main-default'] },
+  };
+
+  const footerTemplate = {
+    '@id': '/templates/footer-layout',
+    blocks: {
+      'footer-branding': { '@type': 'slate', fixed: true, placeholder: 'branding', value: [{ text: 'Footer Branding' }] },
+      'footer-default': { '@type': 'slate', placeholder: 'default', value: [] },
+    },
+    blocks_layout: { items: ['footer-branding', 'footer-default'] },
+  };
+
+  const templates = {
+    '/templates/main-layout': mainTemplate,
+    '/templates/footer-layout': footerTemplate,
+  };
+
+  test('expandTemplatesSync: separate blocks fields get separate templates with shared state', () => {
+    // Main blocks field - user content, force main-layout
+    const mainBlocks = {
+      'main-user-1': { '@type': 'slate', value: [{ text: 'Main user content' }] },
+    };
+    const mainLayout = ['main-user-1'];
+
+    // Footer blocks field - user content, force footer-layout
+    const footerBlocks = {
+      'footer-user-1': { '@type': 'slate', value: [{ text: 'Footer user content' }] },
+    };
+    const footerLayout = ['footer-user-1'];
+
+    // Shared templateState across both calls (like Vue provide/inject)
+    const templateState = {};
+
+    // First call: expand main blocks with main template
+    const mainItems = expandTemplatesSync(mainLayout, {
+      blocks: mainBlocks,
+      templateState,
+      templates,
+      allowedLayouts: ['/templates/main-layout'],
+    });
+
+    // Second call: expand footer blocks with footer template (same templateState)
+    const footerItems = expandTemplatesSync(footerLayout, {
+      blocks: footerBlocks,
+      templateState,
+      templates,
+      allowedLayouts: ['/templates/footer-layout'],
+    });
+
+    // Main blocks should have main template applied
+    expect(mainItems.length).toBeGreaterThan(1); // header + user content
+    const mainHeader = mainItems.find(item => item.value?.[0]?.text === 'Main Header');
+    expect(mainHeader).toBeDefined();
+    const mainUserContent = mainItems.find(item => item.value?.[0]?.text === 'Main user content');
+    expect(mainUserContent).toBeDefined();
+
+    // Footer blocks should have footer template applied (NOT main template!)
+    expect(footerItems.length).toBeGreaterThan(1); // branding + user content
+    const footerBranding = footerItems.find(item => item.value?.[0]?.text === 'Footer Branding');
+    expect(footerBranding).toBeDefined();
+    const footerUserContent = footerItems.find(item => item.value?.[0]?.text === 'Footer user content');
+    expect(footerUserContent).toBeDefined();
+
+    // Footer should NOT have main header (wrong template)
+    const wrongHeader = footerItems.find(item => item.value?.[0]?.text === 'Main Header');
+    expect(wrongHeader).toBeUndefined();
+  });
+
+  test('expandTemplatesSync: blocks field without template passes through unchanged', () => {
+    // Main blocks - has forced layout
+    const mainBlocks = {
+      'main-user-1': { '@type': 'slate', value: [{ text: 'Main content' }] },
+    };
+    const mainLayout = ['main-user-1'];
+
+    // Footer blocks - no allowedLayouts, should pass through
+    const footerBlocks = {
+      'footer-user-1': { '@type': 'slate', value: [{ text: 'Footer content' }] },
+    };
+    const footerLayout = ['footer-user-1'];
+
+    const templateState = {};
+
+    // First call: main blocks with template
+    const mainItems = expandTemplatesSync(mainLayout, {
+      blocks: mainBlocks,
+      templateState,
+      templates,
+      allowedLayouts: ['/templates/main-layout'],
+    });
+
+    // Second call: footer blocks WITHOUT template
+    const footerItems = expandTemplatesSync(footerLayout, {
+      blocks: footerBlocks,
+      templateState,
+      templates,
+      allowedLayouts: null, // No forced layout
+    });
+
+    // Main should have template applied
+    expect(mainItems.length).toBeGreaterThan(1);
+
+    // Footer should pass through unchanged (just 1 item)
+    expect(footerItems.length).toBe(1);
+    expect(footerItems[0]['@uid']).toBe('footer-user-1');
+    expect(footerItems[0].value[0].text).toBe('Footer content');
+  });
+
+  test('expandTemplatesSync: re-calling same blocks field is idempotent', () => {
+    const mainBlocks = {
+      'main-user-1': { '@type': 'slate', value: [{ text: 'Main content' }] },
+    };
+    const mainLayout = ['main-user-1'];
+
+    const templateState = {};
+
+    // First call
+    const items1 = expandTemplatesSync(mainLayout, {
+      blocks: mainBlocks,
+      templateState,
+      templates,
+      allowedLayouts: ['/templates/main-layout'],
+    });
+
+    // Second call with same data (simulates re-render)
+    const items2 = expandTemplatesSync(mainLayout, {
+      blocks: mainBlocks,
+      templateState,
+      templates,
+      allowedLayouts: ['/templates/main-layout'],
+    });
+
+    // Results should be equivalent
+    expect(items1.length).toBe(items2.length);
+    expect(items1.map(i => i['@uid'])).toEqual(items2.map(i => i['@uid']));
+  });
+
+  test('expandTemplates async: separate blocks fields get separate templates', async () => {
+    // Same test but for async version
+    const mainBlocks = {
+      'main-user-1': { '@type': 'slate', value: [{ text: 'Main user content' }] },
+    };
+    const mainLayout = ['main-user-1'];
+
+    const footerBlocks = {
+      'footer-user-1': { '@type': 'slate', value: [{ text: 'Footer user content' }] },
+    };
+    const footerLayout = ['footer-user-1'];
+
+    const templateState = {};
+    const loadTemplate = async (id) => templates[id];
+
+    // First call: main blocks
+    const mainItems = await expandTemplates(mainLayout, {
+      blocks: mainBlocks,
+      templateState,
+      loadTemplate,
+      allowedLayouts: ['/templates/main-layout'],
+    });
+
+    // Second call: footer blocks
+    const footerItems = await expandTemplates(footerLayout, {
+      blocks: footerBlocks,
+      templateState,
+      loadTemplate,
+      allowedLayouts: ['/templates/footer-layout'],
+    });
+
+    // Main should have main template
+    const mainHeader = mainItems.find(item => item.value?.[0]?.text === 'Main Header');
+    expect(mainHeader).toBeDefined();
+
+    // Footer should have footer template
+    const footerBranding = footerItems.find(item => item.value?.[0]?.text === 'Footer Branding');
+    expect(footerBranding).toBeDefined();
+
+    // Footer should NOT have main header
+    const wrongHeader = footerItems.find(item => item.value?.[0]?.text === 'Main Header');
+    expect(wrongHeader).toBeUndefined();
   });
 });
