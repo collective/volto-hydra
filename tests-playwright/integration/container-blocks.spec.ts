@@ -1017,6 +1017,9 @@ test.describe('Empty Block Behavior', () => {
 
     const iframe = helper.getIframe();
 
+    // Wait for nested grid cells to render (Nuxt async components)
+    await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible({ timeout: 10000 });
+
     // First delete grid-cell-2 from grid-1
     await helper.clickBlockInIframe('grid-cell-2');
     await helper.openQuantaToolbarMenu('grid-cell-2');
