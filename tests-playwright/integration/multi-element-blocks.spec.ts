@@ -303,6 +303,9 @@ test.describe('Multi-element blocks', () => {
     await helper.login();
     await helper.navigateToView('/test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Wait for grid block
@@ -346,6 +349,9 @@ test.describe('Multi-element blocks', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
