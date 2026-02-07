@@ -187,7 +187,7 @@
     </div>
   </div>
 
-  <section v-else-if="block['@type'] == 'slider'" :data-block-uid="block_uid" data-block-container="{allowed:['Slide'],add:'horizontal'}"
+  <section ref="carouselRef" v-else-if="block['@type'] == 'slider'" :data-block-uid="block_uid" data-block-container="{allowed:['Slide'],add:'horizontal'}"
     class="max-w-4xl mx-auto" data-carousel="static" >
     <div class="relative w-full">
       <!-- Carousel wrapper -->
@@ -195,10 +195,10 @@
         <div v-for="(slide, index) in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
           class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
           :class="[
-            isSlideActive(index) ? 'flex' : 'hidden',
             { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
           ]"
-          data-carousel-item :style="slide.preview_image ? imageProps(slide, true).class : ''"
+          :data-carousel-item="index === activeSlideIndex ? 'active' : ''"
+          :style="slide.preview_image ? imageProps(slide, true).class : ''"
           data-block-add="right">
           <!-- Clickable overlay for preview_image editing -->
           <div data-media-field="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
@@ -514,7 +514,7 @@
 
 </template>
 <script setup>
-import { ref, watch, nextTick, computed, toRefs, inject } from 'vue';
+import { ref, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
 import { expandTemplatesSync, staticBlocks, isEditMode } from '@hydra-js/hydra.js';
 import RichText from './richtext.vue';
 
@@ -567,33 +567,55 @@ const effectiveContextPath = computed(() => {
 const route = useRoute();
 const gridPageSize = 6;
 const gridPagingCache = new Map();
-const getGridPaging = (gridBlockUid, expectedSources) => {
+const getGridPaging = (gridBlockUid) => {
   const pageFromUrl = parseInt(route.query[`pg_${gridBlockUid}`] || '0', 10);
   const cacheKey = `${gridBlockUid}:${pageFromUrl}`;
   if (!gridPagingCache.has(cacheKey)) {
-    const paging = { start: pageFromUrl * gridPageSize, size: gridPageSize, total: 0, _seen: 0 };
-    if (expectedSources) {
-      paging._expectedSources = expectedSources;
-      paging._ready = new Promise(resolve => { paging._resolve = resolve; });
-    }
-    gridPagingCache.set(cacheKey, paging);
+    gridPagingCache.set(cacheKey, { start: pageFromUrl * gridPageSize, size: gridPageSize, total: 0, _seen: 0 });
   }
   return gridPagingCache.get(cacheKey);
 };
 
-// Expand grid items and initialize paging with expected source count
+// Expand grid items and initialize paging with expected source count.
+// Resets paging counters on each render so stale totals don't accumulate.
 const getGridItems = (gridBlock, gridBlockUid) => {
   const items = expandTemplatesSync(gridBlock.blocks_layout?.items || [], {
     blocks: gridBlock.blocks || {}, templateState, templates,
   });
-  // Initialize paging with the number of sources (items) that will report
-  getGridPaging(gridBlockUid, items.length);
+  const paging = getGridPaging(gridBlockUid);
+  // Reset counters for this render pass
+  paging.total = 0;
+  paging._seen = 0;
+  paging._completedSources = 0;
+  // Set up _ready promise for async paging
+  paging._expectedSources = items.length;
+  paging._ready = new Promise(resolve => { paging._resolve = resolve; });
   return items;
 };
 
 // Slider state: track active slide and detect new slides
 const activeSlideIndex = ref(0);
+const carouselRef = ref(null);
 const prevSlideCount = ref(block.value?.slides?.length || 0);
+
+// On mount: hide non-active slides and initialize Flowbite.
+// Vue's reactive :class is NOT used for visibility to avoid fighting
+// with Flowbite's imperative DOM manipulation during transitions.
+onMounted(async () => {
+  if (block.value?.['@type'] !== 'slider' || !process.client) return;
+  const section = carouselRef.value;
+  if (!section) return;
+  // Hide non-active slides before Flowbite inits (prevents flash)
+  const slides = section.querySelectorAll('[data-carousel-item]');
+  slides.forEach((slide, i) => {
+    if (i !== activeSlideIndex.value) slide.classList.add('hidden');
+    else slide.classList.add('flex');
+  });
+  // Initialize Flowbite carousel
+  await nextTick();
+  const flowbite = await import('flowbite');
+  flowbite.initCarousels();
+});
 
 // Watch for slide count changes to detect new slides and reinitialize Flowbite
 watch(
@@ -615,9 +637,6 @@ watch(
   },
   { immediate: true }
 );
-
-// Helper to check if a slide should be visible
-const isSlideActive = (index) => index === activeSlideIndex.value;
 
 // Helper to get image URL from various formats (string, array, or object with @id)
 // Also adds @@images/image suffix for Plone internal paths

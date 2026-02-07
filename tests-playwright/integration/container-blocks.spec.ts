@@ -287,6 +287,7 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.clickAddBlockButton();
     await helper.selectBlockType('teaser');
+    await helper.getStableBlockCount();
 
     // grid-1 should now have 3 blocks
     const finalGridBlocks = await iframe
@@ -1041,12 +1042,14 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-2');
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
 
     // Now delete grid-cell-1 (the last block in grid-1)
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
 
     // grid-1 should now have 1 empty block
     const gridBlocks = await iframe
@@ -1105,6 +1108,7 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-2');
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
 
     // Verify grid-cell-2 is gone before proceeding
     await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).not.toBeVisible();
@@ -1113,6 +1117,7 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
 
     // Verify grid-cell-1 is gone
     await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).not.toBeVisible();
@@ -1150,11 +1155,13 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-2');
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
 
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
 
     // Wait for empty block to be rendered inside grid-1
     // hydra marks empty blocks with data-hydra-empty attribute
@@ -2325,6 +2332,7 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select teaser block type from chooser (gridBlock only allows teaser/image)
     await helper.selectBlockType('teaser');
+    await helper.getStableBlockCount();
 
     // Wait for 3rd cell to be created
     await expect(gridCells).toHaveCount(3);
@@ -2338,6 +2346,7 @@ test.describe('Container Block Drag and Drop', () => {
     await addButton.click();
 
     await helper.selectBlockType('teaser');
+    await helper.getStableBlockCount();
 
     // Wait for 4th cell to be created
     await expect(gridCells).toHaveCount(4);
