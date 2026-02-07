@@ -594,6 +594,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Step 2: Type bold text
     await editor.pressSequentially('bold', { delay: 10 });
@@ -604,6 +605,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(false);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Step 4: Type non-bold text
     await editor.pressSequentially(' normal', { delay: 10 });
@@ -619,6 +621,7 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(async () => {
       expect(await helper.isActiveFormatButton('bold')).toBe(true);
     }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
 
     // Step 6: Type more bold text
     await editor.pressSequentially(' more', { delay: 10 });
