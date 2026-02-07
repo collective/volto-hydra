@@ -265,6 +265,9 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
+    // Wait for nested grid cells to render (Nuxt async components)
+    await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible({ timeout: 10000 });
+
     // Count initial blocks in grid-1 (should be 2: grid-cell-1, grid-cell-2)
     const initialGridBlocks = await iframe
       .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
@@ -446,6 +449,10 @@ test.describe('Add Button Direction', () => {
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    // Wait for nested grid cells to render (Nuxt async components)
+    await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).toBeVisible({ timeout: 10000 });
 
     // grid-cell-1 has NO data-block-add attribute
     // It's nested at depth 1 (inside grid-1), so direction should be inferred as 'right'
