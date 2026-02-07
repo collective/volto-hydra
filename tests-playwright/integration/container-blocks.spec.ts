@@ -263,9 +263,12 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
-    // Wait for nested grid cells to render (Nuxt async components)
+    // Wait for nested grid cells to render
     await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible({ timeout: 10000 });
 
     // Count initial blocks in grid-1 (should be 2: grid-cell-1, grid-cell-2)
@@ -450,8 +453,11 @@ test.describe('Add Button Direction', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
-    // Wait for nested grid cells to render (Nuxt async components)
+    // Wait for nested grid cells to render
     await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).toBeVisible({ timeout: 10000 });
 
     // grid-cell-1 has NO data-block-add attribute
@@ -1022,9 +1028,12 @@ test.describe('Empty Block Behavior', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
-    // Wait for nested grid cells to render (Nuxt async components)
+    // Wait for nested grid cells to render
     await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible({ timeout: 10000 });
 
     // First delete grid-cell-2 from grid-1
@@ -1086,6 +1095,9 @@ test.describe('Empty Block Behavior', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Delete both blocks from grid-1 to create empty block
@@ -1127,6 +1139,9 @@ test.describe('Empty Block Behavior', () => {
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
@@ -1907,6 +1922,9 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Grid cells are at nesting depth 1 (inside grid-1), so they should use horizontal layout
@@ -2156,6 +2174,9 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // col-1 is a 'column' block
@@ -2281,6 +2302,9 @@ test.describe('Container Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
@@ -2561,6 +2585,9 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Verify slider structure is loaded
@@ -2594,6 +2621,9 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Start by selecting slide-1 using robust helper
@@ -2622,6 +2652,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
@@ -2660,6 +2693,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
@@ -2702,6 +2738,9 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Click on slide-1 first
@@ -2729,6 +2768,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     // For carousels, we can't click directly on the container because slides fill it.
     // Instead, click on a visible child first, then press Escape to go to parent.
@@ -2765,6 +2807,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const sidebar = page.locator('.sidebar-container');
 
@@ -3705,6 +3750,9 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Click on a page-level block (title-block) to enable add button
@@ -3791,6 +3839,9 @@ test.describe('Multi-Container Field Operations', () => {
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 

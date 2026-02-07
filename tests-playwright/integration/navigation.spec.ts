@@ -282,6 +282,9 @@ test.describe('Navigation and URL Handling', () => {
     // Go to view mode (not edit)
     await page.goto('http://localhost:3001/test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     // Wait for iframe content to load
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
