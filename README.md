@@ -1374,6 +1374,16 @@ listing: {
 
 **Shared paging for containers**: For grids with mixed static and listing blocks, pass a shared `paging` object. Use `staticBlocks` for non-listings, `ListingExpander` with the same paging for listings. See the [Nuxt example](./examples/nuxt-blog-starter/components/Block.vue) for the full pattern.
 
+**Async paging with `_ready`**: When a container has multiple sources (static + listing blocks), the paging UI should wait for all sources before rendering. Add `_expectedSources` and `_ready` to the paging object:
+
+```js
+paging._expectedSources = 2;  // number of staticBlocks + expandListingBlocks calls
+paging._ready = new Promise(resolve => { paging._resolve = resolve; });
+// _ready resolves after all sources have called computePagingUI
+```
+
+Then use an async component (e.g. Vue `<Suspense>`) that awaits `paging._ready` before rendering. Use a `:key` to remount on page navigation. See [AsyncPaging.vue](./examples/nuxt-blog-starter/components/AsyncPaging.vue) for the full pattern.
+
 Note: Expanded listing items share the listing block's `@uid`. When editing, selecting any item selects the listing block.
 
 ## Advanced

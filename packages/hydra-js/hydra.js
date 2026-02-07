@@ -8355,6 +8355,17 @@ function computePagingUI(paging) {
     paging.prev = paging.currentPage > 0 ? paging.currentPage - 1 : null;
     paging.next = paging.currentPage < paging.totalPages - 1 ? paging.currentPage + 1 : null;
   }
+
+  // Track completed sources and resolve _ready when all sources have reported.
+  // Frontends set _expectedSources to the number of items that will call
+  // staticBlocks/expandListingBlocks with this paging object, and _resolve
+  // from a _ready Promise. Both are required to use async paging.
+  if (paging._expectedSources && paging._resolve) {
+    paging._completedSources = (paging._completedSources || 0) + 1;
+    if (paging._completedSources >= paging._expectedSources) {
+      paging._resolve(paging);
+    }
+  }
 }
 
 export async function expandListingBlocks(inputItems, options = {}) {

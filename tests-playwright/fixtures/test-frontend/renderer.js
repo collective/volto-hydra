@@ -874,7 +874,7 @@ async function renderGridBlock(block, blockId) {
             return url.pathname + url.search;
         };
 
-        html += '<nav class="grid-paging" style="margin-top: 15px; text-align: center;">';
+        html += '<nav class="grid-paging" aria-label="Page Navigation" style="margin-top: 15px; text-align: center;">';
 
         // Previous link
         if (paging.prev !== null) {

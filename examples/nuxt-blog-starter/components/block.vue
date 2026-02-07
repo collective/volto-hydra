@@ -73,17 +73,17 @@
     :class="[`bg-${block.styles?.backgroundColor || 'white'}-700`]">
     <!-- Grid: expand templates, then render items with shared paging -->
     <div class="grid-row grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      <template v-for="item in expandTemplatesSync(block.blocks_layout?.items || [], { blocks: block.blocks || {}, templateState, templates })" :key="item['@uid']">
+      <template v-for="item in getGridItems(block, block_uid)" :key="item['@uid']">
         <!-- Static items: call staticBlocks to track paging -->
         <template v-if="item['@type'] !== 'listing'">
-          <Block v-for="rendered in staticBlocks([item['@uid']], { blocks: { [item['@uid']]: item }, paging: getGridPaging(block_uid) })"
+          <Block v-for="rendered in staticBlocks([item['@uid']], { blocks: { [item['@uid']]: item }, paging: getGridPaging(block_uid) }).items"
             :key="rendered['@uid']"
             :block_uid="rendered._blockUid || rendered['@uid']"
             :block="rendered" :data="data" :contained="true"
             class="grid-cell p-4" :class="[`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`]" />
         </template>
         <!-- Listing items: expand async with shared paging -->
-        <Suspense v-else>
+        <Suspense v-else :key="`listing-${item['@uid']}-${route.query['pg_' + block_uid] || '0'}`">
           <ListingExpander
             :block="item"
             :block-uid="item['@uid']"
@@ -99,8 +99,10 @@
         </Suspense>
       </template>
     </div>
-    <!-- Paging for the whole grid -->
-    <Paging :paging="getGridPaging(block_uid)" :build-url="(page) => page === 0 ? effectiveContextPath : `${effectiveContextPath}?pg_${block_uid}=${page}`" />
+    <!-- Paging for the whole grid (in its own Suspense to await async listing expansion) -->
+    <Suspense :key="`pg-${block_uid}-${route.query['pg_' + block_uid] || '0'}`">
+      <AsyncPaging :paging="getGridPaging(block_uid)" :build-url="(page) => page === 0 ? effectiveContextPath : `${effectiveContextPath}?pg_${block_uid}=${page}`" />
+    </Suspense>
   </div>
 
   <!-- Columns container block -->
@@ -565,12 +567,28 @@ const effectiveContextPath = computed(() => {
 const route = useRoute();
 const gridPageSize = 6;
 const gridPagingCache = new Map();
-const getGridPaging = (gridBlockUid) => {
-  if (!gridPagingCache.has(gridBlockUid)) {
-    const pageFromUrl = parseInt(route.query[`pg_${gridBlockUid}`] || '0', 10);
-    gridPagingCache.set(gridBlockUid, { start: pageFromUrl * gridPageSize, size: gridPageSize, total: 0, _seen: 0 });
+const getGridPaging = (gridBlockUid, expectedSources) => {
+  const pageFromUrl = parseInt(route.query[`pg_${gridBlockUid}`] || '0', 10);
+  const cacheKey = `${gridBlockUid}:${pageFromUrl}`;
+  if (!gridPagingCache.has(cacheKey)) {
+    const paging = { start: pageFromUrl * gridPageSize, size: gridPageSize, total: 0, _seen: 0 };
+    if (expectedSources) {
+      paging._expectedSources = expectedSources;
+      paging._ready = new Promise(resolve => { paging._resolve = resolve; });
+    }
+    gridPagingCache.set(cacheKey, paging);
   }
-  return gridPagingCache.get(gridBlockUid);
+  return gridPagingCache.get(cacheKey);
+};
+
+// Expand grid items and initialize paging with expected source count
+const getGridItems = (gridBlock, gridBlockUid) => {
+  const items = expandTemplatesSync(gridBlock.blocks_layout?.items || [], {
+    blocks: gridBlock.blocks || {}, templateState, templates,
+  });
+  // Initialize paging with the number of sources (items) that will report
+  getGridPaging(gridBlockUid, items.length);
+  return items;
 };
 
 // Slider state: track active slide and detect new slides

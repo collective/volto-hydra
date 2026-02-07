@@ -292,7 +292,9 @@ test.describe('Navigation and URL Handling', () => {
     // Grid block (block-8-grid) should have paging since it has >6 elements
     // (1 manual teaser + query results from listing-in-grid)
     // Wait for paging controls to appear
-    const pagingNav = iframe.locator('.grid-paging');
+    // Use aria-label selector that works for both mock (.grid-paging) and Nuxt (.paging)
+    // Use .first() since there may be multiple paging navs (grid + listing)
+    const pagingNav = iframe.locator('nav[aria-label="Page Navigation"]').first();
     await expect(pagingNav).toBeVisible({ timeout: 10000 });
 
     // Track if beforeunload dialog appears (it shouldn't in view mode)
@@ -303,7 +305,7 @@ test.describe('Navigation and URL Handling', () => {
     });
 
     // Click the "Next" or page 2 paging link
-    const pagingLink = iframe.locator('.grid-paging a').filter({ hasText: /Next|2/ }).first();
+    const pagingLink = pagingNav.locator('a').filter({ hasText: /Next|2/ }).first();
     await pagingLink.click();
 
     // Wait for the iframe to reload with page 2 content

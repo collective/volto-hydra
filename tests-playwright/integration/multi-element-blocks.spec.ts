@@ -313,8 +313,9 @@ test.describe('Multi-element blocks', () => {
     await expect(grid).toBeVisible({ timeout: 10000 });
 
     // Check paging controls exist
-    const pagingNav = grid.locator('.grid-paging');
-    await expect(pagingNav).toBeVisible({ timeout: 5000 });
+    // Use aria-label selector that works for both mock (.grid-paging) and Nuxt (.paging)
+    const pagingNav = grid.locator('nav[aria-label="Page Navigation"]');
+    await expect(pagingNav).toBeVisible({ timeout: 10000 });
 
     // Verify page 1 is current
     const currentPage = pagingNav.locator('.paging-page.current');
@@ -330,7 +331,7 @@ test.describe('Multi-element blocks', () => {
 
     // Wait for page 2 - iframe reloads with new URL
     const gridAfterNav = iframe.locator('[data-block-uid="block-8-grid"]');
-    const pagingNavAfterNav = gridAfterNav.locator('.grid-paging');
+    const pagingNavAfterNav = gridAfterNav.locator('nav[aria-label="Page Navigation"]');
     await expect(pagingNavAfterNav.locator('.paging-page.current')).toHaveText('2', { timeout: 10000 });
 
     // Wait for page 2 to show different content than page 1
@@ -360,8 +361,9 @@ test.describe('Multi-element blocks', () => {
     await expect(grid).toBeVisible({ timeout: 5000 });
 
     // Check if paging controls exist within the grid block
-    const pagingNav = grid.locator('.grid-paging');
-    await expect(pagingNav).toBeVisible({ timeout: 5000 });
+    // Use aria-label selector that works for both mock (.grid-paging) and Nuxt (.paging)
+    const pagingNav = grid.locator('nav[aria-label="Page Navigation"]');
+    await expect(pagingNav).toBeVisible({ timeout: 10000 });
     console.log('Grid has paging: true');
 
     // Get the current page indicator within the grid's paging
@@ -391,7 +393,7 @@ test.describe('Multi-element blocks', () => {
 
     // Wait for iframe to reload by waiting for the grid's page indicator to change
     const gridAfterNav = iframe.locator('[data-block-uid="block-8-grid"]');
-    const pagingNavAfterNav = gridAfterNav.locator('.grid-paging');
+    const pagingNavAfterNav = gridAfterNav.locator('nav[aria-label="Page Navigation"]');
     await expect(pagingNavAfterNav.locator('.paging-page.current')).toHaveText('2', { timeout: 15000 });
 
     // Verify we're on page 2
