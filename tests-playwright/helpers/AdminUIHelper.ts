@@ -163,6 +163,9 @@ export class AdminUIHelper {
 
     // Wait for iframe to load
     await this.waitForIframeReady();
+
+    // Wait for all blocks to render (Nuxt async components may still be loading)
+    await this.getStableBlockCount();
   }
 
   /**
@@ -191,6 +194,9 @@ export class AdminUIHelper {
 
     // Wait for iframe to load
     await this.waitForIframeReady();
+
+    // Wait for all blocks to render (Nuxt async components may still be loading)
+    await this.getStableBlockCount();
   }
 
   /**
