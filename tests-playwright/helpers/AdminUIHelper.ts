@@ -702,10 +702,18 @@ export class AdminUIHelper {
     // Use first() for multi-element blocks
     await blockLocator.first().waitFor({ state: 'visible', timeout });
 
-    // Wait for iframe drag handle to appear
-    // Position checks are done in waitForDragHandlesAligned (called from waitForQuantaToolbar)
+    // Wait for iframe drag handle to appear and become visible
+    // The drag handle is created with display:none and becomes visible when sendBlockSelected runs
+    // Use polling since sendBlockSelected happens asynchronously on selectionchange
     const dragHandle = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragHandle).toBeVisible({ timeout });
+    await expect(async () => {
+      const isVisible = await dragHandle.isVisible();
+      if (!isVisible) {
+        const exists = await dragHandle.count() > 0;
+        console.log(`[waitForBlockSelected] Drag handle exists=${exists} visible=${isVisible}`);
+      }
+      expect(isVisible).toBe(true);
+    }).toPass({ timeout });
 
     // Return the first element locator for chaining
     return blockLocator.first();
@@ -1319,7 +1327,34 @@ export class AdminUIHelper {
     const timeout = options.timeout ?? 5000;
     await expect(async () => {
       const sel = await this.getSelectionInfo(editor);
+      if (!sel.editorHasFocus) {
+        // Debug: log where focus actually is
+        const topActiveEl = await this.page.evaluate(() => document.activeElement?.tagName);
+        console.log(`[waitForEditorFocus] Focus NOT in editor. activeElementTag=${sel.activeElementTag} topActiveEl=${topActiveEl}`);
+      }
       expect(sel.editorHasFocus).toBe(true);
+    }).toPass({ timeout });
+  }
+
+  /**
+   * Wait for the cursor to be at a specific position in the editor.
+   * Use after format operations to ensure selection is fully restored before typing.
+   * @param editor - The editor locator
+   * @param expectedTextBefore - The expected text before the cursor (stripped of ZWS)
+   * @param options - Options including timeout
+   */
+  async waitForCursorPosition(
+    editor: Locator,
+    expectedTextBefore: string,
+    options: { timeout?: number } = {}
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    await expect(async () => {
+      const pos = await this.getTextAroundCursor(editor);
+      if (pos.textBefore !== expectedTextBefore) {
+        console.log(`[waitForCursorPosition] Expected textBefore="${expectedTextBefore}" but got "${pos.textBefore}"`);
+      }
+      expect(pos.textBefore).toBe(expectedTextBefore);
     }).toPass({ timeout });
   }
 

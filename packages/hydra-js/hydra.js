@@ -1325,7 +1325,7 @@ export class Bridge {
             // Otherwise fall back to the old DOM-based cursor saving approach
             // Use double requestAnimationFrame to wait for ALL rendering to complete
             requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
+              requestAnimationFrame(async () => {
                 // Materialize hydra comments after DOM renders
                 this.materializeHydraComments();
 
@@ -1425,31 +1425,19 @@ export class Bridge {
                   }
                 }
 
-                // NOTE: Unblock happens AFTER replayBufferedEvents() below, not here.
-                // This prevents keystrokes from arriving between unblock and replay.
-              });
-            });
+                // Update block UI overlay positions after form data changes
+                // Blocks might have resized after form updates
+                // Skip focus if this is from sidebar editing (no transformedSelection)
+                // NOTE: This must run AFTER restoreSlateSelection to avoid focus() interfering with selection
+                const skipFocus = !event.data.transformedSelection;
 
-            // After the re-render, add the toolbar
-            // Note: Toolbar creation and block selection should NOT happen in FORM_DATA handler
-            // Those are triggered by user clicks (selectBlock()) or SELECT_BLOCK messages
-            // FORM_DATA is just data synchronization - it updates the rendered blocks
-            // but should not change which block is selected or create/destroy toolbars
+                // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
+                // For existing block, just update UI positions
+                const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
+                const blockHandler = needsBlockSwitch
+                  ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
+                  : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
-            // Update block UI overlay positions after form data changes
-            // Blocks might have resized after form updates
-            // Skip focus if this is from sidebar editing (no transformedSelection)
-            const skipFocus = !event.data.transformedSelection;
-
-            // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
-            // For existing block, just update UI positions
-            const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
-            const blockHandler = needsBlockSwitch
-              ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
-              : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
-
-            requestAnimationFrame(() => {
-              requestAnimationFrame(async () => {
                 if (blockUidToProcess) {
                   let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
 
@@ -6471,6 +6459,13 @@ export class Bridge {
       // Set the actual selection
       const selection = window.getSelection();
       if (!selection) return;
+
+      // Focus the contenteditable element BEFORE setting selection
+      // After re-render, focus goes to BODY - we need to restore it
+      const editableElement = anchorElement.closest('[contenteditable="true"]') || anchorElement;
+      if (editableElement && typeof editableElement.focus === 'function') {
+        editableElement.focus();
+      }
 
       const range = document.createRange();
       range.setStart(anchorPos.node, anchorPos.offset);
