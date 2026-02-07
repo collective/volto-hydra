@@ -353,10 +353,9 @@ export class Bridge {
 
     this.blockPathMap = blockPathMap;
 
-    // Clear readonly registry - new data means fresh state
-    // Frontend will re-register readonly blocks after expansion
-    log('setFormDataFromAdmin: clearing readonly registry, was:', [...this._readonlyBlocks]);
-    this._readonlyBlocks.clear();
+    // Note: do NOT clear _readonlyBlocks here. The frontend re-registers readonly blocks
+    // via expandListingBlocks(), but that's async (API call). Clearing here creates a race
+    // window where blocks appear non-readonly. Stale entries are harmless.
 
     const seq = data?._editSequence || 0;
     // Use simple direct lookup for logging - getBlockData uses this.formData which isn't set yet

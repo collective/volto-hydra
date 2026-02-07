@@ -33,7 +33,7 @@
                                     </div>
                                     <!-- Listing blocks: expand async with own paging -->
                                     <div v-else class="mx-auto max-w-4xl">
-                                        <Suspense>
+                                        <Suspense :key="JSON.stringify(block)">
                                             <ListingExpander
                                                 :block="block"
                                                 :block-uid="block['@uid']"

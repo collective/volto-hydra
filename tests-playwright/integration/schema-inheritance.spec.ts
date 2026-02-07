@@ -93,6 +93,9 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
     await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
 
+    // Wait for Nuxt async re-rendering to settle after variation change
+    await helper.getStableBlockCount();
+
     // Wait for teasers to disappear first (confirms variation change is taking effect)
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
