@@ -182,10 +182,12 @@ function groupByStyle(items) {
     return groups;
 }
 
-// initialize components based on data attribute selectors
+// Initialize Flowbite components based on data attribute selectors.
+// Safe to call initFlowbite() (which includes initCarousels) because block.vue
+// removes data-carousel after init, so initCarousels() finds no elements here.
 onMounted(() => {
-    useFlowbite(() => {
-        initFlowbite();
+    useFlowbite((flowbite) => {
+        flowbite.initFlowbite();
     })
 
     if (import.meta.client) {

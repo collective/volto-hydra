@@ -598,23 +598,31 @@ const activeSlideIndex = ref(0);
 const carouselRef = ref(null);
 const prevSlideCount = ref(block.value?.slides?.length || 0);
 
-// On mount: hide non-active slides and initialize Flowbite.
+// On mount: hide non-active slides and initialize Flowbite carousel.
 // Vue's reactive :class is NOT used for visibility to avoid fighting
 // with Flowbite's imperative DOM manipulation during transitions.
 onMounted(async () => {
   if (block.value?.['@type'] !== 'slider' || !process.client) return;
   const section = carouselRef.value;
   if (!section) return;
+  // Immediately remove data-carousel to prevent ANY other initCarousels() call
+  // from re-initializing this carousel. Each initCarousels() creates a NEW Carousel
+  // whose constructor calls slideTo(defaultPosition), resetting position and adding
+  // duplicate click handlers. Sources: page-level initFlowbite(), window load event.
+  // We restore the attribute only for our single initCarousels() call below.
+  const carouselType = section.getAttribute('data-carousel');
+  section.removeAttribute('data-carousel');
   // Hide non-active slides before Flowbite inits (prevents flash)
   const slides = section.querySelectorAll('[data-carousel-item]');
   slides.forEach((slide, i) => {
     if (i !== activeSlideIndex.value) slide.classList.add('hidden');
     else slide.classList.add('flex');
   });
-  // Initialize Flowbite carousel
   await nextTick();
   const flowbite = await import('flowbite');
+  section.setAttribute('data-carousel', carouselType);
   flowbite.initCarousels();
+  section.removeAttribute('data-carousel');
 });
 
 // Watch for slide count changes to detect new slides and reinitialize Flowbite
@@ -629,8 +637,14 @@ watch(
       // Reinitialize Flowbite carousel to recognize new slides
       if (process.client) {
         await nextTick();
-        const flowbite = await import('flowbite');
-        flowbite.initCarousels();
+        const section = carouselRef.value;
+        if (section) {
+          // Restore data-carousel so initCarousels() finds it, then remove again
+          section.setAttribute('data-carousel', 'static');
+          const flowbite = await import('flowbite');
+          flowbite.initCarousels();
+          section.removeAttribute('data-carousel');
+        }
       }
     }
     prevSlideCount.value = newCount || 0;

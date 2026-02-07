@@ -602,13 +602,28 @@ export class Bridge {
     }
 
     // Element has zero dimensions - try to find a parent with dimensions
-    // This handles overlay elements that rely on parent for sizing (common in carousels/sliders)
-    // Walk up the DOM tree to find the first ancestor with actual dimensions
+    // This handles elements like empty <img> tags that rely on parent for sizing.
+    // Stop at block boundary (data-block-uid) to avoid using a parent container's
+    // rect when the block itself is hidden (e.g., inactive carousel slide).
     let current = element.parentElement;
     let depth = 0;
     const maxDepth = 10; // Safety limit
 
     while (current && depth < maxDepth) {
+      // Stop at block boundary - don't escape into parent block's DOM
+      if (current.hasAttribute('data-block-uid')) {
+        const blockRect = current.getBoundingClientRect();
+        if (blockRect.width > 0 && blockRect.height > 0) {
+          console.log(
+            `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+            `Using block element's dimensions (${blockRect.width}x${blockRect.height}).`
+          );
+          return { top: blockRect.top, left: blockRect.left, width: blockRect.width, height: blockRect.height };
+        }
+        // Block itself is hidden (e.g., inactive carousel slide) - no valid rect
+        break;
+      }
+
       const parentRect = current.getBoundingClientRect();
 
       if (parentRect.width > 0 && parentRect.height > 0) {
@@ -640,7 +655,13 @@ export class Bridge {
    */
   getMediaFields(blockElement) {
     return this.collectBlockFields(blockElement, 'data-media-field',
-      (el, name, results) => { results[name] = { rect: this.getEffectiveMediaRect(el, name) }; });
+      (el, name, results) => {
+        const rect = this.getEffectiveMediaRect(el, name);
+        // Skip fields with zero dimensions (e.g., hidden carousel slides)
+        if (rect && rect.width > 0 && rect.height > 0) {
+          results[name] = { rect };
+        }
+      });
   }
 
   /**
@@ -760,6 +781,16 @@ export class Bridge {
    * @param {Object} [options.selection] - Serialized selection to include
    */
   sendBlockSelected(src, blockElement, options = {}) {
+    // Suppress position-tracking updates during carousel/selector navigation
+    // Allow initial selection sources (fieldFocusListener, selectionChangeListener, etc.) through
+    // so the admin UI can show the sidebar and toolbar for the newly selected block
+    if (this._blockSelectorNavigating) {
+      const isPositionTrackingSource = src === 'transitionTracker' || src === 'transitionEnd' || src === 'scrollHandler';
+      if (isPositionTrackingSource) {
+        return;
+      }
+    }
+
     // Get blockUid from options or element attribute
     const blockUid = options.blockUid || blockElement?.getAttribute('data-block-uid') || PAGE_BLOCK_UID;
 
@@ -1441,19 +1472,31 @@ export class Bridge {
                 if (blockUidToProcess) {
                   let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
 
-                  // If block is hidden (e.g., carousel slide), try to make it visible first
-                  // Skip if navigation is already in progress (SELECT_BLOCK already triggered it)
-                  if (blockElement && this.isElementHidden(blockElement) && !this._navigatingToBlock) {
-                    log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
-                    const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
-                    if (madeVisible) {
-                      // Wait for block to become visible
-                      for (let i = 0; i < 10; i++) {
+                  // If block is hidden (e.g., carousel slide), wait for animation or navigate
+                  if (blockElement && this.isElementHidden(blockElement)) {
+                    if (this._blockSelectorNavigating || this._navigatingToBlock) {
+                      // Navigation already in progress - just wait for animation to complete
+                      log('FORM_DATA: block hidden, waiting for animation:', blockUidToProcess);
+                      for (let i = 0; i < 30; i++) {
                         await new Promise((resolve) => setTimeout(resolve, 50));
                         blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
                         if (blockElement && !this.isElementHidden(blockElement)) {
-                          log('FORM_DATA: block now visible');
+                          log('FORM_DATA: block now visible after animation');
                           break;
+                        }
+                      }
+                    } else {
+                      // No navigation in progress - try to make it visible
+                      log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
+                      const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
+                      if (madeVisible) {
+                        for (let i = 0; i < 10; i++) {
+                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                          if (blockElement && !this.isElementHidden(blockElement)) {
+                            log('FORM_DATA: block now visible');
+                            break;
+                          }
                         }
                       }
                     }
@@ -1675,6 +1718,13 @@ export class Bridge {
 
       // Stop propagation for block clicks (but not selector clicks above)
       event.stopPropagation();
+
+      // Skip block selection during carousel/selector navigation
+      // (a click on the carousel button can also trigger blockClickHandler for the old slide)
+      if (this._blockSelectorNavigating) {
+        log('blockClickHandler: skipping, _blockSelectorNavigating active');
+        return;
+      }
 
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
@@ -3570,7 +3620,7 @@ export class Bridge {
     if (this._blockSelectorNavigating) {
       setTimeout(() => {
         this._blockSelectorNavigating = false;
-      }, 500);
+      }, 1500);
     }
 
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
@@ -3935,6 +3985,10 @@ export class Bridge {
     if (selector !== '+1' && selector !== '-1') {
       const targetUid = selector;
       log('handleBlockSelector: direct selector targetUid =', targetUid);
+      // Hide outline during transition (same as +1/-1 path)
+      this._blockSelectorNavigating = true;
+      this.stopTransitionTracking();
+      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
       this.waitForBlockVisibleAndSelect(targetUid);
       return;
     }
@@ -4036,6 +4090,24 @@ export class Bridge {
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2; // pixels
 
+    // Snapshot which blocks are currently visible before the animation starts.
+    // We won't accept any target position as stable until this set changes,
+    // proving the carousel animation has actually begun.
+    const containerForSnapshot = document.querySelector(`[data-block-uid="${containerUid}"]`);
+    const containerRectSnapshot = containerForSnapshot?.getBoundingClientRect();
+    const initialVisibleUids = new Set();
+    if (containerRectSnapshot) {
+      for (const child of childBlocks) {
+        const rect = child.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        if (center >= containerRectSnapshot.left && center <= containerRectSnapshot.right) {
+          initialVisibleUids.add(child.getAttribute('data-block-uid'));
+        }
+      }
+    }
+    let visibilityChanged = false;
+    log('handleBlockSelector: initial visible blocks:', [...initialVisibleUids]);
+
     // Get the set of child block UIDs for checking if user navigated away
     const childUids = new Set(childBlocks.map(el => el.getAttribute('data-block-uid')));
 
@@ -4053,7 +4125,29 @@ export class Bridge {
 
       const { visible, x } = getTargetVisibility(container);
 
-      if (visible) {
+      // Check if the set of visible blocks has changed from the initial snapshot.
+      // During carousel transitions, multiple slides can be visible simultaneously.
+      // We must wait until the visible set changes before accepting any position as stable,
+      // otherwise we might catch a transient state before the animation has even begun.
+      if (!visibilityChanged && container) {
+        const containerRect = container.getBoundingClientRect();
+        const currentVisible = new Set();
+        for (const child of freshChildBlocks) {
+          const rect = child.getBoundingClientRect();
+          const center = rect.left + rect.width / 2;
+          if (center >= containerRect.left && center <= containerRect.right) {
+            currentVisible.add(child.getAttribute('data-block-uid'));
+          }
+        }
+        // Check if the visible set differs from the initial snapshot
+        if (currentVisible.size !== initialVisibleUids.size ||
+            [...currentVisible].some(uid => !initialVisibleUids.has(uid))) {
+          visibilityChanged = true;
+          log('handleBlockSelector: visible blocks changed, animation started');
+        }
+      }
+
+      if (visible && visibilityChanged) {
         // Check if position is also stable (not animating)
         const positionStable = lastX !== null && Math.abs(x - lastX) < POSITION_TOLERANCE;
 
@@ -4070,6 +4164,8 @@ export class Bridge {
 
         if (stableCount >= STABLE_THRESHOLD) {
           log('handleBlockSelector: target visible and position stable, selecting', targetUid);
+          // Keep _blockSelectorNavigating true - selectBlock will clear it after 1500ms
+          // sendBlockSelected allows initial selection sources through while suppressing position tracking
           const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
           if (targetElement) {
             this.selectBlock(targetElement);
@@ -4092,6 +4188,7 @@ export class Bridge {
         const centeredChild = container ? findMostCenteredChild(freshChildBlocks, container) : null;
         const centeredUid = centeredChild?.getAttribute('data-block-uid');
         log('handleBlockSelector: fallback to most centered =', centeredUid);
+        // Keep _blockSelectorNavigating true - selectBlock will clear it after 1500ms
         if (centeredChild) {
           this.selectBlock(centeredChild);
         } else if (container) {
@@ -4138,15 +4235,40 @@ export class Bridge {
   }
 
   /**
-   * Wait for a specific block to become visible, then select it.
+   * Wait for a specific block to become visible AND position stable, then select it.
+   * Uses same stability check as the +1/-1 path to avoid selecting during animation.
    */
-  waitForBlockVisibleAndSelect(targetUid, retries = 10) {
+  waitForBlockVisibleAndSelect(targetUid, retries = 40, stableCount = 0, lastX = null) {
+    const STABLE_THRESHOLD = 3;
+    const POSITION_TOLERANCE = 2;
+
     const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
     if (targetElement && !this.isElementHidden(targetElement)) {
-      log('handleBlockSelector: selecting', targetUid);
-      this.selectBlock(targetElement);
+      const rect = targetElement.getBoundingClientRect();
+      const x = rect.left;
+      const positionStable = lastX !== null && Math.abs(x - lastX) < POSITION_TOLERANCE;
+
+      if (positionStable) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+      }
+
+      if (stableCount >= STABLE_THRESHOLD) {
+        log('handleBlockSelector: selecting (position stable)', targetUid);
+        this.selectBlock(targetElement);
+        return;
+      }
+
+      // Visible but not stable yet - keep polling
+      if (retries > 0) {
+        setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, stableCount, x), 50);
+      } else {
+        log('handleBlockSelector: selecting (retries exhausted)', targetUid);
+        this.selectBlock(targetElement);
+      }
     } else if (retries > 0) {
-      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1), 50);
+      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, 0, null), 50);
     } else {
       log('handleBlockSelector: block not visible after retries', targetUid);
     }
@@ -4607,7 +4729,8 @@ export class Bridge {
       log('observeBlockTransition: stopped tracking for:', blockUid);
 
       // Final position update using combined bounding box
-      if (this.selectedBlockUid === blockUid) {
+      // Skip during carousel navigation - block may be at stale position
+      if (this.selectedBlockUid === blockUid && !this._blockSelectorNavigating) {
         const finalRect = this.getBoundingBoxForElements(blockElements);
         if (finalRect && this._lastBlockRect) {
           const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
@@ -5199,22 +5322,34 @@ export class Bridge {
         // If block doesn't exist or is hidden, try to make it visible
         // using data-block-selector navigation (e.g., carousel slides)
         if (!blockElement || this.isElementHidden(blockElement)) {
+          // Wait for block to become visible (e.g., carousel animation in progress)
+          const waitForVisible = async () => {
+            for (let i = 0; i < 30; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              blockElement = document.querySelector(
+                `[data-block-uid="${uid}"]`,
+              );
+              if (blockElement && !this.isElementHidden(blockElement)) {
+                return true;
+              }
+            }
+            return false;
+          };
+
+          if (alreadySelected || this._blockSelectorNavigating) {
+            // Navigation already in progress (carousel click or handleBlockSelector) -
+            // just wait for the animation to complete, don't try to navigate again
+            waitForVisible().then((visible) => {
+              if (visible) {
+                this.selectBlock(blockElement);
+              }
+            });
+            return;
+          }
+
+          // Block not yet selected and no navigation in progress - try to navigate to it
           const madeVisible = this.tryMakeBlockVisible(uid);
           if (madeVisible) {
-            // Wait for the renderer to make the block visible (e.g., carousel animation)
-            // Poll for up to 500ms for the block to become visible
-            const waitForVisible = async () => {
-              for (let i = 0; i < 10; i++) {
-                await new Promise((resolve) => setTimeout(resolve, 50));
-                blockElement = document.querySelector(
-                  `[data-block-uid="${uid}"]`,
-                );
-                if (blockElement && !this.isElementHidden(blockElement)) {
-                  return true;
-                }
-              }
-              return false;
-            };
             waitForVisible().then((visible) => {
               if (visible) {
                 this.selectBlock(blockElement);
