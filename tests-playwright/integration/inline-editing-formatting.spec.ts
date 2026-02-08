@@ -575,10 +575,14 @@ test.describe('Inline Editing - Formatting', () => {
 
     // Verify cursor is at the end using visible text before/after cursor
     // (DOM offset varies due to ZWS nodes, but visible position should be at end)
-    const textAround = await helper.getTextAroundCursor(editor);
-    console.log('[TEST] Text around cursor:', JSON.stringify(textAround));
-    expect(textAround.textBefore).toBe('Hello world');
-    expect(textAround.textAfter).toBe('');
+    // Use toPass() because FORM_DATA re-render + restoreSlateSelection may take
+    // an extra rAF cycle to settle.
+    await expect(async () => {
+      const textAround = await helper.getTextAroundCursor(editor);
+      console.log('[TEST] Text around cursor:', JSON.stringify(textAround));
+      expect(textAround.textBefore).toBe('Hello world');
+      expect(textAround.textAfter).toBe('');
+    }).toPass({ timeout: 5000 });
   });
 
   test('prospective formatting: toggle on, type, off, type, on again does not double text', async ({

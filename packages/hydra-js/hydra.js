@@ -1440,21 +1440,6 @@ export class Bridge {
                   }
                 }
 
-                // Only restore selection for toolbar format operations (has transformedSelection)
-                // NOT for sidebar edits - those should not steal focus from sidebar
-                if (event.data.transformedSelection) {
-                  // Store expected selection so selectionchange handler can suppress it
-                  this.expectedSelectionFromAdmin = event.data.transformedSelection;
-                  // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
-                  // the selection we're about to restore from transformedSelection
-                  this.savedClickPosition = null;
-                  try {
-                    this.restoreSlateSelection(event.data.transformedSelection, this.formData);
-                  } catch (e) {
-                    console.error('[HYDRA] Error restoring selection:', e);
-                  }
-                }
-
                 // Update block UI overlay positions after form data changes
                 // Blocks might have resized after form updates
                 // Skip focus if this is from sidebar editing (no transformedSelection)
@@ -1462,10 +1447,17 @@ export class Bridge {
                 // focus request even though the FORM_DATA itself has no transformedSelection.
                 // This happens when LinkEditor closes: FOCUS_FIELD fires, then FORM_DATA
                 // re-renders the DOM - without this, the re-render destroys the focused element.
-                // NOTE: This must run AFTER restoreSlateSelection to avoid focus() interfering with selection
+                // NOTE: This must run BEFORE restoreSlateSelection because focus() resets
+                // cursor to offset 0 - restoreSlateSelection then corrects it.
                 const hasPendingFocus = this._pendingFocusRestore;
                 this._pendingFocusRestore = false;
                 const skipFocus = !event.data.transformedSelection && !hasPendingFocus;
+
+                // Clear savedClickPosition when we have a transformedSelection so
+                // updateBlockUIAfterFormData won't overwrite the selection we're about to restore
+                if (event.data.transformedSelection) {
+                  this.savedClickPosition = null;
+                }
 
                 // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
                 // For existing block, just update UI positions
@@ -1526,6 +1518,19 @@ export class Bridge {
                     blockHandler(blockElement);
                   } else if (needsBlockSwitch) {
                     log('FORM_DATA: block element not found after retries:', blockUidToProcess);
+                  }
+                }
+
+                // Restore selection AFTER updateBlockUIAfterFormData so that focus() doesn't
+                // destroy the cursor position. focus() may reset cursor to offset 0, but
+                // restoreSlateSelection corrects it to the intended position.
+                if (event.data.transformedSelection) {
+                  // Store expected selection so selectionchange handler can suppress it
+                  this.expectedSelectionFromAdmin = event.data.transformedSelection;
+                  try {
+                    this.restoreSlateSelection(event.data.transformedSelection, this.formData);
+                  } catch (e) {
+                    console.error('[HYDRA] Error restoring selection:', e);
                   }
                 }
 
