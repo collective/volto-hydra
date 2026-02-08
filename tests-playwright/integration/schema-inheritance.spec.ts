@@ -604,10 +604,13 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const newFacet = iframe.locator(`[data-block-uid="${newFacetId}"]`);
     await helper.waitForBlockSelected(newFacetId!, 10000);
 
+    // Wait for sidebar to show the NEW facet (not the old "Content Type" facet)
+    // The old facet has Label="Content Type"; new empty facet does not
+    await expect(page.locator('#sidebar-properties')).not.toContainText('Content Type', { timeout: 5000 });
+
     // Find and select the field (review_state)
     const fieldWrapper = page.locator('#sidebar-properties .field-wrapper-field');
     await expect(fieldWrapper).toBeVisible({ timeout: 5000 });
-
     const fieldSelect = fieldWrapper.locator('.react-select__control');
     await fieldSelect.click();
 
