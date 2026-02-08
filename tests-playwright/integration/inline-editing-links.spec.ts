@@ -334,6 +334,20 @@ test.describe('Inline Editing - Links', () => {
     // Wait for both focus AND non-collapsed selection to be stable before typing
     await expect(async () => {
       const selectionInfo = await helper.getSelectionInfo(editor);
+      if (!selectionInfo.editorHasFocus || selectionInfo.isCollapsed) {
+        const debugInfo = await page.evaluate(() => {
+          const active = document.activeElement;
+          const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement | null;
+          const iframeActive = iframeEl?.contentDocument?.activeElement;
+          return {
+            topActive: active?.tagName + (active?.id ? '#' + active.id : ''),
+            topIsFocused: document.hasFocus(),
+            iframeActive: iframeActive?.tagName + (iframeActive?.className ? '.' + iframeActive.className.split(' ')[0] : ''),
+            iframeContentEditable: iframeActive?.getAttribute('contenteditable'),
+          };
+        });
+        console.log('[link-cancel] focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
+      }
       expect(selectionInfo.editorHasFocus).toBe(true);
       expect(selectionInfo.isCollapsed).toBe(false);
     }).toPass({ timeout: 5000 });

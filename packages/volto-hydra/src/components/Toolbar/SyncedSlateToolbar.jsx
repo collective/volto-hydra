@@ -356,6 +356,9 @@ const SyncedSlateToolbar = ({
       // Restore focus to the specific field in the iframe after LinkEditor closes
       // We know which block and field was selected when the popup opened
       if (iframeElement?.contentWindow && selectedBlock) {
+        // Focus the iframe element first - browser won't let field.focus() work
+        // inside an iframe unless the iframe itself has focus in the parent document
+        iframeElement.focus();
         const fieldName = blockUI?.focusedFieldName || 'value';
         iframeElement.contentWindow.postMessage({
           type: 'FOCUS_FIELD',
@@ -365,8 +368,22 @@ const SyncedSlateToolbar = ({
       }
     };
 
+    // Listen for Escape key to focus iframe immediately (with user activation).
+    // setInterval callbacks lack user activation context, so focus() calls from
+    // the poll handler may be silently ignored by the browser. The keydown handler
+    // runs in a user activation context where focus() is guaranteed to work.
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && linkEditorWasVisibleRef.current && iframeElement) {
+        iframeElement.focus();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
     const intervalId = setInterval(checkVisibility, 100);
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [form, currentSelection, onChangeFormData, iframeElement, selectedBlock, blockUI?.focusedFieldName]);
 
   // Helper function for applying inline format with prospective formatting support

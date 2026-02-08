@@ -1458,8 +1458,14 @@ export class Bridge {
                 // Update block UI overlay positions after form data changes
                 // Blocks might have resized after form updates
                 // Skip focus if this is from sidebar editing (no transformedSelection)
+                // EXCEPTION: If FOCUS_FIELD was received before this FORM_DATA, honour the
+                // focus request even though the FORM_DATA itself has no transformedSelection.
+                // This happens when LinkEditor closes: FOCUS_FIELD fires, then FORM_DATA
+                // re-renders the DOM - without this, the re-render destroys the focused element.
                 // NOTE: This must run AFTER restoreSlateSelection to avoid focus() interfering with selection
-                const skipFocus = !event.data.transformedSelection;
+                const hasPendingFocus = this._pendingFocusRestore;
+                this._pendingFocusRestore = false;
+                const skipFocus = !event.data.transformedSelection && !hasPendingFocus;
 
                 // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
                 // For existing block, just update UI positions
@@ -1594,6 +1600,12 @@ export class Bridge {
           // Restore focus to a specific field (e.g., after LinkEditor closes)
           const { blockId, fieldName } = event.data;
           log('Received FOCUS_FIELD:', blockId, fieldName);
+
+          // Set flag so that if a FORM_DATA arrives and re-renders the DOM,
+          // updateBlockUIAfterFormData will refocus even when skipFocus=true.
+          // Without this, FOCUS_FIELD focuses the field, then FORM_DATA re-renders
+          // and destroys the focused element without restoring focus.
+          this._pendingFocusRestore = true;
 
           const blockElement = document.querySelector(`[data-block-uid="${blockId}"]`);
           if (blockElement) {
