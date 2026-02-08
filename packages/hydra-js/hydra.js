@@ -5365,9 +5365,15 @@ export class Bridge {
             return;
           }
 
+          // Scroll into view for new block selection. selectBlock's internal scroll check
+          // compares this.selectedBlockUid === blockUid, but we already set selectedBlockUid
+          // above (line 5303) so it always thinks it's a re-select and skips the scroll.
+          if (!this.elementIsVisibleInViewport(blockElement)) {
+            this.scrollBlockIntoView(blockElement);
+          }
+
           // Call selectBlock() to properly set up toolbar and contenteditable
           // This ensures blocks selected via Order tab work the same as clicking
-          // Note: selectBlock() handles scrolling with toolbar margin awareness
           this.selectBlock(blockElement);
 
           // Focus the contenteditable element for blocks with editable fields
