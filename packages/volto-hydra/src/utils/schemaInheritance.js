@@ -45,8 +45,23 @@ function generatePlaceholder(blockType, allBlocks) {
  * even if the next block is a template block.
  */
 function getTemplateInfoFromNeighbors(context) {
-  const { position, layoutItems, allBlocks, insertAfter } = context;
-  if (!allBlocks || !layoutItems || layoutItems.length === 0) return undefined;
+  const { position, layoutItems, allBlocks, insertAfter, containerId, field } = context;
+  if (!allBlocks || !layoutItems || layoutItems.length === 0) {
+    // Empty container — check if parent container has childPlaceholders for this field.
+    // This handles the case where all blocks in a placeholder region inside a container
+    // have been deleted, leaving the container field empty.
+    if (containerId && field) {
+      const parentBlock = allBlocks?.[containerId];
+      if (parentBlock?.templateId && parentBlock?.childPlaceholders?.[field]) {
+        return {
+          templateId: parentBlock.templateId,
+          templateInstanceId: parentBlock.templateInstanceId,
+          placeholder: parentBlock.childPlaceholders[field],
+        };
+      }
+    }
+    return undefined;
+  }
 
   // Determine the primary neighbor based on insertion direction
   // insertAfter=true: we're inserting AFTER the block at position-1, so inherit from it
@@ -80,6 +95,11 @@ function getTemplateInfoFromNeighbors(context) {
       // Same template - can inherit placeholder
       if (!neighbor.fixed && neighbor.placeholder && !inheritedPlaceholder) {
         inheritedPlaceholder = neighbor.placeholder;
+      }
+      // Fixed blocks with nextPlaceholder indicate an adjacent placeholder region.
+      // This preserves placeholder info even when all placeholder blocks are deleted.
+      if (neighbor.fixed && neighbor.nextPlaceholder && !inheritedPlaceholder) {
+        inheritedPlaceholder = neighbor.nextPlaceholder;
       }
     }
   }

@@ -1147,11 +1147,7 @@ export class Bridge {
               // Support async callbacks (e.g., renderContentWithListings)
               if (this.onContentChangeCallback) {
                 const result = this.onContentChangeCallback(this.formData);
-                // If callback is async, wait for it before materializing comments and applying visuals
-                const postRender = () => requestAnimationFrame(() => {
-                  this.materializeHydraComments();
-                  this.applyReadonlyVisuals();
-                });
+                const postRender = () => this.afterContentRender();
                 if (result && typeof result.then === 'function') {
                   result.then(postRender);
                 } else {
@@ -1348,209 +1344,12 @@ export class Bridge {
             log('Calling onEditChange callback to trigger re-render');
             const callbackResult = callback(this.formData);
 
-            // Run post-render code after callback completes (async or sync)
-            const afterRender = () => {
-            // Restore cursor position after re-render (use requestAnimationFrame to ensure DOM is updated)
-            // If the message includes a transformed Slate selection, use that
-            // Otherwise fall back to the old DOM-based cursor saving approach
-            // Use double requestAnimationFrame to wait for ALL rendering to complete
-            requestAnimationFrame(() => {
-              requestAnimationFrame(async () => {
-                // Materialize hydra comments after DOM renders
-                this.materializeHydraComments();
-
-                // Mark empty blocks so they can be styled (must run on every render)
-                this.markEmptyBlocks();
-
-                // Apply readonly visuals (grey out readonly blocks)
-                this.applyReadonlyVisuals();
-
-                // IMPORTANT: Ensure ZWS in empty inline elements BEFORE restoring selection
-                // This allows cursor positioning inside empty formatting elements
-                if (this.selectedBlockUid) {
-                  const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                  if (blockElement) {
-                    // Re-attach mutation observer after DOM re-render
-                    // The old observer was watching the old blockElement which no longer exists
-                    this.observeBlockTextChanges(blockElement);
-                    // Re-attach event listeners (keydown, paste, etc.) to the new DOM element
-                    this.makeBlockContentEditable(blockElement);
-
-                    // Re-attach ResizeObserver
-                    // This is critical after drag-and-drop when block moves to new position
-                    // For sidebar edits (no transformedSelection): pass skipInitialUpdate to prevent toolbar blink
-                    const editableFields = this.getEditableFields(blockElement);
-                    const isSidebarEdit = !event.data.transformedSelection;
-                    const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
-                    this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, isSidebarEdit);
-
-                    // Send BLOCK_SELECTED if toolbar operation OR if block/media field rects changed
-                    // Block may resize/move after edits, media fields may change (e.g., clearing image → placeholder)
-                    const newBlockRect = blockElement.getBoundingClientRect();
-                    const newMediaFields = this.getMediaFields(blockElement);
-
-                    // Check if block rect changed (size or position)
-                    const blockRectChanged = !this.lastBlockRect ||
-                      Math.abs(newBlockRect.top - this.lastBlockRect.top) > 1 ||
-                      Math.abs(newBlockRect.left - this.lastBlockRect.left) > 1 ||
-                      Math.abs(newBlockRect.width - this.lastBlockRect.width) > 1 ||
-                      Math.abs(newBlockRect.height - this.lastBlockRect.height) > 1;
-
-                    // Check if any media field rect changed
-                    let mediaFieldsChanged = false;
-                    const newFieldNames = Object.keys(newMediaFields);
-                    const lastFieldNames = Object.keys(this.lastMediaFields || {});
-                    if (newFieldNames.length !== lastFieldNames.length) {
-                      mediaFieldsChanged = true;
-                    } else {
-                      for (const fieldName of newFieldNames) {
-                        const newRect = newMediaFields[fieldName]?.rect;
-                        const lastRect = this.lastMediaFields?.[fieldName]?.rect;
-                        if (!newRect || !lastRect ||
-                            Math.abs(newRect.top - lastRect.top) > 1 ||
-                            Math.abs(newRect.left - lastRect.left) > 1 ||
-                            Math.abs(newRect.width - lastRect.width) > 1 ||
-                            Math.abs(newRect.height - lastRect.height) > 1) {
-                          mediaFieldsChanged = true;
-                          break;
-                        }
-                      }
-                    }
-
-                    log('formDataHandler check:', {
-                      blockRectChanged,
-                      mediaFieldsChanged,
-                      newBlockRect: { top: newBlockRect.top, height: newBlockRect.height },
-                      newMediaFields,
-                      lastMediaFields: this.lastMediaFields,
-                    });
-
-                    if (event.data.transformedSelection || blockRectChanged || mediaFieldsChanged) {
-                      // Send updated rect to admin so toolbar/overlays follow the block
-                      // Include transformedSelection if present - this prevents View.jsx from clearing
-                      // the selection when it receives BLOCK_SELECTED without selection
-                      log('formDataHandler sending BLOCK_SELECTED with mediaFields:', newMediaFields);
-                      this.sendBlockSelected('formDataHandler', blockElement, {
-                        selection: event.data.transformedSelection || undefined,
-                      });
-                      this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
-                      this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
-                      // Drag handle position is now set in sendBlockSelected
-                    }
-                  }
-                }
-
-                // Update block UI overlay positions after form data changes
-                // Blocks might have resized after form updates
-                // Skip focus if this is from sidebar editing (no transformedSelection)
-                // EXCEPTION: If FOCUS_FIELD was received before this FORM_DATA, honour the
-                // focus request even though the FORM_DATA itself has no transformedSelection.
-                // This happens when LinkEditor closes: FOCUS_FIELD fires, then FORM_DATA
-                // re-renders the DOM - without this, the re-render destroys the focused element.
-                // NOTE: This must run BEFORE restoreSlateSelection because focus() resets
-                // cursor to offset 0 - restoreSlateSelection then corrects it.
-                const hasPendingFocus = this._pendingFocusRestore;
-                this._pendingFocusRestore = false;
-                const skipFocus = !event.data.transformedSelection && !hasPendingFocus;
-
-                // Clear savedClickPosition when we have a transformedSelection so
-                // updateBlockUIAfterFormData won't overwrite the selection we're about to restore
-                if (event.data.transformedSelection) {
-                  this.savedClickPosition = null;
-                }
-
-                // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
-                // For existing block, just update UI positions
-                const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
-                const blockHandler = needsBlockSwitch
-                  ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
-                  : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
-
-                if (blockUidToProcess) {
-                  let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-
-                  // If block is hidden (e.g., carousel slide), wait for animation or navigate
-                  if (blockElement && this.isElementHidden(blockElement)) {
-                    if (this._blockSelectorNavigating || this._navigatingToBlock) {
-                      // Navigation already in progress - just wait for animation to complete
-                      log('FORM_DATA: block hidden, waiting for animation:', blockUidToProcess);
-                      for (let i = 0; i < 30; i++) {
-                        await new Promise((resolve) => setTimeout(resolve, 50));
-                        blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-                        if (blockElement && !this.isElementHidden(blockElement)) {
-                          log('FORM_DATA: block now visible after animation');
-                          break;
-                        }
-                      }
-                    } else {
-                      // No navigation in progress - try to make it visible
-                      log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
-                      const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
-                      if (madeVisible) {
-                        for (let i = 0; i < 10; i++) {
-                          await new Promise((resolve) => setTimeout(resolve, 50));
-                          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-                          if (blockElement && !this.isElementHidden(blockElement)) {
-                            log('FORM_DATA: block now visible');
-                            break;
-                          }
-                        }
-                      }
-                    }
-                  }
-
-                  // Re-query element in case it changed during wait
-                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-
-                  // If element not found yet, retry a few times (frontend may still be rendering)
-                  if (!blockElement && needsBlockSwitch) {
-                    for (let retry = 0; retry < 10 && !blockElement; retry++) {
-                      await new Promise(r => setTimeout(r, 100));
-                      blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-                      log('FORM_DATA: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
-                    }
-                  }
-
-                  // Ensure elements have min size BEFORE sending BLOCK_SELECTED
-                  // so the new block has dimensions when the admin UI receives the message
-                  this.ensureElementsHaveMinSize();
-                  if (blockElement) {
-                    blockHandler(blockElement);
-                  } else if (needsBlockSwitch) {
-                    log('FORM_DATA: block element not found after retries:', blockUidToProcess);
-                  }
-                }
-
-                // Restore selection AFTER updateBlockUIAfterFormData so that focus() doesn't
-                // destroy the cursor position. focus() may reset cursor to offset 0, but
-                // restoreSlateSelection corrects it to the intended position.
-                if (event.data.transformedSelection) {
-                  // Store expected selection so selectionchange handler can suppress it
-                  this.expectedSelectionFromAdmin = event.data.transformedSelection;
-                  try {
-                    this.restoreSlateSelection(event.data.transformedSelection, this.formData);
-                  } catch (e) {
-                    console.error('[HYDRA] Error restoring selection:', e);
-                  }
-                }
-
-                // When switching to a new block (e.g., after Enter creates new block),
-                // redirect buffered keystrokes to the new block instead of the old one
-                if (needsBlockSwitch && adminSelectedBlockUid) {
-                  if (this.pendingTransform) {
-                    log('Redirecting buffer from', this.pendingTransform.blockId, 'to new block:', adminSelectedBlockUid);
-                    this.pendingTransform.blockId = adminSelectedBlockUid;
-                  }
-                  if (this.eventBuffer.length > 0) {
-                    log('Redirecting eventBuffer to new block:', adminSelectedBlockUid);
-                  }
-                }
-
-                // Single replay point for all paths
-                this.replayBufferAndUnblock();
-              });
+            const afterRender = () => this.afterContentRender({
+              transformedSelection: event.data.transformedSelection,
+              formatRequestId,
+              needsBlockSwitch,
+              adminSelectedBlockUid,
             });
-            }; // End of afterRender function
 
             // Call afterRender after callback completes (async or sync)
             if (callbackResult && typeof callbackResult.then === 'function') {
@@ -3447,6 +3246,173 @@ export class Bridge {
         textNode.textContent = newText;
       }
     }
+  }
+
+  /**
+   * Post-render DOM updates shared by both INITIAL_DATA and FORM_DATA handlers.
+   * Runs inside a double requestAnimationFrame to ensure the renderer has finished.
+   *
+   * For INITIAL_DATA, all optional params are absent so the cursor/resize/block-switch
+   * code paths are no-ops.
+   *
+   * @param {Object} [options]
+   * @param {Object} [options.transformedSelection] - Slate selection from admin
+   * @param {string} [options.formatRequestId] - Format operation request id
+   * @param {boolean} [options.needsBlockSwitch] - Whether admin selected a different block
+   * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
+   */
+  afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        // Visual updates that apply to every render
+        this.materializeHydraComments();
+        this.markEmptyBlocks();
+        this.applyReadonlyVisuals();
+
+        // Re-attach observers/editors for the currently selected block
+        if (this.selectedBlockUid) {
+          const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          if (blockElement) {
+            this.observeBlockTextChanges(blockElement);
+            this.makeBlockContentEditable(blockElement);
+
+            const editableFields = this.getEditableFields(blockElement);
+            const isSidebarEdit = !transformedSelection;
+            const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+            this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, isSidebarEdit);
+
+            const newBlockRect = blockElement.getBoundingClientRect();
+            const newMediaFields = this.getMediaFields(blockElement);
+
+            const blockRectChanged = !this.lastBlockRect ||
+              Math.abs(newBlockRect.top - this.lastBlockRect.top) > 1 ||
+              Math.abs(newBlockRect.left - this.lastBlockRect.left) > 1 ||
+              Math.abs(newBlockRect.width - this.lastBlockRect.width) > 1 ||
+              Math.abs(newBlockRect.height - this.lastBlockRect.height) > 1;
+
+            let mediaFieldsChanged = false;
+            const newFieldNames = Object.keys(newMediaFields);
+            const lastFieldNames = Object.keys(this.lastMediaFields || {});
+            if (newFieldNames.length !== lastFieldNames.length) {
+              mediaFieldsChanged = true;
+            } else {
+              for (const fieldName of newFieldNames) {
+                const newRect = newMediaFields[fieldName]?.rect;
+                const lastRect = this.lastMediaFields?.[fieldName]?.rect;
+                if (!newRect || !lastRect ||
+                    Math.abs(newRect.top - lastRect.top) > 1 ||
+                    Math.abs(newRect.left - lastRect.left) > 1 ||
+                    Math.abs(newRect.width - lastRect.width) > 1 ||
+                    Math.abs(newRect.height - lastRect.height) > 1) {
+                  mediaFieldsChanged = true;
+                  break;
+                }
+              }
+            }
+
+            log('afterContentRender check:', {
+              blockRectChanged,
+              mediaFieldsChanged,
+              newBlockRect: { top: newBlockRect.top, height: newBlockRect.height },
+              newMediaFields,
+              lastMediaFields: this.lastMediaFields,
+            });
+
+            if (transformedSelection || blockRectChanged || mediaFieldsChanged) {
+              log('afterContentRender sending BLOCK_SELECTED with mediaFields:', newMediaFields);
+              this.sendBlockSelected('afterContentRender', blockElement, {
+                selection: transformedSelection || undefined,
+              });
+              this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
+              this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields));
+            }
+          }
+        }
+
+        // Update block UI overlay positions after form data changes
+        const hasPendingFocus = this._pendingFocusRestore;
+        this._pendingFocusRestore = false;
+        const skipFocus = !transformedSelection && !hasPendingFocus;
+
+        if (transformedSelection) {
+          this.savedClickPosition = null;
+        }
+
+        const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
+        const blockHandler = needsBlockSwitch
+          ? (el) => { log('Selecting new block from afterContentRender:', blockUidToProcess); this.selectBlock(el); }
+          : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
+
+        if (blockUidToProcess) {
+          let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+          if (blockElement && this.isElementHidden(blockElement)) {
+            if (this._blockSelectorNavigating || this._navigatingToBlock) {
+              log('afterContentRender: block hidden, waiting for animation:', blockUidToProcess);
+              for (let i = 0; i < 30; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+                blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                if (blockElement && !this.isElementHidden(blockElement)) {
+                  log('afterContentRender: block now visible after animation');
+                  break;
+                }
+              }
+            } else {
+              log('afterContentRender: block is hidden, trying to make visible:', blockUidToProcess);
+              const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
+              if (madeVisible) {
+                for (let i = 0; i < 10; i++) {
+                  await new Promise((resolve) => setTimeout(resolve, 50));
+                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                  if (blockElement && !this.isElementHidden(blockElement)) {
+                    log('afterContentRender: block now visible');
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+          if (!blockElement && needsBlockSwitch) {
+            for (let retry = 0; retry < 10 && !blockElement; retry++) {
+              await new Promise(r => setTimeout(r, 100));
+              blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+              log('afterContentRender: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
+            }
+          }
+
+          this.ensureElementsHaveMinSize();
+          if (blockElement) {
+            blockHandler(blockElement);
+          } else if (needsBlockSwitch) {
+            log('afterContentRender: block element not found after retries:', blockUidToProcess);
+          }
+        }
+
+        if (transformedSelection) {
+          this.expectedSelectionFromAdmin = transformedSelection;
+          try {
+            this.restoreSlateSelection(transformedSelection, this.formData);
+          } catch (e) {
+            console.error('[HYDRA] Error restoring selection:', e);
+          }
+        }
+
+        if (needsBlockSwitch && adminSelectedBlockUid) {
+          if (this.pendingTransform) {
+            log('Redirecting buffer from', this.pendingTransform.blockId, 'to new block:', adminSelectedBlockUid);
+            this.pendingTransform.blockId = adminSelectedBlockUid;
+          }
+          if (this.eventBuffer.length > 0) {
+            log('Redirecting eventBuffer to new block:', adminSelectedBlockUid);
+          }
+        }
+
+        this.replayBufferAndUnblock();
+      });
+    });
   }
 
   /**
@@ -9506,11 +9472,40 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
     if (tplBlock.fixed) {
       // Fixed block - emit template version
       const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
+
+      // Look ahead for next non-fixed placeholder at this nested level
+      const tplIdx = templateLayout.indexOf(tplBlockId);
+      let nextPlaceholder = undefined;
+      for (let i = tplIdx + 1; i < templateLayout.length; i++) {
+        const nextTplBlock = templateBlocks[templateLayout[i]];
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
+          nextPlaceholder = nextTplBlock.placeholder;
+          break;
+        }
+        if (nextTplBlock?.fixed) break;
+      }
+
+      // childPlaceholders for nested containers
+      let childPlaceholders = undefined;
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const innerLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        for (const nestedId of innerLayout) {
+          const nested = tplBlock.blocks[nestedId];
+          if (nested && !nested.fixed && nested.placeholder) {
+            if (!childPlaceholders) childPlaceholders = {};
+            childPlaceholders['blocks'] = nested.placeholder;
+            break;
+          }
+        }
+      }
+
       addItem(
         {
           ...tplBlock,
           templateId: templateId,
           templateInstanceId: instanceId,
+          ...(nextPlaceholder && { nextPlaceholder }),
+          ...(childPlaceholders && { childPlaceholders }),
         },
         blockId
       );
@@ -9947,11 +9942,42 @@ export function expandTemplatesSync(inputItems, options = {}) {
         blockContent = { ...tplBlock, value: existing.block.value };
       }
 
+      // Look ahead in template layout for the next non-fixed placeholder at this level.
+      // This preserves placeholder info even when all placeholder blocks are deleted.
+      const tplIdx = templateLayout.indexOf(tplBlockId);
+      let nextPlaceholder = undefined;
+      for (let i = tplIdx + 1; i < templateLayout.length; i++) {
+        const nextTplBlock = template.blocks?.[templateLayout[i]];
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
+          nextPlaceholder = nextTplBlock.placeholder;
+          break;
+        }
+        if (nextTplBlock?.fixed) break; // Stop at next fixed block
+      }
+
+      // For container blocks, compute childPlaceholders: a map of blocks field name
+      // to the first placeholder in that field. Handles containers with multiple
+      // blocks fields (columns, accordions) where the placeholder may be the first/only child.
+      let childPlaceholders = undefined;
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        for (const nestedId of nestedLayout) {
+          const nested = tplBlock.blocks[nestedId];
+          if (nested && !nested.fixed && nested.placeholder) {
+            if (!childPlaceholders) childPlaceholders = {};
+            childPlaceholders['blocks'] = nested.placeholder;
+            break;
+          }
+        }
+      }
+
       addItem(
         {
           ...blockContent,
           templateId: templateId,
           templateInstanceId: instanceId,
+          ...(nextPlaceholder && { nextPlaceholder }),
+          ...(childPlaceholders && { childPlaceholders }),
         },
         blockId
       );

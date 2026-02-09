@@ -402,8 +402,11 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const atContainerStart = index === 0;
       const atContainerEnd = index === layout.length - 1;
       // Fixed block at edge OR between two fixed blocks = can't insert
+      // Exception: if the block has nextPlaceholder, there's a placeholder region after it
+      // that may be empty — always allow inserting after it.
+      const hasNextPlaceholder = block.nextPlaceholder != null;
       const canInsertBefore = !(isFixed && (atContainerStart || prevBlockIsFixed));
-      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed));
+      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed)) || hasNextPlaceholder;
 
       // Template instance virtual container
       // Only FIRST-LEVEL template blocks get the virtual instance as parent
@@ -676,14 +679,14 @@ export function getChildBlockIds(parentId, blockPathMap) {
 
 /**
  * Get the container field configuration for a nested block.
- * Returns the allowedBlocks, defaultBlock, etc. from the parent's schema.
+ * Returns the allowedBlocks, defaultBlockType, etc. from the parent's schema.
  *
  * @param {string} blockId - The block ID to check
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
- * @returns {Object|null} Container field config { fieldName, allowedBlocks, defaultBlock, maxLength, parentId } or null if page-level
+ * @returns {Object|null} Container field config { fieldName, allowedBlocks, defaultBlockType, maxLength, parentId } or null if page-level
  */
 export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig, intl) {
   const pathInfo = blockPathMap?.[blockId];
@@ -712,7 +715,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       fieldName,
       parentId,
       allowedBlocks: pathInfo.allowedSiblingTypes,
-      defaultBlock: pathInfo.blockType,
+      defaultBlockType: pathInfo.blockType,
       maxLength: pathInfo.maxSiblings,
       isObjectList: true,
       itemSchema: stripFunctionsFromSchema(fieldDef?.schema),
@@ -742,7 +745,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
         fieldName,
         parentId,
         allowedBlocks: fieldDef.allowedBlocks || null,
-        defaultBlock: fieldDef.defaultBlock || null,
+        defaultBlockType: fieldDef.defaultBlockType || null,
         maxLength: fieldDef.maxLength || null,
       };
     }
@@ -758,7 +761,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       fieldName: 'blocks',
       parentId,
       allowedBlocks: parentConfig?.allowedBlocks || null,
-      defaultBlock: parentConfig?.defaultBlock || null,
+      defaultBlockType: parentConfig?.defaultBlockType || null,
       maxLength: parentConfig?.maxLength || null,
     };
   }
@@ -776,7 +779,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
  * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
- * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlock, maxLength, currentCount, canAdd }]
+ * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlockType, maxLength, currentCount, canAdd }]
  */
 export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl, templateEditMode = null) {
   const pathInfo = blockPathMap?.[blockId];
@@ -797,7 +800,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         isTemplateInstance: true,
         // Template children are managed specially - no add button for now
         allowedBlocks: null,
-        defaultBlock: null,
+        defaultBlockType: null,
         maxLength: null,
         currentCount: childIds.length,
         canAdd: false, // Template instances don't support adding via sidebar
@@ -854,7 +857,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
           allowedTemplates: fieldDef.allowedTemplates || null,
           allowedLayouts: fieldDef.allowedLayouts || null,
-          defaultBlock: fieldDef.defaultBlock || blockConfig?.defaultBlock || null,
+          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || null,
           maxLength,
           currentCount,
           canAdd: !parentIsReadonly && maxLengthOk,
@@ -868,7 +871,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: [itemType], // Single virtual type
-          defaultBlock: itemType,
+          defaultBlockType: itemType,
           maxLength: null,
           currentCount,
           canAdd: !parentIsReadonly, // object_list has no maxLength
@@ -883,9 +886,9 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   // Check for implicit container (blocks/blocks_layout without schema definition)
   // Only if no explicit container fields found
-  // Detect from blockConfig (allowedBlocks/defaultBlock) or existing blocks/blocks_layout
+  // Detect from blockConfig (allowedBlocks/defaultBlockType) or existing blocks/blocks_layout
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
-                              blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
+                              blockConfig?.allowedBlocks || blockConfig?.defaultBlockType;
   if (containerFields.length === 0 && isImplicitContainer) {
     const maxLength = blockConfig?.maxLength || null;
     const currentCount = getFieldCount('blocks');
@@ -894,7 +897,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
       fieldName: 'blocks',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
-      defaultBlock: blockConfig?.defaultBlock || null,
+      defaultBlockType: blockConfig?.defaultBlockType || null,
       maxLength,
       currentCount,
       canAdd: !parentIsReadonly && maxLengthOk,
@@ -1001,6 +1004,74 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
   }
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
+}
+
+/**
+ * Strip all @type:'empty' placeholder blocks from formData before saving.
+ * Uses blockPathMap to locate empty blocks at any nesting level.
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
+ * @returns {Object} New formData with empty blocks removed
+ */
+export function stripEmptyBlocks(formData, blocksConfig, intl) {
+  const pathMap = buildBlockPathMap(formData, blocksConfig, intl);
+
+  const emptyIds = [];
+  for (const [blockId, pathInfo] of Object.entries(pathMap)) {
+    if (pathInfo.isTemplateInstance) continue;
+    const block = getBlockById(formData, pathMap, blockId);
+    if (block?.['@type'] === 'empty') {
+      emptyIds.push(blockId);
+    }
+  }
+
+  if (emptyIds.length === 0) return formData;
+
+  let result = formData;
+  for (const blockId of emptyIds) {
+    const containerConfig = getContainerFieldConfig(
+      blockId, pathMap, result, blocksConfig, intl,
+    );
+    result = deleteBlockFromContainer(result, pathMap, blockId, containerConfig);
+  }
+  return result;
+}
+
+/**
+ * Ensure every container block has at least one child.
+ * Inverse of stripEmptyBlocks — restores placeholder blocks on page load
+ * for containers that were saved empty (after stripping).
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
+ * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @returns {Object} New formData with empty containers populated
+ */
+export function ensureAllContainersHaveBlocks(formData, blocksConfig, intl, uuidGenerator) {
+  const pathMap = buildBlockPathMap(formData, blocksConfig, intl);
+
+  let result = formData;
+  for (const [blockId, pathInfo] of Object.entries(pathMap)) {
+    if (pathInfo.isTemplateInstance) continue;
+    const containerFields = getAllContainerFields(
+      blockId, pathMap, result, blocksConfig, intl,
+    );
+    for (const field of containerFields) {
+      if (field.isTemplateInstance) continue;
+      result = ensureEmptyBlockIfEmpty(
+        result,
+        { parentId: blockId, ...field },
+        pathMap,
+        uuidGenerator,
+        blocksConfig,
+        { intl },
+      );
+    }
+  }
+  return result;
 }
 
 /**
@@ -1309,17 +1380,28 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
 
 /**
  * Determine the block type to use for an empty container.
- * Uses defaultBlock if specified, or the single allowed type, otherwise 'empty'.
+ * Fallback chain:
+ *   1. containerConfig.defaultBlockType (explicit default for this container)
+ *   2. Single allowedBlocks entry (only one choice)
+ *   3. config.settings.defaultBlockType if allowed (global default, e.g. 'slate')
+ *   4. 'empty' (placeholder that opens BlockChooser on click)
  *
- * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlock
+ * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create
  */
 function getEmptyBlockType(containerConfig) {
-  if (containerConfig?.defaultBlock) {
-    return containerConfig.defaultBlock;
+  if (containerConfig?.defaultBlockType) {
+    return containerConfig.defaultBlockType;
   }
   if (containerConfig?.allowedBlocks?.length === 1) {
     return containerConfig.allowedBlocks[0];
+  }
+  const globalDefault = config.settings.defaultBlockType;
+  if (globalDefault) {
+    const allowed = containerConfig?.allowedBlocks;
+    if (!allowed || allowed.includes(globalDefault)) {
+      return globalDefault;
+    }
   }
   return 'empty';
 }
@@ -1387,7 +1469,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     let blockData = { [idField]: newBlockId };
 
     // Initialize nested containers
-    if (intl && blocksConfig && containerConfig.defaultBlock) {
+    if (intl && blocksConfig && containerConfig.defaultBlockType) {
       blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties });
     }
 
@@ -1414,7 +1496,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  *
  * For example, when creating a 'columns' block:
  * - columns has allowedBlocks: ['column'], so creates a column inside
- * - column has defaultBlock: 'slate', so creates a slate inside that column
+ * - column has defaultBlockType: 'slate', so creates a slate inside that column
  *
  * @param {Object} blockData - The block data (with at least '@type')
  * @param {Object} blocksConfig - Block configuration from registry
@@ -1486,8 +1568,8 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
 
     // Determine the initial child block type for this container field
     let childBlockType = null;
-    if (fieldDef.defaultBlock) {
-      childBlockType = fieldDef.defaultBlock;
+    if (fieldDef.defaultBlockType) {
+      childBlockType = fieldDef.defaultBlockType;
     } else if (fieldDef.allowedBlocks?.length === 1) {
       childBlockType = fieldDef.allowedBlocks[0];
     }

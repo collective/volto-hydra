@@ -197,6 +197,78 @@ test.describe('Non-matching Placeholder Content', () => {
   });
 });
 
+test.describe('Template Placeholder Replacement', () => {
+  test('replacing placeholder blocks with new content persists after reload', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Wait for template merge to complete (header gets template content)
+    const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
+    await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
+
+    // Verify placeholder blocks exist
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible();
+    await expect(iframe.locator('[data-block-uid="user-content-2"]')).toBeVisible();
+
+    const initialCount = await helper.getBlockCount();
+
+    // Remove BOTH placeholder blocks - this is the bug scenario:
+    // all placeholder info for "primary" is now gone from the instance
+    await helper.clickBlockInIframe('user-content-1');
+    await helper.openQuantaToolbarMenu('user-content-1');
+    await helper.clickQuantaToolbarMenuOption('user-content-1', 'Remove');
+    await helper.waitForBlockToDisappear('user-content-1');
+
+    await helper.clickBlockInIframe('user-content-2');
+    await helper.openQuantaToolbarMenu('user-content-2');
+    await helper.clickQuantaToolbarMenuOption('user-content-2', 'Remove');
+    await helper.waitForBlockToDisappear('user-content-2');
+
+    // All placeholder blocks are gone. The grid block (fixed) now has
+    // nextPlaceholder: "primary" from the merge, so its add button is visible.
+    // Click the grid block (find by content since fixed blocks get new UUIDs after merge).
+    const gridBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Grid Cell 1' }).first();
+    await expect(gridBlock).toBeVisible();
+    const gridBlockId = await gridBlock.getAttribute('data-block-uid');
+
+    // Record all block IDs before adding, so we can find the new one by set difference
+    // (getBlockOrder includes nested blocks, so position-based lookup doesn't work)
+    const blockIdsBefore = new Set(await helper.getBlockOrder());
+
+    await helper.clickBlockInIframe(gridBlockId!);
+    await helper.waitForSidebarOpen();
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('slate');
+
+    // Wait for new block to appear (removed 2, added 1)
+    await helper.waitForBlockCountToBe(initialCount - 1);
+
+    // Find the new block by set difference
+    const blockIdsAfter = await helper.getBlockOrder();
+    const newBlockUid = blockIdsAfter.find(id => !blockIdsBefore.has(id));
+    expect(newBlockUid).toBeTruthy();
+
+    // Save (goes to view mode) — verify the new block persists after merge
+    await helper.saveContent();
+
+    // In view mode the bridge runs the merge again.
+    // The new block should survive because it inherited placeholder: "primary".
+    await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).toBeVisible({ timeout: 15000 });
+
+    // Original placeholder blocks should be gone
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).not.toBeVisible();
+    await expect(iframe.locator('[data-block-uid="user-content-2"]')).not.toBeVisible();
+
+    // Template fixed blocks still present
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first()).toBeVisible();
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Footer' })).toBeVisible();
+  });
+});
+
 test.describe('allowedTemplates vs allowedLayouts', () => {
   test('template in allowedTemplates appears in BlockChooser Templates group', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -234,3 +306,5 @@ test.describe('allowedTemplates vs allowedLayouts', () => {
     test.skip(true, 'Need dedicated test data for this scenario');
   });
 });
+
+

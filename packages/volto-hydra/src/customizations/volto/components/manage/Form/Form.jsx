@@ -47,6 +47,7 @@ import {
 } from 'semantic-ui-react';
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
+import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
 import {
   setMetadataFieldsets,
   resetMetadataFocus,
@@ -182,30 +183,34 @@ class Form extends Component {
     const initialFormData = cloneDeep(formData);
 
     // Adding fallback in case the fields are empty, so we are sure that the edit form
-    // shows at least the default blocks
+    // shows at least one block.  Consistent with getEmptyBlockType() in blockPath.js
+    // which also uses config.settings.defaultBlockType for page-level blocks.
     if (
       formData.hasOwnProperty(blocksFieldname) &&
       formData.hasOwnProperty(blocksLayoutFieldname)
     ) {
       if (
-        !formData[blocksLayoutFieldname] ||
-        isEmpty(formData[blocksLayoutFieldname].items)
+        (!formData[blocksLayoutFieldname] ||
+          isEmpty(formData[blocksLayoutFieldname].items)) &&
+        (!formData[blocksFieldname] || isEmpty(formData[blocksFieldname]))
       ) {
+        const emptyId = ids.text;
         formData[blocksLayoutFieldname] = {
-          items: [ids.title, ids.text],
+          items: [emptyId],
         };
-      }
-      if (!formData[blocksFieldname] || isEmpty(formData[blocksFieldname])) {
         formData[blocksFieldname] = {
-          [ids.title]: {
-            '@type': 'title',
-          },
-          [ids.text]: {
+          [emptyId]: {
             '@type': config.settings.defaultBlockType,
           },
         };
       }
     }
+
+    // Ensure all container blocks have at least one child block.
+    // Containers may be empty after loading from API (empty blocks are stripped on save).
+    formData = ensureAllContainersHaveBlocks(
+      formData, config.blocks.blocksConfig, props.intl, uuid,
+    );
 
     let selectedBlock = null;
     if (
@@ -650,7 +655,12 @@ class Form extends Component {
    * @returns {undefined}
    */
   getOnlyFormModifiedValues = () => {
-    const formData = this.state.formData;
+    // Strip empty placeholder blocks before diffing — they exist only for UX
+    // in edit mode and must never be persisted. Needs the full page formData
+    // so buildBlockPathMap can traverse all page-level blocks fields.
+    const formData = stripEmptyBlocks(
+      this.state.formData, config.blocks.blocksConfig, this.props.intl,
+    );
 
     const fieldsModified = Object.keys(
       difference(formData, this.state.initialFormData),

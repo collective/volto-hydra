@@ -660,7 +660,7 @@ test.describe('allowedLayouts', () => {
   });
 
   test.describe('Empty Page Blocks Fields', () => {
-    test('page without footer_blocks data gets empty block injected', async ({ page }) => {
+    test('page without footer_blocks data gets default block injected', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();
 
@@ -669,28 +669,19 @@ test.describe('allowedLayouts', () => {
       await helper.navigateToEdit('/template-test-page');
       await helper.waitForIframeReady();
 
-      // Debug: Check if footer_blocks is being rendered
+      // footer_blocks has allowedBlocks: ['slate', 'image'], so the default block is 'slate'
+      // (config.settings.defaultBlockType is allowed). Verify a block is injected.
       const footerContent = iframe.locator('#footer-content');
       const footerBlocks = footerContent.locator('[data-block-uid]');
-      const footerBlockCount = await footerBlocks.count();
-      console.log('[TEST] Footer blocks count:', footerBlockCount);
+      await expect(footerBlocks.first()).toBeVisible({ timeout: 5000 });
 
-      if (footerBlockCount > 0) {
-        const blockId = await footerBlocks.first().getAttribute('data-block-uid');
-        const hasEmptyAttr = await footerBlocks.first().getAttribute('data-hydra-empty');
-        console.log('[TEST] First footer block ID:', blockId, 'has data-hydra-empty:', hasEmptyAttr);
-      }
-
-      // Verify empty block is rendered in iframe's footer section with data-hydra-empty attribute
-      const emptyBlock = await helper.waitForEmptyBlock('#footer-content');
-
-      // Click the empty block - should open BlockChooser
-      await emptyBlock.click();
-      const chooserVisible = await helper.isBlockChooserVisible();
-      expect(chooserVisible).toBe(true);
+      // Click the footer block — it should be selectable (slate block, not empty)
+      const blockId = await footerBlocks.first().getAttribute('data-block-uid');
+      await helper.clickBlockInIframe(blockId!);
+      await helper.waitForSidebarOpen();
     });
 
-    test('readonly empty block (in template edit mode) does NOT open BlockChooser', async ({ page }) => {
+    test('footer block in template edit mode is readonly', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();
 
@@ -699,32 +690,23 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Select a template block to show template settings in sidebar
-      // After template merge, the header has content "Template Header - From Template"
-      // and a new UUID, so we find it by content
       const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
       await expect(headerBlock).toBeVisible();
       await headerBlock.click();
-      // Get the block's UID for the toolbar wait
       const headerBlockId = await headerBlock.getAttribute('data-block-uid');
       await helper.waitForQuantaToolbar(headerBlockId!);
 
-      // Enter template edit mode by clicking "Edit Template" checkbox in sidebar
-      // This makes all blocks outside the template readonly
+      // Enter template edit mode — blocks outside the template become readonly
       const editTemplateLabel = page.getByText('Edit Template', { exact: true });
       await editTemplateLabel.click();
 
-      // Wait for template edit mode to be active (blocks outside template get locked class)
-      await expect(iframe.locator('#footer-content [data-hydra-empty].hydra-locked')).toBeVisible({ timeout: 5000 });
-
-      // Now footer_blocks empty block should be readonly (outside the template)
-      const emptyBlock = iframe.locator('#footer-content [data-hydra-empty]');
-
-      // Click the readonly empty block
-      await emptyBlock.click();
-
-      // Verify BlockChooser did NOT open for readonly empty block
-      const chooserVisible = await helper.isBlockChooserVisible();
-      expect(chooserVisible).toBe(false);
+      // Footer block should be locked (outside the template)
+      const footerBlock = iframe.locator('#footer-content [data-block-uid]').first();
+      await expect(footerBlock).toBeVisible({ timeout: 5000 });
+      await expect(footerBlock.locator('.hydra-locked')).toBeVisible({ timeout: 5000 }).catch(() => {
+        // The locked class might be on the block itself
+        return expect(footerBlock).toHaveClass(/hydra-locked/, { timeout: 5000 });
+      });
     });
   });
 });

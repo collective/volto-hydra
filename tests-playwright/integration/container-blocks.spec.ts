@@ -942,8 +942,10 @@ test.describe('Hierarchical Sidebar', () => {
 });
 
 test.describe('Empty Block Behavior', () => {
-  // Note: We use gridBlock for empty block tests because it doesn't have a defaultBlock.
-  // The column block has defaultBlock: 'slate', so it creates slate blocks instead of empty.
+  // Note: We use gridBlock for empty block tests because it doesn't have a defaultBlockType
+  // and 'slate' is not in its allowedBlocks: ['teaser', 'image'], so getEmptyBlockType
+  // falls back to @type:'empty'. The column block has defaultBlockType: 'slate', so it
+  // creates slate blocks instead of empty.
 
   test('container with defaultBlock creates that type when emptied', async ({
     page,
@@ -1194,6 +1196,79 @@ test.describe('Empty Block Behavior', () => {
     // The block should not have the empty fallback
     const blockContent = await teaserBlock.textContent();
     expect(blockContent).not.toContain('Empty block');
+  });
+
+  test('empty blocks are stripped on save and restored on re-edit', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.waitForIframeReady();
+
+    const iframe = helper.getIframe();
+
+    // Delete both blocks from grid-1 to create an empty block.
+    // gridBlock has allowedBlocks: ['teaser', 'image'] — 'slate' is not allowed,
+    // so getEmptyBlockType falls back to @type:'empty'.
+    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.openQuantaToolbarMenu('grid-cell-2');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
+
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.openQuantaToolbarMenu('grid-cell-1');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
+
+    // Verify the empty block was created inside grid-1
+    const emptyBlock = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]',
+    );
+    await expect(emptyBlock).toBeVisible({ timeout: 5000 });
+
+    // Save
+    await helper.saveContent();
+
+    // Verify the API does not contain any @type:'empty' blocks
+    const cookies = await page.context().cookies();
+    const authCookie = cookies.find((c: { name: string }) => c.name === 'auth_token');
+    const token = authCookie!.value;
+    const response = await page.request.get('http://localhost:8888/container-test-page', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+    const apiData = await response.json();
+
+    // Check all blocks recursively for @type:'empty'
+    const findEmptyBlocks = (blocks: Record<string, any>): string[] => {
+      const found: string[] = [];
+      for (const [id, block] of Object.entries(blocks)) {
+        if (block?.['@type'] === 'empty') found.push(id);
+        // Check nested blocks (e.g., inside grid-1)
+        if (block?.blocks && typeof block.blocks === 'object') {
+          found.push(...findEmptyBlocks(block.blocks));
+        }
+      }
+      return found;
+    };
+    const emptyBlocks = findEmptyBlocks(apiData.blocks || {});
+    expect(emptyBlocks).toHaveLength(0);
+
+    // Re-edit — the empty block should be restored by ensureEmptyBlockIfEmpty
+    await helper.navigateToEdit('/container-test-page');
+    await helper.waitForIframeReady();
+
+    // grid-1 should have an empty block again (re-created on edit)
+    const restoredEmpty = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]',
+    );
+    await expect(restoredEmpty).toBeVisible({ timeout: 10000 });
   });
 
   test('adding new container block creates initial block inside', async ({

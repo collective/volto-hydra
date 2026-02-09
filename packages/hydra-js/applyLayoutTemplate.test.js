@@ -1000,3 +1000,118 @@ describe('multiple template instances with shared templateState', () => {
     expect(wrongHeader).toBeUndefined();
   });
 });
+
+describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
+  let counter = 0;
+  const uuidGenerator = () => `uuid-${++counter}`;
+
+  beforeEach(() => {
+    counter = 0;
+  });
+
+  test('nextPlaceholder is set on fixed block preceding a placeholder', async () => {
+    const pageData = {
+      blocks: {
+        'user-1': { '@type': 'slate', value: [{ text: 'User content' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', placeholder: 'default' },
+      },
+      blocks_layout: { items: ['user-1'] },
+    };
+
+    const templateData = {
+      '@id': '/templates/t1',
+      blocks: {
+        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
+        'slot': { '@type': 'slate', placeholder: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+      },
+      blocks_layout: { items: ['header', 'slot', 'footer'] },
+    };
+
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const blocks = result.blocks;
+    const layout = result.blocks_layout.items;
+
+    // Header should have nextPlaceholder: 'default' (the placeholder after it)
+    const headerBlock = blocks[layout[0]];
+    expect(headerBlock.fixed).toBe(true);
+    expect(headerBlock.placeholder).toBe('header');
+    expect(headerBlock.nextPlaceholder).toBe('default');
+
+    // Footer should NOT have nextPlaceholder (nothing follows it)
+    const footerBlock = blocks[layout[layout.length - 1]];
+    expect(footerBlock.fixed).toBe(true);
+    expect(footerBlock.placeholder).toBe('footer');
+    expect(footerBlock.nextPlaceholder).toBeUndefined();
+  });
+
+  test('nextPlaceholder not set when next block is another fixed block', async () => {
+    const pageData = {
+      blocks: {
+        'user-1': { '@type': 'slate', value: [{ text: 'User' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', placeholder: 'default' },
+      },
+      blocks_layout: { items: ['user-1'] },
+    };
+
+    // Template: header → grid (fixed) → slot → footer
+    // header's next is grid (fixed), so header should NOT get nextPlaceholder
+    // grid's next is slot (placeholder), so grid SHOULD get nextPlaceholder
+    const templateData = {
+      '@id': '/templates/t1',
+      blocks: {
+        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
+        'grid': { '@type': 'slate', fixed: true, placeholder: 'grid', value: [{ text: 'Grid' }] },
+        'slot': { '@type': 'slate', placeholder: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+      },
+      blocks_layout: { items: ['header', 'grid', 'slot', 'footer'] },
+    };
+
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const blocks = result.blocks;
+    const layout = result.blocks_layout.items;
+
+    // header → next is grid (fixed) → stop, no nextPlaceholder
+    const headerBlock = blocks[layout[0]];
+    expect(headerBlock.nextPlaceholder).toBeUndefined();
+
+    // grid → next is slot (placeholder: 'default') → nextPlaceholder: 'default'
+    const gridBlock = blocks[layout[1]];
+    expect(gridBlock.nextPlaceholder).toBe('default');
+  });
+
+  test('childPlaceholders set on container fixed block with nested placeholder', async () => {
+    const pageData = {
+      blocks: {},
+      blocks_layout: { items: [] },
+    };
+
+    const templateData = {
+      '@id': '/templates/t1',
+      blocks: {
+        'container': {
+          '@type': 'gridBlock',
+          fixed: true,
+          placeholder: 'container',
+          blocks: {
+            'cell-1': { '@type': 'slate', fixed: true, placeholder: 'cell-1', value: [{ text: 'Cell 1' }] },
+            'cell-2': { '@type': 'slate', placeholder: 'sidebar', value: [{ text: 'Sidebar content' }] },
+          },
+          blocks_layout: { items: ['cell-1', 'cell-2'] },
+        },
+        'slot': { '@type': 'slate', placeholder: 'default', value: [] },
+      },
+      blocks_layout: { items: ['container', 'slot'] },
+    };
+
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const blocks = result.blocks;
+    const layout = result.blocks_layout.items;
+
+    // Container block should have childPlaceholders with the first non-fixed placeholder
+    const containerBlock = blocks[layout[0]];
+    expect(containerBlock.fixed).toBe(true);
+    expect(containerBlock.childPlaceholders).toEqual({ blocks: 'sidebar' });
+    // Container should also have nextPlaceholder for the top-level slot
+    expect(containerBlock.nextPlaceholder).toBe('default');
+  });
+});
