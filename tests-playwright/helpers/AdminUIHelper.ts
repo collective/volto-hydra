@@ -208,11 +208,11 @@ export class AdminUIHelper {
       timeout,
     });
 
-    // Wait for iframe to have at least one visible block.
-    // Use `:visible` pseudo-class so we don't match hidden blocks inside
-    // inactive carousel slides (which would cause waitFor to time out).
+    // Wait for iframe to have at least one block attached to the DOM.
+    // Use state: 'attached' instead of default 'visible' because on carousel
+    // pages, all blocks may be inside inactive slides (hidden) initially.
     const iframe = this.getIframe();
-    await iframe.locator('[data-block-uid]:visible').first().waitFor({ timeout });
+    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'attached', timeout });
 
     // Wait for blocks to stabilize (avoid flaky tests due to partial renders)
     await this.getStableBlockCount();

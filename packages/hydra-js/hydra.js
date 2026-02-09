@@ -3336,7 +3336,11 @@ export class Bridge {
         // focus is now on body (Vue/Nuxt replaced the DOM element).
         // Without this, only the first FORM_DATA after FOCUS_FIELD restores focus;
         // a second FORM_DATA re-render would leave focus on body permanently.
+        // Check document.hasFocus() to avoid stealing focus from the sidebar:
+        // when the user is typing in the sidebar, the iframe's activeElement is
+        // body (since focus is in the parent window), but hasFocus() is false.
         const focusLost = this.focusedFieldName &&
+            document.hasFocus() &&
             (!document.activeElement ||
              document.activeElement === document.body ||
              document.activeElement === document.documentElement);
@@ -3605,11 +3609,18 @@ export class Bridge {
     // Primary element for operations that need a single element
     const blockElement = blockElements[0];
 
-    // Clear block selector navigation flag after a delay to let carousel animation settle
-    // This prevents transitionTracker from sending stale positions during animation
+    // Safety timeout: clear flag after 1500ms in case stability detection in
+    // trackPosition() didn't fire (e.g., tracker was stopped by transitionend).
+    // If stability detection already cleared the flag, this is a no-op.
     if (this._blockSelectorNavigating) {
       setTimeout(() => {
-        this._blockSelectorNavigating = false;
+        if (this._blockSelectorNavigating) {
+          log('selectBlock: navigation safety timeout for', blockUid);
+          this._blockSelectorNavigating = false;
+          if (this.selectedBlockUid === blockUid) {
+            this.sendBlockSelected('navigationSettled', null, { blockUid });
+          }
+        }
       }, 1500);
     }
 
@@ -4674,8 +4685,33 @@ export class Bridge {
       if (!isTracking || this._trackingBlockUid !== blockUid) {
         return;
       }
-      // Skip during carousel navigation - animation may cause stale positions
+      // During carousel navigation, keep tracking position internally but don't
+      // send updates to the admin UI. Detect when the animation settles (position
+      // stable for ~200ms) and then send the final position.
       if (this._blockSelectorNavigating) {
+        const newRect = this.getBoundingBoxForElements(blockElements);
+        if (newRect) {
+          const lastRect = this._lastBlockRect;
+          const positionChanged = !lastRect ||
+            Math.abs(newRect.left - lastRect.left) > 1 ||
+            Math.abs(newRect.top - lastRect.top) > 1;
+          this._lastBlockRect = newRect;
+
+          if (positionChanged) {
+            this._navStableFrames = 0;
+          } else {
+            this._navStableFrames = (this._navStableFrames || 0) + 1;
+            // Position stable for ~200ms (12 frames at 60fps) — animation settled
+            if (this._navStableFrames >= 12) {
+              log('trackPosition: navigation settled for', blockUid);
+              this._blockSelectorNavigating = false;
+              this._navStableFrames = 0;
+              this.sendBlockSelected('navigationSettled', blockElements[0]);
+              stopTracking();
+              return;
+            }
+          }
+        }
         this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
         return;
       }
@@ -4711,6 +4747,13 @@ export class Bridge {
     };
 
     const stopTracking = () => {
+      // During carousel navigation, don't stop — the stability detection in
+      // trackPosition() needs the rAF loop to keep running
+      if (this._blockSelectorNavigating) {
+        log('observeBlockTransition: deferring stop during navigation for:', blockUid);
+        return;
+      }
+
       isTracking = false;
       if (this._transitionAnimationFrame) {
         cancelAnimationFrame(this._transitionAnimationFrame);
@@ -4719,8 +4762,7 @@ export class Bridge {
       log('observeBlockTransition: stopped tracking for:', blockUid);
 
       // Final position update using combined bounding box
-      // Skip during carousel navigation - block may be at stale position
-      if (this.selectedBlockUid === blockUid && !this._blockSelectorNavigating) {
+      if (this.selectedBlockUid === blockUid) {
         const finalRect = this.getBoundingBoxForElements(blockElements);
         if (finalRect && this._lastBlockRect) {
           const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
@@ -4776,7 +4818,9 @@ export class Bridge {
     this._initialTrackingTimeout = setTimeout(() => {
       // Only stop if no ongoing transition was detected
       // (transitionend handler will stop it if one was detected)
-      if (isTracking && this.selectedBlockUid === blockUid) {
+      // During carousel navigation, keep tracking — stability detection
+      // in trackPosition() will handle the stop when animation settles
+      if (isTracking && this.selectedBlockUid === blockUid && !this._blockSelectorNavigating) {
         stopTracking();
       }
     }, 500);
@@ -5441,7 +5485,11 @@ export class Bridge {
   setupScrollHandler() {
     const handleScroll = () => {
       // Hide overlays immediately when scrolling
-      if (this.selectedBlockUid) {
+      // Skip during block selector navigation — carousel animation handles its own
+      // UI state, and scrollBlockIntoViewWithToolbarRoom can trigger scroll events
+      // that would hide the toolbar with no BLOCK_SELECTED to restore it (the
+      // debounced handler below also skips when _blockSelectorNavigating is true).
+      if (this.selectedBlockUid && !this._blockSelectorNavigating) {
         window.parent.postMessage(
           { type: 'HIDE_BLOCK_UI' },
           this.adminOrigin,

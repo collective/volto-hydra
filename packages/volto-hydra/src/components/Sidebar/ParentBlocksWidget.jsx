@@ -20,7 +20,7 @@ import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
-import { set, cloneDeep } from 'lodash';
+import { set, cloneDeep, isEqual } from 'lodash';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
@@ -582,11 +582,21 @@ const ParentBlocksWidget = ({
 
   // Wrapper that captures block data changes before propagating to parent
   const handleBlockChange = React.useCallback((blockId, newBlockData) => {
+    // Skip no-op changes: BlockEdit/BlockDataForm applies schema defaults on
+    // mount/update, calling onChangeBlock even when data hasn't actually changed.
+    // Without this guard, selecting a block causes parent blocks to re-render
+    // (schema defaults → onChangeBlock → onChangeFormData → setState → re-render)
+    // which flickers the toolbar/outline.
+    const oldData = liveBlockDataRef.current[blockId] ??
+      getBlockById(formData, blockPathMap, blockId);
+    if (isEqual(oldData, newBlockData)) {
+      return;
+    }
     // Update ref immediately (synchronous, no React batching)
     liveBlockDataRef.current = { ...liveBlockDataRef.current, [blockId]: newBlockData };
     // Propagate to parent
     onChangeBlock(blockId, newBlockData);
-  }, [onChangeBlock]);
+  }, [onChangeBlock, formData, blockPathMap]);
 
   React.useEffect(() => {
     setIsClient(true);
