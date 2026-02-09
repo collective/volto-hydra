@@ -1,0 +1,60 @@
+{
+  "@id": "/templates/footer-layout",
+  "@type": "Document",
+  "id": "footer-layout",
+  "title": "Footer Layout",
+  "description": "A simple layout template for footer blocks with fixed branding",
+  "blocks": {
+    "fixed-branding": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/footer-layout",
+      "templateInstanceId": "/templates/footer-layout",
+      "placeholder": "branding",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Footer Branding - Forced Layout" }]
+        }
+      ],
+      "plaintext": "Footer Branding - Forced Layout"
+    },
+    "default-slot": {
+      "@type": "slate",
+      "templateId": "/templates/footer-layout",
+      "templateInstanceId": "/templates/footer-layout",
+      "placeholder": "default",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "" }]
+        }
+      ],
+      "plaintext": ""
+    }
+  },
+  "blocks_layout": {
+    "items": ["fixed-branding", "default-slot"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/templates/footer-layout/@actions",
+      "object": [
+        {
+          "@id": "/templates/footer-layout/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/templates/footer-layout/@breadcrumbs",
+      "items": [
+        { "@id": "/templates", "title": "Templates" },
+        { "@id": "/templates/footer-layout", "title": "Footer Layout" }
+      ]
+    }
+  }
+}

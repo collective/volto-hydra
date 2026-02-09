@@ -208,7 +208,7 @@ const blocksFingerprint = computed(() => JSON.stringify(props.block));
 // Computed static items - recomputed when page or blocks change
 const staticItems = computed(() => {
   const paging = { start: pageFromUrl.value * pageSize, size: pageSize, total: 0, _seen: 0 };
-  const { items } = staticBlocks(staticBlocksMap.value, staticLayout.value, paging);
+  const { items } = staticBlocks(staticLayout.value, { blocks: staticBlocksMap.value, paging });
   return items;
 });
 

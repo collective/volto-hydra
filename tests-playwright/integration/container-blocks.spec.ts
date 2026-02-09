@@ -263,7 +263,13 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
+
+    // Wait for nested grid cells to render
+    await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible({ timeout: 10000 });
 
     // Count initial blocks in grid-1 (should be 2: grid-cell-1, grid-cell-2)
     const initialGridBlocks = await iframe
@@ -281,6 +287,7 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.clickAddBlockButton();
     await helper.selectBlockType('teaser');
+    await helper.getStableBlockCount();
 
     // grid-1 should now have 3 blocks
     const finalGridBlocks = await iframe
@@ -346,13 +353,8 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    const iframe = helper.getIframe();
-
-    // Count initial page-level blocks (blocks without a [data-block-uid] ancestor)
-    const initialPageBlocks = await iframe.locator('body').evaluate((body) => {
-      return Array.from(body.querySelectorAll('[data-block-uid]'))
-        .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
-    });
+    // Get initial block count using helper (waits for stability)
+    const initialBlockCount = await helper.getStableBlockCount();
 
     // Select a top-level block then deselect by clicking parent arrow
     await helper.clickBlockInIframe('columns-1');
@@ -395,22 +397,12 @@ test.describe('Adding Blocks to Containers', () => {
     // Wait for block chooser to close and block to be added
     await expect(blockChooser).not.toBeVisible({ timeout: 5000 });
 
-    // Page-level blocks should have increased by 1
-    await expect
-      .poll(async () => {
-        return await iframe.locator('body').evaluate((body) => {
-          return Array.from(body.querySelectorAll('[data-block-uid]'))
-            .filter(el => !el.parentElement?.closest('[data-block-uid]')).length;
-        });
-      }, { timeout: 5000 })
-      .toBe(initialPageBlocks + 1);
+    // Block count should have increased by 1
+    await helper.waitForBlockCountToBe(initialBlockCount + 1);
 
-    // The new block should be the LAST page-level block (added at bottom)
-    const lastBlockUid = await iframe.locator('body').evaluate((body) => {
-      const pageLevelBlocks = Array.from(body.querySelectorAll('[data-block-uid]'))
-        .filter(el => !el.parentElement?.closest('[data-block-uid]'));
-      return pageLevelBlocks[pageLevelBlocks.length - 1]?.getAttribute('data-block-uid');
-    });
+    // The new block should be the LAST block (added at bottom)
+    const blockOrder = await helper.getBlockOrder();
+    const lastBlockUid = blockOrder[blockOrder.length - 1];
     expect(lastBlockUid).not.toBe('grid-1'); // Not the original last block
 
     // The new block should be selected (toolbar visible for it)
@@ -461,6 +453,13 @@ test.describe('Add Button Direction', () => {
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+    // Wait for nested grid cells to render
+    await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).toBeVisible({ timeout: 10000 });
 
     // grid-cell-1 has NO data-block-add attribute
     // It's nested at depth 1 (inside grid-1), so direction should be inferred as 'right'
@@ -833,10 +832,12 @@ test.describe('Hierarchical Sidebar', () => {
     // Select the deepest nested block (text-1a inside col-1 inside columns-1)
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
+    // Wait for quanta toolbar to ensure block is fully selected
+    await helper.waitForQuantaToolbar('text-1a');
 
     // Should see parent block headers in sidebar-parents
     const sidebarParents = page.locator('#sidebar-parents');
-    await expect(sidebarParents).toBeVisible();
+    await expect(sidebarParents).toBeVisible({ timeout: 5000 });
 
     // Find all title input fields in the parent blocks sidebar
     // Each parent block (Columns, Column) should have a title field
@@ -919,41 +920,32 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Select a block to show toolbar
     await helper.clickBlockInIframe('text-after');
-    await page.waitForTimeout(300);
-
-    // Verify block is properly selected with correct positioning
-    const initialResult = await helper.isBlockSelectedInIframe('text-after');
-    expect(initialResult.ok, `Initial selection failed: ${initialResult.reason}`).toBe(true);
+    await helper.waitForQuantaToolbar('text-after');
 
     // Close sidebar
     const closeButton = page.locator('.sidebar-close-button');
     await closeButton.click();
-    await page.waitForTimeout(500); // Wait for resize
-
-    // Verify positioning is still correct after sidebar close
-    const afterCloseResult = await helper.isBlockSelectedInIframe('text-after');
-    expect(
-      afterCloseResult.ok,
-      `After sidebar close: ${afterCloseResult.reason}`,
-    ).toBe(true);
+    // Wait for sidebar to collapse
+    const sidebarContainer = page.locator('.sidebar-container');
+    await expect(sidebarContainer).toHaveClass(/collapsed/, { timeout: 5000 });
+    // Wait for toolbar to reposition after iframe resize
+    await helper.waitForQuantaToolbar('text-after');
 
     // Re-open sidebar
     const triggerButton = page.locator('.sidebar-container .trigger');
     await triggerButton.click();
-    await helper.waitForQuantaToolbar('text-after'); // Wait for toolbar to reposition
-
-    // Verify positioning is still correct after sidebar reopen
-    const afterReopenResult = await helper.isBlockSelectedInIframe('text-after');
-    expect(
-      afterReopenResult.ok,
-      `After sidebar reopen: ${afterReopenResult.reason}`,
-    ).toBe(true);
+    // Wait for sidebar animation to complete (collapsed class removed)
+    await expect(sidebarContainer).not.toHaveClass(/collapsed/, { timeout: 5000 });
+    // Wait for toolbar to reposition after iframe resize
+    await helper.waitForQuantaToolbar('text-after');
   });
 });
 
 test.describe('Empty Block Behavior', () => {
-  // Note: We use gridBlock for empty block tests because it doesn't have a defaultBlock.
-  // The column block has defaultBlock: 'slate', so it creates slate blocks instead of empty.
+  // Note: We use gridBlock for empty block tests because it doesn't have a defaultBlockType
+  // and 'slate' is not in its allowedBlocks: ['teaser', 'image'], so getEmptyBlockType
+  // falls back to @type:'empty'. The column block has defaultBlockType: 'slate', so it
+  // creates slate blocks instead of empty.
 
   test('container with defaultBlock creates that type when emptied', async ({
     page,
@@ -1039,19 +1031,27 @@ test.describe('Empty Block Behavior', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
+
+    // Wait for nested grid cells to render
+    await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible({ timeout: 10000 });
 
     // First delete grid-cell-2 from grid-1
     await helper.clickBlockInIframe('grid-cell-2');
     await helper.openQuantaToolbarMenu('grid-cell-2');
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
 
     // Now delete grid-cell-1 (the last block in grid-1)
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
 
     // grid-1 should now have 1 empty block
     const gridBlocks = await iframe
@@ -1100,6 +1100,9 @@ test.describe('Empty Block Behavior', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Delete both blocks from grid-1 to create empty block
@@ -1107,6 +1110,7 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-2');
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
 
     // Verify grid-cell-2 is gone before proceeding
     await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).not.toBeVisible();
@@ -1115,6 +1119,7 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
 
     // Verify grid-cell-1 is gone
     await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).not.toBeVisible();
@@ -1142,6 +1147,9 @@ test.describe('Empty Block Behavior', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Delete both blocks from grid-1 to create empty block
@@ -1149,11 +1157,13 @@ test.describe('Empty Block Behavior', () => {
     await helper.openQuantaToolbarMenu('grid-cell-2');
     await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
 
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.openQuantaToolbarMenu('grid-cell-1');
     await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
     await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
 
     // Wait for empty block to be rendered inside grid-1
     // hydra marks empty blocks with data-hydra-empty attribute
@@ -1186,6 +1196,79 @@ test.describe('Empty Block Behavior', () => {
     // The block should not have the empty fallback
     const blockContent = await teaserBlock.textContent();
     expect(blockContent).not.toContain('Empty block');
+  });
+
+  test('empty blocks are stripped on save and restored on re-edit', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.waitForIframeReady();
+
+    const iframe = helper.getIframe();
+
+    // Delete both blocks from grid-1 to create an empty block.
+    // gridBlock has allowedBlocks: ['teaser', 'image'] — 'slate' is not allowed,
+    // so getEmptyBlockType falls back to @type:'empty'.
+    await helper.clickBlockInIframe('grid-cell-2');
+    await helper.openQuantaToolbarMenu('grid-cell-2');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-2', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-2');
+    await helper.getStableBlockCount();
+
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.openQuantaToolbarMenu('grid-cell-1');
+    await helper.clickQuantaToolbarMenuOption('grid-cell-1', 'Remove');
+    await helper.waitForBlockToDisappear('grid-cell-1');
+    await helper.getStableBlockCount();
+
+    // Verify the empty block was created inside grid-1
+    const emptyBlock = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]',
+    );
+    await expect(emptyBlock).toBeVisible({ timeout: 5000 });
+
+    // Save
+    await helper.saveContent();
+
+    // Verify the API does not contain any @type:'empty' blocks
+    const cookies = await page.context().cookies();
+    const authCookie = cookies.find((c: { name: string }) => c.name === 'auth_token');
+    const token = authCookie!.value;
+    const response = await page.request.get('http://localhost:8888/container-test-page', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+    const apiData = await response.json();
+
+    // Check all blocks recursively for @type:'empty'
+    const findEmptyBlocks = (blocks: Record<string, any>): string[] => {
+      const found: string[] = [];
+      for (const [id, block] of Object.entries(blocks)) {
+        if (block?.['@type'] === 'empty') found.push(id);
+        // Check nested blocks (e.g., inside grid-1)
+        if (block?.blocks && typeof block.blocks === 'object') {
+          found.push(...findEmptyBlocks(block.blocks));
+        }
+      }
+      return found;
+    };
+    const emptyBlocks = findEmptyBlocks(apiData.blocks || {});
+    expect(emptyBlocks).toHaveLength(0);
+
+    // Re-edit — the empty block should be restored by ensureEmptyBlockIfEmpty
+    await helper.navigateToEdit('/container-test-page');
+    await helper.waitForIframeReady();
+
+    // grid-1 should have an empty block again (re-created on edit)
+    const restoredEmpty = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]',
+    );
+    await expect(restoredEmpty).toBeVisible({ timeout: 10000 });
   });
 
   test('adding new container block creates initial block inside', async ({
@@ -1921,6 +2004,9 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Grid cells are at nesting depth 1 (inside grid-1), so they should use horizontal layout
@@ -2170,6 +2256,9 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // col-1 is a 'column' block
@@ -2296,6 +2385,9 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Verify grid-1 currently has 2 cells
@@ -2315,6 +2407,7 @@ test.describe('Container Block Drag and Drop', () => {
 
     // Select teaser block type from chooser (gridBlock only allows teaser/image)
     await helper.selectBlockType('teaser');
+    await helper.getStableBlockCount();
 
     // Wait for 3rd cell to be created
     await expect(gridCells).toHaveCount(3);
@@ -2328,6 +2421,7 @@ test.describe('Container Block Drag and Drop', () => {
     await addButton.click();
 
     await helper.selectBlockType('teaser');
+    await helper.getStableBlockCount();
 
     // Wait for 4th cell to be created
     await expect(gridCells).toHaveCount(4);
@@ -2442,11 +2536,9 @@ test.describe('Container Block Drag and Drop', () => {
     await page.mouse.move(text1bBox!.x + text1bBox!.width / 2, targetY, { steps: 10 });
     await page.waitForTimeout(100);
     await page.mouse.up();
-    await page.waitForTimeout(500);
 
-    // Verify text-2a moved to col-1
-    const text2aInCol1 = await col1.locator('[data-block-uid="text-2a"]').count();
-    expect(text2aInCol1).toBe(1);
+    // Wait for text-2a to actually move to col-1 (don't rely on fixed timeout)
+    await expect(col1.locator('[data-block-uid="text-2a"]')).toBeVisible({ timeout: 5000 });
 
     // CRITICAL: col-2 should now have a new default block, not be completely empty
     // Since column has defaultBlock: 'slate', it creates a properly initialized slate block
@@ -2577,6 +2669,9 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Verify slider structure is loaded
@@ -2610,6 +2705,9 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Start by selecting slide-1 using robust helper
@@ -2638,6 +2736,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
@@ -2676,6 +2777,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 
@@ -2718,6 +2822,9 @@ test.describe('data-block-selector Navigation', () => {
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Click on slide-1 first
@@ -2745,6 +2852,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     // For carousels, we can't click directly on the container because slides fill it.
     // Instead, click on a visible child first, then press Escape to go to parent.
@@ -2781,6 +2891,9 @@ test.describe('data-block-selector Navigation', () => {
 
     await helper.login();
     await helper.navigateToEdit('/carousel-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const sidebar = page.locator('.sidebar-container');
 
@@ -3721,6 +3834,9 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Click on a page-level block (title-block) to enable add button
@@ -3807,6 +3923,9 @@ test.describe('Multi-Container Field Operations', () => {
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
+
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
 
     const iframe = helper.getIframe();
 

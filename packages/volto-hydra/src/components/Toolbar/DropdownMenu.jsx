@@ -41,6 +41,10 @@ const DropdownMenu = ({
   addDirection, // 'right' or 'bottom' - determines Column vs Row terminology
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  isFixed = false, // Template blocks that can't be moved/deleted
+  isReadonly = false, // Template blocks that can't be edited
+  isInTemplate = false, // Whether block is already part of a template
+  onMakeTemplate, // Handler for "Make Template" action
 }) => {
   const menuRef = useRef(null);
   const [convertSubmenuOpen, setConvertSubmenuOpen] = React.useState(false);
@@ -252,6 +256,37 @@ const DropdownMenu = ({
           />
         </>
       )}
+      {/* Make Template option - only shown for blocks not already in a template and not fixed */}
+      {onMakeTemplate && !isInTemplate && !isFixed && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={() => {
+              onClose();
+              onMakeTemplate();
+            }}
+          >
+            📋 Make Template
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
       {/* Convert to submenu - only shown when there are convertible types */}
       {convertibleTypes?.length > 0 && onConvertBlock && (
         <>
@@ -357,8 +392,8 @@ const DropdownMenu = ({
         </>
       )}
       {/* Remove action - label changes based on table mode and add direction */}
-      {/* Hide remove for page-level fields (selectedBlock is PAGE_BLOCK_UID) */}
-      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && (() => {
+      {/* Hide remove for page-level fields and fixed template blocks */}
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && !isFixed && (() => {
         // Determine remove label and action based on table mode
         // Uses addDirection to determine Column vs Row (same as add button icon)
         const actionsRegistry = config.settings.hydraActions || {};

@@ -20,7 +20,7 @@ import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
-import { set, cloneDeep } from 'lodash';
+import { set, cloneDeep, isEqual } from 'lodash';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
@@ -29,7 +29,7 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, getBlockSchema, updateBlockById } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
-import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 
 /**
  * Get the display title for a block type
@@ -154,9 +154,83 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
 };
 
 /**
+ * Schema for block settings in template edit mode
+ * Adds placeholder, fixed, and readOnly fields to control template behavior
+ */
+const getTemplateBlockSettingsSchema = () => ({
+  title: 'Template Block Settings',
+  fieldsets: [
+    {
+      id: 'default',
+      title: 'Default',
+      fields: [],
+    },
+    {
+      id: 'template',
+      title: 'Template Settings',
+      fields: ['placeholder', 'fixed', 'readOnly'],
+    },
+  ],
+  properties: {
+    placeholder: {
+      title: 'Placeholder Name',
+      description: 'Identifier for this slot in the template (e.g., "header", "main-content")',
+      type: 'string',
+    },
+    fixed: {
+      title: 'Fixed Position',
+      description: 'Disable drag & drop on this block',
+      type: 'boolean',
+    },
+    readOnly: {
+      title: 'Read-only',
+      description: 'Disable editing on this block (content comes from template)',
+      type: 'boolean',
+    },
+  },
+  required: ['placeholder'],
+});
+
+/**
  * Single parent block section with header and settings
  * Renders the block's Edit component with SidebarPortal redirected to this section
  */
+/**
+ * Schema for template instance settings
+ * Used by BlockDataForm to render a consistent form
+ */
+const getTemplateInstanceSchema = (intl) => ({
+  title: 'Template Settings',
+  fieldsets: [
+    {
+      id: 'default',
+      title: 'Default',
+      fields: ['title', 'folder', 'editTemplate'],
+    },
+  ],
+  properties: {
+    title: {
+      title: 'Template Name',
+      description: 'Display name for this template',
+      type: 'string',
+    },
+    folder: {
+      title: 'Save Location',
+      description: 'Folder where this template will be saved',
+      widget: 'object_browser',
+      mode: 'link',
+      selectableTypes: ['Folder'],
+      allowExternals: false,
+    },
+    editTemplate: {
+      title: 'Edit Template',
+      description: 'When enabled, you can edit the template structure. Fixed blocks become editable.',
+      type: 'boolean',
+    },
+  },
+  required: ['title'],
+});
+
 const ParentBlockSection = ({
   blockId,
   blockType,
@@ -173,12 +247,20 @@ const ParentBlockSection = ({
   intl,
   blockPathMap,
   liveBlockDataRef,
+  templateEditMode,
+  onChangeTemplateSettings,
+  onToggleTemplateEditMode,
 }) => {
+  // Get intl from context if not passed (needed for getTemplateInstanceSchema)
+  const contextIntl = useIntl();
   // Store current block data in liveBlockDataRef on every render
   // This ensures child schemaEnhancers can see parent's current data
   if (liveBlockDataRef && blockData) {
     liveBlockDataRef.current[blockId] = blockData;
   }
+
+  // Get pathInfo for template instance detection
+  const pathInfo = blockPathMap?.[blockId];
 
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
@@ -190,9 +272,12 @@ const ParentBlockSection = ({
 
   // Get the Edit component for this block type
   // Skip Edit component if sidebarSchemaOnly is set (e.g., slateTable's Edit expects specific data structures)
+  // For readonly blocks, use the View component instead (like Volto core does)
+  // Use shared isBlockReadonly to handle template edit mode correctly
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   const useSchemaOnly = blockConfig?.sidebarSchemaOnly;
-  const BlockEdit = useSchemaOnly ? null : blockConfig?.edit;
+  const isReadonly = isBlockReadonly(blockData, templateEditMode);
+  const BlockEdit = useSchemaOnly ? null : (isReadonly ? blockConfig?.view : blockConfig?.edit);
 
   // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
   const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
@@ -308,6 +393,10 @@ const ParentBlockSection = ({
                 addDirection={pathInfo?.addDirection}
                 convertibleTypes={convertibleTypes}
                 onConvertBlock={handleConvertBlock}
+                isFixed={!!blockData?.fixed}
+                isReadonly={!!blockData?.readOnly}
+                isInTemplate={!!blockData?.templateId}
+                onMakeTemplate={onBlockAction ? () => onBlockAction('makeTemplate', blockId) : null}
               />
             );
           })()}
@@ -366,7 +455,7 @@ const ParentBlockSection = ({
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
-      {!BlockEdit && schema && (() => {
+      {!BlockEdit && schema && !pathInfo?.isTemplateInstance && (() => {
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
@@ -383,11 +472,81 @@ const ParentBlockSection = ({
               formData={blockData}
               block={blockId}
               applySchemaEnhancers={true}
+              editable={!isReadonly}
             />
           </HydraSchemaProvider>
         );
         // Portal to the target element (sidebar-properties for current, parent-sidebar-{id} for parents)
         const targetElement = document.getElementById(targetId);
+        return targetElement ? createPortal(formContent, targetElement) : null;
+      })()}
+
+      {/* Template instance settings form - uses schema-based BlockDataForm */}
+      {pathInfo?.isTemplateInstance && onChangeTemplateSettings && (() => {
+        // Build form data with editTemplate reflecting current state
+        const templateFormData = {
+          ...blockData,
+          editTemplate: templateEditMode === blockId,
+        };
+        const templateSchema = getTemplateInstanceSchema(contextIntl);
+        const formContent = (
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+            <BlockDataForm
+              schema={templateSchema}
+              onChangeField={(fieldId, value) => {
+                if (fieldId === 'editTemplate') {
+                  // Toggle template edit mode
+                  onToggleTemplateEditMode(value ? blockId : null);
+                } else {
+                  // Update template settings
+                  onChangeTemplateSettings(blockId, { [fieldId]: value });
+                }
+              }}
+              formData={templateFormData}
+              block={blockId}
+            />
+          </HydraSchemaProvider>
+        );
+        const targetElement = document.getElementById(targetId);
+        return targetElement ? createPortal(formContent, targetElement) : null;
+      })()}
+
+      {/* Template block settings form - shown when editing a block inside a template during edit mode */}
+      {(() => {
+        // Check if this block is inside the template being edited
+        const isBlockInEditedTemplate = templateEditMode &&
+          !pathInfo?.isTemplateInstance &&
+          blockData &&
+          blockData.templateId &&
+          blockData.templateInstanceId === templateEditMode;
+
+        if (!isBlockInEditedTemplate) return null;
+
+        // Build form data with current template block settings
+        const templateBlockFormData = {
+          placeholder: blockData.placeholder || '',
+          fixed: blockData.fixed || false,
+          readOnly: blockData.readOnly || false,
+        };
+        const templateBlockSchema = getTemplateBlockSettingsSchema();
+        const formContent = (
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+            <BlockDataForm
+              schema={templateBlockSchema}
+              onChangeField={(fieldId, value) => {
+                const newBlockData = cloneDeep(blockData);
+                // All fields are now top-level (placeholder, fixed, readOnly)
+                newBlockData[fieldId] = value;
+                onChangeBlock(blockId, newBlockData);
+              }}
+              formData={templateBlockFormData}
+              block={blockId}
+              applySchemaEnhancers={false}
+            />
+          </HydraSchemaProvider>
+        );
+        // Portal to sidebar-template-settings (appears after block's regular settings)
+        const targetElement = document.getElementById('sidebar-template-settings');
         return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
     </div>
@@ -406,6 +565,9 @@ const ParentBlocksWidget = ({
   onDeleteBlock,
   onChangeBlock,
   onBlockAction,
+  templateEditMode,
+  onChangeTemplateSettings,
+  onToggleTemplateEditMode,
 }) => {
   const [isClient, setIsClient] = React.useState(false);
   const prevSelectedBlockRef = React.useRef(null);
@@ -420,11 +582,21 @@ const ParentBlocksWidget = ({
 
   // Wrapper that captures block data changes before propagating to parent
   const handleBlockChange = React.useCallback((blockId, newBlockData) => {
+    // Skip no-op changes: BlockEdit/BlockDataForm applies schema defaults on
+    // mount/update, calling onChangeBlock even when data hasn't actually changed.
+    // Without this guard, selecting a block causes parent blocks to re-render
+    // (schema defaults → onChangeBlock → onChangeFormData → setState → re-render)
+    // which flickers the toolbar/outline.
+    const oldData = liveBlockDataRef.current[blockId] ??
+      getBlockById(formData, blockPathMap, blockId);
+    if (isEqual(oldData, newBlockData)) {
+      return;
+    }
     // Update ref immediately (synchronous, no React batching)
     liveBlockDataRef.current = { ...liveBlockDataRef.current, [blockId]: newBlockData };
     // Propagate to parent
     onChangeBlock(blockId, newBlockData);
-  }, [onChangeBlock]);
+  }, [onChangeBlock, formData, blockPathMap]);
 
   React.useEffect(() => {
     setIsClient(true);
@@ -515,12 +687,14 @@ const ParentBlocksWidget = ({
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
   // Get current block data and type from blockPathMap (single source of truth)
-  const currentBlockData = getBlockById(formData, blockPathMap, selectedBlock);
-  const currentBlockType = blockPathMap[selectedBlock]?.blockType;
+  // For virtual blocks (like template instances), use blockData from pathMap
+  const pathInfo = blockPathMap[selectedBlock];
+  const currentBlockData = pathInfo?.blockData || getBlockById(formData, blockPathMap, selectedBlock);
+  const currentBlockType = pathInfo?.blockType;
 
   // Guard: If block data is undefined, skip rendering (data may be out of sync during drag operations)
   if (!currentBlockData) {
-    console.warn('[ParentBlocksWidget] Block data undefined for:', selectedBlock, 'blockPathMap entry:', blockPathMap[selectedBlock]);
+    console.warn('[ParentBlocksWidget] Block data undefined for:', selectedBlock, 'blockPathMap entry:', pathInfo);
     return null;
   }
 
@@ -530,8 +704,10 @@ const ParentBlocksWidget = ({
         <>
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
-            const parentData = getBlockById(formData, blockPathMap, parentId);
-            const parentType = blockPathMap[parentId]?.blockType;
+            // For virtual blocks (like template instances), use blockData from pathMap
+            const parentPathInfo = blockPathMap[parentId];
+            const parentData = parentPathInfo?.blockData || getBlockById(formData, blockPathMap, parentId);
+            const parentType = parentPathInfo?.blockType;
             // Parent of this parent (or null if root)
             const grandparentId = index > 0 ? parentIds[index - 1] : null;
 
@@ -553,6 +729,9 @@ const ParentBlocksWidget = ({
                 intl={intl}
                 blockPathMap={blockPathMap}
                 liveBlockDataRef={liveBlockDataRef}
+                templateEditMode={templateEditMode}
+                onChangeTemplateSettings={onChangeTemplateSettings}
+                onToggleTemplateEditMode={onToggleTemplateEditMode}
               />
             );
           })}
@@ -575,6 +754,9 @@ const ParentBlocksWidget = ({
             intl={intl}
             blockPathMap={blockPathMap}
             liveBlockDataRef={liveBlockDataRef}
+            templateEditMode={templateEditMode}
+            onChangeTemplateSettings={onChangeTemplateSettings}
+            onToggleTemplateEditMode={onToggleTemplateEditMode}
           />
         </>,
         parentsTarget,

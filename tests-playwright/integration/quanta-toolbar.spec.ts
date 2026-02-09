@@ -107,7 +107,7 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     await expect(menu).toBeVisible();
   });
 
-  test('Dropdown menu contains Settings and Remove options', async ({ page }) => {
+  test('Dropdown menu contains Settings, Remove, and Make Template options', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -122,7 +122,8 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
 
     expect(options).toContain('Settings');
     expect(options).toContain('Remove');
-    expect(options.length).toBe(2);
+    expect(options.some(o => o.toLowerCase().includes('make') && o.toLowerCase().includes('template'))).toBe(true);
+    expect(options.length).toBe(3);
   });
 
   test('Clicking Remove option triggers delete', async ({ page }) => {

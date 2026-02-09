@@ -4,9 +4,10 @@
  */
 
 import { produce } from 'immer';
+import { get } from 'lodash';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
-import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 
 /**
  * Strip functions from a schema object for postMessage serialization.
@@ -253,6 +254,8 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
   }
 
   const pathMap = {};
+  // Track created virtual containers for template instances
+  const createdTemplateInstances = new Set();
 
   // Get page schema from _page block type (registered at INIT time)
   // This contains the blocks container fields (blocks, footer_blocks, etc.)
@@ -366,7 +369,16 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     const layout = parent[layoutFieldName]?.items;
     if (!blocks || !layout) return;
 
+    // First pass: collect fixed status for all blocks to determine insert restrictions
+    const blockFixedStatus = {};
     layout.forEach(blockId => {
+      const block = blocks[blockId];
+      if (block) {
+        blockFixedStatus[blockId] = block.fixed === true;
+      }
+    });
+
+    layout.forEach((blockId, index) => {
       const block = blocks[blockId];
       if (!block) return;
 
@@ -374,14 +386,81 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const blockType = block['@type'];
       const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
 
+      // Check Volto's standard block properties
+      const isFixed = block.fixed === true;        // Volto standard: position locked
+      const isReadonly = block.readOnly === true;  // Volto standard: content locked
+
+      // Check if inserting before/after this block is allowed
+      // Can't insert:
+      // 1. Between two adjacent fixed blocks
+      // 2. Before a fixed block at container start (no placeholder there)
+      // 3. After a fixed block at container end (no placeholder there)
+      const prevBlockId = layout[index - 1];
+      const nextBlockId = layout[index + 1];
+      const prevBlockIsFixed = prevBlockId ? blockFixedStatus[prevBlockId] : false;
+      const nextBlockIsFixed = nextBlockId ? blockFixedStatus[nextBlockId] : false;
+      const atContainerStart = index === 0;
+      const atContainerEnd = index === layout.length - 1;
+      // Fixed block at edge OR between two fixed blocks = can't insert
+      // Exception: if the block has nextPlaceholder, there's a placeholder region after it
+      // that may be empty — always allow inserting after it.
+      const hasNextPlaceholder = block.nextPlaceholder != null;
+      const canInsertBefore = !(isFixed && (atContainerStart || prevBlockIsFixed));
+      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed)) || hasNextPlaceholder;
+
+      // Template instance virtual container
+      // Only FIRST-LEVEL template blocks get the virtual instance as parent
+      // Nested blocks (inside containers that are part of the template) keep their actual parent
+      let effectiveParentId = parentId;
+      if (block.templateInstanceId) {
+        const instanceId = block.templateInstanceId;
+
+        // Check if parent container is also part of this template instance
+        // If so, this is a nested block - keep actual parent
+        const parentInSameInstance = parent.templateInstanceId === instanceId;
+
+        if (!parentInSameInstance) {
+          // First-level template block - create/use virtual instance as parent
+          if (!createdTemplateInstances.has(instanceId)) {
+            createdTemplateInstances.add(instanceId);
+
+            // Derive display name from templateId path (e.g., "/templates/test-layout" -> "test-layout")
+            const templatePath = block.templateId || '';
+            const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
+
+            const instanceBlockType = `Template: ${templateName}`;
+            pathMap[instanceId] = {
+              path: null, // Virtual - no actual storage path
+              parentId, // Template instance's parent is the original container
+              containerField: fieldName,
+              blockType: instanceBlockType, // Virtual type for sidebar display
+              isTemplateInstance: true,
+              templateId: block.templateId,
+              // Virtual block data for components that need blockData (e.g., ParentBlocksWidget)
+              blockData: { '@type': instanceBlockType, '@uid': instanceId },
+              // Template instances can be moved/deleted as a unit (TODO: implement group operations)
+            };
+          }
+
+          // Block's parent is the template instance, not the original container
+          effectiveParentId = instanceId;
+        }
+      }
+
       pathMap[blockId] = {
         path: blockPath,
-        parentId,
+        parentId: effectiveParentId,
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
         allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
         maxSiblings: fieldDef.maxLength || null,
+        siblingCount: layout.length, // Total siblings in this container
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
+        ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
+        ...(isReadonly && { isReadonly: true }), // Readonly template blocks can't be edited
+        // Insert restrictions for fixed block boundaries
+        ...(!canInsertBefore && { canInsertBefore: false }),
+        ...(!canInsertAfter && { canInsertAfter: false }),
       };
 
       // RECURSE: process this block's container fields
@@ -556,7 +635,8 @@ export function setBlockByPath(formData, path, value) {
 export function getBlockById(formData, blockPathMap, blockId) {
   const pathInfo = blockPathMap?.[blockId];
   if (!pathInfo?.path) {
-    return undefined;
+    // Virtual blocks (like template instances) have blockData in pathMap instead of formData
+    return pathInfo?.blockData;
   }
   // Return the raw block data - no @type injection
   // Callers should use blockPathMap[blockId].blockType for the block type
@@ -599,14 +679,14 @@ export function getChildBlockIds(parentId, blockPathMap) {
 
 /**
  * Get the container field configuration for a nested block.
- * Returns the allowedBlocks, defaultBlock, etc. from the parent's schema.
+ * Returns the allowedBlocks, defaultBlockType, etc. from the parent's schema.
  *
  * @param {string} blockId - The block ID to check
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
- * @returns {Object|null} Container field config { fieldName, allowedBlocks, defaultBlock, maxLength, parentId } or null if page-level
+ * @returns {Object|null} Container field config { fieldName, allowedBlocks, defaultBlockType, maxLength, parentId } or null if page-level
  */
 export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksConfig, intl) {
   const pathInfo = blockPathMap?.[blockId];
@@ -614,8 +694,15 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     return null;
   }
 
-  const parentId = pathInfo.parentId;
+  let parentId = pathInfo.parentId;
   const fieldName = pathInfo.containerField;
+
+  // If parent is a virtual template instance, use the instance's parent for storage operations
+  // Template blocks are stored flat, so the actual container is the instance's parent
+  const parentPathInfo = blockPathMap[parentId];
+  if (parentPathInfo?.isTemplateInstance) {
+    parentId = parentPathInfo.parentId;
+  }
 
   // Determine parent type: '_page' for page-level blocks, otherwise from blockPathMap
   const parentType = parentId === PAGE_BLOCK_UID ? '_page' : blockPathMap[parentId]?.blockType;
@@ -628,7 +715,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       fieldName,
       parentId,
       allowedBlocks: pathInfo.allowedSiblingTypes,
-      defaultBlock: pathInfo.blockType,
+      defaultBlockType: pathInfo.blockType,
       maxLength: pathInfo.maxSiblings,
       isObjectList: true,
       itemSchema: stripFunctionsFromSchema(fieldDef?.schema),
@@ -658,7 +745,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
         fieldName,
         parentId,
         allowedBlocks: fieldDef.allowedBlocks || null,
-        defaultBlock: fieldDef.defaultBlock || null,
+        defaultBlockType: fieldDef.defaultBlockType || null,
         maxLength: fieldDef.maxLength || null,
       };
     }
@@ -674,7 +761,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       fieldName: 'blocks',
       parentId,
       allowedBlocks: parentConfig?.allowedBlocks || null,
-      defaultBlock: parentConfig?.defaultBlock || null,
+      defaultBlockType: parentConfig?.defaultBlockType || null,
       maxLength: parentConfig?.maxLength || null,
     };
   }
@@ -691,16 +778,47 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
- * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, defaultBlock, maxLength }]
+ * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
+ * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlockType, maxLength, currentCount, canAdd }]
  */
-export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl) {
+export function getAllContainerFields(blockId, blockPathMap, formData, blocksConfig, intl, templateEditMode = null) {
+  const pathInfo = blockPathMap?.[blockId];
+
+  // Special handling for virtual template instances
+  // Template instances don't have a schema, but they contain child blocks
+  // tracked via parentId in the pathMap
+  if (pathInfo?.isTemplateInstance) {
+    // Find all direct children of this template instance
+    const childIds = Object.entries(blockPathMap)
+      .filter(([, info]) => info.parentId === blockId)
+      .map(([id]) => id);
+
+    if (childIds.length > 0) {
+      return [{
+        fieldName: 'blocks', // Virtual field name for template children
+        title: 'Blocks',
+        isTemplateInstance: true,
+        // Template children are managed specially - no add button for now
+        allowedBlocks: null,
+        defaultBlockType: null,
+        maxLength: null,
+        currentCount: childIds.length,
+        canAdd: false, // Template instances don't support adding via sidebar
+      }];
+    }
+    return [];
+  }
+
   // For page-level (blockId is PAGE_BLOCK_UID), use _page schema and formData as the block
   const block = blockId === PAGE_BLOCK_UID ? formData : getBlockById(formData, blockPathMap, blockId);
   if (!block) return [];
 
+  // Check if parent block is readonly (can't add to readonly containers)
+  const parentIsReadonly = isBlockReadonly(block, templateEditMode);
+
   // Use blockPathMap for type lookup (single source of truth)
   // For page-level, use '_page' as the type
-  const blockType = blockId === PAGE_BLOCK_UID ? '_page' : blockPathMap[blockId]?.blockType;
+  const blockType = blockId === PAGE_BLOCK_UID ? '_page' : pathInfo?.blockType;
   if (!blockType) return [];
   const schema = getBlockSchema(blockType, intl, blocksConfig);
 
@@ -708,32 +826,59 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const blockConfig = blocksConfig?.[blockType];
   const defaultAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
+  // Helper to get current count for a container field
+  const getFieldCount = (fieldName, isObjectList = false, dataPath = null) => {
+    if (isObjectList) {
+      // object_list: navigate via dataPath or fieldName
+      const path = dataPath || [fieldName];
+      let data = block;
+      for (const key of path) {
+        data = data?.[key];
+      }
+      return Array.isArray(data) ? data.length : 0;
+    }
+    // blocks container: count items in layout
+    const layoutField = `${fieldName}_layout`;
+    return block[layoutField]?.items?.length || 0;
+  };
+
   const containerFields = [];
 
   // Check for schema-defined container fields (type: 'blocks' or widget: 'object_list')
   if (schema?.properties) {
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
       if (fieldDef.type === 'blocks') {
+        const maxLength = fieldDef.maxLength || blockConfig?.maxLength || null;
+        const currentCount = getFieldCount(fieldName);
+        const maxLengthOk = !maxLength || currentCount < maxLength;
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
-          defaultBlock: fieldDef.defaultBlock || blockConfig?.defaultBlock || null,
-          maxLength: fieldDef.maxLength || blockConfig?.maxLength || null,
+          allowedTemplates: fieldDef.allowedTemplates || null,
+          allowedLayouts: fieldDef.allowedLayouts || null,
+          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || null,
+          maxLength,
+          currentCount,
+          canAdd: !parentIsReadonly && maxLengthOk,
         });
       } else if (fieldDef.widget === 'object_list') {
         // object_list: items stored as array, virtual type is blockType:fieldName
         const itemType = `${blockType}:${fieldName}`;
+        const dataPath = fieldDef.dataPath || null;
+        const currentCount = getFieldCount(fieldName, true, dataPath);
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: [itemType], // Single virtual type
-          defaultBlock: itemType,
+          defaultBlockType: itemType,
           maxLength: null,
+          currentCount,
+          canAdd: !parentIsReadonly, // object_list has no maxLength
           isObjectList: true,
           itemSchema: stripFunctionsFromSchema(fieldDef.schema), // Store itemSchema for editing (stripped for postMessage)
           idField: fieldDef.idField || '@id', // ID field name for items
-          dataPath: fieldDef.dataPath || null, // Path to actual data location
+          dataPath,
         });
       }
     }
@@ -741,16 +886,21 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   // Check for implicit container (blocks/blocks_layout without schema definition)
   // Only if no explicit container fields found
-  // Detect from blockConfig (allowedBlocks/defaultBlock) or existing blocks/blocks_layout
+  // Detect from blockConfig (allowedBlocks/defaultBlockType) or existing blocks/blocks_layout
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
-                              blockConfig?.allowedBlocks || blockConfig?.defaultBlock;
+                              blockConfig?.allowedBlocks || blockConfig?.defaultBlockType;
   if (containerFields.length === 0 && isImplicitContainer) {
+    const maxLength = blockConfig?.maxLength || null;
+    const currentCount = getFieldCount('blocks');
+    const maxLengthOk = !maxLength || currentCount < maxLength;
     containerFields.push({
       fieldName: 'blocks',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
-      defaultBlock: blockConfig?.defaultBlock || null,
-      maxLength: blockConfig?.maxLength || null,
+      defaultBlockType: blockConfig?.defaultBlockType || null,
+      maxLength,
+      currentCount,
+      canAdd: !parentIsReadonly && maxLengthOk,
     });
   }
 
@@ -851,6 +1001,159 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
     const { [blockId]: removed, ...remainingBlocks } = parentBlock[fieldName];
     const filteredItems = items.filter(id => id !== blockId);
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, filteredItems, remainingBlocks);
+  }
+
+  return setBlockByPath(formData, parentPath, updatedParentBlock);
+}
+
+/**
+ * Strip all @type:'empty' placeholder blocks from formData before saving.
+ * Uses blockPathMap to locate empty blocks at any nesting level.
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
+ * @returns {Object} New formData with empty blocks removed
+ */
+export function stripEmptyBlocks(formData, blocksConfig, intl) {
+  const pathMap = buildBlockPathMap(formData, blocksConfig, intl);
+
+  const emptyIds = [];
+  for (const [blockId, pathInfo] of Object.entries(pathMap)) {
+    if (pathInfo.isTemplateInstance) continue;
+    const block = getBlockById(formData, pathMap, blockId);
+    if (block?.['@type'] === 'empty') {
+      emptyIds.push(blockId);
+    }
+  }
+
+  if (emptyIds.length === 0) return formData;
+
+  let result = formData;
+  for (const blockId of emptyIds) {
+    const containerConfig = getContainerFieldConfig(
+      blockId, pathMap, result, blocksConfig, intl,
+    );
+    result = deleteBlockFromContainer(result, pathMap, blockId, containerConfig);
+  }
+  return result;
+}
+
+/**
+ * Ensure every container block has at least one child.
+ * Inverse of stripEmptyBlocks — restores placeholder blocks on page load
+ * for containers that were saved empty (after stripping).
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blocksConfig - Block configuration from registry
+ * @param {Object} intl - The intl object from react-intl
+ * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @returns {Object} New formData with empty containers populated
+ */
+export function ensureAllContainersHaveBlocks(formData, blocksConfig, intl, uuidGenerator) {
+  const pathMap = buildBlockPathMap(formData, blocksConfig, intl);
+
+  let result = formData;
+  for (const [blockId, pathInfo] of Object.entries(pathMap)) {
+    if (pathInfo.isTemplateInstance) continue;
+    const containerFields = getAllContainerFields(
+      blockId, pathMap, result, blocksConfig, intl,
+    );
+    for (const field of containerFields) {
+      if (field.isTemplateInstance) continue;
+      result = ensureEmptyBlockIfEmpty(
+        result,
+        { parentId: blockId, ...field },
+        pathMap,
+        uuidGenerator,
+        blocksConfig,
+        { intl },
+      );
+    }
+  }
+  return result;
+}
+
+/**
+ * Remove a template instance from the page.
+ * - Fixed blocks are deleted entirely
+ * - Non-fixed (placeholder) blocks have template fields stripped and become regular blocks
+ *
+ * @param {Object} formData - The form data
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId, isTemplateInstance, ... }
+ * @param {string} templateInstanceId - The templateInstanceId to remove
+ * @returns {Object} New formData with template instance removed
+ */
+export function removeTemplateInstance(formData, blockPathMap, templateInstanceId) {
+  // Find the template instance entry in pathMap to get container info
+  const instanceInfo = blockPathMap[templateInstanceId];
+  if (!instanceInfo?.isTemplateInstance) {
+    throw new Error(`[HYDRA] removeTemplateInstance: ${templateInstanceId} is not a template instance`);
+  }
+
+  const { parentId, containerField } = instanceInfo;
+
+  // Get the parent container
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] removeTemplateInstance: could not find parent block ${parentId}`);
+  }
+
+  // Get current layout
+  const layoutPath = containerField === 'blocks'
+    ? 'blocks_layout.items'
+    : `${containerField}.blocks_layout.items`;
+  const blocksPath = containerField === 'blocks' ? 'blocks' : `${containerField}.blocks`;
+
+  const layout = get(parentBlock, layoutPath, []);
+  const blocks = get(parentBlock, blocksPath, {});
+
+  // Separate blocks into: fixed (to delete), placeholder (to keep but strip), and unrelated
+  const newLayout = [];
+  const newBlocks = { ...blocks };
+
+  for (const blockId of layout) {
+    const block = blocks[blockId];
+    if (!block) {
+      newLayout.push(blockId);
+      continue;
+    }
+
+    // Check if this block belongs to the template instance being removed
+    if (block.templateInstanceId === templateInstanceId) {
+      if (block.fixed) {
+        // Fixed blocks are deleted - don't add to newLayout, remove from newBlocks
+        delete newBlocks[blockId];
+      } else {
+        // Non-fixed blocks: strip template fields and keep them
+        const { templateId, templateInstanceId: _, placeholder, fixed, readOnly, ...cleanBlock } = block;
+        newBlocks[blockId] = cleanBlock;
+        newLayout.push(blockId);
+      }
+    } else {
+      // Block doesn't belong to this template instance - keep as-is
+      newLayout.push(blockId);
+    }
+  }
+
+  // Build updated parent block
+  let updatedParentBlock;
+  if (containerField === 'blocks') {
+    updatedParentBlock = {
+      ...parentBlock,
+      blocks: newBlocks,
+      blocks_layout: { ...parentBlock.blocks_layout, items: newLayout },
+    };
+  } else {
+    updatedParentBlock = {
+      ...parentBlock,
+      [containerField]: {
+        ...parentBlock[containerField],
+        blocks: newBlocks,
+        blocks_layout: { ...parentBlock[containerField].blocks_layout, items: newLayout },
+      },
+    };
   }
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -1077,17 +1380,28 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
 
 /**
  * Determine the block type to use for an empty container.
- * Uses defaultBlock if specified, or the single allowed type, otherwise 'empty'.
+ * Fallback chain:
+ *   1. containerConfig.defaultBlockType (explicit default for this container)
+ *   2. Single allowedBlocks entry (only one choice)
+ *   3. config.settings.defaultBlockType if allowed (global default, e.g. 'slate')
+ *   4. 'empty' (placeholder that opens BlockChooser on click)
  *
- * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlock
+ * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create
  */
 function getEmptyBlockType(containerConfig) {
-  if (containerConfig?.defaultBlock) {
-    return containerConfig.defaultBlock;
+  if (containerConfig?.defaultBlockType) {
+    return containerConfig.defaultBlockType;
   }
   if (containerConfig?.allowedBlocks?.length === 1) {
     return containerConfig.allowedBlocks[0];
+  }
+  const globalDefault = config.settings.defaultBlockType;
+  if (globalDefault) {
+    const allowed = containerConfig?.allowedBlocks;
+    if (!allowed || allowed.includes(globalDefault)) {
+      return globalDefault;
+    }
   }
   return 'empty';
 }
@@ -1155,7 +1469,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     let blockData = { [idField]: newBlockId };
 
     // Initialize nested containers
-    if (intl && blocksConfig && containerConfig.defaultBlock) {
+    if (intl && blocksConfig && containerConfig.defaultBlockType) {
       blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties });
     }
 
@@ -1182,7 +1496,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  *
  * For example, when creating a 'columns' block:
  * - columns has allowedBlocks: ['column'], so creates a column inside
- * - column has defaultBlock: 'slate', so creates a slate inside that column
+ * - column has defaultBlockType: 'slate', so creates a slate inside that column
  *
  * @param {Object} blockData - The block data (with at least '@type')
  * @param {Object} blocksConfig - Block configuration from registry
@@ -1254,8 +1568,8 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
 
     // Determine the initial child block type for this container field
     let childBlockType = null;
-    if (fieldDef.defaultBlock) {
-      childBlockType = fieldDef.defaultBlock;
+    if (fieldDef.defaultBlockType) {
+      childBlockType = fieldDef.defaultBlockType;
     } else if (fieldDef.allowedBlocks?.length === 1) {
       childBlockType = fieldDef.allowedBlocks[0];
     }

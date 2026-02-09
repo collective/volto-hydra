@@ -93,6 +93,9 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
     await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
 
+    // Wait for Nuxt async re-rendering to settle after variation change
+    await helper.getStableBlockCount();
+
     // Wait for teasers to disappear first (confirms variation change is taking effect)
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
@@ -601,10 +604,13 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const newFacet = iframe.locator(`[data-block-uid="${newFacetId}"]`);
     await helper.waitForBlockSelected(newFacetId!, 10000);
 
+    // Wait for sidebar to show the NEW facet (not the old "Content Type" facet)
+    // The old facet has Label="Content Type"; new empty facet does not
+    await expect(page.locator('#sidebar-properties')).not.toContainText('Content Type', { timeout: 5000 });
+
     // Find and select the field (review_state)
     const fieldWrapper = page.locator('#sidebar-properties .field-wrapper-field');
     await expect(fieldWrapper).toBeVisible({ timeout: 5000 });
-
     const fieldSelect = fieldWrapper.locator('.react-select__control');
     await fieldSelect.click();
 

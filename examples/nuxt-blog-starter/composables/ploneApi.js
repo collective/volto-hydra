@@ -1,4 +1,4 @@
-import { getAccessToken } from '@hydra-js/hydra.js';
+import { getAccessToken, loadTemplates } from '@hydra-js/hydra.js';
 
 export default async function ploneApi({
   path,
@@ -6,12 +6,16 @@ export default async function ploneApi({
   watch = [],
   _default = {},
   pages = {},
+  allowedLayouts = [],  // Optional: forced layouts to pre-load
 }) {
   const runtimeConfig = useRuntimeConfig();
+  const route = useRoute();
+
   var headers = {
     Accept: 'application/json',
   };
-  const token = getAccessToken();
+  // route.query works in SSR, getAccessToken() works client-side
+  const token = route.query.access_token || getAccessToken();
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
@@ -35,7 +39,9 @@ export default async function ploneApi({
     method: query ? 'POST' : 'GET',
     headers: headers,
     body: query,
-    cache: 'no-cache', // we probably don't need it
+    cache: 'no-cache',
+    // When authenticated, don't use cached data - always fetch fresh
+    getCachedData: token ? () => undefined : undefined,
     watch: watch,
     default: () => {
       return _default;
@@ -51,21 +57,28 @@ export default async function ploneApi({
         '@components': { navigation: { items: [] } },
       };
     },
-    transform: (data) => {
-      // if (error!==undefined  ) {
-      //     showError(error);
-      //        // throw new error;
-      //     return {title:"Error"};
-      // }
-
+    transform: async (data) => {
       data['_listing_pages'] = pages;
       if (query) {
         return data;
       } else {
         const comp = data['@components'];
         delete data['@components'];
+
+        // Pre-load templates for SSR (avoids Suspense flicker)
+        const loadTemplate = async (templateId) => {
+          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${templateId}`;
+          const response = await fetch(url, { headers });
+          if (!response.ok) {
+            throw new Error(`Failed to fetch template: ${templateId}`);
+          }
+          return response.json();
+        };
+        const templates = await loadTemplates(data, loadTemplate, allowedLayouts);
+
         return {
           page: data,
+          templates,  // Pre-loaded templates for sync expansion
           _listing_pages: pages,
           navigation: comp.navigation,
           breadcrumbs: comp.breadcrumbs,

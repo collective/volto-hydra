@@ -245,6 +245,8 @@ test.describe('Inline Editing - Links', () => {
 
     // Click inside the link to edit it
     await link.click();
+    // Wait for selection to be within the link
+    await expect(editor).toBeFocused({ timeout: 2000 });
 
     // Click link button again to open editor
     await helper.clickFormatButton('link');
@@ -265,9 +267,11 @@ test.describe('Inline Editing - Links', () => {
     // Wait for popup to close
     await helper.waitForLinkEditorToClose();
 
-    // Verify link was updated
-    expect(await link.getAttribute('href')).toBe('https://newurl.com');
-    expect(await link.textContent()).toBe('Click here');
+    // Verify link was updated (poll to allow time for sync)
+    await expect(async () => {
+      expect(await link.getAttribute('href')).toBe('https://newurl.com');
+      expect(await link.textContent()).toBe('Click here');
+    }).toPass({ timeout: 5000 });
   });
 
   test('LinkEditor closes when focusing back on editor', async ({ page }) => {
@@ -326,17 +330,36 @@ test.describe('Inline Editing - Links', () => {
     expect(textContent).toBe('Test text');
 
     // Verify focus returns to editor automatically after cancelling LinkEditor
-    await helper.waitForEditorFocus(editor);
+    // This is the key test - focus should be restored without user action
+    // Wait for both focus AND non-collapsed selection to be stable before typing
+    await expect(async () => {
+      const selectionInfo = await helper.getSelectionInfo(editor);
+      if (!selectionInfo.editorHasFocus || selectionInfo.isCollapsed) {
+        const debugInfo = await page.evaluate(() => {
+          const active = document.activeElement;
+          const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement | null;
+          const iframeActive = iframeEl?.contentDocument?.activeElement;
+          return {
+            topActive: active?.tagName + (active?.id ? '#' + active.id : ''),
+            topIsFocused: document.hasFocus(),
+            iframeActive: iframeActive?.tagName + (iframeActive?.className ? '.' + iframeActive.className.split(' ')[0] : ''),
+            iframeContentEditable: iframeActive?.getAttribute('contenteditable'),
+          };
+        });
+        console.log('[link-cancel] focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
+      }
+      expect(selectionInfo.editorHasFocus).toBe(true);
+      expect(selectionInfo.isCollapsed).toBe(false);
+    }).toPass({ timeout: 5000 });
 
-    // Move cursor to end and type
-    await editor.press('End');
-    await editor.pressSequentially(' added', { delay: 10 });
+    // Type to verify editor accepts input - will replace selected text
+    await editor.pressSequentially('replaced', { delay: 10 });
 
-    // Verify typing worked
+    // Verify typing worked (replaced selected text since all was selected)
     await expect(async () => {
       const newText = await helper.getCleanTextContent(editor);
-      expect(newText).toContain('added');
-    }).toPass({ timeout: 2000 });
+      expect(newText).toBe('replaced');
+    }).toPass({ timeout: 5000 });
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {

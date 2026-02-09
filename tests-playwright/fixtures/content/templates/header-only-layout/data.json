@@ -1,0 +1,60 @@
+{
+  "@id": "/templates/header-only-layout",
+  "@type": "Document",
+  "id": "header-only-layout",
+  "title": "Header Only Layout",
+  "description": "A layout template with only a fixed header",
+  "blocks": {
+    "fixed-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/header-only-layout",
+      "templateInstanceId": "/templates/header-only-layout",
+      "placeholder": "header",
+      "value": [
+        {
+          "type": "h1",
+          "children": [{ "text": "Header Only" }]
+        }
+      ],
+      "plaintext": "Header Only"
+    },
+    "default-slot": {
+      "@type": "slate",
+      "templateId": "/templates/header-only-layout",
+      "templateInstanceId": "/templates/header-only-layout",
+      "placeholder": "default",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "" }]
+        }
+      ],
+      "plaintext": ""
+    }
+  },
+  "blocks_layout": {
+    "items": ["fixed-header", "default-slot"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/templates/header-only-layout/@actions",
+      "object": [
+        {
+          "@id": "/templates/header-only-layout/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/templates/header-only-layout/@breadcrumbs",
+      "items": [
+        { "@id": "/templates", "title": "Templates" },
+        { "@id": "/templates/header-only-layout", "title": "Header Only Layout" }
+      ]
+    }
+  }
+}

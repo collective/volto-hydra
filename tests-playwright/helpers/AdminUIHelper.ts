@@ -163,6 +163,9 @@ export class AdminUIHelper {
 
     // Wait for iframe to load
     await this.waitForIframeReady();
+
+    // Wait for all blocks to render (Nuxt async components may still be loading)
+    await this.getStableBlockCount();
   }
 
   /**
@@ -191,6 +194,9 @@ export class AdminUIHelper {
 
     // Wait for iframe to load
     await this.waitForIframeReady();
+
+    // Wait for all blocks to render (Nuxt async components may still be loading)
+    await this.getStableBlockCount();
   }
 
   /**
@@ -202,9 +208,11 @@ export class AdminUIHelper {
       timeout,
     });
 
-    // Wait for iframe to have content with blocks
+    // Wait for iframe to have at least one block attached to the DOM.
+    // Use state: 'attached' instead of default 'visible' because on carousel
+    // pages, all blocks may be inside inactive slides (hidden) initially.
     const iframe = this.getIframe();
-    await iframe.locator('[data-block-uid]').first().waitFor({ timeout });
+    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'attached', timeout });
 
     // Wait for blocks to stabilize (avoid flaky tests due to partial renders)
     await this.getStableBlockCount();
@@ -453,6 +461,62 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for a block with specific content to be visible in the iframe.
+   * Returns both the locator and the block's UID.
+   *
+   * @param content - Text content to search for within blocks
+   * @param timeout - Timeout in milliseconds (default 15000)
+   * @returns Object with locator and blockId
+   */
+  async waitForBlockByContent(
+    content: string,
+    timeout: number = 15000,
+  ): Promise<{ locator: Locator; blockId: string }> {
+    const iframe = this.getIframe();
+
+    // Find the text element, then get the closest block ancestor
+    const blockLocator = iframe.getByText(content).first().locator('xpath=ancestor-or-self::*[@data-block-uid][1]');
+
+    // Wait for the block to be visible
+    await expect(blockLocator).toBeVisible({ timeout });
+
+    // Get the block ID
+    const blockId = await blockLocator.getAttribute('data-block-uid');
+    if (!blockId) {
+      throw new Error(`Block with content "${content}" found but has no data-block-uid attribute`);
+    }
+
+    return { locator: blockLocator, blockId };
+  }
+
+  /**
+   * Click on a block within the preview iframe by finding it by text content.
+   * Returns the block's UID for use in subsequent operations.
+   *
+   * @param content - Text content to search for within blocks
+   * @param options.waitForToolbar - If true (default), waits for Volto's quanta-toolbar
+   * @returns The block's data-block-uid attribute value
+   */
+  async clickBlockByContent(
+    content: string,
+    options: { waitForToolbar?: boolean } = {},
+  ): Promise<string> {
+    const { waitForToolbar = true } = options;
+
+    const { locator: blockLocator, blockId } = await this.waitForBlockByContent(content);
+
+    // Scroll into view and click
+    await blockLocator.scrollIntoViewIfNeeded();
+    await blockLocator.click();
+
+    if (waitForToolbar) {
+      await this.waitForQuantaToolbar(blockId);
+    }
+
+    return blockId;
+  }
+
+  /**
    * Navigate up through parent blocks in the sidebar until reaching the target block.
    * Used when clicking on a container block selects a child instead.
    *
@@ -646,10 +710,18 @@ export class AdminUIHelper {
     // Use first() for multi-element blocks
     await blockLocator.first().waitFor({ state: 'visible', timeout });
 
-    // Wait for iframe drag handle to appear
-    // Position checks are done in waitForDragHandlesAligned (called from waitForQuantaToolbar)
+    // Wait for iframe drag handle to appear and become visible
+    // The drag handle is created with display:none and becomes visible when sendBlockSelected runs
+    // Use polling since sendBlockSelected happens asynchronously on selectionchange
     const dragHandle = iframe.locator('.volto-hydra-drag-button');
-    await expect(dragHandle).toBeVisible({ timeout });
+    await expect(async () => {
+      const isVisible = await dragHandle.isVisible();
+      if (!isVisible) {
+        const exists = await dragHandle.count() > 0;
+        console.log(`[waitForBlockSelected] Drag handle exists=${exists} visible=${isVisible}`);
+      }
+      expect(isVisible).toBe(true);
+    }).toPass({ timeout });
 
     // Return the first element locator for chaining
     return blockLocator.first();
@@ -675,6 +747,30 @@ export class AdminUIHelper {
         timeout,
       }
     );
+  }
+
+  /**
+   * Wait for a block to be shown as readonly (has hydra-locked class).
+   * Used to verify template edit mode is active (blocks outside template get locked).
+   * @param blockId - The block ID to check
+   * @param timeout - Maximum time to wait
+   */
+  async waitForBlockReadonly(blockId: string, timeout: number = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await expect(block).toHaveClass(/hydra-locked/, { timeout });
+  }
+
+  /**
+   * Wait for a block to NOT be shown as readonly (no hydra-locked class).
+   * Used to verify template edit mode is inactive.
+   * @param blockId - The block ID to check
+   * @param timeout - Maximum time to wait
+   */
+  async waitForBlockEditable(blockId: string, timeout: number = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+    await expect(block).not.toHaveClass(/hydra-locked/, { timeout });
   }
 
   /**
@@ -861,20 +957,26 @@ export class AdminUIHelper {
   /**
    * Wait for the Quanta toolbar to appear on a block and scroll it into view.
    * Also verifies the toolbar is not covered by the sidebar.
+   * For template instances, pass an array of child block IDs to verify combined bounds.
    */
-  async waitForQuantaToolbar(blockId: string, timeout: number = 10000): Promise<void> {
-    // Scroll block into view FIRST - toolbar is hidden when block is out of viewport
-    await this.scrollBlockIntoViewWithToolbarRoom(blockId);
+  async waitForQuantaToolbar(blockIds: string | string[], timeout: number = 10000): Promise<void> {
+    // Normalize to array
+    const ids = Array.isArray(blockIds) ? blockIds : [blockIds];
+    const firstBlockId = ids[0];
+    const displayId = Array.isArray(blockIds) ? `[${ids.length} blocks]` : blockIds;
 
-    // Wait until toolbar is positioned correctly relative to the block
+    // Scroll first block into view - toolbar is hidden when block is out of viewport
+    await this.scrollBlockIntoViewWithToolbarRoom(firstBlockId);
+
+    // Wait until toolbar is positioned correctly relative to the block(s)
     // (isBlockSelectedInIframe checks visibility AND positioning)
     let lastReason = '';
     await expect.poll(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res: any = await this.isBlockSelectedInIframe(blockId);
+      const res: any = await this.isBlockSelectedInIframe(ids);
       if (typeof res === 'boolean') return res;
       if (res?.reason && res.reason !== lastReason) {
-        console.log(`[waitForQuantaToolbar] ${blockId}: ${res.reason}`);
+        console.log(`[waitForQuantaToolbar] ${displayId}: ${res.reason}`);
         lastReason = res.reason;
       }
       return !!res && !!res.ok;
@@ -884,7 +986,7 @@ export class AdminUIHelper {
     // the toolbar has re-adjusted its position correctly
     await expect.poll(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res: any = await this.isBlockSelectedInIframe(blockId);
+      const res: any = await this.isBlockSelectedInIframe(ids);
       if (typeof res === 'boolean') return res;
       return !!res && !!res.ok;
     }, { timeout: 5000 }).toBeTruthy();
@@ -1233,7 +1335,34 @@ export class AdminUIHelper {
     const timeout = options.timeout ?? 5000;
     await expect(async () => {
       const sel = await this.getSelectionInfo(editor);
+      if (!sel.editorHasFocus) {
+        // Debug: log where focus actually is
+        const topActiveEl = await this.page.evaluate(() => document.activeElement?.tagName);
+        console.log(`[waitForEditorFocus] Focus NOT in editor. activeElementTag=${sel.activeElementTag} topActiveEl=${topActiveEl}`);
+      }
       expect(sel.editorHasFocus).toBe(true);
+    }).toPass({ timeout });
+  }
+
+  /**
+   * Wait for the cursor to be at a specific position in the editor.
+   * Use after format operations to ensure selection is fully restored before typing.
+   * @param editor - The editor locator
+   * @param expectedTextBefore - The expected text before the cursor (stripped of ZWS)
+   * @param options - Options including timeout
+   */
+  async waitForCursorPosition(
+    editor: Locator,
+    expectedTextBefore: string,
+    options: { timeout?: number } = {}
+  ): Promise<void> {
+    const timeout = options.timeout ?? 5000;
+    await expect(async () => {
+      const pos = await this.getTextAroundCursor(editor);
+      if (pos.textBefore !== expectedTextBefore) {
+        console.log(`[waitForCursorPosition] Expected textBefore="${expectedTextBefore}" but got "${pos.textBefore}"`);
+      }
+      expect(pos.textBefore).toBe(expectedTextBefore);
     }).toPass({ timeout });
   }
 
@@ -1426,8 +1555,11 @@ export class AdminUIHelper {
    * 2. They are positioned correctly relative to the block (toolbar above, add button below)
    * 3. Elements are horizontally aligned with the block
    */
-  async isBlockSelectedInIframe(blockId: string): Promise<{ ok: boolean; reason?: string }> {
+  async isBlockSelectedInIframe(blockIds: string | string[]): Promise<{ ok: boolean; reason?: string }> {
     try {
+      // Normalize to array
+      const ids = Array.isArray(blockIds) ? blockIds : [blockIds];
+
       // Verify essential UI overlays are visible (toolbar and outline)
       // Note: add button visibility/positioning is checked separately by verifyBlockUIPositioning
       const toolbar = this.page.locator('.quanta-toolbar');
@@ -1443,8 +1575,9 @@ export class AdminUIHelper {
         };
       }
 
-      // Verify the outline covers THIS specific block
-      const blockBox = await this.getBlockBoundingBoxInIframe(blockId);
+      // Verify the outline covers the block(s)
+      // For multiple blocks, compute combined bounding box
+      const blockBox = await this.getCombinedBlockBoundingBox(ids);
       const outlineBox = await this.getBlockOutlineBoundingBox();
 
       if (!blockBox || !outlineBox) {
@@ -1632,6 +1765,35 @@ export class AdminUIHelper {
   }
 
   /**
+   * Get the combined bounding box for one or more blocks.
+   * For template instances, pass all child block IDs to get the combined bounds.
+   */
+  async getCombinedBlockBoundingBox(blockIds: string[]): Promise<{ x: number; y: number; width: number; height: number } | null> {
+    if (blockIds.length === 0) return null;
+
+    if (blockIds.length === 1) {
+      return await this.getBlockBoundingBoxInIframe(blockIds[0]);
+    }
+
+    // Multiple blocks - compute combined bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const blockId of blockIds) {
+      const box = await this.getBlockBoundingBoxInIframe(blockId);
+      if (box) {
+        minX = Math.min(minX, box.x);
+        minY = Math.min(minY, box.y);
+        maxX = Math.max(maxX, box.x + box.width);
+        maxY = Math.max(maxY, box.y + box.height);
+      }
+    }
+
+    if (minX === Infinity) return null;
+
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  /**
    * Check if the outline is a full border or just a bottom line.
    * Returns the style information about the outline.
    */
@@ -1768,12 +1930,15 @@ export class AdminUIHelper {
 
   /**
    * Save the current content being edited.
+   * Clicks Save, waits for navigation out of /edit, and waits for iframe to render.
    */
   async saveContent(): Promise<void> {
     const saveButton = this.page.locator('#toolbar-save, button:has-text("Save")');
     await saveButton.click();
-    // Wait for save to complete
-    await this.page.waitForTimeout(1000);
+    // Wait for URL to navigate away from /edit (save triggers redirect to view mode)
+    await this.page.waitForURL((url) => !url.pathname.endsWith('/edit'), { timeout: 15000 });
+    // Wait for iframe to load view-mode content
+    await this.waitForIframeReady();
   }
 
   /**
@@ -1787,12 +1952,32 @@ export class AdminUIHelper {
     cursorOffset: number | undefined;
     cursorContainerText: string;
     isFocused: boolean;
+    insideNodeId: boolean;
   }> {
     return await editor.evaluate((el: HTMLElement) => {
       const doc = el.ownerDocument;
       const selection = doc.getSelection();
       const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
       const text = el.innerText || el.textContent || '';
+
+      // Check if cursor is inside a data-node-id element
+      let insideNodeId = false;
+      if (range?.startContainer) {
+        const node = range.startContainer;
+        // Check if this node or any ancestor (up to and including el) has data-node-id
+        let current: Node | null = node;
+        while (current) {
+          if (current.nodeType === Node.ELEMENT_NODE) {
+            const elem = current as Element;
+            if (elem.hasAttribute('data-node-id')) {
+              insideNodeId = true;
+              break;
+            }
+          }
+          if (current === el) break; // Include el in the check
+          current = current.parentNode;
+        }
+      }
 
       return {
         text: text,
@@ -1801,6 +1986,7 @@ export class AdminUIHelper {
         cursorOffset: range?.startOffset,
         cursorContainerText: range?.startContainer?.textContent || '',
         isFocused: doc.activeElement === el,
+        insideNodeId,
       };
     });
   }
@@ -2450,12 +2636,31 @@ export class AdminUIHelper {
    * This should open the block chooser.
    */
   async clickAddBlockButton(): Promise<void> {
+    // Wait for DOM to stabilize (block count settles after re-renders)
+    await this.getStableBlockCount();
 
     // The add button has class volto-hydra-add-button and is appended to the selected block element
     const addButton = this.page.locator('.volto-hydra-add-button');
 
+    // Scroll add button into view - it may be outside viewport if block is at edge
+    await addButton.scrollIntoViewIfNeeded();
     await addButton.click({ timeout: 10000 });
-    await this.page.waitForTimeout(500); // Wait for chooser to appear
+  }
+
+  /**
+   * Wait for an empty block to appear in the iframe.
+   * Empty blocks have the data-hydra-empty attribute set by hydra.js.
+   * @param parentSelector - Optional parent selector to scope the search
+   * @returns Locator for the empty block
+   */
+  async waitForEmptyBlock(parentSelector?: string): Promise<Locator> {
+    const iframe = this.getIframe();
+    const selector = parentSelector
+      ? `${parentSelector} [data-hydra-empty]`
+      : '[data-hydra-empty]';
+    const emptyBlock = iframe.locator(selector);
+    await expect(emptyBlock).toBeVisible({ timeout: 5000 });
+    return emptyBlock;
   }
 
   /**
@@ -3298,6 +3503,46 @@ export class AdminUIHelper {
   }
 
   /**
+   * Drag a block after another block by their IDs.
+   * First selects the source block, then drags it after the target block.
+   * @param sourceBlockId - The block ID to drag
+   * @param targetBlockId - The block ID to drop after
+   */
+  async dragBlockAfter(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    const iframe = this.getIframe();
+
+    // Select the source block first
+    await this.clickBlockInIframe(sourceBlockId);
+    await this.waitForQuantaToolbar(sourceBlockId);
+
+    // Get target block locator
+    const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
+
+    // Use dragBlockWithMouse (first param is unused)
+    await this.dragBlockWithMouse(targetBlock, targetBlock, true);
+  }
+
+  /**
+   * Drag a block before another block by their IDs.
+   * First selects the source block, then drags it before the target block.
+   * @param sourceBlockId - The block ID to drag
+   * @param targetBlockId - The block ID to drop before
+   */
+  async dragBlockBefore(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    const iframe = this.getIframe();
+
+    // Select the source block first
+    await this.clickBlockInIframe(sourceBlockId);
+    await this.waitForQuantaToolbar(sourceBlockId);
+
+    // Get target block locator
+    const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
+
+    // Use dragBlockWithMouse with insertAfter=false
+    await this.dragBlockWithMouse(targetBlock, targetBlock, false);
+  }
+
+  /**
    * Drag a block to target position but DON'T complete the drop.
    * Use this to inspect drop indicator position during drag.
    * Call page.mouse.up() to release when done inspecting.
@@ -4030,48 +4275,37 @@ export class AdminUIHelper {
    * @returns Locator for the object browser popup
    */
   async waitForObjectBrowser(timeout: number = 5000): Promise<Locator> {
-    // Wait for either type of object browser:
-    // - aside[role="presentation"] for link editor
-    // - Element with "Choose Image" heading for toolbar image selection
+    // Wait for the Home button which appears inside the object browser when it's ready
+    // This is more reliable than waiting for the container, which may appear before content loads
+    const homeButton = this.page.getByRole('button', { name: 'Home' });
+    await expect(homeButton).toBeVisible({ timeout });
 
-    // Try aside first (link editor)
+    // Find the object browser container (aside for link editor, or image browser container)
     const aside = this.page.locator('aside[role="presentation"]').last();
-
-    // Also look for image browser by finding "Choose Image" heading and going to parent container
     const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
 
-    // Wait for either to appear
-    await Promise.race([
-      aside.waitFor({ state: 'visible', timeout }).catch(() => null),
-      chooseImageHeading.waitFor({ state: 'visible', timeout }).catch(() => null),
-    ]);
-
-    // Determine which one is visible
     let locator: Locator;
     if (await aside.isVisible().catch(() => false)) {
       locator = aside;
-    } else if (await chooseImageHeading.isVisible()) {
-      // Get the parent container (2 levels up from heading -> header -> container)
+    } else if (await chooseImageHeading.isVisible().catch(() => false)) {
+      // Get the parent container for image browser
       locator = chooseImageHeading.locator('xpath=ancestor::*[.//ul or .//list]').first();
-      // Fallback to just finding the list nearby
       if (!(await locator.count())) {
         locator = this.page.locator('ul:has(li)').filter({ hasText: /Document|Image/ }).last();
       }
     } else {
-      throw new Error('Object browser did not appear');
+      // Fallback to aside even if not detected (Home button was visible so browser is open)
+      locator = aside;
     }
 
     // Object browser may open at current page path (e.g., /test-page) which has no children.
     // Check if we need to navigate to Home (list is empty or no matching items)
     const listItems = this.page.locator('li').filter({ hasText: /Document|Image|Folder/ });
-    const hasItems = await listItems.first().isVisible({ timeout: 1000 }).catch(() => false);
+    const hasItems = await listItems.first().isVisible().catch(() => false);
 
     if (!hasItems) {
-      const homeButton = this.page.getByRole('button', { name: 'Home' });
-      // Wait for the button to be in viewport (page may be scrolling)
-      await expect(homeButton).toBeInViewport({ timeout: 5000 });
+      // Click Home to navigate to root where items are available
       await homeButton.click();
-      await this.page.waitForTimeout(500);
     }
 
     // Wait for list items to appear

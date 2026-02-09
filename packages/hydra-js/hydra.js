@@ -70,6 +70,22 @@
 // injectCSS
 
 ////////////////////////////////////////////////////////////////////////////////
+// Template Utilities
+////////////////////////////////////////////////////////////////////////////////
+
+// isLayoutTemplate
+// findPlaceholderRegions
+// isTemplateAllowedIn
+// getLayoutTemplates
+// getSnippetTemplates
+// cloneBlocksWithNewIds
+// applyLayoutTemplate
+// insertSnippetBlocks
+// getTemplateBlocks
+// isFixedTemplateBlock
+// isPlaceholderContent
+
+////////////////////////////////////////////////////////////////////////////////
 // Methods provided by THIS hydra.js as export
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -149,6 +165,16 @@ export class Bridge {
     // Readonly registry - blocks marked readonly won't have fields collected
     // Set by expandListingBlocks() or frontend code, not persisted to backend
     this._readonlyBlocks = new Set();
+    // Template edit mode - when set to an instanceId, blocks inside that instance
+    // become editable (even if readOnly), and blocks outside become locked
+    this.templateEditMode = null; // instanceId of template being edited
+    // Track iframe focus state via window focus/blur events.
+    // document.hasFocus() is unreliable in headless browsers (always returns false),
+    // but window focus/blur events are dispatched by Chromium's internal frame focus
+    // manager regardless of OS-level window focus.
+    this._iframeFocused = document.hasFocus();
+    window.addEventListener('focus', () => { this._iframeFocused = true; });
+    window.addEventListener('blur', () => { this._iframeFocused = false; });
     this.init(options); // Initialize the bridge
   }
 
@@ -170,27 +196,34 @@ export class Bridge {
 
   /**
    * Check if a block is readonly. Checks in order:
-   * 1. Readonly registry (set by setBlockReadonly)
-   * 2. Block data property (block.readOnly)
+   * 1. Template edit mode (uses shared isBlockReadonly function)
+   * 2. Readonly registry (set by setBlockReadonly) - Bridge-specific
+   * 3. Block data property (block.readOnly) - via shared function
    * DOM attribute (data-block-readonly) is checked separately in collectBlockFields.
    *
    * @param {string} blockUid - The block UID to check
    * @returns {boolean} Whether the block is readonly
    */
   isBlockReadonly(blockUid) {
-    // 1. Check registry first (set by expander or frontend)
+    const blockData = this.getBlockData(blockUid);
+
+    // Use shared utility for template edit mode and block.readOnly checks
+    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
+
+    // In template edit mode, the shared function handles everything
+    if (this.templateEditMode) {
+      log('isBlockReadonly:', readonlyFromShared ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
+      return readonlyFromShared;
+    }
+
+    // Normal mode: also check Bridge-specific registry
     if (this._readonlyBlocks.has(blockUid)) {
       log('isBlockReadonly: TRUE (registry) for:', blockUid);
       return true;
     }
-    // 2. Fall back to block data property
-    const blockData = this.getBlockData(blockUid);
-    if (blockData?.readOnly) {
-      log('isBlockReadonly: TRUE (blockData) for:', blockUid);
-      return true;
-    }
-    log('isBlockReadonly: FALSE for:', blockUid, 'registry:', [...this._readonlyBlocks]);
-    return false;
+
+    log('isBlockReadonly:', readonlyFromShared ? 'TRUE (blockData)' : 'FALSE', 'for:', blockUid);
+    return readonlyFromShared;
   }
 
   /**
@@ -327,10 +360,9 @@ export class Bridge {
 
     this.blockPathMap = blockPathMap;
 
-    // Clear readonly registry - new data means fresh state
-    // Frontend will re-register readonly blocks after expansion
-    log('setFormDataFromAdmin: clearing readonly registry, was:', [...this._readonlyBlocks]);
-    this._readonlyBlocks.clear();
+    // Note: do NOT clear _readonlyBlocks here. The frontend re-registers readonly blocks
+    // via expandListingBlocks(), but that's async (API call). Clearing here creates a race
+    // window where blocks appear non-readonly. Stale entries are harmless.
 
     const seq = data?._editSequence || 0;
     // Use simple direct lookup for logging - getBlockData uses this.formData which isn't set yet
@@ -576,13 +608,28 @@ export class Bridge {
     }
 
     // Element has zero dimensions - try to find a parent with dimensions
-    // This handles overlay elements that rely on parent for sizing (common in carousels/sliders)
-    // Walk up the DOM tree to find the first ancestor with actual dimensions
+    // This handles elements like empty <img> tags that rely on parent for sizing.
+    // Stop at block boundary (data-block-uid) to avoid using a parent container's
+    // rect when the block itself is hidden (e.g., inactive carousel slide).
     let current = element.parentElement;
     let depth = 0;
     const maxDepth = 10; // Safety limit
 
     while (current && depth < maxDepth) {
+      // Stop at block boundary - don't escape into parent block's DOM
+      if (current.hasAttribute('data-block-uid')) {
+        const blockRect = current.getBoundingClientRect();
+        if (blockRect.width > 0 && blockRect.height > 0) {
+          console.log(
+            `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+            `Using block element's dimensions (${blockRect.width}x${blockRect.height}).`
+          );
+          return { top: blockRect.top, left: blockRect.left, width: blockRect.width, height: blockRect.height };
+        }
+        // Block itself is hidden (e.g., inactive carousel slide) - no valid rect
+        break;
+      }
+
       const parentRect = current.getBoundingClientRect();
 
       if (parentRect.width > 0 && parentRect.height > 0) {
@@ -614,13 +661,20 @@ export class Bridge {
    */
   getMediaFields(blockElement) {
     return this.collectBlockFields(blockElement, 'data-media-field',
-      (el, name, results) => { results[name] = { rect: this.getEffectiveMediaRect(el, name) }; });
+      (el, name, results) => {
+        const rect = this.getEffectiveMediaRect(el, name);
+        // Skip fields with zero dimensions (e.g., hidden carousel slides)
+        if (rect && rect.width > 0 && rect.height > 0) {
+          results[name] = { rect };
+        }
+      });
   }
 
   /**
    * Get the add direction for a block element.
    * Uses data-block-add attribute if set, otherwise infers from nesting depth.
    * Even depths (0, 2, ...) → 'bottom' (vertical), odd depths (1, 3, ...) → 'right' (horizontal)
+   * Returns 'hidden' if block cannot have siblings added (empty, readonly, no insertion points).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {string} 'right', 'bottom', or 'hidden'
@@ -633,9 +687,12 @@ export class Bridge {
       return 'hidden';
     }
 
-    // Empty blocks should not have an add button - they are meant to be replaced
-    // via block chooser, not have blocks added after them
-    if (this.getBlockType(blockUid) === 'empty') {
+    // Use centralized addability logic to check if adding is allowed
+    const blockData = this.getBlockData(blockUid);
+    const addability = getBlockAddability(blockUid, this.blockPathMap, blockData, this.templateEditMode);
+
+    // Hide add button if can't insert after (add button only adds after the selected block)
+    if (!addability.canInsertAfter) {
       return 'hidden';
     }
 
@@ -659,12 +716,30 @@ export class Bridge {
   /**
    * Gets all DOM elements for a block UID.
    * A block may render as multiple elements (e.g., listing block renders multiple cards).
+   * For template instances (virtual containers), returns elements from all child blocks.
    *
    * @param {string} blockUid - The block UID to find elements for
-   * @returns {NodeList} All elements with the given data-block-uid
+   * @returns {Array} All elements for the block (array, not NodeList, for template instances)
    */
   getAllBlockElements(blockUid) {
-    return document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+    // Check if this is a template instance (virtual container)
+    // Template instances don't have DOM elements - their children do
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (pathInfo?.isTemplateInstance) {
+      const childBlockIds = Object.entries(this.blockPathMap)
+        .filter(([, info]) => info.parentId === blockUid)
+        .map(([id]) => id);
+      log('getAllBlockElements: template instance', blockUid, 'childBlockIds:', childBlockIds);
+      // Get elements for all child blocks and flatten
+      const elements = childBlockIds.flatMap(id => [...document.querySelectorAll(`[data-block-uid="${id}"]`)]);
+      log('getAllBlockElements: found', elements.length, 'elements for template instance');
+      return elements;
+    }
+    const elements = document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+    if (elements.length === 0) {
+      log('getAllBlockElements: no DOM elements for', blockUid, 'pathInfo:', pathInfo ? 'exists' : 'missing', 'isTemplateInstance:', pathInfo?.isTemplateInstance);
+    }
+    return elements;
   }
 
   /**
@@ -712,8 +787,21 @@ export class Bridge {
    * @param {Object} [options.selection] - Serialized selection to include
    */
   sendBlockSelected(src, blockElement, options = {}) {
-    if (!blockElement) {
-      // Deselection case - send null values
+    // Suppress position-tracking updates during carousel/selector navigation
+    // Allow initial selection sources (fieldFocusListener, selectionChangeListener, etc.) through
+    // so the admin UI can show the sidebar and toolbar for the newly selected block
+    if (this._blockSelectorNavigating) {
+      const isPositionTrackingSource = src === 'transitionTracker' || src === 'transitionEnd' || src === 'scrollHandler';
+      if (isPositionTrackingSource) {
+        return;
+      }
+    }
+
+    // Get blockUid from options or element attribute
+    const blockUid = options.blockUid || blockElement?.getAttribute('data-block-uid') || PAGE_BLOCK_UID;
+
+    // Deselection case - no element and no blockUid in options
+    if (!blockElement && !options.blockUid) {
       this.sendMessageToParent({
         type: 'BLOCK_SELECTED',
         src,
@@ -723,38 +811,32 @@ export class Bridge {
       return;
     }
 
-    // Get blockUid from element attribute, or use PAGE_BLOCK_UID for page-level fields
-    const blockUid = blockElement.getAttribute('data-block-uid') || PAGE_BLOCK_UID;
+    // Get all elements for this block (multi-element blocks, template instances)
+    const allElements = blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : [];
 
-    // Get all elements for this block (multi-element blocks like listings)
-    // For page-level fields (blockUid === PAGE_BLOCK_UID), just use the element itself
+    // Use first element for field detection if no element was passed
+    const elementForFields = blockElement || allElements[0] || null;
+
+    // Compute rect from all elements (combined bounding box for multi-element)
     let rect;
-    if (blockUid && blockUid !== PAGE_BLOCK_UID) {
-      const allElements = this.getAllBlockElements(blockUid);
-      if (allElements.length > 1) {
-        // Multi-element block: compute bounding box around all elements
-        rect = this.getBoundingBoxForElements(allElements);
-        // Fall back to single element rect if bounding box computation failed
-        if (!rect) {
-          const singleRect = blockElement.getBoundingClientRect();
-          rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
-        }
-      } else {
-        // Single element block: use its rect directly
-        const singleRect = blockElement.getBoundingClientRect();
+    if (allElements.length > 0) {
+      rect = this.getBoundingBoxForElements(allElements);
+      // Fall back to single element rect if bounding box computation failed
+      if (!rect && elementForFields) {
+        const singleRect = elementForFields.getBoundingClientRect();
         rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
       }
-    } else {
-      // Page-level field: use the element's rect directly
-      const singleRect = blockElement.getBoundingClientRect();
+    } else if (elementForFields) {
+      // Page-level field or single element: use its rect directly
+      const singleRect = elementForFields.getBoundingClientRect();
       rect = { top: singleRect.top, left: singleRect.left, width: singleRect.width, height: singleRect.height };
     }
 
-    // For field operations, use the passed element (which may be the focused one)
-    const editableFields = this.getEditableFields(blockElement);
-    const linkableFields = this.getLinkableFields(blockElement);
-    const mediaFields = this.getMediaFields(blockElement);
-    const addDirection = this.getAddDirection(blockElement);
+    // For field operations, use elementForFields (first element if none passed)
+    const editableFields = elementForFields ? this.getEditableFields(elementForFields) : {};
+    const linkableFields = elementForFields ? this.getLinkableFields(elementForFields) : {};
+    const mediaFields = elementForFields ? this.getMediaFields(elementForFields) : {};
+    const addDirection = elementForFields ? this.getAddDirection(elementForFields) : 'bottom';
     const focusedFieldName = options.focusedFieldName !== undefined
       ? options.focusedFieldName
       : this.focusedFieldName;
@@ -1072,12 +1154,11 @@ export class Bridge {
               // Support async callbacks (e.g., renderContentWithListings)
               if (this.onContentChangeCallback) {
                 const result = this.onContentChangeCallback(this.formData);
-                // If callback is async, wait for it before materializing comments
-                const materialize = () => requestAnimationFrame(() => this.materializeHydraComments());
+                const postRender = () => this.afterContentRender();
                 if (result && typeof result.then === 'function') {
-                  result.then(materialize);
+                  result.then(postRender);
                 } else {
-                  materialize();
+                  postRender();
                 }
               }
 
@@ -1265,187 +1346,28 @@ export class Bridge {
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
 
+            // Block keyboard input during re-render to prevent keystrokes hitting
+            // detached DOM elements. The re-render callback replaces innerHTML, which
+            // destroys the focused element; any keystroke arriving between now and
+            // afterContentRender (where focus is restored) would be lost.
+            // Only block when inline editing and not already blocked by a format op.
+            if (this.isInlineEditing && this.focusedFieldName && !this.blockedBlockId) {
+              this._ensureDocumentKeyboardBlocker();
+              this.blockedBlockId = this.selectedBlockUid;
+              this._reRenderBlocking = true;
+            }
+
             // Call the callback first to trigger the re-render
             // Support async callbacks (e.g., renderContentWithListings)
             log('Calling onEditChange callback to trigger re-render');
             const callbackResult = callback(this.formData);
 
-            // Run post-render code after callback completes (async or sync)
-            const afterRender = () => {
-            // Restore cursor position after re-render (use requestAnimationFrame to ensure DOM is updated)
-            // If the message includes a transformed Slate selection, use that
-            // Otherwise fall back to the old DOM-based cursor saving approach
-            // Use double requestAnimationFrame to wait for ALL rendering to complete
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                // Materialize hydra comments after DOM renders
-                this.materializeHydraComments();
-
-                // Mark empty blocks so they can be styled (must run on every render)
-                this.markEmptyBlocks();
-
-                // IMPORTANT: Ensure ZWS in empty inline elements BEFORE restoring selection
-                // This allows cursor positioning inside empty formatting elements
-                if (this.selectedBlockUid) {
-                  const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
-                  if (blockElement) {
-                    // Re-attach mutation observer after DOM re-render
-                    // The old observer was watching the old blockElement which no longer exists
-                    this.observeBlockTextChanges(blockElement);
-                    // Re-attach event listeners (keydown, paste, etc.) to the new DOM element
-                    this.makeBlockContentEditable(blockElement);
-
-                    // Re-attach ResizeObserver
-                    // This is critical after drag-and-drop when block moves to new position
-                    // For sidebar edits (no transformedSelection): pass skipInitialUpdate to prevent toolbar blink
-                    const editableFields = this.getEditableFields(blockElement);
-                    const isSidebarEdit = !event.data.transformedSelection;
-                    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, isSidebarEdit);
-
-                    // Send BLOCK_SELECTED if toolbar operation OR if block/media field rects changed
-                    // Block may resize/move after edits, media fields may change (e.g., clearing image → placeholder)
-                    const newBlockRect = blockElement.getBoundingClientRect();
-                    const newMediaFields = this.getMediaFields(blockElement);
-
-                    // Check if block rect changed (size or position)
-                    const blockRectChanged = !this.lastBlockRect ||
-                      Math.abs(newBlockRect.top - this.lastBlockRect.top) > 1 ||
-                      Math.abs(newBlockRect.left - this.lastBlockRect.left) > 1 ||
-                      Math.abs(newBlockRect.width - this.lastBlockRect.width) > 1 ||
-                      Math.abs(newBlockRect.height - this.lastBlockRect.height) > 1;
-
-                    // Check if any media field rect changed
-                    let mediaFieldsChanged = false;
-                    const newFieldNames = Object.keys(newMediaFields);
-                    const lastFieldNames = Object.keys(this.lastMediaFields || {});
-                    if (newFieldNames.length !== lastFieldNames.length) {
-                      mediaFieldsChanged = true;
-                    } else {
-                      for (const fieldName of newFieldNames) {
-                        const newRect = newMediaFields[fieldName]?.rect;
-                        const lastRect = this.lastMediaFields?.[fieldName]?.rect;
-                        if (!newRect || !lastRect ||
-                            Math.abs(newRect.top - lastRect.top) > 1 ||
-                            Math.abs(newRect.left - lastRect.left) > 1 ||
-                            Math.abs(newRect.width - lastRect.width) > 1 ||
-                            Math.abs(newRect.height - lastRect.height) > 1) {
-                          mediaFieldsChanged = true;
-                          break;
-                        }
-                      }
-                    }
-
-                    log('formDataHandler check:', {
-                      blockRectChanged,
-                      mediaFieldsChanged,
-                      newBlockRect: { top: newBlockRect.top, height: newBlockRect.height },
-                      newMediaFields,
-                      lastMediaFields: this.lastMediaFields,
-                    });
-
-                    if (event.data.transformedSelection || blockRectChanged || mediaFieldsChanged) {
-                      // Send updated rect to admin so toolbar/overlays follow the block
-                      // Include transformedSelection if present - this prevents View.jsx from clearing
-                      // the selection when it receives BLOCK_SELECTED without selection
-                      log('formDataHandler sending BLOCK_SELECTED with mediaFields:', newMediaFields);
-                      this.sendBlockSelected('formDataHandler', blockElement, {
-                        selection: event.data.transformedSelection || undefined,
-                      });
-                      this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
-                      this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields)); // Deep copy
-                      // Drag handle position is now set in sendBlockSelected
-                    }
-                  }
-                }
-
-                // Only restore selection for toolbar format operations (has transformedSelection)
-                // NOT for sidebar edits - those should not steal focus from sidebar
-                if (event.data.transformedSelection) {
-                  // Store expected selection so selectionchange handler can suppress it
-                  this.expectedSelectionFromAdmin = event.data.transformedSelection;
-                  // Clear savedClickPosition so updateBlockUIAfterFormData won't overwrite
-                  // the selection we're about to restore from transformedSelection
-                  this.savedClickPosition = null;
-                  try {
-                    this.restoreSlateSelection(event.data.transformedSelection, this.formData);
-                  } catch (e) {
-                    console.error('[HYDRA] Error restoring selection:', e);
-                  }
-                }
-
-                // NOTE: Unblock happens AFTER replayBufferedEvents() below, not here.
-                // This prevents keystrokes from arriving between unblock and replay.
-              });
+            const afterRender = () => this.afterContentRender({
+              transformedSelection: event.data.transformedSelection,
+              formatRequestId,
+              needsBlockSwitch,
+              adminSelectedBlockUid,
             });
-
-            // After the re-render, add the toolbar
-            // Note: Toolbar creation and block selection should NOT happen in FORM_DATA handler
-            // Those are triggered by user clicks (selectBlock()) or SELECT_BLOCK messages
-            // FORM_DATA is just data synchronization - it updates the rendered blocks
-            // but should not change which block is selected or create/destroy toolbars
-
-            // Update block UI overlay positions after form data changes
-            // Blocks might have resized after form updates
-            // Skip focus if this is from sidebar editing (no transformedSelection)
-            const skipFocus = !event.data.transformedSelection;
-
-            // For new block (needsBlockSwitch), call selectBlock to set up contenteditable etc.
-            // For existing block, just update UI positions
-            const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
-            const blockHandler = needsBlockSwitch
-              ? (el) => { log('Selecting new block from FORM_DATA:', blockUidToProcess); this.selectBlock(el); }
-              : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
-
-            requestAnimationFrame(() => {
-              requestAnimationFrame(async () => {
-                if (blockUidToProcess) {
-                  let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-
-                  // If block is hidden (e.g., carousel slide), try to make it visible first
-                  // Skip if navigation is already in progress (SELECT_BLOCK already triggered it)
-                  if (blockElement && this.isElementHidden(blockElement) && !this._navigatingToBlock) {
-                    log('FORM_DATA: block is hidden, trying to make visible:', blockUidToProcess);
-                    const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
-                    if (madeVisible) {
-                      // Wait for block to become visible
-                      for (let i = 0; i < 10; i++) {
-                        await new Promise((resolve) => setTimeout(resolve, 50));
-                        blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-                        if (blockElement && !this.isElementHidden(blockElement)) {
-                          log('FORM_DATA: block now visible');
-                          break;
-                        }
-                      }
-                    }
-                  }
-
-                  // Re-query element in case it changed during wait
-                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-
-                  // If element not found yet, retry a few times (frontend may still be rendering)
-                  if (!blockElement && needsBlockSwitch) {
-                    for (let retry = 0; retry < 10 && !blockElement; retry++) {
-                      await new Promise(r => setTimeout(r, 100));
-                      blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
-                      log('FORM_DATA: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
-                    }
-                  }
-
-                  // Ensure elements have min size BEFORE sending BLOCK_SELECTED
-                  // so the new block has dimensions when the admin UI receives the message
-                  this.ensureElementsHaveMinSize();
-                  if (blockElement) {
-                    blockHandler(blockElement);
-                  } else if (needsBlockSwitch) {
-                    log('FORM_DATA: block element not found after retries:', blockUidToProcess);
-                  }
-                }
-
-                // Single replay point for all paths
-                this.replayBufferAndUnblock();
-              });
-            });
-            }; // End of afterRender function
 
             // Call afterRender after callback completes (async or sync)
             if (callbackResult && typeof callbackResult.then === 'function') {
@@ -1515,6 +1437,22 @@ export class Bridge {
                 firstEditable.focus();
                 log('Focused first editable field (fallback)');
               }
+            }
+          }
+        } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
+          // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
+          // instanceId: the template instance being edited, or null to exit edit mode
+          this.templateEditMode = event.data.instanceId;
+          log('Template edit mode:', this.templateEditMode ? `editing instance ${this.templateEditMode}` : 'disabled');
+
+          // Update visual state of all blocks (grey out readonly blocks)
+          this.applyReadonlyVisuals();
+
+          // Refresh contenteditable on the currently selected block
+          if (this.selectedBlockUid) {
+            const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+            if (blockElement) {
+              this.restoreContentEditableOnFields(blockElement, 'TEMPLATE_EDIT_MODE');
             }
           }
         }
@@ -1607,6 +1545,13 @@ export class Bridge {
 
       // Stop propagation for block clicks (but not selector clicks above)
       event.stopPropagation();
+
+      // Skip block selection during carousel/selector navigation
+      // (a click on the carousel button can also trigger blockClickHandler for the old slide)
+      if (this._blockSelectorNavigating) {
+        log('blockClickHandler: skipping, _blockSelectorNavigating active');
+        return;
+      }
 
       const blockElement = event.target.closest('[data-block-uid]');
       if (blockElement) {
@@ -1759,10 +1704,15 @@ export class Bridge {
 
         // PAGE_BLOCK_UID is the virtual root - treat as "no parent" (deselect)
         if (parentId && parentId !== PAGE_BLOCK_UID) {
-          // Select the parent block
-          const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
-          if (parentElement) {
-            this.selectBlock(parentElement, 'escapeKey');
+          // Handle template instances (virtual containers with no DOM element)
+          if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
+            this.selectBlock(parentId);
+          } else {
+            // Select the parent block
+            const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
+            if (parentElement) {
+              this.selectBlock(parentElement, 'escapeKey');
+            }
           }
         } else {
           // No parent or parent is page - deselect by sending BLOCK_SELECTED with null
@@ -1786,6 +1736,44 @@ export class Bridge {
    * @param {string} blockId - Block UID to block/unblock
    * @param {boolean} processing - true to block input, false to unblock
    */
+  /**
+   * Ensures the document-level keyboard blocker is attached.
+   * The blocker intercepts keydown/keypress/input/beforeinput when blockedBlockId is set,
+   * buffering keydown events in eventBuffer for later replay.
+   * Created once and reused — the handler checks blockedBlockId before acting.
+   */
+  _ensureDocumentKeyboardBlocker() {
+    if (this._documentKeyboardBlocker) return;
+    this._documentKeyboardBlocker = (e) => {
+      if (!this.blockedBlockId) return;
+
+      const targetBlock = e.target.closest?.('[data-block-uid]');
+      if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
+        return;
+      }
+
+      if (e.type === 'keydown') {
+        this.eventBuffer.push({
+          key: e.key,
+          code: e.code,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+        });
+        log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+
+    document.addEventListener('keydown', this._documentKeyboardBlocker, true);
+    document.addEventListener('keypress', this._documentKeyboardBlocker, true);
+    document.addEventListener('input', this._documentKeyboardBlocker, true);
+    document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
+  }
+
   setBlockProcessing(blockId, processing = true, requestId = null) {
     log('setBlockProcessing:', { blockId, processing, requestId });
 
@@ -1795,42 +1783,7 @@ export class Bridge {
       this.eventBuffer = [];
       this.blockedBlockId = blockId;
 
-      // Create keyboard blocker function that buffers keydown events for replay
-      // Attached to document so it survives DOM re-renders
-      if (!this._documentKeyboardBlocker) {
-        this._documentKeyboardBlocker = (e) => {
-          // Only block if we have an active blocked block
-          if (!this.blockedBlockId) return;
-
-          // Check if event is targeting our blocked block (even after re-render)
-          const targetBlock = e.target.closest?.('[data-block-uid]');
-          if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
-            return; // Not our block, let it through
-          }
-
-          // Buffer keydown events for replay after transform completes
-          if (e.type === 'keydown') {
-            this.eventBuffer.push({
-              key: e.key,
-              code: e.code,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-              shiftKey: e.shiftKey,
-              altKey: e.altKey,
-            });
-            log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
-          }
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        };
-
-        // Attach to document so it survives DOM re-renders
-        document.addEventListener('keydown', this._documentKeyboardBlocker, true);
-        document.addEventListener('keypress', this._documentKeyboardBlocker, true);
-        document.addEventListener('input', this._documentKeyboardBlocker, true);
-        document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
-      }
+      this._ensureDocumentKeyboardBlocker();
 
       // Visual feedback on current element
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
@@ -2053,8 +2006,14 @@ export class Bridge {
         return false;
       }
 
-      // If this element is an editable field itself, it's valid
+      // If this element is an editable field itself, check if it has data-node-id children
+      // If so, cursor should be inside those children, not on the container
       if (node.hasAttribute?.('data-editable-field')) {
+        const hasNodeIdChildren = node.querySelector?.('[data-node-id]');
+        if (hasNodeIdChildren) {
+          log('isOnInvalidWhitespace: cursor on editable-field container but has nodeId children, needs correction');
+          return true;
+        }
         return false;
       }
 
@@ -2188,9 +2147,29 @@ export class Bridge {
     if (!returnEndPosition) {
       // Start position → start of first text node
       const walker = document.createTreeWalker(firstNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
-      const textNode = walker.nextNode();
+      let textNode = walker.nextNode();
+
+      // If no text node exists, create one with ZWS for cursor positioning
+      if (!textNode) {
+        textNode = document.createTextNode('\uFEFF');
+        firstNodeIdEl.appendChild(textNode);
+        log('getValidPositionForWhitespace: created ZWS text node in empty element');
+        return { textNode, offset: 1 }; // Position after ZWS
+      }
+
+      // If text node is empty, prepend ZWS for cursor positioning
+      // This ensures browser types into this node rather than creating a new one
+      const visibleText = textNode.textContent.replace(/[\uFEFF\u200B]/g, '');
+      if (visibleText === '') {
+        if (!textNode.textContent.includes('\uFEFF')) {
+          textNode.textContent = '\uFEFF' + textNode.textContent;
+          log('getValidPositionForWhitespace: prepended ZWS to empty text node');
+        }
+        return { textNode, offset: 1 }; // Position after ZWS
+      }
+
       log('getValidPositionForWhitespace: returning start of first text node:', textNode?.textContent?.substring(0, 20));
-      return textNode ? { textNode, offset: 0 } : null;
+      return { textNode, offset: 0 };
     } else {
       // End position → end of last text node
       const walker = document.createTreeWalker(lastNodeIdEl, NodeFilter.SHOW_TEXT, null, false);
@@ -2923,6 +2902,17 @@ export class Bridge {
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
     // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
     const blockUid = blockElement.getAttribute('data-block-uid');
+
+    // If block is readonly, remove contenteditable from all its editable fields
+    if (blockUid && this.isBlockReadonly(blockUid)) {
+      const editableFields = blockElement.querySelectorAll('[data-editable-field][contenteditable="true"]');
+      editableFields.forEach((field) => {
+        field.removeAttribute('contenteditable');
+      });
+      log(`restoreContentEditableOnFields called from ${caller}: block ${blockUid} is readonly, removed contenteditable`);
+      return;
+    }
+
     // For multi-element blocks, collect fields from ALL elements with this UID
     const editableFields = [];
 
@@ -3029,15 +3019,45 @@ export class Bridge {
 
     // If field was already editable AND already focused, browser already handled
     // cursor positioning on click - don't redo it (causes race with typing)
+    // BUT: still check if cursor is on invalid whitespace (e.g., on DIV container
+    // instead of inside P element) and correct if needed
+    // NOTE: Use requestAnimationFrame to run after browser's default click positioning completes
     if (options.wasAlreadyEditable && isAlreadyFocused) {
-      log('activateEditableField: field already editable and focused, trusting browser positioning');
+      requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        const anchorNode = selection?.anchorNode;
+        const anchorNeedsCorrection = anchorNode && this.isOnInvalidWhitespace(anchorNode);
+        log('activateEditableField: deferred check -', {
+          anchorNodeName: anchorNode?.nodeName,
+          anchorOffset: selection?.anchorOffset,
+          needsCorrection: anchorNeedsCorrection,
+        });
+        if (anchorNeedsCorrection) {
+          log('activateEditableField: already focused but cursor on invalid whitespace, correcting');
+          this.correctInvalidWhitespaceSelection();
+        } else {
+          log('activateEditableField: field already editable and focused, browser positioning OK');
+        }
+      });
       this.lastClickPosition = null;
       return;
     }
 
     // Position cursor at click location if we have coordinates
     if (!this.lastClickPosition) {
-      log('activateEditableField: no lastClickPosition, skipping cursor positioning');
+      // No click position (e.g., new block created via Enter) - ensure cursor
+      // is inside a valid data-node-id element using the existing correction logic
+      const selection = window.getSelection();
+      const selectionInfo = selection?.rangeCount ? {
+        rangeCount: selection.rangeCount,
+        anchorNode: selection.anchorNode?.nodeName,
+        anchorOffset: selection.anchorOffset,
+        anchorNodeId: selection.anchorNode?.parentElement?.getAttribute?.('data-node-id') ||
+                      selection.anchorNode?.getAttribute?.('data-node-id'),
+      } : { noSelection: true };
+      log('activateEditableField: no lastClickPosition, selection state:', selectionInfo);
+      const corrected = this.correctInvalidWhitespaceSelection();
+      log('activateEditableField: correction result:', corrected);
       return;
     }
 
@@ -3072,7 +3092,17 @@ export class Bridge {
     } else {
       const range = document.caretRangeFromPoint(clientX, clientY);
       if (range) {
+        log('activateEditableField: caretRangeFromPoint result:', {
+          startContainer: range.startContainer.nodeName,
+          startOffset: range.startOffset,
+          isOnInvalid: this.isOnInvalidWhitespace(range.startContainer),
+        });
         const validPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+        log('activateEditableField: getValidatedPosition result:', {
+          nodeName: validPos.node?.nodeName,
+          offset: validPos.offset,
+          nodeId: validPos.node?.parentElement?.getAttribute?.('data-node-id') || validPos.node?.getAttribute?.('data-node-id'),
+        });
         const finalRange = document.createRange();
         finalRange.setStart(validPos.node, validPos.offset);
         finalRange.collapse(true);
@@ -3234,6 +3264,202 @@ export class Bridge {
   }
 
   /**
+   * Post-render DOM updates shared by both INITIAL_DATA and FORM_DATA handlers.
+   * Runs inside a double requestAnimationFrame to ensure the renderer has finished.
+   *
+   * For INITIAL_DATA, all optional params are absent so the cursor/resize/block-switch
+   * code paths are no-ops.
+   *
+   * @param {Object} [options]
+   * @param {Object} [options.transformedSelection] - Slate selection from admin
+   * @param {string} [options.formatRequestId] - Format operation request id
+   * @param {boolean} [options.needsBlockSwitch] - Whether admin selected a different block
+   * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
+   */
+  afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        // Visual updates that apply to every render
+        this.materializeHydraComments();
+        this.markEmptyBlocks();
+        this.applyReadonlyVisuals();
+
+        // Re-attach observers/editors for the currently selected block
+        if (this.selectedBlockUid) {
+          const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          if (blockElement) {
+            this.observeBlockTextChanges(blockElement);
+            this.makeBlockContentEditable(blockElement);
+
+            const editableFields = this.getEditableFields(blockElement);
+            const isSidebarEdit = !transformedSelection;
+            const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+            this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, isSidebarEdit);
+
+            const newBlockRect = blockElement.getBoundingClientRect();
+            const newMediaFields = this.getMediaFields(blockElement);
+
+            const blockRectChanged = !this.lastBlockRect ||
+              Math.abs(newBlockRect.top - this.lastBlockRect.top) > 1 ||
+              Math.abs(newBlockRect.left - this.lastBlockRect.left) > 1 ||
+              Math.abs(newBlockRect.width - this.lastBlockRect.width) > 1 ||
+              Math.abs(newBlockRect.height - this.lastBlockRect.height) > 1;
+
+            let mediaFieldsChanged = false;
+            const newFieldNames = Object.keys(newMediaFields);
+            const lastFieldNames = Object.keys(this.lastMediaFields || {});
+            if (newFieldNames.length !== lastFieldNames.length) {
+              mediaFieldsChanged = true;
+            } else {
+              for (const fieldName of newFieldNames) {
+                const newRect = newMediaFields[fieldName]?.rect;
+                const lastRect = this.lastMediaFields?.[fieldName]?.rect;
+                if (!newRect || !lastRect ||
+                    Math.abs(newRect.top - lastRect.top) > 1 ||
+                    Math.abs(newRect.left - lastRect.left) > 1 ||
+                    Math.abs(newRect.width - lastRect.width) > 1 ||
+                    Math.abs(newRect.height - lastRect.height) > 1) {
+                  mediaFieldsChanged = true;
+                  break;
+                }
+              }
+            }
+
+            log('afterContentRender check:', {
+              blockRectChanged,
+              mediaFieldsChanged,
+              newBlockRect: { top: newBlockRect.top, height: newBlockRect.height },
+              newMediaFields,
+              lastMediaFields: this.lastMediaFields,
+            });
+
+            if (transformedSelection || blockRectChanged || mediaFieldsChanged) {
+              log('afterContentRender sending BLOCK_SELECTED with mediaFields:', newMediaFields);
+              this.sendBlockSelected('afterContentRender', blockElement, {
+                selection: transformedSelection || undefined,
+              });
+              this.lastBlockRect = { top: newBlockRect.top, left: newBlockRect.left, width: newBlockRect.width, height: newBlockRect.height };
+              this.lastMediaFields = JSON.parse(JSON.stringify(newMediaFields));
+            }
+          }
+        }
+
+        // Update block UI overlay positions after form data changes
+        // Detect focus lost due to re-render: user was editing a field but
+        // focus is now on body (Vue/Nuxt replaced the DOM element).
+        // Use _iframeFocused (tracked via window focus/blur events) instead of
+        // document.hasFocus() — the latter is unreliable in headless browsers
+        // (always returns false), but window focus/blur events fire correctly
+        // because they're dispatched by Chromium's internal frame focus manager.
+        // This avoids stealing focus from the sidebar: when the user is typing
+        // in the sidebar, the iframe receives a blur event → _iframeFocused=false.
+        const focusLost = this.focusedFieldName &&
+            this._iframeFocused &&
+            (!document.activeElement ||
+             document.activeElement === document.body ||
+             document.activeElement === document.documentElement);
+        const skipFocus = !transformedSelection && !focusLost;
+
+        if (transformedSelection) {
+          this.savedClickPosition = null;
+        }
+
+        const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
+        const blockHandler = needsBlockSwitch
+          ? (el) => { log('Selecting new block from afterContentRender:', blockUidToProcess); this.selectBlock(el); }
+          : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
+
+        if (blockUidToProcess) {
+          let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+          if (blockElement && this.isElementHidden(blockElement)) {
+            if (this._blockSelectorNavigating || this._navigatingToBlock) {
+              log('afterContentRender: block hidden, waiting for animation:', blockUidToProcess);
+              for (let i = 0; i < 30; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+                blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                if (blockElement && !this.isElementHidden(blockElement)) {
+                  log('afterContentRender: block now visible after animation');
+                  break;
+                }
+              }
+            } else {
+              log('afterContentRender: block is hidden, trying to make visible:', blockUidToProcess);
+              const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
+              if (madeVisible) {
+                for (let i = 0; i < 10; i++) {
+                  await new Promise((resolve) => setTimeout(resolve, 50));
+                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                  if (blockElement && !this.isElementHidden(blockElement)) {
+                    log('afterContentRender: block now visible');
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+
+          if (!blockElement && needsBlockSwitch) {
+            for (let retry = 0; retry < 10 && !blockElement; retry++) {
+              await new Promise(r => setTimeout(r, 100));
+              blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+              log('afterContentRender: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
+            }
+          }
+
+          this.ensureElementsHaveMinSize();
+          if (blockElement) {
+            blockHandler(blockElement);
+          } else if (needsBlockSwitch) {
+            log('afterContentRender: block element not found after retries:', blockUidToProcess);
+          }
+        }
+
+        if (transformedSelection) {
+          this.expectedSelectionFromAdmin = transformedSelection;
+          try {
+            this.restoreSlateSelection(transformedSelection, this.formData);
+          } catch (e) {
+            console.error('[HYDRA] Error restoring selection:', e);
+          }
+        }
+
+        if (needsBlockSwitch && adminSelectedBlockUid) {
+          if (this.pendingTransform) {
+            log('Redirecting buffer from', this.pendingTransform.blockId, 'to new block:', adminSelectedBlockUid);
+            this.pendingTransform.blockId = adminSelectedBlockUid;
+          }
+          if (this.eventBuffer.length > 0) {
+            log('Redirecting eventBuffer to new block:', adminSelectedBlockUid);
+          }
+        }
+
+        // Replay keystrokes buffered during re-render (separate from format op replay)
+        if (this._reRenderBlocking) {
+          this._reRenderBlocking = false;
+          if (this.eventBuffer.length > 0) {
+            log('Replaying', this.eventBuffer.length, 're-render buffered events');
+            this.pendingBufferReplay = {
+              blockId: this.selectedBlockUid,
+              buffer: [...this.eventBuffer],
+            };
+            this.eventBuffer = [];
+            this.replayBufferedEvents();
+          }
+          // Clear blocking only if no format op is pending
+          if (!this.pendingTransform) {
+            this.blockedBlockId = null;
+          }
+        }
+
+        this.replayBufferAndUnblock();
+      });
+    });
+  }
+
+  /**
    * Marks empty blocks in the DOM with a data attribute for styling.
    * This allows hydra to style empty blocks without requiring the renderer
    * to add special attributes.
@@ -3246,6 +3472,27 @@ export class Bridge {
         blockElement.setAttribute('data-hydra-empty', 'true');
       } else {
         blockElement.removeAttribute('data-hydra-empty');
+      }
+    });
+  }
+
+  /**
+   * Applies visual styling to readonly blocks.
+   * Blocks where isBlockReadonly() returns true get the hydra-locked class.
+   * This visually greys out:
+   * - In normal mode: readonly template blocks
+   * - In template edit mode: blocks outside the template being edited
+   */
+  applyReadonlyVisuals() {
+    const allBlocks = document.querySelectorAll('[data-block-uid]');
+    allBlocks.forEach((blockElement) => {
+      const blockUid = blockElement.getAttribute('data-block-uid');
+      const blockData = this.getBlockData(blockUid);
+
+      if (isBlockReadonly(blockData, this.templateEditMode)) {
+        blockElement.classList.add('hydra-locked');
+      } else {
+        blockElement.classList.remove('hydra-locked');
       }
     });
   }
@@ -3360,7 +3607,8 @@ export class Bridge {
     // changes (e.g., image loading after a re-render).
     // For sidebar edits: pass skipInitialUpdate to prevent spurious BLOCK_SELECTED from immediate observer fire
     const editableFields = this.getEditableFields(blockElement);
-    this.observeBlockResize(blockElement, this.selectedBlockUid, editableFields, skipFocus);
+    const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+    this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, skipFocus);
 
     // Also re-attach the text change observer for the same reason
     this.observeBlockTextChanges(blockElement);
@@ -3373,23 +3621,41 @@ export class Bridge {
    */
   selectBlock(blockElementOrUid) {
     // Accept either a DOM element (from click handlers) or a block UID string
-    const blockElement = typeof blockElementOrUid === 'string'
-      ? document.querySelector(`[data-block-uid="${blockElementOrUid}"]`)
-      : blockElementOrUid;
+    const blockUidFromArg = typeof blockElementOrUid === 'string' ? blockElementOrUid : null;
+
+    // Get blockUid - either from argument or from element attribute
+    const blockUid = blockUidFromArg || blockElementOrUid?.getAttribute?.('data-block-uid');
+    if (!blockUid) return;
+
+    // Check if this is a virtual template instance (no DOM element, but has child blocks)
+    const isTemplateInstance = this.blockPathMap?.[blockUid]?.isTemplateInstance;
+
+    // Get all elements for this block (handles multi-element blocks and template instances)
+    // getAllBlockElements returns child block elements for template instances
+    const blockElements = [...this.getAllBlockElements(blockUid)];
 
     const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
-    log('selectBlock called for:', blockElement?.getAttribute('data-block-uid'), 'from:', caller);
-    if (!blockElement) return;
+    log('selectBlock called for:', blockUid, 'from:', caller, 'elements:', blockElements.length);
+    if (blockElements.length === 0) return;
 
-    // Clear block selector navigation flag after a delay to let carousel animation settle
-    // This prevents transitionTracker from sending stale positions during animation
+    // Primary element for operations that need a single element
+    const blockElement = blockElements[0];
+
+    // Safety timeout: clear flag after 1500ms in case stability detection in
+    // trackPosition() didn't fire (e.g., tracker was stopped by transitionend).
+    // If stability detection already cleared the flag, this is a no-op.
     if (this._blockSelectorNavigating) {
       setTimeout(() => {
-        this._blockSelectorNavigating = false;
-      }, 500);
+        if (this._blockSelectorNavigating) {
+          log('selectBlock: navigation safety timeout for', blockUid);
+          this._blockSelectorNavigating = false;
+          if (this.selectedBlockUid === blockUid) {
+            this.sendBlockSelected('navigationSettled', null, { blockUid });
+          }
+        }
+      }, 1500);
     }
 
-    const blockUid = blockElement.getAttribute('data-block-uid');
     const isSelectingSameBlock = this.selectedBlockUid === blockUid;
 
     // Store for use in async callback (focus handler uses this to decide preventScroll)
@@ -3397,7 +3663,7 @@ export class Bridge {
 
     // Only scroll block into view when selecting a NEW block (not reselecting same block)
     // This prevents unwanted scroll-back when user has scrolled the selected block off screen
-    if (!isSelectingSameBlock && !this.elementIsVisibleInViewport(blockElement)) {
+    if (!isSelectingSameBlock && blockElement && !this.elementIsVisibleInViewport(blockElement)) {
       this.scrollBlockIntoView(blockElement);
     }
 
@@ -3408,59 +3674,38 @@ export class Bridge {
       this.eventBuffer = [];
     }
 
-    this.isInlineEditing = true;
+    // Skip contenteditable setup for template instances (they're virtual containers)
+    if (!isTemplateInstance) {
+      this.isInlineEditing = true;
 
-    // Set contenteditable on all text-editable fields
-    this.restoreContentEditableOnFields(blockElement, 'selectBlock');
+      // Set contenteditable on all text-editable fields
+      this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
-    // For slate blocks (value field), also set up paste/keydown handlers
-    // Check blockElement itself first (Nuxt puts both attributes on same element)
-    // then fall back to querying for child elements
-    let valueField = blockElement.hasAttribute('data-editable-field') &&
-                     blockElement.getAttribute('data-editable-field') === 'value'
-                     ? blockElement
-                     : blockElement.querySelector('[data-editable-field="value"]');
-    if (valueField) {
-      this.makeBlockContentEditable(valueField);
+      // For slate blocks (value field), also set up paste/keydown handlers
+      // Check blockElement itself first (Nuxt puts both attributes on same element)
+      // then fall back to querying for child elements
+      let valueField = blockElement.hasAttribute('data-editable-field') &&
+                       blockElement.getAttribute('data-editable-field') === 'value'
+                       ? blockElement
+                       : blockElement.querySelector('[data-editable-field="value"]');
+      if (valueField) {
+        this.makeBlockContentEditable(valueField);
+      }
     }
 
     // Remove border and button from the previously selected block
-    if (
-      this.prevSelectedBlock === null ||
-      this.prevSelectedBlock?.getAttribute('data-block-uid') !==
-        blockElement?.getAttribute('data-block-uid')
-    ) {
+    const prevBlockUid = this.prevSelectedBlock?.getAttribute('data-block-uid');
+    if (this.prevSelectedBlock === null || prevBlockUid !== blockUid) {
       if (this.currentlySelectedBlock) {
         this.deselectBlock(
           this.currentlySelectedBlock?.getAttribute('data-block-uid'),
-          blockElement?.getAttribute('data-block-uid'),
+          blockUid,
         );
       }
 
-      if (this.formData && !isSelectingSameBlock) {
-        // Add nodeIds if this block has slate fields (only on first selection)
-        const blockFieldTypes = this.blockFieldTypes?.[blockUid] || {};
-        const hasSlateField = Object.values(blockFieldTypes).some(
-          fieldType => this.fieldTypeIsSlate(fieldType)
-        );
-        if (hasSlateField) {
-          // Use getBlockData to handle nested blocks
-          const block = this.getBlockData(blockUid);
-          if (block) {
-            // Add nodeIds to each slate field, following the same pattern as addNodeIdsToAllSlateFields
-            Object.keys(blockFieldTypes).forEach((fieldName) => {
-              if (this.fieldTypeIsSlate(blockFieldTypes[fieldName]) && block[fieldName]) {
-                block[fieldName] = this.addNodeIds(block[fieldName]);
-              }
-            });
-          }
-          // NodeIds are now added to this.formData for internal use
-          // No need to send anywhere - they're already in memory for DOM manipulation
-        }
-      }
-
-      this.currentlySelectedBlock = blockElement;
-      this.prevSelectedBlock = blockElement;
+      // For template instances, there's no single element to track
+      this.currentlySelectedBlock = isTemplateInstance ? null : blockElement;
+      this.prevSelectedBlock = isTemplateInstance ? null : blockElement;
       if (!this.clickOnBtn) {
         window.parent.postMessage(
           { type: 'OPEN_SETTINGS', uid: blockUid },
@@ -3482,8 +3727,8 @@ export class Bridge {
     this.lastBlockRect = null;
     this.lastMediaFields = null;
 
-    // Detect focused fields from click location
-    if (this.lastClickPosition?.target) {
+    // Detect focused fields from click location (skip for template instances)
+    if (!isTemplateInstance && this.lastClickPosition?.target) {
       // Find the clicked editable field
       const clickedElement = this.lastClickPosition.target;
       const clickedField = clickedElement.closest('[data-editable-field]');
@@ -3503,8 +3748,8 @@ export class Bridge {
       }
     }
 
-    // If no clicked field, use the first editable field that belongs to THIS block
-    if (!this.focusedFieldName) {
+    // If no clicked field, use the first editable field that belongs to THIS block (skip for template instances)
+    if (!isTemplateInstance && !this.focusedFieldName && blockElement) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-editable-field');
@@ -3516,21 +3761,28 @@ export class Bridge {
     }
 
     // Store rect and show flags for BLOCK_SELECTED message (sent after selection is established)
-    const rect = blockElement.getBoundingClientRect();
-    const editableFields = this.getEditableFields(blockElement);
-    const linkableFields = this.getLinkableFields(blockElement);
-    const mediaFields = this.getMediaFields(blockElement);
+    // Use combined bounding box for multi-element blocks and template instances
+    const isMultiElement = blockElements.length > 1;
+    const rect = isMultiElement
+      ? this.getBoundingBoxForElements(blockElements)
+      : blockElement.getBoundingClientRect();
+
+    // For template instances, don't collect editable/linkable/media fields (they're virtual containers)
+    const editableFields = isTemplateInstance ? {} : this.getEditableFields(blockElement);
+    const linkableFields = isTemplateInstance ? {} : this.getLinkableFields(blockElement);
+    const mediaFields = isTemplateInstance ? {} : this.getMediaFields(blockElement);
     // Get add button direction (right, bottom, hidden) - uses attribute or infers from nesting depth
     const addDirection = this.getAddDirection(blockElement);
+
     log('Setting _pendingBlockSelected for:', blockUid, '_justFinishedDragBlockId:', this._justFinishedDragBlockId);
     this._pendingBlockSelected = {
       blockUid,
-      rect: {
+      rect: rect ? {
         top: rect.top,
         left: rect.left,
         width: rect.width,
         height: rect.height,
-      },
+      } : null,
       editableFields, // Map of fieldName -> fieldType from DOM
       linkableFields, // Map of fieldName -> true for URL/link fields
       mediaFields, // Map of fieldName -> true for image/media fields
@@ -3538,6 +3790,7 @@ export class Bridge {
       focusedLinkableField: this.focusedLinkableField,
       focusedMediaField: this.focusedMediaField,
       addDirection, // Direction for add button positioning
+      isMultiElement, // Signal that this is a multi-element selection
     };
 
     log('Block selected, sending UI messages:', {
@@ -3550,17 +3803,34 @@ export class Bridge {
       mediaFields,
     });
 
-    // Create drag handle for block reordering
+    // Create drag handle for block reordering (works for all block types including template instances)
     // This creates an invisible button in the iframe positioned under the parent's visual drag handle
     // Mouse events pass through the parent's visual (which has pointerEvents: 'none') to this button
-    this.createDragHandle(blockElement);
-
-    // Observe block text changes for inline editing
-    this.observeBlockTextChanges(blockElement);
+    this.createDragHandle(blockElements);
 
     // Observe block size changes (e.g., image loading, content changes)
     // This updates the selection outline when block dimensions change
-    this.observeBlockResize(blockElement, blockUid, editableFields);
+    this.observeBlockResize(blockElements, blockUid, editableFields);
+
+    // Observe block text changes for inline editing (skip for template instances - they're virtual)
+    if (!isTemplateInstance) {
+      this.observeBlockTextChanges(blockElement);
+    }
+
+    // For template instances, send BLOCK_SELECTED immediately (no text selection to trigger it)
+    if (isTemplateInstance && this._pendingBlockSelected) {
+      const pending = this._pendingBlockSelected;
+      this._pendingBlockSelected = null;
+      log('Sending BLOCK_SELECTED for template instance:', pending.blockUid);
+      // Use sendBlockSelected with blockUid override (template instances have no DOM element)
+      this.sendBlockSelected('templateInstance', blockElement, {
+        blockUid: pending.blockUid,
+        focusedFieldName: pending.focusedFieldName,
+        focusedLinkableField: pending.focusedLinkableField,
+        focusedMediaField: pending.focusedMediaField,
+      });
+      return; // Exit early - no further processing needed for template instances
+    }
 
     // Track selection changes to preserve selection across format operations
     if (!this.selectionChangeListener) {
@@ -3699,6 +3969,7 @@ export class Bridge {
             const pendingFocusedMediaField = this._pendingBlockSelected.focusedMediaField;
             this._pendingBlockSelected = null;
             this.sendBlockSelected('selectionChangeListener', currentBlockElement, {
+              blockUid: pendingBlockUid,
               focusedFieldName: pendingFocusedFieldName,
               focusedLinkableField: pendingFocusedLinkableField,
               focusedMediaField: pendingFocusedMediaField,
@@ -3747,6 +4018,10 @@ export class Bridge {
     if (selector !== '+1' && selector !== '-1') {
       const targetUid = selector;
       log('handleBlockSelector: direct selector targetUid =', targetUid);
+      // Hide outline during transition (same as +1/-1 path)
+      this._blockSelectorNavigating = true;
+      this.stopTransitionTracking();
+      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
       this.waitForBlockVisibleAndSelect(targetUid);
       return;
     }
@@ -3848,6 +4123,24 @@ export class Bridge {
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2; // pixels
 
+    // Snapshot which blocks are currently visible before the animation starts.
+    // We won't accept any target position as stable until this set changes,
+    // proving the carousel animation has actually begun.
+    const containerForSnapshot = document.querySelector(`[data-block-uid="${containerUid}"]`);
+    const containerRectSnapshot = containerForSnapshot?.getBoundingClientRect();
+    const initialVisibleUids = new Set();
+    if (containerRectSnapshot) {
+      for (const child of childBlocks) {
+        const rect = child.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        if (center >= containerRectSnapshot.left && center <= containerRectSnapshot.right) {
+          initialVisibleUids.add(child.getAttribute('data-block-uid'));
+        }
+      }
+    }
+    let visibilityChanged = false;
+    log('handleBlockSelector: initial visible blocks:', [...initialVisibleUids]);
+
     // Get the set of child block UIDs for checking if user navigated away
     const childUids = new Set(childBlocks.map(el => el.getAttribute('data-block-uid')));
 
@@ -3865,7 +4158,29 @@ export class Bridge {
 
       const { visible, x } = getTargetVisibility(container);
 
-      if (visible) {
+      // Check if the set of visible blocks has changed from the initial snapshot.
+      // During carousel transitions, multiple slides can be visible simultaneously.
+      // We must wait until the visible set changes before accepting any position as stable,
+      // otherwise we might catch a transient state before the animation has even begun.
+      if (!visibilityChanged && container) {
+        const containerRect = container.getBoundingClientRect();
+        const currentVisible = new Set();
+        for (const child of freshChildBlocks) {
+          const rect = child.getBoundingClientRect();
+          const center = rect.left + rect.width / 2;
+          if (center >= containerRect.left && center <= containerRect.right) {
+            currentVisible.add(child.getAttribute('data-block-uid'));
+          }
+        }
+        // Check if the visible set differs from the initial snapshot
+        if (currentVisible.size !== initialVisibleUids.size ||
+            [...currentVisible].some(uid => !initialVisibleUids.has(uid))) {
+          visibilityChanged = true;
+          log('handleBlockSelector: visible blocks changed, animation started');
+        }
+      }
+
+      if (visible && visibilityChanged) {
         // Check if position is also stable (not animating)
         const positionStable = lastX !== null && Math.abs(x - lastX) < POSITION_TOLERANCE;
 
@@ -3882,6 +4197,8 @@ export class Bridge {
 
         if (stableCount >= STABLE_THRESHOLD) {
           log('handleBlockSelector: target visible and position stable, selecting', targetUid);
+          // Keep _blockSelectorNavigating true - selectBlock will clear it after 1500ms
+          // sendBlockSelected allows initial selection sources through while suppressing position tracking
           const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
           if (targetElement) {
             this.selectBlock(targetElement);
@@ -3904,6 +4221,7 @@ export class Bridge {
         const centeredChild = container ? findMostCenteredChild(freshChildBlocks, container) : null;
         const centeredUid = centeredChild?.getAttribute('data-block-uid');
         log('handleBlockSelector: fallback to most centered =', centeredUid);
+        // Keep _blockSelectorNavigating true - selectBlock will clear it after 1500ms
         if (centeredChild) {
           this.selectBlock(centeredChild);
         } else if (container) {
@@ -3950,15 +4268,40 @@ export class Bridge {
   }
 
   /**
-   * Wait for a specific block to become visible, then select it.
+   * Wait for a specific block to become visible AND position stable, then select it.
+   * Uses same stability check as the +1/-1 path to avoid selecting during animation.
    */
-  waitForBlockVisibleAndSelect(targetUid, retries = 10) {
+  waitForBlockVisibleAndSelect(targetUid, retries = 40, stableCount = 0, lastX = null) {
+    const STABLE_THRESHOLD = 3;
+    const POSITION_TOLERANCE = 2;
+
     const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
     if (targetElement && !this.isElementHidden(targetElement)) {
-      log('handleBlockSelector: selecting', targetUid);
-      this.selectBlock(targetElement);
+      const rect = targetElement.getBoundingClientRect();
+      const x = rect.left;
+      const positionStable = lastX !== null && Math.abs(x - lastX) < POSITION_TOLERANCE;
+
+      if (positionStable) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+      }
+
+      if (stableCount >= STABLE_THRESHOLD) {
+        log('handleBlockSelector: selecting (position stable)', targetUid);
+        this.selectBlock(targetElement);
+        return;
+      }
+
+      // Visible but not stable yet - keep polling
+      if (retries > 0) {
+        setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, stableCount, x), 50);
+      } else {
+        log('handleBlockSelector: selecting (retries exhausted)', targetUid);
+        this.selectBlock(targetElement);
+      }
     } else if (retries > 0) {
-      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1), 50);
+      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, 0, null), 50);
     } else {
       log('handleBlockSelector: block not visible after retries', targetUid);
     }
@@ -4038,11 +4381,11 @@ export class Bridge {
    * When the block's size changes, sends an updated BLOCK_SELECTED message to update the selection outline.
    * For multi-element blocks, observes ALL elements and recomputes combined bounding box.
    *
-   * @param {Element} blockElement - The block element to observe.
+   * @param {Array} blockElements - Array of DOM elements for the block (used for initial rect fallback).
    * @param {string} blockUid - The block's UID.
    * @param {Object} editableFields - Map of fieldName -> fieldType for editable fields in this block.
    */
-  observeBlockResize(blockElement, blockUid, editableFields, skipInitialUpdate = false) {
+  observeBlockResize(blockElements, blockUid, editableFields, skipInitialUpdate = false) {
     log('observeBlockResize called for block:', blockUid, 'skipInitialUpdate:', skipInitialUpdate);
 
     // Skip if already observing the same block AND the current DOM elements match observed
@@ -4078,8 +4421,8 @@ export class Bridge {
     // Only reset if this is a different block
     // Always convert to plain object - DOMRect is live and would cause comparison issues
     let currentRect = this.getBoundingBoxForElements(allElements);
-    if (!currentRect) {
-      const domRect = blockElement.getBoundingClientRect();
+    if (!currentRect && blockElements?.[0]) {
+      const domRect = blockElements[0].getBoundingClientRect();
       currentRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
     }
     if (!this._lastBlockRect || this._lastBlockRectUid !== blockUid) {
@@ -4137,7 +4480,8 @@ export class Bridge {
           'new:', newRect.top, newRect.left, newRect.width, newRect.height);
 
         // Send updated BLOCK_SELECTED with new rect
-        this.sendBlockSelected('resizeObserver', blockElement);
+        // Pass blockUid so template instances use the correct UID (not the child element's UID)
+        this.sendBlockSelected('resizeObserver', null, { blockUid });
       }
     });
 
@@ -4151,7 +4495,7 @@ export class Bridge {
     this.observeBlockDomChanges(blockUid);
 
     // Also track position during CSS transitions (e.g., carousel slide animations)
-    this.observeBlockTransition(blockElement, blockUid);
+    this.observeBlockTransition(blockElements, blockUid);
   }
 
   /**
@@ -4277,7 +4621,7 @@ export class Bridge {
                   // Always clear after processing - drag is complete
                   this._justFinishedDragBlockId = null;
                 }
-                this.sendBlockSelected('domChange', freshElements[0]);
+                this.sendBlockSelected('domChange', null, { blockUid });
               }
             }, 150); // Wait for animation to settle
             // Drag handle position is now set in sendBlockSelected
@@ -4341,18 +4685,24 @@ export class Bridge {
   /**
    * Tracks block position during CSS transitions/animations.
    * ResizeObserver doesn't fire for transform changes, so we poll during transitions.
+   * For multi-element blocks, observes ALL elements and uses combined bounding box.
    *
-   * @param {Element} blockElement - The block element to observe.
+   * @param {Array} blockElements - Array of DOM elements to observe.
    * @param {string} blockUid - The block's UID.
    */
-  observeBlockTransition(blockElement, blockUid) {
+  observeBlockTransition(blockElements, blockUid) {
+    if (!blockElements || blockElements.length === 0) return;
+
     // Clean up existing transition tracking
     if (this._transitionAnimationFrame) {
       cancelAnimationFrame(this._transitionAnimationFrame);
       this._transitionAnimationFrame = null;
     }
-    if (this._transitionEndHandler) {
-      blockElement.removeEventListener('transitionend', this._transitionEndHandler);
+    // Remove listeners from previously tracked elements
+    if (this._transitionEndHandler && this._trackedBlockElements) {
+      for (const el of this._trackedBlockElements) {
+        el.removeEventListener('transitionend', this._transitionEndHandler);
+      }
     }
     if (this._initialTrackingTimeout) {
       clearTimeout(this._initialTrackingTimeout);
@@ -4367,15 +4717,43 @@ export class Bridge {
       if (!isTracking || this._trackingBlockUid !== blockUid) {
         return;
       }
-      // Skip during carousel navigation - animation may cause stale positions
+      // During carousel navigation, keep tracking position internally but don't
+      // send updates to the admin UI. Detect when the animation settles (position
+      // stable for ~200ms) and then send the final position.
       if (this._blockSelectorNavigating) {
+        const newRect = this.getBoundingBoxForElements(blockElements);
+        if (newRect) {
+          const lastRect = this._lastBlockRect;
+          const positionChanged = !lastRect ||
+            Math.abs(newRect.left - lastRect.left) > 1 ||
+            Math.abs(newRect.top - lastRect.top) > 1;
+          this._lastBlockRect = newRect;
+
+          if (positionChanged) {
+            this._navStableFrames = 0;
+          } else {
+            this._navStableFrames = (this._navStableFrames || 0) + 1;
+            // Position stable for ~200ms (12 frames at 60fps) — animation settled
+            if (this._navStableFrames >= 12) {
+              log('trackPosition: navigation settled for', blockUid);
+              this._blockSelectorNavigating = false;
+              this._navStableFrames = 0;
+              this.sendBlockSelected('navigationSettled', blockElements[0]);
+              stopTracking();
+              return;
+            }
+          }
+        }
         this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
         return;
       }
 
-      const domRect = blockElement.getBoundingClientRect();
-      // Convert to plain object - DOMRect is live and would cause comparison issues
-      const newRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
+      // Use combined bounding box for multi-element blocks
+      const newRect = this.getBoundingBoxForElements(blockElements);
+      if (!newRect) {
+        this._transitionAnimationFrame = requestAnimationFrame(trackPosition);
+        return;
+      }
       const lastRect = this._lastBlockRect;
 
       if (lastRect) {
@@ -4384,7 +4762,7 @@ export class Bridge {
 
         if (topChanged || leftChanged) {
           this._lastBlockRect = newRect;
-          this.sendBlockSelected('transitionTracker', blockElement);
+          this.sendBlockSelected('transitionTracker', blockElements[0]);
         }
       }
 
@@ -4401,6 +4779,13 @@ export class Bridge {
     };
 
     const stopTracking = () => {
+      // During carousel navigation, don't stop — the stability detection in
+      // trackPosition() needs the rAF loop to keep running
+      if (this._blockSelectorNavigating) {
+        log('observeBlockTransition: deferring stop during navigation for:', blockUid);
+        return;
+      }
+
       isTracking = false;
       if (this._transitionAnimationFrame) {
         cancelAnimationFrame(this._transitionAnimationFrame);
@@ -4408,29 +4793,30 @@ export class Bridge {
       }
       log('observeBlockTransition: stopped tracking for:', blockUid);
 
-      // Final position update
+      // Final position update using combined bounding box
       if (this.selectedBlockUid === blockUid) {
-        const domRect = blockElement.getBoundingClientRect();
-        // Convert to plain object - DOMRect is live and would cause comparison issues
-        const finalRect = { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
-        if (this._lastBlockRect) {
+        const finalRect = this.getBoundingBoxForElements(blockElements);
+        if (finalRect && this._lastBlockRect) {
           const moved = Math.abs(finalRect.left - this._lastBlockRect.left) > 1 ||
                         Math.abs(finalRect.top - this._lastBlockRect.top) > 1;
           if (moved) {
             this._lastBlockRect = finalRect;
-            this.sendBlockSelected('transitionEnd', blockElement);
+            this.sendBlockSelected('transitionEnd', blockElements[0]);
           }
         }
       }
     };
 
-    // Stop tracking when transition ends
+    // Stop tracking when transition ends on ANY element
     this._transitionEndHandler = stopTracking;
-    this._trackedBlockElement = blockElement;
+    this._trackedBlockElements = blockElements;
 
-    blockElement.addEventListener('transitionend', this._transitionEndHandler);
+    // Attach listeners to ALL elements
+    for (const el of blockElements) {
+      el.addEventListener('transitionend', this._transitionEndHandler);
+    }
 
-    // Use MutationObserver to detect when transform/translate classes change
+    // Use MutationObserver to detect when transform/translate classes change on ANY element
     if (this._transitionMutationObserver) {
       this._transitionMutationObserver.disconnect();
     }
@@ -4439,7 +4825,7 @@ export class Bridge {
       for (const mutation of mutations) {
         if (mutation.type === 'attributes' &&
             (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
-          const style = window.getComputedStyle(blockElement);
+          const style = window.getComputedStyle(mutation.target);
           // Check if element has a transition and transform
           if (style.transition && style.transition !== 'none' &&
               (style.transform !== 'none' || style.translate !== 'none')) {
@@ -4449,10 +4835,13 @@ export class Bridge {
       }
     });
 
-    this._transitionMutationObserver.observe(blockElement, {
-      attributes: true,
-      attributeFilter: ['class', 'style'],
-    });
+    // Observe ALL elements for attribute changes
+    for (const el of blockElements) {
+      this._transitionMutationObserver.observe(el, {
+        attributes: true,
+        attributeFilter: ['class', 'style'],
+      });
+    }
 
     // Always do initial position tracking for 500ms after selection
     // This catches animations on parent elements (e.g., Flowbite carousel)
@@ -4461,7 +4850,9 @@ export class Bridge {
     this._initialTrackingTimeout = setTimeout(() => {
       // Only stop if no ongoing transition was detected
       // (transitionend handler will stop it if one was detected)
-      if (isTracking && this.selectedBlockUid === blockUid) {
+      // During carousel navigation, keep tracking — stability detection
+      // in trackPosition() will handle the stop when animation settles
+      if (isTracking && this.selectedBlockUid === blockUid && !this._blockSelectorNavigating) {
         stopTracking();
       }
     }, 500);
@@ -4470,8 +4861,11 @@ export class Bridge {
   /**
    * Sets up mouse tracking to position drag handle dynamically.
    * The drag handle is positioned on mousemove to avoid being destroyed by re-renders.
+   *
+   * @param {Array} blockElements - Array of DOM elements for the selected block (not used directly,
+   *                                but included for API consistency - we use getAllBlockElements internally)
    */
-  createDragHandle() {
+  createDragHandle(blockElements) {
 
     // Remove any existing drag handle
     const existingDragHandle = document.querySelector('.volto-hydra-drag-button');
@@ -4549,22 +4943,14 @@ export class Bridge {
       // Set flag to suppress scrollHandler during drag
       this._isDragging = true;
 
-      // Get all elements for this block (multi-element blocks like listings)
-      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      // Get all elements for this block (multi-element blocks like listings, template instances)
+      // Convert NodeList to array for .map() and .includes() support
+      const allElements = [...this.getAllBlockElements(this.selectedBlockUid)];
       if (allElements.length === 0) return;
 
-      const blockElement = allElements[0]; // Primary element for reference
-
       // Compute bounding box for all elements
-      let rect;
-      if (allElements.length > 1) {
-        rect = this.getBoundingBoxForElements(allElements);
-        if (!rect) {
-          rect = blockElement.getBoundingClientRect();
-        }
-      } else {
-        rect = blockElement.getBoundingClientRect();
-      }
+      const rect = this.getBoundingBoxForElements(allElements);
+      if (!rect) return;
 
       document.querySelector('body').classList.add('grabbing');
 
@@ -4581,7 +4967,7 @@ export class Bridge {
         `;
       } else {
         // Single element: clone it as before
-        draggedBlock = blockElement.cloneNode(true);
+        draggedBlock = allElements[0].cloneNode(true);
         draggedBlock.classList.add('dragging');
         // Remove data-block-uid from shadow so it doesn't interfere with selectors
         draggedBlock.removeAttribute('data-block-uid');
@@ -4694,17 +5080,18 @@ export class Bridge {
           closestBlock = closestBlock.parentElement;
         }
 
-        // Exclude the dragged block and its ghost from being drop targets
-        const draggedBlockUid = blockElement.getAttribute('data-block-uid');
+        // Exclude the dragged block(s) and ghost from being drop targets
+        // For multi-element blocks (listings, template instances), exclude all elements
+        const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
         const isSelfOrGhost = closestBlock &&
-          (closestBlock === draggedBlock || closestBlock === blockElement ||
-           closestBlock.getAttribute('data-block-uid') === draggedBlockUid);
+          (closestBlock === draggedBlock || allElements.includes(closestBlock) ||
+           draggedBlockUids.includes(closestBlock.getAttribute('data-block-uid')));
         if (isSelfOrGhost) closestBlock = null;
 
         // Handle overshoot - find nearest block when cursor isn't over any block
         if (!closestBlock) {
           const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
-            .filter(el => el !== draggedBlock && el.getAttribute('data-block-uid') !== draggedBlockUid);
+            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(el.getAttribute('data-block-uid')));
 
           // Find nearest block by vertical distance to cursor
           let nearest = { el: null, dist: Infinity, above: false };
@@ -4725,10 +5112,10 @@ export class Bridge {
         }
 
         if (closestBlock) {
-          // Check if the dragged block type is allowed in the target container
+          // Check if the dragged block type(s) are allowed in the target container
           // If not, walk up the parent chain to find a valid drop target
-          const draggedBlockId = blockElement.getAttribute('data-block-uid');
-          const draggedBlockType = this.getBlockType(draggedBlockId);
+          // For template instances, check all child block types are allowed
+          const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -4738,8 +5125,10 @@ export class Bridge {
             const targetPathInfo = this.blockPathMap?.[validDropTargetUid];
             const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
 
-            // Check if drop is allowed here
-            if (!allowedSiblingTypes || !draggedBlockType || allowedSiblingTypes.includes(draggedBlockType)) {
+            // Check if drop is allowed here - all dragged block types must be allowed
+            const allTypesAllowed = !allowedSiblingTypes || draggedBlockTypes.length === 0 ||
+              draggedBlockTypes.every(type => allowedSiblingTypes.includes(type));
+            if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
             }
@@ -4756,8 +5145,8 @@ export class Bridge {
             validDropTarget = parentElement;
             validDropTargetUid = validDropTarget.getAttribute('data-block-uid');
 
-            // Don't allow dropping on the block we're dragging
-            if (validDropTargetUid === draggedBlockId) {
+            // Don't allow dropping on any of the blocks we're dragging
+            if (draggedBlockUids.includes(validDropTargetUid)) {
               validDropTarget = null;
               validDropTargetUid = null;
               break;
@@ -4808,7 +5197,34 @@ export class Bridge {
           // Determine insertion point based on mouse position relative to block center
           const mousePos = isHorizontal ? e.clientX - rect.left : e.clientY - rect.top;
           const blockSize = isHorizontal ? rect.width : rect.height;
-          insertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
+          const preferredInsertAt = mousePos < blockSize / 2 ? 0 : 1; // 0 = before, 1 = after
+
+          // Check if insert position is allowed using centralized addability logic
+          // This handles fixed blocks, readonly blocks, and templateEditMode
+          // Pass source block data to enable dragging blocks into templates
+          const targetBlockData = this.getBlockData(closestBlockUid);
+          const sourceBlockData = this.getBlockData(this.selectedBlockUid);
+          const addability = getBlockAddability(closestBlockUid, this.blockPathMap, targetBlockData, this.templateEditMode, sourceBlockData);
+
+          // Use preferred position if allowed, otherwise try the other side
+          if (preferredInsertAt === 0 && addability.canInsertBefore) {
+            insertAt = 0;
+          } else if (preferredInsertAt === 1 && addability.canInsertAfter) {
+            insertAt = 1;
+          } else if (addability.canInsertBefore) {
+            insertAt = 0;
+          } else if (addability.canInsertAfter) {
+            insertAt = 1;
+          } else {
+            // Neither side is allowed - hide indicator
+            const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (existingIndicator) {
+              existingIndicator.style.display = 'none';
+            }
+            dropIndicatorVisible = false;
+            closestBlockUid = null;
+            return;
+          }
 
           // For multi-element blocks, use first or last element for indicator positioning
           if (isMultiElement) {
@@ -4897,7 +5313,9 @@ export class Bridge {
           // Only set on successful drop, not on cancelled drags.
           this._justFinishedDragBlockId = this.selectedBlockUid;
 
-          const draggedBlockId = blockElement.getAttribute('data-block-uid');
+          // Use selectedBlockUid (not blockElement's UID) to support template instances
+          // For template instances, selectedBlockUid is the instance ID, blockElement is first child
+          const draggedBlockId = this.selectedBlockUid;
           const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
@@ -4953,6 +5371,15 @@ export class Bridge {
         // Don't update formData here - it's managed via FORM_DATA messages
         // Don't post FORM_DATA - form data syncing is handled separately
 
+        // Handle template instances (virtual containers with no DOM element)
+        // selectBlock handles these by computing bounding box from child elements
+        if (this.blockPathMap?.[uid]?.isTemplateInstance) {
+          if (!alreadySelected) {
+            this.selectBlock(uid);
+          }
+          return;
+        }
+
         // console.log("select block", event.data?.method);
         let blockElement = document.querySelector(
           `[data-block-uid="${uid}"]`,
@@ -4961,22 +5388,34 @@ export class Bridge {
         // If block doesn't exist or is hidden, try to make it visible
         // using data-block-selector navigation (e.g., carousel slides)
         if (!blockElement || this.isElementHidden(blockElement)) {
+          // Wait for block to become visible (e.g., carousel animation in progress)
+          const waitForVisible = async () => {
+            for (let i = 0; i < 30; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              blockElement = document.querySelector(
+                `[data-block-uid="${uid}"]`,
+              );
+              if (blockElement && !this.isElementHidden(blockElement)) {
+                return true;
+              }
+            }
+            return false;
+          };
+
+          if (alreadySelected || this._blockSelectorNavigating) {
+            // Navigation already in progress (carousel click or handleBlockSelector) -
+            // just wait for the animation to complete, don't try to navigate again
+            waitForVisible().then((visible) => {
+              if (visible) {
+                this.selectBlock(blockElement);
+              }
+            });
+            return;
+          }
+
+          // Block not yet selected and no navigation in progress - try to navigate to it
           const madeVisible = this.tryMakeBlockVisible(uid);
           if (madeVisible) {
-            // Wait for the renderer to make the block visible (e.g., carousel animation)
-            // Poll for up to 500ms for the block to become visible
-            const waitForVisible = async () => {
-              for (let i = 0; i < 10; i++) {
-                await new Promise((resolve) => setTimeout(resolve, 50));
-                blockElement = document.querySelector(
-                  `[data-block-uid="${uid}"]`,
-                );
-                if (blockElement && !this.isElementHidden(blockElement)) {
-                  return true;
-                }
-              }
-              return false;
-            };
             waitForVisible().then((visible) => {
               if (visible) {
                 this.selectBlock(blockElement);
@@ -4993,9 +5432,15 @@ export class Bridge {
             return;
           }
 
+          // Scroll into view for new block selection. selectBlock's internal scroll check
+          // compares this.selectedBlockUid === blockUid, but we already set selectedBlockUid
+          // above (line 5303) so it always thinks it's a re-select and skips the scroll.
+          if (!this.elementIsVisibleInViewport(blockElement)) {
+            this.scrollBlockIntoView(blockElement);
+          }
+
           // Call selectBlock() to properly set up toolbar and contenteditable
           // This ensures blocks selected via Order tab work the same as clicking
-          // Note: selectBlock() handles scrolling with toolbar margin awareness
           this.selectBlock(blockElement);
 
           // Focus the contenteditable element for blocks with editable fields
@@ -5072,7 +5517,11 @@ export class Bridge {
   setupScrollHandler() {
     const handleScroll = () => {
       // Hide overlays immediately when scrolling
-      if (this.selectedBlockUid) {
+      // Skip during block selector navigation — carousel animation handles its own
+      // UI state, and scrollBlockIntoViewWithToolbarRoom can trigger scroll events
+      // that would hide the toolbar with no BLOCK_SELECTED to restore it (the
+      // debounced handler below also skips when _blockSelectorNavigating is true).
+      if (this.selectedBlockUid && !this._blockSelectorNavigating) {
         window.parent.postMessage(
           { type: 'HIDE_BLOCK_UI' },
           this.adminOrigin,
@@ -5103,11 +5552,16 @@ export class Bridge {
               element = document.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
             }
           } else {
-            element = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+            // Use getAllBlockElements to handle template instances (virtual containers)
+            // which don't have their own DOM element but have child block elements
+            const elements = this.getAllBlockElements(this.selectedBlockUid);
+            element = elements[0] || null;
           }
 
           if (element) {
-            this.sendBlockSelected('scrollHandler', element);
+            // Pass blockUid explicitly to preserve template instance selection
+            // (element may be a child block with different UID)
+            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid });
           }
         }
       }, 150);
@@ -5123,12 +5577,13 @@ export class Bridge {
     const handleResize = () => {
       // After resize, re-send BLOCK_SELECTED with updated positions
       if (this.selectedBlockUid) {
-        const blockElement = document.querySelector(
-          `[data-block-uid="${this.selectedBlockUid}"]`,
-        );
+        // Use getAllBlockElements to handle template instances (virtual containers)
+        const elements = this.getAllBlockElements(this.selectedBlockUid);
+        const blockElement = elements[0] || null;
 
         if (blockElement) {
-          this.sendBlockSelected('resizeHandler', blockElement);
+          // Pass blockUid explicitly to preserve template instance selection
+          this.sendBlockSelected('resizeHandler', blockElement, { blockUid: this.selectedBlockUid });
         }
       }
     };
@@ -5160,6 +5615,11 @@ export class Bridge {
       // Use getOwnFirstEditableField to avoid getting nested blocks' fields
       blockUid = elementOrBlock.getAttribute('data-block-uid');
       editableField = this.getOwnFirstEditableField(elementOrBlock);
+    }
+
+    // Skip making readonly blocks editable
+    if (blockUid && this.isBlockReadonly(blockUid)) {
+      return;
     }
 
     if (editableField) {
@@ -5353,6 +5813,17 @@ export class Bridge {
           return;
         }
 
+        // Handle Save (Ctrl+S / Cmd+S) - forward to parent for CMS save
+        // Note: strikethrough was moved to Ctrl+Shift+S to free this shortcut
+        if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
+          log('Save shortcut detected');
+          e.preventDefault();
+          this.sendMessageToParent({
+            type: 'SAVE_REQUEST',
+          });
+          return;
+        }
+
         // Handle Copy (Ctrl+C / Cmd+C) - strip ZWS from clipboard
         if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
           const selection = window.getSelection();
@@ -5512,12 +5983,15 @@ export class Bridge {
     // We need a mechanism to distinguish user-initiated text changes from
     // programmatic updates caused by FORM_DATA messages.
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
+      log('MutationObserver fired, mutations:', mutations.length, 'isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
+        log('Mutation:', mutation.type, 'target:', mutation.target?.nodeName, 'text:', mutation.target?.textContent?.substring(0, 50));
         if (mutation.type === 'characterData' && this.isInlineEditing) {
           // Find the editable field element (works for both Slate and non-Slate fields)
           const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
           const targetElement = parentEl?.closest('[data-editable-field]');
+          log('characterData mutation: parentEl=', parentEl?.tagName, 'targetElement=', targetElement?.tagName, 'targetElement has attr:', targetElement?.hasAttribute?.('data-editable-field'));
 
           if (targetElement) {
             // Pass parentEl so handleTextChange can find the actual node that changed
@@ -5838,6 +6312,12 @@ export class Bridge {
       throw new Error('[HYDRA] blockPathMap is required but was not provided by admin');
     }
 
+    // Debug: log all blocks in blockPathMap and formData.blocks
+    const pathMapBlocks = Object.keys(this.blockPathMap);
+    const formDataBlocks = Object.keys(this.formData.blocks || {});
+    const missingFromPathMap = formDataBlocks.filter(id => !pathMapBlocks.includes(id));
+    log('addNodeIdsToAllSlateFields: pathMap has', pathMapBlocks.length, 'blocks, formData has', formDataBlocks.length, 'blocks, missing:', missingFromPathMap.length > 0 ? missingFromPathMap : 'none');
+
     Object.entries(this.blockPathMap).forEach(([blockId, pathInfo]) => {
       const block = this.getBlockData(blockId);
       if (!block) return;
@@ -5855,9 +6335,15 @@ export class Bridge {
       // For regular blocks, use blockFieldTypes
       const blockType = pathInfo.blockType;
       const fieldTypes = this.blockFieldTypes?.[blockType] || {};
+      if (blockType === 'slate') {
+        log('addNodeIdsToAllSlateFields:', blockId, 'blockType:', blockType, 'fieldTypes:', Object.keys(fieldTypes), 'hasValue:', !!block.value);
+      }
       Object.keys(fieldTypes).forEach((fieldName) => {
         if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
+          if (blockType === 'slate') {
+            log('addNodeIdsToAllSlateFields: added nodeIds to', blockId, fieldName, 'value:', JSON.stringify(block[fieldName]));
+          }
         }
       });
     });
@@ -6184,6 +6670,13 @@ export class Bridge {
       // Set the actual selection
       const selection = window.getSelection();
       if (!selection) return;
+
+      // Focus the contenteditable element BEFORE setting selection
+      // After re-render, focus goes to BODY - we need to restore it
+      const editableElement = anchorElement.closest('[contenteditable="true"]') || anchorElement;
+      if (editableElement && typeof editableElement.focus === 'function') {
+        editableElement.focus();
+      }
 
       const range = document.createRange();
       range.setStart(anchorPos.node, anchorPos.offset);
@@ -7443,6 +7936,19 @@ export class Bridge {
           border-radius: 4px;
           pointer-events: none;
         }
+        /* Readonly blocks - visually greyed out but still clickable for selection */
+        .hydra-locked {
+          opacity: 0.5;
+          position: relative;
+        }
+        .hydra-locked::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: rgba(128, 128, 128, 0.1);
+          pointer-events: none;
+          z-index: 1;
+        }
         .volto-hydra--outline {
           position: relative !important;
         }
@@ -7779,6 +8285,20 @@ export function getAccessToken() {
 }
 
 /**
+ * Check if we're in edit mode (hydra iframe connected to admin for editing).
+ * Uses window.name (set by admin) and _edit URL param as signals.
+ * @returns {boolean} True if in edit mode
+ */
+export function isEditMode() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const url = new URL(window.location.href);
+  const editParam = url.searchParams.get('_edit');
+  return window.name.startsWith('hydra-edit:') || editParam === 'true';
+}
+
+/**
  * Get the token from cookie (legacy method, prefer getAccessToken)
  * @returns {String|null} token
  */
@@ -7983,23 +8503,36 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * Use for blocks without listings that render outside Suspense.
  * Shares paging object with expandBlocks for combined paging.
  *
- * @param {Object} blocks - Map of blockId -> block data
- * @param {Array} blocksLayout - Array of blockIds in order
- * @param {Object} paging - Paging object { start, size, total, _seen } - mutated
+ * @param {Array} inputItems - Array of block IDs or objects with @uid
+ * @param {Object} options - Configuration options
+ * @param {Object} options.blocks - Map of blockId -> block data (for ID lookups)
+ * @param {Object} options.paging - Paging object { start, size, total, _seen } - mutated
  * @returns {{ items: Array, paging: Object }} Items on current page + updated paging
  */
-export function staticBlocks(blocks, blocksLayout, paging) {
+export function staticBlocks(inputItems, options = {}) {
+  const { blocks: blocksDict, paging } = options;
+
+  // Normalize items: convert IDs to objects if blocksDict provided
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] staticBlocks: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    return item;
+  }).filter(Boolean);
+
   const items = [];
   const startingSeen = paging._seen;
 
-  for (const blockId of blocksLayout) {
-    const block = blocks[blockId];
-    if (block) {
-      paging._seen++;
-      // Only include items on current page
-      if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
-        items.push({ ...block, '@uid': blockId });
-      }
+  for (const item of normalizedItems) {
+    paging._seen++;
+    // Only include items on current page
+    if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
+      items.push(item);
     }
   }
 
@@ -8033,10 +8566,22 @@ function computePagingUI(paging) {
     paging.prev = paging.currentPage > 0 ? paging.currentPage - 1 : null;
     paging.next = paging.currentPage < paging.totalPages - 1 ? paging.currentPage + 1 : null;
   }
+
+  // Track completed sources and resolve _ready when all sources have reported.
+  // Frontends set _expectedSources to the number of items that will call
+  // staticBlocks/expandListingBlocks with this paging object, and _resolve
+  // from a _ready Promise. Both are required to use async paging.
+  if (paging._expectedSources && paging._resolve) {
+    paging._completedSources = (paging._completedSources || 0) + 1;
+    if (paging._completedSources >= paging._expectedSources) {
+      paging._resolve(paging);
+    }
+  }
 }
 
-export async function expandListingBlocks(blocks, blocksLayout, options) {
+export async function expandListingBlocks(inputItems, options = {}) {
   const {
+    blocks: blocksDict,  // Optional: lookup dict for when items are IDs
     apiUrl,
     contextPath = '/',
     paging: pagingIn,  // { start, size, total, _seen } - mutated to track position across calls
@@ -8045,6 +8590,26 @@ export async function expandListingBlocks(blocks, blocksLayout, options) {
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
     defaultItemType = 'summaryItem',  // Default item type when field is not set
   } = options;
+
+  // Normalize items: convert IDs to objects if blocksDict provided
+  // Items can be: objects with @uid, or string IDs (looked up in blocksDict)
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      // It's a block ID - look up in blocksDict
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] expandListingBlocks: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    // Already an object with @uid
+    return item;
+  }).filter(Boolean);
+
+  // Convert to blocks/layout format for internal processing
+  const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
+  const blocksLayout = normalizedItems.map(item => item['@uid']);
 
   // Create default paging if not provided
   const paging = pagingIn || { start: 0, size: 1000, total: 0, _seen: 0 };
@@ -8269,6 +8834,1332 @@ export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0
   const top = Math.max(viewportOffset.top, viewportOffset.top + blockRect.top - HANDLE_OFFSET_TOP);
   const left = viewportOffset.left + blockRect.left;
   return { top, left };
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Template Utilities
+// For discovering, filtering, and merging templates.
+// Templates are Documents with blocks that have template fields (templateId, templateInstanceId, placeholder).
+// Uses Volto's standard fixed/readOnly properties for block behavior.
+////////////////////////////////////////////////////////////////////////////////
+
+// Deprecated: old marker, kept for backwards compatibility
+export const TEMPLATE_MARKER = '_template';
+
+// Template blocks use flat fields directly on the block:
+// - templateId: string - the template document path (e.g., '/templates/test-layout')
+// - templateInstanceId: string - unique ID for this template application instance
+// - placeholder: string - placeholder region name (e.g., 'primary', 'header')
+
+/**
+ * Simple UUID generator for block IDs.
+ * @returns {string} UUID v4 format string
+ */
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Check if a template is a layout (has fixed blocks at edges).
+ * Layout = first or last block has fixed: true (Volto standard property).
+ *
+ * @param {Object} templateData - Template document with blocks and blocks_layout
+ * @returns {boolean}
+ */
+export function isLayoutTemplate(templateData) {
+  const { blocks, blocks_layout } = templateData;
+  const layout = blocks_layout?.items || [];
+  if (layout.length === 0) return false;
+
+  const firstBlock = blocks?.[layout[0]];
+  const lastBlock = blocks?.[layout[layout.length - 1]];
+
+  // If first or last block has fixed: true (Volto standard), it's a layout
+  const firstIsFixed = firstBlock?.fixed === true;
+  const lastIsFixed = lastBlock?.fixed === true;
+
+  return firstIsFixed || lastIsFixed;
+}
+
+/**
+ * Find placeholder regions in a template.
+ * Placeholder blocks (fixed: false) with same placeholder form a region.
+ *
+ * @param {Object} templateData - Template document
+ * @returns {Object} { placeholder: { blockIds: [], allowedBlocks: [] } }
+ */
+export function findPlaceholderRegions(templateData) {
+  const { blocks, blocks_layout } = templateData;
+  const layout = blocks_layout?.items || [];
+  const regions = {};
+
+  for (const blockId of layout) {
+    const block = blocks?.[blockId];
+    // Placeholder blocks have fixed: false (or undefined) and a placeholder
+    if (block?.fixed) continue; // Skip fixed blocks
+
+    const placeholder = block?.placeholder;
+    if (placeholder) {
+      if (!regions[placeholder]) {
+        regions[placeholder] = {
+          blockIds: [],
+          allowedBlocks: null,
+        };
+      }
+      regions[placeholder].blockIds.push(blockId);
+    }
+  }
+  return regions;
+}
+
+/**
+ * Check if a template is allowed in a given container context.
+ *
+ * @param {Object} templateData - Template document
+ * @param {string} containerType - Block @type of container (e.g., "page", "columns")
+ * @param {string} fieldName - Container field name (e.g., "blocks")
+ * @returns {boolean}
+ */
+export function isTemplateAllowedIn(templateData, containerType, fieldName) {
+  const { allowed_container_types, allowed_field_names } = templateData;
+
+  // If no restrictions, allow everywhere
+  if (!allowed_container_types?.length && !allowed_field_names?.length) {
+    return true;
+  }
+
+  // Check restrictions
+  const typeOk =
+    !allowed_container_types?.length ||
+    allowed_container_types.includes(containerType);
+  const fieldOk =
+    !allowed_field_names?.length || allowed_field_names.includes(fieldName);
+
+  return typeOk && fieldOk;
+}
+
+/**
+ * Filter templates for "Apply Layout" UI.
+ * Returns templates that are layouts and allowed in the given context.
+ *
+ * @param {Array} templates - Array of template documents
+ * @param {string} containerType - Block @type of container
+ * @param {string} fieldName - Container field name
+ * @returns {Array} Filtered templates
+ */
+export function getLayoutTemplates(templates, containerType, fieldName) {
+  return templates.filter(
+    (t) => isLayoutTemplate(t) && isTemplateAllowedIn(t, containerType, fieldName),
+  );
+}
+
+/**
+ * Filter templates for block chooser (snippets).
+ * Returns templates that are NOT layouts and allowed in the given context.
+ *
+ * @param {Array} templates - Array of template documents
+ * @param {string} containerType - Block @type of container
+ * @param {string} fieldName - Container field name
+ * @returns {Array} Filtered templates
+ */
+export function getSnippetTemplates(templates, containerType, fieldName) {
+  return templates.filter(
+    (t) =>
+      !isLayoutTemplate(t) && isTemplateAllowedIn(t, containerType, fieldName),
+  );
+}
+
+/**
+ * Clone template blocks with fresh UUIDs.
+ * Recursively filters nested blocks to only include those with template markers.
+ *
+ * @param {Object} blocks - Template blocks object
+ * @param {Array} layout - Template blocks_layout.items array
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} { blocks, layout, idMap } where idMap tracks old->new IDs
+ */
+export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUUID) {
+  const idMap = {}; // oldId -> newId
+  const newBlocks = {};
+  const newLayout = [];
+
+  for (const oldId of layout) {
+    const newId = uuidGenerator();
+    idMap[oldId] = newId;
+
+    // Deep clone the block, filtering nested blocks without template markers
+    const block = blocks[oldId];
+    if (block) {
+      newBlocks[newId] = cloneBlockFilteringNested(block, uuidGenerator);
+    }
+
+    newLayout.push(newId);
+  }
+
+  return { blocks: newBlocks, layout: newLayout, idMap };
+}
+
+/**
+ * Clone a block, recursively filtering nested blocks without template markers.
+ * Only nested blocks with `placeholder` or `templateId` are included.
+ *
+ * @param {Object} block - Block to clone
+ * @param {Function} uuidGenerator - Function to generate UUIDs
+ * @returns {Object} Cloned block with filtered nested blocks
+ */
+function cloneBlockFilteringNested(block, uuidGenerator) {
+  // Start with a shallow clone
+  const cloned = { ...block };
+
+  // Check for nested blocks field (blocks + blocks_layout pattern)
+  if (cloned.blocks && cloned.blocks_layout?.items) {
+    const nestedBlocks = {};
+    const nestedLayout = [];
+
+    for (const nestedId of cloned.blocks_layout.items) {
+      const nestedBlock = cloned.blocks[nestedId];
+      if (!nestedBlock) continue;
+
+      // Only include nested blocks that have template markers
+      if (nestedBlock.placeholder || nestedBlock.templateId) {
+        const newNestedId = uuidGenerator();
+        // Recursively filter this nested block's children too
+        nestedBlocks[newNestedId] = cloneBlockFilteringNested(nestedBlock, uuidGenerator);
+        nestedLayout.push(newNestedId);
+      }
+    }
+
+    cloned.blocks = nestedBlocks;
+    cloned.blocks_layout = { ...cloned.blocks_layout, items: nestedLayout };
+  }
+
+  return cloned;
+}
+
+
+/**
+ * Insert snippet blocks at a specific position.
+ * - Clones snippet blocks with new IDs
+ * - Adds template fields (templateId, templateInstanceId, placeholder)
+ * - Preserves Volto's fixed/readOnly properties
+ * - Inserts at the specified position
+ *
+ * @param {Object} pageFormData - Existing page data
+ * @param {Object} templateData - Snippet template document
+ * @param {number} position - Index to insert at
+ * @param {Function} uuidGenerator - Function to generate UUIDs (default: generateUUID)
+ * @returns {Object} Updated formData with snippet inserted
+ */
+export function insertSnippetBlocks(pageFormData, templateData, position, uuidGenerator = generateUUID) {
+  const result = {
+    blocks: { ...pageFormData.blocks },
+    blocks_layout: {
+      items: [...(pageFormData.blocks_layout?.items || [])],
+    },
+  };
+  const templateId = templateData['@id'] || templateData.UID;
+  const instanceId = uuidGenerator(); // New instance ID for this insertion
+
+  // Clone snippet blocks
+  const { blocks: clonedBlocks, layout: clonedLayout, idMap } =
+    cloneBlocksWithNewIds(
+      templateData.blocks,
+      templateData.blocks_layout?.items || [],
+      uuidGenerator,
+    );
+
+  // Add template fields
+  for (const [newId, block] of Object.entries(clonedBlocks)) {
+    const originalId = Object.entries(idMap).find(
+      ([_, v]) => v === newId,
+    )?.[0];
+    const originalBlock = templateData.blocks?.[originalId];
+
+    // Set flat template fields
+    block.templateId = templateId;
+    block.templateInstanceId = instanceId;
+    block.placeholder = originalBlock?.placeholder || originalId;
+
+    // Preserve Volto's fixed/readOnly from template
+    if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
+    if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
+
+    result.blocks[newId] = block;
+  }
+
+  // Insert at position
+  result.blocks_layout.items.splice(position, 0, ...clonedLayout);
+
+  return result;
+}
+
+/**
+ * Get blocks that belong to a specific template.
+ *
+ * @param {Object} formData - Page form data
+ * @param {string} tplId - Template UID to find
+ * @returns {Array} Array of block IDs belonging to this template
+ */
+export function getTemplateBlocks(formData, tplId) {
+  const blockIds = [];
+  for (const blockId of formData.blocks_layout?.items || []) {
+    const block = formData.blocks?.[blockId];
+    if (block?.templateId === tplId) {
+      blockIds.push(blockId);
+    }
+  }
+  return blockIds;
+}
+
+/**
+ * Check if a block is a fixed template block (cannot be moved individually).
+ * Uses Volto's standard fixed property.
+ *
+ * @param {Object} block - Block data
+ * @returns {boolean}
+ */
+export function isFixedTemplateBlock(block) {
+  // Fixed if it has templateId AND fixed: true (Volto standard)
+  return block?.templateId && block?.fixed === true;
+}
+
+/**
+ * Check if a block is placeholder content (can be moved freely).
+ * Placeholder blocks have templateId but fixed: false (or undefined).
+ *
+ * @param {Object} block - Block data
+ * @returns {boolean}
+ */
+export function isPlaceholderContent(block) {
+  // Placeholder if it has templateId but is NOT fixed
+  return block?.templateId && !block?.fixed;
+}
+
+/**
+ * Check if a block is inside the template currently being edited.
+ * A block is inside if its templateInstanceId matches the templateEditMode.
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
+ * @returns {boolean} True if the block is inside the edited template, false otherwise
+ */
+export function isBlockInEditedTemplate(blockData, templateEditMode) {
+  if (!templateEditMode) return false;
+  return blockData?.templateInstanceId === templateEditMode;
+}
+
+/**
+ * Check if a block should be readonly based on template edit mode.
+ * This is the shared utility for both admin (sidebar/toolbar) and hydra.js Bridge.
+ *
+ * In template edit mode:
+ * - Blocks inside the template being edited are editable (return false)
+ * - Blocks outside the template are locked (return true)
+ *
+ * In normal mode:
+ * - Check the block's readOnly property (Volto standard)
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
+ * @returns {boolean} True if the block should be readonly
+ */
+export function isBlockReadonly(blockData, templateEditMode) {
+  if (templateEditMode) {
+    // In template edit mode:
+    // - Blocks inside the template being edited are editable
+    // - Blocks outside the template are readonly
+    return !isBlockInEditedTemplate(blockData, templateEditMode);
+  }
+
+  // Normal mode: check block's readOnly property (Volto standard)
+  return !!blockData?.readOnly;
+}
+
+/**
+ * Check if a block's position is locked (cannot be moved/dragged).
+ * This is the shared utility for both admin (toolbar) and hydra.js Bridge.
+ *
+ * In template edit mode:
+ * - Blocks inside the template being edited are movable (return false) - even if fixed
+ * - Blocks outside the template are locked (return true)
+ *
+ * In normal mode:
+ * - Check the block's fixed property (Volto standard)
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
+ * @returns {boolean} True if the block's position is locked
+ */
+export function isBlockPositionLocked(blockData, templateEditMode) {
+  if (templateEditMode) {
+    // In template edit mode, ALL blocks are draggable (not position-locked)
+    // This allows dragging outside blocks into the template
+    // Drop zone restriction (where blocks can be dropped) is handled
+    // separately in the drag handler via isDropAllowedInTemplateEditMode
+    return false;
+  }
+
+  // Normal mode: check block's fixed property (Volto standard)
+  return !!blockData?.fixed;
+}
+
+/**
+ * Get block addability - centralized logic for whether blocks can be added
+ * before/after/into a block. Used by DnD, add buttons, and BlockChooser.
+ *
+ * @param {string} blockId - The block ID to check addability for (target block)
+ * @param {Object} blockPathMap - Map of blockId -> pathInfo
+ * @param {Object} blockData - The target block data object (can be null for pathMap-only checks)
+ * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
+ * @param {Object|null} sourceBlockData - For DnD: the source block being moved. Enables template-aware logic.
+ * @returns {Object} Addability info:
+ *   - canInsertBefore: Can add a sibling before this block
+ *   - canInsertAfter: Can add a sibling after this block
+ *   - canReplace: Can replace this block (for empty blocks)
+ *   - allowedTypes: Array of allowed block types, or null for all types
+ *   - maxReached: Whether container is at maxLength
+ */
+export function getBlockAddability(blockId, blockPathMap, blockData, templateEditMode, sourceBlockData = null) {
+  const pathInfo = blockPathMap?.[blockId];
+
+  // Default: can't add anywhere
+  const result = {
+    canInsertBefore: false,
+    canInsertAfter: false,
+    canReplace: false,
+    allowedTypes: null,
+    maxReached: false,
+  };
+
+  if (!pathInfo) {
+    return result;
+  }
+
+  // Get static insert restrictions from pathMap (based on fixed blocks)
+  const staticCanInsertBefore = pathInfo.canInsertBefore !== false;
+  const staticCanInsertAfter = pathInfo.canInsertAfter !== false;
+
+  // Check if container is at maxLength
+  const maxReached = pathInfo.maxSiblings != null &&
+    pathInfo.siblingCount >= pathInfo.maxSiblings;
+  result.maxReached = maxReached;
+
+  // If max is reached, can't add more blocks
+  if (maxReached) {
+    return result;
+  }
+
+  // Template edit mode handling:
+  // - For add button (no sourceBlockData): Only allow if target is in the edited template
+  // - For DnD (sourceBlockData provided): Allow if source OR target is in the template
+  //   This enables dragging blocks from outside INTO the template
+  let targetInTemplate = false;
+  if (templateEditMode) {
+    targetInTemplate = isBlockInEditedTemplate(blockData, templateEditMode);
+    const sourceInTemplate = sourceBlockData ? isBlockInEditedTemplate(sourceBlockData, templateEditMode) : false;
+
+    // For DnD: allow if either source or target is in the template
+    // For add button: only allow if target is in the template
+    const allowedByTemplateMode = sourceBlockData
+      ? (sourceInTemplate || targetInTemplate)
+      : targetInTemplate;
+
+    if (!allowedByTemplateMode) {
+      // Neither block is in the template being edited - can't add here
+      return result;
+    }
+  }
+
+  // Apply static restrictions
+  // In template edit mode, ignore restrictions for blocks in the template being edited
+  // (the restrictions are for normal mode to prevent adding outside placeholders)
+  if (templateEditMode && targetInTemplate) {
+    result.canInsertBefore = true;
+    result.canInsertAfter = true;
+  } else {
+    result.canInsertBefore = staticCanInsertBefore;
+    result.canInsertAfter = staticCanInsertAfter;
+  }
+
+  // For empty blocks: can replace (unless readonly), but NOT add before/after
+  // Empty blocks are meant to be replaced via block chooser
+  const isEmptyBlock = blockData?.['@type'] === 'empty';
+  if (isEmptyBlock) {
+    // In template edit mode, check if block is in the edited template for replace permission
+    const blockIsReadonly = isBlockReadonly(blockData, templateEditMode);
+    result.canReplace = !blockIsReadonly;
+    result.canInsertBefore = false;
+    result.canInsertAfter = false;
+  }
+
+  // Include allowed types from pathInfo
+  result.allowedTypes = pathInfo.allowedSiblingTypes || null;
+
+  return result;
+}
+
+/**
+ * Get unique template IDs (paths) from page data.
+ *
+ * @param {Object} formData - Page data with blocks
+ * @returns {Array<string>} Array of unique template paths
+ */
+export function getUniqueTemplateIds(formData) {
+  const templateIds = new Set();
+  for (const blockId of Object.keys(formData.blocks || {})) {
+    const block = formData.blocks[blockId];
+    // Skip template definitions (templateInstanceId === templateId)
+    // Only include pages using templates (templateInstanceId !== templateId)
+    if (block?.templateId && block.templateInstanceId !== block.templateId) {
+      templateIds.add(block.templateId);
+    }
+  }
+  return Array.from(templateIds);
+}
+
+/**
+ * Merge templates into page data using expandTemplates.
+ * Processes each blocks field with its allowedLayouts, then recursively handles containers.
+ *
+ * @param {Object} page - Page data with blocks
+ * @param {Object} options - Configuration
+ * @param {Function} options.loadTemplate - Async function to load template: (templateId) => Promise<templateData>
+ * @param {Object} options.pageBlocksFields - Field configs { fieldName: { allowedLayouts, ... } }
+ * @param {Function} options.uuidGenerator - UUID generator function (default: generateUUID)
+ * @returns {Promise<{merged: Object, newTemplateIds: string[]}>}
+ */
+export async function mergeTemplatesIntoPage(page, options = {}) {
+  // Support old signature: mergeTemplatesIntoPage(page, templates, uuidGenerator)
+  // where templates is a pre-loaded cache object
+  let loadTemplate, pageBlocksFields, uuidGenerator, filterInstanceId;
+  if (typeof options.loadTemplate === 'function') {
+    // New signature with options object including loadTemplate function
+    loadTemplate = options.loadTemplate;
+    pageBlocksFields = options.pageBlocksFields || { blocks: {} };
+    uuidGenerator = options.uuidGenerator || generateUUID;
+    filterInstanceId = options.filterInstanceId; // For reverse merge: only process specific instance
+  } else {
+    // Old signature: templates cache is second arg, uuidGenerator is third
+    const templates = options || {};
+    uuidGenerator = arguments[2] || generateUUID;
+    pageBlocksFields = { blocks: {} };
+    filterInstanceId = undefined;
+    // Create loadTemplate from templates cache (old behavior)
+    loadTemplate = async (templateId) => {
+      if (templates[templateId]) {
+        return templates[templateId];
+      }
+      throw new Error(`Template ${templateId} not in cache`);
+    };
+  }
+
+  let result = { ...page };
+  const allNewTemplateIds = new Set();
+
+  // Helper to recursively process blocks and their nested containers
+  async function processBlocksRecursive(blocks, layout, allowedLayouts, templateState) {
+    const items = await expandTemplates(layout, {
+      blocks,
+      templateState,
+      loadTemplate,
+      allowedLayouts,
+      uuidGenerator,
+      filterInstanceId,
+    });
+
+    // Convert items back to blocks/layout format
+    const newBlocks = {};
+    const newLayout = [];
+
+    for (const item of items) {
+      const { '@uid': blockId, ...block } = item;
+      newLayout.push(blockId);
+
+      // Check for nested container blocks and process recursively
+      // Container blocks have a blocks field with @type values
+      const processedBlock = { ...block };
+      for (const [key, value] of Object.entries(block)) {
+        if (isBlocksMap(value)) {
+          const nestedLayoutKey = `${key}_layout`;
+          const nestedLayout = block[nestedLayoutKey]?.items || Object.keys(value);
+          // Recursively process nested blocks with same templateState
+          const { blocks: nestedBlocks, layout: nestedNewLayout } = await processBlocksRecursive(
+            value,
+            nestedLayout,
+            null, // No forced layouts for nested containers
+            templateState
+          );
+          processedBlock[key] = nestedBlocks;
+          processedBlock[nestedLayoutKey] = { items: nestedNewLayout };
+        }
+      }
+
+      newBlocks[blockId] = processedBlock;
+    }
+
+    // Collect new template IDs
+    for (const tid of templateState.newTemplateIds || []) {
+      allNewTemplateIds.add(tid);
+    }
+
+    return { blocks: newBlocks, layout: newLayout };
+  }
+
+  // Process each page-level blocks field
+  const fieldsToProcess = Object.keys(pageBlocksFields).length > 0
+    ? pageBlocksFields
+    : { blocks: {} }; // Default to main blocks field
+
+  for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
+    const blocksData = fieldName === 'blocks' ? result.blocks : result[fieldName];
+    const layoutFieldName = fieldName === 'blocks' ? 'blocks_layout' : `${fieldName}_layout`;
+    const layoutData = result[layoutFieldName];
+    const layout = layoutData?.items || Object.keys(blocksData || {});
+    const allowedLayouts = fieldDef?.allowedLayouts || null;
+
+    if (!blocksData && !allowedLayouts) {
+      // No data and no forced layout - skip
+      continue;
+    }
+
+    const templateState = {};
+    const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
+      blocksData || {},
+      layout,
+      allowedLayouts,
+      templateState
+    );
+
+    if (fieldName === 'blocks') {
+      result.blocks = newBlocks;
+      result.blocks_layout = { items: newLayout };
+    } else {
+      result[fieldName] = newBlocks;
+      result[`${fieldName}_layout`] = { items: newLayout };
+    }
+  }
+
+  return {
+    merged: result,
+    newTemplateIds: Array.from(allNewTemplateIds),
+  };
+}
+
+
+/**
+ * Check if an object looks like a blocks map (string keys -> objects with @type).
+ */
+function isBlocksMap(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  return Object.values(obj).some(v => v?.['@type']);
+}
+
+/**
+ * Recursively scan for blocks with matching templateInstanceId.
+ * Handles arbitrary nesting - looks for blocks maps (values have @type)
+ * and corresponding layout arrays.
+ *
+ * @param {Object} container - Container object to scan
+ * @param {string} instanceId - Template instance ID to match
+ * @param {Map} pendingContent - Map of placeholder -> [{blockId, block}]
+ * @param {Array} standaloneBlocks - Blocks without placeholder
+ * @param {Set} visited - Already visited objects (prevent cycles)
+ */
+function collectContentFromTree(container, instanceId, pendingContent, standaloneBlocks, existingFixedBlockIds, visited = new Set()) {
+  if (!container || typeof container !== 'object') return;
+  if (visited.has(container)) return;
+  visited.add(container);
+
+  if (Array.isArray(container)) {
+    for (const item of container) {
+      collectContentFromTree(item, instanceId, pendingContent, standaloneBlocks, existingFixedBlockIds, visited);
+    }
+    return;
+  }
+
+  // Look for blocks/layout pairs (any field name)
+  for (const [fieldName, value] of Object.entries(container)) {
+    if (!isBlocksMap(value)) continue;
+
+    // Find corresponding layout
+    const layoutField = container[`${fieldName}_layout`];
+    const blockLayout = layoutField?.items || Object.keys(value);
+
+    // Process in order
+    for (const blockId of blockLayout) {
+      const block = value[blockId];
+      if (!block) continue;
+
+      // Only collect blocks matching our instance
+      if (block.templateInstanceId === instanceId) {
+        const placeholder = block.placeholder;
+        if (placeholder) {
+          if (block.fixed) {
+            // Track existing fixed block ID and content for reuse
+            existingFixedBlockIds.set(placeholder, { blockId, block });
+          } else {
+            // User content block
+            if (!pendingContent.has(placeholder)) {
+              pendingContent.set(placeholder, []);
+            }
+            pendingContent.get(placeholder).push({ blockId, block });
+          }
+        }
+      } else if (!block.templateId && !block.placeholder) {
+        // Standalone block (no template markers) - track position
+        standaloneBlocks.push({ blockId, block });
+      }
+
+      // Recurse into block for nested containers
+      collectContentFromTree(block, instanceId, pendingContent, standaloneBlocks, existingFixedBlockIds, visited);
+    }
+  }
+}
+
+/**
+ * Process blocks at a nested level inside a fixed template container.
+ * Called when expandTemplates recognizes we're inside a registered nested container.
+ *
+ * @param {Object} docBlocks - The document's blocks at this nested level
+ * @param {Array} docLayout - The document's layout at this nested level
+ * @param {Object} nestedInfo - Info about the template structure at this level
+ * @param {Object} templateState - Shared template state
+ * @param {Object} options - Original options passed to expandTemplates
+ * @param {Function} addItem - Helper to add items to result
+ * @param {Array} items - Result array to populate
+ * @returns {Array} Items with @uid field
+ */
+function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateState, options, addItem, items) {
+  const { templateBlocks, templateLayout } = nestedInfo;
+  const { templateId, instanceId } = templateState;
+  const { uuidGenerator } = options;
+
+  // Build a map of document blocks by placeholder for user content lookup
+  const docBlocksByPlaceholder = new Map();
+  for (const blockId of docLayout) {
+    const block = docBlocks[blockId];
+    if (block?.placeholder) {
+      if (!docBlocksByPlaceholder.has(block.placeholder)) {
+        docBlocksByPlaceholder.set(block.placeholder, []);
+      }
+      docBlocksByPlaceholder.get(block.placeholder).push({ blockId, block });
+    }
+  }
+
+  // Process the template layout at this nested level
+  // Only emit blocks that have template markers (fixed or placeholder)
+  // Blocks without markers are just defaults and should NOT be synced
+  for (const tplBlockId of templateLayout) {
+    const tplBlock = templateBlocks[tplBlockId];
+    if (!tplBlock) continue;
+
+    if (tplBlock.fixed) {
+      // Fixed block - emit template version
+      const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
+
+      // Look ahead for next non-fixed placeholder at this nested level
+      const tplIdx = templateLayout.indexOf(tplBlockId);
+      let nextPlaceholder = undefined;
+      for (let i = tplIdx + 1; i < templateLayout.length; i++) {
+        const nextTplBlock = templateBlocks[templateLayout[i]];
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
+          nextPlaceholder = nextTplBlock.placeholder;
+          break;
+        }
+        if (nextTplBlock?.fixed) break;
+      }
+
+      // childPlaceholders for nested containers
+      let childPlaceholders = undefined;
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const innerLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        for (const nestedId of innerLayout) {
+          const nested = tplBlock.blocks[nestedId];
+          if (nested && !nested.fixed && nested.placeholder) {
+            if (!childPlaceholders) childPlaceholders = {};
+            childPlaceholders['blocks'] = nested.placeholder;
+            break;
+          }
+        }
+      }
+
+      addItem(
+        {
+          ...tplBlock,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+          ...(nextPlaceholder && { nextPlaceholder }),
+          ...(childPlaceholders && { childPlaceholders }),
+        },
+        blockId
+      );
+
+      // Register further nested containers
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        templateState.nestedContainers.set(tplBlock.blocks, {
+          templateBlockId: tplBlockId,
+          templateBlocks: tplBlock.blocks,
+          templateLayout: nestedLayout,
+        });
+      }
+    } else if (tplBlock.placeholder) {
+      // Placeholder slot - emit document content that goes here
+      const placeholder = tplBlock.placeholder;
+      const userContent = docBlocksByPlaceholder.get(placeholder) || [];
+      for (const { blockId, block } of userContent) {
+        addItem(
+          {
+            ...block,
+            templateId: templateId,
+            templateInstanceId: instanceId,
+            placeholder: placeholder,
+          },
+          blockId
+        );
+      }
+    }
+    // Skip blocks without fixed or placeholder - they're just template defaults
+    // and should NOT be synced to the document
+  }
+
+  return items;
+}
+
+/**
+ * Load all templates referenced in data, including nested templates.
+ * Recursively scans data for templateId references, loads them,
+ * then scans loaded templates for more references until all are loaded.
+ *
+ * @param {Object} data - Page data to scan for template references
+ * @param {Function} loadTemplate - Async function: (templateId) => Promise<templateData>
+ * @param {Array} allowedLayouts - Optional forced layouts to include
+ * @returns {Promise<Object>} Map of templateId -> template data
+ */
+export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
+  const templates = {};
+  const loaded = new Set();
+  const failed = new Set();
+
+  // Helper to scan an object for templateId references
+  function collectTemplateIds(obj, visited = new Set()) {
+    const ids = new Set();
+
+    function scan(o) {
+      if (!o || typeof o !== 'object') return;
+      if (visited.has(o)) return;
+      visited.add(o);
+
+      if (Array.isArray(o)) {
+        for (const item of o) scan(item);
+        return;
+      }
+
+      if (o.templateId && typeof o.templateId === 'string') {
+        ids.add(o.templateId);
+      }
+
+      for (const value of Object.values(o)) {
+        scan(value);
+      }
+    }
+
+    scan(obj);
+    return ids;
+  }
+
+  // Collect initial template IDs from data + allowedLayouts
+  let pending = collectTemplateIds(data);
+  for (const layoutId of allowedLayouts) {
+    if (layoutId) pending.add(layoutId);
+  }
+
+  // Keep loading until no new templates found
+  while (pending.size > 0) {
+    // Filter out already loaded/failed
+    const toLoad = Array.from(pending).filter(id => !loaded.has(id) && !failed.has(id));
+    pending.clear();
+
+    if (toLoad.length === 0) break;
+
+    // Load in parallel
+    const results = await Promise.all(
+      toLoad.map(async (id) => {
+        try {
+          const template = await loadTemplate(id);
+          return { id, template };
+        } catch (error) {
+          console.warn(`[HYDRA] Failed to load template ${id}:`, error);
+          return { id, template: null };
+        }
+      })
+    );
+
+    // Process results and collect nested template IDs
+    for (const { id, template } of results) {
+      if (template) {
+        loaded.add(id);
+        templates[id] = template;
+
+        // Scan this template for nested template references
+        const nestedIds = collectTemplateIds(template);
+        for (const nestedId of nestedIds) {
+          if (!loaded.has(nestedId) && !failed.has(nestedId)) {
+            pending.add(nestedId);
+          }
+        }
+      } else {
+        failed.add(id);
+      }
+    }
+  }
+
+  return templates;
+}
+
+/**
+ * Async version of expandTemplates.
+ * Loads templates on-demand using loadTemplate callback, then delegates to expandTemplatesSync.
+ *
+ * @param {Array} inputItems - Input items (block IDs or block objects)
+ * @param {Object} options - Configuration options
+ * @param {Object} options.blocks - Blocks dict for ID lookup
+ * @param {Object} options.templateState - Mutable state object (pass {} on first call)
+ * @param {Function} options.loadTemplate - Async callback: (templateId) => Promise<templateData>
+ * @param {Array} options.allowedLayouts - Force layout from this list if no matching layout applied
+ * @returns {Promise<Array>} Items with @uid field
+ */
+export async function expandTemplates(inputItems, options = {}) {
+  const {
+    blocks: blocksDict,
+    loadTemplate,
+    allowedLayouts = [],
+  } = options;
+
+  // Build data object for loadTemplates to scan
+  const data = blocksDict
+    ? { blocks: blocksDict, blocks_layout: { items: inputItems } }
+    : { items: inputItems };
+
+  // Load all templates (including nested) using existing helper
+  const templates = await loadTemplates(data, loadTemplate, allowedLayouts || []);
+
+  // Delegate to sync version with loaded templates
+  return expandTemplatesSync(inputItems, {
+    ...options,
+    templates,
+  });
+}
+
+/**
+ * Synchronous version of expandTemplates.
+ * Requires all templates to be pre-loaded in options.templates.
+ * Throws if a required template is not found in the pre-loaded map.
+ *
+ * This function is called recursively: the top-level BlocksRenderer calls it for
+ * the page layout, and the expanded result may contain container blocks (columns,
+ * accordions, etc.) whose child BlocksRenderers call it again. Nested containers
+ * are detected via templateState.nestedContainers (keyed by blocksDict reference)
+ * and handled by processNestedTemplateLevel instead of the main path.
+ *
+ * templateState is shared across all BlocksRenderer instances on the page (via
+ * Vue provide/inject or similar). It must be a fresh {} for each page render to
+ * avoid stale state across navigations.
+ *
+ * @param {Array} inputItems - Input items (block IDs or block objects)
+ * @param {Object} options - Configuration options
+ * @param {Object} options.templates - Map of templateId -> template data (REQUIRED)
+ * @param {Object} options.templateState - Mutable state object (pass {} on first call)
+ * @param {Array} options.allowedLayouts - Force layout from this list if no matching layout applied
+ * @returns {Array} Items with @uid field
+ */
+export function expandTemplatesSync(inputItems, options = {}) {
+  const {
+    blocks: blocksDict,
+    templateState = {},
+    templates,
+    allowedLayouts,
+    uuidGenerator,
+    filterInstanceId,
+  } = options;
+
+  if (!templates) {
+    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
+  }
+
+  const items = [];
+  const addItem = (block, blockId) => {
+    items.push({ ...block, '@uid': blockId });
+  };
+
+  // In edit mode, admin handles template merging - pass blocks through as-is
+  const editMode = isEditMode();
+  if (editMode) {
+    return (inputItems || []).map(item => {
+      if (typeof item === 'string') {
+        const block = blocksDict?.[item];
+        return block ? { ...block, '@uid': item } : null;
+      }
+      return item;
+    }).filter(Boolean);
+  }
+
+  // Normalize items
+  const normalizedItems = (inputItems || []).map(item => {
+    if (typeof item === 'string') {
+      const block = blocksDict?.[item];
+      if (!block) {
+        console.warn(`[HYDRA] expandTemplatesSync: block not found for ID: ${item}`);
+        return null;
+      }
+      return { ...block, '@uid': item };
+    }
+    return item;
+  }).filter(Boolean);
+
+  const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
+  const layout = normalizedItems.map(item => item['@uid']);
+
+  // Initialize global state structures if needed
+  if (!templateState.instances) {
+    templateState.instances = {};
+  }
+  if (!templateState.nestedContainers) {
+    templateState.nestedContainers = new Map();
+  }
+  if (!templateState.generatedInstanceIds) {
+    templateState.generatedInstanceIds = new WeakMap(); // blocksDict -> generated instanceId
+  }
+
+  // Check if inside a registered nested container
+  if (blocksDict && templateState.nestedContainers.has(blocksDict)) {
+    const nestedInfo = templateState.nestedContainers.get(blocksDict);
+    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
+  }
+
+  if (layout.length === 0 && !allowedLayouts?.length) {
+    return items;
+  }
+
+  // Determine templateId and instanceId for this call
+  let templateId = null;
+  let existingInstanceId = filterInstanceId || null;
+  for (const blockId of layout) {
+    const block = blocks[blockId];
+    if (block?.templateId) {
+      templateId = block.templateId;
+      if (!filterInstanceId) {
+        existingInstanceId = block.templateInstanceId;
+      }
+      break;
+    }
+  }
+
+  if (allowedLayouts?.length > 0) {
+    if (!templateId || !allowedLayouts.includes(templateId)) {
+      templateId = allowedLayouts[0];
+      if (!filterInstanceId) {
+        existingInstanceId = null;
+      }
+    }
+  }
+
+  // No template to apply - pass through
+  if (!templateId) {
+    for (const blockId of layout) {
+      if (blocks[blockId]) {
+        addItem(blocks[blockId], blockId);
+      }
+    }
+    return items;
+  }
+
+  // Get or generate instanceId
+  // For forced layouts (no existing instanceId), we use a WeakMap keyed by blocksDict
+  // to ensure idempotency - same blocks object returns same generated instanceId
+  let instanceId = existingInstanceId;
+  if (!instanceId) {
+    if (blocksDict && templateState.generatedInstanceIds.has(blocksDict)) {
+      instanceId = templateState.generatedInstanceIds.get(blocksDict);
+    } else {
+      instanceId = generateUUID();
+      if (blocksDict) {
+        templateState.generatedInstanceIds.set(blocksDict, instanceId);
+      }
+    }
+  }
+
+  // Get or create instance context.
+  // Always rebuild ctx when the instanceId is re-encountered (e.g. after save,
+  // the API returns blocks with the same templateInstanceId but different content).
+  // The ctx is mutated during processing (pendingContent consumed, emittedPlaceholders
+  // populated) so it cannot be reused.
+  let ctx = templateState.instances[instanceId];
+  if (ctx) {
+    delete templateState.instances[instanceId];
+    ctx = null;
+  }
+
+  if (!ctx) {
+    ctx = {
+      templateId,
+      template: null,
+      instanceId,
+      emittedPlaceholders: new Set(),
+      pendingContent: new Map(),
+      existingFixedBlockIds: new Map(),
+      leadingStandaloneBlocks: [],
+      trailingStandaloneBlocks: [],
+      newTemplateIds: new Set(),
+    };
+    templateState.instances[instanceId] = ctx;
+
+    // Initialize content collection for this instance
+    if (existingInstanceId) {
+      const allStandaloneBlocks = [];
+      collectContentFromTree(
+        { blocks, blocks_layout: { items: layout } },
+        existingInstanceId,
+        ctx.pendingContent,
+        allStandaloneBlocks,
+        ctx.existingFixedBlockIds
+      );
+
+      let foundFirstTemplateBlock = false;
+      let lastTemplateBlockIndex = -1;
+      for (let i = 0; i < layout.length; i++) {
+        const block = blocks[layout[i]];
+        if (block?.templateInstanceId === existingInstanceId) {
+          if (!foundFirstTemplateBlock) foundFirstTemplateBlock = true;
+          lastTemplateBlockIndex = i;
+        }
+      }
+
+      for (let i = 0; i < layout.length; i++) {
+        const blockId = layout[i];
+        const block = blocks[blockId];
+        if (!block) continue;
+        if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
+          if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
+            const b = blocks[id];
+            return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
+          }))) {
+            ctx.leadingStandaloneBlocks.push({ blockId, block });
+          } else if (i > lastTemplateBlockIndex) {
+            ctx.trailingStandaloneBlocks.push({ blockId, block });
+          }
+        }
+      }
+    } else {
+      for (const blockId of layout) {
+        const block = blocks[blockId];
+        if (!block) continue;
+        if (block.templateId && block.templateId !== templateId) {
+          ctx.newTemplateIds.add(block.templateId);
+        }
+        if (block.fixed && block.templateId && block.templateId !== templateId) {
+          if (block.readOnly) continue;
+          if (block.placeholder) {
+            ctx.existingFixedBlockIds.set(block.placeholder, { blockId, block });
+          }
+          continue;
+        }
+        if (block.placeholder) {
+          const placeholder = block.placeholder;
+          if (!ctx.pendingContent.has(placeholder)) {
+            ctx.pendingContent.set(placeholder, []);
+          }
+          ctx.pendingContent.get(placeholder).push({ blockId, block });
+        } else {
+          if (!ctx.pendingContent.has('default')) {
+            ctx.pendingContent.set('default', []);
+          }
+          ctx.pendingContent.get('default').push({ blockId, block });
+        }
+      }
+    }
+  }
+
+  // Load template from pre-loaded map (sync - throw if not found)
+  if (!ctx.template) {
+    const template = templates[templateId];
+    if (!template) {
+      throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
+    }
+    ctx.template = template;
+  }
+
+  const { template, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
+
+  // Process template (same as async version from here)
+  const templateLayout = template.blocks_layout?.items || [];
+  let firstFixedIndex = -1;
+  let lastFixedIndex = -1;
+  const slotPositions = {};
+
+  for (let i = 0; i < templateLayout.length; i++) {
+    const tplBlock = template.blocks?.[templateLayout[i]];
+    if (!tplBlock?.placeholder) continue;
+    if (tplBlock.fixed) {
+      if (firstFixedIndex === -1) firstFixedIndex = i;
+      lastFixedIndex = i;
+    } else {
+      if (firstFixedIndex === -1) {
+        slotPositions[tplBlock.placeholder] = 'top';
+      } else if (i > lastFixedIndex) {
+        slotPositions[tplBlock.placeholder] = 'bottom';
+      } else {
+        slotPositions[tplBlock.placeholder] = 'middle';
+      }
+    }
+  }
+
+  for (const { blockId, block } of leadingStandaloneBlocks) {
+    addItem(block, blockId);
+  }
+
+  let defaultInsertIndex = -1;
+  let bottomSlotInsertIndex = -1;
+  let topSlotInsertIndex = -1;
+
+  for (const tplBlockId of templateLayout) {
+    const tplBlock = template.blocks?.[tplBlockId];
+    if (!tplBlock) continue;
+
+    if (tplBlock.fixed) {
+      const placeholder = tplBlock.placeholder;
+      const existing = placeholder && existingFixedBlockIds?.get(placeholder);
+      const blockId = existing?.blockId
+        ? existing.blockId
+        : (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
+
+      let blockContent = tplBlock;
+      if (!tplBlock.readOnly && existing?.block) {
+        blockContent = { ...tplBlock, value: existing.block.value };
+      }
+
+      // Look ahead in template layout for the next non-fixed placeholder at this level.
+      // This preserves placeholder info even when all placeholder blocks are deleted.
+      const tplIdx = templateLayout.indexOf(tplBlockId);
+      let nextPlaceholder = undefined;
+      for (let i = tplIdx + 1; i < templateLayout.length; i++) {
+        const nextTplBlock = template.blocks?.[templateLayout[i]];
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
+          nextPlaceholder = nextTplBlock.placeholder;
+          break;
+        }
+        if (nextTplBlock?.fixed) break; // Stop at next fixed block
+      }
+
+      // For container blocks, compute childPlaceholders: a map of blocks field name
+      // to the first placeholder in that field. Handles containers with multiple
+      // blocks fields (columns, accordions) where the placeholder may be the first/only child.
+      let childPlaceholders = undefined;
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        for (const nestedId of nestedLayout) {
+          const nested = tplBlock.blocks[nestedId];
+          if (nested && !nested.fixed && nested.placeholder) {
+            if (!childPlaceholders) childPlaceholders = {};
+            childPlaceholders['blocks'] = nested.placeholder;
+            break;
+          }
+        }
+      }
+
+      addItem(
+        {
+          ...blockContent,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+          ...(nextPlaceholder && { nextPlaceholder }),
+          ...(childPlaceholders && { childPlaceholders }),
+        },
+        blockId
+      );
+
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        templateState.nestedContainers.set(tplBlock.blocks, {
+          templateBlockId: tplBlockId,
+          templateBlocks: tplBlock.blocks,
+          templateLayout: nestedLayout,
+        });
+      }
+    } else {
+      const placeholder = tplBlock.placeholder || 'default';
+      const insertIndex = items.length;
+
+      if (placeholder === 'default') {
+        defaultInsertIndex = insertIndex;
+      }
+      const position = slotPositions[placeholder];
+      if (position === 'bottom' && bottomSlotInsertIndex === -1) {
+        bottomSlotInsertIndex = insertIndex;
+      } else if (position === 'top' && topSlotInsertIndex === -1) {
+        topSlotInsertIndex = insertIndex;
+      }
+
+      if (!emittedPlaceholders.has(placeholder)) {
+        emittedPlaceholders.add(placeholder);
+        const content = pendingContent.get(placeholder) || [];
+        for (const { blockId, block } of content) {
+          addItem(
+            {
+              ...block,
+              templateId: templateId,
+              templateInstanceId: instanceId,
+              placeholder: placeholder,
+            },
+            blockId
+          );
+        }
+        pendingContent.delete(placeholder);
+      }
+    }
+  }
+
+  const remainingContent = [];
+  for (const [placeholder, content] of pendingContent) {
+    if (!emittedPlaceholders.has(placeholder)) {
+      emittedPlaceholders.add(placeholder);
+      for (const { blockId, block } of content) {
+        remainingContent.push({
+          ...block,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+          placeholder: 'default',
+          _orphaned: true,
+          '@uid': blockId,
+        });
+      }
+    }
+  }
+
+  if (remainingContent.length > 0) {
+    let insertIndex = -1;
+    if (defaultInsertIndex >= 0) {
+      insertIndex = defaultInsertIndex;
+    } else if (bottomSlotInsertIndex >= 0) {
+      insertIndex = bottomSlotInsertIndex;
+    } else if (topSlotInsertIndex >= 0) {
+      insertIndex = topSlotInsertIndex;
+    }
+
+    if (insertIndex >= 0) {
+      items.splice(insertIndex, 0, ...remainingContent);
+    }
+  }
+
+  for (const { blockId, block } of trailingStandaloneBlocks) {
+    addItem(block, blockId);
+  }
+
+  return items;
 }
 
 // Make initBridge available globally

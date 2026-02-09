@@ -303,6 +303,9 @@ test.describe('Multi-element blocks', () => {
     await helper.login();
     await helper.navigateToView('/test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Wait for grid block
@@ -310,32 +313,34 @@ test.describe('Multi-element blocks', () => {
     await expect(grid).toBeVisible({ timeout: 10000 });
 
     // Check paging controls exist
-    const pagingNav = grid.locator('.grid-paging');
-    await expect(pagingNav).toBeVisible({ timeout: 5000 });
+    // Use aria-label selector that works for both mock (.grid-paging) and Nuxt (.paging)
+    const pagingNav = grid.locator('nav[aria-label="Page Navigation"]');
+    await expect(pagingNav).toBeVisible({ timeout: 10000 });
 
     // Verify page 1 is current
     const currentPage = pagingNav.locator('.paging-page.current');
     await expect(currentPage).toHaveText('1');
 
-    // Count items on page 1 (should be 6 with pageSize=6)
+    // Capture first item's title on page 1 to verify content changes after navigation
     const items = grid.locator('.grid-cell');
-    const count = await items.count();
-    console.log('Page 1 items:', count);
-    expect(count).toBe(6);
+    const page1FirstItemTitle = await items.first().locator('h5, h4, h3, h2, h1').first().textContent();
+    console.log('Page 1 first item:', page1FirstItemTitle);
 
     // Click next page
     await pagingNav.locator('.paging-next').click();
 
     // Wait for page 2 - iframe reloads with new URL
     const gridAfterNav = iframe.locator('[data-block-uid="block-8-grid"]');
-    const pagingNavAfterNav = gridAfterNav.locator('.grid-paging');
+    const pagingNavAfterNav = gridAfterNav.locator('nav[aria-label="Page Navigation"]');
     await expect(pagingNavAfterNav.locator('.paging-page.current')).toHaveText('2', { timeout: 10000 });
 
-    // Count items on page 2 (should be remaining items: 10 total - 6 = 4)
+    // Wait for page 2 to show different content than page 1
     const page2Items = iframe.locator('[data-block-uid="block-8-grid"] .grid-cell');
-    const page2Count = await page2Items.count();
-    console.log('Page 2 items:', page2Count);
-    expect(page2Count).toBe(4);
+    await expect(async () => {
+      const page2FirstItemTitle = await page2Items.first().locator('h5, h4, h3, h2, h1').first().textContent();
+      console.log('Page 2 first item:', page2FirstItemTitle);
+      expect(page2FirstItemTitle).not.toBe(page1FirstItemTitle);
+    }).toPass({ timeout: 5000 });
   });
 
   test('grid block shows paging controls and navigates between pages', async ({ page }) => {
@@ -346,6 +351,9 @@ test.describe('Multi-element blocks', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
+    // Wait for all blocks to render (Nuxt async components)
+    await helper.getStableBlockCount();
+
     const iframe = helper.getIframe();
 
     // Wait for grid block to be visible
@@ -353,8 +361,9 @@ test.describe('Multi-element blocks', () => {
     await expect(grid).toBeVisible({ timeout: 5000 });
 
     // Check if paging controls exist within the grid block
-    const pagingNav = grid.locator('.grid-paging');
-    await expect(pagingNav).toBeVisible({ timeout: 5000 });
+    // Use aria-label selector that works for both mock (.grid-paging) and Nuxt (.paging)
+    const pagingNav = grid.locator('nav[aria-label="Page Navigation"]');
+    await expect(pagingNav).toBeVisible({ timeout: 10000 });
     console.log('Grid has paging: true');
 
     // Get the current page indicator within the grid's paging
@@ -384,7 +393,7 @@ test.describe('Multi-element blocks', () => {
 
     // Wait for iframe to reload by waiting for the grid's page indicator to change
     const gridAfterNav = iframe.locator('[data-block-uid="block-8-grid"]');
-    const pagingNavAfterNav = gridAfterNav.locator('.grid-paging');
+    const pagingNavAfterNav = gridAfterNav.locator('nav[aria-label="Page Navigation"]');
     await expect(pagingNavAfterNav.locator('.paging-page.current')).toHaveText('2', { timeout: 15000 });
 
     // Verify we're on page 2

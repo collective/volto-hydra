@@ -266,3 +266,83 @@ export function validateAndLog(formData, source, blockFieldTypes = {}) {
   }
   return valid;
 }
+
+// ============================================================================
+// Template Validation
+// ============================================================================
+
+/**
+ * Validate template placeholder structure.
+ *
+ * Rules:
+ * 1. Blocks with the same placeholder must be adjacent (contiguous)
+ * 2. Different placeholder groups must be separated by a fixed block
+ *
+ * @param {Object} formData - Page data with blocks and blocks_layout
+ * @returns {{ valid: boolean, blocksErrors: Object }} Validation result with Volto-compatible blocksErrors
+ */
+export function validateTemplatePlaceholders(formData) {
+  const blocksErrors = {};
+  const layout = formData.blocks_layout?.items || [];
+  const blocks = formData.blocks || {};
+
+  // Track placeholder groups and their positions
+  const placeholderGroups = new Map(); // placeholder -> [{ blockId, index }]
+  let lastPlaceholder = null;
+
+  for (let i = 0; i < layout.length; i++) {
+    const blockId = layout[i];
+    const block = blocks[blockId];
+    const isFixed = block?.fixed === true;
+
+    if (isFixed) {
+      lastPlaceholder = null; // Reset - fixed block separates groups
+      continue;
+    }
+
+    const placeholder = block?.placeholder;
+    if (!placeholder) continue;
+
+    // Track for contiguity check
+    if (!placeholderGroups.has(placeholder)) {
+      placeholderGroups.set(placeholder, []);
+    }
+    placeholderGroups.get(placeholder).push({ blockId, index: i });
+
+    // Check: different placeholder groups adjacent without fixed block between
+    if (lastPlaceholder !== null && lastPlaceholder !== placeholder) {
+      // We transitioned from one placeholder group to another without a fixed block
+      blocksErrors[blockId] = {
+        _layout: {
+          title: 'Missing Fixed Block',
+          message: `Placeholder groups "${lastPlaceholder}" and "${placeholder}" must be separated by a fixed block.`,
+        },
+      };
+    }
+
+    lastPlaceholder = placeholder;
+  }
+
+  // Check: same placeholder blocks must be contiguous
+  for (const [placeholder, entries] of placeholderGroups) {
+    if (entries.length > 1) {
+      for (let i = 1; i < entries.length; i++) {
+        if (entries[i].index !== entries[i - 1].index + 1) {
+          // This block breaks contiguity
+          const blockId = entries[i].blockId;
+          // Don't overwrite if already has an error
+          if (!blocksErrors[blockId]) {
+            blocksErrors[blockId] = {
+              _layout: {
+                title: 'Placeholder Position',
+                message: `This placeholder block is not adjacent to others in the "${placeholder}" group. Move this block or the previous one to make them contiguous.`,
+              },
+            };
+          }
+        }
+      }
+    }
+  }
+
+  return { valid: Object.keys(blocksErrors).length === 0, blocksErrors };
+}

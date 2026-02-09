@@ -19,7 +19,8 @@ import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
-import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, isBlockPositionLocked } from '@volto-hydra/hydra-js';
+import LayoutSelector from './LayoutSelector';
 
 const messages = defineMessages({
   blocks: {
@@ -102,6 +103,72 @@ const getBlockTitle = (blockData) => {
 };
 
 /**
+ * Group template instance children into sections by placeholder.
+ * Produces a sequence of:
+ * - { type: 'fixed', block } — standalone fixed block (no drag)
+ * - { type: 'placeholder', name, blocks: [...], precedingFixedId } — placeholder region
+ *
+ * Also inserts empty placeholder sections for nextPlaceholder on fixed blocks
+ * when all blocks in that region were deleted.
+ */
+const groupByPlaceholder = (childBlocks, templateEditMode) => {
+  const sections = [];
+  let currentPlaceholder = null;
+
+  for (const child of childBlocks) {
+    const isLocked = isBlockPositionLocked(child.data, templateEditMode);
+
+    if (isLocked) {
+      currentPlaceholder = null;
+      sections.push({ type: 'fixed', block: child });
+    } else {
+      const placeholderName = child.data?.placeholder || 'content';
+      if (!currentPlaceholder || currentPlaceholder.name !== placeholderName) {
+        currentPlaceholder = { type: 'placeholder', name: placeholderName, blocks: [] };
+        sections.push(currentPlaceholder);
+      }
+      currentPlaceholder.blocks.push(child);
+    }
+  }
+
+  // Insert empty placeholder sections for fixed blocks with nextPlaceholder
+  // when all blocks in the region were deleted
+  const result = [];
+  for (let i = 0; i < sections.length; i++) {
+    result.push(sections[i]);
+    if (sections[i].type === 'fixed') {
+      const nextPh = sections[i].block.data?.nextPlaceholder;
+      if (nextPh) {
+        const next = sections[i + 1];
+        if (!next || next.type !== 'placeholder' || next.name !== nextPh) {
+          result.push({
+            type: 'placeholder',
+            name: nextPh,
+            blocks: [],
+            precedingFixedId: sections[i].block.id,
+          });
+        }
+      }
+    }
+  }
+
+  // Set precedingFixedId on all placeholder sections (for add-after when section has blocks too)
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].type === 'placeholder' && !result[i].precedingFixedId) {
+      // Look back for the nearest fixed block
+      for (let j = i - 1; j >= 0; j--) {
+        if (result[j].type === 'fixed') {
+          result[i].precedingFixedId = result[j].block.id;
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
+};
+
+/**
  * Single container field section
  */
 const ContainerFieldSection = ({
@@ -109,14 +176,18 @@ const ContainerFieldSection = ({
   fieldTitle,
   childBlocks,
   allowedBlocks,
-  maxLength,
+  allowedTemplates,
+  allowedLayouts,
+  canAdd, // From getAllContainerFields - considers readonly, maxLength, etc.
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
   parentBlockId,
+  formData,
+  onChangeFormData,
+  blockPathMap,
 }) => {
   const intl = useIntl();
-  const canAdd = !maxLength || childBlocks.length < maxLength;
 
   // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
   const childList = childBlocks.map((child) => [child.id, child]);
@@ -139,6 +210,14 @@ const ContainerFieldSection = ({
       <div className="widget-header">
         <span className="widget-title">{fieldTitle}</span>
         <div className="widget-actions">
+          {onChangeFormData && allowedLayouts?.length > 0 && (
+            <LayoutSelector
+              formData={formData}
+              onChangeFormData={onChangeFormData}
+              allowedLayouts={allowedLayouts}
+              targetBlockId={parentBlockId}
+            />
+          )}
           {canAdd && (
             <button
               onClick={() => onAddBlock(parentBlockId, fieldName)}
@@ -220,6 +299,8 @@ const ChildBlocksWidget = ({
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
+  onChangeFormData,
+  templateEditMode,
 }) => {
   const intl = useIntl();
   const blocksConfig = config.blocks?.blocksConfig;
@@ -232,7 +313,7 @@ const ChildBlocksWidget = ({
   // If no block selected, show page-level blocks for each page field
   // Uses getAllContainerFields(PAGE_BLOCK_UID, ...) to get _page container fields
   if (!selectedBlock) {
-    const fieldsConfig = getAllContainerFields(PAGE_BLOCK_UID, blockPathMap, formData, blocksConfig, intl);
+    const fieldsConfig = getAllContainerFields(PAGE_BLOCK_UID, blockPathMap, formData, blocksConfig, intl, templateEditMode);
 
     if (!isClient) return null;
 
@@ -251,11 +332,16 @@ const ChildBlocksWidget = ({
               fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
               childBlocks={childBlocks}
               allowedBlocks={fieldConfig.allowedBlocks}
-              maxLength={fieldConfig.maxLength}
+              allowedTemplates={fieldConfig.allowedTemplates}
+              allowedLayouts={fieldConfig.allowedLayouts}
+              canAdd={fieldConfig.canAdd}
               onSelectBlock={onSelectBlock}
               onAddBlock={onAddBlock}
               onMoveBlock={onMoveBlock}
-              parentBlockId={null}
+              parentBlockId={PAGE_BLOCK_UID}
+              formData={formData}
+              onChangeFormData={onChangeFormData}
+              blockPathMap={blockPathMap}
             />
           );
         })}
@@ -271,6 +357,7 @@ const ChildBlocksWidget = ({
     formData,
     blocksConfig,
     intl,
+    templateEditMode,
   );
 
   // If no container fields, don't render anything
@@ -282,12 +369,102 @@ const ChildBlocksWidget = ({
   const target = document.getElementById('sidebar-order');
   if (!target) return null;
 
-  // Get the block data for retrieving children
-  const blockData = getBlockById(formData, blockPathMap, selectedBlock);
+  // Get the block data for retrieving children (use virtual blockData for template instances)
+  const pathInfo = blockPathMap[selectedBlock];
+  const blockData = pathInfo?.blockData || getBlockById(formData, blockPathMap, selectedBlock);
 
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
+        // For template instances, group children by placeholder
+        if (field.isTemplateInstance) {
+          const childIds = Object.entries(blockPathMap)
+            .filter(([, info]) => info.parentId === selectedBlock)
+            .map(([id]) => id);
+          const childBlocks = childIds.map((childId) => {
+            const childPathInfo = blockPathMap[childId];
+            const childData = getBlockById(formData, blockPathMap, childId);
+            const blockType = childPathInfo?.blockType || 'unknown';
+            const blockConfig = config.blocks?.blocksConfig?.[blockType];
+            const title = childData?.plaintext || blockConfig?.title || blockType;
+            return { id: childId, type: blockType, title, data: childData };
+          });
+
+          const sections = groupByPlaceholder(childBlocks, templateEditMode);
+          const instanceInfo = blockPathMap[selectedBlock];
+          const realParentId = instanceInfo?.parentId;
+          const realFieldName = instanceInfo?.containerField;
+
+          return sections.map((section, sectionIdx) => {
+            if (section.type === 'fixed') {
+              // Fixed block: clickable, no drag handle
+              return (
+                <div
+                  key={section.block.id}
+                  className="child-block-item fixed-block-item"
+                  onClick={() => onSelectBlock(section.block.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      onSelectBlock(section.block.id);
+                    }
+                  }}
+                >
+                  <span className="block-type">{section.block.title}</span>
+                  <span className="nav-arrow">›</span>
+                </div>
+              );
+            }
+
+            // Placeholder section: reuse ContainerFieldSection
+            const sectionBlockIds = section.blocks.map((b) => b.id);
+
+            // Wrap onMoveBlock to translate section reorder → full layout reorder
+            const wrappedMoveBlock = (_parentBlockId, _fieldName, reorderedIds) => {
+              const realParent = realParentId === PAGE_BLOCK_UID
+                ? formData
+                : getBlockById(formData, blockPathMap, realParentId);
+              const layoutField = `${realFieldName}_layout`;
+              const fullLayout = [...(realParent?.[layoutField]?.items || [])];
+              let idx = 0;
+              const newLayout = fullLayout.map((id) =>
+                sectionBlockIds.includes(id) ? reorderedIds[idx++] : id,
+              );
+              onMoveBlock(realParentId, realFieldName, newLayout);
+            };
+
+            // Wrap onAddBlock to insert after last block in section (or preceding fixed block)
+            const wrappedAddBlock = () => {
+              const afterBlockId = section.blocks.length > 0
+                ? section.blocks[section.blocks.length - 1].id
+                : section.precedingFixedId;
+              if (afterBlockId) {
+                onAddBlock(null, null, { afterBlockId });
+              }
+            };
+
+            const placeholderTitle = section.name.charAt(0).toUpperCase() + section.name.slice(1);
+            return (
+              <ContainerFieldSection
+                key={`placeholder-${section.name}-${sectionIdx}`}
+                fieldName={realFieldName}
+                fieldTitle={placeholderTitle}
+                childBlocks={section.blocks}
+                canAdd={true}
+                onSelectBlock={onSelectBlock}
+                onAddBlock={wrappedAddBlock}
+                onMoveBlock={wrappedMoveBlock}
+                parentBlockId={realParentId}
+                formData={formData}
+                onChangeFormData={onChangeFormData}
+                blockPathMap={blockPathMap}
+              />
+            );
+          });
+        }
+
+        // Standard container field
         const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
         return (
           <ContainerFieldSection
@@ -296,11 +473,16 @@ const ChildBlocksWidget = ({
             fieldTitle={field.title}
             childBlocks={childBlocks}
             allowedBlocks={field.allowedBlocks}
-            maxLength={field.maxLength}
+            allowedTemplates={field.allowedTemplates}
+            allowedLayouts={field.allowedLayouts}
+            canAdd={field.canAdd}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
             onMoveBlock={onMoveBlock}
             parentBlockId={selectedBlock}
+            formData={formData}
+            onChangeFormData={onChangeFormData}
+            blockPathMap={blockPathMap}
           />
         );
       })}
@@ -316,6 +498,8 @@ ChildBlocksWidget.propTypes = {
   onSelectBlock: PropTypes.func,
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
+  onChangeFormData: PropTypes.func,
+  templateEditMode: PropTypes.string,
 };
 
 export default ChildBlocksWidget;

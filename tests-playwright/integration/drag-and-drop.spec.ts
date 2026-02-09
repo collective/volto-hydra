@@ -190,8 +190,13 @@ test.describe('Block Drag and Drop', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
-    
+
     const iframe = helper.getIframe();
+
+    // Wait for block count to stabilize before getting order
+    // test-page has listing blocks that expand, so wait for stable count
+    await helper.getStableBlockCount();
+
     const initialBlocks = await helper.getBlockOrder();
 
     // Need at least 4 blocks for this test (use block at index 2 to avoid image block)
@@ -215,6 +220,9 @@ test.describe('Block Drag and Drop', () => {
 
     // Drag middle block using mouse events to place after last block
     await helper.dragBlockWithMouse(dragHandle, lastBlockElement, true);
+
+    // Wait for block count to stabilize after drag (listing blocks may re-expand)
+    await helper.getStableBlockCount();
 
     const newBlocks = await helper.getBlockOrder();
     console.log('[TEST] Final order:', newBlocks);

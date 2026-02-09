@@ -44,12 +44,22 @@ const sessionContent = {};
 const contentDirMap = {};
 
 /**
- * Get session ID from request header
+ * Get session ID from request header.
+ * Uses auth token as session identifier - each test login generates a unique
+ * token (based on timestamp), providing session isolation between tests.
+ * Both admin (Volto) and Nuxt SSR include Authorization headers, so they
+ * share the same session when using the same auth token.
  * @param {Object} req - Express request
- * @returns {string} Session ID (defaults to '_default' if not provided)
+ * @returns {string} Session ID (defaults to '_default' for unauthenticated requests)
  */
 function getSessionId(req) {
-  return req.headers['x-test-session'] || '_default';
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    return `token:${token}`;
+  }
+  // Unauthenticated requests use default session (no persistence)
+  return '_default';
 }
 
 /**
@@ -92,8 +102,9 @@ app.use((req, res, next) => {
   const parsedUrl = url.parse(req.url, true);
   let cleanPath = parsedUrl.pathname;
 
-  // Check if this is an API request (contains ++api++ prefix)
-  req.isApiRequest = cleanPath.includes('++api++');
+  // Check if this is an API request (contains ++api++ prefix or Accept: application/json header)
+  const acceptHeader = req.headers.accept || '';
+  req.isApiRequest = cleanPath.includes('++api++') || acceptHeader.includes('application/json');
 
   // Handle full VHM path: /VirtualHostBase/http/localhost:8888/++api++/VirtualHostRoot/@login
   const vhmPattern = /^\/VirtualHostBase\/[^/]+\/[^/]+\/\+\+api\+\+\/VirtualHostRoot(.*)$/;
@@ -278,13 +289,27 @@ function formatSearchItem(content, baseUrl) {
  * @returns {Object|null} The raw content object or null if not found
  */
 function loadRawContentFromDisk(urlPath) {
+  // First check contentDirMap (for pre-scanned content)
   const dirInfo = contentDirMap[urlPath];
-  if (!dirInfo) return null;
+  if (dirInfo) {
+    const dataPath = path.join(dirInfo.dirPath, 'data.json');
+    if (fs.existsSync(dataPath)) {
+      return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    }
+  }
 
-  const dataPath = path.join(dirInfo.dirPath, 'data.json');
-  if (!fs.existsSync(dataPath)) return null;
+  // Fallback: try to find content directly from disk for paths not in map
+  // This allows new content files added during tests to be found
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const relativePath = mountPath === '/' ? urlPath : urlPath.replace(mountPath, '');
+    const contentDir = path.join(dirPath, relativePath.replace(/^\//, ''));
+    const dataPath = path.join(contentDir, 'data.json');
+    if (fs.existsSync(dataPath)) {
+      return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    }
+  }
 
-  return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+  return null;
 }
 
 /**
@@ -470,7 +495,7 @@ function enrichContent(content, urlPath, baseUrl) {
 }
 
 /**
- * Scan content directory and populate contentDirMap
+ * Scan content directory and populate contentDirMap (recursively)
  * Content is loaded from disk on-demand, not cached
  */
 function scanContentDir(contentDirPath, mountPath) {
@@ -501,6 +526,8 @@ function scanContentDir(contentDirPath, mountPath) {
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
         console.log(`Registered content: ${urlPath}`);
       }
+      // Always recurse into subdirectories to find nested content (e.g., templates/)
+      scanContentDir(fullDirPath, mountPath);
     }
   });
 }
@@ -1527,6 +1554,27 @@ app.get('*', (req, res, next) => {
   const urlPath = req.path;
   const cleanPath = urlPath.replace('/++api++', '');
   const sessionId = getSessionId(req);
+
+  // Debug logging for template/page requests
+  if (cleanPath.includes('template') || cleanPath.includes('test-page')) {
+    const fs = require('fs');
+    const hasInSession = sessionId && sessionContent[sessionId]?.[cleanPath];
+    let contentPreview = '';
+    if (hasInSession) {
+      // Log content to verify edited value is present
+      const sessionData = sessionContent[sessionId][cleanPath];
+      const blockIds = sessionData?.blocks_layout?.items || Object.keys(sessionData?.blocks || {});
+      const firstBlockId = blockIds[0];
+      if (firstBlockId && sessionData?.blocks?.[firstBlockId]) {
+        const val = JSON.stringify(sessionData.blocks[firstBlockId].value || '');
+        contentPreview = ` firstBlock: ${val.substring(0, 150)}`;
+      }
+    }
+    const logMsg = `[GET] ${cleanPath} sessionId: ${sessionId} inSession: ${!!hasInSession}${contentPreview}\n`;
+    fs.appendFileSync('/tmp/mock-api-get.log', logMsg);
+    console.log(logMsg);
+  }
+
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
 
@@ -1553,20 +1601,40 @@ app.get('*', (req, res, next) => {
 
 /**
  * PATCH /:path
- * Update content - returns merged content but does NOT persist changes
- * This ensures test isolation (each test gets fresh fixture data)
+ * Update content - persists to session storage for authenticated requests.
+ * Default session ('_default') does NOT persist to ensure test isolation for
+ * unauthenticated requests.
  */
 app.patch('*', (req, res) => {
   const urlPath = req.path;
   const cleanPath = urlPath.replace('/++api++', '');
   const sessionId = getSessionId(req);
 
+  const fs = require('fs');
+  const logMsg = `[PATCH] ${cleanPath} sessionId: ${sessionId}\n`;
+  fs.appendFileSync('/tmp/mock-api-patch.log', logMsg);
+  console.log(logMsg);
+
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
-    // Return merged content but don't persist - ensures test isolation
     const mergedContent = { ...content, ...req.body };
+
+    // Persist to session storage for test verification when session is provided
+    // Default session doesn't persist to maintain backward compatibility
+    if (sessionId && sessionId !== '_default') {
+      console.log(`[PATCH] Persisting to session: ${sessionId} path: ${cleanPath}`);
+      setSessionContent(sessionId, cleanPath, mergedContent);
+      // Verify it was saved
+      const fs = require('fs');
+      const verifyInSession = sessionContent[sessionId]?.[cleanPath] ? 'YES' : 'NO';
+      const verifyMsg = `[PATCH VERIFY] ${cleanPath} in session: ${verifyInSession}\n`;
+      fs.appendFileSync('/tmp/mock-api-patch.log', verifyMsg);
+    } else {
+      console.log(`[PATCH] NOT persisting (no session or default)`);
+    }
+
     res.json(mergedContent);
   } else {
     res.status(404).json({
@@ -1588,6 +1656,13 @@ app.get('/hydra.js', (req, res) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.sendFile(hydraJsPath);
+});
+
+// Serve shared block schemas (used by test frontend via import)
+app.get('/shared-block-schemas.js', (req, res) => {
+  const filePath = path.join(__dirname, 'shared-block-schemas.js');
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.sendFile(filePath);
 });
 
 // Serve static files from content directories (for images, etc.)

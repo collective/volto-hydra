@@ -83,12 +83,25 @@ const applyConfig = (config) => {
         title: 'Body',
         widget: 'slate',
       };
-      schema.fieldsets[0].fields.unshift('value');
+      // Defensive check - fieldsets may not exist when called from applyBlockDefaultsWithContext
+      if (schema.fieldsets?.[0]?.fields) {
+        schema.fieldsets[0].fields.unshift('value');
+      }
       return schema;
     },
     sidebarTab: 1,
     mostUsed: true,
   };
+
+  // Override Slate hotkeys: use Ctrl+Shift+S for strikethrough (del) instead of Ctrl+S
+  // This frees Ctrl+S for the standard "save" action that users expect
+  if (config.settings.slate?.hotkeys) {
+    const { 'mod+s': removed, ...otherHotkeys } = config.settings.slate.hotkeys;
+    config.settings.slate.hotkeys = {
+      ...otherHotkeys,
+      'mod+shift+s': { format: 'del', type: 'inline' },
+    };
+  }
 
   // Image block: url field is added to blockSchema (not schemaEnhancer) so that
   // frontend's childBlockConfig recipe doesn't overwrite it.
@@ -240,6 +253,7 @@ const applyConfig = (config) => {
   // recipe doesn't lose it when it replaces the schemaEnhancer.
   config.blocks.blocksConfig.image = {
     ...config.blocks.blocksConfig.image,
+    mostUsed: true,
     blockSchema: (props) => {
       // applyBlockDefaults passes 'data', but ImageSchema expects 'formData'
       const formData = props.formData || props.data || {};
@@ -427,6 +441,12 @@ const applyConfig = (config) => {
     deleteRow: { label: 'Remove Row', icon: rowDeleteSVG },
     deleteColumn: { label: 'Remove Column', icon: columnDeleteSVG },
   };
+
+  // Add "templates" group to block chooser
+  config.blocks.groupBlocksOrder = [
+    ...(config.blocks.groupBlocksOrder || []),
+    { id: 'templates', title: 'Templates' },
+  ];
 
   return config;
 };

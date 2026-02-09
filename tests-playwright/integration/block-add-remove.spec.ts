@@ -120,39 +120,45 @@ test.describe('Adding Blocks', () => {
   });
 
   test('can add multiple blocks in succession', async ({ page }) => {
+    // This tests adding blocks mixing Enter and Add button:
+    // 1. Add first block via Add button
+    // 2. Press Enter in that block to create second block
+    // 3. Click Add button to create third block
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
     const initialCount = await helper.getBlockCount();
+    const initialBlocks = await helper.getBlockOrder();
 
-    // Add first block
+    // Add first block via Add button
     await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForSidebarOpen();
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
     await helper.waitForBlockCountToBe(initialCount + 1);
 
-    const countAfterFirst = await helper.getBlockCount();
-    expect(countAfterFirst).toBe(initialCount + 1);
+    // Find the first new block
+    let currentBlocks = await helper.getBlockOrder();
+    const firstNewBlockUid = currentBlocks.find(id => !initialBlocks.includes(id));
+    expect(firstNewBlockUid).toBeTruthy();
 
-    // Wait for iframe to stabilize after adding block
-    await page.waitForTimeout(500);
-
-    // Add second block
-    await helper.clickBlockInIframe('block-1-uuid');
-    await helper.clickAddBlockButton();
-    await helper.selectBlockType('image');
+    // Click on first new block and press Enter to create second block
+    const iframe = helper.getIframe();
+    const firstNewEditor = await helper.getEditorLocator(firstNewBlockUid!);
+    await firstNewEditor.click();
+    await firstNewEditor.press('Enter');
     await helper.waitForBlockCountToBe(initialCount + 2);
 
-    const countAfterSecond = await helper.getBlockCount();
-    expect(countAfterSecond).toBe(initialCount + 2);
+    // Find the second new block (created via Enter)
+    currentBlocks = await helper.getBlockOrder();
+    const secondNewBlockUid = currentBlocks.find(id => !initialBlocks.includes(id) && id !== firstNewBlockUid);
+    expect(secondNewBlockUid).toBeTruthy();
 
-    // Wait for iframe to stabilize after adding block
-    await page.waitForTimeout(500);
-
-    // Add third block
-    await helper.clickBlockInIframe('block-1-uuid');
+    // Now click Add button to create third block
+    await helper.clickBlockInIframe(secondNewBlockUid!);
+    await helper.waitForBlockSelected(secondNewBlockUid!);
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
     await helper.waitForBlockCountToBe(initialCount + 3);

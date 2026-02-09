@@ -216,11 +216,13 @@ async function renderBlock(blockId, block) {
 function renderSlateBlock(block) {
     const value = block.value || [];
     let html = '';
+    console.log('[TEST-FRONTEND] renderSlateBlock:', JSON.stringify(value?.slice(0,1)));
 
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        console.log('[TEST-FRONTEND] renderSlateBlock node:', node.type, 'nodeId:', node.nodeId, 'attr:', nodeIdAttr);
 
         const text = renderChildren(node.children);
         // Mark as editable field - hydra.js will read this and set contenteditable="true"
@@ -872,7 +874,7 @@ async function renderGridBlock(block, blockId) {
             return url.pathname + url.search;
         };
 
-        html += '<nav class="grid-paging" style="margin-top: 15px; text-align: center;">';
+        html += '<nav class="grid-paging" aria-label="Page Navigation" style="margin-top: 15px; text-align: center;">';
 
         // Previous link
         if (paging.prev !== null) {

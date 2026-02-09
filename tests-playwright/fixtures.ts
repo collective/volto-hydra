@@ -23,7 +23,12 @@ const baseTest = process.env.COVERAGE
 
 // Extend test to capture console logs from page and iframe
 const test = baseTest.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, use, testInfo) => {
+    // Session isolation is handled via auth tokens - each login generates a unique
+    // token (based on timestamp) which the mock API uses as the session identifier.
+    // Both admin (Volto) and Nuxt SSR include Authorization headers, so they share
+    // the same session when using the same auth token.
+
     // Capture main page console logs
     page.on('console', (msg) => {
       console.log(`[log] ${msg.text()}`);

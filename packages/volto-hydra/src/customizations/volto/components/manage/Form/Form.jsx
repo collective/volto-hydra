@@ -47,17 +47,20 @@ import {
 } from 'semantic-ui-react';
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
+import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
 import {
   setMetadataFieldsets,
   resetMetadataFocus,
   setSidebarTab,
   setFormData,
   setUIState,
+  updateContent,
 } from '@plone/volto/actions';
 import { compose } from 'redux';
 import config from '@plone/volto/registry';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
 import Iframe from '../../../../../components/Iframe/View';
+import { validateTemplatePlaceholders } from '../../../../../utils/formDataValidation';
 import './styles.css';
 
 /**
@@ -180,30 +183,34 @@ class Form extends Component {
     const initialFormData = cloneDeep(formData);
 
     // Adding fallback in case the fields are empty, so we are sure that the edit form
-    // shows at least the default blocks
+    // shows at least one block.  Consistent with getEmptyBlockType() in blockPath.js
+    // which also uses config.settings.defaultBlockType for page-level blocks.
     if (
       formData.hasOwnProperty(blocksFieldname) &&
       formData.hasOwnProperty(blocksLayoutFieldname)
     ) {
       if (
-        !formData[blocksLayoutFieldname] ||
-        isEmpty(formData[blocksLayoutFieldname].items)
+        (!formData[blocksLayoutFieldname] ||
+          isEmpty(formData[blocksLayoutFieldname].items)) &&
+        (!formData[blocksFieldname] || isEmpty(formData[blocksFieldname]))
       ) {
+        const emptyId = ids.text;
         formData[blocksLayoutFieldname] = {
-          items: [ids.title, ids.text],
+          items: [emptyId],
         };
-      }
-      if (!formData[blocksFieldname] || isEmpty(formData[blocksFieldname])) {
         formData[blocksFieldname] = {
-          [ids.title]: {
-            '@type': 'title',
-          },
-          [ids.text]: {
+          [emptyId]: {
             '@type': config.settings.defaultBlockType,
           },
         };
       }
     }
+
+    // Ensure all container blocks have at least one child block.
+    // Containers may be empty after loading from API (empty blocks are stripped on save).
+    formData = ensureAllContainersHaveBlocks(
+      formData, config.blocks.blocksConfig, props.intl, uuid,
+    );
 
     let selectedBlock = null;
     if (
@@ -257,6 +264,9 @@ class Form extends Component {
     this.onBlurField = this.onBlurField.bind(this);
     this.onClickInput = this.onClickInput.bind(this);
     this.onToggleMetadataFieldset = this.onToggleMetadataFieldset.bind(this);
+
+    // Ref for Iframe to provide template save function
+    this.saveTemplatesRef = { current: null };
   }
 
   /**
@@ -392,6 +402,28 @@ class Form extends Component {
    */
   componentDidMount() {
     this.setState({ isClient: true });
+
+    // Add Ctrl+S / Cmd+S save shortcut
+    this.handleSaveShortcut = (event) => {
+      const keyName = event.key?.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && keyName === 's') {
+        event.preventDefault();
+        event.stopPropagation();
+        this.onSubmit(event);
+      }
+    };
+    document.addEventListener('keydown', this.handleSaveShortcut);
+  }
+
+  /**
+   * Component will unmount
+   * @method componentWillUnmount
+   * @returns {undefined}
+   */
+  componentWillUnmount() {
+    if (this.handleSaveShortcut) {
+      document.removeEventListener('keydown', this.handleSaveShortcut);
+    }
   }
 
   /**
@@ -519,7 +551,7 @@ class Form extends Component {
    * @param {Object} event Event object.
    * @returns {undefined}
    */
-  onSubmit(event) {
+  async onSubmit(event) {
     const formData = this.state.formData;
 
     if (event) {
@@ -534,6 +566,10 @@ class Form extends Component {
         })
       : {};
 
+    // Validate template placeholder contiguity
+    const templateValidation = validateTemplatePlaceholders(formData);
+    const blocksErrors = templateValidation.blocksErrors;
+
     if (keys(errors).length > 0) {
       const activeIndex = FormValidation.showFirstTabWithErrors({
         errors,
@@ -541,7 +577,10 @@ class Form extends Component {
       });
       this.setState(
         {
-          errors,
+          errors: {
+            ...errors,
+            ...(!isEmpty(blocksErrors) && { blocks: blocksErrors }),
+          },
           activeIndex,
         },
         () => {
@@ -558,9 +597,38 @@ class Form extends Component {
       );
       // Changes the focus to the metadata tab in the sidebar if error
       this.props.setSidebarTab(0);
+    } else if (keys(blocksErrors).length > 0) {
+      // Template validation errors - show toast and highlight blocks
+      const firstBlockId = Object.keys(blocksErrors)[0];
+      const firstError = Object.values(blocksErrors[firstBlockId])[0];
+
+      this.setState({
+        errors: { blocks: blocksErrors },
+      });
+
+      toast.error(
+        <Toast
+          error
+          title={firstError.title || 'Template Error'}
+          content={firstError.message}
+        />,
+      );
+
+      // Select the first block with error
+      this.props.setUIState({
+        selected: firstBlockId,
+        multiSelected: [],
+        hovered: null,
+      });
+      this.props.setSidebarTab(1);
     } else {
-      // Get only the values that have been modified (Edit forms), send all in case that
-      // it's an add form
+      // Save templates first if the Iframe has set up the save function
+      if (this.props.isEditForm && this.saveTemplatesRef.current) {
+        const currentPath = this.props.pathname;
+        await this.saveTemplatesRef.current(formData, currentPath);
+      }
+
+      // Then save the page
       if (this.props.isEditForm) {
         this.props.onSubmit(this.getOnlyFormModifiedValues());
       } else {
@@ -587,7 +655,12 @@ class Form extends Component {
    * @returns {undefined}
    */
   getOnlyFormModifiedValues = () => {
-    const formData = this.state.formData;
+    // Strip empty placeholder blocks before diffing — they exist only for UX
+    // in edit mode and must never be persisted. Needs the full page formData
+    // so buildBlockPathMap can traverse all page-level blocks fields.
+    const formData = stripEmptyBlocks(
+      this.state.formData, config.blocks.blocksConfig, this.props.intl,
+    );
 
     const fieldsModified = Object.keys(
       difference(formData, this.state.initialFormData),
@@ -738,6 +811,7 @@ class Form extends Component {
             history={this.props.history}
             location={this.props.location}
             token={this.props.token}
+            saveTemplatesRef={this.saveTemplatesRef}
           />
           {/* BlocksForm removed - Hydra uses Iframe for block editing */}
           {this.state.isClient &&
@@ -994,6 +1068,7 @@ export default compose(
       setFormData,
       setUIState,
       resetMetadataFocus,
+      updateContent,
     },
     null,
     { forwardRef: true },

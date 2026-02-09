@@ -8,7 +8,7 @@ import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slat
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
-import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID, isBlockPositionLocked, isBlockReadonly } from '@volto-hydra/hydra-js';
 import { useDispatch } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -143,6 +143,8 @@ const SyncedSlateToolbar = ({
   onFileUpload, // Handler for file uploads: (fieldName, file) => void
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  onMakeTemplate, // Handler for "Make Template" action
+  templateEditMode, // instanceId of template being edited, or null
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -354,6 +356,9 @@ const SyncedSlateToolbar = ({
       // Restore focus to the specific field in the iframe after LinkEditor closes
       // We know which block and field was selected when the popup opened
       if (iframeElement?.contentWindow && selectedBlock) {
+        // Focus the iframe element first - browser won't let field.focus() work
+        // inside an iframe unless the iframe itself has focus in the parent document
+        iframeElement.focus();
         const fieldName = blockUI?.focusedFieldName || 'value';
         iframeElement.contentWindow.postMessage({
           type: 'FOCUS_FIELD',
@@ -831,10 +836,12 @@ const SyncedSlateToolbar = ({
   const fieldValue = block[fieldName];
 
   // Determine if we should show format buttons based on field type
+  // Also hide for readonly blocks (e.g., fixed template blocks, or blocks outside template in edit mode)
   const blockType = block?.['@type'];
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
-  const showFormatButtons = isSlateFieldType(fieldType);
+  const blockIsReadonly = isBlockReadonly(block, templateEditMode);
+  const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly;
 
   // Debug: Check what blockFieldTypes the toolbar is receiving
   if (blockType === 'hero') {
@@ -948,28 +955,55 @@ const SyncedSlateToolbar = ({
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
-      {/* Drag handle - only show for blocks, not page-level fields */}
-      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID ? (
-        <div
-          className="drag-handle"
-          style={{
-            cursor: 'move',
-            padding: '4px 6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            color: '#666',
-            fontSize: '14px',
-            background: '#e8e8e8',
-            borderRadius: '2px',
-          }}
-        >
-          ⠿
-        </div>
-      ) : (
-        <div style={{ width: '8px' }} /> // Spacer for page-level fields
-      )}
+      {/* Drag handle or lock icon - only show for blocks, not page-level fields */}
+      {(() => {
+        if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
+          return <div style={{ width: '8px' }} />; // Spacer for page-level fields
+        }
+        // Use shared utility to check position lock (handles template edit mode)
+        const block = getBlock(selectedBlock);
+        const isLocked = isBlockPositionLocked(block, templateEditMode);
+        if (isLocked) {
+          return (
+            <div
+              className="lock-icon"
+              title="This block is part of a template and cannot be moved"
+              style={{
+                padding: '4px 6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                color: '#999',
+                fontSize: '14px',
+                background: '#f5f5f5',
+                borderRadius: '2px',
+              }}
+            >
+              🔒
+            </div>
+          );
+        }
+        return (
+          <div
+            className="drag-handle"
+            style={{
+              cursor: 'move',
+              padding: '4px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              color: '#666',
+              fontSize: '14px',
+              background: '#e8e8e8',
+              borderRadius: '2px',
+            }}
+          >
+            ⠿
+          </div>
+        );
+      })()}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable
@@ -1014,7 +1048,8 @@ const SyncedSlateToolbar = ({
       )}
 
       {/* Field-specific buttons for linkable/media fields */}
-      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && (
+      {/* Skip for readonly blocks */}
+      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && (
         <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center', position: 'relative' }}>
           {blockUI?.focusedLinkableField && (
             <button
@@ -1162,6 +1197,9 @@ const SyncedSlateToolbar = ({
         addDirection={blockUI?.addDirection}
         convertibleTypes={convertibleTypes}
         onConvertBlock={onConvertBlock}
+        isFixed={blockPathMap?.[selectedBlock]?.isFixed}
+        isInTemplate={!!block?.templateId}
+        onMakeTemplate={onMakeTemplate}
       />
     )}
 
@@ -1221,7 +1259,8 @@ const SyncedSlateToolbar = ({
     })()}
 
     {/* Media Field Overlays - show when block is selected, for each media field */}
-    {blockUI?.mediaFields && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
+    {/* Skip for readonly blocks - they shouldn't show media editing UI */}
+    {blockUI?.mediaFields && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
       const mediaValue = getBlock(selectedBlock)?.[fieldName];
       const hasMediaValue = mediaValue && (
         (Array.isArray(mediaValue) && mediaValue.length > 0) ||

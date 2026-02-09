@@ -1,0 +1,84 @@
+{
+  "@id": "/template-test-page-2",
+  "@type": "Document",
+  "id": "template-test-page-2",
+  "title": "Template Test Page 2",
+  "description": "Second test page using the same layout template",
+  "blocks": {
+    "page2-standalone-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Page 2 standalone block" }]
+        }
+      ],
+      "plaintext": "Page 2 standalone block"
+    },
+    "page2-template-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        {
+          "type": "h1",
+          "children": [{ "text": "Stale Header Page 2 - Should Be Replaced By Merge" }]
+        }
+      ],
+      "plaintext": "Stale Header Page 2 - Should Be Replaced By Merge",
+      "templateId": "/templates/test-layout",
+      "templateInstanceId": "tpl-instance-2",
+      "placeholder": "header"
+    },
+    "page2-user-content": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Page 2 user content in placeholder" }]
+        }
+      ],
+      "plaintext": "Page 2 user content in placeholder",
+      "templateId": "/templates/test-layout",
+      "templateInstanceId": "tpl-instance-2",
+      "placeholder": "primary"
+    },
+    "page2-template-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Stale Footer Page 2 - Should Be Replaced By Merge" }]
+        }
+      ],
+      "plaintext": "Stale Footer Page 2 - Should Be Replaced By Merge",
+      "templateId": "/templates/test-layout",
+      "templateInstanceId": "tpl-instance-2",
+      "placeholder": "footer"
+    }
+  },
+  "blocks_layout": {
+    "items": ["page2-standalone-1", "page2-template-header", "page2-user-content", "page2-template-footer"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/template-test-page-2/@actions",
+      "object": [
+        {
+          "@id": "/template-test-page-2/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/template-test-page-2/@breadcrumbs",
+      "items": [
+        { "@id": "/template-test-page-2", "title": "Template Test Page 2" }
+      ]
+    }
+  }
+}

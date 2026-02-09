@@ -27,11 +27,14 @@ for (const [key, value] of Object.entries(route.query)) {
 }
 
 // Expand dynamic blocks - uses shared paging object
-const { items: expandedItems, paging } = await expandListingBlocks(
-  props.blocks,
-  props.layout,
-  { apiUrl: props.apiUrl, contextPath: props.contextPath, paging: props.paging, itemTypeField: 'variation', extraCriteria }
-);
+const { items: expandedItems, paging } = await expandListingBlocks(props.layout, {
+  blocks: props.blocks,
+  apiUrl: props.apiUrl,
+  contextPath: props.contextPath,
+  paging: props.paging,
+  itemTypeField: 'variation',
+  extraCriteria,
+});
 
 // Build paging URL
 const buildPagingUrl = (page) => {
