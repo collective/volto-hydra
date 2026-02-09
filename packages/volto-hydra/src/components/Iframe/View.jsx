@@ -560,6 +560,7 @@ const Iframe = (props) => {
   // Pending template edit exit - stores { requestId, prevInstanceId } when waiting for flush
   const pendingTemplateEditExitRef = useRef(null);
 
+
   // Trigger for template sync effect - INIT increments this when templates need loading
   // This causes the effect to run and fetch templates, then send deferred INITIAL_DATA
   const [templateSyncTrigger, setTemplateSyncTrigger] = useState(0);
@@ -571,6 +572,30 @@ const Iframe = (props) => {
     if (!saveTemplatesRef) return;
 
     saveTemplatesRef.current = async (formData, currentPath) => {
+      // Flush any pending inline edit text from the iframe before saving.
+      // Text typed in the iframe is debounced, so it may not have been sent
+      // via INLINE_EDIT_DATA yet. The flush ensures formData is up to date.
+      if (referenceElement?.contentWindow) {
+        await new Promise((resolve) => {
+          const requestId = `save-flush-${Date.now()}`;
+          const handleMessage = (event) => {
+            if (
+              (event.data.type === 'BUFFER_FLUSHED' && event.data.requestId === requestId) ||
+              (event.data.type === 'INLINE_EDIT_DATA' && event.data.flushRequestId === requestId)
+            ) {
+              window.removeEventListener('message', handleMessage);
+              // Let React process the INLINE_EDIT_DATA state update
+              setTimeout(resolve, 0);
+            }
+          };
+          window.addEventListener('message', handleMessage);
+          referenceElement.contentWindow.postMessage(
+            { type: 'FLUSH_BUFFER', requestId },
+            '*'
+          );
+        });
+      }
+
       const templateCache = templateCacheRef.current;
       const templateIds = getUniqueTemplateIds(formData).filter(
         id => id !== currentPath && templateCache[id]
@@ -609,7 +634,7 @@ const Iframe = (props) => {
         }
       }));
     };
-  }, [saveTemplatesRef]);
+  }, [saveTemplatesRef, referenceElement]);
 
   // Handle pending template edit exit after flush completes
   // When exiting template edit mode, we first flush pending text updates,

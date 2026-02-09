@@ -9672,6 +9672,16 @@ export async function expandTemplates(inputItems, options = {}) {
  * Requires all templates to be pre-loaded in options.templates.
  * Throws if a required template is not found in the pre-loaded map.
  *
+ * This function is called recursively: the top-level BlocksRenderer calls it for
+ * the page layout, and the expanded result may contain container blocks (columns,
+ * accordions, etc.) whose child BlocksRenderers call it again. Nested containers
+ * are detected via templateState.nestedContainers (keyed by blocksDict reference)
+ * and handled by processNestedTemplateLevel instead of the main path.
+ *
+ * templateState is shared across all BlocksRenderer instances on the page (via
+ * Vue provide/inject or similar). It must be a fresh {} for each page render to
+ * avoid stale state across navigations.
+ *
  * @param {Array} inputItems - Input items (block IDs or block objects)
  * @param {Object} options - Configuration options
  * @param {Object} options.templates - Map of templateId -> template data (REQUIRED)
@@ -9795,12 +9805,15 @@ export function expandTemplatesSync(inputItems, options = {}) {
     }
   }
 
-  // Get or create instance context
+  // Get or create instance context.
+  // Always rebuild ctx when the instanceId is re-encountered (e.g. after save,
+  // the API returns blocks with the same templateInstanceId but different content).
+  // The ctx is mutated during processing (pendingContent consumed, emittedPlaceholders
+  // populated) so it cannot be reused.
   let ctx = templateState.instances[instanceId];
-
-  // Return cached results for idempotency (same blocksDict returns same results)
-  if (ctx?.cachedResults) {
-    return ctx.cachedResults;
+  if (ctx) {
+    delete templateState.instances[instanceId];
+    ctx = null;
   }
 
   if (!ctx) {
@@ -9814,7 +9827,6 @@ export function expandTemplatesSync(inputItems, options = {}) {
       leadingStandaloneBlocks: [],
       trailingStandaloneBlocks: [],
       newTemplateIds: new Set(),
-      cachedResults: null, // For idempotency
     };
     templateState.instances[instanceId] = ctx;
 
@@ -10058,9 +10070,6 @@ export function expandTemplatesSync(inputItems, options = {}) {
   for (const { blockId, block } of trailingStandaloneBlocks) {
     addItem(block, blockId);
   }
-
-  // Cache results for idempotency
-  ctx.cachedResults = items;
 
   return items;
 }

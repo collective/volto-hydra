@@ -6,6 +6,8 @@
  * 2. Removing a layout preserves content
  * 3. Deleting a template instance preserves placeholder content
  * 4. Non-matching placeholder content goes to default placeholder
+ *
+ * TODO: Add test where the same template is inserted twice on a page
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -252,12 +254,23 @@ test.describe('Template Placeholder Replacement', () => {
     const newBlockUid = blockIdsAfter.find(id => !blockIdsBefore.has(id));
     expect(newBlockUid).toBeTruthy();
 
+    // Type content into the new block so it's not empty
+    await helper.clickBlockInIframe(newBlockUid!);
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"]`);
+    const slateField = helper.getSlateField(newBlock);
+    await expect(slateField).toBeVisible({ timeout: 5000 });
+    await slateField.click();
+    await page.keyboard.type('New placeholder content');
+    await expect(slateField).toContainText('New placeholder content');
+
     // Save (goes to view mode) — verify the new block persists after merge
     await helper.saveContent();
 
     // In view mode the bridge runs the merge again.
     // The new block should survive because it inherited placeholder: "primary".
-    await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).toBeVisible({ timeout: 15000 });
+    // Check by content (more robust than UID which may change during template re-merge on some frontends).
+    const newContentBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'New placeholder content' });
+    await expect(newContentBlock).toBeVisible({ timeout: 15000 });
 
     // Original placeholder blocks should be gone
     await expect(iframe.locator('[data-block-uid="user-content-1"]')).not.toBeVisible();

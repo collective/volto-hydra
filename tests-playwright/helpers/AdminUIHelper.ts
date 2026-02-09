@@ -1928,12 +1928,15 @@ export class AdminUIHelper {
 
   /**
    * Save the current content being edited.
+   * Clicks Save, waits for navigation out of /edit, and waits for iframe to render.
    */
   async saveContent(): Promise<void> {
     const saveButton = this.page.locator('#toolbar-save, button:has-text("Save")');
     await saveButton.click();
-    // Wait for save to complete
-    await this.page.waitForTimeout(1000);
+    // Wait for URL to navigate away from /edit (save triggers redirect to view mode)
+    await this.page.waitForURL((url) => !url.pathname.endsWith('/edit'), { timeout: 15000 });
+    // Wait for iframe to load view-mode content
+    await this.waitForIframeReady();
   }
 
   /**
