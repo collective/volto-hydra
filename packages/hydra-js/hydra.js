@@ -168,6 +168,13 @@ export class Bridge {
     // Template edit mode - when set to an instanceId, blocks inside that instance
     // become editable (even if readOnly), and blocks outside become locked
     this.templateEditMode = null; // instanceId of template being edited
+    // Track iframe focus state via window focus/blur events.
+    // document.hasFocus() is unreliable in headless browsers (always returns false),
+    // but window focus/blur events are dispatched by Chromium's internal frame focus
+    // manager regardless of OS-level window focus.
+    this._iframeFocused = document.hasFocus();
+    window.addEventListener('focus', () => { this._iframeFocused = true; });
+    window.addEventListener('blur', () => { this._iframeFocused = false; });
     this.init(options); // Initialize the bridge
   }
 
@@ -1339,6 +1346,17 @@ export class Bridge {
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
 
+            // Block keyboard input during re-render to prevent keystrokes hitting
+            // detached DOM elements. The re-render callback replaces innerHTML, which
+            // destroys the focused element; any keystroke arriving between now and
+            // afterContentRender (where focus is restored) would be lost.
+            // Only block when inline editing and not already blocked by a format op.
+            if (this.isInlineEditing && this.focusedFieldName && !this.blockedBlockId) {
+              this._ensureDocumentKeyboardBlocker();
+              this.blockedBlockId = this.selectedBlockUid;
+              this._reRenderBlocking = true;
+            }
+
             // Call the callback first to trigger the re-render
             // Support async callbacks (e.g., renderContentWithListings)
             log('Calling onEditChange callback to trigger re-render');
@@ -1404,12 +1422,6 @@ export class Bridge {
           // Restore focus to a specific field (e.g., after LinkEditor closes)
           const { blockId, fieldName } = event.data;
           log('Received FOCUS_FIELD:', blockId, fieldName);
-
-          // Set flag so that if a FORM_DATA arrives and re-renders the DOM,
-          // updateBlockUIAfterFormData will refocus even when skipFocus=true.
-          // Without this, FOCUS_FIELD focuses the field, then FORM_DATA re-renders
-          // and destroys the focused element without restoring focus.
-          this._pendingFocusRestore = true;
 
           const blockElement = document.querySelector(`[data-block-uid="${blockId}"]`);
           if (blockElement) {
@@ -1724,6 +1736,44 @@ export class Bridge {
    * @param {string} blockId - Block UID to block/unblock
    * @param {boolean} processing - true to block input, false to unblock
    */
+  /**
+   * Ensures the document-level keyboard blocker is attached.
+   * The blocker intercepts keydown/keypress/input/beforeinput when blockedBlockId is set,
+   * buffering keydown events in eventBuffer for later replay.
+   * Created once and reused — the handler checks blockedBlockId before acting.
+   */
+  _ensureDocumentKeyboardBlocker() {
+    if (this._documentKeyboardBlocker) return;
+    this._documentKeyboardBlocker = (e) => {
+      if (!this.blockedBlockId) return;
+
+      const targetBlock = e.target.closest?.('[data-block-uid]');
+      if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
+        return;
+      }
+
+      if (e.type === 'keydown') {
+        this.eventBuffer.push({
+          key: e.key,
+          code: e.code,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+        });
+        log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+
+    document.addEventListener('keydown', this._documentKeyboardBlocker, true);
+    document.addEventListener('keypress', this._documentKeyboardBlocker, true);
+    document.addEventListener('input', this._documentKeyboardBlocker, true);
+    document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
+  }
+
   setBlockProcessing(blockId, processing = true, requestId = null) {
     log('setBlockProcessing:', { blockId, processing, requestId });
 
@@ -1733,42 +1783,7 @@ export class Bridge {
       this.eventBuffer = [];
       this.blockedBlockId = blockId;
 
-      // Create keyboard blocker function that buffers keydown events for replay
-      // Attached to document so it survives DOM re-renders
-      if (!this._documentKeyboardBlocker) {
-        this._documentKeyboardBlocker = (e) => {
-          // Only block if we have an active blocked block
-          if (!this.blockedBlockId) return;
-
-          // Check if event is targeting our blocked block (even after re-render)
-          const targetBlock = e.target.closest?.('[data-block-uid]');
-          if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
-            return; // Not our block, let it through
-          }
-
-          // Buffer keydown events for replay after transform completes
-          if (e.type === 'keydown') {
-            this.eventBuffer.push({
-              key: e.key,
-              code: e.code,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-              shiftKey: e.shiftKey,
-              altKey: e.altKey,
-            });
-            log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
-          }
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        };
-
-        // Attach to document so it survives DOM re-renders
-        document.addEventListener('keydown', this._documentKeyboardBlocker, true);
-        document.addEventListener('keypress', this._documentKeyboardBlocker, true);
-        document.addEventListener('input', this._documentKeyboardBlocker, true);
-        document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
-      }
+      this._ensureDocumentKeyboardBlocker();
 
       // Visual feedback on current element
       const block = document.querySelector(`[data-block-uid="${blockId}"]`);
@@ -3330,21 +3345,20 @@ export class Bridge {
         }
 
         // Update block UI overlay positions after form data changes
-        const hasPendingFocus = this._pendingFocusRestore;
-        this._pendingFocusRestore = false;
         // Detect focus lost due to re-render: user was editing a field but
         // focus is now on body (Vue/Nuxt replaced the DOM element).
-        // Without this, only the first FORM_DATA after FOCUS_FIELD restores focus;
-        // a second FORM_DATA re-render would leave focus on body permanently.
-        // Check document.hasFocus() to avoid stealing focus from the sidebar:
-        // when the user is typing in the sidebar, the iframe's activeElement is
-        // body (since focus is in the parent window), but hasFocus() is false.
+        // Use _iframeFocused (tracked via window focus/blur events) instead of
+        // document.hasFocus() — the latter is unreliable in headless browsers
+        // (always returns false), but window focus/blur events fire correctly
+        // because they're dispatched by Chromium's internal frame focus manager.
+        // This avoids stealing focus from the sidebar: when the user is typing
+        // in the sidebar, the iframe receives a blur event → _iframeFocused=false.
         const focusLost = this.focusedFieldName &&
-            document.hasFocus() &&
+            this._iframeFocused &&
             (!document.activeElement ||
              document.activeElement === document.body ||
              document.activeElement === document.documentElement);
-        const skipFocus = !transformedSelection && !hasPendingFocus && !focusLost;
+        const skipFocus = !transformedSelection && !focusLost;
 
         if (transformedSelection) {
           this.savedClickPosition = null;
@@ -3419,6 +3433,24 @@ export class Bridge {
           }
           if (this.eventBuffer.length > 0) {
             log('Redirecting eventBuffer to new block:', adminSelectedBlockUid);
+          }
+        }
+
+        // Replay keystrokes buffered during re-render (separate from format op replay)
+        if (this._reRenderBlocking) {
+          this._reRenderBlocking = false;
+          if (this.eventBuffer.length > 0) {
+            log('Replaying', this.eventBuffer.length, 're-render buffered events');
+            this.pendingBufferReplay = {
+              blockId: this.selectedBlockUid,
+              buffer: [...this.eventBuffer],
+            };
+            this.eventBuffer = [];
+            this.replayBufferedEvents();
+          }
+          // Clear blocking only if no format op is pending
+          if (!this.pendingTransform) {
+            this.blockedBlockId = null;
           }
         }
 
