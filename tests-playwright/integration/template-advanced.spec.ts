@@ -269,6 +269,161 @@ test.describe('Template Placeholder Replacement', () => {
   });
 });
 
+test.describe('Template Sidebar Placeholder Sections', () => {
+  test('sidebar groups template children by placeholder with fixed blocks between', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Click a template block then Escape up to the template virtual block
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
+    await headerBlock.click();
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Should be at template instance level
+    const stickyHeaders = page.locator('.sidebar-section-header.sticky-header');
+    await expect(stickyHeaders.nth(1)).toContainText('Template: test-layout');
+
+    // Fixed blocks should appear as fixed-block-items (no drag handle)
+    const fixedItems = page.locator('#sidebar-order .fixed-block-item');
+    await expect(fixedItems.first()).toBeVisible({ timeout: 5000 });
+    const fixedCount = await fixedItems.count();
+    expect(fixedCount).toBeGreaterThanOrEqual(3); // header, grid, footer
+
+    // Placeholder section should show "Primary" header with user content blocks
+    const primarySection = page.locator('.container-field-section').filter({
+      has: page.locator('.widget-title', { hasText: 'Primary' }),
+    });
+    await expect(primarySection).toBeVisible({ timeout: 5000 });
+
+    // Primary section should have 2 draggable child blocks (user-content-1, user-content-2)
+    const primaryItems = primarySection.locator('.child-block-item');
+    await expect(primaryItems).toHaveCount(2);
+
+    // Drag handles should be visible on placeholder blocks (they're draggable)
+    const dragHandles = primarySection.locator('.drag-handle');
+    await expect(dragHandles).toHaveCount(2);
+
+    // Fixed blocks should NOT have drag handles
+    for (let i = 0; i < fixedCount; i++) {
+      await expect(fixedItems.nth(i).locator('.drag-handle')).not.toBeVisible();
+    }
+  });
+
+  test('DnD reorders blocks within a placeholder section', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Navigate to template instance level
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
+    await headerBlock.click();
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Find the Primary placeholder section
+    const primarySection = page.locator('.container-field-section').filter({
+      has: page.locator('.widget-title', { hasText: 'Primary' }),
+    });
+    await expect(primarySection).toBeVisible({ timeout: 5000 });
+
+    // Verify initial order: user-content-1 before user-content-2
+    await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible();
+    await expect(iframe.locator('[data-block-uid="user-content-2"]')).toBeVisible();
+
+    const initialOrder = await iframe.locator('main [data-block-uid], #content [data-block-uid]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+    const idx1 = initialOrder.indexOf('user-content-1');
+    const idx2 = initialOrder.indexOf('user-content-2');
+    expect(idx1).toBeLessThan(idx2);
+
+    // Use keyboard-based DnD (more reliable than mouse in automated tests)
+    // react-beautiful-dnd: focus drag handle → Space to grab → ArrowDown to move → Space to drop
+    const firstHandle = primarySection.locator('.drag-handle').first();
+    await firstHandle.focus();
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Space');
+
+    // Verify order changed in iframe: user-content-2 now before user-content-1
+    await expect(async () => {
+      const newOrder = await iframe.locator('main [data-block-uid], #content [data-block-uid]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+      const newIdx1 = newOrder.indexOf('user-content-1');
+      const newIdx2 = newOrder.indexOf('user-content-2');
+      expect(newIdx2).toBeLessThan(newIdx1);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('add block into placeholder section via sidebar [+] button', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Navigate to template instance level
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
+    await headerBlock.click();
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Find the Primary placeholder section
+    const primarySection = page.locator('.container-field-section').filter({
+      has: page.locator('.widget-title', { hasText: 'Primary' }),
+    });
+    await expect(primarySection).toBeVisible({ timeout: 5000 });
+
+    // Initial count of blocks in Primary section
+    const initialItems = primarySection.locator('.child-block-item');
+    await expect(initialItems).toHaveCount(2);
+
+    // Record block IDs before adding
+    const blockIdsBefore = new Set(await helper.getBlockOrder());
+
+    // Click the [+] button in the Primary section header
+    const addButton = primarySection.locator('.widget-actions button');
+    await addButton.click();
+
+    // BlockChooser should appear — select slate
+    await helper.selectBlockType('slate');
+
+    // Wait for new block to appear in iframe
+    await expect(async () => {
+      const currentIds = await helper.getBlockOrder();
+      expect(currentIds.length).toBeGreaterThan(blockIdsBefore.size);
+    }).toPass({ timeout: 5000 });
+
+    // Find the new block ID
+    const blockIdsAfter = await helper.getBlockOrder();
+    const newBlockId = blockIdsAfter.find((id: string) => !blockIdsBefore.has(id));
+    expect(newBlockId).toBeTruthy();
+
+    // The new block should be in the iframe between user-content-2 and the footer
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
+    await expect(newBlock).toBeVisible({ timeout: 5000 });
+
+    // Verify the new block is positioned after user-content-2 (the last block in the primary section)
+    const finalOrder = await iframe.locator('main [data-block-uid], #content [data-block-uid]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
+    const idxContent2 = finalOrder.indexOf('user-content-2');
+    const idxNew = finalOrder.indexOf(newBlockId);
+    expect(idxNew).toBe(idxContent2 + 1);
+  });
+});
+
 test.describe('allowedTemplates vs allowedLayouts', () => {
   test('template in allowedTemplates appears in BlockChooser Templates group', async ({ page }) => {
     const helper = new AdminUIHelper(page);

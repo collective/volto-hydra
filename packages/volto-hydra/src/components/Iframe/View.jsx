@@ -3481,8 +3481,21 @@ const Iframe = (props) => {
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}
-        onAddBlock={(parentBlockId, fieldName) => {
-          handleSidebarAdd(parentBlockId, fieldName);
+        onAddBlock={(parentBlockId, fieldName, options) => {
+          if (options?.afterBlockId) {
+            // Template placeholder section: add after specific block
+            const afterId = options.afterBlockId;
+            const afterPathInfo = iframeSyncState.blockPathMap?.[afterId];
+            const allowed = afterPathInfo?.allowedSiblingTypes || null;
+            if (allowed?.length === 1) {
+              insertAndSelectBlock(afterId, allowed[0], 'after');
+            } else {
+              setPendingAdd({ mode: 'iframe', afterBlockId: afterId });
+              setAddNewBlockOpened(true);
+            }
+          } else {
+            handleSidebarAdd(parentBlockId, fieldName);
+          }
         }}
         onMoveBlock={(parentBlockId, fieldName, newOrder) => {
           const newFormData = reorderBlocksInContainer(

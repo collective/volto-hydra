@@ -19,7 +19,7 @@ import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
-import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, isBlockPositionLocked } from '@volto-hydra/hydra-js';
 import LayoutSelector from './LayoutSelector';
 
 const messages = defineMessages({
@@ -100,6 +100,72 @@ const getBlockTitle = (blockData) => {
 
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   return blockConfig?.title || blockType;
+};
+
+/**
+ * Group template instance children into sections by placeholder.
+ * Produces a sequence of:
+ * - { type: 'fixed', block } — standalone fixed block (no drag)
+ * - { type: 'placeholder', name, blocks: [...], precedingFixedId } — placeholder region
+ *
+ * Also inserts empty placeholder sections for nextPlaceholder on fixed blocks
+ * when all blocks in that region were deleted.
+ */
+const groupByPlaceholder = (childBlocks, templateEditMode) => {
+  const sections = [];
+  let currentPlaceholder = null;
+
+  for (const child of childBlocks) {
+    const isLocked = isBlockPositionLocked(child.data, templateEditMode);
+
+    if (isLocked) {
+      currentPlaceholder = null;
+      sections.push({ type: 'fixed', block: child });
+    } else {
+      const placeholderName = child.data?.placeholder || 'content';
+      if (!currentPlaceholder || currentPlaceholder.name !== placeholderName) {
+        currentPlaceholder = { type: 'placeholder', name: placeholderName, blocks: [] };
+        sections.push(currentPlaceholder);
+      }
+      currentPlaceholder.blocks.push(child);
+    }
+  }
+
+  // Insert empty placeholder sections for fixed blocks with nextPlaceholder
+  // when all blocks in the region were deleted
+  const result = [];
+  for (let i = 0; i < sections.length; i++) {
+    result.push(sections[i]);
+    if (sections[i].type === 'fixed') {
+      const nextPh = sections[i].block.data?.nextPlaceholder;
+      if (nextPh) {
+        const next = sections[i + 1];
+        if (!next || next.type !== 'placeholder' || next.name !== nextPh) {
+          result.push({
+            type: 'placeholder',
+            name: nextPh,
+            blocks: [],
+            precedingFixedId: sections[i].block.id,
+          });
+        }
+      }
+    }
+  }
+
+  // Set precedingFixedId on all placeholder sections (for add-after when section has blocks too)
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].type === 'placeholder' && !result[i].precedingFixedId) {
+      // Look back for the nearest fixed block
+      for (let j = i - 1; j >= 0; j--) {
+        if (result[j].type === 'fixed') {
+          result[i].precedingFixedId = result[j].block.id;
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
 };
 
 /**
@@ -310,13 +376,12 @@ const ChildBlocksWidget = ({
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        // For template instances, get children from pathMap (via parentId)
-        let childBlocks;
+        // For template instances, group children by placeholder
         if (field.isTemplateInstance) {
           const childIds = Object.entries(blockPathMap)
             .filter(([, info]) => info.parentId === selectedBlock)
             .map(([id]) => id);
-          childBlocks = childIds.map((childId) => {
+          const childBlocks = childIds.map((childId) => {
             const childPathInfo = blockPathMap[childId];
             const childData = getBlockById(formData, blockPathMap, childId);
             const blockType = childPathInfo?.blockType || 'unknown';
@@ -324,9 +389,83 @@ const ChildBlocksWidget = ({
             const title = childData?.plaintext || blockConfig?.title || blockType;
             return { id: childId, type: blockType, title, data: childData };
           });
-        } else {
-          childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
+
+          const sections = groupByPlaceholder(childBlocks, templateEditMode);
+          const instanceInfo = blockPathMap[selectedBlock];
+          const realParentId = instanceInfo?.parentId;
+          const realFieldName = instanceInfo?.containerField;
+
+          return sections.map((section, sectionIdx) => {
+            if (section.type === 'fixed') {
+              // Fixed block: clickable, no drag handle
+              return (
+                <div
+                  key={section.block.id}
+                  className="child-block-item fixed-block-item"
+                  onClick={() => onSelectBlock(section.block.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      onSelectBlock(section.block.id);
+                    }
+                  }}
+                >
+                  <span className="block-type">{section.block.title}</span>
+                  <span className="nav-arrow">›</span>
+                </div>
+              );
+            }
+
+            // Placeholder section: reuse ContainerFieldSection
+            const sectionBlockIds = section.blocks.map((b) => b.id);
+
+            // Wrap onMoveBlock to translate section reorder → full layout reorder
+            const wrappedMoveBlock = (_parentBlockId, _fieldName, reorderedIds) => {
+              const realParent = realParentId === PAGE_BLOCK_UID
+                ? formData
+                : getBlockById(formData, blockPathMap, realParentId);
+              const layoutField = `${realFieldName}_layout`;
+              const fullLayout = [...(realParent?.[layoutField]?.items || [])];
+              let idx = 0;
+              const newLayout = fullLayout.map((id) =>
+                sectionBlockIds.includes(id) ? reorderedIds[idx++] : id,
+              );
+              onMoveBlock(realParentId, realFieldName, newLayout);
+            };
+
+            // Wrap onAddBlock to insert after last block in section (or preceding fixed block)
+            const wrappedAddBlock = () => {
+              const afterBlockId = section.blocks.length > 0
+                ? section.blocks[section.blocks.length - 1].id
+                : section.precedingFixedId;
+              if (afterBlockId) {
+                onAddBlock(null, null, { afterBlockId });
+              }
+            };
+
+            const placeholderTitle = section.name.charAt(0).toUpperCase() + section.name.slice(1);
+            return (
+              <ContainerFieldSection
+                key={`placeholder-${section.name}-${sectionIdx}`}
+                fieldName={realFieldName}
+                fieldTitle={placeholderTitle}
+                childBlocks={section.blocks}
+                canAdd={true}
+                onSelectBlock={onSelectBlock}
+                onAddBlock={wrappedAddBlock}
+                onMoveBlock={wrappedMoveBlock}
+                parentBlockId={realParentId}
+                formData={formData}
+                onChangeFormData={onChangeFormData}
+                blockPathMap={blockPathMap}
+              />
+            );
+          });
         }
+
+        // Standard container field
+        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
         return (
           <ContainerFieldSection
             key={field.fieldName}
