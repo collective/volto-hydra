@@ -1658,6 +1658,13 @@ app.get('/hydra.js', (req, res) => {
   res.sendFile(hydraJsPath);
 });
 
+// Serve shared block schemas (used by test frontend via import)
+app.get('/shared-block-schemas.js', (req, res) => {
+  const filePath = path.join(__dirname, 'shared-block-schemas.js');
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.sendFile(filePath);
+});
+
 // Serve static files from content directories (for images, etc.)
 // This allows content like /pretagov/images/client-1.png to be served directly
 const STATIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.pdf'];

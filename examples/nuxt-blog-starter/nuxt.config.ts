@@ -4,6 +4,7 @@ import { dirname, resolve } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const hydraJsPath = resolve(__dirname, '../../packages/hydra-js')
+const fixturesPath = resolve(__dirname, '../../tests-playwright/fixtures')
 
 export default defineNuxtConfig({
   nitro: {
@@ -171,7 +172,8 @@ export default defineNuxtConfig({
       alias: {
         // In test mode, use source hydra.js for live reload
         // In production, use synced local copy (prebuild script syncs from source)
-        '@hydra-js': process.env.NUXT_ENV_NAME === 'test' ? hydraJsPath : './packages'
+        '@hydra-js': process.env.NUXT_ENV_NAME === 'test' ? hydraJsPath : './packages',
+        '@test-fixtures': fixturesPath
       }
     },
         /* options for vite */

@@ -445,7 +445,7 @@ const bridge = initBridge({
                 title: "Slides",
                 type: 'blocks',
                 allowedBlocks: ['slide', 'image'],
-                defaultBlock: 'slide',
+                defaultBlockType: 'slide',
                 maxLength: 10,
               }
             },
@@ -655,7 +655,7 @@ slider: {
     properties: {
       slides: {
         title:"Slides", 
-        type: 'blocks',                                                                       allowedBlocks: ['slide', 'image'],                                                     defaultBlock: 'slide',
+        type: 'blocks',                                                                       allowedBlocks: ['slide', 'image'],                                                     defaultBlockType: 'slide',
         maxLength: 10,             
       }
     }
@@ -746,7 +746,7 @@ Note:
 ##### Empty Blocks
 
 For the UI work a blocks field can never be left empty. If the last child block
-is deleted then while editing either the defaultBlock type will be added,
+is deleted then while editing either the defaultBlockType will be added,
 or if not defined a special block of type "empty" will be added.
 
 - These will be stripped out before saving.
