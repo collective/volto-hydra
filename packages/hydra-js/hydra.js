@@ -3332,7 +3332,15 @@ export class Bridge {
         // Update block UI overlay positions after form data changes
         const hasPendingFocus = this._pendingFocusRestore;
         this._pendingFocusRestore = false;
-        const skipFocus = !transformedSelection && !hasPendingFocus;
+        // Detect focus lost due to re-render: user was editing a field but
+        // focus is now on body (Vue/Nuxt replaced the DOM element).
+        // Without this, only the first FORM_DATA after FOCUS_FIELD restores focus;
+        // a second FORM_DATA re-render would leave focus on body permanently.
+        const focusLost = this.focusedFieldName &&
+            (!document.activeElement ||
+             document.activeElement === document.body ||
+             document.activeElement === document.documentElement);
+        const skipFocus = !transformedSelection && !hasPendingFocus && !focusLost;
 
         if (transformedSelection) {
           this.savedClickPosition = null;
