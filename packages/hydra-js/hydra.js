@@ -6046,7 +6046,8 @@ export class Bridge {
         // Backspace at absolute start of a slate field → send to admin to unwrap
         // The admin knows the Slate data model and will convert non-paragraph
         // blocks (headings, lists, blockquotes) back to paragraphs, and remove
-        // inline marks at position 0.
+        // inline marks at position 0. Also sends isFirstField/isEmpty so the
+        // admin can delete the block if it's already a default-type paragraph.
         if (e.key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
           const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
           const editField = blockEl.closest('[data-editable-field]');
@@ -6064,9 +6065,41 @@ export class Bridge {
               // Also check that any selection is only ZWS (not real content)
               const selectedText = range.collapsed ? '' : this.stripZeroWidthSpaces(range.toString());
               if (selectedText === '') {
-                log('Backspace at start of slate field - sending unwrapBlock');
+                // Check if this is the first editable field and if it's empty
+                const blockElement = editField.closest('[data-block-uid]');
+                const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+                const isFirstField = firstField === editField;
+                const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
+                const isEmpty = fieldText === '';
+
+                log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
                 e.preventDefault();
-                this.sendTransformRequest(blockUid, 'unwrapBlock', {});
+                this.sendTransformRequest(blockUid, 'unwrapBlock', {
+                  isFirstField,
+                  isEmpty,
+                });
+                return;
+              }
+            }
+          }
+        }
+
+        // Backspace in empty first simple text field → delete block
+        if (e.key === 'Backspace' && !this.isSlateField(blockUid, this.focusedFieldName)) {
+          const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          const editField = blockEl.closest('[data-editable-field]');
+          if (editField) {
+            const fieldText = (editField.textContent || '').trim();
+            if (fieldText === '') {
+              const blockElement = editField.closest('[data-block-uid]');
+              const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+              if (firstField === editField) {
+                log('Backspace in empty first simple text field - sending DELETE_BLOCK');
+                e.preventDefault();
+                this.sendMessageToParent({
+                  type: 'DELETE_BLOCK',
+                  uid: blockUid,
+                });
                 return;
               }
             }

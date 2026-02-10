@@ -1525,6 +1525,9 @@ const Iframe = (props) => {
               transformAction.markdownType = event.data.markdownType;
               transformAction.blockType = event.data.blockType;
               transformAction.inlineType = event.data.inlineType;
+            } else if (event.data.transformType === 'unwrapBlock') {
+              transformAction.isFirstField = event.data.isFirstField;
+              transformAction.isEmpty = event.data.isEmpty;
             }
 
             // IMPORTANT: Adopt the iframe's sequence if it's higher than ours.

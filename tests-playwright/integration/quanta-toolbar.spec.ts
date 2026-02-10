@@ -452,6 +452,58 @@ test.describe('Quanta Toolbar - Format Dropdown', () => {
     await expect(block.locator('h3')).toBeVisible({ timeout: 5000 });
   });
 
+  test('format dropdown includes Paragraph option to revert heading back to plain text', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const blockId = 'block-1-uuid';
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Click on Slate block and place cursor inside
+    await helper.clickBlockInIframe(blockId);
+    const editableField = await helper.getEditorLocator(blockId);
+    await editableField.click();
+
+    // Convert to H2 via format dropdown
+    const toolbar = page.locator('.quanta-toolbar');
+    const formatDropdown = toolbar.locator('.format-dropdown-trigger');
+    await formatDropdown.click();
+    const dropdownMenu = page.locator('.format-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 5000 });
+    const titleButton = dropdownMenu.getByRole('button', { name: 'Title', exact: true });
+    await titleButton.click();
+    await expect(block.locator('h2')).toBeVisible({ timeout: 5000 });
+
+    // Re-open dropdown — should have a Paragraph/Normal option
+    await formatDropdown.click();
+    await expect(dropdownMenu).toBeVisible({ timeout: 5000 });
+    const items = dropdownMenu.locator('.format-dropdown-item');
+    const titles = await items.evaluateAll((els) =>
+      els.map((el) => (el.getAttribute('title') || el.textContent || '').trim()),
+    );
+    const hasParagraph = titles.some(
+      (t) => /paragraph|normal|body/i.test(t),
+    );
+    expect(hasParagraph, `Expected a Paragraph option in dropdown, got: ${titles.join(', ')}`).toBe(true);
+
+    // Click it to revert to paragraph
+    const paragraphButton = items.filter({
+      has: page.locator('[title]'),
+    }).filter({
+      hasText: /paragraph|normal|body/i,
+    }).first();
+    await paragraphButton.click();
+
+    // H2 should be gone, paragraph should be back
+    await expect(block.locator('h2')).not.toBeVisible({ timeout: 5000 });
+    await expect(block.locator('p')).toBeVisible({ timeout: 5000 });
+  });
+
   test('format dropdown shows current format indicator', async ({
     page,
   }) => {

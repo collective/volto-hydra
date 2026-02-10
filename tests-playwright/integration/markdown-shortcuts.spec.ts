@@ -225,6 +225,41 @@ test.describe('Markdown Shortcuts', () => {
       await newBlock.pressSequentially('New block list', { delay: 10 });
       await expect(li).toContainText('New block list', { timeout: 5000 });
     });
+
+    test('Backspace at start of empty paragraph block removes it', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+
+      // Create a new empty block via Enter
+      const editor = await helper.enterEditMode(blockId);
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('Some text', { delay: 10 });
+      await helper.waitForEditorText(editor, /Some text/);
+
+      const initialBlocks = await helper.getStableBlockCount();
+      await editor.press('Enter');
+      await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+      // Find the new empty block
+      const blockOrder = await helper.getBlockOrder();
+      const originalBlockIndex = blockOrder.indexOf(blockId);
+      const newBlockUid = blockOrder[originalBlockIndex + 1];
+      expect(newBlockUid).toBeTruthy();
+
+      const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"] [data-editable-field]`);
+      await expect(newBlock).toBeVisible({ timeout: 5000 });
+
+      // Backspace in the empty block should remove it
+      await newBlock.press('Backspace');
+      await helper.waitForBlockCountToBe(initialBlocks, 5000);
+
+      // The new block should be gone
+      await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });
+    });
   });
 
   test.describe('Unwrap on Backspace', () => {
@@ -260,6 +295,136 @@ test.describe('Markdown Shortcuts', () => {
       const paragraph = iframe.locator(`[data-block-uid="${blockId}"] p`);
       await expect(paragraph).toBeVisible({ timeout: 5000 });
       await helper.waitForEditorText(paragraph, /^$/);
+    });
+  });
+
+  test.describe('List keyboard handling', () => {
+    test('Enter in a bullet list creates a new bullet, not a new block', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+      const editor = await helper.enterEditMode(blockId);
+
+      // Create bullet list via markdown shortcut
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('-', { delay: 10 });
+      await editor.press(' ');
+
+      const li = iframe.locator(`[data-block-uid="${blockId}"] ul li`);
+      await expect(li.first()).toBeVisible({ timeout: 5000 });
+
+      // Type text in the first bullet
+      await editor.pressSequentially('first item', { delay: 10 });
+      await expect(li.first()).toContainText('first item', { timeout: 5000 });
+
+      const initialBlocks = await helper.getStableBlockCount();
+
+      // Press Enter — should create a second bullet, NOT a new block
+      await editor.press('Enter');
+
+      // Should now have two list items in the same block
+      await expect(li).toHaveCount(2, { timeout: 5000 });
+
+      // Block count should NOT have changed
+      const afterBlocks = await helper.getStableBlockCount();
+      expect(afterBlocks).toBe(initialBlocks);
+
+      // Type in the second bullet
+      await editor.pressSequentially('second item', { delay: 10 });
+      await expect(li.nth(1)).toContainText('second item', { timeout: 5000 });
+    });
+
+    test('Enter on empty bullet exits list and creates a new block', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+      const editor = await helper.enterEditMode(blockId);
+
+      // Create bullet list via markdown shortcut
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('-', { delay: 10 });
+      await editor.press(' ');
+
+      const li = iframe.locator(`[data-block-uid="${blockId}"] ul li`);
+      await expect(li.first()).toBeVisible({ timeout: 5000 });
+
+      // Type text in the first bullet then Enter to create second bullet
+      await editor.pressSequentially('first item', { delay: 10 });
+      await editor.press('Enter');
+      await expect(li).toHaveCount(2, { timeout: 5000 });
+
+      const initialBlocks = await helper.getStableBlockCount();
+
+      // Press Enter again on the empty second bullet — should exit list and create new block
+      await editor.press('Enter');
+      await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+      // The original block should still have a list with one item
+      await expect(iframe.locator(`[data-block-uid="${blockId}"] ul li`)).toHaveCount(1, { timeout: 5000 });
+    });
+
+    test('Tab indents a bullet into a nested list', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+      const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+      const editor = await helper.enterEditMode(blockId);
+
+      // Create bullet list with two items
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('-', { delay: 10 });
+      await editor.press(' ');
+      await expect(block.locator('ul li').first()).toBeVisible({ timeout: 5000 });
+      await editor.pressSequentially('parent', { delay: 10 });
+      await editor.press('Enter');
+      await editor.pressSequentially('child', { delay: 10 });
+
+      // Tab on second bullet should indent it (nested ul)
+      await editor.press('Tab');
+
+      // Should now have a nested list: ul > li > ul > li
+      const nestedLi = block.locator('ul ul li');
+      await expect(nestedLi).toBeVisible({ timeout: 5000 });
+      await expect(nestedLi).toContainText('child');
+    });
+
+    test('Shift+Tab outdents a nested bullet', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+      const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+      const editor = await helper.enterEditMode(blockId);
+
+      // Create bullet list with two items, indent the second
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('-', { delay: 10 });
+      await editor.press(' ');
+      await expect(block.locator('ul li').first()).toBeVisible({ timeout: 5000 });
+      await editor.pressSequentially('parent', { delay: 10 });
+      await editor.press('Enter');
+      await editor.pressSequentially('child', { delay: 10 });
+      await editor.press('Tab');
+      await expect(block.locator('ul ul li')).toBeVisible({ timeout: 5000 });
+
+      // Shift+Tab should outdent back to top level
+      await editor.press('Shift+Tab');
+
+      // Nested list should be gone — both items at top level
+      await expect(block.locator('ul ul')).not.toBeVisible({ timeout: 5000 });
+      const topItems = block.locator('ul > li');
+      await expect(topItems).toHaveCount(2, { timeout: 5000 });
     });
   });
 

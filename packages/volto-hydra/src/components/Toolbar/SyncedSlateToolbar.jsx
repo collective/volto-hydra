@@ -590,6 +590,20 @@ const SyncedSlateToolbar = ({
                 Editor.removeMark(editor, mark);
               });
             }
+            // If the block is already the defaultBlockType, empty, and this is the
+            // first field — delete it. We verify all three conditions on the admin side:
+            // 1. Already in else branch = no non-default elements found
+            // 2. Editor text is empty (protects against stale isEmpty flag from iframe)
+            // 3. Root element type matches defaultBlockType explicitly
+            // Clear transformAction before delete to prevent stale re-processing on remount.
+            if (transformAction.isFirstField && transformAction.isEmpty) {
+              const editorText = Editor.string(editor, []);
+              const rootType = editor.children?.[0]?.type;
+              if (editorText === '' && rootType === defaultType) {
+                onTransformApplied?.();
+                onDeleteBlock(selectedBlock, true);
+              }
+            }
           }
           break;
         }
