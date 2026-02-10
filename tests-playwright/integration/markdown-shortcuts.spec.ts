@@ -426,6 +426,47 @@ test.describe('Markdown Shortcuts', () => {
       const topItems = block.locator('ul > li');
       await expect(topItems).toHaveCount(2, { timeout: 5000 });
     });
+
+    test('Shift+Tab on top-level bullet splits into separate blocks', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+      const editor = await helper.enterEditMode(blockId);
+
+      // Create bullet list with three items: alpha, beta, gamma
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('-', { delay: 10 });
+      await editor.press(' ');
+      const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+      await expect(block.locator('ul li').first()).toBeVisible({ timeout: 5000 });
+      await editor.pressSequentially('alpha', { delay: 10 });
+      await editor.press('Enter');
+      await editor.pressSequentially('beta', { delay: 10 });
+      await editor.press('Enter');
+      await editor.pressSequentially('gamma', { delay: 10 });
+
+      // Should have 3 list items in one block
+      await expect(block.locator('ul li')).toHaveCount(3, { timeout: 5000 });
+      const initialBlocks = await helper.getStableBlockCount();
+
+      // Move cursor to "beta" (second item) — press Up arrow once
+      await editor.press('ArrowUp');
+
+      // Shift+Tab on top-level item should split into 3 blocks:
+      // 1) list with "alpha", 2) paragraph "beta", 3) list with "gamma"
+      await editor.press('Shift+Tab');
+
+      // Block count should increase by 2 (1 block → 3 blocks)
+      const afterBlocks = await helper.getStableBlockCount();
+      expect(afterBlocks).toBe(initialBlocks + 2);
+
+      // The original block should now be a list with just "alpha"
+      await expect(block.locator('ul li')).toHaveCount(1, { timeout: 5000 });
+      await expect(block.locator('ul li').first()).toContainText('alpha');
+    });
   });
 
   test.describe('Non-matching patterns', () => {

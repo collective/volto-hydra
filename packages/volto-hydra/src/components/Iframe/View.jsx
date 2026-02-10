@@ -1577,8 +1577,77 @@ const Iframe = (props) => {
                 event.origin,
               );
             }
+          } else if (event.data.transformType === 'outdent') {
+            // Check if this is a top-level list item — needs block splitting
+            const { blockId: odBlockId, fieldName: odFieldName, selection: odSelection, requestId: odRequestId } = event.data;
+            const odForm = event.data.data;
+            const odBpm = buildBlockPathMap(odForm, config.blocks.blocksConfig, intl);
+            const odBlockPath = odBpm[odBlockId]?.path;
+            const odBlock = odBlockPath ? getBlockByPath(odForm, odBlockPath) : odForm.blocks[odBlockId];
+            const odFieldValue = odBlock?.[odFieldName];
+            const split = odFieldValue ? slateTransforms.splitListAtItem(odFieldValue, odSelection) : null;
+
+            if (!split) {
+              // Nested outdent: forward to toolbar
+              const incomingSeq = odForm?._editSequence || 0;
+              if (incomingSeq > editSequenceRef.current) editSequenceRef.current = incomingSeq;
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: odForm,
+                blockPathMap: odBpm,
+                selection: odSelection || null,
+                transformAction: { type: 'outdent', requestId: odRequestId },
+              }));
+            } else {
+              // Top-level outdent: split list block into up to 3 blocks
+              const containerConfig = getContainerFieldConfig(odBlockId, odBpm, odForm, config.blocks.blocksConfig, intl);
+              const blockType = odBlock['@type'];
+
+              // Update current block with before-list (or paragraph if no before)
+              const updatedBlock = { ...odBlock, [odFieldName]: split.before || split.paragraph };
+              let fd = mutateBlockInContainer(odForm, odBpm, odBlockId, updatedBlock, containerConfig);
+              let bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+              let selectBlockId = odBlockId;
+
+              // Insert paragraph block after current (only if current kept the before-list)
+              if (split.before) {
+                const paraId = uuid();
+                fd = insertBlockInContainer(fd, bpm, odBlockId, paraId,
+                  { '@type': blockType, [odFieldName]: split.paragraph }, containerConfig, 'after');
+                bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                selectBlockId = paraId;
+
+                // Insert after-list block after the paragraph
+                if (split.after) {
+                  const afterId = uuid();
+                  fd = insertBlockInContainer(fd, bpm, paraId, afterId,
+                    { '@type': blockType, [odFieldName]: split.after }, containerConfig, 'after');
+                  bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                }
+              } else if (split.after) {
+                // No before: current block IS paragraph, insert after-list after it
+                const afterId = uuid();
+                fd = insertBlockInContainer(fd, bpm, odBlockId, afterId,
+                  { '@type': blockType, [odFieldName]: split.after }, containerConfig, 'after');
+                bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+              }
+
+              // Set pending selection and blockPathMap, but NOT formData
+              // formData will be updated by the useEffect after it sends FORM_DATA to iframe
+              // This ensures the useEffect sees a content change and doesn't skip sending
+              flushSync(() => {
+                setIframeSyncState(prev => ({
+                  ...prev,
+                  blockPathMap: bpm,
+                  pendingSelectBlockUid: selectBlockId,
+                  ...(odRequestId ? { pendingFormatRequestId: odRequestId } : {}),
+                }));
+              });
+              onChangeFormData(fd);
+              dispatch(setSidebarTab(1));
+            }
           } else {
-            // Format, paste, delete - let toolbar handle via transformAction
+            // Format, paste, delete, indent - let toolbar handle via transformAction
             // Build transformAction based on transformType
             const transformAction = {
               type: event.data.transformType,

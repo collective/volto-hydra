@@ -270,6 +270,52 @@ export function removeEmptyListItem(value, selection) {
   return { newValue: editor.children };
 }
 
+/**
+ * Split a list block at a top-level list item into before/paragraph/after.
+ * Returns null if the item is nested (not top-level) — caller should use toolbar outdent.
+ * Returns { before, paragraph, after } where each is a Slate value or null.
+ */
+export function splitListAtItem(value, selection) {
+  if (!selection) return null;
+  const { slate } = config.settings;
+  const editor = createHeadlessEditor(value);
+  editor.selection = selection;
+
+  const [match] = Editor.nodes(editor, {
+    at: selection.anchor.path,
+    match: (n) => Element.isElement(n) && n.type === slate.listItemType,
+    mode: 'lowest',
+  });
+  if (!match) return null;
+  const [listItemNode, listItemPath] = match;
+
+  // Find parent list (ul/ol)
+  const [parentList, parentListPath] = Editor.parent(editor, listItemPath);
+
+  // Only handle top-level: parent list is direct child of editor root
+  if (parentListPath.length !== 1) return null;
+
+  const listItemIndex = listItemPath[listItemPath.length - 1];
+  const totalItems = parentList.children.length;
+
+  // Convert li children to paragraph
+  const paragraph = [{ type: slate.defaultBlockType, children: JSON.parse(JSON.stringify(listItemNode.children)) }];
+
+  if (totalItems === 1) {
+    return { before: null, paragraph, after: null };
+  }
+
+  const before = listItemIndex > 0
+    ? [{ type: parentList.type, children: JSON.parse(JSON.stringify(parentList.children.slice(0, listItemIndex))) }]
+    : null;
+
+  const after = listItemIndex < totalItems - 1
+    ? [{ type: parentList.type, children: JSON.parse(JSON.stringify(parentList.children.slice(listItemIndex + 1))) }]
+    : null;
+
+  return { before, paragraph, after };
+}
+
 // Export default for backwards compatibility
 export default {
   createHeadlessEditor,
@@ -279,4 +325,5 @@ export default {
   isCurrentListItemEmpty,
   splitListItem,
   removeEmptyListItem,
+  splitListAtItem,
 };
