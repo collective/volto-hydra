@@ -283,7 +283,12 @@ function renderListItems(items) {
             const content = renderChildren(item.children || []);
             return `<li${nodeIdAttr}>${content}</li>`;
         }
-        // If not an li, render as inline content (shouldn't happen in valid Slate)
+        // Handle nested lists (ul/ol inside ul/ol) for indentation
+        if (item.type === 'ul' || item.type === 'ol') {
+            const nodeIdAttr = item.nodeId !== undefined ? ` data-node-id="${item.nodeId}"` : '';
+            return `<${item.type}${nodeIdAttr}>${renderListItems(item.children)}</${item.type}>`;
+        }
+        // If not an li or nested list, render as inline content
         return renderChildren([item]);
     }).join('');
 }

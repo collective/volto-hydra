@@ -1469,6 +1469,53 @@ const Iframe = (props) => {
                 break;
               }
 
+              // Check if cursor is in a list item — handle differently from normal split
+              if (slateTransforms.isSelectionInList(fieldValue, enterSelection)) {
+                const containerConfig = getContainerFieldConfig(
+                  enterBlockId, enterBlockPathMap, formToUseForEnter,
+                  config.blocks.blocksConfig, intl,
+                );
+
+                if (slateTransforms.isCurrentListItemEmpty(fieldValue, enterSelection)) {
+                  // Empty list item: remove it and create new empty block after
+                  const { newValue } = slateTransforms.removeEmptyListItem(fieldValue, enterSelection);
+                  const updatedBlock = { ...currentBlock, [enterFieldName]: newValue };
+                  const mutatedFormData = mutateBlockInContainer(
+                    formToUseForEnter, enterBlockPathMap, enterBlockId, updatedBlock, containerConfig,
+                  );
+                  const syncedBpm = buildBlockPathMap(mutatedFormData, config.blocks.blocksConfig, intl);
+                  flushSync(() => {
+                    setIframeSyncState(prev => ({
+                      ...prev,
+                      formData: mutatedFormData,
+                      blockPathMap: syncedBpm,
+                    }));
+                  });
+                  onChangeFormData(mutatedFormData);
+                  insertAndSelectBlock(enterBlockId, 'slate', 'after', null, {
+                    formatRequestId: enterRequestId,
+                    formData: mutatedFormData,
+                    blockPathMap: syncedBpm,
+                  });
+                } else {
+                  // Non-empty list item: split it (new bullet, same block)
+                  const { newValue, newSelection } = slateTransforms.splitListItem(fieldValue, enterSelection);
+                  const updatedBlock = { ...currentBlock, [enterFieldName]: newValue };
+                  const mutatedFormData = mutateBlockInContainer(
+                    formToUseForEnter, enterBlockPathMap, enterBlockId, updatedBlock, containerConfig,
+                  );
+                  const newBpm = buildBlockPathMap(mutatedFormData, config.blocks.blocksConfig, intl);
+                  setIframeSyncState(prev => ({
+                    ...prev,
+                    formData: mutatedFormData,
+                    blockPathMap: newBpm,
+                    selection: newSelection,
+                    toolbarRequestDone: enterRequestId,
+                  }));
+                }
+                break;
+              }
+
               // Split the block at the cursor using slateTransforms
               const { topValue, bottomValue } = slateTransforms.splitBlock(
                 fieldValue,

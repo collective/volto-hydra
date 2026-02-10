@@ -94,7 +94,7 @@
 // onEditChange
 
 // Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
-let debugEnabled = true; // TEMP: Enable for debugging
+let debugEnabled = false;
 const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
 
 /**
@@ -1770,9 +1770,16 @@ export class Bridge {
     this._documentKeyboardBlocker = (e) => {
       if (!this.blockedBlockId) return;
 
-      const targetBlock = e.target.closest?.('[data-block-uid]');
-      if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
-        return;
+      // During transforms, the renderer replaces innerHTML which destroys the
+      // focused element. Focus falls to document.body, so keystrokes arrive
+      // targeting BODY instead of the block. We must also buffer these events,
+      // otherwise characters typed during re-render are silently lost.
+      const isBodyTarget = e.target === document.body || e.target === document.documentElement;
+      if (!isBodyTarget) {
+        const targetBlock = e.target.closest?.('[data-block-uid]');
+        if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
+          return;
+        }
       }
 
       if (e.type === 'keydown') {
@@ -1917,11 +1924,11 @@ export class Bridge {
     // Also detect format hotkeys and special keys that need to be replayed
     let textToInsert = '';
     let formatHotkeyToReplay = null;
-    const specialKeys = []; // Backspace, Delete, Enter — dispatched as synthetic events
+    const specialKeys = []; // Tab, Backspace, Delete, Enter — dispatched as synthetic events
     for (const evt of buffer) {
       if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
         textToInsert += evt.key;
-      } else if (['Backspace', 'Delete', 'Enter'].includes(evt.key)) {
+      } else if (['Tab', 'Backspace', 'Delete', 'Enter'].includes(evt.key)) {
         specialKeys.push(evt);
       } else if ((evt.ctrlKey || evt.metaKey) && this.slateConfig?.hotkeys) {
         // Check if this is a format hotkey
@@ -1961,9 +1968,28 @@ export class Bridge {
         const textNode = document.createTextNode(textToInsert);
         range.insertNode(textNode);
 
-        // Move cursor after inserted text
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
+        // Clean up ZWS text nodes left by restoreSlateSelection's ensureZwsPosition.
+        // These cause browser text-node normalization that displaces the cursor,
+        // leading to lost keystrokes when the user types immediately after replay.
+        const parentEl = textNode.parentNode;
+        if (parentEl) {
+          for (const sibling of [...parentEl.childNodes]) {
+            if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE) {
+              const cleaned = sibling.textContent.replace(/[\uFEFF\u200B]/g, '');
+              if (cleaned === '') {
+                sibling.remove();
+              }
+            }
+          }
+        }
+
+        // Position cursor at the END of the inserted text node (not after it).
+        // setStartAfter(textNode) puts cursor between sibling nodes, which
+        // causes the browser to create new text nodes on the next keystroke.
+        // setStart(textNode, len) puts cursor inside the text node, so the
+        // browser appends to the same node — no normalization issues.
+        range.setStart(textNode, textNode.textContent.length);
+        range.setEnd(textNode, textNode.textContent.length);
         selection.removeAllRanges();
         selection.addRange(range);
 
@@ -1992,21 +2018,32 @@ export class Bridge {
       });
     }
 
-    // Replay special keys (Backspace, Delete, Enter) by dispatching synthetic
-    // keydown events so they go through the normal keydown handler on the
-    // editable field. The keyboard blocker has already been removed at this point.
-    for (const evt of specialKeys) {
-      log('Replaying buffered special key:', evt.key);
-      currentEditable.dispatchEvent(new KeyboardEvent('keydown', {
-        key: evt.key,
-        code: evt.code,
-        shiftKey: evt.shiftKey,
-        ctrlKey: evt.ctrlKey,
-        metaKey: evt.metaKey,
-        altKey: evt.altKey,
-        bubbles: true,
-        cancelable: true,
-      }));
+    // Replay special keys (Tab, Backspace, Delete, Enter) by dispatching synthetic
+    // keydown events so they go through the normal keydown handlers on the
+    // editable field (e.g. Tab→indent, Enter→split). Temporarily clear
+    // blockedBlockId so the capture-phase blocker doesn't re-intercept them.
+    if (specialKeys.length > 0) {
+      const savedBlockedId = this.blockedBlockId;
+      this.blockedBlockId = null;
+      for (const evt of specialKeys) {
+        log('Replaying buffered special key:', evt.key);
+        currentEditable.dispatchEvent(new KeyboardEvent('keydown', {
+          key: evt.key,
+          code: evt.code,
+          shiftKey: evt.shiftKey,
+          ctrlKey: evt.ctrlKey,
+          metaKey: evt.metaKey,
+          altKey: evt.altKey,
+          bubbles: true,
+          cancelable: true,
+        }));
+      }
+      // If a replayed key started a new transform (Tab→indent, Enter→split),
+      // blockedBlockId is already re-set by sendTransformRequest. Otherwise
+      // restore the previous state so replayBufferAndUnblock can clean up.
+      if (!this.blockedBlockId) {
+        this.blockedBlockId = savedBlockedId;
+      }
     }
   }
 
@@ -6076,6 +6113,22 @@ export class Bridge {
                 return;
               }
               // No markdown match — let space insert normally
+            }
+          }
+        }
+
+        // Handle Tab/Shift+Tab for list indentation in slate fields
+        if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
+          if (this.isSlateField(blockUid, this.focusedFieldName)) {
+            const selection = window.getSelection();
+            if (selection.rangeCount) {
+              const tabNode = selection.getRangeAt(0).startContainer;
+              const tabEl = tabNode.nodeType === Node.TEXT_NODE ? tabNode.parentElement : tabNode;
+              if (tabEl?.closest('li')) {
+                e.preventDefault();
+                this.sendTransformRequest(blockUid, e.shiftKey ? 'outdent' : 'indent', {});
+                return;
+              }
             }
           }
         }

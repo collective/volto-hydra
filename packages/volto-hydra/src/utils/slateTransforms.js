@@ -8,9 +8,10 @@
  * Related: GitHub Issue #147 - formatting can result in removing text in slate
  */
 
-import { Transforms, Element, Text } from 'slate';
+import { Editor, Transforms, Element, Text } from 'slate';
 import { jsx } from 'slate-hyperscript';
 import { makeEditor } from '@plone/volto-slate/utils';
+import config from '@plone/volto/registry';
 
 // Inline formatting element types that should be removed when empty
 const INLINE_FORMAT_TYPES = ['strong', 'em', 'del', 'sub', 'sup'];
@@ -196,9 +197,86 @@ export function splitBlock(value, selection) {
   }
 }
 
+/**
+ * Check if selection is inside a list item in the given Slate value.
+ */
+export function isSelectionInList(value, selection) {
+  if (!selection) return false;
+  const { slate } = config.settings;
+  const editor = createHeadlessEditor(value);
+  editor.selection = selection;
+  const result = Editor.above(editor, {
+    match: (n) => Element.isElement(n) && n.type === slate.listItemType,
+  });
+  return !!result;
+}
+
+/**
+ * Check if the current list item at the selection is empty (no text content).
+ */
+export function isCurrentListItemEmpty(value, selection) {
+  const { slate } = config.settings;
+  const editor = createHeadlessEditor(value);
+  editor.selection = selection;
+  const [match] = Editor.nodes(editor, {
+    at: selection.anchor.path,
+    match: (n) => Element.isElement(n) && n.type === slate.listItemType,
+    mode: 'lowest',
+  });
+  if (!match) return false;
+  const [, listItemPath] = match;
+  return !Editor.string(editor, listItemPath);
+}
+
+/**
+ * Split the list item at cursor position. Returns new value and selection.
+ * Used when Enter is pressed in a non-empty list item.
+ * Pattern from breakList.js:50-56.
+ */
+export function splitListItem(value, selection) {
+  const { slate } = config.settings;
+  const editor = createHeadlessEditor(value);
+  editor.selection = selection;
+
+  Transforms.splitNodes(editor, {
+    at: editor.selection,
+    match: (node) => Element.isElement(node) && node.type === slate.listItemType,
+    always: true,
+  });
+
+  return { newValue: editor.children, newSelection: editor.selection };
+}
+
+/**
+ * Remove the empty list item at the selection and return modified value.
+ * Used when Enter is pressed on an empty list item (to exit the list).
+ * The normalizer will clean up empty parent lists automatically.
+ */
+export function removeEmptyListItem(value, selection) {
+  const { slate } = config.settings;
+  const editor = createHeadlessEditor(value);
+  editor.selection = selection;
+
+  const [match] = Editor.nodes(editor, {
+    at: selection.anchor.path,
+    match: (n) => Element.isElement(n) && n.type === slate.listItemType,
+    mode: 'lowest',
+  });
+  if (!match) return { newValue: value };
+
+  const [, listItemPath] = match;
+  Transforms.removeNodes(editor, { at: listItemPath });
+
+  return { newValue: editor.children };
+}
+
 // Export default for backwards compatibility
 export default {
   createHeadlessEditor,
   htmlToSlate,
   splitBlock,
+  isSelectionInList,
+  isCurrentListItemEmpty,
+  splitListItem,
+  removeEmptyListItem,
 };

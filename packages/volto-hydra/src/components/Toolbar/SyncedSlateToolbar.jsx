@@ -607,6 +607,46 @@ const SyncedSlateToolbar = ({
           }
           break;
         }
+        case 'indent': {
+          // Tab in list: indent list item (wrap in nested list)
+          const { increaseItemDepth } = require('@plone/volto-slate/blocks/Text/keyboard/indentListItems');
+          const indentMockEvent = { preventDefault: () => {}, stopPropagation: () => {} };
+          increaseItemDepth(editor, indentMockEvent);
+          break;
+        }
+        case 'outdent': {
+          // Shift+Tab in list: outdent list item (unwrap from parent list)
+          // Inline core logic from decreaseItemDepth, skipping deconstructToVoltoBlocks
+          const { slate: slateConfig } = config.settings;
+          const { getCurrentListItem, mergeWithPreviousList, mergeWithNextList } = require('@plone/volto-slate/utils/lists');
+          const { Path } = require('slate');
+          const [listItemNode, listItemPath] = getCurrentListItem(editor);
+          if (listItemNode) {
+            const [, parentListPath] = Editor.parent(editor, listItemPath);
+            const listItemRef = Editor.pathRef(editor, listItemPath);
+
+            Transforms.unwrapNodes(editor, {
+              at: listItemPath,
+              split: true,
+              mode: 'lowest',
+              match: (node) => slateConfig.listTypes.includes(node.type),
+            });
+
+            if (listItemRef.current.length > 1) mergeWithPreviousList(editor, Path.parent(listItemRef.current));
+            if (listItemRef.current.length > 1) mergeWithNextList(editor, Path.parent(listItemRef.current));
+
+            if (parentListPath.length === 1) {
+              // Top-level list: convert li to paragraph
+              Transforms.setNodes(
+                editor,
+                { type: slateConfig.defaultBlockType },
+                { at: listItemRef.current, match: (n) => n === listItemNode },
+              );
+            }
+            listItemRef.unref();
+          }
+          break;
+        }
         default:
           console.warn('[TOOLBAR] Unknown transform type:', type);
       }
