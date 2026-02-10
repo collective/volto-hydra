@@ -607,6 +607,42 @@ test.describe('Enter Key to Add/Navigate', () => {
     const newBlockId = newBlocks[heroIdx + 1];
     expect(initialBlocks).not.toContain(newBlockId);
   });
+
+  test('Backspace at start of empty paragraph block removes it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Create a new empty block via Enter
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Some text', { delay: 10 });
+    await helper.waitForEditorText(editor, /Some text/);
+
+    const initialBlocks = await helper.getStableBlockCount();
+    await editor.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+    // Find the new empty block
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf(blockId);
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Wait for editable field to appear and focus to land on it
+    const newEditor = await helper.getEditorLocator(newBlockUid);
+    await expect(newEditor).toBeAttached({ timeout: 10000 });
+
+    // Backspace in the empty block should remove it
+    await newEditor.press('Backspace');
+    await helper.waitForBlockCountToBe(initialBlocks, 5000);
+
+    // The new block should be gone
+    await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });
+  });
 });
 
 test.describe('Allowed Blocks from Frontend', () => {

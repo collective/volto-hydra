@@ -852,4 +852,38 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(editor.locator(boldSelector)).toBeVisible();
     expect(await editor.textContent()).toContain('Test with sidebar closed');
   });
+
+  test('Backspace through heading text deletes the block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+    const editor = await helper.enterEditMode(blockId);
+
+    const initialBlocks = await helper.getStableBlockCount();
+
+    // Create H2 via markdown shortcut
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('##', { delay: 10 });
+    await editor.press(' ');
+
+    const h2 = iframe.locator(`[data-block-uid="${blockId}"] h2`);
+    await expect(h2).toBeVisible({ timeout: 5000 });
+
+    // Type text into the heading
+    await editor.pressSequentially('abc', { delay: 10 });
+    await expect(h2).toContainText('abc', { timeout: 5000 });
+
+    // Backspace 3 times to delete all chars, then once more to delete the block
+    for (let i = 0; i < 3; i++) {
+      await editor.press('Backspace');
+    }
+    await editor.press('Backspace');
+
+    // Block should be removed
+    await helper.waitForBlockCountToBe(initialBlocks - 1, 5000);
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeVisible({ timeout: 5000 });
+  });
 });

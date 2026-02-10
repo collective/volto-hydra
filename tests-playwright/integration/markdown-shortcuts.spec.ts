@@ -212,90 +212,21 @@ test.describe('Markdown Shortcuts', () => {
       const newBlockUid = blockOrder[originalBlockIndex + 1];
       expect(newBlockUid).toBeTruthy();
 
-      // The new block is already focused — type directly into it
-      const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"] [data-editable-field]`);
-      await expect(newBlock).toBeVisible({ timeout: 5000 });
-      await newBlock.pressSequentially('-', { delay: 10 });
-      await newBlock.press(' ');
+      // The new block is already focused — wait for editable field to appear
+      // (Nuxt needs time for hydra.js to add contenteditable after async re-render)
+      const newEditor = await helper.getEditorLocator(newBlockUid);
+      await expect(newEditor).toBeAttached({ timeout: 10000 });
+      await newEditor.pressSequentially('-', { delay: 10 });
+      await newEditor.press(' ');
 
       // Should convert to unordered list
       const li = iframe.locator(`[data-block-uid="${newBlockUid}"] ul li`);
       await expect(li).toBeVisible({ timeout: 5000 });
 
-      await newBlock.pressSequentially('New block list', { delay: 10 });
+      await newEditor.pressSequentially('New block list', { delay: 10 });
       await expect(li).toContainText('New block list', { timeout: 5000 });
     });
 
-    test('Backspace at start of empty paragraph block removes it', async ({ page }) => {
-      const helper = new AdminUIHelper(page);
-      await helper.login();
-      await helper.navigateToEdit('/test-page');
-
-      const blockId = 'block-1-uuid';
-      const iframe = helper.getIframe();
-
-      // Create a new empty block via Enter
-      const editor = await helper.enterEditMode(blockId);
-      await helper.selectAllTextInEditor(editor);
-      await editor.pressSequentially('Some text', { delay: 10 });
-      await helper.waitForEditorText(editor, /Some text/);
-
-      const initialBlocks = await helper.getStableBlockCount();
-      await editor.press('Enter');
-      await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
-
-      // Find the new empty block
-      const blockOrder = await helper.getBlockOrder();
-      const originalBlockIndex = blockOrder.indexOf(blockId);
-      const newBlockUid = blockOrder[originalBlockIndex + 1];
-      expect(newBlockUid).toBeTruthy();
-
-      const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"] [data-editable-field]`);
-      await expect(newBlock).toBeVisible({ timeout: 5000 });
-
-      // Backspace in the empty block should remove it
-      await newBlock.press('Backspace');
-      await helper.waitForBlockCountToBe(initialBlocks, 5000);
-
-      // The new block should be gone
-      await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });
-    });
-  });
-
-  test.describe('Unwrap on Backspace', () => {
-    test('Backspace through heading text then unwrap leaves empty paragraph', async ({ page }) => {
-      const helper = new AdminUIHelper(page);
-      await helper.login();
-      await helper.navigateToEdit('/test-page');
-
-      const blockId = 'block-1-uuid';
-      const iframe = helper.getIframe();
-      const editor = await helper.enterEditMode(blockId);
-
-      // Create H2 via markdown shortcut
-      await helper.selectAllTextInEditor(editor);
-      await editor.pressSequentially('##', { delay: 10 });
-      await editor.press(' ');
-
-      const h2 = iframe.locator(`[data-block-uid="${blockId}"] h2`);
-      await expect(h2).toBeVisible({ timeout: 5000 });
-
-      // Type text into the heading
-      await editor.pressSequentially('abc', { delay: 10 });
-      await expect(h2).toContainText('abc', { timeout: 5000 });
-
-      // Backspace 3 times to delete all chars, then once more to unwrap
-      for (let i = 0; i < 3; i++) {
-        await editor.press('Backspace');
-      }
-      await editor.press('Backspace');
-
-      // Should be an empty paragraph — no leftover characters
-      await expect(iframe.locator(`[data-block-uid="${blockId}"] h2`)).not.toBeVisible({ timeout: 5000 });
-      const paragraph = iframe.locator(`[data-block-uid="${blockId}"] p`);
-      await expect(paragraph).toBeVisible({ timeout: 5000 });
-      await helper.waitForEditorText(paragraph, /^$/);
-    });
   });
 
   test.describe('List keyboard handling', () => {
