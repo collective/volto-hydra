@@ -1726,6 +1726,25 @@ export class Bridge {
       };
       document.addEventListener('keydown', this._escapeKeyHandler, true);
     }
+
+    // Add global Enter handler for "block selected, no field focused" → add block after
+    if (!this._enterKeyHandler) {
+      this._enterKeyHandler = (e) => {
+        if (e.key !== 'Enter' || e.shiftKey) return;
+        if (!this.selectedBlockUid) return;
+        // Only fire if no editable field is currently focused
+        if (document.activeElement?.closest('[data-editable-field]')) return;
+        // Must be in edit mode
+        if (!this.isInlineEditing) return;
+
+        e.preventDefault();
+        this.sendMessageToParent({
+          type: 'ADD_BLOCK_AFTER',
+          blockId: this.selectedBlockUid,
+        });
+      };
+      document.addEventListener('keydown', this._enterKeyHandler);
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -2971,11 +2990,33 @@ export class Bridge {
         field.setAttribute('contenteditable', 'true');
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
 
-        // For plain string fields (single-line), prevent Enter key from creating new lines
+        // For plain string fields (single-line), Enter navigates to next field or adds a block
         if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
           field._enterKeyHandler = (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
+              const blockEl = field.closest('[data-block-uid]');
+              if (!blockEl) return;
+              const ownFields = this.getOwnEditableFields(blockEl);
+              const idx = ownFields.indexOf(field);
+              if (idx < ownFields.length - 1) {
+                // Not last field → focus next field
+                const nextField = ownFields[idx + 1];
+                nextField.focus();
+                const sel = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(nextField);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              } else {
+                // Last field → add new block after
+                const blockUid = blockEl.getAttribute('data-block-uid');
+                this.sendMessageToParent({
+                  type: 'ADD_BLOCK_AFTER',
+                  blockId: blockUid,
+                });
+              }
             }
           };
           field.addEventListener('keydown', field._enterKeyHandler);
@@ -6039,12 +6080,39 @@ export class Bridge {
           }
         }
 
-        // Handle Enter key to create new block
+        // Handle Enter key to create new block (slate fields only)
+        // Non-slate fields handle Enter via _enterKeyHandler in restoreContentEditableOnFields
         if (e.key === 'Enter' && !e.shiftKey) {
-          log('Enter key detected (no Shift)');
+          if (!this.isSlateField(blockUid, this.focusedFieldName)) {
+            // Non-slate field — _enterKeyHandler handles navigation/add-block
+            return;
+          }
 
+          log('Enter key detected in slate field (no Shift)');
+
+          const blockElement = editableField.closest('[data-block-uid]');
+          if (!blockElement) return;
+
+          // Check if this is the last editable field — if not, navigate to next field
+          const ownFields = this.getOwnEditableFields(blockElement);
+          const currentIndex = ownFields.indexOf(editableField);
+          const isLastField = currentIndex === ownFields.length - 1;
+
+          if (!isLastField && ownFields.length > 1) {
+            e.preventDefault();
+            const nextField = ownFields[currentIndex + 1];
+            nextField.focus();
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(nextField);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return;
+          }
+
+          // Last (or only) slate field — split/create via transform
           // Correct cursor if it's on invalid whitespace before checking data-node-id
-          // This handles the case where Enter is pressed before selectionchange fires
           this.correctInvalidWhitespaceSelection();
 
           const selection = window.getSelection();
@@ -6054,7 +6122,6 @@ export class Bridge {
           const range = selection.getRangeAt(0);
           const node = range.startContainer;
 
-          // Check if this is a Slate block (has data-node-id)
           const parentElement =
             node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
           const hasNodeId = parentElement?.closest('[data-node-id]');
@@ -6062,9 +6129,7 @@ export class Bridge {
 
           if (hasNodeId) {
             log('Preventing default Enter and sending transform request for block:', blockUid);
-            e.preventDefault(); // Block the default Enter behavior
-
-            // Send enter request with current form data included
+            e.preventDefault();
             this.sendTransformRequest(blockUid, 'enter', {});
             return;
           }

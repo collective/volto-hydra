@@ -1312,6 +1312,10 @@ const Iframe = (props) => {
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
+        case 'ADD_BLOCK_AFTER':
+          insertAndSelectBlock(event.data.blockId, 'slate', 'after');
+          break;
+
         case 'SLASH_MENU':
           if (event.data.action === 'filter') {
             setSlashMenu({ blockId: event.data.blockId, filter: event.data.filter, fieldRect: event.data.fieldRect });
