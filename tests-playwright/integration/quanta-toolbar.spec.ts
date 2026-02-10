@@ -492,9 +492,7 @@ test.describe('Quanta Toolbar - Format Dropdown', () => {
     expect(hasParagraph, `Expected a Paragraph option in dropdown, got: ${titles.join(', ')}`).toBe(true);
 
     // Click it to revert to paragraph
-    const paragraphButton = items.filter({
-      has: page.locator('[title]'),
-    }).filter({
+    const paragraphButton = dropdownMenu.locator('.format-dropdown-item[title]').filter({
       hasText: /paragraph|normal|body/i,
     }).first();
     await paragraphButton.click();
