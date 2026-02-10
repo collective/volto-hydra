@@ -6313,10 +6313,6 @@ export class Bridge {
     if (this.blockTextMutationObserver) {
       this.blockTextMutationObserver.disconnect();
     }
-    // TODO: When a transform update (delete/enter/paste/undo/redo) gets rerendered,
-    // it triggers mutations that shouldn't result in INLINE_EDIT_DATA being sent.
-    // We need a mechanism to distinguish user-initiated text changes from
-    // programmatic updates caused by FORM_DATA messages.
     this.blockTextMutationObserver = new MutationObserver((mutations) => {
       log('MutationObserver fired, mutations:', mutations.length, 'isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
@@ -6336,17 +6332,10 @@ export class Bridge {
           } else {
             console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
-        } else if (mutation.type === 'childList' && this.isInlineEditing) {
-          // childList mutations happen when text nodes are added/removed (e.g., deleting
-          // the last character removes the text node, or the browser inserts a <br>).
-          // Without this, the last-character deletion is never sent to the admin.
-          const targetElement = mutation.target?.closest?.('[data-editable-field]')
-            || mutation.target?.querySelector?.('[data-editable-field]');
-          if (targetElement) {
-            log('childList mutation: triggering handleTextChange for', targetElement.tagName);
-            this.handleTextChange(targetElement, mutation.target, null);
-          }
         }
+        // childList mutations are NOT processed here. Structural DOM changes
+        // (adding/removing element nodes like STRONG, EM) come from FORM_DATA
+        // re-renders and are already handled by the admin via transforms.
       });
     });
 
@@ -6358,7 +6347,6 @@ export class Bridge {
         this.blockTextMutationObserver.observe(element, {
           subtree: true,
           characterData: true,
-          childList: true,
         });
       }
     } else {
@@ -6366,7 +6354,6 @@ export class Bridge {
       this.blockTextMutationObserver.observe(blockElement, {
         subtree: true,
         characterData: true,
-        childList: true,
       });
     }
   }
