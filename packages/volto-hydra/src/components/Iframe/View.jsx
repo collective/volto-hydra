@@ -1521,6 +1521,10 @@ const Iframe = (props) => {
               transformAction.html = event.data.html;
             } else if (event.data.transformType === 'delete') {
               transformAction.direction = event.data.direction;
+            } else if (event.data.transformType === 'markdown') {
+              transformAction.markdownType = event.data.markdownType;
+              transformAction.blockType = event.data.blockType;
+              transformAction.inlineType = event.data.inlineType;
             }
 
             // IMPORTANT: Adopt the iframe's sequence if it's higher than ours.

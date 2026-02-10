@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Component } from 'react';
 import { Slate, ReactEditor } from 'slate-react';
-import { Transforms, Node, Range, Editor, Point } from 'slate';
+import { Transforms, Node, Range, Editor, Element, Point } from 'slate';
 import { isEqual, cloneDeep } from 'lodash';
 import config from '@plone/volto/registry';
 import { Icon } from '@plone/volto/components';
@@ -544,6 +544,55 @@ const SyncedSlateToolbar = ({
             Transforms.delete(editor);
           }
           break;
+        case 'markdown':
+          // Trigger Slate's withAutoformat plugin by calling editor.insertText(' ')
+          // The editor content was already synced (replaceEditorContent) with the
+          // markdown markup text (e.g., "##" or "**bold**"). The space triggers
+          // autoformat which recognizes the pattern and applies the transform.
+          editor.insertText(' ');
+          break;
+        case 'unwrapBlock': {
+          // Backspace at start of a slate field: unwrap any non-default structure.
+          // Converts headings/blockquotes/lists → paragraph, removes inline marks.
+          if (!editor.selection) break;
+          const { slate } = config.settings;
+          const defaultType = slate?.defaultBlockType || 'p';
+
+          Transforms.select(editor, Editor.start(editor, []));
+
+          // Find the deepest non-default element (e.g., LI inside UL, or H2)
+          const [entry] = Editor.nodes(editor, {
+            match: (n) => Element.isElement(n) && !Editor.isEditor(n) && n.type !== defaultType,
+            mode: 'lowest',
+          });
+
+          if (entry) {
+            const [, path] = entry;
+            // Check if this element is nested inside another non-editor element
+            // (e.g., LI inside UL/OL) — unwrap the parent wrapper first
+            const parentEntry = Editor.above(editor, {
+              at: path,
+              match: (n) => Element.isElement(n) && !Editor.isEditor(n) && n.type !== defaultType,
+            });
+            if (parentEntry) {
+              Transforms.unwrapNodes(editor, {
+                at: parentEntry[1],
+                split: true,
+              });
+            }
+            // Convert the remaining non-default node to paragraph
+            Transforms.setNodes(editor, { type: defaultType });
+          } else {
+            // No non-default elements — remove any inline marks at cursor
+            const marks = Editor.marks(editor);
+            if (marks) {
+              Object.keys(marks).forEach((mark) => {
+                Editor.removeMark(editor, mark);
+              });
+            }
+          }
+          break;
+        }
         default:
           console.warn('[TOOLBAR] Unknown transform type:', type);
       }

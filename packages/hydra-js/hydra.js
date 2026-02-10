@@ -1891,12 +1891,15 @@ export class Bridge {
     this.pendingBufferReplay = null;
 
     // Build up text string from consecutive printable characters
-    // Also detect format hotkeys that need to be replayed
+    // Also detect format hotkeys and special keys that need to be replayed
     let textToInsert = '';
     let formatHotkeyToReplay = null;
+    const specialKeys = []; // Backspace, Delete, Enter — dispatched as synthetic events
     for (const evt of buffer) {
       if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
         textToInsert += evt.key;
+      } else if (['Backspace', 'Delete', 'Enter'].includes(evt.key)) {
+        specialKeys.push(evt);
       } else if ((evt.ctrlKey || evt.metaKey) && this.slateConfig?.hotkeys) {
         // Check if this is a format hotkey
         for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
@@ -1943,6 +1946,11 @@ export class Bridge {
 
         log('Inserted buffered text:', textToInsert);
 
+        // Clear prospective inline since the element now has real text content.
+        // Without this, the beforeinput handler would keep appending to the first
+        // (ZWS) text node instead of at the cursor position after the replayed text.
+        this.prospectiveInlineElement = null;
+
         // Manually trigger text change handler since insertNode creates a childList mutation
         // but our MutationObserver only watches for characterData mutations
         const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
@@ -1959,6 +1967,23 @@ export class Bridge {
       this.sendTransformRequest(blockId, 'format', {
         format: formatHotkeyToReplay,
       });
+    }
+
+    // Replay special keys (Backspace, Delete, Enter) by dispatching synthetic
+    // keydown events so they go through the normal keydown handler on the
+    // editable field. The keyboard blocker has already been removed at this point.
+    for (const evt of specialKeys) {
+      log('Replaying buffered special key:', evt.key);
+      currentEditable.dispatchEvent(new KeyboardEvent('keydown', {
+        key: evt.key,
+        code: evt.code,
+        shiftKey: evt.shiftKey,
+        ctrlKey: evt.ctrlKey,
+        metaKey: evt.metaKey,
+        altKey: evt.altKey,
+        bubbles: true,
+        cancelable: true,
+      }));
     }
   }
 
@@ -5885,6 +5910,99 @@ export class Bridge {
           return;
         }
 
+        // Handle markdown shortcuts (Space triggers autoformat)
+        // Must be before Enter handler - checks text before cursor for markdown patterns
+        if (e.key === ' ' && this.isSlateField(blockUid, this.focusedFieldName)) {
+          const sel = window.getSelection();
+          if (sel.rangeCount && sel.isCollapsed) {
+            const range = sel.getRangeAt(0);
+            const node = range.startContainer;
+
+            // Get text from start of current block-level element to cursor
+            const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            const editableField = blockEl.closest('[data-editable-field]');
+            if (editableField) {
+              // Walk up to find the block-level element (p, h2, li, blockquote, etc.)
+              const blockNode = blockEl.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, div[data-node-id]')
+                                || editableField;
+
+              // Get text from start of block node to cursor position
+              const textRange = document.createRange();
+              textRange.setStart(blockNode, 0);
+              textRange.setEnd(range.startContainer, range.startOffset);
+              // Strip ZWS/NBSP artifacts from contenteditable — they prevent exact pattern matches
+              const textBeforeCursor = this.stripZeroWidthSpaces(textRange.toString());
+              log('Markdown check - textBeforeCursor:', JSON.stringify(textBeforeCursor));
+
+              // Block-level patterns: entire text must match (longer patterns first)
+              const blockPatterns = [
+                { markup: '###', type: 'h3' },
+                { markup: '##', type: 'h2' },
+                { markup: '>', type: 'blockquote' },
+                { markup: '1.', type: 'ol' },
+                { markup: '1)', type: 'ol' },
+                { markup: '-', type: 'ul' },
+                { markup: '+', type: 'ul' },
+              ];
+
+              for (const pattern of blockPatterns) {
+                if (textBeforeCursor === pattern.markup) {
+                  log('Markdown block shortcut detected:', pattern.markup, '→', pattern.type);
+                  e.preventDefault();
+                  this.sendTransformRequest(blockUid, 'markdown', {
+                    markdownType: 'block',
+                    blockType: pattern.type,
+                  });
+                  return;
+                }
+              }
+
+              // Check * separately for block-level (UL) — only when it's the full text
+              // This avoids conflict with inline *text* pattern
+              if (textBeforeCursor === '*') {
+                log('Markdown block shortcut detected: * → ul');
+                e.preventDefault();
+                this.sendTransformRequest(blockUid, 'markdown', {
+                  markdownType: 'block',
+                  blockType: 'ul',
+                });
+                return;
+              }
+
+              // Inline patterns: **text**, __text__, ~~text~~, *text*, _text_
+              // Longer delimiters checked first to avoid false matches
+              const inlinePatterns = [
+                { between: ['**', '**'], type: 'strong' },
+                { between: ['__', '__'], type: 'strong' },
+                { between: ['~~', '~~'], type: 'del' },
+                { between: ['*', '*'], type: 'em' },
+                { between: ['_', '_'], type: 'em' },
+              ];
+
+              for (const pattern of inlinePatterns) {
+                const [open, close] = pattern.between;
+                if (!textBeforeCursor.endsWith(close)) continue;
+                // Find the opening delimiter before the closing one
+                const searchText = textBeforeCursor.slice(0, -close.length);
+                const openIdx = searchText.lastIndexOf(open);
+                if (openIdx === -1) continue;
+                const inner = searchText.slice(openIdx + open.length);
+                if (inner.length === 0 || inner.trim() !== inner) continue;
+                // Opening delimiter must be preceded by whitespace or be at start
+                if (openIdx > 0 && !/\s/.test(searchText[openIdx - 1])) continue;
+                log('Markdown inline shortcut detected:', open + '...' + close, '→', pattern.type);
+                e.preventDefault();
+                this.sendTransformRequest(blockUid, 'markdown', {
+                  markdownType: 'inline',
+                  inlineType: pattern.type,
+                });
+                return;
+              }
+              // No markdown match — let space insert normally
+            }
+          }
+        }
+
         // Handle Enter key to create new block
         if (e.key === 'Enter' && !e.shiftKey) {
           log('Enter key detected (no Shift)');
@@ -5924,6 +6042,36 @@ export class Bridge {
 
         const range = selection.getRangeAt(0);
         const node = range.startContainer;
+
+        // Backspace at absolute start of a slate field → send to admin to unwrap
+        // The admin knows the Slate data model and will convert non-paragraph
+        // blocks (headings, lists, blockquotes) back to paragraphs, and remove
+        // inline marks at position 0.
+        if (e.key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
+          const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          const editField = blockEl.closest('[data-editable-field]');
+          if (editField) {
+            // Check if cursor is at the very start of the editable field.
+            // Use range start (not end) to handle the case where a selection
+            // exists but starts at position 0. Strip ZWS since restoreSlateSelection
+            // may insert invisible characters for prospective formatting.
+            const textRange = document.createRange();
+            textRange.setStart(editField, 0);
+            textRange.setEnd(range.startContainer, range.startOffset);
+            const textBefore = this.stripZeroWidthSpaces(textRange.toString());
+
+            if (textBefore === '') {
+              // Also check that any selection is only ZWS (not real content)
+              const selectedText = range.collapsed ? '' : this.stripZeroWidthSpaces(range.toString());
+              if (selectedText === '') {
+                log('Backspace at start of slate field - sending unwrapBlock');
+                e.preventDefault();
+                this.sendTransformRequest(blockUid, 'unwrapBlock', {});
+                return;
+              }
+            }
+          }
+        }
 
         // Check if selection spans element nodes (formatted content like STRONG, EM, etc.)
         // If so, send as transform - don't let browser handle it locally
@@ -6001,6 +6149,16 @@ export class Bridge {
           } else {
             console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
+        } else if (mutation.type === 'childList' && this.isInlineEditing) {
+          // childList mutations happen when text nodes are added/removed (e.g., deleting
+          // the last character removes the text node, or the browser inserts a <br>).
+          // Without this, the last-character deletion is never sent to the admin.
+          const targetElement = mutation.target?.closest?.('[data-editable-field]')
+            || mutation.target?.querySelector?.('[data-editable-field]');
+          if (targetElement) {
+            log('childList mutation: triggering handleTextChange for', targetElement.tagName);
+            this.handleTextChange(targetElement, mutation.target, null);
+          }
         }
       });
     });
@@ -6013,6 +6171,7 @@ export class Bridge {
         this.blockTextMutationObserver.observe(element, {
           subtree: true,
           characterData: true,
+          childList: true,
         });
       }
     } else {
@@ -6020,6 +6179,7 @@ export class Bridge {
       this.blockTextMutationObserver.observe(blockElement, {
         subtree: true,
         characterData: true,
+        childList: true,
       });
     }
   }
