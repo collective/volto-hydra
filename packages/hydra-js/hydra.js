@@ -1439,6 +1439,10 @@ export class Bridge {
               }
             }
           }
+        } else if (event.data.type === 'SLASH_MENU_CLOSED') {
+          // Admin closed the slash menu (user selected a block type or dismissed)
+          log('Received SLASH_MENU_CLOSED');
+          this._slashMenuActive = false;
         } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
           // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
           // instanceId: the template instance being edited, or null to exit edit mode
@@ -5758,6 +5762,38 @@ export class Bridge {
           this.prospectiveInlineElement = null;
         }
 
+        // When slash menu is active, forward navigation keys to admin
+        if (this._slashMenuActive) {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.sendMessageToParent({
+              type: 'SLASH_MENU',
+              action: e.key === 'ArrowUp' ? 'up' : 'down',
+              blockId: blockUid,
+            });
+            return;
+          }
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.sendMessageToParent({
+              type: 'SLASH_MENU',
+              action: 'select',
+              blockId: blockUid,
+            });
+            return;
+          }
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            this._slashMenuActive = false;
+            this.sendMessageToParent({
+              type: 'SLASH_MENU',
+              action: 'hide',
+              blockId: blockUid,
+            });
+            return;
+          }
+        }
+
         // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
         // to prevent native formatting from conflicting with Slate-based formatting
         const nativeFormattingKeys = ['b', 'i', 'u', 's'];
@@ -7556,6 +7592,37 @@ export class Bridge {
 
     // Buffer the update - text and selection are captured together
     this.bufferUpdate(this.fieldTypeIsSlate(fieldType) ? 'textChangeSlate' : 'textChange');
+
+    // Check for slash menu pattern (entire field content is /[letters]*)
+    if (this.fieldTypeIsSlate(fieldType)) {
+      const plaintext = this.stripZeroWidthSpaces(target.textContent || '').trim();
+      const slashMatch = plaintext.match(/^\/([\p{L}\p{N}]*)$/u);
+
+      if (slashMatch) {
+        this._slashMenuActive = true;
+        // Send field rect so admin can position the menu under the field
+        const fieldRect = target.getBoundingClientRect();
+        this.sendMessageToParent({
+          type: 'SLASH_MENU',
+          action: 'filter',
+          blockId: blockUid,
+          filter: slashMatch[1],
+          fieldRect: {
+            top: fieldRect.top,
+            bottom: fieldRect.bottom,
+            left: fieldRect.left,
+            width: fieldRect.width,
+          },
+        });
+      } else if (this._slashMenuActive) {
+        this._slashMenuActive = false;
+        this.sendMessageToParent({
+          type: 'SLASH_MENU',
+          action: 'hide',
+          blockId: blockUid,
+        });
+      }
+    }
   }
 
   /**

@@ -76,6 +76,7 @@ import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { BlockChooser, Icon, Toast } from '@plone/volto/components';
+import { Menu } from 'semantic-ui-react';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
@@ -460,6 +461,8 @@ const Iframe = (props) => {
 
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
+  const [slashMenu, setSlashMenu] = useState(null); // { blockId, filter } or null
+  const [slashMenuIndex, setSlashMenuIndex] = useState(0);
 
   // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
   // Selection and toolbarRequestDone are now part of iframeSyncState.
@@ -1307,6 +1310,23 @@ const Iframe = (props) => {
 
         case 'DELETE_BLOCK':
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
+          break;
+
+        case 'SLASH_MENU':
+          if (event.data.action === 'filter') {
+            setSlashMenu({ blockId: event.data.blockId, filter: event.data.filter, fieldRect: event.data.fieldRect });
+            setSlashMenuIndex(0);
+          } else if (event.data.action === 'hide') {
+            setSlashMenu(null);
+            setSlashMenuIndex(0);
+          } else if (event.data.action === 'up') {
+            setSlashMenuIndex(prev => (prev > 0 ? prev - 1 : prev));
+          } else if (event.data.action === 'down') {
+            setSlashMenuIndex(prev => prev + 1);
+          } else if (event.data.action === 'select') {
+            // Selection is handled by the slashMenuSelect effect below
+            setSlashMenu(prev => prev ? { ...prev, selecting: true } : null);
+          }
           break;
 
         case 'INLINE_EDIT_DATA':
@@ -2711,6 +2731,85 @@ const Iframe = (props) => {
   }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation]);
 
   // ============================================================================
+  // SLASH MENU — filtered block list for "/" command in iframe
+  // ============================================================================
+  const slashMenuBlocks = useMemo(() => {
+    if (!slashMenu) return [];
+    const hasAllowed = effectiveAllowedBlocks && effectiveAllowedBlocks.length > 0;
+    const search = (slashMenu.filter || '').toLowerCase();
+
+    const scoreBlock = (block) => {
+      if (!search) return 0;
+      const title = intl.formatMessage({ id: block.title, defaultMessage: block.title }).toLowerCase();
+      if (title.indexOf(search) === 0) return 2; // prefix match
+      if (title.includes(search)) return 1; // substring match
+      return 0;
+    };
+
+    return Object.values(blocksConfig)
+      .filter(block => {
+        if (!block.id || !block.title) return false;
+        if (block.id === 'slate') return false; // same as core Volto
+        if (typeof block.restricted === 'function'
+          ? block.restricted({ properties, block, navRoot, contentType })
+          : block.restricted) return false;
+        if (hasAllowed && !effectiveAllowedBlocks.includes(block.id)) return false;
+        if (!search) return true;
+        const title = intl.formatMessage({ id: block.title, defaultMessage: block.title }).toLowerCase();
+        const originalTitle = block.title.toLowerCase();
+        return title.includes(search) || originalTitle.includes(search);
+      })
+      .sort((a, b) => {
+        const scoreDiff = scoreBlock(b) - scoreBlock(a);
+        if (scoreDiff) return scoreDiff;
+        const aTitle = intl.formatMessage({ id: a.title, defaultMessage: a.title });
+        const bTitle = intl.formatMessage({ id: b.title, defaultMessage: b.title });
+        return aTitle.localeCompare(bTitle);
+      });
+  }, [slashMenu, blocksConfig, effectiveAllowedBlocks, properties, navRoot, contentType, intl]);
+
+  // Clamp slashMenuIndex to available blocks
+  const clampedSlashMenuIndex = slashMenuBlocks.length > 0
+    ? Math.min(slashMenuIndex, slashMenuBlocks.length - 1)
+    : 0;
+
+  // Handle slash menu selection (when 'selecting' flag is set)
+  useEffect(() => {
+    if (!slashMenu?.selecting) return;
+    const block = slashMenuBlocks[clampedSlashMenuIndex];
+    if (block) {
+      onMutateBlock(slashMenu.blockId, { '@type': block.id });
+    }
+    setSlashMenu(null);
+    setSlashMenuIndex(0);
+    // Tell iframe to clear _slashMenuActive
+    document.getElementById('previewIframe')?.contentWindow?.postMessage(
+      { type: 'SLASH_MENU_CLOSED' },
+      '*',
+    );
+  }, [slashMenu?.selecting]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close slash menu on click outside (or block change)
+  useEffect(() => {
+    if (!slashMenu) return;
+    const closeSlashMenu = () => {
+      setSlashMenu(null);
+      setSlashMenuIndex(0);
+      document.getElementById('previewIframe')?.contentWindow?.postMessage(
+        { type: 'SLASH_MENU_CLOSED' },
+        '*',
+      );
+    };
+    // Click anywhere outside the menu portal closes it
+    const handleMouseDown = (e) => {
+      if (e.target.closest('.power-user-menu')) return;
+      closeSlashMenu();
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [slashMenu !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ============================================================================
   // BLOCK ADD FLOW (Unified for Sidebar and Iframe)
   // ============================================================================
   //
@@ -2852,6 +2951,56 @@ const Iframe = (props) => {
               contentType={contentType}
             />
           </div>,
+          document.body,
+        )}
+      {/* Slash menu — appears under the field in the iframe where "/" was typed */}
+      {slashMenu && referenceElement && slashMenu.fieldRect &&
+        createPortal(
+          (() => {
+            const iframeRect = referenceElement.getBoundingClientRect();
+            const menuTop = iframeRect.top + slashMenu.fieldRect.bottom;
+            const menuLeft = iframeRect.left + slashMenu.fieldRect.left;
+            return (
+              <div
+                className="power-user-menu"
+                style={{
+                  position: 'fixed',
+                  top: menuTop,
+                  left: menuLeft,
+                  width: 210,
+                  zIndex: 10,
+                }}
+              >
+                <Menu vertical fluid borderless>
+                  {slashMenuBlocks.map((block, index) => (
+                    <Menu.Item
+                      key={block.id}
+                      className={block.id}
+                      active={index === clampedSlashMenuIndex}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMutateBlock(slashMenu.blockId, { '@type': block.id });
+                        setSlashMenu(null);
+                        setSlashMenuIndex(0);
+                        document.getElementById('previewIframe')?.contentWindow?.postMessage(
+                          { type: 'SLASH_MENU_CLOSED' },
+                          '*',
+                        );
+                      }}
+                    >
+                      <Icon name={block.icon} size="24px" />
+                      {intl.formatMessage({ id: block.title, defaultMessage: block.title })}
+                    </Menu.Item>
+                  ))}
+                  {slashMenuBlocks.length === 0 && (
+                    <Menu.Item>
+                      {intl.formatMessage({ id: 'No matching blocks', defaultMessage: 'No matching blocks' })}
+                    </Menu.Item>
+                  )}
+                </Menu>
+              </div>
+            );
+          })(),
           document.body,
         )}
       {/* Only render when src is ready (ensures name attribute is applied on creation).
