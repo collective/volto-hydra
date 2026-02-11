@@ -6008,6 +6008,7 @@ export class Bridge {
           if (sel) {
             const alter = e.shiftKey ? 'extend' : 'move';
             sel.modify(alter, navActions[e.key][0], navActions[e.key][1]);
+            e.preventDefault(); // Prevent native action doubling the movement
           }
         }
 
