@@ -94,7 +94,7 @@
 // onEditChange
 
 // Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
-let debugEnabled = false;
+let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
 const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
 
 /**
@@ -1373,7 +1373,17 @@ export class Bridge {
             if (callbackResult && typeof callbackResult.then === 'function') {
               callbackResult.then(afterRender);
             } else {
-              afterRender();
+              // Sync callback — framework may render asynchronously (Vue, React).
+              // If a transform or re-render is pending, wait for the actual DOM
+              // mutation before proceeding with selection restore and buffer replay.
+              const blockId = this.selectedBlockUid;
+              const blockEl = blockId && document.querySelector(`[data-block-uid="${blockId}"]`);
+              log('DEBUG sync callback:', { blockId, hasBlockEl: !!blockEl, pendingTransform: !!this.pendingTransform, reRenderBlocking: !!this._reRenderBlocking, bufferLen: this.eventBuffer.length });
+              if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
+                this._waitForDomMutation(blockEl, afterRender);
+              } else {
+                afterRender();
+              }
             }
           } else {
             throw new Error('No form data has been sent from the adminUI');
@@ -1768,6 +1778,11 @@ export class Bridge {
   _ensureDocumentKeyboardBlocker() {
     if (this._documentKeyboardBlocker) return;
     this._documentKeyboardBlocker = (e) => {
+      // DEBUG: trace End/Backspace through the blocker
+      if (e.type === 'keydown' && (e.key === 'End' || e.key === 'Backspace')) {
+        log('DEBUG blocker:', e.key, 'blockedBlockId:', this.blockedBlockId,
+            'target:', e.target?.nodeName, 'target.closest block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
+      }
       if (!this.blockedBlockId) return;
 
       // During transforms, the renderer replaces innerHTML which destroys the
@@ -1866,14 +1881,19 @@ export class Bridge {
 
     const { blockId, requestId: originalRequestId } = this.pendingTransform;
 
-    // Prepare buffer for replay
-    if (this.eventBuffer.length > 0) {
+    // Prepare buffer for replay. Include any remainder from a previous replay
+    // that was interrupted by a transform (e.g. Enter→split mid-replay).
+    const remainder = this._replayRemainder || [];
+    this._replayRemainder = null;
+
+    if (remainder.length > 0 || this.eventBuffer.length > 0) {
       this.pendingBufferReplay = {
         blockId,
-        buffer: [...this.eventBuffer],
+        buffer: [...remainder, ...this.eventBuffer],
       };
       this.eventBuffer = [];
-      log('Prepared', this.pendingBufferReplay.buffer.length, 'events for replay');
+      log('Prepared', this.pendingBufferReplay.buffer.length, 'events for replay',
+          remainder.length ? `(${remainder.length} from previous cycle)` : '');
     }
 
     // Replay buffered events (may send new format request with new requestId)
@@ -1906,7 +1926,7 @@ export class Bridge {
 
     // Re-query editable field in case DOM was re-rendered
     const currentBlock = document.querySelector(`[data-block-uid="${blockId}"]`);
-    const currentEditable = currentBlock?.querySelector('[contenteditable="true"]');
+    const currentEditable = currentBlock ? this.getOwnFirstEditableField(currentBlock) : null;
     if (!currentEditable) {
       // Retry a few times with RAF to wait for Vue/Nuxt re-render
       if (retryCount < 5) {
@@ -1920,130 +1940,170 @@ export class Bridge {
 
     this.pendingBufferReplay = null;
 
-    // Build up text string from consecutive printable characters
-    // Also detect format hotkeys and special keys that need to be replayed
-    let textToInsert = '';
-    let formatHotkeyToReplay = null;
-    const specialKeys = []; // Tab, Backspace, Delete, Enter — dispatched as synthetic events
-    for (const evt of buffer) {
-      if (evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey) {
-        textToInsert += evt.key;
-      } else if (['Tab', 'Backspace', 'Delete', 'Enter'].includes(evt.key)) {
-        specialKeys.push(evt);
-      } else if ((evt.ctrlKey || evt.metaKey) && this.slateConfig?.hotkeys) {
-        // Check if this is a format hotkey
-        for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
-          const parts = shortcut.toLowerCase().split('+');
-          const hasmod = parts.includes('mod');
-          const hasShift = parts.includes('shift');
-          const hasAlt = parts.includes('alt');
-          const key = parts[parts.length - 1];
+    // Navigation key → selection.modify() mapping
+    const navMap = {
+      ArrowLeft: ['backward', 'character'],
+      ArrowRight: ['forward', 'character'],
+      ArrowUp: ['backward', 'line'],
+      ArrowDown: ['forward', 'line'],
+      Home: ['backward', 'lineboundary'],
+      End: ['forward', 'lineboundary'],
+    };
 
-          const modifierMatch = hasmod ? (evt.ctrlKey || evt.metaKey) : true;
-          const shiftMatch = hasShift ? evt.shiftKey : !evt.shiftKey;
-          const altMatch = hasAlt ? evt.altKey : !evt.altKey;
-          const keyMatch = evt.key.toLowerCase() === key;
-
-          if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
-            formatHotkeyToReplay = config.format;
-            log('Detected format hotkey in buffer:', config.format);
-            break;
-          }
+    // Helper: detect format hotkey from a buffered event
+    const getFormatFromHotkey = (evt) => {
+      if (!(evt.ctrlKey || evt.metaKey) || !this.slateConfig?.hotkeys) return null;
+      for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
+        const parts = shortcut.toLowerCase().split('+');
+        const hasmod = parts.includes('mod');
+        const hasShift = parts.includes('shift');
+        const hasAlt = parts.includes('alt');
+        const key = parts[parts.length - 1];
+        if ((hasmod ? (evt.ctrlKey || evt.metaKey) : true) &&
+            (hasShift ? evt.shiftKey : !evt.shiftKey) &&
+            (hasAlt ? evt.altKey : !evt.altKey) &&
+            evt.key.toLowerCase() === key && config.type === 'inline') {
+          return config.format;
         }
       }
-    }
+      return null;
+    };
 
-    if (textToInsert) {
-      // Insert text directly using Selection API
+    // Helper: insert accumulated text using Selection API
+    const insertText = (text) => {
       const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
+      if (!selection || !selection.rangeCount) return;
+      const range = selection.getRangeAt(0);
 
-        // Delete any selected content first
-        if (!range.collapsed) {
-          range.deleteContents();
-        }
+      if (!range.collapsed) {
+        range.deleteContents();
+      }
 
-        // Insert the text
-        const textNode = document.createTextNode(textToInsert);
-        range.insertNode(textNode);
+      const textNode = document.createTextNode(text);
+      range.insertNode(textNode);
 
-        // Clean up ZWS text nodes left by restoreSlateSelection's ensureZwsPosition.
-        // These cause browser text-node normalization that displaces the cursor,
-        // leading to lost keystrokes when the user types immediately after replay.
-        const parentEl = textNode.parentNode;
-        if (parentEl) {
-          for (const sibling of [...parentEl.childNodes]) {
-            if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE) {
-              const cleaned = sibling.textContent.replace(/[\uFEFF\u200B]/g, '');
-              if (cleaned === '') {
-                sibling.remove();
-              }
+      // Clean up ZWS text nodes left by restoreSlateSelection's ensureZwsPosition
+      const parentEl = textNode.parentNode;
+      if (parentEl) {
+        for (const sibling of [...parentEl.childNodes]) {
+          if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE) {
+            const cleaned = sibling.textContent.replace(/[\uFEFF\u200B]/g, '');
+            if (cleaned === '') {
+              sibling.remove();
             }
           }
         }
+      }
 
-        // Position cursor at the END of the inserted text node (not after it).
-        // setStartAfter(textNode) puts cursor between sibling nodes, which
-        // causes the browser to create new text nodes on the next keystroke.
-        // setStart(textNode, len) puts cursor inside the text node, so the
-        // browser appends to the same node — no normalization issues.
-        range.setStart(textNode, textNode.textContent.length);
-        range.setEnd(textNode, textNode.textContent.length);
-        selection.removeAllRanges();
-        selection.addRange(range);
+      // Position cursor inside the text node (not after it) to prevent
+      // browser text-node normalization on next keystroke
+      range.setStart(textNode, textNode.textContent.length);
+      range.setEnd(textNode, textNode.textContent.length);
+      selection.removeAllRanges();
+      selection.addRange(range);
 
-        log('Inserted buffered text:', textToInsert);
+      log('Inserted buffered text:', text);
 
-        // Clear prospective inline since the element now has real text content.
-        // Without this, the beforeinput handler would keep appending to the first
-        // (ZWS) text node instead of at the cursor position after the replayed text.
-        this.prospectiveInlineElement = null;
+      this.prospectiveInlineElement = null;
 
-        // Manually trigger text change handler since insertNode creates a childList mutation
-        // but our MutationObserver only watches for characterData mutations
-        const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
-        if (editableField && this.isInlineEditing) {
-          this.handleTextChange(editableField, textNode.parentElement, textNode);
+      // Manually trigger text change handler since insertNode creates a
+      // childList mutation but our MutationObserver only watches characterData
+      const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
+      if (editableField && this.isInlineEditing) {
+        this.handleTextChange(editableField, textNode.parentElement, textNode);
+      }
+    };
+
+    // Helper: replay a special key via synthetic keydown + native fallback
+    const replaySpecialKey = (evt) => {
+      log('Replaying buffered special key:', evt.key);
+      const syntheticEvent = new KeyboardEvent('keydown', {
+        key: evt.key,
+        code: evt.code,
+        shiftKey: evt.shiftKey,
+        ctrlKey: evt.ctrlKey,
+        metaKey: evt.metaKey,
+        altKey: evt.altKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      currentEditable.dispatchEvent(syntheticEvent);
+
+      // Synthetic events are untrusted and don't trigger native actions.
+      // If our keydown handler didn't handle it, perform the action manually.
+      // If it DID handle it (e.g. Enter→split), it called sendTransformRequest
+      // which sets blockedBlockId — the loop will detect this and stop.
+      if (!syntheticEvent.defaultPrevented) {
+        if (evt.key === 'Backspace') {
+          document.execCommand('delete', false);
+        } else if (evt.key === 'Delete') {
+          document.execCommand('forwardDelete', false);
+        } else if (navMap[evt.key]) {
+          const sel = window.getSelection();
+          if (sel) {
+            const alter = evt.shiftKey ? 'extend' : 'move';
+            sel.modify(alter, navMap[evt.key][0], navMap[evt.key][1]);
+          }
         }
       }
+    };
+
+    // Process buffer events sequentially to preserve ordering.
+    // If a replayed event triggers a new transform (e.g. Enter→split,
+    // Tab→indent), stop and save remaining events for the next replay cycle.
+    // Clear blockedBlockId so the capture-phase blocker doesn't interfere;
+    // if a replayed event starts a new transform, blockedBlockId gets re-set.
+    const savedBlockedId = this.blockedBlockId;
+    this.blockedBlockId = null;
+
+    let textBatch = '';
+    for (let i = 0; i < buffer.length; i++) {
+      // A replayed event started a new transform — save remainder for next cycle
+      if (this.blockedBlockId) {
+        if (textBatch) {
+          // Flush any pending text before saving remainder
+          insertText(textBatch);
+          textBatch = '';
+        }
+        this._replayRemainder = buffer.slice(i);
+        log('Replay interrupted by transform, saved', this._replayRemainder.length, 'events for next cycle');
+        break;
+      }
+
+      const evt = buffer[i];
+      const isTextChar = evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey;
+
+      if (isTextChar) {
+        textBatch += evt.key;
+      } else {
+        // Flush accumulated text before handling a non-text event
+        if (textBatch) {
+          insertText(textBatch);
+          textBatch = '';
+        }
+
+        const format = getFormatFromHotkey(evt);
+        if (format) {
+          log('Replaying buffered format hotkey:', format);
+          this.sendTransformRequest(blockId, 'format', { format });
+        } else if (['Tab', 'Backspace', 'Delete', 'Enter',
+                     'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                     'Home', 'End'].includes(evt.key)) {
+          replaySpecialKey(evt);
+        }
+        // Other keys (Escape, F-keys, etc.) are silently dropped
+      }
     }
 
-    // Replay any format hotkey that was buffered
-    if (formatHotkeyToReplay) {
-      log('Replaying buffered format hotkey:', formatHotkeyToReplay);
-      // Send the format request - this updates pendingTransform with new requestId
-      this.sendTransformRequest(blockId, 'format', {
-        format: formatHotkeyToReplay,
-      });
+    // Flush any remaining text batch
+    if (textBatch && !this.blockedBlockId) {
+      insertText(textBatch);
     }
 
-    // Replay special keys (Tab, Backspace, Delete, Enter) by dispatching synthetic
-    // keydown events so they go through the normal keydown handlers on the
-    // editable field (e.g. Tab→indent, Enter→split). Temporarily clear
-    // blockedBlockId so the capture-phase blocker doesn't re-intercept them.
-    if (specialKeys.length > 0) {
-      const savedBlockedId = this.blockedBlockId;
-      this.blockedBlockId = null;
-      for (const evt of specialKeys) {
-        log('Replaying buffered special key:', evt.key);
-        currentEditable.dispatchEvent(new KeyboardEvent('keydown', {
-          key: evt.key,
-          code: evt.code,
-          shiftKey: evt.shiftKey,
-          ctrlKey: evt.ctrlKey,
-          metaKey: evt.metaKey,
-          altKey: evt.altKey,
-          bubbles: true,
-          cancelable: true,
-        }));
-      }
-      // If a replayed key started a new transform (Tab→indent, Enter→split),
-      // blockedBlockId is already re-set by sendTransformRequest. Otherwise
-      // restore the previous state so replayBufferAndUnblock can clean up.
-      if (!this.blockedBlockId) {
-        this.blockedBlockId = savedBlockedId;
-      }
+    // Restore blockedBlockId if no replayed event started a new transform.
+    // replayBufferAndUnblock will then unblock normally.
+    if (!this.blockedBlockId) {
+      this.blockedBlockId = savedBlockedId;
     }
   }
 
@@ -5830,14 +5890,66 @@ export class Bridge {
         e.clipboardData.setData('text/html', cleanHtml);
       });
 
+      // Prevent browser from removing text nodes on last-char deletion.
+      // Like slate-react, we keep empty text nodes alive with ZWS (\uFEFF)
+      // so MutationObserver always fires characterData (not childList).
+      editableField.addEventListener('beforeinput', (e) => {
+        if (e.inputType !== 'deleteContentBackward' && e.inputType !== 'deleteContentForward') return;
+        const sel = window.getSelection();
+        if (!sel.rangeCount || !sel.isCollapsed) return;
+
+        const textNode = sel.getRangeAt(0).startContainer;
+        if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+        const realText = this.stripZeroWidthSpaces(textNode.textContent);
+        if (realText.length !== 1) return;
+
+        // Last real character — replace with ZWS instead of letting browser remove the node
+        e.preventDefault();
+        textNode.textContent = '\uFEFF';
+        const r = document.createRange();
+        r.setStart(textNode, e.inputType === 'deleteContentBackward' ? 0 : 1);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      });
+
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
       editableField.addEventListener('keydown', (e) => {
+        // DEBUG: trace End/Backspace key arrival and selection state
+        if (e.key === 'End' || e.key === 'Backspace') {
+          const sel = window.getSelection();
+          log('DEBUG keydown:', e.key, 'isTrusted:', e.isTrusted,
+              'collapsed:', sel?.isCollapsed, 'anchorOffset:', sel?.anchorOffset,
+              'focusOffset:', sel?.focusOffset, 'anchorNode:', sel?.anchorNode?.nodeName,
+              'blockedBlockId:', this.blockedBlockId);
+        }
         // Clear prospective inline on navigation keys (user intentionally leaving the inline)
         const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
         const isNavigationKey = navigationKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;
         if (isNavigationKey && this.prospectiveInlineElement) {
           log('Clearing prospective inline due to navigation key:', e.key);
           this.prospectiveInlineElement = null;
+        }
+
+        // Ensure navigation keys actually move the cursor.
+        // CDP-dispatched keydown events (e.g. from Playwright or automation) don't always
+        // trigger the browser's native cursor movement in contenteditable. Apply
+        // selection.modify explicitly — this is idempotent with the native action.
+        const navActions = {
+          ArrowLeft: ['backward', 'character'],
+          ArrowRight: ['forward', 'character'],
+          ArrowUp: ['backward', 'line'],
+          ArrowDown: ['forward', 'line'],
+          Home: ['backward', 'lineboundary'],
+          End: ['forward', 'lineboundary'],
+        };
+        if (navActions[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const sel = window.getSelection();
+          if (sel) {
+            const alter = e.shiftKey ? 'extend' : 'move';
+            sel.modify(alter, navActions[e.key][0], navActions[e.key][1]);
+          }
         }
 
         // When slash menu is active, forward navigation keys to admin
@@ -6392,6 +6504,27 @@ export class Bridge {
   }
 
   /**
+   * Waits for a DOM mutation on the given element before calling the callback.
+   * Used after sync onEditChange callbacks to wait for framework re-renders
+   * (Vue, React, etc.) before proceeding with selection restore and buffer replay.
+   * Falls back to calling the callback after a timeout if no mutation occurs.
+   */
+  _waitForDomMutation(element, callback) {
+    let called = false;
+    const proceed = (source) => {
+      if (called) return;
+      called = true;
+      observer.disconnect();
+      log('DEBUG _waitForDomMutation proceed via:', source);
+      callback();
+    };
+    const observer = new MutationObserver(() => proceed('mutation'));
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+    // Fallback if no mutation (e.g., data didn't change visible content)
+    setTimeout(() => proceed('timeout'), 100);
+  }
+
+  /**
    * Checks if an element is hidden (display: none, visibility: hidden, or zero dimensions)
    * @param {HTMLElement} el - The element to check
    * @returns {boolean} True if the element is hidden
@@ -6878,6 +7011,19 @@ export class Bridge {
           setTimeout(() => {
             this._selectionRetryPending = false;
             this.restoreSlateSelection(slateSelection, formData);
+            // If blocking was held for this retry, replay buffer and unblock now
+            if (this.blockedBlockId && !this.pendingTransform) {
+              if (this.eventBuffer.length > 0) {
+                log('Replaying', this.eventBuffer.length, 'events buffered during selection retry');
+                this.pendingBufferReplay = {
+                  blockId: this.blockedBlockId,
+                  buffer: [...this.eventBuffer],
+                };
+                this.eventBuffer = [];
+              }
+              this.blockedBlockId = null;
+              this.replayBufferedEvents();
+            }
           }, 50);
           return;
         }

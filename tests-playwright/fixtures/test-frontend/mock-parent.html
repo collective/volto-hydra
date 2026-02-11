@@ -80,36 +80,30 @@
   <div class="volto-hydra-block-outline" id="block-outline"></div>
   <div class="volto-hydra-add-button" id="add-button">+</div>
 
-  <div id="iframe-container">
-    <iframe id="previewIframe" name="hydra-edit:http://localhost:8888" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
-  </div>
+  <div id="iframe-container"></div>
 
   <div id="log">
     <div class="log-entry"><span style="font-weight: bold">Message Log:</strong></div>
   </div>
 
   <script>
+    // Configure iframe frontend from ?frontend= URL param (default: mock frontend on 8888)
+    const frontendOrigin = new URLSearchParams(window.location.search).get('frontend') || 'http://localhost:8888';
+    const adminOrigin = window.location.origin;
+
+    // Create iframe dynamically so name is set BEFORE the browsing context is created.
+    // Setting iframe.name after the element is in the DOM doesn't propagate to contentWindow.name.
+    const previewIframe = document.createElement('iframe');
+    previewIframe.id = 'previewIframe';
+    previewIframe.name = `hydra-edit:${adminOrigin}`;
+    previewIframe.src = `${frontendOrigin}/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
+    document.getElementById('iframe-container').appendChild(previewIframe);
+
     console.log('[MOCK_PARENT] Loaded');
 
-    // Helper to add nodeIds to Slate JSON (matching hydra.js logic)
-    function addNodeIds(nodes, startId = 1) {
-      let currentId = startId;
-
-      function processNode(node) {
-        // Check if it's an element node (has type or children properties)
-        if (node.type || (node.children && !node.text)) {
-          // Add nodeId to element nodes
-          node.nodeId = currentId++;
-
-          if (node.children) {
-            node.children = node.children.map(child => processNode(child));
-          }
-        }
-        return node;
-      }
-
-      return nodes.map(node => processNode(node));
-    }
+    // NOTE: No addNodeIds here — hydra.js adds nodeIds to all slate fields
+    // when it receives FORM_DATA, so the mock parent (acting as admin) should
+    // send plain Slate JSON without nodeIds, just like the real admin does.
 
     // Helper to build blockPathMap from mockFormData
     function buildBlockPathMap() {
@@ -130,7 +124,8 @@
       'slate': { value: 'slate' },
       'text': { text: 'string' },
       'multifield': { title: 'string', description: 'slate' },
-      'textarea': { content: 'string:textarea' }
+      'textarea': { content: 'string:textarea' },
+      'hero': { heading: 'string', subheading: 'string:textarea', buttonText: 'string', description: 'slate' }
     };
 
     // Simple Slate transformation without needing full Slate library
@@ -185,7 +180,20 @@
       paragraph.children = newChildren;
 
       // Add nodeIds to the result
-      return addNodeIds(result);
+      // No addNodeIds needed — hydra.js adds them when it receives FORM_DATA.
+      return result;
+    }
+
+    function applySlateDelete(value, selection) {
+      if (!selection || !value[0]) return value;
+      // For a non-collapsed selection, replace all content with empty text.
+      // This is a simplified mock — real Slate handles partial deletes, but
+      // for testing buffer replay we just need the content to be cleared.
+      // No addNodeIds needed — hydra.js adds them when it receives FORM_DATA.
+      const result = JSON.parse(JSON.stringify(value));
+      const paragraph = result[0];
+      paragraph.children = [{ text: '' }];
+      return result;
     }
 
     // Mock form data with both a slate block and a simple text block
@@ -197,7 +205,7 @@
       blocks: {
         'mock-block-1': {
           '@type': 'slate',
-          value: addNodeIds([
+          value: [
             {
               type: 'p',
               children: [
@@ -206,7 +214,7 @@
                 },
               ],
             },
-          ]),
+          ],
         },
         'mock-text-block': {
           '@type': 'text',
@@ -215,7 +223,7 @@
         'mock-multi-field-block': {
           '@type': 'multifield',
           title: 'Block Title',
-          description: addNodeIds([
+          description: [
             {
               type: 'p',
               children: [
@@ -224,15 +232,27 @@
                 },
               ],
             },
-          ]),
+          ],
         },
         'mock-textarea-block': {
           '@type': 'textarea',
           content: 'First line of textarea',
         },
+        'mock-hero-block': {
+          '@type': 'hero',
+          heading: 'Simple text field',
+          subheading: 'Textarea content',
+          buttonText: 'Click me',
+          description: [
+            {
+              type: 'p',
+              children: [{ text: 'Hero description' }],
+            },
+          ],
+        },
       },
       blocks_layout: {
-        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block'],
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block', 'mock-hero-block'],
       },
     };
 
@@ -391,14 +411,16 @@
             console.log('[MOCK_PARENT] Applying Slate transformation:', {
               transformType,
               format,
-              selection,
+              selection: JSON.stringify(selection),
               currentValue: JSON.stringify(currentValue)
             });
 
-            // Apply the Slate transformation (for format transforms)
+            // Apply the Slate transformation
             let updatedValue = currentValue;
             if (transformType === 'format' && format) {
               updatedValue = applySlateTransform(currentValue, selection, format, transformType);
+            } else if (transformType === 'delete') {
+              updatedValue = applySlateDelete(currentValue, selection);
             }
 
             console.log('[MOCK_PARENT] Transformation result:', JSON.stringify(updatedValue));

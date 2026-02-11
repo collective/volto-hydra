@@ -226,6 +226,7 @@ onMounted(() => {
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
             const bridge = initBridge({
+                debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
                 pageBlocksFields: [
                     {
                         fieldName: 'blocks',
