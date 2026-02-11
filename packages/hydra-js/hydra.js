@@ -1971,6 +1971,11 @@ export class Bridge {
 
     // Helper: insert accumulated text using Selection API
     const insertText = (text) => {
+      // Ensure cursor is inside a data-node-id element, not on Vue/Nuxt
+      // template whitespace. After a transform, the framework may re-render
+      // and leave the cursor on whitespace outside the content element.
+      this.correctInvalidWhitespaceSelection();
+
       const selection = window.getSelection();
       if (!selection || !selection.rangeCount) return;
       const range = selection.getRangeAt(0);
@@ -2393,6 +2398,46 @@ export class Bridge {
 
     log('correctInvalidWhitespaceSelection: Corrected selection');
     return true;
+  }
+
+  /**
+   * Ensures the cursor's text node is a valid insertion target for the browser.
+   * Browsers refuse to insert characters into a whitespace-only text node inside
+   * a block element (like <p>), creating a new text node on the parent instead.
+   * This replaces ASCII whitespace with FEFF so the browser treats it as valid.
+   *
+   * @returns {boolean} True if the text node was fixed
+   */
+  ensureValidInsertionTarget() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return false;
+
+    const node = selection.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+
+    // Only fix whitespace-only text nodes
+    const text = node.textContent;
+    if (!text || text.trim() !== '' || /[\uFEFF\u200B]/.test(text)) return false;
+
+    // Only fix nodes inside a data-node-id element
+    let current = node.parentNode;
+    while (current) {
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+        // Replace whitespace with FEFF and position cursor after it
+        node.textContent = '\uFEFF';
+        const range = selection.getRangeAt(0);
+        range.setStart(node, 1);
+        range.setEnd(node, 1);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        log('ensureValidInsertionTarget: replaced whitespace-only text with FEFF');
+        return true;
+      }
+      if (current.hasAttribute?.('data-editable-field')) break;
+      current = current.parentNode;
+    }
+
+    return false;
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -5924,6 +5969,20 @@ export class Bridge {
               'focusOffset:', sel?.focusOffset, 'anchorNode:', sel?.anchorNode?.nodeName,
               'blockedBlockId:', this.blockedBlockId);
         }
+        // Ensure cursor is inside a data-node-id element before processing.
+        // After transforms (e.g. delete), Vue/Nuxt may re-render and leave the
+        // cursor on template whitespace outside the content element.
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+          this.correctInvalidWhitespaceSelection();
+          // Also fix whitespace-only text nodes INSIDE data-node-id elements.
+          // Nuxt renders empty paragraphs as <p> </p> (space). The browser's
+          // contenteditable refuses to insert characters into a whitespace-only
+          // text node inside a block element, creating a new node on the parent
+          // instead. Replace the whitespace with FEFF so the browser has a valid
+          // insertion target.
+          this.ensureValidInsertionTarget();
+        }
+
         // Clear prospective inline on navigation keys (user intentionally leaving the inline)
         const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
         const isNavigationKey = navigationKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;

@@ -195,4 +195,115 @@ test.describe('Navigation key behavior in contenteditable', () => {
       window.mockParent.setTransformDelay(0);
     });
   });
+
+  test('Clear formatted content then type immediately preserves all characters', async ({ helper, page }) => {
+    // Reproduces nuxt timing issue: after a delete transform completes and
+    // the DOM re-renders, the double-RAF in afterContentRender delays unblocking.
+    // Characters typed in that window should be buffered and replayed.
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(100);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Apply bold to create formatted content
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
+
+    // Select all bold text and delete — triggers delete transform
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('Backspace');
+
+    // Type immediately — characters arrive while transform is in flight.
+    // They should be buffered and replayed, not lost.
+    await page.keyboard.type('some new text');
+
+    await expect(editable).toContainText('some new text', { timeout: 5000 });
+    const text = await editable.textContent();
+    console.log('[TEST] Text after clear+type:', text);
+    expect(text).toContain('some new text');
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('Typing into whitespace-only text node stays inside data-node-id element', async ({ helper, page }) => {
+    // Reproduces nuxt integration test failure: after clearing, Nuxt renders
+    // empty paragraphs as <p> </p> (space). The browser's contenteditable
+    // refuses to insert characters into a whitespace-only text node inside
+    // a block element, creating a new text node on the parent DIV instead.
+    // ensureValidInsertionTarget replaces the space with FEFF to fix this.
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Apply bold to create formatted content
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
+
+    // Select all bold text and delete — triggers delete transform
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('Backspace');
+
+    // Wait for the clear to complete
+    await expect.poll(() => editable.textContent()).toMatch(/^[\s\uFEFF\u200B]*$/);
+
+    // Simulate Nuxt's rendering: replace content of <p> with whitespace-only text node.
+    // This is what Nuxt does after a re-render — Vue templates produce " " in empty elements.
+    // On mock frontend, data-node-id is on the same element as data-editable-field;
+    // on Nuxt, data-node-id is on a child <p>. Handle both cases.
+    await editable.evaluate((el) => {
+      const nodeEl = el.querySelector('[data-node-id="0"]')
+        || (el.hasAttribute('data-node-id') ? el : null);
+      if (!nodeEl) throw new Error('No data-node-id="0" element found');
+      nodeEl.textContent = ' ';
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.setStart(nodeEl.firstChild, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+
+    // Type — without the fix, "r" would land outside <p> as a sibling text node
+    await page.keyboard.type('replacement text', { delay: 10 });
+
+    await expect(editable).toContainText('replacement text', { timeout: 5000 });
+    const text = await editable.textContent();
+    console.log('[TEST] Text after whitespace fix:', text);
+
+    // Verify all text is inside a data-node-id element, not leaked as a sibling.
+    // On mock frontend, data-node-id is on the editable itself (same <p>).
+    // On Nuxt, data-node-id is on a child <p> inside a <div> editable.
+    const hasLeakedText = await editable.evaluate((el) => {
+      // If the editable itself has data-node-id, text inside it is fine
+      if (el.hasAttribute('data-node-id')) return false;
+      // Otherwise, check for text nodes directly under editable (outside <p>)
+      for (const child of el.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+          return true; // Leaked text outside data-node-id element
+        }
+      }
+      return false;
+    });
+    expect(hasLeakedText).toBe(false);
+    expect(text).toContain('replacement text');
+  });
 });

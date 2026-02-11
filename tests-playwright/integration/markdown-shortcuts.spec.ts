@@ -168,6 +168,7 @@ test.describe('Markdown Shortcuts', () => {
 
       // __bold__
       await clearEditor();
+
       await editor.pressSequentially('some text __under__', { delay: 10 });
       await editor.press(' ');
       await expect(block.locator(boldSelector)).toContainText('under', { timeout: 5000 });

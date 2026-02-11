@@ -443,6 +443,21 @@
             console.log('[MOCK_PARENT] Sending FORM_DATA with formatRequestId:', response);
             event.source.postMessage(response, event.origin);
             logMessage('sent', 'FORM_DATA', { blockId, formatRequestId: requestId });
+
+            // Optionally send a duplicate FORM_DATA after a delay to simulate
+            // the real admin's Redux-triggered re-render cascade.
+            if (window.mockDuplicateFormData) {
+              setTimeout(() => {
+                const dupeResponse = {
+                  type: 'FORM_DATA',
+                  data: mockFormData,
+                  blockPathMap: buildBlockPathMap(),
+                  blockFieldTypes,
+                };
+                event.source.postMessage(dupeResponse, event.origin);
+                console.log('[MOCK_PARENT] Sent duplicate FORM_DATA (Redux echo)');
+              }, 50);
+            }
           };
 
           // Execute the async transform (with optional delay) - await to ensure delay happens
@@ -462,9 +477,21 @@
           console.log('[MOCK_PARENT] Received INLINE_EDIT_DATA:', message);
           // Update mockFormData with the changes
           mockFormData = message.data;
-          // DO NOT send FORM_DATA back - this would trigger re-render and interrupt typing
-          // Just update our local state and log it
           logMessage('RECEIVED', 'INLINE_EDIT_DATA', message);
+
+          // Optionally echo FORM_DATA back (like real admin does).
+          // Real admin has a React render cycle before sending, so use setTimeout.
+          if (window.mockEchoFormData) {
+            const echoData = JSON.parse(JSON.stringify(mockFormData));
+            setTimeout(() => {
+              const iframe = document.getElementById('previewIframe');
+              iframe.contentWindow.postMessage({
+                type: 'FORM_DATA',
+                data: echoData,
+              }, '*');
+              console.log('[MOCK_PARENT] Echoed FORM_DATA back');
+            }, window.mockEchoDelay || 10);
+          }
           break;
         }
 
@@ -515,6 +542,8 @@
       getFormData: () => mockFormData,
       getBlock: (blockId) => mockFormData.blocks[blockId],
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
+      setEchoFormData: (enabled) => { window.mockEchoFormData = enabled; },
+      setDuplicateFormData: (enabled) => { window.mockDuplicateFormData = enabled; },
     };
   </script>
 </body>
