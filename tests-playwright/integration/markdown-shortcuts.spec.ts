@@ -150,36 +150,45 @@ test.describe('Markdown Shortcuts', () => {
       const italicSelector = helper.getFormatSelector('italic');
       const strikeSelector = 'del, s, span[style*="text-decoration: line-through"]';
 
+      // Helper to clear editor content between sub-tests.
+      // selectAll + Backspace triggers a delete transform when formatted content
+      // spans element nodes, so we must wait for it to complete before typing.
+      const clearEditor = async () => {
+        await helper.selectAllTextInEditor(editor);
+        await editor.press('Backspace');
+        await helper.waitForEditorText(editor, /^[\s\uFEFF\u200B]*$/);
+      };
+
       // **bold** — with preceding text like real usage
-      await helper.selectAllTextInEditor(editor);
+      await clearEditor();
       await editor.pressSequentially('some text **bold**', { delay: 10 });
       await editor.press(' ');
       await expect(block.locator(boldSelector)).toContainText('bold', { timeout: 5000 });
       expect(await editor.textContent()).toMatch(/some text bold\s/);
 
       // __bold__
-      await helper.selectAllTextInEditor(editor);
+      await clearEditor();
       await editor.pressSequentially('some text __under__', { delay: 10 });
       await editor.press(' ');
       await expect(block.locator(boldSelector)).toContainText('under', { timeout: 5000 });
       expect(await editor.textContent()).toMatch(/some text under\s/);
 
       // ~~strikethrough~~
-      await helper.selectAllTextInEditor(editor);
+      await clearEditor();
       await editor.pressSequentially('some text ~~strike~~', { delay: 10 });
       await editor.press(' ');
       await expect(block.locator(strikeSelector)).toContainText('strike', { timeout: 5000 });
       expect(await editor.textContent()).toMatch(/some text strike\s/);
 
       // *italic*
-      await helper.selectAllTextInEditor(editor);
+      await clearEditor();
       await editor.pressSequentially('some text *italic*', { delay: 10 });
       await editor.press(' ');
       await expect(block.locator(italicSelector)).toContainText('italic', { timeout: 5000 });
       expect(await editor.textContent()).toMatch(/some text italic\s/);
 
       // _italic_
-      await helper.selectAllTextInEditor(editor);
+      await clearEditor();
       await editor.pressSequentially('some text _emphasis_', { delay: 10 });
       await editor.press(' ');
       await expect(block.locator(italicSelector)).toContainText('emphasis', { timeout: 5000 });

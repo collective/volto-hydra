@@ -643,6 +643,29 @@ test.describe('Enter Key to Add/Navigate', () => {
     // The new block should be gone
     await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });
   });
+
+  test('Backspace to delete last block on page triggers empty block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/another-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode on the only block
+    const editor = await helper.enterEditMode(blockId);
+
+    // Select all text and delete it
+    await helper.selectAllTextInEditor(editor);
+    await editor.press('Backspace');
+
+    // Now the block should be empty — backspace again should trigger empty block behavior
+    await editor.press('Backspace');
+
+    // The page should still have a block (empty block created to replace the deleted one)
+    const emptyBlock = await helper.waitForEmptyBlock();
+    await expect(emptyBlock).toBeVisible({ timeout: 5000 });
+  });
 });
 
 test.describe('Allowed Blocks from Frontend', () => {

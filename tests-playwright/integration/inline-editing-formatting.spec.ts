@@ -853,7 +853,79 @@ test.describe('Inline Editing - Formatting', () => {
     expect(await editor.textContent()).toContain('Test with sidebar closed');
   });
 
-  test('Backspace through heading text deletes the block', async ({ page }) => {
+  test('Backspace on last char updates admin state before next action', async ({ page }) => {
+    // When the last character in a text node is deleted, the browser removes the
+    // text node entirely (childList mutation). We need to detect this and update
+    // formData so subsequent actions (like Enter to split) get the correct state.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+
+    // Type a single character
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('x', { delay: 10 });
+    await helper.waitForEditorText(editor, /x/);
+
+    // Delete it — browser removes the text node
+    await editor.press('Backspace');
+
+    // Press Enter to split — if formData was updated correctly, both blocks
+    // should be empty. If stale (still "x"), the new block would contain "x".
+    const initialBlocks = await helper.getStableBlockCount();
+    await editor.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+    // Get the new block
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf(blockId);
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Verify the new block is empty (not "x")
+    const newEditor = await helper.getEditorLocator(newBlockUid);
+    await expect(newEditor).toBeAttached({ timeout: 10000 });
+    await expect(async () => {
+      const newText = await helper.getCleanTextContent(newEditor);
+      expect(newText).toBe('');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Backspace on last char in bold preserves formatting for next typed char', async ({ page }) => {
+    // When the last character inside a <strong> element is deleted, a ZWS should
+    // keep the text node alive so the cursor stays inside the bold context.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+
+    // Type a single character and make it bold
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('a', { delay: 10 });
+    await helper.waitForEditorText(editor, /a/);
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton('bold');
+    await helper.waitForFormattedText(editor, /a/, 'bold');
+
+    // Move to end and delete the bold "a"
+    await editor.press('End');
+    await editor.press('Backspace');
+
+    // Type a new character — it should be bold since cursor was inside <strong>
+    await editor.pressSequentially('b', { delay: 10 });
+
+    // Verify "b" is bold
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(async () => {
+      await expect(editor.locator(boldSelector)).toContainText('b');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Backspace through heading unwraps then deletes the block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -876,10 +948,13 @@ test.describe('Inline Editing - Formatting', () => {
     await editor.pressSequentially('abc', { delay: 10 });
     await expect(h2).toContainText('abc', { timeout: 5000 });
 
-    // Backspace 3 times to delete all chars, then once more to delete the block
+    // Backspace 3 times to delete "abc", once to unwrap H2→P, once to delete block
     for (let i = 0; i < 3; i++) {
       await editor.press('Backspace');
     }
+    // First backspace on empty heading unwraps to paragraph
+    await editor.press('Backspace');
+    // Second backspace on empty paragraph deletes the block
     await editor.press('Backspace');
 
     // Block should be removed
