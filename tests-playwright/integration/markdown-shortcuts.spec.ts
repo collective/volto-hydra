@@ -408,6 +408,47 @@ test.describe('Markdown Shortcuts', () => {
       await expect(block.locator('ul li')).toHaveCount(1, { timeout: 5000 });
       await expect(block.locator('ul li').first()).toContainText('alpha');
     });
+
+    test('typing "1. " inside an existing list item does not trigger markdown shortcut', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const blockId = 'block-1-uuid';
+      const iframe = helper.getIframe();
+      const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+      const editor = await helper.enterEditMode(blockId);
+
+      // Create bullet list via markdown shortcut
+      await helper.selectAllTextInEditor(editor);
+      await editor.pressSequentially('-', { delay: 10 });
+      await editor.press(' ');
+      await expect(block.locator('ul li').first()).toBeVisible({ timeout: 5000 });
+
+      // Type text in first bullet, then Enter to create second bullet
+      await editor.pressSequentially('first', { delay: 10 });
+      await editor.press('Enter');
+      await expect(block.locator('ul li')).toHaveCount(2, { timeout: 5000 });
+
+      // Type "1. " in the second list item — this should NOT trigger
+      // the ordered list markdown shortcut (we're already inside a list)
+      await editor.pressSequentially('1.', { delay: 10 });
+      await editor.press(' ');
+
+      // Wait a moment for any transform to complete (or not)
+      await page.waitForTimeout(500);
+
+      // The block should still be a UL with 2 items — not corrupted
+      await expect(block.locator('ul')).toBeVisible({ timeout: 3000 });
+      await expect(block.locator('ul li')).toHaveCount(2, { timeout: 3000 });
+      await expect(block.locator('ul li').first()).toContainText('first');
+      // The second item should contain "1. " as literal text (space was typed normally)
+      await expect(block.locator('ul li').nth(1)).toContainText('1.', { timeout: 3000 });
+
+      // The editor should still be functional (not stuck/blocked)
+      await editor.pressSequentially('more text', { delay: 10 });
+      await expect(block.locator('ul li').nth(1)).toContainText('more text', { timeout: 5000 });
+    });
   });
 
   test.describe('Non-matching patterns', () => {

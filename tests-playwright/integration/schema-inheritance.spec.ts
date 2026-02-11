@@ -604,6 +604,11 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const newFacet = iframe.locator(`[data-block-uid="${newFacetId}"]`);
     await helper.waitForBlockSelected(newFacetId!, 10000);
 
+    // Wait for iframe blocks to stabilize — adding a facet triggers re-renders
+    // that cause sidebar re-mounts, detaching react-select DOM nodes mid-click
+    await helper.getStableBlockCount();
+    await helper.waitForSidebarOpen();
+
     // Wait for sidebar to show the NEW facet (not the old "Content Type" facet)
     // The old facet has Label="Content Type"; new empty facet does not
     await expect(page.locator('#sidebar-properties')).not.toContainText('Content Type', { timeout: 5000 });

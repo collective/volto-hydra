@@ -3201,7 +3201,13 @@ const Iframe = (props) => {
                   ...prev,
                   formData: formData,
                   selection: selection || prev.selection,
-                  toolbarRequestDone: formatRequestId || null,
+                  // Preserve existing toolbarRequestDone if new call doesn't have one.
+                  // Multiple onChange calls from a single transform can batch together;
+                  // the first has the formatRequestId, subsequent ones don't. Without
+                  // this guard, the second call would overwrite the requestId with null,
+                  // preventing the FORM_DATA useEffect from sending it to the iframe,
+                  // leaving the iframe permanently blocked.
+                  toolbarRequestDone: formatRequestId || prev.toolbarRequestDone,
                 };
               });
               // NOTE: Don't update Redux here - let the useEffect do it after sending FORM_DATA

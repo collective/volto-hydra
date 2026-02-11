@@ -6221,38 +6221,43 @@ export class Bridge {
               log('Markdown check - textBeforeCursor:', JSON.stringify(textBeforeCursor));
 
               // Block-level patterns: entire text must match (longer patterns first)
-              const blockPatterns = [
-                { markup: '###', type: 'h3' },
-                { markup: '##', type: 'h2' },
-                { markup: '>', type: 'blockquote' },
-                { markup: '1.', type: 'ol' },
-                { markup: '1)', type: 'ol' },
-                { markup: '-', type: 'ul' },
-                { markup: '+', type: 'ul' },
-              ];
+              // Skip when cursor is inside a list item — block-level shortcuts
+              // should only convert paragraphs, not transform existing list items
+              const isInsideListItem = blockNode.nodeName === 'LI' || !!blockEl.closest('li');
+              if (!isInsideListItem) {
+                const blockPatterns = [
+                  { markup: '###', type: 'h3' },
+                  { markup: '##', type: 'h2' },
+                  { markup: '>', type: 'blockquote' },
+                  { markup: '1.', type: 'ol' },
+                  { markup: '1)', type: 'ol' },
+                  { markup: '-', type: 'ul' },
+                  { markup: '+', type: 'ul' },
+                ];
 
-              for (const pattern of blockPatterns) {
-                if (textBeforeCursor === pattern.markup) {
-                  log('Markdown block shortcut detected:', pattern.markup, '→', pattern.type);
+                for (const pattern of blockPatterns) {
+                  if (textBeforeCursor === pattern.markup) {
+                    log('Markdown block shortcut detected:', pattern.markup, '→', pattern.type);
+                    e.preventDefault();
+                    this.sendTransformRequest(blockUid, 'markdown', {
+                      markdownType: 'block',
+                      blockType: pattern.type,
+                    });
+                    return;
+                  }
+                }
+
+                // Check * separately for block-level (UL) — only when it's the full text
+                // This avoids conflict with inline *text* pattern
+                if (textBeforeCursor === '*') {
+                  log('Markdown block shortcut detected: * → ul');
                   e.preventDefault();
                   this.sendTransformRequest(blockUid, 'markdown', {
                     markdownType: 'block',
-                    blockType: pattern.type,
+                    blockType: 'ul',
                   });
                   return;
                 }
-              }
-
-              // Check * separately for block-level (UL) — only when it's the full text
-              // This avoids conflict with inline *text* pattern
-              if (textBeforeCursor === '*') {
-                log('Markdown block shortcut detected: * → ul');
-                e.preventDefault();
-                this.sendTransformRequest(blockUid, 'markdown', {
-                  markdownType: 'block',
-                  blockType: 'ul',
-                });
-                return;
               }
 
               // Inline patterns: **text**, __text__, ~~text~~, *text*, _text_
