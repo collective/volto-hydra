@@ -4,25 +4,10 @@
  * Verifies that when a block changes size (e.g., image loading),
  * the selection outline is updated to match the new dimensions.
  */
-import { test, expect } from '../fixtures';
-import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { test, expect } from './fixtures';
 
 test.describe('Block Resize Detection', () => {
-  let helper: AdminUIHelper;
-
-  test.beforeEach(async ({ page }) => {
-    helper = new AdminUIHelper(page);
-
-    // Load the mock parent page from the mock API server
-    await page.goto('http://localhost:8888/mock-parent.html');
-
-    // Wait for iframe to load
-    await helper.waitForIframeReady();
-
-    console.log('[TEST] Mock parent page loaded');
-  });
-
-  test('ResizeObserver updates overlay when block size changes', async ({ page }) => {
+  test('ResizeObserver updates overlay when block size changes', async ({ helper, page }) => {
     // This test simulates an image loading and changing the block's size.
     // The ResizeObserver in hydra.js should detect the size change and send
     // an updated BLOCK_SELECTED message with the new dimensions.
@@ -55,7 +40,7 @@ test.describe('Block Resize Detection', () => {
     ).toBe(true);
   });
 
-  test('ResizeObserver still works after FORM_DATA re-render', async ({ page }) => {
+  test('ResizeObserver still works after FORM_DATA re-render', async ({ helper, page }) => {
     // This test verifies that after a FORM_DATA message causes a re-render,
     // the ResizeObserver is re-attached to the new DOM element.
     //
