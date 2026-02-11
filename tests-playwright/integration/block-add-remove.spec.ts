@@ -644,7 +644,7 @@ test.describe('Enter Key to Add/Navigate', () => {
     await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('Backspace to delete last block on page triggers empty block', async ({ page }) => {
+  test('Backspace to delete last block on page triggers new default block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/another-page');
@@ -659,12 +659,16 @@ test.describe('Enter Key to Add/Navigate', () => {
     await helper.selectAllTextInEditor(editor);
     await editor.press('Backspace');
 
-    // Now the block should be empty — backspace again should trigger empty block behavior
+    // Now the block should be empty — backspace again should trigger delete
     await editor.press('Backspace');
 
-    // The page should still have a block (empty block created to replace the deleted one)
-    const emptyBlock = await helper.waitForEmptyBlock();
-    await expect(emptyBlock).toBeVisible({ timeout: 5000 });
+    // The original block should be gone, replaced by a new default (slate) block.
+    // Page-level uses the global defaultBlockType ('slate'), not 'empty'.
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeVisible({ timeout: 5000 });
+
+    // A new block should exist in the main content area (not footer)
+    const mainBlocks = iframe.locator('main [data-block-uid]');
+    await expect(mainBlocks).toHaveCount(1, { timeout: 5000 });
   });
 });
 
