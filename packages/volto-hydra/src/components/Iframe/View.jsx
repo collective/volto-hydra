@@ -1585,7 +1585,9 @@ const Iframe = (props) => {
             const odBlockPath = odBpm[odBlockId]?.path;
             const odBlock = odBlockPath ? getBlockByPath(odForm, odBlockPath) : odForm.blocks[odBlockId];
             const odFieldValue = odBlock?.[odFieldName];
+            log('[OUTDENT] selection:', JSON.stringify(odSelection), 'fieldValue:', JSON.stringify(odFieldValue));
             const split = odFieldValue ? slateTransforms.splitListAtItem(odFieldValue, odSelection) : null;
+            log('[OUTDENT] split result:', split ? JSON.stringify({ before: !!split.before, paragraph: !!split.paragraph, after: !!split.after }) : 'null');
 
             if (!split) {
               // Nested outdent: forward to toolbar

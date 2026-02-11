@@ -22,6 +22,11 @@ export class AdminUIHelper {
       }
     });
 
+    // Enable View.jsx debug logging (checked at module load time)
+    this.page.addInitScript(() => {
+      (window as any).HYDRA_DEBUG = true;
+    });
+
     // Capture page errors
     this.page.on('pageerror', (error) => {
       console.log(`[BROWSER PAGE ERROR] ${error.message}`);
