@@ -140,6 +140,158 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
   });
 
+  test('text echo arriving before format response does not lose buffered keystrokes', async ({ helper, page }) => {
+    // Reproduce the race condition:
+    // 1. Type "Hello" → debounce fires → INLINE_EDIT_DATA sent
+    // 2. Ctrl+B → blocking starts, SLATE_TRANSFORM_REQUEST sent
+    // 3. " world" typed → buffered
+    // 4. Text echo FORM_DATA arrives DURING blocking (before format response)
+    // 5. If the echo triggers replayBufferAndUnblock, it drains the buffer
+    //    into the pre-format DOM. The format response then overwrites it,
+    //    losing the replayed text.
+    //
+    // We control timing precisely: slow transform (500ms), and manually
+    // send the text echo from the test during the blocking window.
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+
+    // Type initial text and wait for debounce to settle
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(500);
+
+    // Ctrl+B starts blocking, transform will take 500ms
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(20); // Ensure blocking is set
+
+    // Type during blocking — these go into the event buffer
+    await page.keyboard.type(' world');
+
+    // NOW send a text echo FORM_DATA — simulating the INLINE_EDIT_DATA echo
+    // arriving during the blocking window (before the format response).
+    // This is the exact race: the echo has no formatRequestId.
+    await page.evaluate(() => {
+      const iframe = document.getElementById('previewIframe');
+      const echoData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+      iframe.contentWindow.postMessage({
+        type: 'FORM_DATA',
+        data: echoData,
+        blockPathMap: {},
+      }, '*');
+      console.log('[TEST] Sent text echo FORM_DATA during blocking');
+    });
+
+    // Wait for format response (500ms transform) + replay
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 10000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('Redux echo after format response does not overwrite replayed keystrokes', async ({ helper, page }) => {
+    // Reproduce the Redux re-render cascade race:
+    //
+    // In real Volto, after sending the format response FORM_DATA, View.jsx
+    // calls onChangeFormData() → Redux update → useEffect → ANOTHER FORM_DATA
+    // (without formatRequestId) with the same formatted content.
+    //
+    // If this "Redux echo" arrives while afterContentRender is in its
+    // double-rAF window (after format response rendered, before buffer replay),
+    // it triggers callback(formData) → re-renders DOM with PRE-REPLAY data
+    // → buffer replay text is lost.
+    //
+    // We simulate this from the mock parent: listen for the format response
+    // postMessage, then immediately send a Redux echo (same data, no
+    // formatRequestId) so it arrives during the double-rAF window.
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(200);
+
+      // Install a listener that sends a Redux echo immediately after the
+      // mock parent sends the format response. The mock parent's transform
+      // handler posts FORM_DATA to the iframe; we intercept this by
+      // listening on the parent window for the iframe's message event,
+      // then posting the echo right after.
+      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+      (window as any).__reduxEchoCleanup = null;
+
+      // Override the mock parent's transform to also send a Redux echo
+      const origProcessMessage = (window as any).processMessage;
+
+      // Simpler: just listen for FORM_DATA messages sent TO the iframe
+      // and echo them without formatRequestId
+      const observer = new MutationObserver(() => {}); // dummy
+      let echoArmed = true;
+
+      // Use a MessageChannel to intercept outgoing messages
+      // Actually, simplest: patch postMessage on the iframe's contentWindow
+      const origPostMessage = iframeEl.contentWindow!.postMessage.bind(iframeEl.contentWindow!);
+      iframeEl.contentWindow!.postMessage = function(msg: any, origin: any) {
+        origPostMessage(msg, origin);
+        // If this is the format response, send a Redux echo right after
+        if (echoArmed && msg?.type === 'FORM_DATA' && msg?.formatRequestId) {
+          echoArmed = false;
+          // Send echo WITHOUT formatRequestId — like Redux re-render would
+          const echoData = JSON.parse(JSON.stringify(msg.data));
+          origPostMessage({
+            type: 'FORM_DATA',
+            data: echoData,
+            blockPathMap: msg.blockPathMap || {},
+          }, origin);
+          console.log('[TEST] Sent Redux echo FORM_DATA immediately after format response');
+        }
+      };
+
+      (window as any).__reduxEchoCleanup = () => {
+        if (iframeEl.contentWindow) {
+          iframeEl.contentWindow.postMessage = origPostMessage;
+        }
+      };
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+
+    // Type initial text and wait for debounce to settle
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(500);
+
+    // Ctrl+B starts blocking, transform will take 200ms
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(20); // Ensure blocking is set
+
+    // Type during blocking — these go into the event buffer
+    await page.keyboard.type(' world');
+
+    // Wait for format response + replay
+    // The Redux echo should NOT overwrite the replayed " world"
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 10000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      if ((window as any).__reduxEchoCleanup) {
+        (window as any).__reduxEchoCleanup();
+      }
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
   test('should handle partial text selection', async ({ helper, page }) => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
@@ -246,6 +398,65 @@ test.describe('Inline Editing with Mock Parent', () => {
     if (nodeIdMatch) {
       console.log('[TEST] Found data-node-id:', nodeIdMatch[1]);
     }
+  });
+
+  test('space-only buffer replay is not destroyed by ensureValidInsertionTarget', async ({ helper, page }) => {
+    // Reproduce the exact flaky bug from inline-editing-formatting.spec.ts:655.
+    //
+    // When only a space character is buffered during a format transform:
+    // 1. Ctrl+B → blocking starts, SLATE_TRANSFORM_REQUEST sent
+    // 2. Space typed → buffered (1 char)
+    // 3. Format response arrives → re-render → restoreSlateSelection (ensureZwsPosition
+    //    creates BOM in empty bold span) → replayBufferAndUnblock → insertText(" ")
+    //    cleans up BOM sibling, inserts space → UNBLOCK
+    // 4. Next keydown "w" → element keydown handler calls ensureValidInsertionTarget()
+    // 5. BUG: ensureValidInsertionTarget sees the space-only text node inside the
+    //    bold <span data-node-id="0.1">, walks up to <p data-editable-field="value"
+    //    data-node-id="0">, hits data-editable-field BEFORE data-node-id → breaks
+    //    without checking P's content ("Hello ") → replaces space with FEFF
+    //
+    // We use a transform delay to ensure ONLY the space is buffered,
+    // then type the rest after the transform completes.
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+
+    // Type "Hello" and wait for it to settle
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(300);
+
+    // Set a short delay — long enough for the space to be buffered,
+    // short enough that subsequent chars arrive after unblocking
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(100);
+    });
+
+    // Ctrl+B: toggle bold (prospective formatting with collapsed cursor)
+    await page.keyboard.press('ControlOrMeta+b');
+
+    // Type space immediately — should be buffered during the 100ms transform
+    await page.waitForTimeout(20); // ensure blocking is set
+    await page.keyboard.press('Space');
+
+    // Wait for the transform to complete and space to be replayed
+    await page.waitForTimeout(200);
+
+    // Now type "world" — these arrive AFTER unblocking, as direct keystrokes.
+    // The "w" keydown will trigger ensureValidInsertionTarget on the space.
+    await page.keyboard.type('world');
+
+    // Verify the space was preserved — "Hello world", not "Helloworld"
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 5000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
   });
 
   // NOTE: "should handle selection across node boundaries and delete" test moved to

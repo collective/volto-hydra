@@ -95,7 +95,12 @@
 
 // Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
 let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
-const log = (...args) => debugEnabled && console.log('[HYDRA]', ...args);
+const log = (...args) => {
+  if (!debugEnabled) return;
+  const runId = typeof window !== 'undefined' && window.__testRunId;
+  const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : '[HYDRA]';
+  console.log(prefix, ...args);
+};
 
 /**
  * Virtual block UID for page-level fields (title, description, preview_image, etc.)
@@ -1881,9 +1886,13 @@ export class Bridge {
    * Called from FORM_DATA handler after DOM is updated.
    */
   replayBufferAndUnblock(context = '') {
-    if (!this.pendingTransform) return;
+    if (!this.pendingTransform) {
+      log('[HYDRA-DEBUG] replayBufferAndUnblock: no pendingTransform, returning');
+      return;
+    }
 
     const { blockId, requestId: originalRequestId } = this.pendingTransform;
+    log('[HYDRA-DEBUG] replayBufferAndUnblock:', { blockId, requestId: originalRequestId, bufferLen: this.eventBuffer.length, remainderLen: this._replayRemainder?.length || 0, context });
 
     // Prepare buffer for replay. Include any remainder from a previous replay
     // that was interrupted by a transform (e.g. Enter→split mid-replay).
@@ -1988,7 +1997,24 @@ export class Bridge {
         range.deleteContents();
       }
 
-      const textNode = document.createTextNode(text);
+      // Prevent CSS whitespace collapse: replace leading/trailing spaces with
+      // NBSP when inserting into an inline formatting element (e.g. <span> for
+      // bold). Without this, a space-only string like " " inside an empty
+      // <span> gets collapsed by CSS, making innerText return "" and preventing
+      // the browser from positioning the caret there.
+      // handleTextChange's stripZeroWidthSpaces converts NBSP back to regular
+      // space when building the Slate data, so this doesn't leak into the model.
+      let insertionText = text;
+      const insertParent = range.startContainer.nodeType === Node.TEXT_NODE
+        ? range.startContainer.parentElement
+        : range.startContainer;
+      if (insertParent && insertParent.hasAttribute?.('data-node-id')
+          && !insertParent.hasAttribute?.('data-editable-field')) {
+        // Inside an inline element — use NBSP for leading/trailing spaces
+        insertionText = insertionText.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
+      }
+
+      const textNode = document.createTextNode(insertionText);
       range.insertNode(textNode);
 
       // Clean up ZWS text nodes left by restoreSlateSelection's ensureZwsPosition
@@ -2011,6 +2037,7 @@ export class Bridge {
       selection.removeAllRanges();
       selection.addRange(range);
 
+      log('[HYDRA-DEBUG] insertText:', JSON.stringify(text), 'parent:', textNode.parentElement?.tagName, 'nodeId:', textNode.parentElement?.getAttribute('data-node-id'));
       log('Inserted buffered text:', text);
 
       this.prospectiveInlineElement = null;
@@ -2568,7 +2595,9 @@ export class Bridge {
     let foundDataNodeId = false;
     while (current) {
       if (current.nodeType === Node.ELEMENT_NODE) {
-        if (current.hasAttribute?.('data-editable-field')) break;
+        // Check data-node-id BEFORE data-editable-field because elements
+        // can have both attrs (e.g. <p data-editable-field="value" data-node-id="0">).
+        // We must check the element's content before potentially breaking out.
         if (current.hasAttribute?.('data-node-id')) {
           foundDataNodeId = true;
           const elementText = this.stripZeroWidthSpaces(current.textContent);
@@ -2577,6 +2606,7 @@ export class Bridge {
             return false;
           }
         }
+        if (current.hasAttribute?.('data-editable-field')) break;
       }
       current = current.parentNode;
     }
@@ -7916,6 +7946,11 @@ export class Bridge {
 
     // Block the editor
     this.setBlockProcessing(blockUid, true, requestId);
+
+    // Increment sequence — this is a new state. If the text debounce timer
+    // already fired (sending INLINE_EDIT_DATA at seq N), the echo FORM_DATA
+    // will arrive at seq N which is now < our local seq N+1 → stale → skipped.
+    this.formData._editSequence = (this.formData?._editSequence || 0) + 1;
 
     // Get current form data (includes any typed text since formData is updated immediately)
     const data = this.getFormDataWithoutNodeIds();

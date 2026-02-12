@@ -654,11 +654,18 @@ test.describe('Inline Editing - Formatting', () => {
 
   test('typing space immediately after format toggle is not lost (buffer replay)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
+
+    // Inject run ID into iframe so hydra.js log() includes it
+    const iframe = helper.getIframe();
+    await iframe.locator('body').evaluate((_, id) => {
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
 
     const blockId = 'block-1-uuid';
 
@@ -677,6 +684,11 @@ test.describe('Inline Editing - Formatting', () => {
     // Wait for everything to settle and verify no characters were lost
     await expect(async () => {
       const textContent = await helper.getCleanTextContent(editor);
+      const innerHTML = await editor.evaluate(el => el.innerHTML);
+      const rawText = await editor.evaluate(el => el.textContent);
+      console.log(`${RUN} innerHTML:`, innerHTML);
+      console.log(`${RUN} rawText:`, JSON.stringify(rawText));
+      console.log(`${RUN} cleanText:`, JSON.stringify(textContent));
       expect(textContent).toBe('Hello world');
     }).toPass({ timeout: 10000 });
   });
