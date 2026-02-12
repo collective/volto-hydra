@@ -1778,10 +1778,10 @@ export class Bridge {
   _ensureDocumentKeyboardBlocker() {
     if (this._documentKeyboardBlocker) return;
     this._documentKeyboardBlocker = (e) => {
-      // DEBUG: trace End/Backspace through the blocker
-      if (e.type === 'keydown' && (e.key === 'End' || e.key === 'Backspace')) {
-        log('DEBUG blocker:', e.key, 'blockedBlockId:', this.blockedBlockId,
-            'target:', e.target?.nodeName, 'target.closest block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
+      // DEBUG: log ALL keydown events through the blocker
+      if (e.type === 'keydown') {
+        log('DEBUG blocker entry:', e.key, 'blockedBlockId:', this.blockedBlockId,
+            'target:', e.target?.nodeName);
       }
       if (!this.blockedBlockId) return;
 
@@ -1793,6 +1793,10 @@ export class Bridge {
       if (!isBodyTarget) {
         const targetBlock = e.target.closest?.('[data-block-uid]');
         if (!targetBlock || targetBlock.getAttribute('data-block-uid') !== this.blockedBlockId) {
+          if (e.type === 'keydown') {
+            log('DEBUG blocker: key', e.key, 'target block mismatch. target:', e.target?.nodeName,
+                'closest block:', targetBlock?.getAttribute('data-block-uid'), 'blockedBlockId:', this.blockedBlockId);
+          }
           return;
         }
       }
@@ -2136,12 +2140,135 @@ export class Bridge {
   }
 
   ////////////////////////////////////////////////////////////////////////////////
-  // Cursor Position Correction - Handle template whitespace
+  // Whitespace & Zero-Width Space (ZWS) Strategy
+  //
+  // BACKGROUND — CSS Whitespace Collapsing in Contenteditable
+  //
+  //   Under `white-space: normal` (the default), the CSS rendering engine
+  //   collapses whitespace in two phases:
+  //     Phase I:  Consecutive spaces/tabs collapse to a single space.
+  //     Phase II: Spaces at the start and end of each line are trimmed.
+  //
+  //   A text node containing ONLY collapsible whitespace (e.g. " " inside an
+  //   otherwise-empty <p>) gets fully trimmed — it exists in the DOM but has
+  //   NO CSS layout box (zero rendered width/height).
+  //
+  //   The browser's editing engine positions the caret based on rendered layout,
+  //   not the raw DOM. With no layout box, there is no caret position. When the
+  //   user types, the browser creates a new text node at the nearest valid
+  //   insertion point — typically on the parent element, OUTSIDE the intended
+  //   Slate node structure. Text "leaks" out of <p data-node-id> elements.
+  //
+  //   However, if the whitespace text node is adjacent to visible content in the
+  //   same inline formatting context (e.g. a space between "Hello" and "world"),
+  //   it collapses to a single rendered space but STILL HAS a layout position.
+  //   The browser can insert into it fine.
+  //
+  //   References:
+  //     CSS Text Module Level 4 §4 — https://drafts.csswg.org/css-text-4/
+  //     MDN "How whitespace is handled" — https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model/Whitespace
+  //     Mozilla Bug 681626 — inconsistent insertion point with trailing space
+  //     Slate-react string.tsx — uses U+FEFF for empty text nodes, void elements,
+  //       and inline edges: https://github.com/ianstormtaylor/slate/blob/main/packages/slate-react/src/components/string.tsx
+  //     ProseMirror cursorWrapper — uses U+FEFF for mark state during typing:
+  //       https://discuss.prosemirror.net/t/what-does-the-cursorwrapper-solve/1892
+  //     Tiptap white-space: pre-wrap — https://github.com/ueberdosis/tiptap/issues/2265
+  //
+  // ALTERNATIVE CONSIDERED — white-space: pre-wrap
+  //
+  //   Tiptap and Slate-react set `white-space: pre-wrap` on contenteditable
+  //   elements, which preserves all whitespace and eliminates this problem
+  //   entirely. We can't do this because the iframe renders the frontend's
+  //   actual theme (Nuxt/Vue). `pre-wrap` would make Vue template whitespace
+  //   artifacts (newlines/indentation between tags like "\n  ") visible during
+  //   editing, causing layout differences between edit mode and published view.
+  //
+  // OUR APPROACH — ZWS Characters + Whitespace Correction
+  //
+  //   We handle three distinct whitespace problems:
+  //
+  //   Problem 1: Template whitespace (cursor lands on "\n  " between Vue tags)
+  //     → correctInvalidWhitespaceSelection() moves cursor to valid position
+  //     → isOnInvalidWhitespace() detects these nodes
+  //     → getValidPositionForWhitespace() finds nearest valid text position
+  //
+  //   Problem 2: Empty element whitespace (Nuxt renders <p> </p> for empty blocks)
+  //     → ensureValidInsertionTarget() replaces artifact space with U+FEFF (BOM)
+  //       so the text node has a layout box and the browser can insert into it
+  //     → Only fires when ALL data-node-id ancestors are empty. If any ancestor
+  //       has visible content, the whitespace has layout and needs no fix.
+  //
+  //   Problem 3: Prospective formatting (user toggles bold/italic with no selection)
+  //     When the user presses Ctrl+B without a selection, Slate creates an empty
+  //     inline node: <strong>{ text: '' }</strong>. The frontend renders this as
+  //     an empty <strong> element. The browser can't position a caret inside an
+  //     empty element, so we insert a BOM text node for cursor placement.
+  //
+  //     Flow:
+  //       1. Ctrl+B → sendTransformRequest('format', { format: 'strong' })
+  //       2. Admin applies Slate transform → sends FORM_DATA with empty inline
+  //       3. Frontend re-renders → empty <strong data-node-id="X"></strong>
+  //       4. restoreSlateSelection → ensureZwsPosition() creates BOM text node
+  //          inside the empty <strong> and positions cursor after it
+  //       5. this.prospectiveInlineElement = the <strong> element (tracked for
+  //          Chrome workaround where cursor escapes the inline)
+  //       6. User types → characters go inside <strong> → bold text
+  //       7. On navigation keys, prospectiveInlineElement is cleared
+  //
+  //     Critical interaction with Problem 2:
+  //       After typing in a prospective inline and toggling format again, the
+  //       user may type a space that ends up in a NEW prospective inline (e.g.
+  //       <strong data-node-id="0.3"> </strong>). This space is user content,
+  //       not an artifact. ensureValidInsertionTarget must NOT replace it — the
+  //       walk-up-all-ancestors check detects that the parent <p> has content
+  //       ("Hello bold normal") and skips the replacement.
+  //
+  //   ZWS lifecycle — adding:
+  //     ensureValidInsertionTarget()  — BOM in empty-block artifact whitespace
+  //     ensureZwsPosition()           — BOM in/around inline elements for cursor
+  //                                     positioning after format operations
+  //                                     (in restoreSlateSelection)
+  //     getValidPositionForWhitespace() — BOM in empty elements during cursor
+  //                                       correction
+  //     beforeinput handler            — BOM to keep text nodes alive when user
+  //                                      deletes the last real character
+  //
+  //   ZWS lifecycle — stripping:
+  //     stripZeroWidthSpaces()         — strips from text strings during
+  //                                      serialization, offset calculation
+  //     stripZeroWidthSpacesFromDOM()  — strips from DOM text nodes that have
+  //                                      other content (not ZWS-only nodes)
+  //     Copy/cut handlers              — strips before writing to clipboard
+  //     Frontend re-render             — FORM_DATA triggers re-render which
+  //                                      naturally replaces ZWS-containing nodes
+  //     NOTE: ZWS is NOT stripped during typing to avoid cursor corruption.
+  //
+  //   ZWS-aware offset calculation:
+  //     findPositionByVisibleOffset()  — skips ZWS when counting char offsets
+  //     findTextNodeInChild()          — positions cursor AFTER ZWS in ZWS-only
+  //                                      nodes
+  //     calculateNormalizedOffset()    — uses range.toString() which excludes
+  //                                      collapsed whitespace
+  //
+  // CRITICAL TESTS
+  //
+  //   tests-playwright/mock-parent/navigation-keys.spec.ts:
+  //     "Typing into whitespace-only text node stays inside data-node-id element"
+  //       — Verifies ensureValidInsertionTarget prevents text leaking outside <p>
+  //         in empty paragraphs (the core browser bug this code works around)
+  //
+  //   tests-playwright/integration/inline-editing-formatting.spec.ts:
+  //     "prospective formatting: toggle on, type, off, type, on again does not
+  //      double text"
+  //       — Verifies user-typed spaces between format toggles are preserved
+  //         (the bug where ensureValidInsertionTarget destroyed user spaces)
+  //
   ////////////////////////////////////////////////////////////////////////////////
 
   /**
    * Checks if a node is on invalid whitespace (text node outside any data-node-id element).
    * This happens when cursor lands on template whitespace in Vue/Nuxt templates.
+   * Part of "Problem 1" in the whitespace strategy above.
    *
    * @param {Node} node - The DOM node to check
    * @returns {boolean} True if the node is on invalid whitespace
@@ -2401,10 +2528,22 @@ export class Bridge {
   }
 
   /**
-   * Ensures the cursor's text node is a valid insertion target for the browser.
-   * Browsers refuse to insert characters into a whitespace-only text node inside
-   * a block element (like <p>), creating a new text node on the parent instead.
-   * This replaces ASCII whitespace with FEFF so the browser treats it as valid.
+   * Handles Problem 2 in the ZWS strategy above.
+   *
+   * When a text node contains only collapsible whitespace and the entire
+   * container tree is empty (no visible content in any data-node-id ancestor),
+   * the whitespace is a rendering artifact (e.g. Nuxt's <p> </p>). The CSS
+   * engine strips its layout box, so the browser can't position a caret or
+   * insert typed characters into it — it creates a new text node on the parent
+   * instead, leaking text outside the Slate node structure.
+   *
+   * Fix: replace the artifact whitespace with U+FEFF (BOM), giving the text
+   * node a layout box. Like Slate-react's string.tsx approach.
+   *
+   * If ANY data-node-id ancestor has visible content, the whitespace has a
+   * layout position (it's adjacent to rendered content) and the browser can
+   * insert into it fine — we leave it alone. This prevents destroying
+   * user-typed spaces in prospective formatting elements (Problem 3).
    *
    * @returns {boolean} True if the text node was fixed
    */
@@ -2419,23 +2558,40 @@ export class Bridge {
     const text = node.textContent;
     if (!text || text.trim() !== '' || /[\uFEFF\u200B]/.test(text)) return false;
 
-    // Only fix nodes inside a data-node-id element
+    // Walk up through ALL data-node-id ancestors. If any ancestor has visible
+    // content, this whitespace has a CSS layout box (it's between rendered
+    // content) and the browser can insert into it fine — don't touch it.
+    // Only replace with BOM when the entire container tree is empty, meaning
+    // the whitespace is a rendering artifact (e.g. Nuxt's <p> </p>) with no
+    // layout box that the browser can't insert into.
     let current = node.parentNode;
+    let foundDataNodeId = false;
     while (current) {
-      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
-        // Replace whitespace with FEFF and position cursor after it
-        node.textContent = '\uFEFF';
-        const range = selection.getRangeAt(0);
-        range.setStart(node, 1);
-        range.setEnd(node, 1);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        log('ensureValidInsertionTarget: replaced whitespace-only text with FEFF');
-        return true;
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        if (current.hasAttribute?.('data-editable-field')) break;
+        if (current.hasAttribute?.('data-node-id')) {
+          foundDataNodeId = true;
+          const elementText = this.stripZeroWidthSpaces(current.textContent);
+          if (elementText.trim() !== '') {
+            log('ensureValidInsertionTarget: skipping, ancestor has content:', elementText.substring(0, 30));
+            return false;
+          }
+        }
       }
-      if (current.hasAttribute?.('data-editable-field')) break;
       current = current.parentNode;
     }
+
+    if (!foundDataNodeId) return false;
+
+    // All ancestors are empty — whitespace is a rendering artifact with no
+    // CSS layout box. Replace with BOM so the browser has a valid target.
+    node.textContent = '\uFEFF';
+    const range = selection.getRangeAt(0);
+    range.setStart(node, 1);
+    range.setEnd(node, 1);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    log('ensureValidInsertionTarget: replaced artifact whitespace with FEFF');
 
     return false;
   }
@@ -3381,8 +3537,9 @@ export class Bridge {
    */
   /**
    * Strip zero-width spaces from text content.
-   * ZWS characters are added for cursor positioning in empty elements and should be
-   * removed when serializing text back to Slate.
+   * Part of ZWS lifecycle (stripping) — see "Whitespace & ZWS Strategy".
+   * ZWS characters are added for cursor positioning and should be removed
+   * when serializing text back to Slate. Also converts NBSP to regular space.
    *
    * @param {string} text - Text content that may contain ZWS
    * @returns {string} - Text with ZWS removed
@@ -3436,8 +3593,9 @@ export class Bridge {
 
   /**
    * Strip zero-width spaces from DOM text nodes within a container.
-   * Called after user types to remove ZWS that was added for cursor positioning.
-   * Only removes ZWS from text nodes that have other content (not from empty-except-ZWS nodes).
+   * Part of ZWS lifecycle (stripping) — see "Whitespace & ZWS Strategy".
+   * Only removes ZWS from text nodes that have other content (not from
+   * empty-except-ZWS nodes, which still need ZWS for cursor positioning).
    *
    * @param {HTMLElement} container - Container element to search for text nodes
    */
@@ -5936,8 +6094,9 @@ export class Bridge {
       });
 
       // Prevent browser from removing text nodes on last-char deletion.
-      // Like slate-react, we keep empty text nodes alive with ZWS (\uFEFF)
-      // so MutationObserver always fires characterData (not childList).
+      // Like slate-react (string.tsx), we keep empty text nodes alive with
+      // ZWS (\uFEFF) so MutationObserver always fires characterData (not
+      // childList). Part of ZWS lifecycle — see "Whitespace & ZWS Strategy".
       editableField.addEventListener('beforeinput', (e) => {
         if (e.inputType !== 'deleteContentBackward' && e.inputType !== 'deleteContentForward') return;
         const sel = window.getSelection();
@@ -6580,13 +6739,21 @@ export class Bridge {
       if (called) return;
       called = true;
       observer.disconnect();
-      log('DEBUG _waitForDomMutation proceed via:', source);
+      log('_waitForDomMutation proceed via:', source);
       callback();
     };
-    const observer = new MutationObserver(() => proceed('mutation'));
+    let settleRaf = null;
+    const observer = new MutationObserver(() => {
+      // Wait for mutations to settle: each mutation resets the wait.
+      // Frameworks may patch DOM across multiple microtask cycles (e.g.,
+      // Vue watchers triggering a second render pass). Proceeding after
+      // one rAF with no new mutations means the framework is done.
+      if (settleRaf) cancelAnimationFrame(settleRaf);
+      settleRaf = requestAnimationFrame(() => proceed('mutation-settled'));
+    });
     observer.observe(element, { childList: true, subtree: true, characterData: true });
     // Fallback if no mutation (e.g., data didn't change visible content)
-    setTimeout(() => proceed('timeout'), 100);
+    setTimeout(() => proceed('timeout'), 200);
   }
 
   /**
@@ -7109,7 +7276,9 @@ export class Bridge {
           return;
         }
 
-        // Helper to create ZWS position for cursor placement
+        // Helper to create ZWS position for cursor placement.
+        // Handles Problem 3 (prospective formatting) in the ZWS strategy.
+        // See "Whitespace & Zero-Width Space (ZWS) Strategy" comment block.
         const ensureZwsPosition = (result, offset, parentChildren) => {
           // Case 1: Cursor exit - offset 0 in text after an inline element
           // When there's existing text after the inline element, DON'T create ZWS or position at offset 0.
@@ -7792,8 +7961,9 @@ export class Bridge {
 
 
     // Note: We intentionally do NOT strip ZWS from DOM during typing.
-    // Like slate-react, we let the frontend re-render (triggered by FORM_DATA) naturally remove ZWS.
-    // Stripping during typing corrupts cursor position. ZWS is stripped on copy events and during serialization.
+    // Like slate-react, we let the frontend re-render (triggered by FORM_DATA)
+    // naturally remove ZWS. Stripping during typing corrupts cursor position.
+    // See "Whitespace & ZWS Strategy" for the full ZWS lifecycle.
 
     if (this.fieldTypeIsSlate(fieldType)) {
       // Slate field - update JSON structure using nodeId

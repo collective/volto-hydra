@@ -652,6 +652,148 @@ test.describe('Inline Editing - Formatting', () => {
     }).toPass({ timeout: 5000 });
   });
 
+  test('typing space immediately after format toggle is not lost (buffer replay)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Toggle bold ON and immediately type " world" — no waiting for
+    // the format round-trip to complete. The space and subsequent chars
+    // should be buffered during blocking and replayed without loss.
+    await editor.press('ControlOrMeta+b');
+    await editor.pressSequentially(' world', { delay: 10 });
+
+    // Wait for everything to settle and verify no characters were lost
+    await expect(async () => {
+      const textContent = await helper.getCleanTextContent(editor);
+      expect(textContent).toBe('Hello world');
+    }).toPass({ timeout: 10000 });
+  });
+
+  test('prospective formatting: user-typed space not destroyed by ensureValidInsertionTarget', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Toggle bold ON, type "bold"
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+    await helper.waitForCursorPosition(editor, 'Hello ');
+    await editor.pressSequentially('bold', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold/);
+
+    // Toggle bold OFF, type " normal"
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+    await helper.waitForCursorPosition(editor, 'Hello bold');
+    await editor.pressSequentially(' normal', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold normal/);
+
+    // Toggle bold ON again
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+    await helper.waitForCursorPosition(editor, 'Hello bold normal');
+
+    // INSTRUMENT: Install a MutationObserver INSIDE the iframe on the block element.
+    // Must use frame.evaluate since iframe is cross-origin.
+    const iframeHandle = await page.waitForSelector('#previewIframe');
+    const frame = await iframeHandle.contentFrame();
+    await frame!.evaluate((blockId) => {
+      const blockEl = document.querySelector(`[data-block-uid="${blockId}"]`);
+      if (!blockEl) {
+        console.error('[DOM-MUTATION] Block element not found:', blockId);
+        return;
+      }
+      console.log('[DOM-MUTATION] Observer installed on block:', blockId,
+        'current text:', blockEl.textContent?.replace(/[\u200B\uFEFF]/g, ''));
+
+      (window as any).__domMutationLog = [];
+      const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          const entry: any = {
+            type: m.type,
+            time: performance.now().toFixed(1),
+            target: (m.target as HTMLElement).nodeName + (
+              (m.target as HTMLElement).getAttribute?.('data-block-uid') ||
+              (m.target as HTMLElement).getAttribute?.('data-node-id') || ''
+            ),
+          };
+          if (m.type === 'childList') {
+            entry.addedNodes = m.addedNodes.length;
+            entry.removedNodes = m.removedNodes.length;
+            if (m.addedNodes.length > 0 || m.removedNodes.length > 0) {
+              const textAfter = blockEl.textContent?.replace(/[\u200B\uFEFF]/g, '');
+              entry.textAfter = textAfter;
+            }
+          } else if (m.type === 'characterData') {
+            entry.oldValue = m.oldValue;
+            entry.newValue = (m.target as Text).textContent;
+          }
+          (window as any).__domMutationLog.push(entry);
+          console.log('[DOM-MUTATION]', JSON.stringify(entry));
+        }
+      });
+      observer.observe(blockEl, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        characterDataOldValue: true,
+      });
+      (window as any).__domObserver = observer;
+    }, blockId);
+
+    // Now type " more" — this is where the space gets lost on Nuxt
+    await editor.pressSequentially(' more', { delay: 50 });
+
+    // Wait a bit for any late renders to complete
+    await page.waitForTimeout(2000);
+
+    // Collect the mutation log from the iframe
+    const mutationLog = await frame!.evaluate(() => (window as any).__domMutationLog || []);
+    console.log('[TEST] Total DOM mutations after typing:', mutationLog.length);
+    for (const entry of mutationLog) {
+      console.log('[TEST] Mutation:', JSON.stringify(entry));
+    }
+
+    // Disconnect the observer
+    await frame!.evaluate(() => {
+      (window as any).__domObserver?.disconnect();
+    });
+
+    // Check the text
+    const textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Final text:', textContent);
+    expect(textContent).toBe('Hello bold normal more');
+  });
+
   test('prospective formatting: toggle in middle of text preserves text to right', async ({
     page,
   }) => {
