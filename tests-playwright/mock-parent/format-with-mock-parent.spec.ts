@@ -459,6 +459,132 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
   });
 
+  test('FORM_DATA arriving mid-keystroke does not lose characters', async ({ helper, page }) => {
+    // Reproduce the sidebar typing race condition:
+    // In real Volto, sidebar edits trigger an undebounced round-trip:
+    //   sidebar onChange → Redux → useEffect → FORM_DATA to iframe → re-render
+    // Each FORM_DATA re-renders the iframe DOM. If a keystroke arrives during
+    // the re-render window, it could be lost.
+    //
+    // Since iframe typing uses debounced INLINE_EDIT_DATA (so echoes don't
+    // arrive during typing), we simulate the sidebar path by injecting
+    // FORM_DATA messages directly during typing via a MutationObserver that
+    // fires on every text change.
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+
+    // Type initial content
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(300);
+
+    // Install a MutationObserver inside the iframe that sends FORM_DATA
+    // back from the parent for every text change (simulates undebounced sidebar)
+    await page.evaluate(() => {
+      const iframeEl = document.getElementById('previewIframe');
+      const iframeDoc = iframeEl.contentDocument;
+      const editField = iframeDoc.querySelector('[data-editable-field="value"]');
+
+      const observer = new MutationObserver(() => {
+        // Read current text and send FORM_DATA with it
+        const currentText = editField.innerText.replace(/[\u200B\uFEFF]/g, '').replace(/\u00A0/g, ' ').trim();
+        const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+        formData.blocks['mock-block-1'].value = [
+          { type: 'p', children: [{ text: currentText }] },
+        ];
+        iframeEl.contentWindow.postMessage({
+          type: 'FORM_DATA',
+          data: formData,
+          blockPathMap: window.mockParent.buildBlockPathMap(),
+          blockFieldTypes: window.mockParent.getBlockFieldTypes(),
+        }, '*');
+      });
+
+      observer.observe(editField, { characterData: true, subtree: true, childList: true });
+      window.__echoObserver = observer;
+    });
+
+    // Now type more text — each char triggers a FORM_DATA re-render
+    await page.keyboard.press('End');
+    await page.keyboard.type(' world', { delay: 10 });
+
+    // Verify all characters arrived
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 5000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      if (window.__echoObserver) {
+        window.__echoObserver.disconnect();
+        delete window.__echoObserver;
+      }
+    });
+  });
+
+  test('rapid FORM_DATA from sidebar typing shows final text, not stale render', async ({ helper, page }) => {
+    // Reproduce the flaky integration test "editing text in Admin UI updates iframe".
+    //
+    // In real Volto, sidebar typing sends rapid FORM_DATA messages (one per
+    // keystroke, undebounced). Each triggers onEditChange → renderContentWithListings
+    // which is async when listings are present. Multiple concurrent async renders
+    // can complete out of order, causing stale data to overwrite the latest.
+    //
+    // We simulate this by:
+    // 1. Injecting a random delay into renderContent to make render order non-deterministic
+    // 2. Sending rapid FORM_DATA messages (one per character of "Make this bold")
+    // 3. Verifying the final DOM shows the full text, not a stale partial
+
+    const iframe = helper.getIframe();
+
+    // Wait for initial content
+    await expect(iframe.locator('[data-block-uid="mock-block-1"]')).toBeVisible();
+    await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
+
+    // Inject async delay into renderContent to simulate slow listing expansion.
+    // Use page.evaluate to access the iframe's contentWindow from the parent.
+    await page.evaluate(() => {
+      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+      const iframeWin = iframeEl.contentWindow as any;
+      const origRenderContent = iframeWin.renderContent;
+      iframeWin.renderContent = async function(...args: any[]) {
+        // Random delay 0–50ms makes completion order non-deterministic
+        await new Promise(r => setTimeout(r, Math.random() * 50));
+        return origRenderContent.apply(this, args);
+      };
+    });
+
+    // Send rapid FORM_DATA messages simulating sidebar typing "Make this bold"
+    const text = 'Make this bold';
+    for (let i = 1; i <= text.length; i++) {
+      const partialText = text.substring(0, i);
+      await page.evaluate(({ partialText }) => {
+        const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+        const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+        formData.blocks['mock-block-1'].value = [
+          { type: 'p', children: [{ text: partialText }] },
+        ];
+        iframeEl.contentWindow!.postMessage({
+          type: 'FORM_DATA',
+          data: formData,
+          blockPathMap: window.mockParent.buildBlockPathMap(),
+          blockFieldTypes: window.mockParent.getBlockFieldTypes(),
+        }, '*');
+      }, { partialText });
+    }
+
+    // Wait for all renders to settle, then check final DOM
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(
+        iframe.locator('[data-block-uid="mock-block-1"] [data-editable-field="value"]')
+      );
+      expect(text).toBe('Make this bold');
+    }).toPass({ timeout: 5000 });
+  });
+
   // NOTE: "should handle selection across node boundaries and delete" test moved to
   // tests-playwright/integration/inline-editing-basic.spec.ts because it requires
   // SLATE_TRANSFORM_REQUEST processing which only works with full Volto Admin UI

@@ -20,6 +20,30 @@
 // Global render counter for testing re-render behavior
 window.hydraRenderCount = window.hydraRenderCount || 0;
 
+// Test-frontend log with run ID prefix (matches hydra.js log pattern)
+function tfLog(...args) {
+  const runId = window.__testRunId;
+  const prefix = runId != null ? `[TEST-FRONTEND][RUN-${runId}]` : '[TEST-FRONTEND]';
+  console.log(prefix, ...args);
+}
+
+/**
+ * Expand child items, only going async when there are actual listing blocks.
+ * Used by container renderers (grid, columns, accordion) and the top-level page render.
+ * @param {Object} blocks - Block dict keyed by ID
+ * @param {string[]} layout - Array of block IDs
+ * @param {string} containerId - Container ID for paging
+ * @returns {Promise<{items: Object[], paging: Object|null}>}
+ */
+async function expandItems(blocks, layout, containerId) {
+    const hasListings = layout.some(id => blocks[id]?.['@type'] === 'listing' && blocks[id]?.querystring?.query);
+    if (hasListings && window._expandListingBlocks) {
+        return await window._expandListingBlocks(blocks, layout, containerId);
+    }
+    // No listings — convert to items format directly (sync, no fetch)
+    return { items: layout.map(id => ({ ...blocks[id], '@uid': id })), paging: null };
+}
+
 // Slider state: track slide count to detect new slides { [blockId]: slideCount }
 const sliderSlideCount = {};
 
@@ -76,8 +100,9 @@ function getLinkUrl(value) {
  * Render content blocks to the DOM.
  * @param {Object} content - Content object with items array (each item has @uid and @type)
  * @param {string} containerId - ID of the container element (default: 'content')
+ * @param {number} [renderGeneration] - If provided, abort if window._renderGeneration has changed
  */
-async function renderContent(content, containerId = 'content') {
+async function renderContent(content, containerId = 'content', renderGeneration) {
     // Increment render counter (only for main content)
     if (containerId === 'content') {
         window.hydraRenderCount++;
@@ -87,6 +112,8 @@ async function renderContent(content, containerId = 'content') {
 
     const container = document.getElementById(containerId);
     if (!container) return;
+    // Stale check before clearing DOM
+    if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return;
     container.innerHTML = '';
 
     const { items } = content;
@@ -98,6 +125,7 @@ async function renderContent(content, containerId = 'content') {
     for (const item of items) {
         // Pass @uid as blockId - this becomes data-block-uid
         const blockElement = await renderBlock(item['@uid'], item);
+        if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return; // stale
         if (blockElement) {
             container.appendChild(blockElement);
         }
@@ -216,13 +244,13 @@ async function renderBlock(blockId, block) {
 function renderSlateBlock(block) {
     const value = block.value || [];
     let html = '';
-    console.log('[TEST-FRONTEND] renderSlateBlock:', JSON.stringify(value?.slice(0,1)));
+    tfLog('renderSlateBlock:', JSON.stringify(value?.slice(0,1)));
 
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
-        console.log('[TEST-FRONTEND] renderSlateBlock node:', node.type, 'nodeId:', node.nodeId, 'attr:', nodeIdAttr);
+        tfLog('renderSlateBlock node:', node.type, 'nodeId:', node.nodeId, 'attr:', nodeIdAttr);
 
         const text = renderChildren(node.children);
         // Mark as editable field - hydra.js will read this and set contenteditable="true"
@@ -642,7 +670,7 @@ function renderSummaryItemBlock(block, blockUid) {
  * @returns {string} HTML string
  */
 function renderImageBlock(block) {
-    console.log('[TEST-FRONTEND] renderImageBlock:', { url: block.url, type: typeof block.url, hasImageScales: !!block.url?.image_scales });
+    tfLog('renderImageBlock:', { url: block.url, type: typeof block.url, hasImageScales: !!block.url?.image_scales });
     const imageSrc = getImageUrl(block.url);
     // Volto's image block uses 'placeholder' for alt text, not 'alt'
     const alt = block.placeholder || block.alt || '';
@@ -743,13 +771,7 @@ async function renderColumnContent(column, columnId) {
     let items = column.blocks_layout?.items || [];
     const title = column.title || '';
 
-    // Expand nested listings if expansion function is available
-    // expandListingBlocks returns { items: [...], paging: {...} } where each item is a full block object
-    let expandedItems = null;
-    if (window._expandListingBlocks && items.length > 0) {
-        const result = await window._expandListingBlocks(blocks, items, columnId);
-        expandedItems = result.items;
-    }
+    const { items: expandedItems } = await expandItems(blocks, items, columnId);
 
     let html = '';
 
@@ -758,8 +780,7 @@ async function renderColumnContent(column, columnId) {
         html += `<h4 data-editable-field="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
     }
 
-    // Use expanded items if available, otherwise use original blocks/items
-    const itemsToRender = expandedItems || items.map(id => ({ ...blocks[id], '@uid': id }));
+    const itemsToRender = expandedItems;
     for (const item of itemsToRender) {
         const blockId = item['@uid'];
         const block = item;
@@ -811,20 +832,13 @@ async function renderGridBlock(block, blockId) {
     let items = block.blocks_layout?.items || [];
     let paging = block._paging;
 
-    // Expand nested listings if expansion function is available
-    // expandListingBlocks returns { items, paging } where each item has @uid
-    // paging includes computed UI values: currentPage, totalPages, pages, prev, next
-    let expandedItems = null;
-    if (window._expandListingBlocks) {
-        const result = await window._expandListingBlocks(blocks, items, blockId);
-        expandedItems = result.items;
-        paging = result.paging?.totalPages > 1 ? result.paging : null;
-    }
+    const result = await expandItems(blocks, items, blockId);
+    const expandedItems = result.items;
+    paging = result.paging?.totalPages > 1 ? result.paging : null;
 
     let html = '<div class="grid-row" style="display: flex; flex-wrap: wrap; gap: 20px;">';
 
-    // Use expanded items if available, otherwise fall back to original blocks
-    const itemsToRender = expandedItems || items.map(id => ({ ...blocks[id], '@uid': id }));
+    const itemsToRender = expandedItems;
 
     for (const childBlock of itemsToRender) {
         if (!childBlock) continue;
@@ -1087,13 +1101,7 @@ async function renderAccordionBlock(block, blockId) {
     let content = block.content || {};
     let contentItems = block.content_layout?.items || [];
 
-    // Expand nested listings in content (header usually doesn't have listings)
-    // expandListingBlocks returns { items, paging } where each item has @uid
-    let expandedItems = null;
-    if (window._expandListingBlocks && contentItems.length > 0) {
-        const result = await window._expandListingBlocks(content, contentItems, `${blockId}-content`);
-        expandedItems = result.items;
-    }
+    const { items: expandedItems } = await expandItems(content, contentItems, `${blockId}-content`);
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
@@ -1116,8 +1124,7 @@ async function renderAccordionBlock(block, blockId) {
     html += '<div class="accordion-content" style="padding: 15px;">';
     html += '<div class="content-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">CONTENT</div>';
 
-    // Use expanded items if available, otherwise fall back to original blocks
-    const itemsToRender = expandedItems || contentItems.map(id => ({ ...content[id], '@uid': id }));
+    const itemsToRender = expandedItems;
 
     for (const childBlock of itemsToRender) {
         if (!childBlock) continue;

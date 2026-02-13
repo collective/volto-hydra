@@ -458,11 +458,21 @@ test.describe('Inline Editing - Basic', () => {
     await expect(sidebarEditor).toContainText('Second line', { timeout: 5000 });
   });
 
-  test('editing text in Admin UI updates iframe', async ({ page }) => {
+  test('editing text in Admin UI updates iframe', async ({ page }, testInfo) => {
+    const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
+
+    // Inject run ID into admin page (View.jsx) and iframe (hydra.js, renderer)
+    await page.evaluate((id) => {
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
+    const iframe = helper.getIframe();
+    await iframe.locator('body').evaluate((_, id) => {
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
 
     const blockId = 'block-1-uuid';
 
@@ -477,6 +487,7 @@ test.describe('Inline Editing - Basic', () => {
     // Verify the iframe updated with the new text (wait for sync)
     await expect(async () => {
       const iframeText = await helper.getBlockTextInIframe(blockId);
+      console.log(`${RUN} iframeText:`, JSON.stringify(iframeText));
       expect(iframeText).toContain(newText);
     }).toPass({ timeout: 5000 });
 

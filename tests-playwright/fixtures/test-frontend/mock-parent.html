@@ -522,14 +522,22 @@
           // Real admin has a React render cycle before sending, so use setTimeout.
           if (window.mockEchoFormData) {
             const echoData = JSON.parse(JSON.stringify(mockFormData));
-            setTimeout(() => {
+            const delay = window.mockEchoDelay !== undefined ? window.mockEchoDelay : 10;
+            const sendEcho = () => {
               const iframe = document.getElementById('previewIframe');
               iframe.contentWindow.postMessage({
                 type: 'FORM_DATA',
                 data: echoData,
+                blockPathMap: buildBlockPathMap(),
+                blockFieldTypes,
               }, '*');
               console.log('[MOCK_PARENT] Echoed FORM_DATA back');
-            }, window.mockEchoDelay || 10);
+            };
+            if (delay === 0) {
+              sendEcho();
+            } else {
+              setTimeout(sendEcho, delay);
+            }
           }
           break;
         }
@@ -580,6 +588,8 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlock: (blockId) => mockFormData.blocks[blockId],
+      buildBlockPathMap,
+      getBlockFieldTypes: () => blockFieldTypes,
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
       setEchoFormData: (enabled) => { window.mockEchoFormData = enabled; },
       setDuplicateFormData: (enabled) => { window.mockDuplicateFormData = enabled; },

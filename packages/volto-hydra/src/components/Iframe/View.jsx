@@ -16,7 +16,12 @@ import Api from '@plone/volto/helpers/Api/Api';
 // Debug logging - disabled by default, enable via window.HYDRA_DEBUG
 const debugEnabled =
   typeof window !== 'undefined' && window.HYDRA_DEBUG;
-const log = (...args) => debugEnabled && console.log('[VIEW]', ...args);
+const log = (...args) => {
+  if (!debugEnabled) return;
+  const runId = typeof window !== 'undefined' && window.__testRunId;
+  const prefix = runId != null ? `[VIEW][RUN-${runId}]` : '[VIEW]';
+  console.log(prefix, ...args);
+};
 // eslint-disable-next-line no-unused-vars
 const logExtract = (...args) =>
   debugEnabled && console.log('[EXTRACT]', ...args);
