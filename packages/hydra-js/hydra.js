@@ -1998,21 +1998,11 @@ export class Bridge {
       }
 
       // Prevent CSS whitespace collapse: replace leading/trailing spaces with
-      // NBSP when inserting into an inline formatting element (e.g. <span> for
-      // bold). Without this, a space-only string like " " inside an empty
-      // <span> gets collapsed by CSS, making innerText return "" and preventing
-      // the browser from positioning the caret there.
+      // NBSP. Browsers do this automatically for native typing, but
+      // range.insertNode with a raw text node doesn't get that fixup.
       // handleTextChange's stripZeroWidthSpaces converts NBSP back to regular
       // space when building the Slate data, so this doesn't leak into the model.
-      let insertionText = text;
-      const insertParent = range.startContainer.nodeType === Node.TEXT_NODE
-        ? range.startContainer.parentElement
-        : range.startContainer;
-      if (insertParent && insertParent.hasAttribute?.('data-node-id')
-          && !insertParent.hasAttribute?.('data-editable-field')) {
-        // Inside an inline element — use NBSP for leading/trailing spaces
-        insertionText = insertionText.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
-      }
+      let insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
 
       const textNode = document.createTextNode(insertionText);
       range.insertNode(textNode);
@@ -2050,9 +2040,12 @@ export class Bridge {
       }
     };
 
-    // Helper: replay a special key via synthetic keydown + native fallback
-    const replaySpecialKey = (evt) => {
-      log('Replaying buffered special key:', evt.key);
+    // Helper: replay any non-text key via synthetic keydown + native fallback.
+    // Always dispatches the synthetic event so our keydown handler gets a chance
+    // (e.g. Enter→split, Tab→indent). Then applies manual fallbacks for actions
+    // browsers refuse to perform from untrusted events.
+    const replayKey = (evt) => {
+      log('Replaying buffered key:', evt.key, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
       const syntheticEvent = new KeyboardEvent('keydown', {
         key: evt.key,
         code: evt.code,
@@ -2066,10 +2059,10 @@ export class Bridge {
       currentEditable.dispatchEvent(syntheticEvent);
 
       // Synthetic events are untrusted and don't trigger native actions.
-      // If our keydown handler didn't handle it, perform the action manually.
-      // If it DID handle it (e.g. Enter→split), it called sendTransformRequest
-      // which sets blockedBlockId — the loop will detect this and stop.
+      // If our keydown handler handled it (e.g. Enter→split), it called
+      // sendTransformRequest which sets blockedBlockId — the loop detects this.
       if (!syntheticEvent.defaultPrevented) {
+        // Manual fallbacks for native actions browsers won't perform from untrusted events
         if (evt.key === 'Backspace') {
           document.execCommand('delete', false);
         } else if (evt.key === 'Delete') {
@@ -2079,6 +2072,15 @@ export class Bridge {
           if (sel) {
             const alter = evt.shiftKey ? 'extend' : 'move';
             sel.modify(alter, navMap[evt.key][0], navMap[evt.key][1]);
+          }
+        } else if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'a') {
+          // Select all
+          const sel = window.getSelection();
+          if (sel && currentEditable) {
+            const range = document.createRange();
+            range.selectNodeContents(currentEditable);
+            sel.removeAllRanges();
+            sel.addRange(range);
           }
         }
       }
@@ -2122,12 +2124,12 @@ export class Bridge {
         if (format) {
           log('Replaying buffered format hotkey:', format);
           this.sendTransformRequest(blockId, 'format', { format });
-        } else if (['Tab', 'Backspace', 'Delete', 'Enter',
-                     'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-                     'Home', 'End'].includes(evt.key)) {
-          replaySpecialKey(evt);
+        } else {
+          // Dispatch synthetic keydown for all non-text keys. Our keydown handler
+          // gets a chance to process it (Enter, Tab, etc.), and replayKey applies
+          // manual fallbacks for native actions browsers won't do from untrusted events.
+          replayKey(evt);
         }
-        // Other keys (Escape, F-keys, etc.) are silently dropped
       }
     }
 

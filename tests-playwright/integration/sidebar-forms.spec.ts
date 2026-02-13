@@ -325,7 +325,9 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     expect(focusLocation).toBe('sidebar');
   });
 
-  test('toolbar style unchanged during sidebar typing', async ({ page }) => {
+  test('toolbar style unchanged during sidebar typing', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'nuxt', 'Mock frontend clears innerHTML on re-render, causing scroll');
+
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');

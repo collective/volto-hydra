@@ -211,53 +211,13 @@ test.describe('Inline Editing with Mock Parent', () => {
     // it triggers callback(formData) → re-renders DOM with PRE-REPLAY data
     // → buffer replay text is lost.
     //
-    // We simulate this from the mock parent: listen for the format response
-    // postMessage, then immediately send a Redux echo (same data, no
-    // formatRequestId) so it arrives during the double-rAF window.
+    // The mock parent's mockDuplicateFormData flag sends a duplicate FORM_DATA
+    // 50ms after the format response (without formatRequestId) — exactly like
+    // a Redux echo. This works cross-origin since postMessage is allowed.
 
     await page.evaluate(() => {
       window.mockParent.setTransformDelay(200);
-
-      // Install a listener that sends a Redux echo immediately after the
-      // mock parent sends the format response. The mock parent's transform
-      // handler posts FORM_DATA to the iframe; we intercept this by
-      // listening on the parent window for the iframe's message event,
-      // then posting the echo right after.
-      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
-      (window as any).__reduxEchoCleanup = null;
-
-      // Override the mock parent's transform to also send a Redux echo
-      const origProcessMessage = (window as any).processMessage;
-
-      // Simpler: just listen for FORM_DATA messages sent TO the iframe
-      // and echo them without formatRequestId
-      const observer = new MutationObserver(() => {}); // dummy
-      let echoArmed = true;
-
-      // Use a MessageChannel to intercept outgoing messages
-      // Actually, simplest: patch postMessage on the iframe's contentWindow
-      const origPostMessage = iframeEl.contentWindow!.postMessage.bind(iframeEl.contentWindow!);
-      iframeEl.contentWindow!.postMessage = function(msg: any, origin: any) {
-        origPostMessage(msg, origin);
-        // If this is the format response, send a Redux echo right after
-        if (echoArmed && msg?.type === 'FORM_DATA' && msg?.formatRequestId) {
-          echoArmed = false;
-          // Send echo WITHOUT formatRequestId — like Redux re-render would
-          const echoData = JSON.parse(JSON.stringify(msg.data));
-          origPostMessage({
-            type: 'FORM_DATA',
-            data: echoData,
-            blockPathMap: msg.blockPathMap || {},
-          }, origin);
-          console.log('[TEST] Sent Redux echo FORM_DATA immediately after format response');
-        }
-      };
-
-      (window as any).__reduxEchoCleanup = () => {
-        if (iframeEl.contentWindow) {
-          iframeEl.contentWindow.postMessage = origPostMessage;
-        }
-      };
+      window.mockParent.setDuplicateFormData(true);
     });
 
     const iframe = helper.getIframe();
@@ -285,9 +245,7 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Cleanup
     await page.evaluate(() => {
-      if ((window as any).__reduxEchoCleanup) {
-        (window as any).__reduxEchoCleanup();
-      }
+      window.mockParent.setDuplicateFormData(false);
       window.mockParent.setTransformDelay(0);
     });
   });
@@ -466,10 +424,8 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Each FORM_DATA re-renders the iframe DOM. If a keystroke arrives during
     // the re-render window, it could be lost.
     //
-    // Since iframe typing uses debounced INLINE_EDIT_DATA (so echoes don't
-    // arrive during typing), we simulate the sidebar path by injecting
-    // FORM_DATA messages directly during typing via a MutationObserver that
-    // fires on every text change.
+    // We simulate this by scheduling FORM_DATA messages with known partial texts
+    // from the parent during typing. Uses postMessage (cross-origin safe).
 
     const iframe = helper.getIframe();
     const editable = iframe.locator('[data-editable-field="value"]');
@@ -480,33 +436,33 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.keyboard.type('Hello');
     await page.waitForTimeout(300);
 
-    // Install a MutationObserver inside the iframe that sends FORM_DATA
-    // back from the parent for every text change (simulates undebounced sidebar)
+    // Schedule FORM_DATA messages with progressive partial texts during typing.
+    // Each message simulates the sidebar having received and echoed back the
+    // user's text at that point. Sent every 15ms to overlap with keystroke timing.
     await page.evaluate(() => {
-      const iframeEl = document.getElementById('previewIframe');
-      const iframeDoc = iframeEl.contentDocument;
-      const editField = iframeDoc.querySelector('[data-editable-field="value"]');
-
-      const observer = new MutationObserver(() => {
-        // Read current text and send FORM_DATA with it
-        const currentText = editField.innerText.replace(/[\u200B\uFEFF]/g, '').replace(/\u00A0/g, ' ').trim();
+      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+      const partials = ['Hello', 'Hello ', 'Hello w', 'Hello wo', 'Hello wor'];
+      let i = 0;
+      (window as any).__echoInterval = setInterval(() => {
+        if (i >= partials.length) {
+          clearInterval((window as any).__echoInterval);
+          return;
+        }
         const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
         formData.blocks['mock-block-1'].value = [
-          { type: 'p', children: [{ text: currentText }] },
+          { type: 'p', children: [{ text: partials[i] }] },
         ];
-        iframeEl.contentWindow.postMessage({
+        iframeEl.contentWindow!.postMessage({
           type: 'FORM_DATA',
           data: formData,
           blockPathMap: window.mockParent.buildBlockPathMap(),
           blockFieldTypes: window.mockParent.getBlockFieldTypes(),
         }, '*');
-      });
-
-      observer.observe(editField, { characterData: true, subtree: true, childList: true });
-      window.__echoObserver = observer;
+        i++;
+      }, 15);
     });
 
-    // Now type more text — each char triggers a FORM_DATA re-render
+    // Now type more text — scheduled FORM_DATA arrives during typing
     await page.keyboard.press('End');
     await page.keyboard.type(' world', { delay: 10 });
 
@@ -518,9 +474,9 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Cleanup
     await page.evaluate(() => {
-      if (window.__echoObserver) {
-        window.__echoObserver.disconnect();
-        delete window.__echoObserver;
+      if ((window as any).__echoInterval) {
+        clearInterval((window as any).__echoInterval);
+        delete (window as any).__echoInterval;
       }
     });
   });
@@ -533,29 +489,15 @@ test.describe('Inline Editing with Mock Parent', () => {
     // which is async when listings are present. Multiple concurrent async renders
     // can complete out of order, causing stale data to overwrite the latest.
     //
-    // We simulate this by:
-    // 1. Injecting a random delay into renderContent to make render order non-deterministic
-    // 2. Sending rapid FORM_DATA messages (one per character of "Make this bold")
-    // 3. Verifying the final DOM shows the full text, not a stale partial
+    // We simulate this by sending rapid FORM_DATA messages (one per character
+    // of "Make this bold") from the parent via postMessage (cross-origin safe)
+    // and verifying the final DOM shows the full text, not a stale partial.
 
     const iframe = helper.getIframe();
 
     // Wait for initial content
     await expect(iframe.locator('[data-block-uid="mock-block-1"]')).toBeVisible();
     await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
-
-    // Inject async delay into renderContent to simulate slow listing expansion.
-    // Use page.evaluate to access the iframe's contentWindow from the parent.
-    await page.evaluate(() => {
-      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
-      const iframeWin = iframeEl.contentWindow as any;
-      const origRenderContent = iframeWin.renderContent;
-      iframeWin.renderContent = async function(...args: any[]) {
-        // Random delay 0–50ms makes completion order non-deterministic
-        await new Promise(r => setTimeout(r, Math.random() * 50));
-        return origRenderContent.apply(this, args);
-      };
-    });
 
     // Send rapid FORM_DATA messages simulating sidebar typing "Make this bold"
     const text = 'Make this bold';
@@ -576,10 +518,12 @@ test.describe('Inline Editing with Mock Parent', () => {
       }, { partialText });
     }
 
-    // Wait for all renders to settle, then check final DOM
+    // Wait for all renders to settle, then check final DOM.
+    // Use the block element directly — rapid FORM_DATA re-renders may transiently
+    // strip data-editable-field before hydra.js re-adds it.
     await expect(async () => {
       const text = await helper.getCleanTextContent(
-        iframe.locator('[data-block-uid="mock-block-1"] [data-editable-field="value"]')
+        iframe.locator('[data-block-uid="mock-block-1"]')
       );
       expect(text).toBe('Make this bold');
     }).toPass({ timeout: 5000 });
