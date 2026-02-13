@@ -454,8 +454,9 @@ Key methods:
 - **Case 1 (toolbar):** When `toolbarRequestDone` is set, sends FORM_DATA with `transformedSelection` from `iframeSyncState.formData`, then updates Redux via `onChangeFormData`
 - **Case 2 (properties):** When `properties` changes (sidebar edit, block add, etc.), sends FORM_DATA without selection
 - **Echo prevention:** Case 2 skips if:
-  1. `iframeSyncState.formData._editSequence > properties._editSequence` (we already sent newer data, Redux just hasn't caught up)
+  1. `processedInlineEditCounterRef` detects the change came from an inline edit already forwarded (fast O(1) counter check)
   2. Content is identical via `formDataContentEqual()` (ignores `_editSequence` metadata)
+  See [Echo Prevention (3-Way Sync)](#echo-prevention-3-way-sync) for full design rationale.
 
 **Message handlers:**
 - `BLOCK_SELECTED` - Update blockUI and selection atomically
@@ -466,6 +467,107 @@ Key methods:
 
 **Key functions:**
 - `insertAndSelectBlock(blockId, blockType, action, fieldName)` - Unified block insertion
+
+---
+
+## Echo Prevention (3-Way Sync)
+
+The system has a 3-way sync problem: data flows between **iframe** (hydra.js), **admin** (View.jsx), and **Redux** (properties). Each change can echo back through the other components, creating infinite loops or overwriting newer data with stale copies.
+
+### The Problem
+
+When the user types in the iframe:
+1. Iframe sends INLINE_EDIT_DATA to admin
+2. Admin updates iframeSyncState (direct) AND Redux (async)
+3. Redux triggers Unified Form Sync useEffect
+4. Without echo prevention, admin would send FORM_DATA back to iframe (echo!)
+5. Iframe receives its own text back, possibly overwriting newer keystrokes
+
+### Approaches Considered
+
+Three general approaches to 3-way sync conflict resolution were evaluated:
+
+#### 1. Sequence Numbers (Lamport Clocks)
+
+Each mutation increments a monotonic counter (`_editSequence`). Receivers reject data with a lower sequence than their own.
+
+| Pro | Con |
+|-----|-----|
+| Gives causal ordering — "this is newer than that" | Every code path must maintain the counter correctly |
+| Works even when content is identical | Sequences diverge across async boundaries (Redux) |
+| Compact (single integer) | Admin-side changes inherit stale sequences from Redux |
+| | Universal adoption, per-branch stamping, stripping — complex and error-prone |
+
+#### 2. Content Comparison
+
+Compare actual data at each boundary. If content matches what we already have, it's an echo — skip it.
+
+| Pro | Con |
+|-----|-----|
+| Simple — correct by definition | Can't distinguish "same content, different logical state" |
+| No state to maintain across boundaries | O(n) comparison cost (acceptable in practice) |
+| Works for all code paths automatically | |
+
+#### 3. Focus-Based Locking / Merge
+
+Track where the user is acting. Only the "owner" (iframe or sidebar) writes to the shared state. Or: merge incoming data with local state, preserving the field being edited.
+
+| Pro | Con |
+|-----|-----|
+| Both changes preserved immediately (merge) | Can't instrument custom sidebar panels (they write to Redux directly) |
+| Better UX — sidebar edits not delayed | Merge requires careful handling of stale buffer snapshots |
+| | Re-rendering during merge could disrupt contenteditable |
+
+### Current Design: Layered Approach
+
+The system uses different mechanisms at each boundary, chosen for what works best at that layer:
+
+#### Admin Side (View.jsx → iframe)
+
+Echo prevention uses **content comparison + source tracking**:
+
+1. **`processedInlineEditCounterRef`** (source tracking): Counts inline edits processed. When Redux triggers Unified Form Sync, the counter detects "this change came from an inline edit I already forwarded" and skips it. Fast O(1) check.
+
+2. **`formDataContentEqual()`** (content comparison): Catches any remaining echoes where content is identical. Handles all code paths (sidebar edits, block add/delete, etc.) without needing sequence numbers.
+
+Sequence-based echo prevention was removed from the admin side because admin-side changes (delete, add) go through Redux which has stale `_editSequence`, causing genuinely new data to be incorrectly rejected.
+
+#### Iframe Side (hydra.js receiving FORM_DATA)
+
+Uses **sequence numbers** because the iframe may have **unsent buffered text** (typing debounced at 300ms) that content comparison can't protect:
+
+- Iframe increments `_editSequence` when buffering text and before sending transforms
+- When FORM_DATA arrives: `incomingSeq < localSeq` → reject as stale
+- Exception: format responses (`formatRequestId`) are never rejected
+
+This protects against: user types "ab", admin sends FORM_DATA with old text "a" (from sidebar edit). Content IS different (sidebar changed Title), but text "a" is stale. Sequence check rejects it. When buffer flushes, admin gets both changes.
+
+#### Iframe Side (hydra.js sending updates)
+
+Uses **content comparison** via `lastReceivedFormData` + `focusedFieldValuesEqual()`:
+
+- After rendering FORM_DATA, save it as `lastReceivedFormData`
+- Before buffering a text update, compare current state against `lastReceivedFormData`
+- If content matches → echo of what we just rendered → skip
+
+#### Admin ↔ Iframe coordination
+
+Uses **blocking + flush** for transform operations:
+
+- Toolbar button click → FLUSH_BUFFER → iframe sends pending text → blocks editor → admin processes → FORM_DATA → unblock
+- Hotkey/Enter/Backspace → iframe flushes locally → blocks → sends transform request → admin processes → FORM_DATA → unblock
+
+The blocking mechanism ensures there is never pending text AND incoming FORM_DATA simultaneously during transform processing. This eliminates the need for merge/locking during the most common conflict scenarios.
+
+### Why Not Sequence Numbers on Admin Side?
+
+The admin side has two data sources: `iframeSyncState` (updated directly from iframe messages) and `properties` (updated async via Redux). Sequence numbers fail here because:
+
+1. **Redux strips sequences**: INLINE_EDIT_DATA strips `_editSequence` before updating Redux (to prevent sidebar edits from inheriting stale sequences)
+2. **Admin changes have no sequence**: Block delete/add creates data from `properties` which has no `_editSequence` or a stale one
+3. **Universal adoption creates gaps**: Adopting iframe's sequence makes admin's counter jump ahead, then Redux changes with lower sequences are incorrectly rejected
+
+Content comparison avoids all these issues — it doesn't matter what sequence the data has, only whether the content actually changed.
 
 ---
 

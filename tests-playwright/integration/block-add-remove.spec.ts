@@ -608,13 +608,24 @@ test.describe('Enter Key to Add/Navigate', () => {
     expect(initialBlocks).not.toContain(newBlockId);
   });
 
-  test('Backspace at start of empty paragraph block removes it', async ({ page }) => {
+  test('Backspace at start of empty paragraph block removes it', async ({ page }, testInfo) => {
+    const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const blockId = 'block-1-uuid';
+    // Enable debug logging with run ID
+    await page.evaluate((id) => {
+      (window as any).HYDRA_DEBUG = true;
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
     const iframe = helper.getIframe();
+    await iframe.locator('body').evaluate((_, id) => {
+      (window as any).HYDRA_DEBUG = true;
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
+
+    const blockId = 'block-1-uuid';
 
     // Create a new empty block via Enter
     const editor = await helper.enterEditMode(blockId);
@@ -632,13 +643,19 @@ test.describe('Enter Key to Add/Navigate', () => {
     const newBlockUid = blockOrder[originalBlockIndex + 1];
     expect(newBlockUid).toBeTruthy();
 
-    // Wait for editable field to appear and focus to land on it
+    // Wait for editable field to appear and block to be fully selected
     const newEditor = await helper.getEditorLocator(newBlockUid);
     await expect(newEditor).toBeAttached({ timeout: 10000 });
+    await helper.waitForQuantaToolbar(newBlockUid);
 
     // Backspace in the empty block should remove it
     await newEditor.press('Backspace');
-    await helper.waitForBlockCountToBe(initialBlocks, 5000);
+
+    // Wait for block count to stabilize — not just reach the target.
+    // A stale toolbar onChange can briefly remove the block then re-add it,
+    // so we need the count to settle at initialBlocks, not just hit it once.
+    const stableCount = await helper.getStableBlockCount();
+    expect(stableCount).toBe(initialBlocks);
 
     // The new block should be gone
     await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });

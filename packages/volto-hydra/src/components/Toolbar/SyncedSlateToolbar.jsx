@@ -17,6 +17,9 @@ import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
+import { createLog } from '../../utils/log';
+
+const log = createLog('TOOLBAR');
 
 /**
  * Validates if a selection is valid for the given document structure.
@@ -203,7 +206,7 @@ const SyncedSlateToolbar = ({
         return originalFocus(editorToFocus);
       } catch (e) {
         // Silently catch DOM resolution errors for toolbar editor
-        console.warn('[ReactEditor.focus] Focus error caught:', e.message);
+        log('[ReactEditor.focus] Focus error caught:', e.message);
       }
     };
 
@@ -304,9 +307,6 @@ const SyncedSlateToolbar = ({
     });
   }, [editor]);
 
-  // Track last sequence we've seen to detect new data
-  const lastSeenSequenceRef = useRef(0);
-
   // Track pending flush request for button click coordination
   const pendingFlushRef = useRef(null); // { requestId, button }
   // Track the requestId of active format operation (persists through handleChange)
@@ -399,7 +399,7 @@ const SyncedSlateToolbar = ({
           const afterPoint = Editor.after(editor, inlinePath);
           const formBlock = getBlockById(form, blockPathMap, selectedBlock);
           const formBlockValue = formBlock?.value?.[0]?.children;
-          console.log('[TOOLBAR FORMAT] Cursor exit: inlinePath:', JSON.stringify(inlinePath), 'afterPoint:', JSON.stringify(afterPoint), 'editor.children:', JSON.stringify(editor.children?.[0]?.children), 'form.blocks.value:', JSON.stringify(formBlockValue));
+          log('FORMAT: Cursor exit: inlinePath:', JSON.stringify(inlinePath), 'afterPoint:', JSON.stringify(afterPoint), 'editor.children:', JSON.stringify(editor.children?.[0]?.children), 'form.blocks.value:', JSON.stringify(formBlockValue));
           if (afterPoint) {
             Transforms.select(editor, afterPoint);
             // Selection-only change won't trigger handleChange, so manually send FORM_DATA
@@ -408,7 +408,7 @@ const SyncedSlateToolbar = ({
               activeFormatRequestIdRef.current = null;
             }
           } else {
-            console.log('[TOOLBAR FORMAT] Cursor exit: NO afterPoint, inserting empty text node');
+            log('FORMAT: Cursor exit: NO afterPoint, inserting empty text node');
             Transforms.insertNodes(editor, { text: '' }, { at: [...inlinePath.slice(0, -1), inlinePath[inlinePath.length - 1] + 1] });
             const newAfterPoint = Editor.after(editor, inlinePath);
             if (newAfterPoint) {
@@ -420,10 +420,10 @@ const SyncedSlateToolbar = ({
         // Cursor is NOT inside the format element - enable prospective formatting
         // Use zero-width space (ZWS) to prevent withEmptyInlineRemoval from removing the node
         // ZWS is invisible but makes the node non-empty, so normalization won't delete it
-        console.log('[TOOLBAR FORMAT] Before insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'selection:', JSON.stringify(editor.selection));
+        log('FORMAT: Before insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'selection:', JSON.stringify(editor.selection));
         const inlineNode = { type: format, children: [{ text: '\u200B' }] };
         Transforms.insertNodes(editor, inlineNode);
-        console.log('[TOOLBAR FORMAT] After insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'ops:', editor.operations.length);
+        log('FORMAT: After insertNodes:', JSON.stringify(editor.children?.[0]?.children), 'ops:', editor.operations.length);
 
         const [insertedEntry] = Editor.nodes(editor, {
           match: n => n.type === format && n.children?.length === 1 && n.children[0].text === '\u200B',
@@ -434,9 +434,9 @@ const SyncedSlateToolbar = ({
         if (insertedEntry) {
           const [, insertedPath] = insertedEntry;
           Transforms.select(editor, { path: [...insertedPath, 0], offset: 0 });
-          console.log('[TOOLBAR FORMAT] After select, insertedPath:', JSON.stringify(insertedPath), 'selection:', JSON.stringify(editor.selection));
+          log('FORMAT: After select, insertedPath:', JSON.stringify(insertedPath), 'selection:', JSON.stringify(editor.selection));
         } else {
-          console.log('[TOOLBAR FORMAT] WARNING: Could not find inserted node!');
+          log('FORMAT: WARNING: Could not find inserted node!');
         }
         // handleChange will fire because we changed children
       }
@@ -452,7 +452,7 @@ const SyncedSlateToolbar = ({
         try {
           Transforms.select(editor, rangeRef.current);
         } catch (e) {
-          console.warn('[TOOLBAR FORMAT] Failed to restore selection after format:', e.message);
+          log('Failed to restore selection after format:', e.message);
         }
         rangeRef.unref();
       }
@@ -477,32 +477,23 @@ const SyncedSlateToolbar = ({
     }
 
     // === DETERMINE WHAT NEEDS TO HAPPEN ===
-    const incomingSequence = form?._editSequence || 0;
-    const hasNewData = incomingSequence > lastSeenSequenceRef.current;
-    // Always track the highest sequence seen, even if we don't sync content
-    // This prevents older data (e.g., INLINE_EDIT_DATA sent before format) from being seen as "new"
-    if (hasNewData) {
-      lastSeenSequenceRef.current = incomingSequence;
-    }
-    // Content sync is needed if fieldValue differs from editor.children AND it's newer data
-    // The sequence check prevents older INLINE_EDIT_DATA (e.g., from typing before format)
-    // from overwriting formatted content that was applied after it was sent
+    // Echo prevention is handled by View.jsx (editSequenceRef filters stale INLINE_EDIT_DATA
+    // before it reaches iframeSyncState.formData), so the toolbar only needs to check
+    // whether content has actually changed.
     const contentIsDifferent = fieldValue && !isEqual(fieldValue, editor.children);
-    const contentNeedsSync = hasNewData && contentIsDifferent;
+    const contentNeedsSync = contentIsDifferent;
     const hasUnprocessedTransform = transformAction &&
       transformAction.requestId !== processedTransformRequestIdRef.current;
 
-    console.log('[TOOLBAR SYNC] hasNewData:', hasNewData,
-      'contentNeedsSync:', contentNeedsSync,
-      'hasUnprocessedTransform:', hasUnprocessedTransform,
-      'incomingSeq:', incomingSequence, 'lastSeenSeq:', lastSeenSequenceRef.current);
+    log('SYNC: contentNeedsSync:', contentNeedsSync,
+      'hasUnprocessedTransform:', hasUnprocessedTransform);
 
     // Debug: check for ZWS differences
     if (fieldValue && editor.children) {
       const fieldText = fieldValue[0]?.children?.[0]?.text;
       const editorText = editor.children[0]?.children?.[0]?.text;
       if (fieldText !== editorText) {
-        console.log('[TOOLBAR SYNC] Text mismatch - fieldValue:', JSON.stringify(fieldText?.substring(0,40)),
+        log('SYNC: Text mismatch - fieldValue:', JSON.stringify(fieldText?.substring(0,40)),
           'editor:', JSON.stringify(editorText?.substring(0,40)),
           'fieldHasZWS:', fieldText?.includes('\u200B'),
           'editorHasZWS:', editorText?.includes('\u200B'));
@@ -554,7 +545,10 @@ const SyncedSlateToolbar = ({
         case 'unwrapBlock': {
           // Backspace at start of a slate field: unwrap any non-default structure.
           // Converts headings/blockquotes/lists → paragraph, removes inline marks.
-          if (!editor.selection) break;
+          if (!editor.selection) {
+            log('unwrapBlock: no editor.selection, skipping');
+            break;
+          }
           const { slate } = config.settings;
           const defaultType = slate?.defaultBlockType || 'p';
 
@@ -568,6 +562,7 @@ const SyncedSlateToolbar = ({
 
           if (entry) {
             const [, path] = entry;
+            log('unwrapBlock: found non-default element at path:', JSON.stringify(path), 'type:', entry[0]?.type);
             // Check if this element is nested inside another non-editor element
             // (e.g., LI inside UL/OL) — unwrap the parent wrapper first
             const parentEntry = Editor.above(editor, {
@@ -596,10 +591,14 @@ const SyncedSlateToolbar = ({
             // 2. Editor text is empty (protects against stale isEmpty flag from iframe)
             // 3. Root element type matches defaultBlockType explicitly
             // Clear transformAction before delete to prevent stale re-processing on remount.
+            const editorText = Editor.string(editor, []);
+            const rootType = editor.children?.[0]?.type;
+            log('unwrapBlock: isFirstField:', transformAction.isFirstField,
+              'isEmpty:', transformAction.isEmpty, 'editorText:', JSON.stringify(editorText),
+              'rootType:', rootType, 'selectedBlock:', selectedBlock);
             if (transformAction.isFirstField && transformAction.isEmpty) {
-              const editorText = Editor.string(editor, []);
-              const rootType = editor.children?.[0]?.type;
               if (editorText === '' && rootType === defaultType) {
+                log('unwrapBlock: deleting empty block:', selectedBlock);
                 onTransformApplied?.();
                 onDeleteBlock(selectedBlock, true);
               }
@@ -648,17 +647,17 @@ const SyncedSlateToolbar = ({
           break;
         }
         default:
-          console.warn('[TOOLBAR] Unknown transform type:', type);
+          log('ERROR: Unknown transform type:', type);
       }
     };
 
     // === EXECUTE ===
     if (contentNeedsSync) {
       // Content changed from external source - sync it
-      console.log('[TOOLBAR SYNC] Syncing content from iframe, incomingSeq:', incomingSequence, 'fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
+      log('SYNC: Syncing content from iframe, fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
       // Debug: log full children structure to diagnose missing "w" bug
       if (fieldValue?.[0]?.children) {
-        console.log('[TOOLBAR SYNC] Full children structure:', JSON.stringify(fieldValue[0].children));
+        log('SYNC: Full children structure:', JSON.stringify(fieldValue[0].children));
       }
 
       // If there's a transform, run it in the same batch
@@ -667,7 +666,7 @@ const SyncedSlateToolbar = ({
         // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
         // This is needed for delete/paste transforms that don't go through applyInlineFormat
         activeFormatRequestIdRef.current = transformAction.requestId;
-        console.log('[TOOLBAR SYNC] Applying transform in batch');
+        log('SYNC: Applying transform in batch');
         applyTransform();
         onTransformApplied?.();
       } : null;
@@ -675,11 +674,11 @@ const SyncedSlateToolbar = ({
       replaceEditorContent(fieldValue, currentSelection, transformCallback);
 
       // Debug: check what editor.children looks like after replace
-      console.log('[TOOLBAR SYNC] After replaceEditorContent, editor.children[0].children[0].text:',
+      log('SYNC: After replaceEditorContent, editor.children[0].children[0].text:',
         JSON.stringify(editor.children?.[0]?.children?.[0]?.text?.substring(0, 40)));
       // Debug: show full editor children after replace to diagnose missing "w"
       if (editor.children?.[0]?.children) {
-        console.log('[TOOLBAR SYNC] After replace, full editor.children[0].children:', JSON.stringify(editor.children[0].children));
+        log('SYNC: After replace, full editor.children[0].children:', JSON.stringify(editor.children[0].children));
       }
 
       // Update internalValueRef from editor.children AFTER transform (not fieldValue)
@@ -696,25 +695,25 @@ const SyncedSlateToolbar = ({
       // current content. If content differs, sync it first. This handles cases where the
       // iframe typed text but the sequence didn't change (e.g., typing during blocking).
       if (contentIsDifferent) {
-        console.log('[TOOLBAR SYNC] Content differs, syncing before transform');
+        log('SYNC: Content differs, syncing before transform');
         replaceEditorContent(fieldValue, currentSelection, () => {
-          console.log('[TOOLBAR SYNC] Applying transform after content sync');
+          log('SYNC: Applying transform after content sync');
           applyTransform();
         });
         internalValueRef.current = editor.children;
       } else {
-        console.log('[TOOLBAR SYNC] Applying transform (content already synced)');
+        log('SYNC: Applying transform (content already synced)');
         // IMPORTANT: Apply the selection from the iframe before running the transform
         // The transform request includes the selection where the format should be applied,
         // but the editor's selection may be stale (e.g., at end of paragraph instead of
         // the selected text range). We need to update editor.selection first.
         if (currentSelection && !isEqual(currentSelection, editor.selection) &&
             isSelectionValidForDocument(currentSelection, editor.children)) {
-          console.log('[TOOLBAR SYNC] Applying selection before transform:', JSON.stringify(currentSelection));
+          log('SYNC: Applying selection before transform:', JSON.stringify(currentSelection));
           try {
             Transforms.select(editor, currentSelection);
           } catch (e) {
-            console.warn('[TOOLBAR SYNC] Failed to apply selection before transform:', e.message);
+            log('Failed to apply selection before transform:', e.message);
           }
         }
         applyTransform();
@@ -726,14 +725,14 @@ const SyncedSlateToolbar = ({
       if (isValid) {
         // Selection-only change - update editor's selection
         // This handles clicks that move cursor without changing content
-        console.log('[TOOLBAR SYNC] Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
+        log('SYNC: Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
         try {
           Transforms.select(editor, currentSelection);
         } catch (e) {
           // Selection invalid, ignore
         }
       } else {
-        console.log('[TOOLBAR SYNC] Selection invalid for document:', JSON.stringify(currentSelection),
+        log('SYNC: Selection invalid for document:', JSON.stringify(currentSelection),
           'editor.children[0]:', JSON.stringify(editor.children?.[0]?.children?.map(c => ({ type: c.type, text: c.text?.substring(0,20) }))));
       }
     }
@@ -786,7 +785,7 @@ const SyncedSlateToolbar = ({
   const handleChange = useCallback(
     (newValue) => {
       const newText = newValue?.[0]?.children?.[0]?.text?.substring(0, 40);
-      console.log('[TOOLBAR onChange] called, newText:', JSON.stringify(newText), 'selection:', JSON.stringify(editor.selection));
+      log('onChange: called, newText:', JSON.stringify(newText), 'selection:', JSON.stringify(editor.selection));
 
       // Update internal value tracker
       internalValueRef.current = newValue;
@@ -798,10 +797,10 @@ const SyncedSlateToolbar = ({
       const currentText = currentFieldValue?.[0]?.children?.[0]?.text?.substring(0, 40);
 
       if (isEqual(newValue, currentFieldValue)) {
-        console.log('[TOOLBAR onChange] values equal, skipping');
+        log('onChange: values equal, skipping');
         return;
       }
-      console.log('[TOOLBAR onChange] values DIFFER! newText:', JSON.stringify(newText), 'currentText:', JSON.stringify(currentText), '- SENDING TO REDUX');
+      log('onChange: values DIFFER! newText:', JSON.stringify(newText), 'currentText:', JSON.stringify(currentText), '- SENDING TO REDUX');
 
       // Build updated form data with the correct field (supports nested blocks)
       const updatedBlock = {
@@ -1374,7 +1373,7 @@ const SyncedSlateToolbar = ({
       const mediaRect = fieldData?.rect;
       if (!mediaRect) return null;
 
-      console.log('[TOOLBAR] Media field overlay:', fieldName, 'hasMediaValue:', hasMediaValue, 'mediaRect:', mediaRect, 'toolbarIframeRect:', toolbarIframeRect);
+      log(' Media field overlay:', fieldName, 'hasMediaValue:', hasMediaValue, 'mediaRect:', mediaRect, 'toolbarIframeRect:', toolbarIframeRect);
 
       const fieldCenterX = toolbarIframeRect.left + mediaRect.left + mediaRect.width / 2;
       const fieldCenterY = toolbarIframeRect.top + mediaRect.top + mediaRect.height / 2;
