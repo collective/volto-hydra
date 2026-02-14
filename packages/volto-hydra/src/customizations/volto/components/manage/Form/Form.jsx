@@ -48,6 +48,8 @@ import {
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
 import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
+import { createLog } from '../../../../../utils/log';
+const log = createLog('FORM');
 import {
   setMetadataFieldsets,
   resetMetadataFocus,
@@ -679,6 +681,25 @@ class Form extends Component {
    * @param {object} schema The schema definition of the form.
    * @returns A modified copy of the given schema.
    */
+  /**
+   * Stable callback for Iframe's onChangeFormData prop.
+   * Defined as a class property so the reference never changes between renders,
+   * preventing unnecessary re-renders of the Iframe (View.jsx) component.
+   */
+  onIframeChangeFormData = (newData) => {
+    const formData = this.state.formData;
+    const newFormData = {
+      ...formData,
+      ...newData,
+    };
+    this.setState({
+      formData: newFormData,
+    });
+    if (this.props.global) {
+      this.props.setFormData(newFormData);
+    }
+  };
+
   removeBlocksLayoutFields = (schema) => {
     const newSchema = { ...schema };
     const layoutFieldsetIndex = findIndex(
@@ -723,10 +744,17 @@ class Form extends Component {
       schema: originalSchema,
       onCancel,
       onSubmit,
-      navRoot,
+      navRoot: navRootProp,
       type,
       metadataFieldsets,
     } = this.props;
+
+    // Stabilize navRoot reference — it gets a new object from parent on every
+    // render even when content is identical, causing unnecessary View.jsx re-renders.
+    if (!isEqual(navRootProp, this._stableNavRoot)) {
+      this._stableNavRoot = navRootProp;
+    }
+    const navRoot = this._stableNavRoot;
     const formData = this.state.formData;
     const schema = this.removeBlocksLayoutFields(originalSchema);
     const Container =
@@ -748,18 +776,7 @@ class Form extends Component {
               formData={formData}
               selectedBlock={this.props.uiState.selected}
               selectedBlocks={this.props.uiState.multiSelected}
-              onChangeBlocks={(newBlockData) => {
-                const newFormData = {
-                  ...formData,
-                  ...newBlockData,
-                };
-                this.setState({
-                  formData: newFormData,
-                });
-                if (this.props.global) {
-                  this.props.setFormData(newFormData);
-                }
-              }}
+              onChangeBlocks={this.onIframeChangeFormData}
               onSetSelectedBlocks={(blockIds) =>
                 this.props.setUIState({ multiSelected: blockIds })
               }
@@ -783,18 +800,7 @@ class Form extends Component {
           <Iframe
             formData={formData}
             schema={this.props.schema}
-            onChangeFormData={(newData) => {
-              const newFormData = {
-                ...formData,
-                ...newData,
-              };
-              this.setState({
-                formData: newFormData,
-              });
-              if (this.props.global) {
-                this.props.setFormData(newFormData);
-              }
-            }}
+            onChangeFormData={this.onIframeChangeFormData}
             onChangeField={this.onChangeField}
             onSelectBlock={this.onSelectBlock}
             properties={formData}

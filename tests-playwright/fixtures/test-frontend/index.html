@@ -351,8 +351,10 @@
 
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
+                    window._formDataCount = 0;
                     window.bridge.onEditChange(async (formData) => {
-                        tfLog('Bridge connected! Received form data:', formData);
+                        window._formDataCount++;
+                        tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
 
                         // Update page title if provided
                         if (formData.title) {

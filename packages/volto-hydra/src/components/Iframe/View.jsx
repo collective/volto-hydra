@@ -435,6 +435,20 @@ const Iframe = (props) => {
 
   const dispatch = useDispatch();
 
+  // DEBUG: Track what causes re-renders
+  const renderCountRef = useRef(0);
+  const prevPropsRef = useRef({});
+  renderCountRef.current++;
+  const changedProps = Object.keys(props).filter(
+    (key) => props[key] !== prevPropsRef.current[key]
+  );
+  if (renderCountRef.current > 1 && changedProps.length > 0) {
+    log('[RENDER]', renderCountRef.current, 'changed props:', changedProps.join(', '));
+  } else if (renderCountRef.current > 1) {
+    log('[RENDER]', renderCountRef.current, 'no prop changes (state/context)');
+  }
+  prevPropsRef.current = props;
+
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   // pendingAdd: { mode: 'sidebar', parentBlockId, fieldName } | { mode: 'iframe', afterBlockId }
   const [pendingAdd, setPendingAdd] = useState(null);
@@ -2594,10 +2608,8 @@ const Iframe = (props) => {
     // Also skip if content is identical (ignoring _editSequence metadata)
     // Compare defaults-applied versions to avoid infinite loops
     if (formDataContentEqual(formWithDefaults, iframeSyncState.formData)) {
-      log('[SYNC SKIP] Content identical, skipping FORM_DATA');
       return;
     }
-    log('[SYNC] Content changed, will send FORM_DATA');
 
     // Validate selection (may be stale after document structure changes)
     let newSelection = iframeSyncState.selection;
@@ -3639,6 +3651,11 @@ const Iframe = (props) => {
           }
         }}
         onChangeBlock={(blockId, newBlockData) => {
+          // DEBUG: trace facets changes through onChangeBlock
+          if (newBlockData?.facets) {
+            log('[onChangeBlock] blockId:', blockId, 'facets:', newBlockData.facets.length,
+              'ids:', newBlockData.facets.map(f => f['@id']));
+          }
           // Guard: blockId can be undefined when Volto components like BlockDataForm
           // are missing the block prop (e.g., SearchBlockEdit doesn't pass block to BlockDataForm)
           if (!blockId) {
