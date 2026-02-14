@@ -3660,7 +3660,12 @@ export class Bridge {
         if (this.selectedBlockUid) {
           const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
           if (blockElement) {
-            this.observeBlockTextChanges(blockElement);
+            // NOTE: observeBlockTextChanges is NOT called here — it's deferred
+            // to the very end of afterContentRender, after restoreSlateSelection
+            // and replayBufferAndUnblock complete. Reconnecting the observer
+            // earlier causes it to fire on DOM mutations from selection
+            // restoration (ZWS creation) or late Vue render passes, corrupting
+            // this.formData via handleTextChange reading mid-render DOM.
             this.makeBlockContentEditable(blockElement);
 
             const editableFields = this.getEditableFields(blockElement);
@@ -3839,6 +3844,18 @@ export class Bridge {
           // FORM_DATA handler (stale check, addNodeIds, etc.)
           window.postMessage(queued, window.location.origin);
         }
+
+        // Re-attach text change observer LAST, after all DOM operations
+        // (restoreSlateSelection, replayBufferAndUnblock, queue processing)
+        // are complete. Reconnecting earlier causes the observer to fire on
+        // ZWS creation from restoreSlateSelection or late Vue render passes,
+        // and handleTextChange reads mid-render DOM, corrupting this.formData.
+        if (this.selectedBlockUid) {
+          const currentBlockEl = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          if (currentBlockEl) {
+            this.observeBlockTextChanges(currentBlockEl);
+          }
+        }
       });
     });
   }
@@ -3994,8 +4011,9 @@ export class Bridge {
     const blockElements = [...this.getAllBlockElements(this.selectedBlockUid)];
     this.observeBlockResize(blockElements, this.selectedBlockUid, editableFields, skipFocus);
 
-    // Also re-attach the text change observer for the same reason
-    this.observeBlockTextChanges(blockElement);
+    // NOTE: text change observer is NOT re-attached here — it's deferred to
+    // the end of afterContentRender to avoid firing on DOM mutations from
+    // restoreSlateSelection or late framework render passes.
   }
 
   /**
