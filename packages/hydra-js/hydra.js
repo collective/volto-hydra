@@ -1155,16 +1155,9 @@ export class Bridge {
               // Add nodeIds to all slate fields in all blocks
               this.addNodeIdsToAllSlateFields();
 
-              // Call onContentChange callback directly to trigger initial render
-              // Support async callbacks (e.g., renderContentWithListings)
+              // Trigger initial render through shared render path
               if (this.onContentChangeCallback) {
-                const result = this.onContentChangeCallback(this.formData);
-                const postRender = () => this.afterContentRender();
-                if (result && typeof result.then === 'function') {
-                  result.then(postRender);
-                } else {
-                  postRender();
-                }
+                this._executeRender(this.onContentChangeCallback);
               }
 
               // Restore block selection if provided (e.g., after adding a new block)
@@ -1351,45 +1344,22 @@ export class Bridge {
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
 
-            // Block keyboard input during re-render to prevent keystrokes hitting
-            // detached DOM elements. The re-render callback replaces innerHTML, which
-            // destroys the focused element; any keystroke arriving between now and
-            // afterContentRender (where focus is restored) would be lost.
-            // Only block when inline editing and not already blocked by a format op.
-            if (this.isInlineEditing && this.focusedFieldName && !this.blockedBlockId) {
-              this._ensureDocumentKeyboardBlocker();
-              this.blockedBlockId = this.selectedBlockUid;
-              this._reRenderBlocking = true;
+            // If a render is already in progress, queue this FORM_DATA.
+            // Processing two concurrent renders causes MutationObserver to fire
+            // mid-render, corrupting formData. Process the queue after the
+            // current render's afterContentRender completes.
+            if (this._renderInProgress) {
+              log('FORM_DATA: render in progress, queuing');
+              this._formDataQueue = event.data;
+              return;
             }
-
-            // Call the callback first to trigger the re-render
-            // Support async callbacks (e.g., renderContentWithListings)
             log('Calling onEditChange callback to trigger re-render');
-            const callbackResult = callback(this.formData);
-
-            const afterRender = () => this.afterContentRender({
+            this._executeRender(callback, {
               transformedSelection: event.data.transformedSelection,
               formatRequestId,
               needsBlockSwitch,
               adminSelectedBlockUid,
             });
-
-            // Call afterRender after callback completes (async or sync)
-            if (callbackResult && typeof callbackResult.then === 'function') {
-              callbackResult.then(afterRender);
-            } else {
-              // Sync callback — framework may render asynchronously (Vue, React).
-              // If a transform or re-render is pending, wait for the actual DOM
-              // mutation before proceeding with selection restore and buffer replay.
-              const blockId = this.selectedBlockUid;
-              const blockEl = blockId && document.querySelector(`[data-block-uid="${blockId}"]`);
-              log('DEBUG sync callback:', { blockId, hasBlockEl: !!blockEl, pendingTransform: !!this.pendingTransform, reRenderBlocking: !!this._reRenderBlocking, bufferLen: this.eventBuffer.length });
-              if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
-                this._waitForDomMutation(blockEl, afterRender);
-              } else {
-                afterRender();
-              }
-            }
           } else {
             throw new Error('No form data has been sent from the adminUI');
           }
@@ -3857,6 +3827,18 @@ export class Bridge {
         }
 
         this.replayBufferAndUnblock();
+
+        // Render cycle complete — process any queued FORM_DATA.
+        // Only the latest queued message matters (earlier ones are stale).
+        this._renderInProgress = false;
+        if (this._formDataQueue) {
+          const queued = this._formDataQueue;
+          this._formDataQueue = null;
+          log('Processing queued FORM_DATA after render complete');
+          // Re-dispatch as a message event so it goes through the full
+          // FORM_DATA handler (stale check, addNodeIds, etc.)
+          window.postMessage(queued, window.location.origin);
+        }
       });
     });
   }
@@ -6757,6 +6739,60 @@ export class Bridge {
     // Center if block fits, otherwise show top
     const blockPosition = scrollRect.height > availableHeight ? 'start' : 'center';
     el.scrollIntoView({ behavior: 'instant', block: blockPosition });
+  }
+
+  /**
+   * Shared render logic for INITIAL_DATA and FORM_DATA handlers.
+   * Sets _renderInProgress, disconnects MutationObserver, calls the callback,
+   * and invokes afterContentRender when done.
+   *
+   * During INITIAL_DATA, keyboard blocking and DOM mutation waiting are
+   * naturally skipped because isInlineEditing is false and pendingTransform
+   * / _reRenderBlocking are unset.
+   */
+  _executeRender(callbackFn, afterRenderOptions = {}) {
+    this._renderInProgress = true;
+
+    // Block keyboard input during re-render to prevent keystrokes hitting
+    // detached DOM elements. The re-render callback replaces innerHTML, which
+    // destroys the focused element; any keystroke arriving between now and
+    // afterContentRender (where focus is restored) would be lost.
+    // Only block when inline editing and not already blocked by a format op.
+    if (this.isInlineEditing && this.focusedFieldName && !this.blockedBlockId) {
+      this._ensureDocumentKeyboardBlocker();
+      this.blockedBlockId = this.selectedBlockUid;
+      this._reRenderBlocking = true;
+    }
+
+    // Disconnect MutationObserver before rendering. The framework
+    // re-render will mutate DOM (text nodes, elements) and we must
+    // not run handleTextChange on framework-generated mutations.
+    // The observer is re-attached in afterContentRender.
+    if (this.blockTextMutationObserver) {
+      this.blockTextMutationObserver.disconnect();
+    }
+
+    // Call the callback to trigger the render
+    // Support async callbacks (e.g., renderContentWithListings)
+    const callbackResult = callbackFn(this.formData);
+
+    const afterRender = () => this.afterContentRender(afterRenderOptions);
+
+    // Call afterRender after callback completes (async or sync)
+    if (callbackResult && typeof callbackResult.then === 'function') {
+      callbackResult.then(afterRender);
+    } else {
+      // Sync callback — framework may render asynchronously (Vue, React).
+      // If a transform or re-render is pending, wait for the actual DOM
+      // mutation before proceeding with selection restore and buffer replay.
+      const blockId = this.selectedBlockUid;
+      const blockEl = blockId && document.querySelector(`[data-block-uid="${blockId}"]`);
+      if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
+        this._waitForDomMutation(blockEl, afterRender);
+      } else {
+        afterRender();
+      }
+    }
   }
 
   /**

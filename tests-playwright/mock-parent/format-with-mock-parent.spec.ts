@@ -250,6 +250,59 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
   });
 
+  test('Redux echo after format does not destroy selection for subsequent Ctrl+A', async ({ helper, page }) => {
+    // Reproduce the CI-flaky scenario:
+    // 1. Apply bold to selected text
+    // 2. Redux echo (duplicate FORM_DATA) arrives and re-renders DOM
+    // 3. Immediately try Ctrl+A — selection should work, not return empty
+    //
+    // Under load, the echo re-render can destroy focus/selection state,
+    // causing the next Ctrl+A to silently fail (empty selection).
+
+    await page.evaluate(() => {
+      window.mockParent.setDuplicateFormData(true);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+
+    // Select all and apply bold
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() => editable.evaluate(() =>
+      window.getSelection()?.toString()
+    )).toBe('Text to format');
+
+    await page.keyboard.press('ControlOrMeta+b');
+
+    // Wait for bold to be applied (format response + render)
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold');
+
+    // Wait long enough for the Redux echo (50ms) to arrive and re-render
+    await page.waitForTimeout(200);
+
+    // Now try Ctrl+A — this should select all text even after the echo re-render
+    await editable.focus();
+    await page.keyboard.press('ControlOrMeta+a');
+
+    const selection = await expect.poll(async () => {
+      return editable.evaluate(() => window.getSelection()?.toString().trim() || '');
+    }, { timeout: 5000 }).toBeTruthy();
+
+    // Verify we can apply another format (un-bold) without error
+    await page.keyboard.press('ControlOrMeta+b');
+
+    // Text should still exist after removing bold
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Text to format');
+    }).toPass({ timeout: 5000 });
+
+    await page.evaluate(() => {
+      window.mockParent.setDuplicateFormData(false);
+    });
+  });
+
   test('should handle partial text selection', async ({ helper, page }) => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
