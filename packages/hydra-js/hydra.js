@@ -1700,6 +1700,11 @@ export class Bridge {
             if (!blockUid || !this.selectedBlockUid) return;
 
             if (blockUid !== this.selectedBlockUid) {
+              // Skip if block-selector or arrow-key navigation is in progress —
+              // those flows manage their own block selection
+              if (this._blockSelectorNavigating || this._navigatingToBlock) {
+                return;
+              }
               // Focus moved to a different block (e.g., via Tab) — select it
               log('Focus moved to different block:', blockUid, 'from:', this.selectedBlockUid);
               this.selectBlock(blockElement);
@@ -2128,6 +2133,18 @@ export class Bridge {
 
     document.removeEventListener('click', this.blockClickHandler, true);
     document.addEventListener('click', this.blockClickHandler, true);
+
+    // Set _blockSelectorNavigating on mousedown (before focus fires) so the
+    // focus listener doesn't incorrectly select the container block when a
+    // block-selector button (e.g., carousel +1/-1) is clicked.
+    if (!this._blockSelectorMousedownHandler) {
+      this._blockSelectorMousedownHandler = (event) => {
+        if (event.target.closest('[data-block-selector]')) {
+          this._blockSelectorNavigating = true;
+        }
+      };
+      document.addEventListener('mousedown', this._blockSelectorMousedownHandler, true);
+    }
 
     // Add global keydown handler for space on interactive elements
     // Certain elements (buttons, inputs, summary) have space key behavior that conflicts
