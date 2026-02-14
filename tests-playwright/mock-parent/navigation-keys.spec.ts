@@ -84,6 +84,12 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // If selection is collapsed, select all again to test the non-collapsed case
     if (info.collapsed) {
       await page.keyboard.press('ControlOrMeta+a');
+      // Wait for Ctrl+A to take effect — on slow CI the keystroke may not
+      // be processed before the evaluate runs.
+      await expect.poll(() => editable.evaluate((el) => {
+        const sel = el.ownerDocument.defaultView.getSelection();
+        return sel?.isCollapsed;
+      }), { timeout: 5000 }).toBe(false);
       info = await editable.evaluate((el) => {
         const sel = el.ownerDocument.defaultView.getSelection();
         return { collapsed: sel.isCollapsed, text: sel.toString() };
