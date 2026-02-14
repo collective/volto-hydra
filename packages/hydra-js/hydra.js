@@ -2010,12 +2010,62 @@ export class Bridge {
       }
     };
 
-    // Helper: replay any non-text key via synthetic keydown + native fallback.
-    // Always dispatches the synthetic event so our keydown handler gets a chance
-    // (e.g. Enter→split, Tab→indent). Then applies manual fallbacks for actions
-    // browsers refuse to perform from untrusted events.
+    // Helper: replay a non-text key.
+    // Known native actions (Backspace, Delete, navigation, Ctrl+A) are executed
+    // directly — synthetic KeyboardEvents are untrusted and browsers won't
+    // perform native actions from them.
+    // Unknown keys are dispatched as synthetic keydown so our keydown handler
+    // can process them (e.g. Enter→split, Tab→indent set blockedBlockId).
     const replayKey = (evt) => {
       log('Replaying buffered key:', evt.key, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
+
+      // Native actions — execute directly
+      if (evt.key === 'Backspace') {
+        document.execCommand('delete', false);
+        return;
+      }
+      if (evt.key === 'Delete') {
+        document.execCommand('forwardDelete', false);
+        return;
+      }
+      if (navMap[evt.key]) {
+        const sel = window.getSelection();
+        if (sel) {
+          const alter = evt.shiftKey ? 'extend' : 'move';
+          sel.modify(alter, navMap[evt.key][0], navMap[evt.key][1]);
+        }
+        return;
+      }
+      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'a') {
+        const sel = window.getSelection();
+        if (sel && currentEditable) {
+          // Use text node endpoints instead of selectNodeContents on the container,
+          // because the selectionchange listener's correctInvalidWhitespaceSelection
+          // treats selections anchored on the data-editable-field container as invalid
+          // (since the container has data-node-id children) and "corrects" them.
+          const walker = document.createTreeWalker(currentEditable, NodeFilter.SHOW_TEXT);
+          const firstText = walker.firstChild();
+          let lastText = firstText;
+          while (walker.nextNode()) lastText = walker.currentNode;
+          if (firstText && lastText) {
+            const range = document.createRange();
+            range.setStart(firstText, 0);
+            range.setEnd(lastText, lastText.length);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          } else {
+            // Fallback: no text nodes, use selectNodeContents
+            const range = document.createRange();
+            range.selectNodeContents(currentEditable);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+          log('Ctrl+A replay: selection set to:', JSON.stringify(sel.toString()), 'on', currentEditable.tagName, currentEditable.getAttribute('data-editable-field'));
+        }
+        return;
+      }
+
+      // Unknown keys — dispatch synthetic event for our keydown handler
       const syntheticEvent = new KeyboardEvent('keydown', {
         key: evt.key,
         code: evt.code,
@@ -2027,33 +2077,6 @@ export class Bridge {
         cancelable: true,
       });
       currentEditable.dispatchEvent(syntheticEvent);
-
-      // Synthetic events are untrusted and don't trigger native actions.
-      // If our keydown handler handled it (e.g. Enter→split), it called
-      // sendTransformRequest which sets blockedBlockId — the loop detects this.
-      if (!syntheticEvent.defaultPrevented) {
-        // Manual fallbacks for native actions browsers won't perform from untrusted events
-        if (evt.key === 'Backspace') {
-          document.execCommand('delete', false);
-        } else if (evt.key === 'Delete') {
-          document.execCommand('forwardDelete', false);
-        } else if (navMap[evt.key]) {
-          const sel = window.getSelection();
-          if (sel) {
-            const alter = evt.shiftKey ? 'extend' : 'move';
-            sel.modify(alter, navMap[evt.key][0], navMap[evt.key][1]);
-          }
-        } else if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'a') {
-          // Select all
-          const sel = window.getSelection();
-          if (sel && currentEditable) {
-            const range = document.createRange();
-            range.selectNodeContents(currentEditable);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-        }
-      }
     };
 
     // Process buffer events sequentially to preserve ordering.
@@ -3794,12 +3817,31 @@ export class Bridge {
           }
         }
 
+        // Wait for rendered DOM content to match formData before restoring
+        // selection. On mock frontends this matches immediately; on Nuxt, Vue's
+        // reactivity may trigger secondary renders that replace DOM nodes after
+        // the double-RAF. Proceeding before the render is complete would cause
+        // restoreSlateSelection to anchor on nodes that get replaced, destroying
+        // the selection.
+        if (this.selectedBlockUid && this.formData) {
+          const contentBlock = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          if (contentBlock) {
+            await this.waitForContentReady(contentBlock);
+          }
+        }
+
+        let selectionRestored = true;
         if (transformedSelection) {
           this.expectedSelectionFromAdmin = transformedSelection;
           try {
-            this.restoreSlateSelection(transformedSelection, this.formData);
+            selectionRestored = await this.restoreSlateSelection(transformedSelection, this.formData);
           } catch (e) {
             console.error('[HYDRA] Error restoring selection:', e);
+            selectionRestored = false;
+          }
+          if (!selectionRestored) {
+            log('Selection restore failed — dropping', this.eventBuffer.length, 'buffered events to avoid wrong-selection replay');
+            this.eventBuffer = [];
           }
         }
 
@@ -3858,6 +3900,71 @@ export class Bridge {
         }
       });
     });
+  }
+
+  /**
+   * Read the text content of a data-node-id element from the DOM.
+   * Shared by handleTextChange (single node) and readFieldValueFromDOM (full field).
+   */
+  readNodeText(nodeEl) {
+    return this.stripZeroWidthSpaces(nodeEl.innerText)?.replace(/\n$/, '');
+  }
+
+  /**
+   * Read an editable field's current DOM content back as a slate value.
+   * Clones the formData value then updates each node's text from the DOM,
+   * using the same readNodeText logic as handleTextChange.
+   */
+  readFieldValueFromDOM(fieldEl, slateValue) {
+    const clone = JSON.parse(JSON.stringify(slateValue));
+    const nodeEls = fieldEl.querySelectorAll('[data-node-id]');
+    const nodes = fieldEl.hasAttribute('data-node-id')
+      ? [fieldEl, ...nodeEls] : [...nodeEls];
+
+    for (const nodeEl of nodes) {
+      // Skip parent nodes that contain child data-node-id elements —
+      // their innerText includes children's text, which would cause
+      // updateJsonNode to collapse the inline element structure.
+      if (nodeEl.querySelector('[data-node-id]')) continue;
+
+      const nodeId = nodeEl.getAttribute('data-node-id');
+      const text = this.readNodeText(nodeEl);
+      this.updateJsonNode(clone, nodeId, text);
+    }
+    return clone;
+  }
+
+  /**
+   * Wait for the rendered DOM to match this.formData for a block's editable fields.
+   * Reads the full contenteditable back via readFieldValueFromDOM and compares
+   * against the formData value. Returns immediately when content matches (zero
+   * cost on mock); on Nuxt/Vue waits for secondary renders to complete.
+   */
+  async waitForContentReady(blockElement, maxRetries = 20) {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const blockData = this.getBlockData(blockUid);
+    if (!blockData) return;
+
+    const editableFields = this.getEditableFields(blockElement);
+    for (const [fieldName, fieldType] of Object.entries(editableFields)) {
+      if (!this.fieldTypeIsSlate(fieldType)) continue;
+      const slateValue = blockData[fieldName];
+      if (!slateValue || !Array.isArray(slateValue)) continue;
+
+      const fieldEl = blockElement.querySelector(`[data-editable-field="${fieldName}"]`)
+        || (blockElement.getAttribute('data-editable-field') === fieldName ? blockElement : null);
+      if (!fieldEl) continue;
+
+      const expected = JSON.stringify(slateValue);
+      for (let retry = 0; retry < maxRetries; retry++) {
+        const domValue = this.readFieldValueFromDOM(fieldEl, slateValue);
+        if (JSON.stringify(domValue) === expected) break;
+        if (retry === 0) {
+          log('waitForContentReady: content mismatch, waiting for render to complete');
+        }
+        await new Promise(r => requestAnimationFrame(r));
+      }
+    }
   }
 
   /**
@@ -7265,24 +7372,31 @@ export class Bridge {
    * @param {Object} slateSelection - Slate selection object with anchor and focus
    * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
    */
-  restoreSlateSelection(slateSelection, formData) {
+  /**
+   * Restore cursor/selection from Slate selection format.
+   * @param {Object} slateSelection - Slate selection object with anchor and focus
+   * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
+   * @returns {Promise<boolean>} true if selection was restored, false if it failed
+   */
+  async restoreSlateSelection(slateSelection, formData) {
     log('restoreSlateSelection called with:', JSON.stringify(slateSelection));
     if (!slateSelection || !slateSelection.anchor || !slateSelection.focus) {
-      console.warn('[HYDRA] Invalid Slate selection:', slateSelection);
-      return;
+      console.warn('[HYDRA] restoreSlateSelection failed: invalid selection', slateSelection);
+      return false;
     }
 
     try {
       // Find the selected block and determine field type
       if (!this.selectedBlockUid || !this.focusedFieldName) {
-        log('restoreSlateSelection: missing selectedBlockUid or focusedFieldName');
-        return;
+        log('restoreSlateSelection failed: missing selectedBlockUid or focusedFieldName');
+        return false;
       }
 
       // Use getBlockData to handle nested blocks (formData.blocks[uid] only works for top-level)
       const block = this.getBlockData(this.selectedBlockUid);
       if (!block) {
-        return;
+        log('restoreSlateSelection failed: block not found', this.selectedBlockUid);
+        return false;
       }
 
       // Resolve field path and get field type (supports page-level and nested blocks)
@@ -7294,7 +7408,8 @@ export class Bridge {
       // Find the block element for locating editable fields
       const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
       if (!blockElement) {
-        return;
+        log('restoreSlateSelection failed: block element not in DOM', this.selectedBlockUid);
+        return false;
       }
 
       // Check if this is a slate field with nodeIds
@@ -7313,8 +7428,8 @@ export class Bridge {
         const focusResult = this.getNodeIdFromPath(fieldValue, slateSelection.focus.path);
 
         if (!anchorResult || !focusResult) {
-          console.warn('[HYDRA] Could not get nodeId from path');
-          return;
+          console.warn('[HYDRA] restoreSlateSelection failed: could not get nodeId from path');
+          return false;
         }
 
         // Scope to current block to avoid selecting wrong element when multiple blocks visible
@@ -7322,30 +7437,20 @@ export class Bridge {
         focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
         // If elements not found, DOM may not be ready yet (async framework render)
-        // Retry after a short delay - but only once to avoid infinite loops
-        if ((!anchorElement || !focusElement) && !this._selectionRetryPending) {
-          log('restoreSlateSelection: nodeId elements not found, scheduling retry');
-          this._selectionRetryPending = true;
-          setTimeout(() => {
-            this._selectionRetryPending = false;
-            this.restoreSlateSelection(slateSelection, formData);
-            // If blocking was held for this retry, replay buffer and unblock now
-            if (this.blockedBlockId && !this.pendingTransform) {
-              if (this.eventBuffer.length > 0) {
-                log('Replaying', this.eventBuffer.length, 'events buffered during selection retry');
-                this.pendingBufferReplay = {
-                  blockId: this.blockedBlockId,
-                  buffer: [...this.eventBuffer],
-                };
-                this.eventBuffer = [];
-              }
-              this.blockedBlockId = null;
-              this.replayBufferedEvents();
-            }
-          }, 50);
-          return;
+        // Wait and retry — afterContentRender awaits us, so buffer replay won't
+        // run until we finish and the selection is actually restored.
+        if (!anchorElement || !focusElement) {
+          log('restoreSlateSelection: nodeId elements not found, waiting for DOM');
+          await new Promise(resolve => setTimeout(resolve, 50));
+          anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
+          focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
+          if (!anchorElement || !focusElement) {
+            console.warn('[HYDRA] restoreSlateSelection failed: nodeId elements not found after retry',
+              { anchorNodeId: anchorResult.nodeId, focusNodeId: focusResult.nodeId });
+            return false;
+          }
+          log('restoreSlateSelection: elements found after retry');
         }
-        this._selectionRetryPending = false;
 
         log('restoreSlateSelection: looking for nodeIds', {
           anchorNodeId: anchorResult.nodeId,
@@ -7358,8 +7463,8 @@ export class Bridge {
         });
 
         if (!anchorElement || !focusElement) {
-          console.warn('[HYDRA] Could not find elements by nodeId');
-          return;
+          console.warn('[HYDRA] restoreSlateSelection failed: could not find elements by nodeId');
+          return false;
         }
 
         // Helper to create ZWS position for cursor placement.
@@ -7452,8 +7557,8 @@ export class Bridge {
         // Simple field - use the editable field directly
         const editableField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
         if (!editableField) {
-          console.warn('[HYDRA] Could not find editable field:', this.focusedFieldName);
-          return;
+          console.warn('[HYDRA] restoreSlateSelection failed: editable field not found:', this.focusedFieldName);
+          return false;
         }
         anchorElement = focusElement = editableField;
         // For simple fields, use findPositionByVisibleOffset
@@ -7463,13 +7568,13 @@ export class Bridge {
 
 
       if (!anchorPos || !focusPos) {
-        console.warn('[HYDRA] Could not find positions by visible offset');
-        return;
+        console.warn('[HYDRA] restoreSlateSelection failed: could not find positions by visible offset');
+        return false;
       }
 
       // Set the actual selection
       const selection = window.getSelection();
-      if (!selection) return;
+      if (!selection) return false;
 
       // Focus the contenteditable element BEFORE setting selection
       // After re-render, focus goes to BODY - we need to restore it
@@ -7484,9 +7589,11 @@ export class Bridge {
 
       selection.removeAllRanges();
       selection.addRange(range);
+      return true;
 
     } catch (e) {
-      console.error('[HYDRA] Error restoring Slate selection:', e);
+      console.error('[HYDRA] restoreSlateSelection failed with error:', e);
+      return false;
     }
   }
 
@@ -8126,7 +8233,7 @@ export class Bridge {
       if (childIndex === null) {
         // Fallback: update using innerText of the whole node (original behavior)
         // This handles inline elements (STRONG, EM, etc.) which have their own nodeId
-        textContent = this.stripZeroWidthSpaces(closestNode.innerText)?.replace(/\n$/, '');
+        textContent = this.readNodeText(closestNode);
         log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
       }
 

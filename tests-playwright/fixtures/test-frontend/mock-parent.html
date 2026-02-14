@@ -450,12 +450,18 @@
               [fieldName || 'value']: updatedValue,
             };
 
-            // Compute transformedSelection: for prospective formatting (collapsed
-            // selection), the cursor moves into the new inline element.
+            // Compute transformedSelection based on the transform result.
             let transformedSelection = selection;
-            if (selection && selection.anchor.offset === selection.focus.offset
+            if (transformType === 'delete') {
+              // After delete, content is empty — cursor at start of first node
+              transformedSelection = {
+                anchor: { path: [0, 0], offset: 0 },
+                focus: { path: [0, 0], offset: 0 },
+              };
+            } else if (selection && selection.anchor.offset === selection.focus.offset
                 && JSON.stringify(selection.anchor.path) === JSON.stringify(selection.focus.path)) {
-              // Collapsed selection — check if an inline element was inserted
+              // Collapsed selection — for prospective formatting, the cursor
+              // moves into the new inline element.
               const block = mockFormData.blocks[blockId];
               const val = block[fieldName] || block.value;
               if (val && val[0] && val[0].children) {

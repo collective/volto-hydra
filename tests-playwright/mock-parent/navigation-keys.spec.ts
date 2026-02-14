@@ -149,6 +149,9 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // End moved cursor to end (collapsing selection), then X was typed there
     expect(text).toMatch(/Text to formatX$/);
 
+    // Verify cursor is after X at end
+    await helper.waitForCursorPosition(editable, 'Text to formatX');
+
     await page.evaluate(() => {
       window.mockParent.setTransformDelay(0);
     });
@@ -197,6 +200,9 @@ test.describe('Navigation key behavior in contenteditable', () => {
     console.log('[TEST] Text after buffered Backspace+type:', text);
     expect(text).toContain('replacement text');
 
+    // Verify cursor is at end of typed text
+    await helper.waitForCursorPosition(editable, 'replacement text');
+
     await page.evaluate(() => {
       window.mockParent.setTransformDelay(0);
     });
@@ -237,6 +243,9 @@ test.describe('Navigation key behavior in contenteditable', () => {
     const text = await editable.textContent();
     console.log('[TEST] Text after clear+type:', text);
     expect(text).toContain('some new text');
+
+    // Verify cursor is at end of typed text
+    await helper.waitForCursorPosition(editable, 'some new text');
 
     await page.evaluate(() => {
       window.mockParent.setTransformDelay(0);
@@ -311,5 +320,192 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
     expect(hasLeakedText).toBe(false);
     expect(text).toContain('replacement text');
+  });
+
+  test('Ctrl+A buffered during transform replays as select-all', async ({ helper, page }) => {
+    // When Ctrl+A arrives while input is blocked (transform in flight),
+    // it should be buffered and replayed as selectNodeContents after unblock.
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Place cursor at position 3 (not selecting all)
+    await helper.moveCursorToPosition(editable, 3);
+    const info0 = await helper.getCursorInfo(editable);
+    expect(info0.selectionCollapsed).toBe(true);
+    expect(info0.cursorOffset).toBe(3);
+
+    // Select all and apply bold — blocks input for 500ms
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(50); // Let blocking kick in
+
+    // Press Ctrl+A while blocked — should be buffered
+    await page.keyboard.press('ControlOrMeta+a');
+
+    // Wait for transform to complete and buffer to replay
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
+
+    // Ctrl+A should have been replayed — poll for selection to cover all text
+    await helper.verifySelectionMatches(editable, 'Text to format');
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('Home replay during buffer moves cursor to start of line', async ({ helper, page }) => {
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Select all text and apply bold — blocks input for 500ms
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(50);
+
+    // Press Home then type — Home should move cursor to start, X typed there
+    await page.keyboard.press('Home');
+    await page.keyboard.type('X');
+
+    await expect(editable).toContainText('X', { timeout: 5000 });
+    const text = await editable.textContent();
+    console.log('[TEST] Text after buffered Home+X:', text);
+    expect(text).toMatch(/^XText to format/);
+
+    // Verify cursor is after X at start (position 1)
+    await helper.waitForCursorPosition(editable, 'X');
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('ArrowLeft replay during buffer moves cursor left', async ({ helper, page }) => {
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Select all text and apply bold — blocks input for 500ms
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(50);
+
+    // Press End (collapse to end), then ArrowLeft 3 times, then type X
+    // "Text to format" → End → at pos 14 → Left×3 → at pos 11 → type X
+    // Expected: "Text to forXmat"
+    await page.keyboard.press('End');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.type('X');
+
+    await expect(editable).toContainText('X', { timeout: 5000 });
+    const text = await editable.textContent();
+    console.log('[TEST] Text after buffered ArrowLeft+X:', text);
+    expect(text).toBe('Text to forXmat');
+
+    // Verify cursor is after X (between "for" and "mat")
+    await helper.waitForCursorPosition(editable, 'Text to forX');
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('ArrowRight replay during buffer moves cursor right', async ({ helper, page }) => {
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Select all text and apply bold — blocks input for 500ms
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(50);
+
+    // Press Home (collapse to start), then ArrowRight 4 times, then type X
+    // "Text to format" → Home → at pos 0 → Right×4 → at pos 4 → type X
+    // Expected: "TextX to format"
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.type('X');
+
+    await expect(editable).toContainText('X', { timeout: 5000 });
+    const text = await editable.textContent();
+    console.log('[TEST] Text after buffered ArrowRight+X:', text);
+    expect(text).toBe('TextX to format');
+
+    // Verify cursor is after X (between "Text" and " to format")
+    await helper.waitForCursorPosition(editable, 'TextX');
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('Delete replay during buffer forward-deletes character', async ({ helper, page }) => {
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = iframe.locator('[data-editable-field="value"]');
+    await editable.click();
+
+    // Select all text and apply bold — blocks input for 500ms
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(50);
+
+    // Press Home (collapse to start), then Delete to remove first char
+    // "Text to format" → Home → at pos 0 → Delete → "ext to format"
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Delete');
+
+    await expect.poll(() => editable.textContent(), { timeout: 5000 }).toBe('ext to format');
+    const text = await editable.textContent();
+    console.log('[TEST] Text after buffered Delete:', text);
+    expect(text).toBe('ext to format');
+
+    // Verify cursor is at start (position 0, nothing before cursor)
+    await helper.waitForCursorPosition(editable, '');
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
   });
 });
