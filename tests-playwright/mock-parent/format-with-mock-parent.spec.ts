@@ -70,8 +70,11 @@ test.describe('Inline Editing with Mock Parent', () => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
-    // Click at the beginning - use smaller x position to ensure cursor is before first character
-    await editable.click({ position: { x: 1, y: 5 } });
+    // Click on the editable, then press Home to move cursor to the beginning.
+    // Avoid clicking at x=1 — the drag handle overlay sits at the left edge
+    // and intercepts pointer events.
+    await editable.click();
+    await page.keyboard.press('Home');
 
     // Type some text
     await page.keyboard.type('Hello ');
