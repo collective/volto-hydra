@@ -1095,6 +1095,108 @@ export class Bridge {
   }
 
   /**
+   * Checks text before cursor for markdown shortcut patterns (Space triggers autoformat).
+   * Handles both block-level (##, >, -, etc.) and inline (**bold**, __bold__, etc.) patterns.
+   * Shared between the live keydown handler and buffer replay.
+   *
+   * @param {string} blockUid - The block UID
+   * @returns {boolean} true if a markdown pattern was detected and transform sent
+   */
+  handleSpaceKey(blockUid) {
+    if (!this.isSlateField(blockUid, this.focusedFieldName)) return false;
+
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !sel.isCollapsed) return false;
+
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const editableField = blockEl.closest('[data-editable-field]');
+    if (!editableField) return false;
+
+    // Walk up to find the block-level element (p, h2, li, blockquote, etc.)
+    const blockNode = blockEl.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, div[data-node-id]')
+                      || editableField;
+
+    // Get text from start of block node to cursor position
+    const textRange = document.createRange();
+    textRange.setStart(blockNode, 0);
+    textRange.setEnd(range.startContainer, range.startOffset);
+    // Strip ZWS/NBSP artifacts from contenteditable — they prevent exact pattern matches
+    const textBeforeCursor = this.stripZeroWidthSpaces(textRange.toString());
+    log('Markdown check - textBeforeCursor:', JSON.stringify(textBeforeCursor));
+
+    // Block-level patterns: entire text must match (longer patterns first)
+    // Skip when cursor is inside a list item — block-level shortcuts
+    // should only convert paragraphs, not transform existing list items
+    const isInsideListItem = blockNode.nodeName === 'LI' || !!blockEl.closest('li');
+    if (!isInsideListItem) {
+      const blockPatterns = [
+        { markup: '###', type: 'h3' },
+        { markup: '##', type: 'h2' },
+        { markup: '>', type: 'blockquote' },
+        { markup: '1.', type: 'ol' },
+        { markup: '1)', type: 'ol' },
+        { markup: '-', type: 'ul' },
+        { markup: '+', type: 'ul' },
+      ];
+
+      for (const pattern of blockPatterns) {
+        if (textBeforeCursor === pattern.markup) {
+          log('Markdown block shortcut detected:', pattern.markup, '→', pattern.type);
+          this.sendTransformRequest(blockUid, 'markdown', {
+            markdownType: 'block',
+            blockType: pattern.type,
+          });
+          return true;
+        }
+      }
+
+      // Check * separately for block-level (UL) — only when it's the full text
+      // This avoids conflict with inline *text* pattern
+      if (textBeforeCursor === '*') {
+        log('Markdown block shortcut detected: * → ul');
+        this.sendTransformRequest(blockUid, 'markdown', {
+          markdownType: 'block',
+          blockType: 'ul',
+        });
+        return true;
+      }
+    }
+
+    // Inline patterns: **text**, __text__, ~~text~~, *text*, _text_
+    // Longer delimiters checked first to avoid false matches
+    const inlinePatterns = [
+      { between: ['**', '**'], type: 'strong' },
+      { between: ['__', '__'], type: 'strong' },
+      { between: ['~~', '~~'], type: 'del' },
+      { between: ['*', '*'], type: 'em' },
+      { between: ['_', '_'], type: 'em' },
+    ];
+
+    for (const pattern of inlinePatterns) {
+      const [open, close] = pattern.between;
+      if (!textBeforeCursor.endsWith(close)) continue;
+      // Find the opening delimiter before the closing one
+      const searchText = textBeforeCursor.slice(0, -close.length);
+      const openIdx = searchText.lastIndexOf(open);
+      if (openIdx === -1) continue;
+      const inner = searchText.slice(openIdx + open.length);
+      if (inner.length === 0 || inner.trim() !== inner) continue;
+      // Opening delimiter must be preceded by whitespace or be at start
+      if (openIdx > 0 && !/\s/.test(searchText[openIdx - 1])) continue;
+      log('Markdown inline shortcut detected:', open + '...' + close, '→', pattern.type);
+      this.sendTransformRequest(blockUid, 'markdown', {
+        markdownType: 'inline',
+        inlineType: pattern.type,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Gets all DOM elements for a block UID.
    * A block may render as multiple elements (e.g., listing block renders multiple cards).
    * For template instances (virtual containers), returns elements from all child blocks.
@@ -2493,7 +2595,19 @@ export class Bridge {
       const isTextChar = evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey;
 
       if (isTextChar) {
-        textBatch += evt.key;
+        // Space may trigger markdown autoformat — flush text first so the DOM
+        // has the preceding text, then check via shared handler
+        if (evt.key === ' ') {
+          if (textBatch) {
+            insertText(textBatch);
+            textBatch = '';
+          }
+          if (!this.handleSpaceKey(blockId)) {
+            insertText(' ');
+          }
+        } else {
+          textBatch += evt.key;
+        }
       } else {
         // Flush accumulated text before handling a non-text event
         if (textBatch) {
@@ -6917,101 +7031,10 @@ export class Bridge {
         }
 
         // Handle markdown shortcuts (Space triggers autoformat)
-        // Must be before Enter handler - checks text before cursor for markdown patterns
-        if (e.key === ' ' && this.isSlateField(blockUid, this.focusedFieldName)) {
-          const sel = window.getSelection();
-          if (sel.rangeCount && sel.isCollapsed) {
-            const range = sel.getRangeAt(0);
-            const node = range.startContainer;
-
-            // Get text from start of current block-level element to cursor
-            const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-            const editableField = blockEl.closest('[data-editable-field]');
-            if (editableField) {
-              // Walk up to find the block-level element (p, h2, li, blockquote, etc.)
-              const blockNode = blockEl.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, div[data-node-id]')
-                                || editableField;
-
-              // Get text from start of block node to cursor position
-              const textRange = document.createRange();
-              textRange.setStart(blockNode, 0);
-              textRange.setEnd(range.startContainer, range.startOffset);
-              // Strip ZWS/NBSP artifacts from contenteditable — they prevent exact pattern matches
-              const textBeforeCursor = this.stripZeroWidthSpaces(textRange.toString());
-              log('Markdown check - textBeforeCursor:', JSON.stringify(textBeforeCursor));
-
-              // Block-level patterns: entire text must match (longer patterns first)
-              // Skip when cursor is inside a list item — block-level shortcuts
-              // should only convert paragraphs, not transform existing list items
-              const isInsideListItem = blockNode.nodeName === 'LI' || !!blockEl.closest('li');
-              if (!isInsideListItem) {
-                const blockPatterns = [
-                  { markup: '###', type: 'h3' },
-                  { markup: '##', type: 'h2' },
-                  { markup: '>', type: 'blockquote' },
-                  { markup: '1.', type: 'ol' },
-                  { markup: '1)', type: 'ol' },
-                  { markup: '-', type: 'ul' },
-                  { markup: '+', type: 'ul' },
-                ];
-
-                for (const pattern of blockPatterns) {
-                  if (textBeforeCursor === pattern.markup) {
-                    log('Markdown block shortcut detected:', pattern.markup, '→', pattern.type);
-                    e.preventDefault();
-                    this.sendTransformRequest(blockUid, 'markdown', {
-                      markdownType: 'block',
-                      blockType: pattern.type,
-                    });
-                    return;
-                  }
-                }
-
-                // Check * separately for block-level (UL) — only when it's the full text
-                // This avoids conflict with inline *text* pattern
-                if (textBeforeCursor === '*') {
-                  log('Markdown block shortcut detected: * → ul');
-                  e.preventDefault();
-                  this.sendTransformRequest(blockUid, 'markdown', {
-                    markdownType: 'block',
-                    blockType: 'ul',
-                  });
-                  return;
-                }
-              }
-
-              // Inline patterns: **text**, __text__, ~~text~~, *text*, _text_
-              // Longer delimiters checked first to avoid false matches
-              const inlinePatterns = [
-                { between: ['**', '**'], type: 'strong' },
-                { between: ['__', '__'], type: 'strong' },
-                { between: ['~~', '~~'], type: 'del' },
-                { between: ['*', '*'], type: 'em' },
-                { between: ['_', '_'], type: 'em' },
-              ];
-
-              for (const pattern of inlinePatterns) {
-                const [open, close] = pattern.between;
-                if (!textBeforeCursor.endsWith(close)) continue;
-                // Find the opening delimiter before the closing one
-                const searchText = textBeforeCursor.slice(0, -close.length);
-                const openIdx = searchText.lastIndexOf(open);
-                if (openIdx === -1) continue;
-                const inner = searchText.slice(openIdx + open.length);
-                if (inner.length === 0 || inner.trim() !== inner) continue;
-                // Opening delimiter must be preceded by whitespace or be at start
-                if (openIdx > 0 && !/\s/.test(searchText[openIdx - 1])) continue;
-                log('Markdown inline shortcut detected:', open + '...' + close, '→', pattern.type);
-                e.preventDefault();
-                this.sendTransformRequest(blockUid, 'markdown', {
-                  markdownType: 'inline',
-                  inlineType: pattern.type,
-                });
-                return;
-              }
-              // No markdown match — let space insert normally
-            }
-          }
+        // Shared handler checks text before cursor for block/inline patterns
+        if (e.key === ' ' && this.handleSpaceKey(blockUid)) {
+          e.preventDefault();
+          return;
         }
 
         // Handle Tab/Shift+Tab for list indentation in slate fields
