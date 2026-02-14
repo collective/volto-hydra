@@ -996,6 +996,105 @@ export class Bridge {
   }
 
   /**
+   * Handles Backspace/Delete special cases: unwrap, delete block, delete across
+   * formatted nodes. Shared between the live keydown handler and buffer replay.
+   *
+   * @param {string} blockUid - The block UID
+   * @param {string} key - 'Backspace' or 'Delete'
+   * @returns {boolean} true if handled (caller should preventDefault / skip native action)
+   */
+  handleDeleteKey(blockUid, key) {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return false;
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
+
+    // Backspace at absolute start of a slate field → send to admin to unwrap
+    if (key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
+      const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const editField = blockEl.closest('[data-editable-field]');
+      if (editField) {
+        const textRange = document.createRange();
+        textRange.setStart(editField, 0);
+        textRange.setEnd(range.startContainer, range.startOffset);
+        const textBefore = this.stripZeroWidthSpaces(textRange.toString());
+
+        if (textBefore === '') {
+          const selectedText = range.collapsed ? '' : this.stripZeroWidthSpaces(range.toString());
+          if (selectedText === '') {
+            const blockElement = editField.closest('[data-block-uid]');
+            const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+            const isFirstField = firstField === editField;
+            const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
+            const isEmpty = fieldText === '';
+
+            log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
+            this.sendTransformRequest(blockUid, 'unwrapBlock', {
+              isFirstField,
+              isEmpty,
+            });
+            return true;
+          }
+        }
+      }
+    }
+
+    // Backspace in empty first simple text field → delete block
+    if (key === 'Backspace' && !this.isSlateField(blockUid, this.focusedFieldName)) {
+      const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const editField = blockEl.closest('[data-editable-field]');
+      if (editField) {
+        const fieldText = (editField.textContent || '').trim();
+        if (fieldText === '') {
+          const blockElement = editField.closest('[data-block-uid]');
+          const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+          if (firstField === editField) {
+            log('Backspace in empty first simple text field - sending DELETE_BLOCK');
+            this.sendMessageToParent({
+              type: 'DELETE_BLOCK',
+              uid: blockUid,
+            });
+            return true;
+          }
+        }
+      }
+    }
+
+    // Selection spans element nodes (formatted content) → delete transform
+    if (!range.collapsed) {
+      const hasElementNodes = this.selectionContainsElementNodes(range);
+      if (hasElementNodes) {
+        log('Delete selection contains element nodes, sending transform');
+        this.sendTransformRequest(blockUid, 'delete', {
+          direction: key === 'Backspace' ? 'backward' : 'forward',
+        });
+        return true;
+      }
+    }
+
+    // At node boundary with different formatting → delete transform
+    const atStart = range.startOffset === 0;
+    const atEnd =
+      range.startOffset === node.textContent?.length ||
+      range.startOffset === node.length;
+
+    if ((key === 'Backspace' && atStart) || (key === 'Delete' && atEnd)) {
+      const parentElement =
+        node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const hasNodeId = parentElement?.closest('[data-node-id]');
+
+      if (hasNodeId) {
+        this.sendTransformRequest(blockUid, 'delete', {
+          direction: key === 'Backspace' ? 'backward' : 'forward',
+        });
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Gets all DOM elements for a block UID.
    * A block may render as multiple elements (e.g., listing block renders multiple cards).
    * For template instances (virtual containers), returns elements from all child blocks.
@@ -2299,13 +2398,18 @@ export class Bridge {
     const replayKey = (evt) => {
       log('Replaying buffered key:', evt.key, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
 
-      // Native actions — execute directly
+      // Backspace/Delete: shared handler checks for special cases (unwrap, delete
+      // block, boundary). Only use native execCommand if handler didn't act.
       if (evt.key === 'Backspace') {
-        document.execCommand('delete', false);
+        if (!this.handleDeleteKey(blockId, 'Backspace')) {
+          document.execCommand('delete', false);
+        }
         return;
       }
       if (evt.key === 'Delete') {
-        document.execCommand('forwardDelete', false);
+        if (!this.handleDeleteKey(blockId, 'Delete')) {
+          document.execCommand('forwardDelete', false);
+        }
         return;
       }
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(evt.key)) {
@@ -6981,115 +7085,13 @@ export class Bridge {
           }
         }
 
-        // Handle Delete/Backspace at node boundaries
-        if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-
-        const range = selection.getRangeAt(0);
-        const node = range.startContainer;
-
-        // Backspace at absolute start of a slate field → send to admin to unwrap
-        // The admin knows the Slate data model and will convert non-paragraph
-        // blocks (headings, lists, blockquotes) back to paragraphs, and remove
-        // inline marks at position 0. Also sends isFirstField/isEmpty so the
-        // admin can delete the block if it's already a default-type paragraph.
-        if (e.key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
-          const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-          const editField = blockEl.closest('[data-editable-field]');
-          if (editField) {
-            // Check if cursor is at the very start of the editable field.
-            // Use range start (not end) to handle the case where a selection
-            // exists but starts at position 0. Strip ZWS since restoreSlateSelection
-            // may insert invisible characters for prospective formatting.
-            const textRange = document.createRange();
-            textRange.setStart(editField, 0);
-            textRange.setEnd(range.startContainer, range.startOffset);
-            const textBefore = this.stripZeroWidthSpaces(textRange.toString());
-
-            if (textBefore === '') {
-              // Also check that any selection is only ZWS (not real content)
-              const selectedText = range.collapsed ? '' : this.stripZeroWidthSpaces(range.toString());
-              if (selectedText === '') {
-                // Check if this is the first editable field and if it's empty
-                const blockElement = editField.closest('[data-block-uid]');
-                const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
-                const isFirstField = firstField === editField;
-                const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
-                const isEmpty = fieldText === '';
-
-                log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
-                e.preventDefault();
-                this.sendTransformRequest(blockUid, 'unwrapBlock', {
-                  isFirstField,
-                  isEmpty,
-                });
-                return;
-              }
-            }
-          }
-        }
-
-        // Backspace in empty first simple text field → delete block
-        if (e.key === 'Backspace' && !this.isSlateField(blockUid, this.focusedFieldName)) {
-          const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-          const editField = blockEl.closest('[data-editable-field]');
-          if (editField) {
-            const fieldText = (editField.textContent || '').trim();
-            if (fieldText === '') {
-              const blockElement = editField.closest('[data-block-uid]');
-              const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
-              if (firstField === editField) {
-                log('Backspace in empty first simple text field - sending DELETE_BLOCK');
-                e.preventDefault();
-                this.sendMessageToParent({
-                  type: 'DELETE_BLOCK',
-                  uid: blockUid,
-                });
-                return;
-              }
-            }
-          }
-        }
-
-        // Check if selection spans element nodes (formatted content like STRONG, EM, etc.)
-        // If so, send as transform - don't let browser handle it locally
-        if (!range.collapsed) {
-          const hasElementNodes = this.selectionContainsElementNodes(range);
-          if (hasElementNodes) {
+        // Handle Delete/Backspace special cases (unwrap, delete block, boundary)
+        // via shared handler. If not handled, let browser perform native action.
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (this.handleDeleteKey(blockUid, e.key)) {
             e.preventDefault();
-            log('Delete selection contains element nodes, sending transform');
-            this.sendTransformRequest(blockUid, 'delete', {
-              direction: e.key === 'Backspace' ? 'backward' : 'forward',
-            });
-            return;
           }
         }
-
-        // Check if at node boundary
-        const atStart = range.startOffset === 0;
-        const atEnd =
-          range.startOffset === node.textContent?.length ||
-          range.startOffset === node.length;
-
-        // If deleting and at boundary, might need transform
-        if ((e.key === 'Backspace' && atStart) || (e.key === 'Delete' && atEnd)) {
-          // Check if there's an adjacent node with different formatting
-          const parentElement =
-            node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-          const hasNodeId = parentElement?.closest('[data-node-id]');
-
-          if (hasNodeId) {
-            e.preventDefault(); // Block the delete
-
-            // Send delete request with current form data included
-            this.sendTransformRequest(blockUid, 'delete', {
-              direction: e.key === 'Backspace' ? 'backward' : 'forward',
-            });
-          }
-        }
-        // Otherwise let normal delete happen (no blocking needed)
       });
     }
   }

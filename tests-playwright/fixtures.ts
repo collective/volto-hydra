@@ -29,6 +29,13 @@ const test = baseTest.extend({
     // Both admin (Volto) and Nuxt SSR include Authorization headers, so they share
     // the same session when using the same auth token.
 
+    // Set run ID on admin page so parallel/repeated test logs can be filtered.
+    // AdminUIHelper.navigateToEdit propagates this to the iframe.
+    const runId = testInfo.workerIndex * 1000 + testInfo.repeatEachIndex;
+    page.addInitScript((id) => {
+      (window as any).__testRunId = id;
+    }, runId);
+
     // Capture main page console logs
     page.on('console', (msg) => {
       console.log(`[log] ${msg.text()}`);

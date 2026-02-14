@@ -219,6 +219,14 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     await iframe.locator('[data-block-uid]').first().waitFor({ state: 'attached', timeout });
 
+    // Propagate run ID from admin page to iframe for log filtering
+    const runId = await this.page.evaluate(() => (window as any).__testRunId);
+    if (runId != null) {
+      await iframe.locator('body').evaluate((_, id) => {
+        (window as any).__testRunId = id;
+      }, runId);
+    }
+
     // Wait for blocks to stabilize (avoid flaky tests due to partial renders)
     await this.getStableBlockCount();
   }
