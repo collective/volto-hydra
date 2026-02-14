@@ -513,4 +513,27 @@ test.describe('Arrow key block-to-block navigation', () => {
       }).toPass({ timeout: 5000 });
     });
   });
+
+  // ── Focus-driven block selection ───────────────────────────────────────
+  // When focus moves to an element in a different block (e.g., via Tab),
+  // the block selection should update to match.
+
+  test.describe('Focus change selects block', () => {
+
+    test('Tab that moves focus to another block updates selection', async ({ helper, page }) => {
+      const iframe = helper.getIframe();
+      // Start in mock-block-1 (auto-selected by fixture)
+      const editable = iframe.locator('[data-block-uid="mock-block-1"] [contenteditable="true"]');
+      await editable.click();
+
+      // Tab — browser moves focus to next focusable element in tab order
+      await page.keyboard.press('Tab');
+
+      // Whatever block received focus should now be selected
+      await expect(async () => {
+        const selectedId = await getLastSelectedBlockUid(page);
+        expect(selectedId).not.toBe('mock-block-1');
+      }).toPass({ timeout: 5000 });
+    });
+  });
 });

@@ -1494,27 +1494,30 @@ export class Bridge {
           this.fieldFocusListenerAdded = true;
           document.addEventListener('focus', (e) => {
             const target = e.target;
+            const blockElement = target.closest('[data-block-uid]');
+            const blockUid = blockElement?.getAttribute('data-block-uid');
+            if (!blockUid || !this.selectedBlockUid) return;
+
+            if (blockUid !== this.selectedBlockUid) {
+              // Focus moved to a different block (e.g., via Tab) — select it
+              log('Focus moved to different block:', blockUid, 'from:', this.selectedBlockUid);
+              this.selectBlock(blockElement);
+              return;
+            }
+
+            // Focus changed within the currently selected block
             const editableField = target.getAttribute('data-editable-field');
+            if (editableField) {
+              log('Field focused:', editableField);
+              const previousFieldName = this.focusedFieldName;
+              this.focusedFieldName = editableField;
 
-            // Only handle if it's an editable field in the currently selected block
-            if (editableField && this.selectedBlockUid) {
-              const blockElement = target.closest('[data-block-uid]');
-              const blockUid = blockElement?.getAttribute('data-block-uid');
-
-              if (blockUid === this.selectedBlockUid) {
-                log('Field focused:', editableField);
-                const previousFieldName = this.focusedFieldName;
-                this.focusedFieldName = editableField;
-
-                // Only update toolbar if field actually changed
-                if (previousFieldName !== editableField) {
-                  log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
-
-                  // Send BLOCK_SELECTED message to update toolbar visibility
-                  const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
-                  if (blockElement) {
-                    this.sendBlockSelected('fieldFocusListener', blockElement, { focusedFieldName: editableField });
-                  }
+              // Only update toolbar if field actually changed
+              if (previousFieldName !== editableField) {
+                log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
+                const blockEl = document.querySelector(`[data-block-uid="${blockUid}"]`);
+                if (blockEl) {
+                  this.sendBlockSelected('fieldFocusListener', blockEl, { focusedFieldName: editableField });
                 }
               }
             }
