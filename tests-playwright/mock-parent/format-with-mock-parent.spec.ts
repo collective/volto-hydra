@@ -108,7 +108,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
     // Select all text using keyboard (works across all frontends)
     await editable.click();
@@ -161,7 +161,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
     // Type initial text and wait for debounce to settle
     await editable.click();
@@ -224,7 +224,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
     // Type initial text and wait for debounce to settle
     await editable.click();
@@ -267,7 +267,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
     // Select all and apply bold
     await editable.click();
@@ -433,7 +433,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     // then type the rest after the transform completes.
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
     // Type "Hello" and wait for it to settle
     await editable.click();
@@ -484,7 +484,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     // from the parent during typing. Uses postMessage (cross-origin safe).
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
     // Type initial content
     await editable.click();

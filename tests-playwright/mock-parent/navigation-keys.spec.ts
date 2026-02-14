@@ -122,7 +122,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Select all text
@@ -166,7 +166,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Select all and apply bold to create formatted content
@@ -217,7 +217,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Apply bold to create formatted content
@@ -259,7 +259,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // a block element, creating a new text node on the parent DIV instead.
     // ensureValidInsertionTarget replaces the space with FEFF to fix this.
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Apply bold to create formatted content
@@ -330,7 +330,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Place cursor at position 3 (not selecting all)
@@ -367,7 +367,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Select all text and apply bold — blocks input for 500ms
@@ -401,7 +401,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Select all text and apply bold — blocks input for 500ms
@@ -440,7 +440,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Select all text and apply bold — blocks input for 500ms
@@ -480,7 +480,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
     await editable.click();
 
     // Select all text and apply bold — blocks input for 500ms

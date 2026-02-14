@@ -719,6 +719,283 @@ export class Bridge {
   }
 
   /**
+   * Get the adjacent block ID in a given direction, using blockPathMap siblings + DOM order.
+   * For table vertical navigation (Up/Down on cells), finds the same-column cell in the adjacent row.
+   *
+   * @param {string} blockId - The current block ID
+   * @param {'forward'|'backward'} direction - Navigation direction
+   * @param {boolean} isTableVertical - True for Up/Down navigation in table mode (cross-row)
+   * @returns {string|null} The adjacent block ID, or null if at boundary
+   */
+  getAdjacentBlockId(blockId, direction, isTableVertical = false) {
+    const pathInfo = this.blockPathMap?.[blockId];
+    if (!pathInfo) return null;
+    // parentId can be null for top-level blocks — they're still siblings
+
+    if (isTableVertical) {
+      // Table vertical: find same-column cell in adjacent row
+      // cellId → rowId (parentId) → tableId (row's parentId)
+      const rowId = pathInfo.parentId;
+      const rowInfo = this.blockPathMap?.[rowId];
+      if (!rowInfo?.parentId) return null;
+      const tableId = rowInfo.parentId;
+
+      // Get all rows (siblings of rowId with same parentId=tableId), sorted by DOM
+      const rows = this._getSiblingsByDomOrder(rowId, tableId);
+      const rowIdx = rows.indexOf(rowId);
+      if (rowIdx === -1) return null;
+
+      // Get cells in current row to find column index
+      const cellsInCurrentRow = this._getSiblingsByDomOrder(blockId, rowId);
+      const colIdx = cellsInCurrentRow.indexOf(blockId);
+      if (colIdx === -1) return null;
+
+      // Find adjacent row
+      const adjRowIdx = direction === 'forward' ? rowIdx + 1 : rowIdx - 1;
+      if (adjRowIdx < 0 || adjRowIdx >= rows.length) return null;
+      const adjRowId = rows[adjRowIdx];
+
+      // Get cells in adjacent row and pick same column
+      const cellsInAdjRow = Object.entries(this.blockPathMap)
+        .filter(([, info]) => info.parentId === adjRowId)
+        .map(([id]) => id);
+      // Sort by DOM order
+      cellsInAdjRow.sort((a, b) => {
+        const elA = document.querySelector(`[data-block-uid="${a}"]`);
+        const elB = document.querySelector(`[data-block-uid="${b}"]`);
+        if (!elA || !elB) return 0;
+        return elA.compareDocumentPosition(elB) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+
+      return colIdx < cellsInAdjRow.length ? cellsInAdjRow[colIdx] : null;
+    }
+
+    // Standard: find siblings with same parentId, sorted by DOM, pick adjacent
+    const siblings = this._getSiblingsByDomOrder(blockId, pathInfo.parentId);
+    const idx = siblings.indexOf(blockId);
+    if (idx === -1) return null;
+    const adjIdx = direction === 'forward' ? idx + 1 : idx - 1;
+    return (adjIdx >= 0 && adjIdx < siblings.length) ? siblings[adjIdx] : null;
+  }
+
+  /**
+   * Get sibling block IDs sorted by DOM position.
+   * @param {string} blockId - A block to find siblings for
+   * @param {string} parentId - The parent block ID
+   * @returns {string[]} Sibling IDs sorted by DOM order
+   */
+  _getSiblingsByDomOrder(blockId, parentId) {
+    const siblings = Object.entries(this.blockPathMap)
+      .filter(([, info]) => info.parentId === parentId)
+      .map(([id]) => id);
+    siblings.sort((a, b) => {
+      const elA = document.querySelector(`[data-block-uid="${a}"]`);
+      const elB = document.querySelector(`[data-block-uid="${b}"]`);
+      if (!elA || !elB) return 0;
+      return elA.compareDocumentPosition(elB) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+    return siblings;
+  }
+
+  /**
+   * Handle arrow key press when cursor is at the edge of an editable field.
+   * Navigates between fields within a block, or to adjacent blocks.
+   *
+   * @param {string} key - The arrow key ('ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown')
+   * @param {string} blockUid - The current block UID
+   * @param {HTMLElement} editableField - The currently focused editable field
+   * @param {HTMLElement} blockElement - The block element
+   */
+  handleArrowAtEdge(key, blockUid, editableField, blockElement) {
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo) return;
+
+    // Determine layout direction for navigation (skip addability checks — we want
+    // navigation direction even for blocks that can't have siblings added)
+    let addDirection = blockElement.getAttribute('data-block-add');
+    if (!addDirection) {
+      let depth = 0;
+      let parent = blockElement.parentElement;
+      while (parent) {
+        if (parent.hasAttribute('data-block-uid')) depth++;
+        parent = parent.parentElement;
+      }
+      addDirection = depth % 2 === 0 ? 'bottom' : 'right';
+    }
+    const isTableMode = pathInfo.parentAddMode === 'table';
+
+    // Map arrow keys to directions
+    const isForwardKey = (key === 'ArrowDown' || key === 'ArrowRight');
+    const isVerticalKey = (key === 'ArrowUp' || key === 'ArrowDown');
+    const isHorizontalKey = (key === 'ArrowLeft' || key === 'ArrowRight');
+
+    // Determine if this key should trigger navigation
+    let shouldNavigate = false;
+    let isTableVertical = false;
+
+    if (isTableMode) {
+      // Table mode: both directions work
+      // Horizontal (Left/Right) → navigate between cells in same row
+      // Vertical (Up/Down) → navigate between rows (same column)
+      if (isHorizontalKey) {
+        shouldNavigate = true;
+      } else if (isVerticalKey) {
+        shouldNavigate = true;
+        isTableVertical = true;
+      }
+    } else if (addDirection === 'bottom' && isVerticalKey) {
+      shouldNavigate = true;
+    } else if (addDirection === 'right' && isHorizontalKey) {
+      shouldNavigate = true;
+    }
+
+    if (!shouldNavigate) return;
+
+    const direction = isForwardKey ? 'forward' : 'backward';
+
+    // Check multi-field: navigate between fields within the block first
+    const ownFields = this.getOwnEditableFields(blockElement);
+    if (ownFields.length > 1 && !isTableVertical) {
+      const fieldIdx = ownFields.indexOf(editableField);
+      if (fieldIdx !== -1) {
+        if (direction === 'forward' && fieldIdx < ownFields.length - 1) {
+          // Move to next field in same block
+          const nextField = ownFields[fieldIdx + 1];
+          nextField.focus();
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(nextField);
+          range.collapse(true); // Cursor at start
+          sel.removeAllRanges();
+          sel.addRange(range);
+          return;
+        }
+        if (direction === 'backward' && fieldIdx > 0) {
+          // Move to previous field in same block
+          const prevField = ownFields[fieldIdx - 1];
+          prevField.focus();
+          this._placeCursorAtEnd(prevField);
+          return;
+        }
+      }
+    }
+
+    // Navigate to adjacent block, or to parent if at container boundary
+    let adjacentId = this.getAdjacentBlockId(blockUid, direction, isTableVertical);
+    if (!adjacentId && pathInfo.parentId) {
+      // At boundary of a container — navigate to parent block
+      adjacentId = pathInfo.parentId;
+    }
+    if (!adjacentId) return;
+
+    const adjacentElement = document.querySelector(`[data-block-uid="${adjacentId}"]`);
+    if (!adjacentElement) return;
+
+    log('handleArrowAtEdge: navigating from', blockUid, 'to', adjacentId, 'direction:', direction);
+
+    // selectBlock() sets up toolbar, contenteditable, and sends BLOCK_SELECTED to admin.
+    // Admin echoes back SELECT_BLOCK but iframe skips it (alreadySelected).
+    // So we handle field focusing and cursor placement directly here.
+    this.selectBlock(adjacentElement);
+
+    // Focus the appropriate field and place cursor after DOM settles
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const currentElement = document.querySelector(`[data-block-uid="${adjacentId}"]`);
+        if (!currentElement) return;
+        let targetField;
+        if (direction === 'backward') {
+          const fields = this.getOwnEditableFields(currentElement);
+          targetField = fields[fields.length - 1] || null;
+        } else {
+          targetField = this.getOwnFirstEditableField(currentElement);
+        }
+        if (targetField && targetField.getAttribute('contenteditable') === 'true') {
+          targetField.focus();
+          if (direction === 'backward') {
+            this._placeCursorAtEnd(targetField);
+          } else {
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(targetField);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Place cursor at the end of the last text node in an element.
+   * @param {HTMLElement} element - The element to place cursor in
+   */
+  _placeCursorAtEnd(element) {
+    const sel = window.getSelection();
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let lastText = walker.firstChild();
+    while (walker.nextNode()) lastText = walker.currentNode;
+    if (lastText) {
+      const range = document.createRange();
+      range.setStart(lastText, lastText.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      // No text nodes — place at end of element
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
+  /**
+   * Move cursor with an arrow key and detect if at edge of field.
+   * Shared by keydown handler and buffer replay.
+   *
+   * @param {string} key - Arrow key name (ArrowLeft, ArrowRight, ArrowUp, ArrowDown)
+   * @param {HTMLElement} editableField - The editable field element
+   * @param {boolean} shiftKey - Whether shift is held (extend selection)
+   */
+  moveArrowKey(key, editableField, shiftKey = false) {
+    const navActions = {
+      ArrowLeft: ['backward', 'character'],
+      ArrowRight: ['forward', 'character'],
+      ArrowUp: ['backward', 'line'],
+      ArrowDown: ['forward', 'line'],
+    };
+    if (!navActions[key]) return;
+
+    const sel = window.getSelection();
+    if (!sel) return;
+
+    if (shiftKey) {
+      sel.modify('extend', navActions[key][0], navActions[key][1]);
+      return;
+    }
+
+    if (!sel.isCollapsed || this._slashMenuActive || this.blockedBlockId) {
+      sel.modify('move', navActions[key][0], navActions[key][1]);
+      return;
+    }
+
+    const beforeNode = sel.focusNode;
+    const beforeOffset = sel.focusOffset;
+    sel.modify('move', navActions[key][0], navActions[key][1]);
+
+    if (sel.focusNode === beforeNode && sel.focusOffset === beforeOffset) {
+      const blockEl = editableField.closest('[data-block-uid]');
+      if (blockEl) {
+        const uid = blockEl.getAttribute('data-block-uid');
+        this.handleArrowAtEdge(key, uid, editableField, blockEl);
+      }
+    }
+  }
+
+  /**
    * Gets all DOM elements for a block UID.
    * A block may render as multiple elements (e.g., listing block renders multiple cards).
    * For template instances (virtual containers), returns elements from all child blocks.
@@ -2026,6 +2303,10 @@ export class Bridge {
       }
       if (evt.key === 'Delete') {
         document.execCommand('forwardDelete', false);
+        return;
+      }
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(evt.key)) {
+        this.moveArrowKey(evt.key, currentEditable, evt.shiftKey);
         return;
       }
       if (navMap[evt.key]) {
@@ -3344,6 +3625,17 @@ export class Bridge {
           };
           field.addEventListener('keydown', field._enterKeyHandler);
         }
+
+        // Arrow key edge navigation: move between fields/blocks when cursor is at edge
+        if (!field._arrowNavHandler) {
+          field._arrowNavHandler = (e) => {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            this.moveArrowKey(e.key, field, e.shiftKey);
+            e.preventDefault();
+          };
+          field.addEventListener('keydown', field._arrowNavHandler);
+        }
       } else {
         log(`  ${fieldPath}: skipped (type: ${fieldType})`);
       }
@@ -4199,6 +4491,26 @@ export class Bridge {
                        : blockElement.querySelector('[data-editable-field="value"]');
       if (valueField) {
         this.makeBlockContentEditable(valueField);
+      }
+
+      // For blocks with no editable fields (e.g., image), make the block element
+      // focusable and attach arrow key navigation so user can navigate away.
+      const hasEditableFields = this.getOwnEditableFields(blockElement).length > 0;
+      if (!hasEditableFields) {
+        if (!blockElement.hasAttribute('tabindex')) {
+          blockElement.setAttribute('tabindex', '-1');
+        }
+        blockElement.focus({ preventScroll: true });
+        if (!blockElement._nonEditableArrowHandler) {
+          blockElement._nonEditableArrowHandler = (e) => {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+            if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+            e.preventDefault();
+            const uid = blockElement.getAttribute('data-block-uid');
+            this.handleArrowAtEdge(e.key, uid, null, blockElement);
+          };
+          blockElement.addEventListener('keydown', blockElement._nonEditableArrowHandler);
+        }
       }
     }
 
@@ -6114,14 +6426,17 @@ export class Bridge {
     let blockUid;
     let editableField;
 
+    let blockElement;
+
     if (elementOrBlock.hasAttribute('data-editable-field')) {
       // Called with the editable field directly - find block-uid from parent
       editableField = elementOrBlock;
-      const blockElement = elementOrBlock.closest('[data-block-uid]');
+      blockElement = elementOrBlock.closest('[data-block-uid]');
       blockUid = blockElement?.getAttribute('data-block-uid');
     } else {
       // Called with a block element - query for child editable field
       // Use getOwnFirstEditableField to avoid getting nested blocks' fields
+      blockElement = elementOrBlock;
       blockUid = elementOrBlock.getAttribute('data-block-uid');
       editableField = this.getOwnFirstEditableField(elementOrBlock);
     }
@@ -6293,20 +6608,20 @@ export class Bridge {
         // CDP-dispatched keydown events (e.g. from Playwright or automation) don't always
         // trigger the browser's native cursor movement in contenteditable. Apply
         // selection.modify explicitly — this is idempotent with the native action.
+        // Arrow keys are handled by _arrowNavHandler (attached in restoreContentEditableOnFields)
+        // for ALL field types, so only handle Home/End and Shift+arrow here.
         const navActions = {
-          ArrowLeft: ['backward', 'character'],
-          ArrowRight: ['forward', 'character'],
-          ArrowUp: ['backward', 'line'],
-          ArrowDown: ['forward', 'line'],
           Home: ['backward', 'lineboundary'],
           End: ['forward', 'lineboundary'],
         };
+        // Arrow keys are handled by _arrowNavHandler (from restoreContentEditableOnFields).
+        // Only handle Home/End here.
         if (navActions[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
           const sel = window.getSelection();
           if (sel) {
             const alter = e.shiftKey ? 'extend' : 'move';
             sel.modify(alter, navActions[e.key][0], navActions[e.key][1]);
-            e.preventDefault(); // Prevent native action doubling the movement
+            e.preventDefault();
           }
         }
 
