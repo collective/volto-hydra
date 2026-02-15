@@ -1453,29 +1453,21 @@ export class AdminUIHelper {
   async getEditorLocator(blockId: string, fieldName?: string): Promise<Locator> {
     const iframe = this.getIframe();
 
-    // If field name specified, target that specific field
     if (fieldName) {
+      // Descendant or same-element (Nuxt puts both attrs on same element)
       return iframe.locator(
         `[data-block-uid="${blockId}"] [data-editable-field="${fieldName}"]`,
-      );
+      ).or(iframe.locator(
+        `[data-block-uid="${blockId}"][data-editable-field="${fieldName}"]`,
+      ));
     }
 
-    // Try descendant first (mock frontend: data-block-uid > [contenteditable])
-    let editor = iframe
-      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
-      .first();
-
-    // Use count() instead of isVisible() - element might exist but be scrolled out of view
-    const count = await editor.count().catch(() => 0);
-
-    if (count === 0) {
-      // Try same-element selector (Nuxt: data-block-uid AND contenteditable on same element)
-      editor = iframe.locator(
-        `[data-block-uid="${blockId}"][contenteditable="true"]`,
-      );
-    }
-
-    return editor;
+    // No field name — match any contenteditable in the block (descendant or same-element)
+    return iframe.locator(
+      `[data-block-uid="${blockId}"] [contenteditable="true"]`,
+    ).first().or(iframe.locator(
+      `[data-block-uid="${blockId}"][contenteditable="true"]`,
+    ));
   }
 
   /**
