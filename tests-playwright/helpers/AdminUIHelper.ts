@@ -1401,13 +1401,13 @@ export class AdminUIHelper {
       const beforeRange = document.createRange();
       beforeRange.selectNodeContents(el);
       beforeRange.setEnd(range.startContainer, range.startOffset);
-      const textBefore = beforeRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+      const textBefore = beforeRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '').replace(/\u00A0/g, ' ');
 
       // Get text after cursor
       const afterRange = document.createRange();
       afterRange.selectNodeContents(el);
       afterRange.setStart(range.endContainer, range.endOffset);
-      const textAfter = afterRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+      const textAfter = afterRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '').replace(/\u00A0/g, ' ');
 
       return { textBefore, textAfter };
     });

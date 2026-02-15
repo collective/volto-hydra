@@ -144,7 +144,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await expect(editable).toContainText('X', { timeout: 5000 });
 
     // Verify X is at the end of the text (not replacing the selection)
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after buffered End+X:', text);
     // End moved cursor to end (collapsing selection), then X was typed there
     expect(text).toMatch(/Text to formatX$/);
@@ -196,7 +196,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await expect(editable).toContainText('replacement text', { timeout: 5000 });
 
     // Verify the full text is correct (no missing characters)
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after buffered Backspace+type:', text);
     expect(text).toContain('replacement text');
 
@@ -240,7 +240,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.type('some new text');
 
     await expect(editable).toContainText('some new text', { timeout: 5000 });
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after clear+type:', text);
     expect(text).toContain('some new text');
 
@@ -301,7 +301,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.type('replacement text', { delay: 10 });
 
     await expect(editable).toContainText('replacement text', { timeout: 5000 });
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after whitespace fix:', text);
 
     // Verify all text is inside a data-node-id element, not leaked as a sibling.
@@ -383,7 +383,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.type('X');
 
     await expect(editable).toContainText('X', { timeout: 5000 });
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after buffered Home+X:', text);
     expect(text).toMatch(/^XText to format/);
 
@@ -422,7 +422,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.type('X');
 
     await expect(editable).toContainText('X', { timeout: 5000 });
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after buffered ArrowLeft+X:', text);
     expect(text).toBe('Text to forXmat');
 
@@ -462,7 +462,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.type('X');
 
     await expect(editable).toContainText('X', { timeout: 5000 });
-    const text = await editable.textContent();
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after buffered ArrowRight+X:', text);
     expect(text).toBe('TextX to format');
 
@@ -496,8 +496,8 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.press('Home');
     await page.keyboard.press('Delete');
 
-    await expect.poll(() => editable.textContent(), { timeout: 5000 }).toBe('ext to format');
-    const text = await editable.textContent();
+    await expect.poll(() => helper.getCleanTextContent(editable), { timeout: 5000 }).toBe('ext to format');
+    const text = await helper.getCleanTextContent(editable);
     console.log('[TEST] Text after buffered Delete:', text);
     expect(text).toBe('ext to format');
 
