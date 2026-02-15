@@ -133,9 +133,8 @@ test.describe('Arrow key block-to-block navigation', () => {
   test.describe('Vertical layout', () => {
 
     test('ArrowDown at end of field navigates to next block', async ({ helper, page }) => {
-      const iframe = helper.getIframe();
       // Start in mock-block-1 (auto-selected by fixture), move cursor to end
-      const editable = iframe.locator('[data-block-uid="mock-block-1"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-block-1');
       await editable.click();
       await page.keyboard.press('End');
 
@@ -158,8 +157,7 @@ test.describe('Arrow key block-to-block navigation', () => {
     test('ArrowUp at start of field navigates to previous block', async ({ helper, page }) => {
       // Select mock-text-block (second block)
       await selectBlock(helper, page, 'mock-text-block');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-text-block"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-text-block');
       await editable.click();
       await page.keyboard.press('Home');
 
@@ -187,7 +185,12 @@ test.describe('Arrow key block-to-block navigation', () => {
       // Focus the last editable field in hero block and move to end
       // Hero has: heading, subheading, description, buttonText
       // The last field in DOM order depends on renderer
-      const editables = iframe.locator('[data-block-uid="mock-hero-block"] [contenteditable="true"]');
+      // Use combined selector for both mock (descendant) and nuxt (same-element) patterns
+      const editables = iframe.locator(
+        '[data-block-uid="mock-hero-block"] [contenteditable="true"]'
+      ).or(iframe.locator(
+        '[data-block-uid="mock-hero-block"][contenteditable="true"]'
+      ));
       const count = await editables.count();
       const lastEditable = editables.nth(count - 1);
       await lastEditable.click();
@@ -204,9 +207,8 @@ test.describe('Arrow key block-to-block navigation', () => {
     });
 
     test('ArrowUp at start of first block stays in same block', async ({ helper, page }) => {
-      const iframe = helper.getIframe();
       // mock-block-1 is the first block (auto-selected by fixture)
-      const editable = iframe.locator('[data-block-uid="mock-block-1"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-block-1');
       await editable.click();
       await page.keyboard.press('Home');
 
@@ -225,8 +227,7 @@ test.describe('Arrow key block-to-block navigation', () => {
     });
 
     test('ArrowDown in middle of text moves cursor but does not navigate', async ({ helper, page }) => {
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-block-1"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-block-1');
       await editable.click();
       // Position cursor in the middle
       await page.keyboard.press('Home');
@@ -247,8 +248,7 @@ test.describe('Arrow key block-to-block navigation', () => {
     });
 
     test('ArrowRight at end does not navigate (wrong direction for bottom layout)', async ({ helper, page }) => {
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-block-1"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-block-1');
       await editable.click();
       await page.keyboard.press('End');
 
@@ -366,8 +366,7 @@ test.describe('Arrow key block-to-block navigation', () => {
 
     test('ArrowRight at end of cell navigates to next cell in same row', async ({ helper, page }) => {
       await selectBlock(helper, page, 'mock-cell-1a');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-cell-1a"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-cell-1a');
       await editable.click();
       await page.keyboard.press('End');
 
@@ -382,8 +381,7 @@ test.describe('Arrow key block-to-block navigation', () => {
 
     test('ArrowLeft at start of cell navigates to previous cell in same row', async ({ helper, page }) => {
       await selectBlock(helper, page, 'mock-cell-1b');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-cell-1b"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-cell-1b');
       await editable.click();
       await page.keyboard.press('Home');
 
@@ -398,8 +396,7 @@ test.describe('Arrow key block-to-block navigation', () => {
 
     test('ArrowDown at end of cell navigates to same-column cell in next row', async ({ helper, page }) => {
       await selectBlock(helper, page, 'mock-cell-1a');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-cell-1a"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-cell-1a');
       await editable.click();
       await page.keyboard.press('End');
 
@@ -414,8 +411,7 @@ test.describe('Arrow key block-to-block navigation', () => {
 
     test('ArrowUp at start of cell navigates to same-column cell in previous row', async ({ helper, page }) => {
       await selectBlock(helper, page, 'mock-cell-2a');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-cell-2a"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-cell-2a');
       await editable.click();
       await page.keyboard.press('Home');
 
@@ -472,8 +468,7 @@ test.describe('Arrow key block-to-block navigation', () => {
     test('ArrowUp at start of first block in container navigates to parent', async ({ helper, page }) => {
       // Select the only block inside col-1
       await selectBlock(helper, page, 'mock-col1-slate');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-col1-slate"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-col1-slate');
       await editable.click();
       await page.keyboard.press('Home');
 
@@ -494,8 +489,7 @@ test.describe('Arrow key block-to-block navigation', () => {
     test('ArrowDown at end of last block in container navigates to parent', async ({ helper, page }) => {
       // Select the only block inside col-1
       await selectBlock(helper, page, 'mock-col1-slate');
-      const iframe = helper.getIframe();
-      const editable = iframe.locator('[data-block-uid="mock-col1-slate"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-col1-slate');
       await editable.click();
       await page.keyboard.press('End');
 
@@ -521,9 +515,8 @@ test.describe('Arrow key block-to-block navigation', () => {
   test.describe('Focus change selects block', () => {
 
     test('Tab that moves focus to another block updates selection', async ({ helper, page }) => {
-      const iframe = helper.getIframe();
       // Start in mock-block-1 (auto-selected by fixture)
-      const editable = iframe.locator('[data-block-uid="mock-block-1"] [contenteditable="true"]');
+      const editable = await helper.getEditorLocator('mock-block-1');
       await editable.click();
 
       // Tab — browser moves focus to next focusable element in tab order
