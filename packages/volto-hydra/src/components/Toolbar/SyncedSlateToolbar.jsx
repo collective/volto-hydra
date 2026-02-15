@@ -128,6 +128,7 @@ const SyncedSlateToolbar = ({
   form,
   blockPathMap,
   currentSelection,
+  mouseActivityCounter,
   onChangeFormData,
   completedFlushRequestId,
   transformAction,
@@ -315,6 +316,53 @@ const SyncedSlateToolbar = ({
   const processedTransformRequestIdRef = useRef(null);
   // Track LinkEditor visibility across effect restarts (persists when dependencies change)
   const linkEditorWasVisibleRef = useRef(false);
+
+  // ── Toolbar auto-fade on inactivity ──────────────────────────────────
+  // Toolbar starts hidden on each block selection. Only mouse activity or
+  // text selection shows it. Clicking a block fires MOUSE_ACTIVITY which
+  // shows it; keyboard navigation (arrow, Enter, Tab) keeps it hidden.
+  const [isFaded, setIsFaded] = useState(true);
+  const fadeTimerRef = useRef(null);
+  const isCollapsedRef = useRef(true);
+
+  // Determine if currentSelection is collapsed (anchor === focus)
+  const isSelectionCollapsed = !currentSelection ||
+    (currentSelection.anchor && currentSelection.focus &&
+     isEqual(currentSelection.anchor, currentSelection.focus));
+
+  // Keep ref in sync for use in event handlers
+  isCollapsedRef.current = isSelectionCollapsed;
+
+  const startFadeTimer = useCallback(() => {
+    clearTimeout(fadeTimerRef.current);
+    fadeTimerRef.current = setTimeout(() => setIsFaded(true), 5000);
+  }, []);
+
+  // Reset to faded on block change — each block starts hidden
+  useEffect(() => {
+    setIsFaded(true);
+    clearTimeout(fadeTimerRef.current);
+  }, [selectedBlock]);
+
+  // Text selection shows toolbar; collapsing starts fade timer
+  useEffect(() => {
+    if (!isSelectionCollapsed) {
+      clearTimeout(fadeTimerRef.current);
+      setIsFaded(false);
+    } else {
+      startFadeTimer();
+    }
+    return () => clearTimeout(fadeTimerRef.current);
+  }, [isSelectionCollapsed, startFadeTimer]);
+
+  // Mouse activity from iframe: show toolbar, restart fade timer if collapsed
+  useEffect(() => {
+    if (mouseActivityCounter === 0) return; // Skip initial mount
+    setIsFaded(false);
+    if (isCollapsedRef.current) {
+      startFadeTimer();
+    }
+  }, [mouseActivityCounter, startFadeTimer]);
 
   // Poll for LinkEditor (.add-link) visibility changes to detect when it closes
   // The LinkEditor doesn't use Redux for visibility - it uses CSS opacity
@@ -1047,6 +1095,8 @@ const SyncedSlateToolbar = ({
           maxWidth: `${constrainedMaxWidth}px`,
           zIndex: 10,
           display: isBlockVisible ? 'flex' : 'none',
+          opacity: isFaded ? 0 : 1,
+          transition: 'opacity 0.3s',
           gap: '2px',
           background: '#fff',
           border: '1px solid #e0e0e0',

@@ -738,3 +738,78 @@ test.describe('Quanta Toolbar - Overflow', () => {
   });
 
 });
+
+test.describe('Quanta Toolbar - Auto-fade', () => {
+  test('toolbar shows on mouse click then fades after inactivity', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a slate block — mouse activity shows toolbar
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toHaveCSS('opacity', '1');
+
+    // Toolbar should fade out after inactivity (5s timer + 0.3s transition)
+    await expect(toolbar).toHaveCSS('opacity', '0', { timeout: 8000 });
+  });
+
+  test('keyboard navigation keeps toolbar hidden', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // ArrowDown with no block selected → selects first block via keyboard
+    await page.keyboard.press('ArrowDown');
+
+    // Toolbar should be hidden — no mouse activity
+    await expect(toolbar).toHaveCSS('opacity', '0');
+
+    // Arrow to next block — still hidden
+    await page.keyboard.press('ArrowDown');
+    await expect(toolbar).toHaveCSS('opacity', '0');
+  });
+
+  test('mouse activity after keyboard nav shows toolbar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // Select first block via keyboard — toolbar hidden
+    await page.keyboard.press('ArrowDown');
+    await expect(toolbar).toHaveCSS('opacity', '0');
+
+    // Move mouse inside iframe — toolbar appears
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="block-1-uuid"]').hover();
+    await expect(toolbar).toHaveCSS('opacity', '1');
+  });
+
+  test('text selection shows toolbar and prevents fade', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // Select first block via keyboard — toolbar hidden
+    await page.keyboard.press('ArrowDown');
+    await expect(toolbar).toHaveCSS('opacity', '0');
+
+    // Select all text — SELECTION_CHANGE shows toolbar
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(toolbar).toHaveCSS('opacity', '1');
+
+    // Toolbar stays visible — non-collapsed selection prevents fade
+    await page.waitForTimeout(6000);
+    await expect(toolbar).toHaveCSS('opacity', '1');
+  });
+});

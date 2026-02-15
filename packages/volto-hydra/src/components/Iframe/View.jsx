@@ -456,6 +456,7 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
+  const [mouseActivityCounter, setMouseActivityCounter] = useState(0); // incremented on MOUSE_ACTIVITY from iframe
 
   // History for routing - needed early for edit mode detection
   const history = useHistory();
@@ -1939,8 +1940,17 @@ const Iframe = (props) => {
           break;
         }
 
-        // NOTE: SELECTION_CHANGE was removed - selection is now always sent
-        // WITH text content in INLINE_EDIT_DATA to keep them atomic/in-sync.
+        case 'SELECTION_CHANGE':
+          // Selection-only update (no text change) — safe because data is already in sync
+          // Sent by hydra.js when selectionchange fires but text is unchanged (e.g., Ctrl+A, Shift+Arrow)
+          setIframeSyncState(prev => {
+            const newSelection = event.data.selection || null;
+            if (JSON.stringify(prev.selection) === JSON.stringify(newSelection)) {
+              return prev;
+            }
+            return { ...prev, selection: newSelection };
+          });
+          break;
 
         case 'BLOCK_SELECTED': {
           // Update block UI state and selection atomically
@@ -2077,6 +2087,11 @@ const Iframe = (props) => {
           // The block will be re-shown when BLOCK_SELECTED is sent after scroll stops
           setBlockUI(null);
           // Don't call onSelectBlock(null) - keep the block selected in Redux
+          break;
+
+        case 'MOUSE_ACTIVITY':
+          // Throttled mousemove from iframe — reset toolbar fade timer
+          setMouseActivityCounter(c => c + 1);
           break;
 
         case 'INIT':
@@ -3190,6 +3205,7 @@ const Iframe = (props) => {
             form={iframeSyncState.formData}
             blockPathMap={iframeSyncState.blockPathMap}
             currentSelection={iframeSyncState.selection}
+            mouseActivityCounter={mouseActivityCounter}
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}

@@ -1550,6 +1550,7 @@ export class Bridge {
         this.listenForSelectBlockMessage();
         this.setupScrollHandler();
         this.setupResizeHandler();
+        this.setupMouseActivityReporter();
 
         // Add beforeunload warning to prevent accidental navigation
         window.addEventListener('beforeunload', (e) => {
@@ -1637,6 +1638,11 @@ export class Bridge {
               if (this.onContentChangeCallback) {
                 this._executeRender(this.onContentChangeCallback);
               }
+
+              // Focus the iframe window so keyboard events reach it on page load.
+              // Must happen inside the iframe (window.focus()) because the parent
+              // cannot call contentWindow.focus() on a cross-origin iframe.
+              window.focus();
 
               // Restore block selection if provided (e.g., after adding a new block)
               if (e.data.selectedBlockUid) {
@@ -2208,6 +2214,26 @@ export class Bridge {
         }
       };
       document.addEventListener('keydown', this._escapeKeyHandler, true);
+    }
+
+    // Add global ArrowDown handler for "no block selected" → select first page-level block
+    if (!this._arrowDownNoSelectionHandler) {
+      this._arrowDownNoSelectionHandler = (e) => {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        if (this.selectedBlockUid) return;
+
+        const allBlocks = document.querySelectorAll('[data-block-uid]');
+        // Find page-level blocks (not nested inside another block)
+        const pageBlocks = Array.from(allBlocks).filter(el =>
+          !el.parentElement?.closest('[data-block-uid]'),
+        );
+        if (pageBlocks.length === 0) return;
+
+        e.preventDefault();
+        const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
+        this.selectBlock(target);
+      };
+      document.addEventListener('keydown', this._arrowDownNoSelectionHandler);
     }
 
     // Add global Enter handler for "block selected, no field focused" → add block after
@@ -6650,6 +6676,24 @@ export class Bridge {
     window.addEventListener('resize', handleResize);
   }
 
+  /**
+   * Sends throttled MOUSE_ACTIVITY messages to admin on mouse use.
+   * The admin uses this to show the toolbar (which starts hidden).
+   * Listens for both mousemove and mousedown (click without prior movement).
+   * Throttled to 1 message per second to avoid flooding.
+   */
+  setupMouseActivityReporter() {
+    let lastSent = 0;
+    const sendActivity = () => {
+      const now = Date.now();
+      if (now - lastSent < 1000) return;
+      lastSent = now;
+      window.parent.postMessage({ type: 'MOUSE_ACTIVITY' }, this.adminOrigin);
+    };
+    document.addEventListener('mousemove', sendActivity);
+    document.addEventListener('mousedown', sendActivity);
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Make Block Text Inline Editable and Text Changes Observation
   ////////////////////////////////////////////////////////////////////////////////
@@ -8685,7 +8729,14 @@ export class Bridge {
     if (this.lastReceivedFormData) {
       const isEcho = this.focusedFieldValuesEqual(data, this.lastReceivedFormData);
       if (isEcho) {
-        // Same content as what we received - don't buffer
+        // Text unchanged — send selection-only update (e.g., Ctrl+A, Shift+Arrow)
+        // Safe because data is already in sync; atomicity only matters when text changes
+        if (from === 'selectionChange') {
+          const selection = this.serializeSelection();
+          if (selection) {
+            window.parent.postMessage({ type: 'SELECTION_CHANGE', selection }, this.adminOrigin);
+          }
+        }
         log('bufferUpdate: echo, skipping. from:', from, 'seq:', currentSeq);
         return;
       }
