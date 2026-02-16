@@ -756,14 +756,9 @@ test.describe('Inline Editing - Basic', () => {
     expect(selectedText).toBe('Hello beautiful world');
   });
 
-  // SKIPPED: Home key doesn't work with hydra.js but works in plain iframes.
-  // ArrowLeft, ArrowRight, End all work. Only Home fails.
-  // Cmd+Left (Meta+ArrowLeft) works as alternative on macOS.
-  // Root cause unknown - key is received, not prevented, but cursor doesn't move.
-  // This is expected macOS behavior - use Cmd+Left (Meta+ArrowLeft) for start of line.
-  // See: https://en.wikipedia.org/wiki/Home_key
-  // but it doesn't explain why without hydra home did appear to work in our testing on a basic conteneditible
-  test.skip('keyboard navigation with Home key', async ({ page }) => {
+  // Home key is handled via selection.modify('move','backward','lineboundary')
+  // in hydra.js keydown handler since CDP-dispatched events don't trigger native cursor movement.
+  test('keyboard navigation with Home key', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
