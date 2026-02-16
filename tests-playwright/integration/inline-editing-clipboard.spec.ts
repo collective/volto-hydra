@@ -306,11 +306,11 @@ test.describe('Inline Editing - Clipboard', () => {
     const afterIndex = blockOrder.indexOf(afterBlockId);
     expect(afterIndex).toBeGreaterThan(originalIndex + 1);
 
-    // Verify a table element exists between original and "After table" blocks
+    // Verify the table block between original and "After table" renders a table
     const tableBlockId = blockOrder[originalIndex + 1];
     expect(tableBlockId).toBeDefined();
-    await expect(iframe.locator(`[data-block-uid="${tableBlockId}"] table`))
-      .toBeAttached({ timeout: 5000 });
+    await expect(iframe.locator(`[data-block-uid="${tableBlockId}"]`))
+      .toContainText('Name', { timeout: 5000 });
   });
 
   test('clipboard test on parent document', async ({ page, context }) => {

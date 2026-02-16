@@ -448,8 +448,12 @@ const applyConfig = (config) => {
     { id: 'templates', title: 'Templates' },
   ];
 
-  // Fix volto-slate bug: extractTables emitter creates @type:'table' but
-  // blocksConfig registers it as 'slateTable'. Wrap the emitter to fix the type.
+  // Fix volto-slate extractTables bugs:
+  // 1. Creates @type:'table' but blocksConfig registers it as 'slateTable'.
+  // 2. Cell values are bare text nodes [{ text:'Name' }] because the HTML
+  //    deserializer doesn't wrap TD/TH text children in paragraphs. Normalize
+  //    them to [{ type:'p', children:[{ text:'Name' }] }] to match the format
+  //    Volto produces when creating tables normally.
   if (config.settings.slate?.voltoBlockEmiters) {
     config.settings.slate.voltoBlockEmiters =
       config.settings.slate.voltoBlockEmiters.map((emitter) => {
@@ -459,6 +463,17 @@ const applyConfig = (config) => {
             for (const [, blockData] of blocks) {
               if (blockData['@type'] === 'table') {
                 blockData['@type'] = 'slateTable';
+              }
+              // Wrap bare text cell values in paragraph nodes
+              for (const row of blockData.table?.rows || []) {
+                for (const cell of row.cells || []) {
+                  if (
+                    cell.value?.length > 0 &&
+                    cell.value.every((n) => typeof n.text === 'string' && !n.type)
+                  ) {
+                    cell.value = [{ type: 'p', children: cell.value }];
+                  }
+                }
               }
             }
             return blocks;
