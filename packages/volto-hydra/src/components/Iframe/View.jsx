@@ -2439,6 +2439,7 @@ const Iframe = (props) => {
         ...iframeSyncState.formData,
         _editSequence: editSequenceRef.current,
       };
+      const skipRender = iframeSyncState.skipRenderOnSend;
       const message = {
         type: 'FORM_DATA',
         data: formWithSequence,
@@ -2448,8 +2449,15 @@ const Iframe = (props) => {
       if (iframeSyncState.selection) {
         message.transformedSelection = iframeSyncState.selection;
       }
-      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId, '_editSequence:', editSequenceRef.current);
-      document.getElementById('previewIframe')?.contentWindow?.postMessage(
+      // When data didn't change (e.g. link cancel), tell iframe to skip
+      // re-render — just unblock and restore selection/focus.
+      if (skipRender) {
+        message.skipRender = true;
+      }
+      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId,
+        '_editSequence:', editSequenceRef.current, 'skipRender:', !!skipRender);
+      const iframeEl = document.getElementById('previewIframe');
+      iframeEl?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
       );
@@ -2460,9 +2468,15 @@ const Iframe = (props) => {
       // This prevents race condition where Redux update triggers Case 2 with stale properties
       // NOTE: flushSync may warn "cannot flush when already rendering" but still works
       flushSync(() => {
-        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
+        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, skipRenderOnSend: false, formData: formWithSequence }));
         onChangeFormData(formWithoutSeq);
       });
+      // Focus iframe AFTER flushSync — React has finished all synchronous
+      // renders so nothing will steal focus. The iframe-side field focus is
+      // handled by restoreSlateSelection in afterContentRender.
+      if (iframeEl && message.formatRequestId) {
+        iframeEl.focus();
+      }
       return;
     }
 
@@ -3239,6 +3253,7 @@ const Iframe = (props) => {
               setIframeSyncState(prev => {
                 let fd = prev.formData;
                 let bpm = prev.blockPathMap;
+                let dataChanged = false;
 
                 // Apply field value change to the selected block
                 if (newFieldValue != null) {
@@ -3246,6 +3261,7 @@ const Iframe = (props) => {
                   const block = getBlockById(fd, bpm, selectedBlock);
                   const updatedBlock = { ...block, [fieldName]: newFieldValue };
                   fd = updateBlockById(fd, bpm, selectedBlock, updatedBlock);
+                  dataChanged = true;
                 }
 
                 // Insert extra blocks from paste emitter extraction (images,
@@ -3263,6 +3279,7 @@ const Iframe = (props) => {
                     lastId = newId;
                   }
                   pendingSelectBlockUid = lastId;
+                  dataChanged = true;
                 }
 
                 const newSel = selection || prev.selection;
@@ -3276,6 +3293,9 @@ const Iframe = (props) => {
                   selection: newSel,
                   _selectionSource: selection ? 'onChangeFormData:toolbar' : prev._selectionSource,
                   toolbarRequestDone: formatRequestId || prev.toolbarRequestDone,
+                  // When data didn't change, tell iframe to skip re-render
+                  // (e.g. link cancel — just unblock and restore focus)
+                  skipRenderOnSend: !dataChanged && !!formatRequestId,
                   ...(pendingSelectBlockUid ? { pendingSelectBlockUid } : {}),
                 };
               });

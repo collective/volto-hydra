@@ -419,31 +419,21 @@ const SyncedSlateToolbar = ({
 
     const handlePopupClosed = () => {
       if (activeFormatRequestIdRef.current) {
+        // Send the formatRequestId to unblock the iframe. Focus restoration
+        // happens automatically: the FORM_DATA useEffect focuses the iframe
+        // element after React render, and afterContentRender restores the
+        // field selection inside the iframe.
         onChangeFormData(null, currentSelection, activeFormatRequestIdRef.current);
         activeFormatRequestIdRef.current = null;
       }
       // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
       // The polling might detect a stale popup closing while a new button click is pending,
       // and we don't want to interfere with that pending operation.
-
-      // Restore focus to the specific field in the iframe after LinkEditor closes
-      // We know which block and field was selected when the popup opened
-      if (iframeElement?.contentWindow && selectedBlock) {
-        // Focus the iframe element first - browser won't let field.focus() work
-        // inside an iframe unless the iframe itself has focus in the parent document
-        iframeElement.focus();
-        const fieldName = blockUI?.focusedFieldName || 'value';
-        iframeElement.contentWindow.postMessage({
-          type: 'FOCUS_FIELD',
-          blockId: selectedBlock,
-          fieldName: fieldName,
-        }, '*');
-      }
     };
 
     const intervalId = setInterval(checkVisibility, 100);
     return () => clearInterval(intervalId);
-  }, [form, currentSelection, onChangeFormData, iframeElement, selectedBlock, blockUI?.focusedFieldName]);
+  }, [form, currentSelection, onChangeFormData]);
 
   // Helper function for applying inline format with prospective formatting support
   // Used by both hotkey transforms and toolbar button clicks

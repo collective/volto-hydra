@@ -1852,8 +1852,14 @@ export class Bridge {
             if (event.data.transformedSelection) {
               this.expectedSelectionFromAdmin = event.data.transformedSelection;
             }
-            log('Calling onEditChange callback to trigger re-render');
-            this._executeRender(callback, {
+            // skipRender: data didn't change (e.g. link cancel) — skip the
+            // framework re-render but still run afterContentRender for
+            // selection restore, unblock, observer reattachment, etc.
+            const renderFn = event.data.skipRender ? () => {} : callback;
+            log(event.data.skipRender
+              ? 'FORM_DATA: skipRender — running afterContentRender without re-render'
+              : 'Calling onEditChange callback to trigger re-render');
+            this._executeRender(renderFn, {
               transformedSelection: event.data.transformedSelection,
               formatRequestId,
               needsBlockSwitch,
