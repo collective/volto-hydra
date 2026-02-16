@@ -2307,15 +2307,37 @@ export class Bridge {
       }
 
       if (e.type === 'keydown') {
-        this.eventBuffer.push({
-          key: e.key,
-          code: e.code,
-          ctrlKey: e.ctrlKey,
-          metaKey: e.metaKey,
-          shiftKey: e.shiftKey,
-          altKey: e.altKey,
-        });
-        log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+        // Paste (Cmd+V): read clipboard data now while we have user gesture
+        // context, store in buffer entry for replay. The async read completes
+        // well before the transform finishes and replay starts.
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+          const entry = { _type: 'paste', html: null };
+          this.eventBuffer.push(entry);
+          navigator.clipboard.read().then(async (items) => {
+            for (const item of items) {
+              if (item.types.includes('text/html')) {
+                entry.html = await (await item.getType('text/html')).text();
+                return;
+              }
+              if (item.types.includes('text/plain')) {
+                entry.html = await (await item.getType('text/plain')).text();
+              }
+            }
+          }).catch(() => {
+            navigator.clipboard.readText().then(text => { entry.html = text; }).catch(() => {});
+          });
+          log('BUFFERED paste with clipboard read, buffer size:', this.eventBuffer.length);
+        } else {
+          this.eventBuffer.push({
+            key: e.key,
+            code: e.code,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+          });
+          log('BUFFERED keyboard event:', e.key, 'buffer size:', this.eventBuffer.length);
+        }
       }
       e.preventDefault();
       e.stopPropagation();
@@ -2604,6 +2626,17 @@ export class Bridge {
         return;
       }
 
+      // Copy: execCommand triggers trusted copy event → _doCopy cleans clipboard
+      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'c') {
+        document.execCommand('copy');
+        return;
+      }
+      // Cut: copy cleaned selection + delete via transform
+      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'x') {
+        this._doCut(blockId);
+        return;
+      }
+
       // Unknown keys — dispatch synthetic event for our keydown handler
       const syntheticEvent = new KeyboardEvent('keydown', {
         key: evt.key,
@@ -2641,6 +2674,16 @@ export class Bridge {
       }
 
       const evt = buffer[i];
+
+      // Buffered paste: replay with stored clipboard data
+      if (evt._type === 'paste') {
+        if (textBatch) { insertText(textBatch); textBatch = ''; }
+        if (evt.html) {
+          this._doPaste(blockId, evt.html);
+        }
+        continue;
+      }
+
       const isTextChar = evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey;
 
       if (isTextChar) {
@@ -4176,6 +4219,49 @@ export class Bridge {
     });
 
     return tempDiv.innerHTML;
+  }
+
+  /**
+   * Handle copy event — clean selection and write to clipboard.
+   * Single function called from both native copy events and execCommand('copy') replay.
+   * Strips ZWS/NBSP from text, removes internal data-* attributes from HTML.
+   */
+  _doCopy(e) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+
+    // Strip ZWS and NBSP (contenteditable artifacts) from text
+    let cleanText = this.stripZeroWidthSpaces(selection.toString());
+    cleanText = cleanText.replace(/\u00A0/g, ' ');
+
+    // cleanHtmlForClipboard only cleans within [data-editable-field] elements
+    const cleanHtml = this.cleanHtmlForClipboard(range.cloneContents());
+
+    log('Copy event - cleaning clipboard');
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', cleanText);
+    e.clipboardData.setData('text/html', cleanHtml);
+  }
+
+  /**
+   * Handle cut — copy cleaned selection to clipboard, then delete via transform.
+   * Single function called from both normal keydown handler and buffered replay.
+   */
+  _doCut(blockUid) {
+    // execCommand('copy') triggers a trusted copy event → _doCopy cleans clipboard
+    document.execCommand('copy');
+    // Delete the selected content via transform
+    this.sendTransformRequest(blockUid, 'delete', {});
+  }
+
+  /**
+   * Handle paste — send paste transform with HTML content.
+   * Single function called from both native paste event handler and buffered replay.
+   */
+  _doPaste(blockUid, html) {
+    this.sendTransformRequest(blockUid, 'paste', { html });
   }
 
   /**
@@ -6804,36 +6890,40 @@ export class Bridge {
       // Add paste event listener
       editableField.addEventListener('paste', (e) => {
         e.preventDefault(); // Prevent default paste
-
-        const pastedHtml = e.clipboardData.getData('text/html');
-        const pastedText = e.clipboardData.getData('text/plain');
-
-        // Send paste request with current form data included
-        this.sendTransformRequest(blockUid, 'paste', {
-          html: pastedHtml || pastedText,
-        });
+        const html = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+        this._doPaste(blockUid, html);
       });
 
       // Add copy event listener on document - strip ZWS/NBSP and internal data attributes from clipboard
       // Listen on document because keyboard shortcuts may not bubble through contenteditable
-      document.addEventListener('copy', (e) => {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
+      document.addEventListener('copy', (e) => this._doCopy(e));
 
-        const range = selection.getRangeAt(0);
+      // Document-level paste handler (registered once) — catches paste events
+      // that don't reach a field-level handler: when no block is focused (body),
+      // or during transforms when the editable field was destroyed by re-render.
+      if (!this._documentPasteHandler) {
+        this._documentPasteHandler = (e) => {
+          // Skip if a field-level paste handler already handled this
+          if (e.defaultPrevented) return;
 
-        // Strip ZWS and NBSP (contenteditable artifacts) from text
-        let cleanText = this.stripZeroWidthSpaces(selection.toString());
-        cleanText = cleanText.replace(/\u00A0/g, ' ');
+          // During transforms: buffer clipboard data for replay
+          if (this.blockedBlockId) {
+            e.preventDefault();
+            const html = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+            this.eventBuffer.push({ _type: 'paste', html });
+            log('BUFFERED paste data (document handler), buffer size:', this.eventBuffer.length);
+            return;
+          }
 
-        // cleanHtmlForClipboard only cleans within [data-editable-field] elements
-        const cleanHtml = this.cleanHtmlForClipboard(range.cloneContents());
-
-        log('Copy event - cleaning clipboard');
-        e.preventDefault();
-        e.clipboardData.setData('text/plain', cleanText);
-        e.clipboardData.setData('text/html', cleanHtml);
-      });
+          // No transform: paste into selected block if available
+          if (this.selectedBlockUid) {
+            e.preventDefault();
+            const html = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+            this._doPaste(this.selectedBlockUid, html);
+          }
+        };
+        document.addEventListener('paste', this._documentPasteHandler);
+      }
 
       // Prevent browser from removing text nodes on last-char deletion.
       // Like slate-react (string.tsx), we keep empty text nodes alive with
@@ -7036,66 +7126,19 @@ export class Bridge {
           return;
         }
 
-        // Handle Copy (Ctrl+C / Cmd+C) - strip ZWS from clipboard
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-          const selection = window.getSelection();
-          const selectedText = selection.toString();
-          // Strip ZWS characters before writing to clipboard
-          const cleanText = this.stripZeroWidthSpaces(selectedText);
-          if (cleanText !== selectedText) {
-            log('Copy - stripping ZWS from clipboard');
-            e.preventDefault();
-            navigator.clipboard.writeText(cleanText).catch(err => {
-              console.error('[HYDRA] Failed to write to clipboard:', err);
-            });
-          }
-          // If no ZWS, let native copy happen
-          return;
-        }
+        // Copy (Ctrl+C / Cmd+C): let native keydown propagate → copy event
+        // fires → _doCopy cleans clipboard with both HTML and plain text.
 
-        // Handle Cut (Ctrl+X / Cmd+X)
+        // Cut (Ctrl+X / Cmd+X): copy via execCommand (triggers _doCopy),
+        // then delete via transform. Synchronous — no async clipboard API.
         if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-          log('Cut shortcut detected');
           e.preventDefault();
-
-          // Get selected text and copy to clipboard
-          const selection = window.getSelection();
-          const selectedText = selection.toString();
-          // Strip ZWS characters before writing to clipboard
-          const cleanText = this.stripZeroWidthSpaces(selectedText);
-          log('Cut text:', cleanText);
-
-          if (cleanText) {
-            // Write to clipboard
-            navigator.clipboard.writeText(cleanText).then(() => {
-              log('Text written to clipboard');
-              // Cut is just delete with clipboard - send delete request
-              this.sendTransformRequest(blockUid, 'delete', {});
-            }).catch(err => {
-              console.error('[HYDRA] Failed to write to clipboard:', err);
-            });
-          }
+          this._doCut(blockUid);
           return;
         }
 
-        // Handle Paste (Ctrl+V / Cmd+V)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-          log('Paste shortcut detected');
-          e.preventDefault();
-
-          // Read from clipboard then send transform request
-          navigator.clipboard.readText().then(text => {
-            log('Clipboard text:', text);
-
-            // Send paste request with current form data included
-            this.sendTransformRequest(blockUid, 'paste', {
-              html: text,
-            });
-          }).catch(err => {
-            console.error('[HYDRA] Failed to read clipboard:', err);
-          });
-          return;
-        }
+        // Paste (Ctrl+V / Cmd+V): let native keydown propagate → paste
+        // event fires → field-level handler calls _doPaste with HTML.
 
         // Handle markdown shortcuts (Space triggers autoformat)
         // Shared handler checks text before cursor for block/inline patterns

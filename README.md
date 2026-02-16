@@ -818,7 +818,7 @@ const bridge = initBridge({
 - `field`: Field to check (use `../field` for parent/page fields)
 - Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
 
-#### Block conversion and synchronised block types
+#### Block conversion
 
 If a block type has a `fieldMappings` defined it will enable a "Convert to..." UI action.
 You specify either conversions to a specific type, or to a generic search result schema
@@ -827,13 +827,13 @@ You specify either conversions to a specific type, or to a generic search result
 ```js
 teaser: {
   fieldMappings: {
-    default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+    @default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
     image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
   },
 },
 image: {
   fieldMappings: {
-    default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+    @default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
     teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
   },
 },
@@ -842,9 +842,27 @@ image: {
 Note it will perform transitive conversions by using paths through intermediate types (hero → teaser → image). Any fields that don't match will still be kept in the data so if the block
 is converted back that data will reappear.
 
+#### HTML Paste support (TODO)
+
+To support the user pasting rich text into the editor and having appear as you custom
+block type you can use a special field mapping of `css:<selector>`
+
+```js
+video: {
+  fieldMappings: {
+    'css:video': { 'src': 'url', 'caption[@class="alt"]': 'alt'},
+  },
+},
+```
+
+TODO: need to do this via htmlTagsToSlate to bypass conversion to slate or handle encoding into slate so we don't lose attributes and classes we need? 
+TODO: how this works for container blocks.
+
+#### Synchronised bI lock types in a container
+
 You might want to have one container
-type that can hold different types of blocks but they all have to be the same type with the
-synchronised settings.
+type that can hold different types of blocks but you want to constrain them to all have
+be the same type with synchronised settings.
 A field on the parent will let the editor select the type and all the blocks will get
 converted to that new type using ```fieldMappings```.
 

@@ -102,6 +102,217 @@ test.describe('Inline Editing - Clipboard', () => {
     expect(finalText).toBe('Helsting');
   });
 
+  test('pasting plain text with line break splits block like Enter', async ({ page }) => {
+    // Pasting text that contains \n in a single-line slate field should
+    // behave like pressing Enter: split the block at the newline boundary.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode and set up initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Before', { delay: 10 });
+    await helper.waitForEditorText(editor, /Before/);
+
+    // Place cursor at end of text
+    await editor.press('End');
+
+    // Get initial block count
+    const initialBlocks = await helper.getStableBlockCount();
+
+    // Dispatch a paste event with plain text containing a line break
+    await editor.evaluate((el) => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'Hello\nWorld');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dt });
+      el.dispatchEvent(event);
+    });
+
+    // The newline should cause a block split, creating one new block
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+    // Wait for the new "World" block to appear in the iframe
+    const { blockId: worldBlockId } = await helper.waitForBlockByContent('World');
+
+    // Verify the original block contains "BeforeHello" (text before \n appended)
+    await helper.waitForEditorText(
+      await helper.getEditorLocator(blockId), /BeforeHello/,
+    );
+
+    // Verify the new block is positioned right after the original
+    const blockOrder = await helper.getBlockOrder();
+    const originalIndex = blockOrder.indexOf(blockId);
+    const worldIndex = blockOrder.indexOf(worldBlockId);
+    expect(worldIndex).toBe(originalIndex + 1);
+  });
+
+  test('pasting HTML via document handler when no field is focused', async ({ page }) => {
+    // When a block is selected but the editable field doesn't have focus
+    // (e.g. user clicked on the admin sidebar), pasting should still work
+    // via the document-level paste handler routing to the selected block.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode and clear text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Original', { delay: 10 });
+    await helper.waitForEditorText(editor, /Original/);
+
+    // Click outside the iframe to move focus to the admin page
+    // The block should remain selected but the editable field loses focus
+    await page.locator('#sidebar').click({ force: true }).catch(() => {
+      // Sidebar may not exist in all test setups, click the admin body instead
+      return page.locator('body').click({ position: { x: 5, y: 5 } });
+    });
+    await page.waitForTimeout(200);
+
+    // Now dispatch a paste event on the iframe's document (not on the field)
+    // The document-level handler should catch it and route to the selected block
+    await iframe.locator('body').evaluate((body) => {
+      const dt = new DataTransfer();
+      dt.setData('text/html', '<p><strong>Pasted</strong> content</p>');
+      dt.setData('text/plain', 'Pasted content');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dt });
+      body.dispatchEvent(event);
+    });
+
+    // Wait for the paste to be processed — editor should contain pasted content
+    await expect(async () => {
+      const editorAfter = await helper.getEditorLocator(blockId);
+      const text = await helper.getCleanTextContent(editorAfter);
+      expect(text).toContain('Pasted');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('pasting HTML with image into container creates image block', async ({ page }) => {
+    // Pasting HTML that contains text and an <img> tag into a block inside a
+    // container (columns) should split into: text in original block, image
+    // block after it, remaining text in another block — all within the same column.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const blockId = 'text-1a'; // Inside col-1 of columns-1
+
+    // Enter edit mode and clear existing text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Start', { delay: 10 });
+    await helper.waitForEditorText(editor, /Start/);
+
+    // Place cursor at end
+    await editor.press('End');
+
+    // Get initial block count
+    const initialBlocks = await helper.getStableBlockCount();
+
+    // Paste HTML with text + image + more text
+    await editor.evaluate((el) => {
+      const dt = new DataTransfer();
+      dt.setData('text/html', '<p>Hello</p><img src="http://localhost:8888/test-image.jpg" alt="Pasted image"><p>World</p>');
+      dt.setData('text/plain', 'Hello\n[image]\nWorld');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dt });
+      el.dispatchEvent(event);
+    });
+
+    // Should create 2 new blocks (image + "World" text) in the same column
+    await helper.waitForBlockCountToBe(initialBlocks + 2, 10000);
+
+    // Verify content: original block has "StartHello", new block has "World"
+    const iframe = helper.getIframe();
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`))
+      .toContainText('StartHello', { timeout: 5000 });
+    const { blockId: worldBlockId } = await helper.waitForBlockByContent('World');
+
+    // Verify order: original → image → World
+    const blockOrder = await helper.getBlockOrder();
+    const originalIndex = blockOrder.indexOf(blockId);
+    const worldIndex = blockOrder.indexOf(worldBlockId);
+    expect(worldIndex).toBe(originalIndex + 2);
+
+    // Verify the block between original and World is an image
+    const imageBlockId = blockOrder[originalIndex + 1];
+    expect(imageBlockId).toBeDefined();
+    await expect(iframe.locator(`[data-block-uid="${imageBlockId}"] img`))
+      .toBeAttached({ timeout: 5000 });
+
+    // Verify new blocks are still inside the same column container:
+    // Click on the "World" block and check sidebar shows ‹ Column breadcrumb
+    await helper.clickBlockByContent('World');
+    const parentButton = page.locator('button').filter({ hasText: /^‹.*Column/ });
+    await expect(parentButton.first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('pasting HTML with table creates table block', async ({ page }) => {
+    // Pasting HTML that contains a <table> should extract the table into a
+    // separate Volto table block, with surrounding text staying as slate blocks.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode and set up initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Before', { delay: 10 });
+    await helper.waitForEditorText(editor, /Before/);
+    await editor.press('End');
+
+    // Paste HTML: text + table + text
+    await editor.evaluate((el) => {
+      const dt = new DataTransfer();
+      dt.setData('text/html',
+        '<p>Hello</p>' +
+        '<table><tr><th>Name</th><th>Value</th></tr>' +
+        '<tr><td>A</td><td>1</td></tr></table>' +
+        '<p>After table</p>',
+      );
+      dt.setData('text/plain', 'Hello\nName\tValue\nA\t1\nAfter table');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dt });
+      el.dispatchEvent(event);
+    });
+
+    // Wait for the "After table" text block to appear (proves both blocks were created)
+    const { blockId: afterBlockId } = await helper.waitForBlockByContent('After table');
+
+    // Original block should contain "BeforeHello"
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`))
+      .toContainText('BeforeHello', { timeout: 5000 });
+
+    // Verify order: original → table → After table
+    // (getBlockOrder returns all data-block-uid elements including table internals,
+    // so we just check the table block is between original and "After table")
+    const blockOrder = await helper.getBlockOrder();
+    const originalIndex = blockOrder.indexOf(blockId);
+    const afterIndex = blockOrder.indexOf(afterBlockId);
+    expect(afterIndex).toBeGreaterThan(originalIndex + 1);
+
+    // Verify a table element exists between original and "After table" blocks
+    const tableBlockId = blockOrder[originalIndex + 1];
+    expect(tableBlockId).toBeDefined();
+    await expect(iframe.locator(`[data-block-uid="${tableBlockId}"] table`))
+      .toBeAttached({ timeout: 5000 });
+  });
+
   test('clipboard test on parent document', async ({ page, context }) => {
     // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);

@@ -3219,31 +3219,50 @@ const Iframe = (props) => {
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}
-            onChangeFormData={(formData, selection, formatRequestId) => {
-              log('onChangeFormData callback called, formatRequestId:', formatRequestId);
-              // Update iframeSyncState atomically with formData, selection, and toolbarRequestDone
-              // The FORM_DATA useEffect will:
-              // 1. Send to iframe when it sees toolbarRequestDone (with formatRequestId)
-              // 2. THEN update Redux (to avoid race condition where Redux re-render
-              //    happens before toolbarRequestDone is committed)
+            onChangeFormData={(newFieldValue, selection, formatRequestId, extraBlocks) => {
+              log('onChangeFormData callback called, formatRequestId:', formatRequestId,
+                'hasFieldValue:', newFieldValue != null, 'extraBlocks:', extraBlocks?.length || 0);
+
+              // Apply field value change and/or extra blocks to the latest
+              // iframeSyncState (via prev), not the stale form prop snapshot.
               setIframeSyncState(prev => {
-                log('setIframeSyncState called, prev toolbarRequestDone:', prev.toolbarRequestDone, 'new:', formatRequestId);
+                let fd = prev.formData;
+                let bpm = prev.blockPathMap;
+
+                // Apply field value change to the selected block
+                if (newFieldValue != null) {
+                  const fieldName = blockUI?.focusedFieldName || 'value';
+                  const block = getBlockById(fd, bpm, selectedBlock);
+                  const updatedBlock = { ...block, [fieldName]: newFieldValue };
+                  fd = updateBlockById(fd, bpm, selectedBlock, updatedBlock);
+                }
+
+                // Insert extra blocks from paste emitter extraction (images,
+                // tables, text blocks split from multi-paragraph paste)
+                let pendingSelectBlockUid = null;
+                if (extraBlocks?.length > 0) {
+                  bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                  const containerConfig = getContainerFieldConfig(
+                    selectedBlock, bpm, fd, config.blocks.blocksConfig, intl,
+                  );
+                  let lastId = selectedBlock;
+                  for (const [newId, blockData] of extraBlocks) {
+                    fd = insertBlockInContainer(fd, bpm, lastId, newId, blockData, containerConfig, 'after');
+                    bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                    lastId = newId;
+                  }
+                  pendingSelectBlockUid = lastId;
+                }
+
                 return {
                   ...prev,
-                  formData: formData,
+                  formData: fd,
+                  blockPathMap: bpm,
                   selection: selection || prev.selection,
-                  // Preserve existing toolbarRequestDone if new call doesn't have one.
-                  // Multiple onChange calls from a single transform can batch together;
-                  // the first has the formatRequestId, subsequent ones don't. Without
-                  // this guard, the second call would overwrite the requestId with null,
-                  // preventing the FORM_DATA useEffect from sending it to the iframe,
-                  // leaving the iframe permanently blocked.
                   toolbarRequestDone: formatRequestId || prev.toolbarRequestDone,
+                  ...(pendingSelectBlockUid ? { pendingSelectBlockUid } : {}),
                 };
               });
-              // NOTE: Don't update Redux here - let the useEffect do it after sending FORM_DATA
-              // This avoids a race condition where Redux dispatch causes re-render before
-              // setIframeSyncState commits, making useEffect see old toolbarRequestDone value
             }}
             blockUI={blockUI}
             blockFieldTypes={blockFieldTypes}

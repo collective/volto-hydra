@@ -448,6 +448,26 @@ const applyConfig = (config) => {
     { id: 'templates', title: 'Templates' },
   ];
 
+  // Fix volto-slate bug: extractTables emitter creates @type:'table' but
+  // blocksConfig registers it as 'slateTable'. Wrap the emitter to fix the type.
+  if (config.settings.slate?.voltoBlockEmiters) {
+    config.settings.slate.voltoBlockEmiters =
+      config.settings.slate.voltoBlockEmiters.map((emitter) => {
+        if (emitter.name === 'extractTables') {
+          return (editor, pathRef) => {
+            const blocks = emitter(editor, pathRef);
+            for (const [, blockData] of blocks) {
+              if (blockData['@type'] === 'table') {
+                blockData['@type'] = 'slateTable';
+              }
+            }
+            return blocks;
+          };
+        }
+        return emitter;
+      });
+  }
+
   return config;
 };
 

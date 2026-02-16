@@ -210,7 +210,7 @@ test.describe('Inline Editing - Basic', () => {
   // (ParentBlocksWidget receives "12appears") but Slate's DOM doesn't update.
   // This is a volto-slate internal issue, not a Hydra state management bug.
   // See docs/typing-sync-bug-investigation.md for full analysis
-  test.skip('typing before bold: second keystroke fails to sync to sidebar', async ({ page }) => {
+  test('typing before bold: second keystroke fails to sync to sidebar', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -335,7 +335,7 @@ test.describe('Inline Editing - Basic', () => {
     await expect(sidebarEditor).not.toContainText('bold text', { timeout: 5000 });
   });
 
-  test.skip('can undo and redo', async ({ page }) => {
+  test('can undo and redo', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();

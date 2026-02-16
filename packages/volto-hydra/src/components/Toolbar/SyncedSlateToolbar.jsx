@@ -7,6 +7,7 @@ import { Icon } from '@plone/volto/components';
 import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slate/utils';
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
+import { syncCreateSlateBlock } from '@plone/volto-slate/utils/volto-blocks';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID, isBlockPositionLocked, isBlockReadonly } from '@volto-hydra/hydra-js';
 import { useDispatch } from 'react-redux';
@@ -169,6 +170,11 @@ const SyncedSlateToolbar = ({
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete
   const [editor] = useState(() => {
     const ed = withEmptyInlineRemoval(makeEditor());
+
+    // Skip normalizeExternalData (like the Text block does) so that pasted
+    // inline elements (images, tables) survive deserialization intact.
+    // The base normalizeExternalData strips them during Editor.normalize().
+    ed.normalizeExternalData = (fragment) => fragment;
 
     // Implement savedSelection for link plugin (stores selection from iframe)
     ed.savedSelection = null;
@@ -394,7 +400,7 @@ const SyncedSlateToolbar = ({
 
     const handlePopupClosed = () => {
       if (activeFormatRequestIdRef.current) {
-        onChangeFormData(form, currentSelection, activeFormatRequestIdRef.current);
+        onChangeFormData(null, currentSelection, activeFormatRequestIdRef.current);
         activeFormatRequestIdRef.current = null;
       }
       // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
@@ -452,7 +458,7 @@ const SyncedSlateToolbar = ({
             Transforms.select(editor, afterPoint);
             // Selection-only change won't trigger handleChange, so manually send FORM_DATA
             if (requestId) {
-              onChangeFormData(form, editor.selection, requestId);
+              onChangeFormData(null, editor.selection, requestId);
               activeFormatRequestIdRef.current = null;
             }
           } else {
@@ -548,29 +554,88 @@ const SyncedSlateToolbar = ({
       }
     }
 
-    // Helper to apply transform based on type
+    // Helper to apply transform based on type.
+    // Wraps all transforms in _batchingTransform to suppress intermediate onChange
+    // calls (many transforms do multiple Slate operations, each firing onChange).
+    // handleChange fires once in the finally block with the final editor state.
     const applyTransform = () => {
       const { type, requestId } = transformAction;
+      editor._batchingTransform = true;
+      try {
       switch (type) {
         case 'format':
           applyInlineFormat(transformAction.format, requestId);
           break;
-        case 'paste':
-          const pastedSlate = slateTransforms.htmlToSlate(transformAction.html);
-          let fragment = [];
-          pastedSlate.forEach((node) => {
-            if (node.children) {
-              fragment.push(...node.children);
-            } else {
-              fragment.push(node);
-            }
-          });
-          if (fragment.length === 1 && fragment[0].text !== undefined && Object.keys(fragment[0]).length === 1) {
-            Transforms.insertText(editor, fragment[0].text);
+        case 'paste': {
+          // Use volto-slate's full insertData pipeline (handles text/plain with
+          // newline splitting, text/html with tables/images/lists, and Slate fragments).
+          const dt = new DataTransfer();
+          const pasteContent = transformAction.html;
+          if (pasteContent.trimStart().startsWith('<')) {
+            dt.setData('text/html', pasteContent);
           } else {
-            Transforms.insertNodes(editor, fragment);
+            dt.setData('text/plain', pasteContent);
+          }
+          editor.insertData(dt);
+          log('PASTE: after insertData, children count:', editor.children.length,
+            'children:', JSON.stringify(editor.children).substring(0, 500));
+
+          // Run voltoBlockEmiters (extractImages, extractTables) on the editor
+          // to extract inline images/tables into separate block tuples.
+          // Then split extra top-level children into new slate blocks.
+          // First child stays in the editor (original block), rest become extraBlocks.
+          const { voltoBlockEmiters } = config.settings.slate;
+          if (editor.children.length > 1) {
+            const pathRefs = Array.from(Node.children(editor, []))
+              .map(([, path]) => Editor.pathRef(editor, path));
+            const extraBlocks = [];
+
+            // Process all children in order (matching deconstructToVoltoBlocks).
+            // For each child: run emitters (extract images/tables), then keep
+            // remaining text. First child's text stays in the editor; the rest
+            // become new slate blocks. Emitter results follow each child's text.
+            for (let i = 0; i < pathRefs.length; i++) {
+              const pathRef = pathRefs[i];
+              const extras = voltoBlockEmiters
+                .map((emit) => emit(editor, pathRef))
+                .flat(1);
+              // First child stays in editor — only extract emitter results
+              if (i > 0 && pathRef.current) {
+                const [childNode] = Editor.node(editor, pathRef.current);
+                if (childNode && !Editor.isEmpty(editor, childNode)) {
+                  extraBlocks.push(syncCreateSlateBlock([childNode]));
+                }
+              }
+              extraBlocks.push(...extras);
+            }
+
+            // Keep only first child in editor
+            Editor.withoutNormalizing(editor, () => {
+              for (let i = editor.children.length - 1; i > 0; i--) {
+                Transforms.removeNodes(editor, { at: [i] });
+              }
+            });
+
+            pathRefs.forEach((ref) => ref.unref());
+
+            log('PASTE: extracted', extraBlocks.length, 'extra blocks:',
+              extraBlocks.map(([id, data]) => `${id.substring(0,8)}:${data['@type']}`));
+            if (extraBlocks.length > 0) {
+              editor._extraBlocks = extraBlocks;
+            }
+          } else if (voltoBlockEmiters.length > 0) {
+            // Single child — still check for inline images/tables
+            const pathRef = Editor.pathRef(editor, [0]);
+            const extras = voltoBlockEmiters
+              .map((emit) => emit(editor, pathRef))
+              .flat(1);
+            pathRef.unref();
+            if (extras.length > 0) {
+              editor._extraBlocks = extras;
+            }
           }
           break;
+        }
         case 'delete':
           // When selection is collapsed, delete one character in the given direction
           // When selection is a range, delete the entire selection (no unit option)
@@ -696,6 +761,10 @@ const SyncedSlateToolbar = ({
         }
         default:
           log('ERROR: Unknown transform type:', type);
+      }
+      } finally {
+        editor._batchingTransform = false;
+        handleChange(editor.children);
       }
     };
 
@@ -832,6 +901,10 @@ const SyncedSlateToolbar = ({
   // Handle changes from button clicks (like Volto's handleChange)
   const handleChange = useCallback(
     (newValue) => {
+      // Skip intermediate onChange calls during transform batching (many transforms
+      // do multiple Slate operations; handleChange fires once in applyTransform's finally)
+      if (editor._batchingTransform) return;
+
       const newText = newValue?.[0]?.children?.[0]?.text?.substring(0, 40);
       log('onChange: called, newText:', JSON.stringify(newText), 'selection:', JSON.stringify(editor.selection));
 
@@ -850,27 +923,18 @@ const SyncedSlateToolbar = ({
       }
       log('onChange: values DIFFER! newText:', JSON.stringify(newText), 'currentText:', JSON.stringify(currentText), '- SENDING TO REDUX');
 
-      // Build updated form data with the correct field (supports nested blocks)
-      const updatedBlock = {
-        ...block,
-        [fieldName]: newValue,
-      };
-      const updatedForm = updateBlockInForm(selectedBlock, updatedBlock);
-
-      // NOTE: Don't add _editSequence here - View.jsx adds it when sending FORM_DATA
-      // View.jsx is the authoritative source for sequence numbers
-
-      // Send form data AND selection together atomically to parent
-      // This ensures the iframe receives both in sync
-      // Include requestId if this is from a format operation (allows iframe to match and unblock)
       const formatRequestId = activeFormatRequestIdRef.current;
       activeFormatRequestIdRef.current = null; // Clear after use
-      onChangeFormData(updatedForm, editor.selection, formatRequestId);
 
-      // DON'T increment renderKey here - it would remount <Slate> and reset editor.children
-      // Buttons will re-render naturally when React processes the state updates
+      // Pick up extra blocks from paste emitter extraction
+      const extraBlocks = editor._extraBlocks || null;
+      editor._extraBlocks = null;
+
+      // Send field value change — View.jsx applies it to latest iframeSyncState
+      // (not the stale form prop) inside setIframeSyncState(prev => ...)
+      onChangeFormData(newValue, editor.selection, formatRequestId, extraBlocks);
     },
-    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor, getBlock, updateBlockInForm],
+    [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor, getBlock],
   );
 
   // Get button configuration
