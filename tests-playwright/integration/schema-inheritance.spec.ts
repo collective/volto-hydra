@@ -636,13 +636,12 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const fieldSelect = fieldWrapper.locator('.react-select__control');
     await fieldSelect.click();
 
-    // Wait for dropdown menu to appear and select review_state
+    // Wait for the specific option to appear in the dropdown
     const fieldMenu = page.locator('.react-select__menu');
-    await fieldMenu.waitFor({ state: 'visible', timeout: 3000 });
-
     const reviewStateOption = fieldMenu.locator('.react-select__option', {
       hasText: /Review state|review_state/i,
     });
+    await expect(reviewStateOption).toBeVisible({ timeout: 5000 });
     await reviewStateOption.click();
 
     // Wait for field dropdown to close and sidebar to fully settle after data change.
@@ -661,11 +660,11 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const typeSelect = typeWrapper.locator('.react-select__control');
     const typeMenu = page.locator('.react-select__menu');
     await typeSelect.click();
-    await typeMenu.waitFor({ state: 'visible', timeout: 3000 });
 
     const selectFacetOption = typeMenu.locator('.react-select__option', {
       hasText: /Select/i,
     });
+    await expect(selectFacetOption).toBeVisible({ timeout: 5000 });
     await selectFacetOption.click();
 
     // Verify the facet now renders as a dropdown (select element)
