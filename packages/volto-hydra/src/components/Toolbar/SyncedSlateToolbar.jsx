@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Component } from 'react';
-import { Slate, ReactEditor } from 'slate-react';
+import { Slate, ReactEditor, useSlate } from 'slate-react';
 import { Transforms, Node, Range, Editor, Element, Point } from 'slate';
 import { isEqual, cloneDeep } from 'lodash';
 import config from '@plone/volto/registry';
@@ -124,11 +124,30 @@ function isBlockButton(Btn, BlockButtonRef) {
  * For detailed data flow architecture (format buttons, sidebar editing, hotkeys,
  * block selection), see: docs/slate-transforms-architecture.md
  */
+
+// DEBUG: Component inside <Slate> context to verify useSlate() subscriber re-renders
+let _debugSlateChildRenderCount = 0;
+const DebugSlateChild = () => {
+  const editor = useSlate();
+  _debugSlateChildRenderCount++;
+  const hasStrong = editor.children?.[0]?.children?.some(c => c.type === 'strong');
+  const active = hasStrong ? isBlockActive(editor, 'strong') : false;
+  const selPath = editor.selection?.anchor?.path;
+  if (hasStrong) {
+    log('DEBUG_SLATE_CHILD render #' + _debugSlateChildRenderCount +
+      ': hasStrong:', hasStrong, 'isBlockActive(strong):', active,
+      'selection:', JSON.stringify(selPath),
+      'children:', JSON.stringify(editor.children?.[0]?.children?.map(c => ({ type: c.type, text: c.text?.substring(0,10) }))));
+  }
+  return null;
+};
+
 const SyncedSlateToolbar = ({
   selectedBlock,
   form,
   blockPathMap,
   currentSelection,
+  _selectionSource,
   mouseActivityCounter,
   onChangeFormData,
   completedFlushRequestId,
@@ -458,7 +477,11 @@ const SyncedSlateToolbar = ({
             Transforms.select(editor, afterPoint);
             // Selection-only change won't trigger handleChange, so manually send FORM_DATA
             if (requestId) {
-              onChangeFormData(null, editor.selection, requestId);
+              const exitSel = editor.selection ? {
+                anchor: { path: [...editor.selection.anchor.path], offset: editor.selection.anchor.offset },
+                focus: { path: [...editor.selection.focus.path], offset: editor.selection.focus.offset },
+              } : null;
+              onChangeFormData(null, exitSel, requestId);
               activeFormatRequestIdRef.current = null;
             }
           } else {
@@ -557,9 +580,12 @@ const SyncedSlateToolbar = ({
     // Helper to apply transform based on type.
     // Wraps all transforms in _batchingTransform to suppress intermediate onChange
     // calls (many transforms do multiple Slate operations, each firing onChange).
-    // handleChange fires once in the finally block with the final editor state.
+    // When called standalone, handleChange fires once in the finally block.
+    // When called inside replaceEditorContent (outer batching), the caller is
+    // responsible for calling handleChange after replaceEditorContent returns.
     const applyTransform = () => {
       const { type, requestId } = transformAction;
+      const outerBatching = editor._batchingTransform;
       editor._batchingTransform = true;
       try {
       switch (type) {
@@ -759,8 +785,15 @@ const SyncedSlateToolbar = ({
           log('ERROR: Unknown transform type:', type);
       }
       } finally {
-        editor._batchingTransform = false;
-        handleChange(editor.children);
+        if (!outerBatching) {
+          // We own the batching — finalize: un-batch and send one handleChange
+          editor._batchingTransform = false;
+          const hasStrongAfter = editor.children?.[0]?.children?.some(c => c.type === 'strong');
+          log('FINALLY: _batchingTransform=false, calling handleChange. hasStrong:', hasStrongAfter);
+          handleChange(editor.children);
+        }
+        // else: outer batching context (replaceEditorContent) will call
+        // handleChange once after withoutNormalizing exits + normalizes
       }
     };
 
@@ -784,7 +817,21 @@ const SyncedSlateToolbar = ({
         onTransformApplied?.();
       } : null;
 
+      // When running a transform inside replaceEditorContent, suppress ALL
+      // intermediate onChange→handleChange calls. Without this, each Slate
+      // operation (removeNodes, insertNodes, select, normalize) fires
+      // editor.onChange→handleChange→onChangeFormData with intermediate state.
+      // The normalization after withoutNormalizing can send a stale selection
+      // that overwrites the correct post-transform selection.
+      if (transformCallback) {
+        editor._batchingTransform = true;
+      }
       replaceEditorContent(fieldValue, currentSelection, transformCallback);
+      if (transformCallback) {
+        // Single handleChange with the final post-transform + normalized state
+        editor._batchingTransform = false;
+        handleChange(editor.children);
+      }
 
       // Debug: check what editor.children looks like after replace
       log('SYNC: After replaceEditorContent, editor.children[0].children[0].text:',
@@ -796,6 +843,7 @@ const SyncedSlateToolbar = ({
 
       // Update internalValueRef from editor.children AFTER transform (not fieldValue)
       internalValueRef.current = editor.children;
+      log('SYNC: After content+transform batch, editor has strong:', editor.children?.[0]?.children?.some(c => c.type === 'strong'), 'selection:', JSON.stringify(editor.selection));
 
     } else if (hasUnprocessedTransform) {
       // No content sync needed (sequence check passed), but transform is pending
@@ -809,10 +857,13 @@ const SyncedSlateToolbar = ({
       // iframe typed text but the sequence didn't change (e.g., typing during blocking).
       if (contentIsDifferent) {
         log('SYNC: Content differs, syncing before transform');
+        editor._batchingTransform = true;
         replaceEditorContent(fieldValue, currentSelection, () => {
           log('SYNC: Applying transform after content sync');
           applyTransform();
         });
+        editor._batchingTransform = false;
+        handleChange(editor.children);
         internalValueRef.current = editor.children;
       } else {
         log('SYNC: Applying transform (content already synced)');
@@ -831,14 +882,24 @@ const SyncedSlateToolbar = ({
         }
         applyTransform();
       }
+      log('SYNC: After transform-only, editor has strong:', editor.children?.[0]?.children?.some(c => c.type === 'strong'), 'selection:', JSON.stringify(editor.selection));
 
-    } else if (!contentNeedsSync && currentSelection && !isEqual(currentSelection, editor.selection)) {
+    } else if (!contentNeedsSync && !hasUnprocessedTransform) {
+      // Log editor state when no sync/transform needed — helps trace format overwrite
+      const hasStrong = editor.children?.[0]?.children?.some(c => c.type === 'strong');
+      const selPath = editor.selection?.anchor?.path;
+      if (hasStrong) {
+        log('SYNC: idle with strong in editor, selection path:', JSON.stringify(selPath), 'children:', JSON.stringify(editor.children?.[0]?.children?.map(c => c.type || c.text?.substring(0,10))));
+      }
+    }
+
+    if (!contentNeedsSync && !hasUnprocessedTransform && currentSelection && !isEqual(currentSelection, editor.selection)) {
       // Check if selection needs update
       const isValid = isSelectionValidForDocument(currentSelection, editor.children);
       if (isValid) {
         // Selection-only change - update editor's selection
         // This handles clicks that move cursor without changing content
-        log('SYNC: Selection-only change, updating editor.selection:', JSON.stringify(currentSelection));
+        log('SYNC: Selection-only change, updating editor.selection:', JSON.stringify(currentSelection), 'source:', _selectionSource);
         try {
           Transforms.select(editor, currentSelection);
         } catch (e) {
@@ -926,9 +987,16 @@ const SyncedSlateToolbar = ({
       const extraBlocks = editor._extraBlocks || null;
       editor._extraBlocks = null;
 
+      // Snapshot selection to prevent Slate's Object.assign mutation from
+      // corrupting iframeSyncState through shared reference (Slate mutates
+      // editor.selection in-place via Object.assign in apply/set_selection)
+      const selSnapshot = editor.selection ? {
+        anchor: { path: [...editor.selection.anchor.path], offset: editor.selection.anchor.offset },
+        focus: { path: [...editor.selection.focus.path], offset: editor.selection.focus.offset },
+      } : null;
       // Send field value change — View.jsx applies it to latest iframeSyncState
       // (not the stale form prop) inside setIframeSyncState(prev => ...)
-      onChangeFormData(newValue, editor.selection, formatRequestId, extraBlocks);
+      onChangeFormData(newValue, selSnapshot, formatRequestId, extraBlocks);
     },
     [form, selectedBlock, onChangeFormData, blockUI?.focusedFieldName, editor, getBlock],
   );
@@ -1069,6 +1137,14 @@ const SyncedSlateToolbar = ({
     : hasValidSlateValue
     ? fieldValue
     : [{type: 'p', children: [{text: ''}]}];
+
+  // DEBUG: Check what the bold button SHOULD see during render
+  const _debugStrongActive = isBlockActive(editor, 'strong');
+  const _debugHasStrong = editor.children?.[0]?.children?.some(c => c.type === 'strong');
+  const _debugSelPath = editor.selection?.anchor?.path;
+  if (_debugHasStrong) {
+    log('RENDER: isBlockActive(strong):', _debugStrongActive, 'hasStrong:', _debugHasStrong, 'editorSel:', JSON.stringify(_debugSelPath), 'propSel:', JSON.stringify(currentSelection?.anchor?.path), 'children:', editor.children?.[0]?.children?.length, 'selSameRef:', currentSelection === editor.selection);
+  }
 
   // DEBUG: Log first li keys during render to trace when corruption happens
   if (currentValue?.[0]?.children?.[0]) {
@@ -1233,6 +1309,7 @@ const SyncedSlateToolbar = ({
                 initialValue={currentValue}
                 onChange={handleChange}
               >
+                <DebugSlateChild />
                 <>
                   {/* Format dropdown for block-level buttons - only show if room */}
                   {showFormatDropdown && (

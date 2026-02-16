@@ -709,7 +709,18 @@ test.describe('Inline Editing - Formatting', () => {
     // Toggle bold ON, type "bold"
     await editor.press('ControlOrMeta+b');
     await expect(async () => {
-      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+      const toolbar = page.locator('.quanta-toolbar');
+      const toolbarCount = await toolbar.count();
+      const toolbarDisplay = toolbarCount > 0 ? await toolbar.first().evaluate(el => el.style.display) : 'N/A';
+      const toolbarOpacity = toolbarCount > 0 ? await toolbar.first().evaluate(el => el.style.opacity) : 'N/A';
+      const boldBtn = page.locator('.quanta-toolbar [title*="Bold" i]');
+      const btnCount = await boldBtn.count();
+      const btnClasses = btnCount > 0 ? await boldBtn.first().evaluate(el => el.className) : 'N/A';
+      const isActive = await helper.isActiveFormatButton('bold');
+      if (!isActive) {
+        console.log(`[DEBUG-BOLD] toolbar=${toolbarCount} display=${toolbarDisplay} opacity=${toolbarOpacity} btnCount=${btnCount} classes="${btnClasses}" isActive=${isActive}`);
+      }
+      expect(isActive).toBe(true);
     }).toPass({ timeout: 5000 });
     await helper.waitForEditorFocus(editor);
     await helper.waitForCursorPosition(editor, 'Hello ');

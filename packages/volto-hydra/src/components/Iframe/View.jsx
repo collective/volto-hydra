@@ -1387,6 +1387,7 @@ const Iframe = (props) => {
               formData: event.data.data,
               blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
+              _selectionSource: 'INLINE_EDIT_DATA:new',
               ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
             }));
             // Strip _editSequence when updating Redux - sequence numbers are for iframe
@@ -1396,13 +1397,17 @@ const Iframe = (props) => {
             log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux (without _editSequence)');
             onChangeFormData(formDataWithoutSeq);
           } else {
-            // Echo or stale - only update selection and flush state
-            log('INLINE_EDIT_DATA: echo/stale, only updating selection');
-            setIframeSyncState(prev => ({
-              ...prev,
-              selection: event.data.selection || null,
-              ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
-            }));
+            // Echo or stale - only update flush state (NOT selection).
+            // The iframe may echo back a wrong cursor position (e.g., [0,0]
+            // instead of [0,1,0] inside a prospective-format node). The admin
+            // already has the authoritative selection from the format transform.
+            log('INLINE_EDIT_DATA: echo/stale, updating flush state only (ignoring selection)');
+            if (event.data.flushRequestId) {
+              setIframeSyncState(prev => ({
+                ...prev,
+                completedFlushRequestId: event.data.flushRequestId,
+              }));
+            }
           }
           break;
 
@@ -1412,6 +1417,7 @@ const Iframe = (props) => {
           setIframeSyncState(prev => ({
             ...prev,
             selection: event.data.selection || null,
+            _selectionSource: 'BUFFER_FLUSHED',
             completedFlushRequestId: event.data.requestId,
           }));
           break;
@@ -1706,6 +1712,7 @@ const Iframe = (props) => {
               formData: event.data.data,
               blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
+              _selectionSource: 'SLATE_TRANSFORM_REQUEST',
               transformAction: transformAction,
             }));
           }
@@ -2664,11 +2671,13 @@ const Iframe = (props) => {
     // NOTE: Do NOT clear pendingSelectBlockUid here - keep it set until BLOCK_SELECTED
     // is received for that block. This prevents race conditions where another block
     // (e.g., parent container) gets selected during re-render and we send SELECT_BLOCK for it.
+    log('PROPS_SYNC: overwriting iframeSyncState. prev.selection:', JSON.stringify(iframeSyncState.selection?.anchor?.path), 'newSelection:', JSON.stringify(newSelection?.anchor?.path), 'prevSource:', iframeSyncState._selectionSource);
     setIframeSyncState(prev => ({
       ...prev,
       formData: formWithSequence,
       blockPathMap: newBlockPathMap,
       selection: newSelection,
+      _selectionSource: 'PROPS_SYNC',
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
     }));
 
@@ -3215,13 +3224,15 @@ const Iframe = (props) => {
             form={iframeSyncState.formData}
             blockPathMap={iframeSyncState.blockPathMap}
             currentSelection={iframeSyncState.selection}
+            _selectionSource={iframeSyncState._selectionSource}
             mouseActivityCounter={mouseActivityCounter}
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}
             onChangeFormData={(newFieldValue, selection, formatRequestId, extraBlocks) => {
               log('onChangeFormData callback called, formatRequestId:', formatRequestId,
-                'hasFieldValue:', newFieldValue != null, 'extraBlocks:', extraBlocks?.length || 0);
+                'hasFieldValue:', newFieldValue != null, 'extraBlocks:', extraBlocks?.length || 0,
+                'selectionPath:', JSON.stringify(selection?.anchor?.path), 'selectionOffset:', selection?.anchor?.offset);
 
               // Apply field value change and/or extra blocks to the latest
               // iframeSyncState (via prev), not the stale form prop snapshot.
@@ -3254,11 +3265,16 @@ const Iframe = (props) => {
                   pendingSelectBlockUid = lastId;
                 }
 
+                const newSel = selection || prev.selection;
+                log('onChangeFormData updater: prevSelPath:', JSON.stringify(prev.selection?.anchor?.path),
+                  'newSelPath:', JSON.stringify(newSel?.anchor?.path), 'newSelOffset:', newSel?.anchor?.offset,
+                  'selSameRef:', selection === prev.selection, 'formatRequestId:', formatRequestId);
                 return {
                   ...prev,
                   formData: fd,
                   blockPathMap: bpm,
-                  selection: selection || prev.selection,
+                  selection: newSel,
+                  _selectionSource: selection ? 'onChangeFormData:toolbar' : prev._selectionSource,
                   toolbarRequestDone: formatRequestId || prev.toolbarRequestDone,
                   ...(pendingSelectBlockUid ? { pendingSelectBlockUid } : {}),
                 };

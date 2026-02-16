@@ -1845,6 +1845,13 @@ export class Bridge {
               this._formDataQueue = event.data;
               return;
             }
+            // Set expectedSelectionFromAdmin BEFORE the render so that any
+            // selectionchange from DOM re-render is suppressed. Without this,
+            // the selectionchange fires before afterContentRender's double-rAF
+            // sets it, sending a stale [0,0] selection back to the admin.
+            if (event.data.transformedSelection) {
+              this.expectedSelectionFromAdmin = event.data.transformedSelection;
+            }
             log('Calling onEditChange callback to trigger re-render');
             this._executeRender(callback, {
               transformedSelection: event.data.transformedSelection,
@@ -4480,7 +4487,8 @@ export class Bridge {
 
         let selectionRestored = true;
         if (transformedSelection) {
-          this.expectedSelectionFromAdmin = transformedSelection;
+          // expectedSelectionFromAdmin was already set before the render
+          // (in the FORM_DATA handler) to suppress re-render selectionchanges.
           try {
             selectionRestored = await this.restoreSlateSelection(transformedSelection, this.formData);
           } catch (e) {
@@ -4491,6 +4499,9 @@ export class Bridge {
             log('Selection restore failed — dropping', this.eventBuffer.length, 'buffered events to avoid wrong-selection replay');
             this.eventBuffer = [];
           }
+          // Clear after a brief settling period to catch trailing selectionchanges
+          // from DOM attribute updates (contenteditable, nodeIds, etc.)
+          setTimeout(() => { this.expectedSelectionFromAdmin = null; }, 100);
         }
 
         if (needsBlockSwitch && adminSelectedBlockUid) {
@@ -5040,33 +5051,12 @@ export class Bridge {
           // Check if this selection matches what Admin just sent us
           // If so, this is the result of restoring their selection - don't echo it back
           if (this.expectedSelectionFromAdmin) {
-            // We're expecting a specific selection from Admin
-            if (!this.savedSelection) {
-              // Selection serialization failed (DOM might be re-rendering)
-              // Don't send anything yet - wait for stable DOM
-              log('selectionchange: expectedSelectionFromAdmin set but savedSelection null - waiting');
-              return;
-            }
-            const expected = this.expectedSelectionFromAdmin;
-            const current = this.savedSelection;
-            // Compare anchor and focus paths and offsets
-            const matches =
-              JSON.stringify(expected.anchor) === JSON.stringify(current.anchor) &&
-              JSON.stringify(expected.focus) === JSON.stringify(current.focus);
-            log('selectionchange: comparing selections', {
-              expected: JSON.stringify(expected),
-              current: JSON.stringify(current),
-              matches,
-            });
-            if (matches) {
-              // Same selection as Admin sent - this is the restore, suppress it
-              log('Selection matches Admin restore - not sending back');
-              return;
-            } else {
-              // Different selection - user moved cursor/selected text, clear expected
-              log('Selection differs from Admin restore - user action');
-              this.expectedSelectionFromAdmin = null;
-            }
+            // Admin sent a selection to restore (via FORM_DATA transformedSelection).
+            // Suppress ALL selectionchanges while set — they're either the
+            // successful restore or re-render artifacts from DOM replacement.
+            // afterContentRender clears this after restoreSlateSelection completes.
+            log('selectionchange: expectedSelectionFromAdmin set, suppressing');
+            return;
           } else {
             log('selectionchange: no expectedSelectionFromAdmin, sending new selection');
           }
