@@ -98,6 +98,11 @@ const getBlockTitle = (blockData) => {
   const blockType = blockData?.['@type'];
   if (!blockType) return 'Block';
 
+  // Fixed template blocks: show plaintext content so users can identify them
+  if (blockData.fixed && blockData.plaintext) {
+    return blockData.plaintext;
+  }
+
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   return blockConfig?.title || blockType;
 };

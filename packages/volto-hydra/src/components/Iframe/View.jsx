@@ -2006,6 +2006,16 @@ const Iframe = (props) => {
             onSelectBlock(event.data.blockUid);
           }
 
+          // Deselection: just call onSelectBlock(null) — skip blockUI/addability updates.
+          // The selectedBlock useEffect will set blockUI to null.
+          // Without this early return, setBlockUI({ blockUid: null }) creates a truthy
+          // object that causes a brief intermediate render where the sidebar checks
+          // blockUI (truthy) and renders block-level UI instead of page-level UI.
+          if (!event.data.blockUid) {
+            setBlockUI(null);
+            break;
+          }
+
           // Check if we can add/replace at this block - if so, open block chooser for empty blocks
           // This should happen on every click of an empty block, not just "new" selections
           // BlockChooser will dynamically decide to mutate vs insert based on selected block type

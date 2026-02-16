@@ -2182,7 +2182,13 @@ export class Bridge {
     if (!this._escapeKeyHandler) {
       this._escapeKeyHandler = (e) => {
         if (e.key !== 'Escape') return;
-        if (!this.selectedBlockUid) return;
+        // If no block is selected in iframe, still send deselect to admin —
+        // the admin may have a selectedBlock (from Redux) that the iframe
+        // hasn't processed yet (e.g., during INITIAL_DATA waitForStable).
+        if (!this.selectedBlockUid) {
+          this.sendBlockSelected('escapeKey', null);
+          return;
+        }
 
         // Don't interfere with escape in modals, dropdowns, etc.
         const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
@@ -11214,6 +11220,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
     }
   }
 
+  // Track previous templateId before allowedLayouts may override it
+  const previousTemplateId = templateId;
+
   if (allowedLayouts?.length > 0) {
     if (!templateId || !allowedLayouts.includes(templateId)) {
       templateId = allowedLayouts[0];
@@ -11221,6 +11230,19 @@ export function expandTemplatesSync(inputItems, options = {}) {
         existingInstanceId = null;
       }
     }
+  }
+
+  // Template removal: allowedLayouts forced null but a template was applied.
+  // Use same merge logic with a synthetic "container" template (just a default slot)
+  // so content is properly extracted from nested structures, then strip markers.
+  let removingTemplate = false;
+  if (!templateId && previousTemplateId) {
+    removingTemplate = true;
+    templateId = '__none__';
+    templates['__none__'] = {
+      blocks: { '__default__': { '@type': 'slate', placeholder: 'default' } },
+      blocks_layout: { items: ['__default__'] },
+    };
   }
 
   // No template to apply - pass through
@@ -11512,6 +11534,20 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   for (const { blockId, block } of trailingStandaloneBlocks) {
     addItem(block, blockId);
+  }
+
+  // Template removal: strip all template markers so blocks are clean
+  if (removingTemplate) {
+    for (const item of items) {
+      delete item.templateId;
+      delete item.templateInstanceId;
+      delete item.placeholder;
+      delete item.fixed;
+      delete item.readOnly;
+      delete item.nextPlaceholder;
+      delete item.childPlaceholders;
+      delete item._orphaned;
+    }
   }
 
   return items;
