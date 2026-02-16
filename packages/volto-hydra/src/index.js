@@ -454,33 +454,55 @@ const applyConfig = (config) => {
   //    deserializer doesn't wrap TD/TH text children in paragraphs. Normalize
   //    them to [{ type:'p', children:[{ text:'Name' }] }] to match the format
   //    Volto produces when creating tables normally.
-  if (config.settings.slate?.voltoBlockEmiters) {
-    config.settings.slate.voltoBlockEmiters =
-      config.settings.slate.voltoBlockEmiters.map((emitter) => {
-        if (emitter.name === 'extractTables') {
-          return (editor, pathRef) => {
-            const blocks = emitter(editor, pathRef);
-            for (const [, blockData] of blocks) {
-              if (blockData['@type'] === 'table') {
-                blockData['@type'] = 'slateTable';
-              }
-              // Wrap bare text cell values in paragraph nodes
-              for (const row of blockData.table?.rows || []) {
-                for (const cell of row.cells || []) {
-                  if (
-                    cell.value?.length > 0 &&
-                    cell.value.every((n) => typeof n.text === 'string' && !n.type)
-                  ) {
-                    cell.value = [{ type: 'p', children: cell.value }];
-                  }
-                }
-              }
-            }
-            return blocks;
-          };
+  // Wrap the entire emitter array with a getter so fixes apply regardless of
+  // addon load order (extractTables may be added after our config runs).
+  if (config.settings.slate) {
+    const fixTableBlock = (blockData) => {
+      if (blockData['@type'] === 'table') {
+        blockData['@type'] = 'slateTable';
+      }
+      for (const row of blockData.table?.rows || []) {
+        for (const cell of row.cells || []) {
+          if (
+            cell.value?.length > 0 &&
+            cell.value.every((n) => typeof n.text === 'string' && !n.type)
+          ) {
+            cell.value = [{ type: 'p', children: cell.value }];
+          }
         }
-        return emitter;
-      });
+      }
+    };
+
+    // Use a getter on the slate config so we intercept the emitter array
+    // at call time, not at config time. This way even emitters added by
+    // addons that install after us get wrapped.
+    let _emiters = config.settings.slate.voltoBlockEmiters || [];
+    let _wrappedEmiters = null;
+    let _wrappedSource = null;
+    Object.defineProperty(config.settings.slate, 'voltoBlockEmiters', {
+      get() {
+        // Re-wrap only when the source array changes
+        if (_wrappedSource !== _emiters) {
+          _wrappedSource = _emiters;
+          _wrappedEmiters = _emiters.map((emitter) => {
+            return (editor, pathRef) => {
+              const blocks = emitter(editor, pathRef);
+              for (const [, blockData] of blocks) {
+                fixTableBlock(blockData);
+              }
+              return blocks;
+            };
+          });
+        }
+        return _wrappedEmiters;
+      },
+      set(val) {
+        _emiters = val;
+        _wrappedSource = null; // Invalidate cache
+      },
+      configurable: true,
+      enumerable: true,
+    });
   }
 
   return config;
