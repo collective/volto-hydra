@@ -7076,15 +7076,12 @@ export class Bridge {
           log('Undo detected');
           e.preventDefault();
 
-          // Small delay to ensure any pending updates are processed
-          setTimeout(() => {
-            // Don't block processing - let the undo manager's FORM_DATA update come through
-            this.sendMessageToParent({
-              type: 'SLATE_UNDO_REQUEST',
-              blockId: blockUid,
-            });
-            log('SLATE_UNDO_REQUEST message sent');
-          }, 50);
+          // Flush pending text so undo manager has the latest state
+          this.flushPendingTextUpdates();
+          this.sendMessageToParent({
+            type: 'SLATE_UNDO_REQUEST',
+            blockId: blockUid,
+          });
           return;
         }
 
@@ -7093,15 +7090,12 @@ export class Bridge {
           log('Redo detected');
           e.preventDefault();
 
-          // Small delay to ensure any pending updates are processed
-          setTimeout(() => {
-            // Don't block processing - let the undo manager's FORM_DATA update come through
-            this.sendMessageToParent({
-              type: 'SLATE_REDO_REQUEST',
-              blockId: blockUid,
-            });
-            log('SLATE_REDO_REQUEST message sent');
-          }, 50);
+          // Flush pending text so redo manager has the latest state
+          this.flushPendingTextUpdates();
+          this.sendMessageToParent({
+            type: 'SLATE_REDO_REQUEST',
+            blockId: blockUid,
+          });
           return;
         }
 

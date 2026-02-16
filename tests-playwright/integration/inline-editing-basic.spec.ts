@@ -356,30 +356,21 @@ test.describe('Inline Editing - Basic', () => {
     let text = await helper.getCleanTextContent(editor);
     expect(text).toBe('First Second');
 
-    // Check what's in the sidebar before undo
+    // Wait for text to sync to sidebar (300ms debounce + render)
     await helper.openSidebarTab('Block');
-    let sidebarValue = await helper.getSidebarFieldValue('value');
-    console.log('[TEST] Sidebar text before undo:', sidebarValue);
-    expect(sidebarValue).toBe('First Second');
+    await helper.waitForFieldValueToBe('value', 'First Second');
 
     // Undo - should remove " Second"
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(200);
 
-    // Check sidebar first
-    sidebarValue = await helper.getSidebarFieldValue('value');
-    console.log('[TEST] Sidebar text after undo:', sidebarValue);
-    expect(sidebarValue).toBe('First');
-
-    // Then check iframe
-    text = await helper.getCleanTextContent(editor);
-    expect(text).toBe('First');
+    // Wait for undo to propagate to sidebar and iframe
+    await helper.waitForFieldValueToBe('value', 'First');
+    await helper.waitForEditorText(editor, /^First$/);
 
     // Redo - should restore "Second"
     await page.keyboard.press('Control+Shift+z');
-    await page.waitForTimeout(200);
-    text = await helper.getCleanTextContent(editor);
-    expect(text).toBe('First Second');
+    await helper.waitForFieldValueToBe('value', 'First Second');
+    await helper.waitForEditorText(editor, /^First Second$/);
   });
 
   test('pressing Enter at end of line creates new Slate block', async ({ page }) => {
