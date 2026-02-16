@@ -634,15 +634,17 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const fieldWrapper = page.locator('#sidebar-properties .field-wrapper-field');
     await expect(fieldWrapper).toBeVisible({ timeout: 5000 });
     const fieldSelect = fieldWrapper.locator('.react-select__control');
-    await fieldSelect.click();
 
-    // Wait for the specific option to appear in the dropdown
+    // Sidebar re-renders after adding a facet can close the dropdown between
+    // opening it and clicking the option. Retry the whole sequence.
     const fieldMenu = page.locator('.react-select__menu');
     const reviewStateOption = fieldMenu.locator('.react-select__option', {
       hasText: /Review state|review_state/i,
     });
-    await expect(reviewStateOption).toBeVisible({ timeout: 5000 });
-    await reviewStateOption.click();
+    await expect(async () => {
+      await fieldSelect.click({ timeout: 1000 });
+      await reviewStateOption.click({ timeout: 2000 });
+    }).toPass({ timeout: 10000 });
 
     // Wait for field dropdown to close and sidebar to fully settle after data change.
     // Selecting a field triggers onChangeBlock → Redux → sidebar re-render cascade.
