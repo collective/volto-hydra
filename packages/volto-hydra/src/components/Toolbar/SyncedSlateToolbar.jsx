@@ -577,8 +577,6 @@ const SyncedSlateToolbar = ({
             dt.setData('text/plain', pasteContent);
           }
           editor.insertData(dt);
-          log('PASTE: after insertData, children count:', editor.children.length,
-            'children:', JSON.stringify(editor.children).substring(0, 500));
 
           // Run voltoBlockEmiters (extractImages, extractTables) on the editor
           // to extract inline images/tables into separate block tuples.
@@ -618,8 +616,6 @@ const SyncedSlateToolbar = ({
 
             pathRefs.forEach((ref) => ref.unref());
 
-            log('PASTE: extracted', extraBlocks.length, 'extra blocks:',
-              extraBlocks.map(([id, data]) => `${id.substring(0,8)}:${data['@type']}`));
             if (extraBlocks.length > 0) {
               editor._extraBlocks = extraBlocks;
             }
