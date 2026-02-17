@@ -570,12 +570,29 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const initialCount = await initialFacets.count();
     expect(initialCount).toBe(2); // facet-type and facet-state
 
-    // Click on a facet title to select it (avoid clicking checkboxes)
-    await helper.clickBlockInIframe('facet-type', {
-      selector: '[data-editable-field="title"]',
-    });
+    // Wait for iframe to finish re-rendering after initial load —
+    // expanding facets triggers multiple FORM_DATA updates to iframe.
+    await helper.getStableBlockCount();
 
-    // Toolbar should appear
+    // Select the facet entirely via sidebar to avoid clicking interactive
+    // checkboxes in the iframe. Press Escape to get to page level, then
+    // drill down: Search block → Content Type facet.
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+
+    const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
+    await expect(pageChildBlocks).toBeVisible({ timeout: 5000 });
+    const searchItem = pageChildBlocks.locator('.child-block-item', { hasText: 'Search' });
+    await expect(searchItem).toBeVisible({ timeout: 5000 });
+    await searchItem.click();
+
+    // Now click the Content Type facet in the search block's child list
+    const facetItem = page.locator('.child-block-item', { hasText: 'Content Type' });
+    await expect(facetItem).toBeVisible({ timeout: 5000 });
+    await facetItem.click();
+
+    // Wait for facet to be selected and toolbar to appear
+    await helper.waitForBlockSelected('facet-type', 5000);
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
@@ -604,6 +621,11 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const newFacet = iframe.locator(`[data-block-uid="${newFacetId}"]`);
     await helper.waitForBlockSelected(newFacetId!, 10000);
 
+    // Wait for iframe blocks to stabilize — adding a facet triggers re-renders
+    // that cause sidebar re-mounts, detaching react-select DOM nodes mid-click
+    await helper.getStableBlockCount();
+    await helper.waitForSidebarOpen();
+
     // Wait for sidebar to show the NEW facet (not the old "Content Type" facet)
     // The old facet has Label="Content Type"; new empty facet does not
     await expect(page.locator('#sidebar-properties')).not.toContainText('Content Type', { timeout: 5000 });
@@ -612,31 +634,39 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const fieldWrapper = page.locator('#sidebar-properties .field-wrapper-field');
     await expect(fieldWrapper).toBeVisible({ timeout: 5000 });
     const fieldSelect = fieldWrapper.locator('.react-select__control');
-    await fieldSelect.click();
 
-    // Wait for dropdown menu to appear and select review_state
+    // Sidebar re-renders after adding a facet can close the dropdown between
+    // opening it and clicking the option. Retry the whole sequence.
     const fieldMenu = page.locator('.react-select__menu');
-    await fieldMenu.waitFor({ state: 'visible', timeout: 3000 });
-
     const reviewStateOption = fieldMenu.locator('.react-select__option', {
       hasText: /Review state|review_state/i,
     });
-    await reviewStateOption.click();
+    await expect(async () => {
+      await fieldSelect.click({ timeout: 1000 });
+      await reviewStateOption.click({ timeout: 2000 });
+    }).toPass({ timeout: 10000 });
+
+    // Wait for field dropdown to close and sidebar to fully settle after data change.
+    // Selecting a field triggers onChangeBlock → Redux → sidebar re-render cascade.
+    // Wait for the selected value to appear in the control, confirming re-render is done.
+    await fieldMenu.waitFor({ state: 'hidden', timeout: 3000 });
+    await expect(fieldWrapper.locator('.react-select__single-value')).toContainText(
+      /Review state|review_state/i,
+      { timeout: 5000 },
+    );
 
     // Now find and set the facet type to selectFacet
     const typeWrapper = page.locator('#sidebar-properties .field-wrapper-type');
     await expect(typeWrapper).toBeVisible({ timeout: 5000 });
 
     const typeSelect = typeWrapper.locator('.react-select__control');
-    await typeSelect.click();
-
-    // Wait for type dropdown and select selectFacet
     const typeMenu = page.locator('.react-select__menu');
-    await typeMenu.waitFor({ state: 'visible', timeout: 3000 });
+    await typeSelect.click();
 
     const selectFacetOption = typeMenu.locator('.react-select__option', {
       hasText: /Select/i,
     });
+    await expect(selectFacetOption).toBeVisible({ timeout: 5000 });
     await selectFacetOption.click();
 
     // Verify the facet now renders as a dropdown (select element)

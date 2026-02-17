@@ -652,6 +652,171 @@ test.describe('Inline Editing - Formatting', () => {
     }).toPass({ timeout: 5000 });
   });
 
+  test('typing space immediately after format toggle is not lost (buffer replay)', async ({
+    page,
+  }, testInfo) => {
+    const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Inject run ID into iframe so hydra.js log() includes it
+    const iframe = helper.getIframe();
+    await iframe.locator('body').evaluate((_, id) => {
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
+
+    const blockId = 'block-1-uuid';
+
+    // Enter edit mode and type initial text
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Toggle bold ON and immediately type " world" — no waiting for
+    // the format round-trip to complete. The space and subsequent chars
+    // should be buffered during blocking and replayed without loss.
+    await editor.press('ControlOrMeta+b');
+    await editor.pressSequentially(' world', { delay: 10 });
+
+    // Wait for everything to settle and verify no characters were lost
+    await expect(async () => {
+      const textContent = await helper.getCleanTextContent(editor);
+      const innerHTML = await editor.evaluate(el => el.innerHTML);
+      const rawText = await editor.evaluate(el => el.textContent);
+      console.log(`${RUN} innerHTML:`, innerHTML);
+      console.log(`${RUN} rawText:`, JSON.stringify(rawText));
+      console.log(`${RUN} cleanText:`, JSON.stringify(textContent));
+      expect(textContent).toBe('Hello world');
+    }).toPass({ timeout: 10000 });
+  });
+
+  test('prospective formatting: user-typed space not destroyed by ensureValidInsertionTarget', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Hello ', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello/);
+
+    // Toggle bold ON, type "bold"
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      const toolbar = page.locator('.quanta-toolbar');
+      const toolbarCount = await toolbar.count();
+      const toolbarDisplay = toolbarCount > 0 ? await toolbar.first().evaluate(el => el.style.display) : 'N/A';
+      const toolbarOpacity = toolbarCount > 0 ? await toolbar.first().evaluate(el => el.style.opacity) : 'N/A';
+      const boldBtn = page.locator('.quanta-toolbar [title*="Bold" i]');
+      const btnCount = await boldBtn.count();
+      const btnClasses = btnCount > 0 ? await boldBtn.first().evaluate(el => el.className) : 'N/A';
+      const isActive = await helper.isActiveFormatButton('bold');
+      if (!isActive) {
+        console.log(`[DEBUG-BOLD] toolbar=${toolbarCount} display=${toolbarDisplay} opacity=${toolbarOpacity} btnCount=${btnCount} classes="${btnClasses}" isActive=${isActive}`);
+      }
+      expect(isActive).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+    await helper.waitForCursorPosition(editor, 'Hello ');
+    await editor.pressSequentially('bold', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold/);
+
+    // Toggle bold OFF, type " normal"
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(false);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+    await helper.waitForCursorPosition(editor, 'Hello bold');
+    await editor.pressSequentially(' normal', { delay: 10 });
+    await helper.waitForEditorText(editor, /Hello bold normal/);
+
+    // Toggle bold ON again
+    await editor.press('ControlOrMeta+b');
+    await expect(async () => {
+      expect(await helper.isActiveFormatButton('bold')).toBe(true);
+    }).toPass({ timeout: 5000 });
+    await helper.waitForEditorFocus(editor);
+    await helper.waitForCursorPosition(editor, 'Hello bold normal');
+
+    // INSTRUMENT: Install a MutationObserver INSIDE the iframe on the block element.
+    // Must use frame.evaluate since iframe is cross-origin.
+    const iframeHandle = await page.waitForSelector('#previewIframe');
+    const frame = await iframeHandle.contentFrame();
+    await frame!.evaluate((blockId) => {
+      const blockEl = document.querySelector(`[data-block-uid="${blockId}"]`);
+      if (!blockEl) {
+        console.error('[DOM-MUTATION] Block element not found:', blockId);
+        return;
+      }
+      console.log('[DOM-MUTATION] Observer installed on block:', blockId,
+        'current text:', blockEl.textContent?.replace(/[\u200B\uFEFF]/g, ''));
+
+      (window as any).__domMutationLog = [];
+      const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          const entry: any = {
+            type: m.type,
+            time: performance.now().toFixed(1),
+            target: (m.target as HTMLElement).nodeName + (
+              (m.target as HTMLElement).getAttribute?.('data-block-uid') ||
+              (m.target as HTMLElement).getAttribute?.('data-node-id') || ''
+            ),
+          };
+          if (m.type === 'childList') {
+            entry.addedNodes = m.addedNodes.length;
+            entry.removedNodes = m.removedNodes.length;
+            if (m.addedNodes.length > 0 || m.removedNodes.length > 0) {
+              const textAfter = blockEl.textContent?.replace(/[\u200B\uFEFF]/g, '');
+              entry.textAfter = textAfter;
+            }
+          } else if (m.type === 'characterData') {
+            entry.oldValue = m.oldValue;
+            entry.newValue = (m.target as Text).textContent;
+          }
+          (window as any).__domMutationLog.push(entry);
+          console.log('[DOM-MUTATION]', JSON.stringify(entry));
+        }
+      });
+      observer.observe(blockEl, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        characterDataOldValue: true,
+      });
+      (window as any).__domObserver = observer;
+    }, blockId);
+
+    // Now type " more" — this is where the space gets lost on Nuxt
+    await editor.pressSequentially(' more', { delay: 50 });
+
+    // Wait a bit for any late renders to complete
+    await page.waitForTimeout(2000);
+
+    // Collect the mutation log from the iframe
+    const mutationLog = await frame!.evaluate(() => (window as any).__domMutationLog || []);
+    console.log('[TEST] Total DOM mutations after typing:', mutationLog.length);
+    for (const entry of mutationLog) {
+      console.log('[TEST] Mutation:', JSON.stringify(entry));
+    }
+
+    // Disconnect the observer
+    await frame!.evaluate(() => {
+      (window as any).__domObserver?.disconnect();
+    });
+
+    // Check the text
+    const textContent = await helper.getCleanTextContent(editor);
+    console.log('[TEST] Final text:', textContent);
+    expect(textContent).toBe('Hello bold normal more');
+  });
+
   test('prospective formatting: toggle in middle of text preserves text to right', async ({
     page,
   }) => {
@@ -851,5 +1016,114 @@ test.describe('Inline Editing - Formatting', () => {
     const boldSelector = helper.getFormatSelector('bold');
     await expect(editor.locator(boldSelector)).toBeVisible();
     expect(await editor.textContent()).toContain('Test with sidebar closed');
+  });
+
+  test('Backspace on last char updates admin state before next action', async ({ page }) => {
+    // When the last character in a text node is deleted, the browser removes the
+    // text node entirely (childList mutation). We need to detect this and update
+    // formData so subsequent actions (like Enter to split) get the correct state.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+
+    // Type a single character
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('x', { delay: 10 });
+    await helper.waitForEditorText(editor, /x/);
+
+    // Delete it — browser removes the text node
+    await editor.press('Backspace');
+
+    // Press Enter to split — if formData was updated correctly, both blocks
+    // should be empty. If stale (still "x"), the new block would contain "x".
+    const initialBlocks = await helper.getStableBlockCount();
+    await editor.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+    // Get the new block
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf(blockId);
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Verify the new block is empty (not "x")
+    const newEditor = await helper.getEditorLocator(newBlockUid);
+    await expect(newEditor).toBeAttached({ timeout: 10000 });
+    await expect(async () => {
+      const newText = await helper.getCleanTextContent(newEditor);
+      expect(newText).toBe('');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Backspace on last char in bold preserves formatting for next typed char', async ({ page }) => {
+    // When the last character inside a <strong> element is deleted, a ZWS should
+    // keep the text node alive so the cursor stays inside the bold context.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+
+    // Type a single character and make it bold
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('a', { delay: 10 });
+    await helper.waitForEditorText(editor, /a/);
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton('bold');
+    await helper.waitForFormattedText(editor, /a/, 'bold');
+
+    // Move to end and delete the bold "a"
+    await editor.press('End');
+    await editor.press('Backspace');
+
+    // Type a new character — it should be bold since cursor was inside <strong>
+    await editor.pressSequentially('b', { delay: 10 });
+
+    // Verify "b" is bold
+    const boldSelector = helper.getFormatSelector('bold');
+    await expect(async () => {
+      await expect(editor.locator(boldSelector)).toContainText('b');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Backspace through heading unwraps then deletes the block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+    const editor = await helper.enterEditMode(blockId);
+
+    const initialBlocks = await helper.getStableBlockCount();
+
+    // Create H2 via markdown shortcut
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('##', { delay: 10 });
+    await editor.press(' ');
+
+    const h2 = iframe.locator(`[data-block-uid="${blockId}"] h2`);
+    await expect(h2).toBeVisible({ timeout: 5000 });
+
+    // Type text into the heading
+    await editor.pressSequentially('abc', { delay: 10 });
+    await expect(h2).toContainText('abc', { timeout: 5000 });
+
+    // Backspace 3 times to delete "abc", once to unwrap H2→P, once to delete block
+    for (let i = 0; i < 3; i++) {
+      await editor.press('Backspace');
+    }
+    // First backspace on empty heading unwraps to paragraph
+    await editor.press('Backspace');
+    // Second backspace on empty paragraph deletes the block
+    await editor.press('Backspace');
+
+    // Block should be removed
+    await helper.waitForBlockCountToBe(initialBlocks - 1, 5000);
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeVisible({ timeout: 5000 });
   });
 });

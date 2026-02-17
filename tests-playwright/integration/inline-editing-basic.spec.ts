@@ -335,7 +335,7 @@ test.describe('Inline Editing - Basic', () => {
     await expect(sidebarEditor).not.toContainText('bold text', { timeout: 5000 });
   });
 
-  test.skip('can undo and redo', async ({ page }) => {
+  test('can undo and redo', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -356,30 +356,21 @@ test.describe('Inline Editing - Basic', () => {
     let text = await helper.getCleanTextContent(editor);
     expect(text).toBe('First Second');
 
-    // Check what's in the sidebar before undo
+    // Wait for text to sync to sidebar (300ms debounce + render)
     await helper.openSidebarTab('Block');
-    let sidebarValue = await helper.getSidebarFieldValue('value');
-    console.log('[TEST] Sidebar text before undo:', sidebarValue);
-    expect(sidebarValue).toBe('First Second');
+    await helper.waitForFieldValueToBe('value', 'First Second');
 
     // Undo - should remove " Second"
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(200);
 
-    // Check sidebar first
-    sidebarValue = await helper.getSidebarFieldValue('value');
-    console.log('[TEST] Sidebar text after undo:', sidebarValue);
-    expect(sidebarValue).toBe('First');
-
-    // Then check iframe
-    text = await helper.getCleanTextContent(editor);
-    expect(text).toBe('First');
+    // Wait for undo to propagate to sidebar and iframe
+    await helper.waitForFieldValueToBe('value', 'First');
+    await helper.waitForEditorText(editor, /^First$/);
 
     // Redo - should restore "Second"
     await page.keyboard.press('Control+Shift+z');
-    await page.waitForTimeout(200);
-    text = await helper.getCleanTextContent(editor);
-    expect(text).toBe('First Second');
+    await helper.waitForFieldValueToBe('value', 'First Second');
+    await helper.waitForEditorText(editor, /^First Second$/);
   });
 
   test('pressing Enter at end of line creates new Slate block', async ({ page }) => {
@@ -458,11 +449,21 @@ test.describe('Inline Editing - Basic', () => {
     await expect(sidebarEditor).toContainText('Second line', { timeout: 5000 });
   });
 
-  test('editing text in Admin UI updates iframe', async ({ page }) => {
+  test('editing text in Admin UI updates iframe', async ({ page }, testInfo) => {
+    const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
+
+    // Inject run ID into admin page (View.jsx) and iframe (hydra.js, renderer)
+    await page.evaluate((id) => {
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
+    const iframe = helper.getIframe();
+    await iframe.locator('body').evaluate((_, id) => {
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
 
     const blockId = 'block-1-uuid';
 
@@ -477,6 +478,7 @@ test.describe('Inline Editing - Basic', () => {
     // Verify the iframe updated with the new text (wait for sync)
     await expect(async () => {
       const iframeText = await helper.getBlockTextInIframe(blockId);
+      console.log(`${RUN} iframeText:`, JSON.stringify(iframeText));
       expect(iframeText).toContain(newText);
     }).toPass({ timeout: 5000 });
 
@@ -745,14 +747,9 @@ test.describe('Inline Editing - Basic', () => {
     expect(selectedText).toBe('Hello beautiful world');
   });
 
-  // SKIPPED: Home key doesn't work with hydra.js but works in plain iframes.
-  // ArrowLeft, ArrowRight, End all work. Only Home fails.
-  // Cmd+Left (Meta+ArrowLeft) works as alternative on macOS.
-  // Root cause unknown - key is received, not prevented, but cursor doesn't move.
-  // This is expected macOS behavior - use Cmd+Left (Meta+ArrowLeft) for start of line.
-  // See: https://en.wikipedia.org/wiki/Home_key
-  // but it doesn't explain why without hydra home did appear to work in our testing on a basic conteneditible
-  test.skip('keyboard navigation with Home key', async ({ page }) => {
+  // Home key is handled via selection.modify('move','backward','lineboundary')
+  // in hydra.js keydown handler since CDP-dispatched events don't trigger native cursor movement.
+  test('keyboard navigation with Home key', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();

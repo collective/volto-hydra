@@ -80,65 +80,122 @@
   <div class="volto-hydra-block-outline" id="block-outline"></div>
   <div class="volto-hydra-add-button" id="add-button">+</div>
 
-  <div id="iframe-container">
-    <iframe id="previewIframe" name="hydra-edit:http://localhost:8888" src="http://localhost:8888/test-page?_edit=true&_admin_origin=http://localhost:8888"></iframe>
-  </div>
+  <div id="iframe-container"></div>
 
   <div id="log">
     <div class="log-entry"><span style="font-weight: bold">Message Log:</strong></div>
   </div>
 
   <script>
+    // Configure iframe frontend from ?frontend= URL param (default: mock frontend on 8888)
+    const frontendOrigin = new URLSearchParams(window.location.search).get('frontend') || 'http://localhost:8888';
+    const adminOrigin = window.location.origin;
+
+    // Create iframe dynamically so name is set BEFORE the browsing context is created.
+    // Setting iframe.name after the element is in the DOM doesn't propagate to contentWindow.name.
+    const previewIframe = document.createElement('iframe');
+    previewIframe.id = 'previewIframe';
+    previewIframe.name = `hydra-edit:${adminOrigin}`;
+    previewIframe.src = `${frontendOrigin}/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
+    document.getElementById('iframe-container').appendChild(previewIframe);
+
     console.log('[MOCK_PARENT] Loaded');
 
-    // Helper to add nodeIds to Slate JSON (matching hydra.js logic)
-    function addNodeIds(nodes, startId = 1) {
-      let currentId = startId;
+    // NOTE: No addNodeIds here — hydra.js adds nodeIds to all slate fields
+    // when it receives FORM_DATA, so the mock parent (acting as admin) should
+    // send plain Slate JSON without nodeIds, just like the real admin does.
 
-      function processNode(node) {
-        // Check if it's an element node (has type or children properties)
-        if (node.type || (node.children && !node.text)) {
-          // Add nodeId to element nodes
-          node.nodeId = currentId++;
-
-          if (node.children) {
-            node.children = node.children.map(child => processNode(child));
-          }
-        }
-        return node;
-      }
-
-      return nodes.map(node => processNode(node));
-    }
-
-    // Helper to build blockPathMap from mockFormData
+    // Helper to build blockPathMap from mockFormData (recursive for nested blocks)
     function buildBlockPathMap() {
       const pathMap = {};
-      mockFormData.blocks_layout.items.forEach(blockId => {
-        const block = mockFormData.blocks[blockId];
-        pathMap[blockId] = {
-          path: ['blocks', blockId],
-          parentId: null,
-          blockType: block?.['@type']
-        };
-      });
+
+      function processContainer(container, parentId, basePath, addMode) {
+        const layout = container.blocks_layout?.items || [];
+        layout.forEach(blockId => {
+          const block = container.blocks?.[blockId];
+          if (!block) return;
+          const path = [...basePath, 'blocks', blockId];
+          const blockType = block['@type'];
+          const entry = {
+            path,
+            parentId,
+            blockType,
+          };
+          if (addMode === 'table') {
+            entry.parentAddMode = 'table';
+          }
+          pathMap[blockId] = entry;
+
+          // Recurse into nested blocks
+          if (block.blocks && block.blocks_layout) {
+            processContainer(block, blockId, path, null);
+          }
+
+          // Handle columns-style container fields (columns/columns_layout, top_images/top_images_layout)
+          const containerFields = [
+            { data: 'columns', layout: 'columns_layout' },
+            { data: 'top_images', layout: 'top_images_layout' },
+          ];
+          containerFields.forEach(({ data, layout }) => {
+            if (block[data] && block[layout]?.items) {
+              block[layout].items.forEach(childId => {
+                const child = block[data][childId];
+                if (!child) return;
+                const childPath = [...path, data, childId];
+                pathMap[childId] = {
+                  path: childPath,
+                  parentId: blockId,
+                  blockType: child['@type'] || data,
+                };
+                // Recurse if child has blocks/blocks_layout
+                if (child.blocks && child.blocks_layout) {
+                  processContainer(child, childId, childPath, null);
+                }
+              });
+            }
+          });
+
+          // Handle slateTable: rows and cells use .key as blockId
+          if (blockType === 'slateTable' && block.table?.rows) {
+            block.table.rows.forEach(row => {
+              pathMap[row.key] = {
+                path: [...path, 'table', 'rows', row.key],
+                parentId: blockId,
+                blockType: 'slateTable:row',
+                addMode: 'table',
+              };
+              (row.cells || []).forEach(cell => {
+                pathMap[cell.key] = {
+                  path: [...path, 'table', 'rows', row.key, 'cells', cell.key],
+                  parentId: row.key,
+                  blockType: 'slateTable:cell',
+                  parentAddMode: 'table',
+                };
+              });
+            });
+          }
+        });
+      }
+
+      processContainer(mockFormData, null, [], null);
       return pathMap;
     }
 
     // Block field types metadata (constant)
     const blockFieldTypes = {
       'slate': { value: 'slate' },
-      'text': { text: 'string' },
-      'multifield': { title: 'string', description: 'slate' },
-      'textarea': { content: 'string:textarea' }
+      'hero': { heading: 'string', subheading: 'string:textarea', buttonText: 'string', description: 'slate' },
+      'slateTable:cell': { value: 'slate' },
     };
 
     // Simple Slate transformation without needing full Slate library
     // This manually creates the expected structure for testing
     function applySlateTransform(value, selection, format, action) {
       const result = JSON.parse(JSON.stringify(value)); // Deep clone
+      console.log('[MOCK_PARENT] applySlateTransform entry:', { value: JSON.stringify(value), selection: JSON.stringify(selection), format, action });
 
       if (!selection || !result[0] || !result[0].children) {
+        console.log('[MOCK_PARENT] applySlateTransform: early return (no selection/result/children)');
         return result;
       }
 
@@ -149,14 +206,31 @@
       // Get selection bounds
       const start = Math.min(anchor.offset, focus.offset);
       const end = Math.max(anchor.offset, focus.offset);
+      console.log('[MOCK_PARENT] applySlateTransform:', { start, end, anchorPath: JSON.stringify(anchor.path), focusPath: JSON.stringify(focus.path) });
 
       // Get the text from first child (assuming simple structure for now)
       const textNode = paragraph.children[0];
       if (!textNode || !textNode.text) {
+        console.log('[MOCK_PARENT] applySlateTransform: early return (no textNode or no text)', { textNode: JSON.stringify(textNode) });
         return result;
       }
 
       const originalText = textNode.text;
+      console.log('[MOCK_PARENT] applySlateTransform:', { originalText, collapsed: start === end });
+
+      // Handle collapsed selection (prospective formatting):
+      // Insert an empty inline element at the cursor position so subsequent
+      // typing goes into the formatted span.
+      if (start === end) {
+        const before = originalText.substring(0, start);
+        const after = originalText.substring(start);
+        const newChildren = [];
+        if (before) newChildren.push({ text: before });
+        newChildren.push({ type: format, children: [{ text: '' }] });
+        if (after) newChildren.push({ text: after });
+        paragraph.children = newChildren;
+        return result;
+      }
 
       // Split into three parts: before, selected, after
       const before = originalText.substring(0, start);
@@ -185,7 +259,20 @@
       paragraph.children = newChildren;
 
       // Add nodeIds to the result
-      return addNodeIds(result);
+      // No addNodeIds needed — hydra.js adds them when it receives FORM_DATA.
+      return result;
+    }
+
+    function applySlateDelete(value, selection) {
+      if (!selection || !value[0]) return value;
+      // For a non-collapsed selection, replace all content with empty text.
+      // This is a simplified mock — real Slate handles partial deletes, but
+      // for testing buffer replay we just need the content to be cleared.
+      // No addNodeIds needed — hydra.js adds them when it receives FORM_DATA.
+      const result = JSON.parse(JSON.stringify(value));
+      const paragraph = result[0];
+      paragraph.children = [{ text: '' }];
+      return result;
     }
 
     // Mock form data with both a slate block and a simple text block
@@ -197,7 +284,7 @@
       blocks: {
         'mock-block-1': {
           '@type': 'slate',
-          value: addNodeIds([
+          value: [
             {
               type: 'p',
               children: [
@@ -206,16 +293,18 @@
                 },
               ],
             },
-          ]),
+          ],
         },
         'mock-text-block': {
-          '@type': 'text',
-          text: 'Simple text field',
+          '@type': 'slate',
+          value: [{ type: 'p', children: [{ text: 'Simple text field' }] }],
         },
         'mock-multi-field-block': {
-          '@type': 'multifield',
-          title: 'Block Title',
-          description: addNodeIds([
+          '@type': 'hero',
+          heading: 'Block Title',
+          subheading: 'Subtitle text',
+          buttonText: 'Click',
+          description: [
             {
               type: 'p',
               children: [
@@ -224,15 +313,99 @@
                 },
               ],
             },
-          ]),
+          ],
         },
         'mock-textarea-block': {
-          '@type': 'textarea',
-          content: 'First line of textarea',
+          '@type': 'slate',
+          value: [{ type: 'p', children: [{ text: 'First line of textarea' }] }],
+        },
+        'mock-image-block': {
+          '@type': 'image',
+          url: 'https://example.com/test.jpg',
+          alt: 'Test image',
+        },
+        'mock-hero-block': {
+          '@type': 'hero',
+          heading: 'Simple text field',
+          subheading: 'Textarea content',
+          buttonText: 'Click me',
+          description: [
+            {
+              type: 'p',
+              children: [{ text: 'Hero description' }],
+            },
+          ],
+        },
+        // Columns container with two columns, each containing a slate block
+        'mock-columns': {
+          '@type': 'columns',
+          columns: {
+            'mock-col-1': {
+              '@type': 'column',
+              blocks: {
+                'mock-col1-slate': {
+                  '@type': 'slate',
+                  value: [{ type: 'p', children: [{ text: 'Column 1 text' }] }],
+                },
+              },
+              blocks_layout: { items: ['mock-col1-slate'] },
+            },
+            'mock-col-2': {
+              '@type': 'column',
+              blocks: {
+                'mock-col2-slate': {
+                  '@type': 'slate',
+                  value: [{ type: 'p', children: [{ text: 'Column 2 text' }] }],
+                },
+              },
+              blocks_layout: { items: ['mock-col2-slate'] },
+            },
+          },
+          columns_layout: { items: ['mock-col-1', 'mock-col-2'] },
+        },
+        // slateTable: 2x2 grid for table-mode navigation tests
+        // Uses the existing slateTable renderer format: table.rows[].cells[]
+        // with .key as block UID, data-block-add="bottom" on rows, "right" on cells
+        'mock-table': {
+          '@type': 'slateTable',
+          table: {
+            rows: [
+              {
+                key: 'mock-row-1',
+                cells: [
+                  {
+                    key: 'mock-cell-1a',
+                    type: 'data',
+                    value: [{ type: 'p', children: [{ text: 'Cell 1A' }] }],
+                  },
+                  {
+                    key: 'mock-cell-1b',
+                    type: 'data',
+                    value: [{ type: 'p', children: [{ text: 'Cell 1B' }] }],
+                  },
+                ],
+              },
+              {
+                key: 'mock-row-2',
+                cells: [
+                  {
+                    key: 'mock-cell-2a',
+                    type: 'data',
+                    value: [{ type: 'p', children: [{ text: 'Cell 2A' }] }],
+                  },
+                  {
+                    key: 'mock-cell-2b',
+                    type: 'data',
+                    value: [{ type: 'p', children: [{ text: 'Cell 2B' }] }],
+                  },
+                ],
+              },
+            ],
+          },
         },
       },
       blocks_layout: {
-        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block'],
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block', 'mock-image-block', 'mock-columns', 'mock-table', 'mock-hero-block'],
       },
     };
 
@@ -391,14 +564,16 @@
             console.log('[MOCK_PARENT] Applying Slate transformation:', {
               transformType,
               format,
-              selection,
+              selection: JSON.stringify(selection),
               currentValue: JSON.stringify(currentValue)
             });
 
-            // Apply the Slate transformation (for format transforms)
+            // Apply the Slate transformation
             let updatedValue = currentValue;
             if (transformType === 'format' && format) {
               updatedValue = applySlateTransform(currentValue, selection, format, transformType);
+            } else if (transformType === 'delete') {
+              updatedValue = applySlateDelete(currentValue, selection);
             }
 
             console.log('[MOCK_PARENT] Transformation result:', JSON.stringify(updatedValue));
@@ -409,6 +584,32 @@
               [fieldName || 'value']: updatedValue,
             };
 
+            // Compute transformedSelection based on the transform result.
+            let transformedSelection = selection;
+            if (transformType === 'delete') {
+              // After delete, content is empty — cursor at start of first node
+              transformedSelection = {
+                anchor: { path: [0, 0], offset: 0 },
+                focus: { path: [0, 0], offset: 0 },
+              };
+            } else if (selection && selection.anchor.offset === selection.focus.offset
+                && JSON.stringify(selection.anchor.path) === JSON.stringify(selection.focus.path)) {
+              // Collapsed selection — for prospective formatting, the cursor
+              // moves into the new inline element.
+              const block = mockFormData.blocks[blockId];
+              const val = block[fieldName] || block.value;
+              if (val && val[0] && val[0].children) {
+                const inlineIdx = val[0].children.findIndex(c => c.type === format);
+                if (inlineIdx >= 0) {
+                  const newPath = [0, inlineIdx, 0];
+                  transformedSelection = {
+                    anchor: { path: newPath, offset: 0 },
+                    focus: { path: newPath, offset: 0 },
+                  };
+                }
+              }
+            }
+
             // Send FORM_DATA with formatRequestId so hydra.js knows to unblock
             const response = {
               type: 'FORM_DATA',
@@ -416,11 +617,26 @@
               blockPathMap: buildBlockPathMap(),
               blockFieldTypes,
               formatRequestId: requestId,
-              transformedSelection: selection,  // Must match what hydra.js checks for
+              transformedSelection,
             };
             console.log('[MOCK_PARENT] Sending FORM_DATA with formatRequestId:', response);
             event.source.postMessage(response, event.origin);
             logMessage('sent', 'FORM_DATA', { blockId, formatRequestId: requestId });
+
+            // Optionally send a duplicate FORM_DATA after a delay to simulate
+            // the real admin's Redux-triggered re-render cascade.
+            if (window.mockDuplicateFormData) {
+              setTimeout(() => {
+                const dupeResponse = {
+                  type: 'FORM_DATA',
+                  data: mockFormData,
+                  blockPathMap: buildBlockPathMap(),
+                  blockFieldTypes,
+                };
+                event.source.postMessage(dupeResponse, event.origin);
+                console.log('[MOCK_PARENT] Sent duplicate FORM_DATA (Redux echo)');
+              }, 50);
+            }
           };
 
           // Execute the async transform (with optional delay) - await to ensure delay happens
@@ -440,13 +656,35 @@
           console.log('[MOCK_PARENT] Received INLINE_EDIT_DATA:', message);
           // Update mockFormData with the changes
           mockFormData = message.data;
-          // DO NOT send FORM_DATA back - this would trigger re-render and interrupt typing
-          // Just update our local state and log it
           logMessage('RECEIVED', 'INLINE_EDIT_DATA', message);
+
+          // Optionally echo FORM_DATA back (like real admin does).
+          // Real admin has a React render cycle before sending, so use setTimeout.
+          if (window.mockEchoFormData) {
+            const echoData = JSON.parse(JSON.stringify(mockFormData));
+            const delay = window.mockEchoDelay !== undefined ? window.mockEchoDelay : 10;
+            const sendEcho = () => {
+              const iframe = document.getElementById('previewIframe');
+              iframe.contentWindow.postMessage({
+                type: 'FORM_DATA',
+                data: echoData,
+                blockPathMap: buildBlockPathMap(),
+                blockFieldTypes,
+              }, '*');
+              console.log('[MOCK_PARENT] Echoed FORM_DATA back');
+            };
+            if (delay === 0) {
+              sendEcho();
+            } else {
+              setTimeout(sendEcho, delay);
+            }
+          }
           break;
         }
 
         case 'BLOCK_SELECTED': {
+          // Track the last selected block for test assertions
+          window.mockParent.lastSelectedBlockUid = message.blockUid;
           // Position the block UI overlays based on rect from iframe
           const { rect, blockUid } = message;
           if (rect) {
@@ -492,7 +730,24 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlock: (blockId) => mockFormData.blocks[blockId],
+      buildBlockPathMap,
+      getBlockFieldTypes: () => blockFieldTypes,
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
+      setEchoFormData: (enabled) => { window.mockEchoFormData = enabled; },
+      setDuplicateFormData: (enabled) => { window.mockDuplicateFormData = enabled; },
+      // Select a specific block by sending SELECT_BLOCK + FORM_DATA to iframe
+      selectBlock: (blockId) => {
+        const iframe = document.getElementById('previewIframe');
+        if (!iframe?.contentWindow) return;
+        const blockPathMap = buildBlockPathMap();
+        iframe.contentWindow.postMessage({
+          type: 'SELECT_BLOCK',
+          uid: blockId,
+          data: mockFormData,
+          blockPathMap,
+        }, '*');
+        console.log('[MOCK_PARENT] selectBlock:', blockId);
+      },
     };
   </script>
 </body>

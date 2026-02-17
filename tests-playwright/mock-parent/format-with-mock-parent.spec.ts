@@ -1,5 +1,4 @@
-import { test, expect } from '../fixtures';
-import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { test, expect } from './fixtures';
 
 /**
  * Mock Parent Window Inline Editing Tests
@@ -22,24 +21,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
  */
 
 test.describe('Inline Editing with Mock Parent', () => {
-  let helper: AdminUIHelper;
-
-  test.beforeEach(async ({ page }) => {
-    helper = new AdminUIHelper(page);
-
-    // Load the mock parent page from the mock API server
-    await page.goto('http://localhost:8888/mock-parent.html');
-
-    // Wait for iframe to load using helper (waits for [data-block-uid] not contenteditable)
-    await helper.waitForIframeReady();
-
-    // Mock parent auto-selects first block, wait for it to be selected
-    await helper.waitForBlockSelected('mock-block-1');
-
-    console.log('[TEST] Mock parent page loaded');
-  });
-
-  test('should load mock parent with iframe and initial content', async ({ page }) => {
+  test('should load mock parent with iframe and initial content', async ({ helper, page }) => {
     // Verify parent page loaded
     await expect(page.locator('h1')).toContainText('Mock Parent Window');
 
@@ -56,7 +38,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(content?.trim()).toBe('Text to format');
   });
 
-  test('should handle selection and apply formatting', async ({ page }) => {
+  test('should handle selection and apply formatting', async ({ helper, page }) => {
     const iframe = helper.getIframe();
 
     // Click block to select it (this will set contenteditable)
@@ -76,34 +58,32 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Apply bold using keyboard shortcut (triggers SLATE_TRANSFORM_REQUEST)
     await page.keyboard.press('ControlOrMeta+b');
 
-    // Wait for bold formatting to appear (polls until condition met)
-    await expect(editable.locator('span[style*="font-weight: bold"]')).toBeVisible();
+    // Wait for bold formatting to appear
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold');
 
-    // Verify bold was applied (renderer converts {type: "strong"} to styled span)
-    const html = await editable.innerHTML();
-    console.log('[TEST] HTML after formatting:', html);
-
-    expect(html).toContain('font-weight: bold');
-    expect(html).toContain('Text to format');
+    // Verify bold was applied
+    const boldEl = editable.locator(helper.getFormatSelector('bold')).first();
+    await expect(boldEl).toContainText('Text to format');
   });
 
-  test('should maintain cursor position after typing', async ({ page }) => {
+  test('should maintain cursor position after typing', async ({ helper, page }) => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
-    // Click at the beginning - use smaller x position to ensure cursor is before first character
-    await editable.click({ position: { x: 1, y: 5 } });
+    // Click on the editable, then press Home to move cursor to the beginning.
+    // Avoid clicking at x=1 — the drag handle overlay sits at the left edge
+    // and intercepts pointer events.
+    await editable.click();
+    await page.keyboard.press('Home');
 
     // Type some text
     await page.keyboard.type('Hello ');
 
     // Verify text was added at the beginning
-    const content = await editable.textContent();
-    expect(content).toContain('Hello');
-    expect(content).toMatch(/^Hello\s+Text to format/); // Should start with "Hello "
+    await expect(editable).toContainText(/^Hello\s+Text to format/);
   });
 
-  test('should handle deleting text with backspace', async ({ page }) => {
+  test('should handle deleting text with backspace', async ({ helper, page }) => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
@@ -121,37 +101,21 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(content).not.toContain('mat'); // 'format' should have lost 'mat'
   });
 
-  test('should buffer input during slow transform and replay after completion', async ({ page }) => {
+  test('should buffer input during slow transform and replay after completion', async ({ helper, page }) => {
     // Configure mock parent to simulate a slow transform (500ms delay)
     await page.evaluate(() => {
       window.mockParent.setTransformDelay(500);
     });
 
     const iframe = helper.getIframe();
-    const editable = iframe.locator('[data-editable-field="value"]');
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
 
-    // Select all text programmatically to ensure selection exists
+    // Select all text using keyboard (works across all frontends)
     await editable.click();
-    const selectionSet = await iframe.locator('[contenteditable="true"]').evaluate(() => {
-      const el = document.querySelector('[contenteditable="true"]');
-      const textNode = el?.firstChild;
-      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-        return {
-          success: true,
-          text: selection?.toString(),
-          rangeCount: selection?.rangeCount,
-        };
-      }
-      return { success: false };
-    });
-    console.log('[TEST] Selection set:', selectionSet);
-    expect(selectionSet.success).toBe(true);
-    expect(selectionSet.text).toBe('Text to format');
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() =>
+      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+    ).toBe('Text to format');
 
     // Apply bold using keyboard shortcut to trigger transform
     await page.keyboard.press('ControlOrMeta+b');
@@ -169,14 +133,9 @@ test.describe('Inline Editing with Mock Parent', () => {
     // The buffered text should appear after cursor is restored
     await expect(editable).toContainText('BUFFERED');
 
-    // Verify bold was applied (renderer converts {type: "strong"} to styled span)
-    // Since text was selected when typing, BUFFERED replaces "Text to format"
-    const html = await editable.innerHTML();
-    console.log('[TEST] HTML after formatting:', html);
-    expect(html).toContain('font-weight: bold');
-    expect(html).toContain('BUFFERED');
-    // Original text is replaced by buffered typing (normal editor behavior)
-    expect(html).not.toContain('Text to format');
+    // Verify bold was applied and BUFFERED replaced original text
+    await helper.waitForFormattedText(editable, 'BUFFERED', 'bold');
+    await expect(editable).not.toContainText('Text to format');
 
     // Reset delay for other tests
     await page.evaluate(() => {
@@ -184,49 +143,185 @@ test.describe('Inline Editing with Mock Parent', () => {
     });
   });
 
-  test('should handle partial text selection', async ({ page }) => {
+  test('text echo arriving before format response does not lose buffered keystrokes', async ({ helper, page }) => {
+    // Reproduce the race condition:
+    // 1. Type "Hello" → debounce fires → INLINE_EDIT_DATA sent
+    // 2. Ctrl+B → blocking starts, SLATE_TRANSFORM_REQUEST sent
+    // 3. " world" typed → buffered
+    // 4. Text echo FORM_DATA arrives DURING blocking (before format response)
+    // 5. If the echo triggers replayBufferAndUnblock, it drains the buffer
+    //    into the pre-format DOM. The format response then overwrites it,
+    //    losing the replayed text.
+    //
+    // We control timing precisely: slow transform (500ms), and manually
+    // send the text echo from the test during the blocking window.
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(500);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
+
+    // Type initial text and wait for debounce to settle
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(500);
+
+    // Ctrl+B starts blocking, transform will take 500ms
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(20); // Ensure blocking is set
+
+    // Type during blocking — these go into the event buffer
+    await page.keyboard.type(' world');
+
+    // NOW send a text echo FORM_DATA — simulating the INLINE_EDIT_DATA echo
+    // arriving during the blocking window (before the format response).
+    // This is the exact race: the echo has no formatRequestId.
+    await page.evaluate(() => {
+      const iframe = document.getElementById('previewIframe');
+      const echoData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+      iframe.contentWindow.postMessage({
+        type: 'FORM_DATA',
+        data: echoData,
+        blockPathMap: {},
+      }, '*');
+      console.log('[TEST] Sent text echo FORM_DATA during blocking');
+    });
+
+    // Wait for format response (500ms transform) + replay
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 10000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('Redux echo after format response does not overwrite replayed keystrokes', async ({ helper, page }) => {
+    // Reproduce the Redux re-render cascade race:
+    //
+    // In real Volto, after sending the format response FORM_DATA, View.jsx
+    // calls onChangeFormData() → Redux update → useEffect → ANOTHER FORM_DATA
+    // (without formatRequestId) with the same formatted content.
+    //
+    // If this "Redux echo" arrives while afterContentRender is in its
+    // double-rAF window (after format response rendered, before buffer replay),
+    // it triggers callback(formData) → re-renders DOM with PRE-REPLAY data
+    // → buffer replay text is lost.
+    //
+    // The mock parent's mockDuplicateFormData flag sends a duplicate FORM_DATA
+    // 50ms after the format response (without formatRequestId) — exactly like
+    // a Redux echo. This works cross-origin since postMessage is allowed.
+
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(200);
+      window.mockParent.setDuplicateFormData(true);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
+
+    // Type initial text and wait for debounce to settle
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(500);
+
+    // Ctrl+B starts blocking, transform will take 200ms
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.waitForTimeout(20); // Ensure blocking is set
+
+    // Type during blocking — these go into the event buffer
+    await page.keyboard.type(' world');
+
+    // Wait for format response + replay
+    // The Redux echo should NOT overwrite the replayed " world"
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 10000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      window.mockParent.setDuplicateFormData(false);
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('Redux echo after format does not destroy selection for subsequent Ctrl+A', async ({ helper, page }) => {
+    // Reproduce the CI-flaky scenario:
+    // 1. Apply bold to selected text
+    // 2. Redux echo (duplicate FORM_DATA) arrives and re-renders DOM
+    // 3. Immediately try Ctrl+A — selection should work, not return empty
+    //
+    // Under load, the echo re-render can destroy focus/selection state,
+    // causing the next Ctrl+A to silently fail (empty selection).
+
+    await page.evaluate(() => {
+      window.mockParent.setDuplicateFormData(true);
+    });
+
+    const iframe = helper.getIframe();
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
+
+    // Select all and apply bold
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(() => editable.evaluate(() =>
+      window.getSelection()?.toString()
+    )).toBe('Text to format');
+
+    await page.keyboard.press('ControlOrMeta+b');
+
+    // Wait for bold to be applied (format response + render)
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold');
+
+    // Wait long enough for the Redux echo (50ms) to arrive and re-render
+    await page.waitForTimeout(200);
+
+    // Now try Ctrl+A — this should select all text even after the echo re-render
+    await editable.focus();
+    await page.keyboard.press('ControlOrMeta+a');
+
+    const selection = await expect.poll(async () => {
+      return editable.evaluate(() => window.getSelection()?.toString().trim() || '');
+    }, { timeout: 5000 }).toBeTruthy();
+
+    // Verify we can apply another format (un-bold) without error
+    await page.keyboard.press('ControlOrMeta+b');
+
+    // Text should still exist after removing bold
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Text to format');
+    }).toPass({ timeout: 5000 });
+
+    await page.evaluate(() => {
+      window.mockParent.setDuplicateFormData(false);
+    });
+  });
+
+  test('should handle partial text selection', async ({ helper, page }) => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
     await editable.click();
 
-    // Select just "Text" (first word)
-    const selectionResult = await iframe.locator('[contenteditable="true"]').evaluate(() => {
-      const el = document.querySelector('[contenteditable="true"]');
+    // Select just "Text" (first word) using helper that walks text nodes
+    await helper.selectTextRange(editable, 0, 4);
 
-      // The contenteditable element IS the paragraph element, so el.firstChild is the text node
-      const textNode = el?.firstChild;
-      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-        const range = document.createRange();
-        range.setStart(textNode, 0);
-        range.setEnd(textNode, 4);
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-
-        // Verify selection was set
-        const verifySelection = window.getSelection();
-        console.log('[TEST-EVAL] Selection after setting:', {
-          rangeCount: verifySelection?.rangeCount,
-          isCollapsed: verifySelection?.isCollapsed,
-          text: verifySelection?.toString(),
-          anchorNode: verifySelection?.anchorNode,
-          focusNode: verifySelection?.focusNode
-        });
-
-        return {
-          success: true,
-          rangeCount: verifySelection?.rangeCount,
-          isCollapsed: verifySelection?.isCollapsed,
-          text: verifySelection?.toString()
-        };
-      }
-      return { success: false };
+    // Verify selection was set
+    const selectionResult = await editable.evaluate((el) => {
+      const sel = el.ownerDocument.defaultView.getSelection();
+      return { text: sel?.toString(), collapsed: sel?.isCollapsed };
     });
-
-    console.log('[TEST] Selection result:', selectionResult);
-
-    await page.waitForTimeout(200);
+    expect(selectionResult.collapsed).toBe(false);
+    expect(selectionResult.text).toBe('Text');
 
     // Apply bold using keyboard shortcut
     await page.keyboard.press('ControlOrMeta+b');
@@ -235,41 +330,19 @@ test.describe('Inline Editing with Mock Parent', () => {
     const html = await editable.innerHTML();
     console.log('[TEST] HTML after partial selection formatting:', html);
 
-    // Should have bold styling (renderer converts {type: "strong"} to styled span)
-    expect(html).toContain('font-weight: bold');
-    // Should still have all the text
+    // Should have bold styling and still have all the text
+    await helper.waitForFormattedText(editable, 'Text', 'bold');
     expect(html).toContain('Text');
     expect(html).toContain('to format');
 
-    // Verify cursor position is restored correctly
-    const selectionInfo = await iframe.locator('[contenteditable="true"]').evaluate(() => {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) {
-        return { hasSelection: false };
-      }
-
-      const range = selection.getRangeAt(0);
-      return {
-        hasSelection: true,
-        isCollapsed: range.collapsed,
-        startOffset: range.startOffset,
-        endOffset: range.endOffset,
-        selectedText: selection.toString(),
-        startContainerText: range.startContainer.textContent,
-        endContainerText: range.endContainer.textContent,
-      };
-    });
-
-    console.log('[TEST] Selection after formatting:', selectionInfo);
-
     // Verify selection is restored (should still select "Text")
-    expect(selectionInfo.hasSelection).toBe(true);
-    expect(selectionInfo.selectedText).toBe('Text');
-    expect(selectionInfo.startOffset).toBe(0);
-    expect(selectionInfo.endOffset).toBe(4);
+    const selectedText = await editable.evaluate((el) => {
+      return el.ownerDocument.defaultView.getSelection()?.toString() || '';
+    });
+    expect(selectedText).toBe('Text');
   });
 
-  test('should exchange correct postMessage types', async ({ page }) => {
+  test('should exchange correct postMessage types', async ({ helper, page }) => {
     const messages: string[] = [];
 
     // Track console messages to verify protocol
@@ -303,7 +376,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(hasTransformRequest || hasFormData).toBe(true); // At least one should be present
   });
 
-  test('should render data-node-id attributes in HTML after formatting', async ({ page }) => {
+  test('should render data-node-id attributes in HTML after formatting', async ({ helper, page }) => {
     const iframe = helper.getIframe();
     const editable = iframe.locator('[contenteditable="true"]');
 
@@ -319,18 +392,12 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Apply bold using keyboard shortcut
     await page.keyboard.press('ControlOrMeta+b');
 
-    // Wait for bold formatting to appear (polls until condition met)
-    await expect(editable.locator('span[style*="font-weight: bold"]')).toBeVisible();
+    // Wait for bold formatting to appear
+    await helper.waitForFormattedText(editable, 'Text to format', 'bold');
 
     // Get the rendered HTML
-    const html = await editable.innerHTML();
     const outerHtml = await editable.evaluate((el) => el.outerHTML);
-    console.log('[TEST] Rendered innerHTML after formatting:', html);
     console.log('[TEST] Rendered outerHTML after formatting:', outerHtml);
-
-    // Verify bold was applied (renderer converts {type: "strong"} to styled span)
-    expect(html).toContain('font-weight: bold');
-    expect(html).toContain('Text to format');
 
     // Verify the paragraph element has data-node-id attribute
     expect(outerHtml).toContain('data-node-id=');
@@ -345,6 +412,177 @@ test.describe('Inline Editing with Mock Parent', () => {
     if (nodeIdMatch) {
       console.log('[TEST] Found data-node-id:', nodeIdMatch[1]);
     }
+  });
+
+  test('space-only buffer replay is not destroyed by ensureValidInsertionTarget', async ({ helper, page }) => {
+    // Reproduce the exact flaky bug from inline-editing-formatting.spec.ts:655.
+    //
+    // When only a space character is buffered during a format transform:
+    // 1. Ctrl+B → blocking starts, SLATE_TRANSFORM_REQUEST sent
+    // 2. Space typed → buffered (1 char)
+    // 3. Format response arrives → re-render → restoreSlateSelection (ensureZwsPosition
+    //    creates BOM in empty bold span) → replayBufferAndUnblock → insertText(" ")
+    //    cleans up BOM sibling, inserts space → UNBLOCK
+    // 4. Next keydown "w" → element keydown handler calls ensureValidInsertionTarget()
+    // 5. BUG: ensureValidInsertionTarget sees the space-only text node inside the
+    //    bold <span data-node-id="0.1">, walks up to <p data-editable-field="value"
+    //    data-node-id="0">, hits data-editable-field BEFORE data-node-id → breaks
+    //    without checking P's content ("Hello ") → replaces space with FEFF
+    //
+    // We use a transform delay to ensure ONLY the space is buffered,
+    // then type the rest after the transform completes.
+
+    const iframe = helper.getIframe();
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
+
+    // Type "Hello" and wait for it to settle
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(300);
+
+    // Set a short delay — long enough for the space to be buffered,
+    // short enough that subsequent chars arrive after unblocking
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(100);
+    });
+
+    // Ctrl+B: toggle bold (prospective formatting with collapsed cursor)
+    await page.keyboard.press('ControlOrMeta+b');
+
+    // Type space immediately — should be buffered during the 100ms transform
+    await page.waitForTimeout(20); // ensure blocking is set
+    await page.keyboard.press('Space');
+
+    // Wait for the transform to complete and space to be replayed
+    await page.waitForTimeout(200);
+
+    // Now type "world" — these arrive AFTER unblocking, as direct keystrokes.
+    // The "w" keydown will trigger ensureValidInsertionTarget on the space.
+    await page.keyboard.type('world');
+
+    // Verify the space was preserved — "Hello world", not "Helloworld"
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 5000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      window.mockParent.setTransformDelay(0);
+    });
+  });
+
+  test('FORM_DATA arriving mid-keystroke does not lose characters', async ({ helper, page }) => {
+    // Reproduce the sidebar typing race condition:
+    // In real Volto, sidebar edits trigger an undebounced round-trip:
+    //   sidebar onChange → Redux → useEffect → FORM_DATA to iframe → re-render
+    // Each FORM_DATA re-renders the iframe DOM. If a keystroke arrives during
+    // the re-render window, it could be lost.
+    //
+    // We simulate this by scheduling FORM_DATA messages with known partial texts
+    // from the parent during typing. Uses postMessage (cross-origin safe).
+
+    const iframe = helper.getIframe();
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
+
+    // Type initial content
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Hello');
+    await page.waitForTimeout(300);
+
+    // Schedule FORM_DATA messages with progressive partial texts during typing.
+    // Each message simulates the sidebar having received and echoed back the
+    // user's text at that point. Sent every 15ms to overlap with keystroke timing.
+    await page.evaluate(() => {
+      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+      const partials = ['Hello', 'Hello ', 'Hello w', 'Hello wo', 'Hello wor'];
+      let i = 0;
+      (window as any).__echoInterval = setInterval(() => {
+        if (i >= partials.length) {
+          clearInterval((window as any).__echoInterval);
+          return;
+        }
+        const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+        formData.blocks['mock-block-1'].value = [
+          { type: 'p', children: [{ text: partials[i] }] },
+        ];
+        iframeEl.contentWindow!.postMessage({
+          type: 'FORM_DATA',
+          data: formData,
+          blockPathMap: window.mockParent.buildBlockPathMap(),
+          blockFieldTypes: window.mockParent.getBlockFieldTypes(),
+        }, '*');
+        i++;
+      }, 15);
+    });
+
+    // Now type more text — scheduled FORM_DATA arrives during typing
+    await page.keyboard.press('End');
+    await page.keyboard.type(' world', { delay: 10 });
+
+    // Verify all characters arrived
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Hello world');
+    }).toPass({ timeout: 5000 });
+
+    // Cleanup
+    await page.evaluate(() => {
+      if ((window as any).__echoInterval) {
+        clearInterval((window as any).__echoInterval);
+        delete (window as any).__echoInterval;
+      }
+    });
+  });
+
+  test('rapid FORM_DATA from sidebar typing shows final text, not stale render', async ({ helper, page }) => {
+    // Reproduce the flaky integration test "editing text in Admin UI updates iframe".
+    //
+    // In real Volto, sidebar typing sends rapid FORM_DATA messages (one per
+    // keystroke, undebounced). Each triggers onEditChange → renderContentWithListings
+    // which is async when listings are present. Multiple concurrent async renders
+    // can complete out of order, causing stale data to overwrite the latest.
+    //
+    // We simulate this by sending rapid FORM_DATA messages (one per character
+    // of "Make this bold") from the parent via postMessage (cross-origin safe)
+    // and verifying the final DOM shows the full text, not a stale partial.
+
+    const iframe = helper.getIframe();
+
+    // Wait for initial content
+    await expect(iframe.locator('[data-block-uid="mock-block-1"]')).toBeVisible();
+    await helper.clickBlockInIframe('mock-block-1', { waitForToolbar: false });
+
+    // Send rapid FORM_DATA messages simulating sidebar typing "Make this bold"
+    const text = 'Make this bold';
+    for (let i = 1; i <= text.length; i++) {
+      const partialText = text.substring(0, i);
+      await page.evaluate(({ partialText }) => {
+        const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+        const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+        formData.blocks['mock-block-1'].value = [
+          { type: 'p', children: [{ text: partialText }] },
+        ];
+        iframeEl.contentWindow!.postMessage({
+          type: 'FORM_DATA',
+          data: formData,
+          blockPathMap: window.mockParent.buildBlockPathMap(),
+          blockFieldTypes: window.mockParent.getBlockFieldTypes(),
+        }, '*');
+      }, { partialText });
+    }
+
+    // Wait for all renders to settle, then check final DOM.
+    // Use the block element directly — rapid FORM_DATA re-renders may transiently
+    // strip data-editable-field before hydra.js re-adds it.
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(
+        iframe.locator('[data-block-uid="mock-block-1"]')
+      );
+      expect(text).toBe('Make this bold');
+    }).toPass({ timeout: 5000 });
   });
 
   // NOTE: "should handle selection across node boundaries and delete" test moved to

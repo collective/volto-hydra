@@ -117,6 +117,45 @@ const FormatDropdown = ({ blockButtons, onMouseDownCapture, onClickCapture }) =>
           onMouseDownCapture={onMouseDownCapture}
           onClickCapture={onClickCapture}
         >
+          {/* Paragraph option to revert any block format back to plain text */}
+          <button
+            className="format-dropdown-item"
+            data-toolbar-button="paragraph"
+            data-format={activeButton ? getInnerProps(activeButton.element).format : ''}
+            title="Paragraph"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 12px',
+              background: !activeButton ? '#e3f2fd' : 'transparent',
+              cursor: 'pointer',
+              border: 'none',
+              width: '100%',
+              textAlign: 'left',
+            }}
+            onMouseEnter={(e) => {
+              if (activeButton) e.currentTarget.style.background = '#f5f5f5';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = !activeButton ? '#e3f2fd' : 'transparent';
+            }}
+            onMouseDown={(e) => {
+              if (e.currentTarget.dataset.bypassCapture === 'true') {
+                e.preventDefault();
+                if (activeButton) {
+                  const activeProps = getInnerProps(activeButton.element);
+                  if (activeProps.format) {
+                    toggleBlock(editor, activeProps.format, activeProps.allowedChildren);
+                  }
+                }
+                setIsOpen(false);
+              }
+            }}
+          >
+            <Icon name={paragraphIcon} size="20px" />
+            <span style={{ fontSize: '14px', color: '#333' }}>Paragraph</span>
+          </button>
           {blockButtons.map(({ name, element }) => {
             const innerProps = getInnerProps(element);
             const format = innerProps.format;

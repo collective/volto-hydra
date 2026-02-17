@@ -42,17 +42,42 @@ const getDisplayName = (url, intl) => {
     .join(' ');
 };
 
+// Detect the currently applied layout from formData blocks.
+// Blocks from a layout template carry a `templateId` that matches an allowedLayouts URL.
+const detectCurrentLayout = (formData, allowedLayouts) => {
+  if (!allowedLayouts?.length) return '';
+  const blocks = formData?.blocks || {};
+  for (const block of Object.values(blocks)) {
+    if (block.templateId && allowedLayouts.includes(block.templateId)) {
+      return block.templateId;
+    }
+  }
+  return '';
+};
+
 const LayoutSelector = ({
   formData,
   onChangeFormData,
   allowedLayouts, // Array of template URL strings from field config
 }) => {
   const intl = useIntl();
-  const [selectedUrl, setSelectedUrl] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
+  // Detect the currently applied layout from formData
+  const currentLayout = React.useMemo(
+    () => detectCurrentLayout(formData, allowedLayouts),
+    [formData, allowedLayouts],
+  );
+
+  const [selectedUrl, setSelectedUrl] = React.useState(currentLayout);
+
+  // Sync dropdown when current layout changes (after apply or initial load)
+  React.useEffect(() => {
+    setSelectedUrl(currentLayout);
+  }, [currentLayout]);
+
   const handleApply = async () => {
-    if (!selectedUrl) return;
+    if (!selectedUrl || selectedUrl === currentLayout) return;
 
     setLoading(true);
     try {
@@ -74,8 +99,7 @@ const LayoutSelector = ({
         blocks: newFormData.blocks,
         blocks_layout: newFormData.blocks_layout,
       });
-
-      setSelectedUrl('');
+      // Don't reset selectedUrl — the useEffect will sync it from currentLayout
     } catch (error) {
       console.error('Failed to apply layout:', error);
     } finally {
@@ -117,7 +141,7 @@ const LayoutSelector = ({
           </option>
         ))}
       </select>
-      {selectedUrl && (
+      {selectedUrl && selectedUrl !== currentLayout && (
         <button
           className="apply-layout-btn"
           onClick={handleApply}

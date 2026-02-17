@@ -22,6 +22,11 @@ export class AdminUIHelper {
       }
     });
 
+    // Enable View.jsx debug logging (checked at module load time)
+    this.page.addInitScript(() => {
+      (window as any).HYDRA_DEBUG = true;
+    });
+
     // Capture page errors
     this.page.on('pageerror', (error) => {
       console.log(`[BROWSER PAGE ERROR] ${error.message}`);
@@ -213,6 +218,14 @@ export class AdminUIHelper {
     // pages, all blocks may be inside inactive slides (hidden) initially.
     const iframe = this.getIframe();
     await iframe.locator('[data-block-uid]').first().waitFor({ state: 'attached', timeout });
+
+    // Propagate run ID from admin page to iframe for log filtering
+    const runId = await this.page.evaluate(() => (window as any).__testRunId);
+    if (runId != null) {
+      await iframe.locator('body').evaluate((_, id) => {
+        (window as any).__testRunId = id;
+      }, runId);
+    }
 
     // Wait for blocks to stabilize (avoid flaky tests due to partial renders)
     await this.getStableBlockCount();
@@ -1388,13 +1401,13 @@ export class AdminUIHelper {
       const beforeRange = document.createRange();
       beforeRange.selectNodeContents(el);
       beforeRange.setEnd(range.startContainer, range.startOffset);
-      const textBefore = beforeRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+      const textBefore = beforeRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '').replace(/\u00A0/g, ' ');
 
       // Get text after cursor
       const afterRange = document.createRange();
       afterRange.selectNodeContents(el);
       afterRange.setStart(range.endContainer, range.endOffset);
-      const textAfter = afterRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '');
+      const textAfter = afterRange.toString().replace(new RegExp(`[${ZWS}]`, 'g'), '').replace(/\u00A0/g, ' ');
 
       return { textBefore, textAfter };
     });
@@ -1440,29 +1453,21 @@ export class AdminUIHelper {
   async getEditorLocator(blockId: string, fieldName?: string): Promise<Locator> {
     const iframe = this.getIframe();
 
-    // If field name specified, target that specific field
     if (fieldName) {
+      // Descendant or same-element (Nuxt puts both attrs on same element)
       return iframe.locator(
         `[data-block-uid="${blockId}"] [data-editable-field="${fieldName}"]`,
-      );
+      ).or(iframe.locator(
+        `[data-block-uid="${blockId}"][data-editable-field="${fieldName}"]`,
+      ));
     }
 
-    // Try descendant first (mock frontend: data-block-uid > [contenteditable])
-    let editor = iframe
-      .locator(`[data-block-uid="${blockId}"] [contenteditable="true"]`)
-      .first();
-
-    // Use count() instead of isVisible() - element might exist but be scrolled out of view
-    const count = await editor.count().catch(() => 0);
-
-    if (count === 0) {
-      // Try same-element selector (Nuxt: data-block-uid AND contenteditable on same element)
-      editor = iframe.locator(
-        `[data-block-uid="${blockId}"][contenteditable="true"]`,
-      );
-    }
-
-    return editor;
+    // No field name — match any contenteditable in the block (descendant or same-element)
+    return iframe.locator(
+      `[data-block-uid="${blockId}"] [contenteditable="true"]`,
+    ).first().or(iframe.locator(
+      `[data-block-uid="${blockId}"][contenteditable="true"]`,
+    ));
   }
 
   /**
@@ -3391,7 +3396,16 @@ export class AdminUIHelper {
   /**
    * Complete the drag operation by releasing the mouse and waiting for cleanup.
    */
-  private async completeDrop(): Promise<void> {
+  private async completeDrop(
+    targetBlock?: Locator,
+    insertAfter?: boolean,
+  ): Promise<void> {
+    // Verify drop indicator is still in correct position right before dropping.
+    // Between moveToDropPosition and here, evaluations and timing could shift things.
+    if (targetBlock && insertAfter !== undefined) {
+      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter);
+    }
+
     // Get all block order before drop (using body to include all containers)
     const orderBefore = await this.getBlockOrder('body');
 
@@ -3401,8 +3415,11 @@ export class AdminUIHelper {
     await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
     await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
 
-    // Wait for block order to change (indicates formData update and re-render completed)
+    // Wait for block order to change AND render to stabilize.
+    // getStableBlockCount inside the loop ensures we don't catch intermediate
+    // states where container innerHTML is cleared during async re-render.
     await expect(async () => {
+      await this.getStableBlockCount();
       const orderAfter = await this.getBlockOrder('body');
       if (JSON.stringify(orderBefore) === JSON.stringify(orderAfter)) {
         throw new Error('Block order has not changed yet');
@@ -3498,8 +3515,8 @@ export class AdminUIHelper {
     // Step 3: Move to drop position and verify indicator
     await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage);
 
-    // Step 4: Complete the drop
-    await this.completeDrop();
+    // Step 4: Verify indicator is still correct and complete the drop
+    await this.completeDrop(targetBlock, insertAfter);
   }
 
   /**

@@ -27,25 +27,13 @@
                         <div class="flex justify-between px-4 mx-auto max-w-screen-xl">
                             <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
                                 <template v-for="block in styleGroup.blocks" :key="block['@uid']">
-                                    <!-- Static blocks: render immediately -->
-                                    <div v-if="block['@type'] !== 'listing'" class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
-                                        <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
+                                    <!-- Listing blocks: expand async with paging -->
+                                    <div v-if="block['@type'] === 'listing'" class="mx-auto max-w-4xl">
+                                        <BlockExpander :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
                                     </div>
-                                    <!-- Listing blocks: expand async with own paging -->
-                                    <div v-else class="mx-auto max-w-4xl">
-                                        <Suspense :key="JSON.stringify(block)">
-                                            <ListingExpander
-                                                :block="block"
-                                                :block-uid="block['@uid']"
-                                                :api-url="apiUrl"
-                                                :context-path="contextPath"
-                                                v-slot="{ items: expandedItems, paging: listingPaging, buildPagingUrl }"
-                                            >
-                                                <Block v-for="item in expandedItems" :key="item['@uid']"
-                                                       :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
-                                                <Paging :paging="listingPaging" :build-url="buildPagingUrl" />
-                                            </ListingExpander>
-                                        </Suspense>
+                                    <!-- Static blocks: render immediately -->
+                                    <div v-else class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
+                                        <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
                                     </div>
                                 </template>
                             </div>
@@ -81,23 +69,12 @@
                 v-slot="{ items }"
             >
                 <template v-for="block in items" :key="block['@uid']">
-                    <!-- Static blocks: render immediately -->
-                    <Block v-if="block['@type'] !== 'listing'"
+                    <!-- Listing blocks: expand async with paging -->
+                    <BlockExpander v-if="block['@type'] === 'listing'"
                            :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                    <!-- Listing blocks: expand async -->
-                    <Suspense v-else>
-                        <ListingExpander
-                            :block="block"
-                            :block-uid="block['@uid']"
-                            :api-url="apiUrl"
-                            :context-path="contextPath"
-                            v-slot="{ items: expandedItems, paging, buildPagingUrl }"
-                        >
-                            <Block v-for="item in expandedItems" :key="item['@uid']"
-                                   :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
-                            <Paging :paging="paging" :build-url="buildPagingUrl" />
-                        </ListingExpander>
-                    </Suspense>
+                    <!-- Static blocks: render immediately -->
+                    <Block v-else
+                           :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
                 </template>
             </BlocksRenderer>
         </div>
@@ -150,10 +127,11 @@ const isInEditMode = computed(() => {
     return false;
 });
 
-// Whether we should render blocks - in edit mode, wait for admin data
+// Render blocks immediately - no need to wait for admin data since hydra.js
+// also initializes in onMounted, so no interaction is possible before then.
+// Admin data (with nodeIds) will trigger a re-render when it arrives.
 const shouldRenderBlocks = computed(() => {
-    if (!isInEditMode.value) return true;  // View mode: render from API
-    return hasAdminData.value;  // Edit mode: wait for admin data with nodeIds
+    return true;
 });
 
 /**
@@ -226,6 +204,7 @@ onMounted(() => {
             // Page-level blocks (column is only allowed inside columns, not at page level)
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
             const bridge = initBridge({
+                debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
                 pageBlocksFields: [
                     {
                         fieldName: 'blocks',
@@ -255,7 +234,7 @@ onMounted(() => {
                 if (page) {
                     // Mark that we have admin data with nodeIds
                     hasAdminData.value = true;
-                    // Update page data - AsyncListingBlock components will
+                    // Update page data - BlockExpander components will
                     // re-render and expand listings via their own Suspense
                     data.value.page = page;
                 }

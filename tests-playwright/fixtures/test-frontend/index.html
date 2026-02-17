@@ -107,9 +107,16 @@
         // Make search criteria available globally for form handlers
         window._searchCriteria = {};
 
+        // Render generation counter — prevents stale async renders from
+        // overwriting newer ones when rapid FORM_DATA messages arrive.
+        // On window so renderContent (in renderer.js) can check it too.
+        window._renderGeneration = 0;
+
         // Render content, expanding top-level listings
         // Container renderers (like renderGridBlock) call window._expandListingBlocks for nested content
         async function renderContentWithListings(content) {
+            const myGeneration = ++window._renderGeneration;
+
             // Extract path from @id
             let contextPath = content['@id'] || '/';
             if (contextPath.startsWith('http')) {
@@ -118,7 +125,7 @@
 
             const pages = getPagesFromUrl();
             const extraCriteria = getSearchCriteriaFromUrl();
-            console.log('[TEST-FRONTEND] extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
+            tfLog('extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
             window._searchCriteria = extraCriteria; // Store for form handlers
             const baseOptions = { apiUrl: window.location.origin, contextPath, extraCriteria };
 
@@ -133,21 +140,22 @@
                 return await expandListingBlocks(layout, { blocks, ...baseOptions, paging, itemTypeField: 'variation' });
             };
 
-            // Expand top-level listings - returns { items, paging }
-            // Each item has @uid (block ID to use for data-block-uid)
-            const { items } = await expandListingBlocks(
-                content.blocks_layout?.items || [],
-                { blocks: content.blocks, ...baseOptions, itemTypeField: 'variation' }
-            );
+            // Convert layout IDs to block objects with @uid
+            // Listing blocks are rendered individually by renderBlock with paging support
+            const layout = content.blocks_layout?.items || [];
+            const blocks = content.blocks || {};
+            const items = layout.map(id => ({ ...blocks[id], '@uid': id }));
 
-            // Render main content with expanded items
-            await renderContent({ ...content, items });
+            // Render main content (pass generation so renderContent can abort if stale)
+            await renderContent({ ...content, items }, 'content', myGeneration);
 
             // Render footer_blocks if present (or if forced layout will inject content)
             // Determine if we should force footer layout based on page path (same logic as bridge init)
             const pagePath = contextPath.replace(/\/edit$/, '');
             const forceFooterLayout = pagePath === '/another-page';
             const footerAllowedLayouts = forceFooterLayout ? ['/templates/footer-layout'] : null;
+
+            if (myGeneration !== window._renderGeneration) return; // stale render
 
             if (content.footer_blocks && content.footer_blocks_layout?.items?.length > 0 || footerAllowedLayouts) {
                 const footerBlocks = content.footer_blocks || {};
@@ -171,12 +179,15 @@
                     allowedLayouts: footerAllowedLayouts,
                 });
 
+                if (myGeneration !== window._renderGeneration) return; // stale render
+
                 if (expandedItems.length > 0) {
                     const { items: footerItems } = await expandListingBlocks(
                         expandedItems,
                         { ...baseOptions, itemTypeField: 'variation' }
                     );
-                    await renderContent({ items: footerItems }, 'footer-content');
+                    if (myGeneration !== window._renderGeneration) return; // stale render
+                    await renderContent({ items: footerItems }, 'footer-content', myGeneration);
                 } else {
                     // Clear footer if no content after expansion
                     const footerContainer = document.getElementById('footer-content');
@@ -198,7 +209,7 @@
             let pageLoadCount = parseInt(sessionStorage.getItem(SESSION_KEY) || '0', 10) + 1;
             sessionStorage.setItem(SESSION_KEY, String(pageLoadCount));
             document.getElementById('render-counter').textContent = pageLoadCount;
-            console.log('[TEST-FRONTEND] Page load count:', pageLoadCount);
+            tfLog('Page load count:', pageLoadCount);
 
             try {
                 // Get content path from current URL
@@ -225,7 +236,7 @@
                                      || editParam === 'true'
                                      || editParam === 'false';
                 const isEditMode = isHydraEdit || editParam === 'true';
-                console.log('[TEST-FRONTEND] Mode detection:', {
+                tfLog('Mode detection:', {
                     url: window.location.href,
                     windowName: window.name,
                     editParam,
@@ -269,14 +280,14 @@
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];
                 const navElement = document.getElementById('navigation');
-                console.log('[TEST-FRONTEND] Navigation items from API:', navItems.length, navItems.map(i => i.title));
+                tfLog('Navigation items from API:', navItems.length, navItems.map(i => i.title));
                 if (navItems.length > 0) {
                     navElement.innerHTML = navItems.map(item =>
                         `<a href="${new URL(item['@id']).pathname}">${item.title}</a>`
                     ).join('');
-                    console.log('[TEST-FRONTEND] Navigation rendered, innerHTML length:', navElement.innerHTML.length);
+                    tfLog('Navigation rendered, innerHTML length:', navElement.innerHTML.length);
                 } else {
-                    console.log('[TEST-FRONTEND] WARNING: No navigation items to render!');
+                    tfLog('WARNING: No navigation items to render!');
                 }
 
                 // In VIEW mode or no bridge: render immediately from API data
@@ -288,7 +299,7 @@
 
                 // Initialize Hydra bridge
                 if (loadHydraBridge) {
-                    console.log('[TEST-FRONTEND] Initializing Hydra bridge');
+                    tfLog('Initializing Hydra bridge');
 
                     // Define custom blocks via voltoConfig (shared schemas + any test-only overrides)
                     const voltoConfig = {
@@ -326,12 +337,14 @@
                         debug: true,  // Enable debug logging for tests
                     });
 
-                    console.log('[TEST-FRONTEND] Bridge initialized, setting up change listener');
+                    tfLog('Bridge initialized, setting up change listener');
 
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
+                    window._formDataCount = 0;
                     window.bridge.onEditChange(async (formData) => {
-                        console.log('[TEST-FRONTEND] Bridge connected! Received form data:', formData);
+                        window._formDataCount++;
+                        tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
 
                         // Update page title if provided
                         if (formData.title) {
@@ -357,15 +370,15 @@
                             const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
                             const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
                             if (col1 || col2) {
-                                console.log('[TEST-FRONTEND] col-1 blocks_layout:', col1?.blocks_layout?.items);
-                                console.log('[TEST-FRONTEND] col-2 blocks_layout:', col2?.blocks_layout?.items);
+                                tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
+                                tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
                             }
-                            console.log('[TEST-FRONTEND] Re-rendering blocks with updated data');
+                            tfLog('Re-rendering blocks with updated data');
                             return await renderContentWithListings(formData);
                         }
                     });
 
-                    console.log('[TEST-FRONTEND] Bridge setup complete, waiting for connection');
+                    tfLog('Bridge setup complete, waiting for connection');
                 }
             } catch (error) {
                 console.error('Failed to initialize page:', error);

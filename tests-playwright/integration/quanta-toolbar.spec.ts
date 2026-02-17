@@ -452,6 +452,56 @@ test.describe('Quanta Toolbar - Format Dropdown', () => {
     await expect(block.locator('h3')).toBeVisible({ timeout: 5000 });
   });
 
+  test('format dropdown includes Paragraph option to revert heading back to plain text', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const blockId = 'block-1-uuid';
+    const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+
+    // Click on Slate block and place cursor inside
+    await helper.clickBlockInIframe(blockId);
+    const editableField = await helper.getEditorLocator(blockId);
+    await editableField.click();
+
+    // Convert to H2 via format dropdown
+    const toolbar = page.locator('.quanta-toolbar');
+    const formatDropdown = toolbar.locator('.format-dropdown-trigger');
+    await formatDropdown.click();
+    const dropdownMenu = page.locator('.format-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 5000 });
+    const titleButton = dropdownMenu.getByRole('button', { name: 'Title', exact: true });
+    await titleButton.click();
+    await expect(block.locator('h2')).toBeVisible({ timeout: 5000 });
+
+    // Re-open dropdown — should have a Paragraph/Normal option
+    await formatDropdown.click();
+    await expect(dropdownMenu).toBeVisible({ timeout: 5000 });
+    const items = dropdownMenu.locator('.format-dropdown-item');
+    const titles = await items.evaluateAll((els) =>
+      els.map((el) => (el.getAttribute('title') || el.textContent || '').trim()),
+    );
+    const hasParagraph = titles.some(
+      (t) => /paragraph|normal|body/i.test(t),
+    );
+    expect(hasParagraph, `Expected a Paragraph option in dropdown, got: ${titles.join(', ')}`).toBe(true);
+
+    // Click it to revert to paragraph
+    const paragraphButton = dropdownMenu.locator('.format-dropdown-item[title]').filter({
+      hasText: /paragraph|normal|body/i,
+    }).first();
+    await paragraphButton.click();
+
+    // H2 should be gone, paragraph should be back
+    await expect(block.locator('h2')).not.toBeVisible({ timeout: 5000 });
+    await expect(block.locator('p')).toBeVisible({ timeout: 5000 });
+  });
+
   test('format dropdown shows current format indicator', async ({
     page,
   }) => {
@@ -687,4 +737,153 @@ test.describe('Quanta Toolbar - Overflow', () => {
     await expect(activeButton).toBeVisible();
   });
 
+});
+
+test.describe('Quanta Toolbar - Auto-fade', () => {
+  test('toolbar shows on mouse click then fades after inactivity', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click a slate block — mouse activity shows toolbar
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toHaveCSS('opacity', '1');
+
+    // Toolbar should fade out after inactivity (5s timer + 0.3s transition)
+    await expect(toolbar).toHaveCSS('opacity', '0', { timeout: 8000 });
+  });
+
+  test('keyboard navigation keeps toolbar hidden', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // ArrowDown with no block selected → selects first block via keyboard
+    await page.keyboard.press('ArrowDown');
+
+    // Toolbar should be hidden — no mouse activity
+    await expect(toolbar).toHaveCSS('opacity', '0');
+
+    // Arrow to next block — still hidden
+    await page.keyboard.press('ArrowDown');
+    await expect(toolbar).toHaveCSS('opacity', '0');
+  });
+
+  test('mouse activity after keyboard nav shows toolbar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // Select first block via keyboard — toolbar hidden
+    await page.keyboard.press('ArrowDown');
+    await expect(toolbar).toHaveCSS('opacity', '0');
+
+    // Move mouse inside iframe — toolbar appears
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="block-1-uuid"]').hover();
+    await expect(toolbar).toHaveCSS('opacity', '1');
+  });
+
+  test('text selection shows toolbar and prevents fade', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // Select first block via keyboard — toolbar hidden
+    await page.keyboard.press('ArrowDown');
+    await expect(toolbar).toHaveCSS('opacity', '0');
+
+    // Select all text — SELECTION_CHANGE shows toolbar
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(toolbar).toHaveCSS('opacity', '1');
+
+    // Toolbar stays visible — non-collapsed selection prevents fade
+    await page.waitForTimeout(6000);
+    await expect(toolbar).toHaveCSS('opacity', '1');
+  });
+
+  test('arrow keys navigate past fixed blocks without editable fields', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - template merge uses different block IDs');
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Template-test-page layout (after merge):
+    // standalone-block-1 (editable slate)
+    // [template instance: template-header (fixed), ..., user-content-2, template-footer (fixed)]
+    // standalone-block-2 (editable slate)
+
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
+
+    // Start at the last user content block inside the template
+    await helper.clickBlockInIframe('user-content-2');
+    await helper.waitForQuantaToolbar('user-content-2');
+
+    // ArrowDown from user-content-2 reaches fixed template-footer (selected but not editable)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar(footerBlockId);
+
+    // ArrowDown from template-footer crosses template boundary to standalone-block-2
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar('standalone-block-2');
+
+    // ArrowUp from standalone-block-2: first press moves cursor to "home" (start of line),
+    // second press detects edge and crosses template boundary to template-footer
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await helper.waitForQuantaToolbar(footerBlockId);
+
+    // ArrowUp from template-footer returns to user-content-2
+    await page.keyboard.press('ArrowUp');
+    await helper.waitForQuantaToolbar('user-content-2');
+  });
+
+  test('arrow keys navigate across page block field boundaries', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt');
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // test-page has two page-level block fields:
+    // blocks: [block-1-uuid, ..., skiplogic-test]
+    // footer_blocks: [footer-block-1 (slate), footer-block-2 (image)]
+    // ArrowUp from footer-block-1 should cross into main blocks
+
+    // Click footer-block-1 (first block in footer_blocks field)
+    await helper.clickBlockInIframe('footer-block-1');
+    await helper.waitForQuantaToolbar('footer-block-1');
+
+    // ArrowUp should cross the block field boundary into the main blocks area.
+    // First ArrowUp goes "home" (cursor normalization), second triggers edge navigation.
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+
+    // Verify we left footer-block-1 (now in main blocks field)
+    const iframe = helper.getIframe();
+    await expect(async () => {
+      const dragHandle = iframe.locator('.volto-hydra-drag-button');
+      const handleBox = await dragHandle.boundingBox();
+      const footerBlock = iframe.locator('[data-block-uid="footer-block-1"]');
+      const footerBox = await footerBlock.boundingBox();
+      // Drag handle should be ABOVE footer-block-1 (navigated backward)
+      expect(handleBox!.y).toBeLessThan(footerBox!.y);
+    }).toPass({ timeout: 5000 });
+
+    // ArrowDown should return to footer-block-1 (cross back into footer_blocks)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar('footer-block-1');
+  });
 });

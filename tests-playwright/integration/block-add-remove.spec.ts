@@ -10,9 +10,6 @@
  * - Block count changes
  * - Changes sync with Admin UI
  * TODO: Extra tests
- * - / short cut to add block
- * - enter on any block adds new block below
- * - enter on 2nd last field goes to next field
  * - removing last block adds new blank block
  * 
  * Container tests
@@ -535,6 +532,161 @@ test.describe('Footer Blocks Add/Remove', () => {
     expect(newFooterBlocks).not.toContain(blockToRemove);
   });
 
+});
+
+test.describe('Enter Key to Add/Navigate', () => {
+  test('Enter on image block (no focused field) adds new block after', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const initialCount = await helper.getBlockCount();
+    const initialBlocks = await helper.getBlockOrder();
+
+    // Click on the image block (no editable text fields)
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForSidebarOpen();
+
+    // Press Enter — should add a new block after the image
+    await page.keyboard.press('Enter');
+    await helper.waitForBlockCountToBe(initialCount + 1);
+
+    // New block should be right after block-2-uuid
+    const newBlocks = await helper.getBlockOrder();
+    const imageIdx = newBlocks.indexOf('block-2-uuid');
+    const newBlockId = newBlocks[imageIdx + 1];
+    expect(initialBlocks).not.toContain(newBlockId);
+  });
+
+  test('Enter on hero heading (non-last field) moves focus to next field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const initialCount = await helper.getBlockCount();
+    const iframe = helper.getIframe();
+
+    // Enter edit mode on the hero heading field
+    const editor = await helper.enterEditMode('block-4-hero', 'heading');
+
+    // Press Enter — should move focus to the next field (subheading), NOT add a block
+    await editor.press('Enter');
+
+    // Block count should stay the same
+    const countAfter = await helper.getBlockCount();
+    expect(countAfter).toBe(initialCount);
+
+    // The subheading field should now be focused — typing should go into it
+    const subheadingField = iframe.locator('[data-block-uid="block-4-hero"] .hero-subheading');
+    // Type into the now-focused subheading field and verify text appears there
+    await page.keyboard.type('test-focus', { delay: 10 });
+    await expect(subheadingField).toContainText('test-focus', { timeout: 5000 });
+  });
+
+  test('Enter on hero last field (buttonText) adds new block after', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const initialCount = await helper.getBlockCount();
+    const initialBlocks = await helper.getBlockOrder();
+
+    // Enter edit mode on the hero's last editable field (buttonText)
+    const editor = await helper.enterEditMode('block-4-hero', 'buttonText');
+
+    // Press Enter — should add a new block after the hero block
+    await editor.press('Enter');
+    await helper.waitForBlockCountToBe(initialCount + 1);
+
+    // New block should be after the hero block
+    const newBlocks = await helper.getBlockOrder();
+    const heroIdx = newBlocks.indexOf('block-4-hero');
+    const newBlockId = newBlocks[heroIdx + 1];
+    expect(initialBlocks).not.toContain(newBlockId);
+  });
+
+  test('Backspace at start of empty paragraph block removes it', async ({ page }, testInfo) => {
+    const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enable debug logging with run ID
+    await page.evaluate((id) => {
+      (window as any).HYDRA_DEBUG = true;
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
+    const iframe = helper.getIframe();
+    await iframe.locator('body').evaluate((_, id) => {
+      (window as any).HYDRA_DEBUG = true;
+      (window as any).__testRunId = id;
+    }, testInfo.repeatEachIndex);
+
+    const blockId = 'block-1-uuid';
+
+    // Create a new empty block via Enter
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Some text', { delay: 10 });
+    await helper.waitForEditorText(editor, /Some text/);
+
+    const initialBlocks = await helper.getStableBlockCount();
+    await editor.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+    // Find the new empty block
+    const blockOrder = await helper.getBlockOrder();
+    const originalBlockIndex = blockOrder.indexOf(blockId);
+    const newBlockUid = blockOrder[originalBlockIndex + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Wait for editable field to appear and block to be fully selected
+    const newEditor = await helper.getEditorLocator(newBlockUid);
+    await expect(newEditor).toBeAttached({ timeout: 10000 });
+    await helper.waitForQuantaToolbar(newBlockUid);
+
+    // Backspace in the empty block should remove it
+    await newEditor.press('Backspace');
+
+    // Wait for block count to stabilize — not just reach the target.
+    // A stale toolbar onChange can briefly remove the block then re-add it,
+    // so we need the count to settle at initialBlocks, not just hit it once.
+    const stableCount = await helper.getStableBlockCount();
+    expect(stableCount).toBe(initialBlocks);
+
+    // The new block should be gone
+    await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('Backspace to delete last block on page triggers new default block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/another-page');
+
+    const blockId = 'block-1-uuid';
+    const iframe = helper.getIframe();
+
+    // Enter edit mode on the only block
+    const editor = await helper.enterEditMode(blockId);
+
+    // Select all text and delete it
+    await helper.selectAllTextInEditor(editor);
+    await editor.press('Backspace');
+
+    // Now the block should be empty — backspace again should trigger delete
+    await editor.press('Backspace');
+
+    // The original block should be gone, replaced by a new default (slate) block.
+    // Page-level uses the global defaultBlockType ('slate'), not 'empty'.
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeVisible({ timeout: 5000 });
+
+    // A new block should exist in the main content area (not footer)
+    const mainBlocks = iframe.locator('main [data-block-uid]');
+    await expect(mainBlocks).toHaveCount(1, { timeout: 5000 });
+  });
 });
 
 test.describe('Allowed Blocks from Frontend', () => {

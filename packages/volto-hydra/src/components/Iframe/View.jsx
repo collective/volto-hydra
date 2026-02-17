@@ -13,13 +13,10 @@ import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, getBlockAddability } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
-// Debug logging - disabled by default, enable via window.HYDRA_DEBUG
-const debugEnabled =
-  typeof window !== 'undefined' && window.HYDRA_DEBUG;
-const log = (...args) => debugEnabled && console.log('[VIEW]', ...args);
-// eslint-disable-next-line no-unused-vars
-const logExtract = (...args) =>
-  debugEnabled && console.log('[EXTRACT]', ...args);
+import { createLog } from '../../utils/log';
+
+const log = createLog('VIEW');
+const logExtract = createLog('EXTRACT'); // eslint-disable-line no-unused-vars
 
 /**
  * Get field type string in "type:widget" format.
@@ -76,6 +73,7 @@ import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { BlockChooser, Icon, Toast } from '@plone/volto/components';
+import { Menu } from 'semantic-ui-react';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
@@ -437,6 +435,20 @@ const Iframe = (props) => {
 
   const dispatch = useDispatch();
 
+  // DEBUG: Track what causes re-renders
+  const renderCountRef = useRef(0);
+  const prevPropsRef = useRef({});
+  renderCountRef.current++;
+  const changedProps = Object.keys(props).filter(
+    (key) => props[key] !== prevPropsRef.current[key]
+  );
+  if (renderCountRef.current > 1 && changedProps.length > 0) {
+    log('[RENDER]', renderCountRef.current, 'changed props:', changedProps.join(', '));
+  } else if (renderCountRef.current > 1) {
+    log('[RENDER]', renderCountRef.current, 'no prop changes (state/context)');
+  }
+  prevPropsRef.current = props;
+
   const [addNewBlockOpened, setAddNewBlockOpened] = useState(false);
   // pendingAdd: { mode: 'sidebar', parentBlockId, fieldName } | { mode: 'iframe', afterBlockId }
   const [pendingAdd, setPendingAdd] = useState(null);
@@ -444,6 +456,7 @@ const Iframe = (props) => {
   const [popperElement, setPopperElement] = useState(null);
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
+  const [mouseActivityCounter, setMouseActivityCounter] = useState(0); // incremented on MOUSE_ACTIVITY from iframe
 
   // History for routing - needed early for edit mode detection
   const history = useHistory();
@@ -460,6 +473,8 @@ const Iframe = (props) => {
 
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
   const blockChooserRef = useRef();
+  const [slashMenu, setSlashMenu] = useState(null); // { blockId, filter } or null
+  const [slashMenuIndex, setSlashMenuIndex] = useState(0);
 
   // NOTE: selectionToSendRef, formatRequestIdToSendRef, and applyFormatRef have been removed.
   // Selection and toolbarRequestDone are now part of iframeSyncState.
@@ -612,13 +627,13 @@ const Iframe = (props) => {
         const template = templateCache[templateId];
         if (!template) return;
 
-        console.log('[SAVE TEMPLATE] Saving template:', templateId);
-        console.log('[SAVE TEMPLATE] Template blocks:', Object.keys(template.blocks || {}));
+        log('SAVE TEMPLATE: Saving template:', templateId);
+        log('SAVE TEMPLATE: Template blocks:', Object.keys(template.blocks || {}));
         // Log first block's value to check if edit is present
         const firstBlockId = template.blocks_layout?.items?.[0];
         if (firstBlockId && template.blocks[firstBlockId]) {
           const block = template.blocks[firstBlockId];
-          console.log('[SAVE TEMPLATE] First block value:', JSON.stringify(block.value)?.substring(0, 200));
+          log('SAVE TEMPLATE: First block value:', JSON.stringify(block.value)?.substring(0, 200));
         }
 
         // PATCH the template - cache already has merged content from edit mode exit
@@ -665,14 +680,14 @@ const Iframe = (props) => {
     if (templateId && templateCacheRef.current[templateId]) {
       const template = templateCacheRef.current[templateId];
 
-      console.log('[REVERSE MERGE] Starting reverse merge for template:', templateId);
-      console.log('[REVERSE MERGE] prevInstanceId:', prevInstanceId);
-      console.log('[REVERSE MERGE] Template blocks:', Object.keys(template.blocks || {}));
-      console.log('[REVERSE MERGE] FormData blocks:', Object.keys(formData.blocks || {}));
+      log('REVERSE MERGE: Starting reverse merge for template:', templateId);
+      log('REVERSE MERGE: prevInstanceId:', prevInstanceId);
+      log('REVERSE MERGE: Template blocks:', Object.keys(template.blocks || {}));
+      log('REVERSE MERGE: FormData blocks:', Object.keys(formData.blocks || {}));
       // Log fixed blocks' content in formData
       for (const [blockId, block] of Object.entries(formData.blocks || {})) {
         if (block.fixed && block.templateInstanceId === prevInstanceId) {
-          console.log(`[REVERSE MERGE] Fixed block ${blockId}:`, JSON.stringify(block.value)?.substring(0, 200));
+          log(`REVERSE MERGE: Fixed block ${blockId}:`, JSON.stringify(block.value)?.substring(0, 200));
         }
       }
 
@@ -682,12 +697,12 @@ const Iframe = (props) => {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
       }).then(({ merged: updatedTemplate }) => {
-        console.log('[REVERSE MERGE] Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
+        log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
         // Log first block's value to check if edit is captured
         const firstBlockId = updatedTemplate.blocks_layout?.items?.[0];
         if (firstBlockId && updatedTemplate.blocks[firstBlockId]) {
           const block = updatedTemplate.blocks[firstBlockId];
-          console.log('[REVERSE MERGE] First block value:', JSON.stringify(block.value)?.substring(0, 200));
+          log('REVERSE MERGE: First block value:', JSON.stringify(block.value)?.substring(0, 200));
         }
 
         // Update cache with merged template
@@ -1253,6 +1268,21 @@ const Iframe = (props) => {
         iframeOriginRef.current = event.origin;
       }
       const { type } = event.data;
+
+      // Save pre-message sequence for echo detection (used by INLINE_EDIT_DATA).
+      const preMessageSeq = editSequenceRef.current;
+
+      // Adopt the iframe's edit sequence from ANY message carrying form data.
+      // The iframe increments _editSequence when buffering local changes (typing).
+      // Without this, editSequenceRef stays stale when typing is buffered directly
+      // into a transform request (e.g., Enter pressed before debounced send).
+      if (event.data.data?._editSequence != null) {
+        const msgSeq = event.data.data._editSequence;
+        if (msgSeq > editSequenceRef.current) {
+          editSequenceRef.current = msgSeq;
+        }
+      }
+
       switch (type) {
         case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
           // Check if this is in-page navigation (e.g., paging) - just resend form data
@@ -1309,23 +1339,44 @@ const Iframe = (props) => {
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
+        case 'ADD_BLOCK_AFTER':
+          insertAndSelectBlock(event.data.blockId, 'slate', 'after');
+          break;
+
+        case 'SLASH_MENU':
+          if (event.data.action === 'filter') {
+            setSlashMenu({ blockId: event.data.blockId, filter: event.data.filter, fieldRect: event.data.fieldRect });
+            setSlashMenuIndex(0);
+          } else if (event.data.action === 'hide') {
+            setSlashMenu(null);
+            setSlashMenuIndex(0);
+          } else if (event.data.action === 'up') {
+            setSlashMenuIndex(prev => (prev > 0 ? prev - 1 : prev));
+          } else if (event.data.action === 'down') {
+            setSlashMenuIndex(prev => prev + 1);
+          } else if (event.data.action === 'select') {
+            // Selection is handled by the slashMenuSelect effect below
+            setSlashMenu(prev => prev ? { ...prev, selecting: true } : null);
+          }
+          break;
+
         case 'INLINE_EDIT_DATA':
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
           const incomingSequence = event.data.data?._editSequence || 0;
-          // Use ref instead of state to avoid closure issues - ref is always current
-          const currentSequence = editSequenceRef.current;
-          log('INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, '_editSequence:', incomingSequence, 'currentSeq:', currentSequence);
+          // Use preMessageSeq (saved before universal adoption) for echo detection.
+          // The universal adoption already bumped editSequenceRef, so reading it
+          // here would always show incomingSeq == editSequenceRef → never new.
+          log('INLINE_EDIT_DATA flushRequestId:', event.data.flushRequestId, '_editSequence:', incomingSequence, 'preMessageSeq:', preMessageSeq);
 
           // Sequence logic:
-          // - incomingSeq > currentSeq: new edit from iframe, process it
-          // - incomingSeq <= currentSeq: echo or stale, only update selection
-          const isNewEdit = incomingSequence > currentSequence;
+          // - incomingSeq > preMessageSeq: new edit from iframe, process it
+          // - incomingSeq <= preMessageSeq: echo or stale, only update selection
+          const isNewEdit = incomingSequence > preMessageSeq;
 
           if (isNewEdit) {
             // New edit from iframe - update everything
             inlineEditCounterRef.current += 1;
-            editSequenceRef.current = incomingSequence; // Track the new sequence
             // Debug: log full children structure to diagnose missing "w" bug
             const debugBlock = event.data.data?.blocks?.['block-1-uuid'];
             if (debugBlock?.value?.[0]?.children) {
@@ -1336,22 +1387,27 @@ const Iframe = (props) => {
               formData: event.data.data,
               blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
+              _selectionSource: 'INLINE_EDIT_DATA:new',
               ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
             }));
             // Strip _editSequence when updating Redux - sequence numbers are for iframe
-            // echo detection only. Keeping them in Redux would cause sidebar edits to
-            // inherit stale sequences, breaking the "skip if propsSeq < syncedSeq" check.
+            // echo detection only. Redux data doesn't need sequences since admin-side echo
+            // prevention uses content comparison (processedInlineEditCounterRef + formDataContentEqual).
             const { _editSequence: _, ...formDataWithoutSeq } = event.data.data;
             log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux (without _editSequence)');
             onChangeFormData(formDataWithoutSeq);
           } else {
-            // Echo or stale - only update selection and flush state
-            log('INLINE_EDIT_DATA: echo/stale, only updating selection');
-            setIframeSyncState(prev => ({
-              ...prev,
-              selection: event.data.selection || null,
-              ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
-            }));
+            // Echo or stale - only update flush state (NOT selection).
+            // The iframe may echo back a wrong cursor position (e.g., [0,0]
+            // instead of [0,1,0] inside a prospective-format node). The admin
+            // already has the authoritative selection from the format transform.
+            log('INLINE_EDIT_DATA: echo/stale, updating flush state only (ignoring selection)');
+            if (event.data.flushRequestId) {
+              setIframeSyncState(prev => ({
+                ...prev,
+                completedFlushRequestId: event.data.flushRequestId,
+              }));
+            }
           }
           break;
 
@@ -1361,6 +1417,7 @@ const Iframe = (props) => {
           setIframeSyncState(prev => ({
             ...prev,
             selection: event.data.selection || null,
+            _selectionSource: 'BUFFER_FLUSHED',
             completedFlushRequestId: event.data.requestId,
           }));
           break;
@@ -1409,6 +1466,7 @@ const Iframe = (props) => {
           // Unified transform request from iframe - always includes form data with buffer
           // transformType: 'format', 'paste', 'delete', 'enter'
           // fieldName: which field is being edited (e.g., 'value', 'description')
+
           if (event.data.transformType === 'enter') {
             // Enter is handled directly here since it creates a new block
             try {
@@ -1442,6 +1500,53 @@ const Iframe = (props) => {
               // Get the field value to split
               const fieldValue = currentBlock[enterFieldName];
               if (!fieldValue) {
+                break;
+              }
+
+              // Check if cursor is in a list item — handle differently from normal split
+              if (slateTransforms.isSelectionInList(fieldValue, enterSelection)) {
+                const containerConfig = getContainerFieldConfig(
+                  enterBlockId, enterBlockPathMap, formToUseForEnter,
+                  config.blocks.blocksConfig, intl,
+                );
+
+                if (slateTransforms.isCurrentListItemEmpty(fieldValue, enterSelection)) {
+                  // Empty list item: remove it and create new empty block after
+                  const { newValue } = slateTransforms.removeEmptyListItem(fieldValue, enterSelection);
+                  const updatedBlock = { ...currentBlock, [enterFieldName]: newValue };
+                  const mutatedFormData = mutateBlockInContainer(
+                    formToUseForEnter, enterBlockPathMap, enterBlockId, updatedBlock, containerConfig,
+                  );
+                  const syncedBpm = buildBlockPathMap(mutatedFormData, config.blocks.blocksConfig, intl);
+                  flushSync(() => {
+                    setIframeSyncState(prev => ({
+                      ...prev,
+                      formData: mutatedFormData,
+                      blockPathMap: syncedBpm,
+                    }));
+                  });
+                  onChangeFormData(mutatedFormData);
+                  insertAndSelectBlock(enterBlockId, 'slate', 'after', null, {
+                    formatRequestId: enterRequestId,
+                    formData: mutatedFormData,
+                    blockPathMap: syncedBpm,
+                  });
+                } else {
+                  // Non-empty list item: split it (new bullet, same block)
+                  const { newValue, newSelection } = slateTransforms.splitListItem(fieldValue, enterSelection);
+                  const updatedBlock = { ...currentBlock, [enterFieldName]: newValue };
+                  const mutatedFormData = mutateBlockInContainer(
+                    formToUseForEnter, enterBlockPathMap, enterBlockId, updatedBlock, containerConfig,
+                  );
+                  const newBpm = buildBlockPathMap(mutatedFormData, config.blocks.blocksConfig, intl);
+                  setIframeSyncState(prev => ({
+                    ...prev,
+                    formData: mutatedFormData,
+                    blockPathMap: newBpm,
+                    selection: newSelection,
+                    toolbarRequestDone: enterRequestId,
+                  }));
+                }
                 break;
               }
 
@@ -1485,8 +1590,9 @@ const Iframe = (props) => {
               });
               onChangeFormData(mutatedFormData);
 
-              // Now insert new block using normal flow (like BlockChooser)
-              // Only pass blockData for new block content, not custom formData/blockPathMap
+              // Insert new block with bottom half of split text.
+              // Must pass mutatedFormData because properties is stale (won't update
+              // until next render after onChangeFormData dispatch above).
               const newBlockData = {
                 '@type': blockType,
                 [enterFieldName]: bottomValue,
@@ -1494,6 +1600,8 @@ const Iframe = (props) => {
               insertAndSelectBlock(enterBlockId, blockType, 'after', null, {
                 blockData: newBlockData,
                 formatRequestId: enterRequestId,
+                formData: mutatedFormData,
+                blockPathMap: syncedBlockPathMap,
               });
             } catch (error) {
               console.error('[VIEW] Error handling enter transform:', error);
@@ -1506,8 +1614,77 @@ const Iframe = (props) => {
                 event.origin,
               );
             }
+          } else if (event.data.transformType === 'outdent') {
+            // Check if this is a top-level list item — needs block splitting
+            const { blockId: odBlockId, fieldName: odFieldName, selection: odSelection, requestId: odRequestId } = event.data;
+            const odForm = event.data.data;
+            const odBpm = buildBlockPathMap(odForm, config.blocks.blocksConfig, intl);
+            const odBlockPath = odBpm[odBlockId]?.path;
+            const odBlock = odBlockPath ? getBlockByPath(odForm, odBlockPath) : odForm.blocks[odBlockId];
+            const odFieldValue = odBlock?.[odFieldName];
+            log('[OUTDENT] selection:', JSON.stringify(odSelection), 'fieldValue:', JSON.stringify(odFieldValue));
+            const split = odFieldValue ? slateTransforms.splitListAtItem(odFieldValue, odSelection) : null;
+            log('[OUTDENT] split result:', split ? JSON.stringify({ before: !!split.before, paragraph: !!split.paragraph, after: !!split.after }) : 'null');
+
+            if (!split) {
+              // Nested outdent: forward to toolbar
+              setIframeSyncState(prev => ({
+                ...prev,
+                formData: odForm,
+                blockPathMap: odBpm,
+                selection: odSelection || null,
+                transformAction: { type: 'outdent', requestId: odRequestId },
+              }));
+            } else {
+              // Top-level outdent: split list block into up to 3 blocks
+              const containerConfig = getContainerFieldConfig(odBlockId, odBpm, odForm, config.blocks.blocksConfig, intl);
+              const blockType = odBlock['@type'];
+
+              // Update current block with before-list (or paragraph if no before)
+              const updatedBlock = { ...odBlock, [odFieldName]: split.before || split.paragraph };
+              let fd = mutateBlockInContainer(odForm, odBpm, odBlockId, updatedBlock, containerConfig);
+              let bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+              let selectBlockId = odBlockId;
+
+              // Insert paragraph block after current (only if current kept the before-list)
+              if (split.before) {
+                const paraId = uuid();
+                fd = insertBlockInContainer(fd, bpm, odBlockId, paraId,
+                  { '@type': blockType, [odFieldName]: split.paragraph }, containerConfig, 'after');
+                bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                selectBlockId = paraId;
+
+                // Insert after-list block after the paragraph
+                if (split.after) {
+                  const afterId = uuid();
+                  fd = insertBlockInContainer(fd, bpm, paraId, afterId,
+                    { '@type': blockType, [odFieldName]: split.after }, containerConfig, 'after');
+                  bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                }
+              } else if (split.after) {
+                // No before: current block IS paragraph, insert after-list after it
+                const afterId = uuid();
+                fd = insertBlockInContainer(fd, bpm, odBlockId, afterId,
+                  { '@type': blockType, [odFieldName]: split.after }, containerConfig, 'after');
+                bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+              }
+
+              // Set pending selection and blockPathMap, but NOT formData
+              // formData will be updated by the useEffect after it sends FORM_DATA to iframe
+              // This ensures the useEffect sees a content change and doesn't skip sending
+              flushSync(() => {
+                setIframeSyncState(prev => ({
+                  ...prev,
+                  blockPathMap: bpm,
+                  pendingSelectBlockUid: selectBlockId,
+                  ...(odRequestId ? { pendingFormatRequestId: odRequestId } : {}),
+                }));
+              });
+              onChangeFormData(fd);
+              dispatch(setSidebarTab(1));
+            }
           } else {
-            // Format, paste, delete - let toolbar handle via transformAction
+            // Format, paste, delete, indent - let toolbar handle via transformAction
             // Build transformAction based on transformType
             const transformAction = {
               type: event.data.transformType,
@@ -1521,16 +1698,13 @@ const Iframe = (props) => {
               transformAction.html = event.data.html;
             } else if (event.data.transformType === 'delete') {
               transformAction.direction = event.data.direction;
-            }
-
-            // IMPORTANT: Adopt the iframe's sequence if it's higher than ours.
-            // The iframe increments sequence when buffering local changes (typing).
-            // If we don't adopt it, FORM_DATA we send back will have a lower sequence,
-            // and subsequent typing will use a stale sequence baseline.
-            const incomingSeq = event.data.data?._editSequence || 0;
-            if (incomingSeq > editSequenceRef.current) {
-              editSequenceRef.current = incomingSeq;
-              log('SLATE_TRANSFORM_REQUEST: adopting iframe sequence:', incomingSeq);
+            } else if (event.data.transformType === 'markdown') {
+              transformAction.markdownType = event.data.markdownType;
+              transformAction.blockType = event.data.blockType;
+              transformAction.inlineType = event.data.inlineType;
+            } else if (event.data.transformType === 'unwrapBlock') {
+              transformAction.isFirstField = event.data.isFirstField;
+              transformAction.isEmpty = event.data.isEmpty;
             }
 
             setIframeSyncState(prev => ({
@@ -1538,6 +1712,7 @@ const Iframe = (props) => {
               formData: event.data.data,
               blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
+              _selectionSource: 'SLATE_TRANSFORM_REQUEST',
               transformAction: transformAction,
             }));
           }
@@ -1627,7 +1802,7 @@ const Iframe = (props) => {
         case 'MOVE_BLOCK': {
           // Handle drag-and-drop block moves (supports container and page-level)
           const { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId } = event.data;
-          console.log('[MOVE_BLOCK] received:', { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId });
+          log('MOVE_BLOCK: received:', { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId });
 
           // Use properties (Redux) as source of truth for moves
           // Rebuild blockPathMap from properties to ensure consistency
@@ -1649,7 +1824,7 @@ const Iframe = (props) => {
 
             // Find all child blocks of this template instance in layout order
             blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
-            console.log('[MOVE_BLOCK] template instance - moving blocks:', blocksToMove);
+            log('MOVE_BLOCK: template instance - moving blocks:', blocksToMove);
           } else {
             blocksToMove = [blockId];
           }
@@ -1686,7 +1861,7 @@ const Iframe = (props) => {
             );
 
             if (!newFormData) {
-              console.log('[MOVE_BLOCK] moveBlockBetweenContainers failed for:', moveBlockId);
+              log('MOVE_BLOCK: moveBlockBetweenContainers failed for:', moveBlockId);
               break;
             }
 
@@ -1694,7 +1869,7 @@ const Iframe = (props) => {
             currentTarget = moveBlockId;
             currentInsertAfter = true;
           }
-          console.log('[MOVE_BLOCK] moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
+          log('MOVE_BLOCK: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
             // Apply defaults to moved blocks based on their new position
@@ -1734,7 +1909,7 @@ const Iframe = (props) => {
               if (updatedBlockData !== blockData) {
                 newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                console.log('[MOVE_BLOCK] Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'placeholder:', updatedBlockData.placeholder);
+                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'placeholder:', updatedBlockData.placeholder);
               }
             }
 
@@ -1764,16 +1939,25 @@ const Iframe = (props) => {
             // Debug: Log column contents after move
             const col1AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-1'];
             const col2AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-2'];
-            console.log('[MOVE_BLOCK] col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
-            console.log('[MOVE_BLOCK] col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
-            console.log('[MOVE_BLOCK] calling onChangeFormData');
+            log('MOVE_BLOCK: col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
+            log('MOVE_BLOCK: col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
+            log('MOVE_BLOCK: calling onChangeFormData');
             onChangeFormData(newFormData);
           }
           break;
         }
 
-        // NOTE: SELECTION_CHANGE was removed - selection is now always sent
-        // WITH text content in INLINE_EDIT_DATA to keep them atomic/in-sync.
+        case 'SELECTION_CHANGE':
+          // Selection-only update (no text change) — safe because data is already in sync
+          // Sent by hydra.js when selectionchange fires but text is unchanged (e.g., Ctrl+A, Shift+Arrow)
+          setIframeSyncState(prev => {
+            const newSelection = event.data.selection || null;
+            if (JSON.stringify(prev.selection) === JSON.stringify(newSelection)) {
+              return prev;
+            }
+            return { ...prev, selection: newSelection };
+          });
+          break;
 
         case 'BLOCK_SELECTED': {
           // Update block UI state and selection atomically
@@ -1814,7 +1998,7 @@ const Iframe = (props) => {
           }
 
           log('BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect, 'isNewBlock:', isNewBlock, 'currentBlockUI:', blockUI?.blockUid, 'currentSelectedBlock:', selectedBlock);
-          console.log('[VIEW-DEBUG] BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect);
+          log(' BLOCK_SELECTED received:', event.data.blockUid, 'src:', event.data.src, 'rect:', event.data.rect);
 
           // Update lastSentSelectBlockRef to match iframe's selection
           // This is critical: when iframe confirms a selection, our ref must match
@@ -1827,6 +2011,16 @@ const Iframe = (props) => {
           if (isNewBlock) {
             log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);
+          }
+
+          // Deselection: just call onSelectBlock(null) — skip blockUI/addability updates.
+          // The selectedBlock useEffect will set blockUI to null.
+          // Without this early return, setBlockUI({ blockUid: null }) creates a truthy
+          // object that causes a brief intermediate render where the sidebar checks
+          // blockUI (truthy) and renders block-level UI instead of page-level UI.
+          if (!event.data.blockUid) {
+            setBlockUI(null);
+            break;
           }
 
           // Check if we can add/replace at this block - if so, open block chooser for empty blocks
@@ -1843,7 +2037,7 @@ const Iframe = (props) => {
           }
 
           // Now update blockUI state
-          console.log('[VIEW-DEBUG] About to call setBlockUI for:', event.data.blockUid);
+          log(' About to call setBlockUI for:', event.data.blockUid);
           setBlockUI((prevBlockUI) => {
             // Skip update if nothing changed - prevents unnecessary toolbar redraws
             // IMPORTANT: Must compare mediaFields because they can change independently
@@ -1910,6 +2104,11 @@ const Iframe = (props) => {
           // The block will be re-shown when BLOCK_SELECTED is sent after scroll stops
           setBlockUI(null);
           // Don't call onSelectBlock(null) - keep the block selected in Redux
+          break;
+
+        case 'MOUSE_ACTIVITY':
+          // Throttled mousemove from iframe — reset toolbar fade timer
+          setMouseActivityCounter(c => c + 1);
           break;
 
         case 'INIT':
@@ -2240,6 +2439,7 @@ const Iframe = (props) => {
         ...iframeSyncState.formData,
         _editSequence: editSequenceRef.current,
       };
+      const skipRender = iframeSyncState.skipRenderOnSend;
       const message = {
         type: 'FORM_DATA',
         data: formWithSequence,
@@ -2249,8 +2449,15 @@ const Iframe = (props) => {
       if (iframeSyncState.selection) {
         message.transformedSelection = iframeSyncState.selection;
       }
-      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId, '_editSequence:', editSequenceRef.current);
-      document.getElementById('previewIframe')?.contentWindow?.postMessage(
+      // When data didn't change (e.g. link cancel), tell iframe to skip
+      // re-render — just unblock and restore selection/focus.
+      if (skipRender) {
+        message.skipRender = true;
+      }
+      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId,
+        '_editSequence:', editSequenceRef.current, 'skipRender:', !!skipRender);
+      const iframeEl = document.getElementById('previewIframe');
+      iframeEl?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
       );
@@ -2261,9 +2468,15 @@ const Iframe = (props) => {
       // This prevents race condition where Redux update triggers Case 2 with stale properties
       // NOTE: flushSync may warn "cannot flush when already rendering" but still works
       flushSync(() => {
-        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, formData: formWithSequence }));
+        setIframeSyncState(prev => ({ ...prev, toolbarRequestDone: null, skipRenderOnSend: false, formData: formWithSequence }));
         onChangeFormData(formWithoutSeq);
       });
+      // Focus iframe AFTER flushSync — React has finished all synchronous
+      // renders so nothing will steal focus. The iframe-side field focus is
+      // handled by restoreSlateSelection in afterContentRender.
+      if (iframeEl && message.formatRequestId) {
+        iframeEl.focus();
+      }
       return;
     }
 
@@ -2424,17 +2637,6 @@ const Iframe = (props) => {
       return;
     }
 
-    // Skip if properties has an older sequence than what we've already sent
-    // This prevents stale Redux echoes after Case 1 runs.
-    // IMPORTANT: Sidebar edits come through Redux without _editSequence (it's undefined),
-    // so we must NOT skip those - only skip when properties explicitly has an older sequence.
-    const syncedSeq = iframeSyncState.formData?._editSequence || 0;
-    const propsSeq = formToUse?._editSequence;
-    if (propsSeq !== undefined && syncedSeq > propsSeq) {
-      log('[SYNC SKIP] Stale sequence: propsSeq', propsSeq, '< syncedSeq', syncedSeq);
-      return;
-    }
-
     // Build blockPathMap first - needed for applying defaults to nested blocks
     const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
 
@@ -2452,10 +2654,8 @@ const Iframe = (props) => {
     // Also skip if content is identical (ignoring _editSequence metadata)
     // Compare defaults-applied versions to avoid infinite loops
     if (formDataContentEqual(formWithDefaults, iframeSyncState.formData)) {
-      log('[SYNC SKIP] Content identical, skipping FORM_DATA');
       return;
     }
-    log('[SYNC] Content changed, will send FORM_DATA. propsSeq:', propsSeq, 'syncedSeq:', syncedSeq);
 
     // Validate selection (may be stale after document structure changes)
     let newSelection = iframeSyncState.selection;
@@ -2485,11 +2685,13 @@ const Iframe = (props) => {
     // NOTE: Do NOT clear pendingSelectBlockUid here - keep it set until BLOCK_SELECTED
     // is received for that block. This prevents race conditions where another block
     // (e.g., parent container) gets selected during re-render and we send SELECT_BLOCK for it.
+    log('PROPS_SYNC: overwriting iframeSyncState. prev.selection:', JSON.stringify(iframeSyncState.selection?.anchor?.path), 'newSelection:', JSON.stringify(newSelection?.anchor?.path), 'prevSource:', iframeSyncState._selectionSource);
     setIframeSyncState(prev => ({
       ...prev,
       formData: formWithSequence,
       blockPathMap: newBlockPathMap,
       selection: newSelection,
+      _selectionSource: 'PROPS_SYNC',
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
     }));
 
@@ -2704,6 +2906,85 @@ const Iframe = (props) => {
   }, [pendingAdd, selectedBlock, iframeSyncState.blockPathMap, properties, allowedBlocks, filterByParentVariation]);
 
   // ============================================================================
+  // SLASH MENU — filtered block list for "/" command in iframe
+  // ============================================================================
+  const slashMenuBlocks = useMemo(() => {
+    if (!slashMenu) return [];
+    const hasAllowed = effectiveAllowedBlocks && effectiveAllowedBlocks.length > 0;
+    const search = (slashMenu.filter || '').toLowerCase();
+
+    const scoreBlock = (block) => {
+      if (!search) return 0;
+      const title = intl.formatMessage({ id: block.title, defaultMessage: block.title }).toLowerCase();
+      if (title.indexOf(search) === 0) return 2; // prefix match
+      if (title.includes(search)) return 1; // substring match
+      return 0;
+    };
+
+    return Object.values(blocksConfig)
+      .filter(block => {
+        if (!block.id || !block.title) return false;
+        if (block.id === 'slate') return false; // same as core Volto
+        if (typeof block.restricted === 'function'
+          ? block.restricted({ properties, block, navRoot, contentType })
+          : block.restricted) return false;
+        if (hasAllowed && !effectiveAllowedBlocks.includes(block.id)) return false;
+        if (!search) return true;
+        const title = intl.formatMessage({ id: block.title, defaultMessage: block.title }).toLowerCase();
+        const originalTitle = block.title.toLowerCase();
+        return title.includes(search) || originalTitle.includes(search);
+      })
+      .sort((a, b) => {
+        const scoreDiff = scoreBlock(b) - scoreBlock(a);
+        if (scoreDiff) return scoreDiff;
+        const aTitle = intl.formatMessage({ id: a.title, defaultMessage: a.title });
+        const bTitle = intl.formatMessage({ id: b.title, defaultMessage: b.title });
+        return aTitle.localeCompare(bTitle);
+      });
+  }, [slashMenu, blocksConfig, effectiveAllowedBlocks, properties, navRoot, contentType, intl]);
+
+  // Clamp slashMenuIndex to available blocks
+  const clampedSlashMenuIndex = slashMenuBlocks.length > 0
+    ? Math.min(slashMenuIndex, slashMenuBlocks.length - 1)
+    : 0;
+
+  // Handle slash menu selection (when 'selecting' flag is set)
+  useEffect(() => {
+    if (!slashMenu?.selecting) return;
+    const block = slashMenuBlocks[clampedSlashMenuIndex];
+    if (block) {
+      onMutateBlock(slashMenu.blockId, { '@type': block.id });
+    }
+    setSlashMenu(null);
+    setSlashMenuIndex(0);
+    // Tell iframe to clear _slashMenuActive
+    document.getElementById('previewIframe')?.contentWindow?.postMessage(
+      { type: 'SLASH_MENU_CLOSED' },
+      '*',
+    );
+  }, [slashMenu?.selecting]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close slash menu on click outside (or block change)
+  useEffect(() => {
+    if (!slashMenu) return;
+    const closeSlashMenu = () => {
+      setSlashMenu(null);
+      setSlashMenuIndex(0);
+      document.getElementById('previewIframe')?.contentWindow?.postMessage(
+        { type: 'SLASH_MENU_CLOSED' },
+        '*',
+      );
+    };
+    // Click anywhere outside the menu portal closes it
+    const handleMouseDown = (e) => {
+      if (e.target.closest('.power-user-menu')) return;
+      closeSlashMenu();
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [slashMenu !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ============================================================================
   // BLOCK ADD FLOW (Unified for Sidebar and Iframe)
   // ============================================================================
   //
@@ -2847,6 +3128,56 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
+      {/* Slash menu — appears under the field in the iframe where "/" was typed */}
+      {slashMenu && referenceElement && slashMenu.fieldRect &&
+        createPortal(
+          (() => {
+            const iframeRect = referenceElement.getBoundingClientRect();
+            const menuTop = iframeRect.top + slashMenu.fieldRect.bottom;
+            const menuLeft = iframeRect.left + slashMenu.fieldRect.left;
+            return (
+              <div
+                className="power-user-menu"
+                style={{
+                  position: 'fixed',
+                  top: menuTop,
+                  left: menuLeft,
+                  width: 210,
+                  zIndex: 10,
+                }}
+              >
+                <Menu vertical fluid borderless>
+                  {slashMenuBlocks.map((block, index) => (
+                    <Menu.Item
+                      key={block.id}
+                      className={block.id}
+                      active={index === clampedSlashMenuIndex}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMutateBlock(slashMenu.blockId, { '@type': block.id });
+                        setSlashMenu(null);
+                        setSlashMenuIndex(0);
+                        document.getElementById('previewIframe')?.contentWindow?.postMessage(
+                          { type: 'SLASH_MENU_CLOSED' },
+                          '*',
+                        );
+                      }}
+                    >
+                      <Icon name={block.icon} size="24px" />
+                      {intl.formatMessage({ id: block.title, defaultMessage: block.title })}
+                    </Menu.Item>
+                  ))}
+                  {slashMenuBlocks.length === 0 && (
+                    <Menu.Item>
+                      {intl.formatMessage({ id: 'No matching blocks', defaultMessage: 'No matching blocks' })}
+                    </Menu.Item>
+                  )}
+                </Menu>
+              </div>
+            );
+          })(),
+          document.body,
+        )}
       {/* Only render when src is ready (ensures name attribute is applied on creation).
           Key on mode ensures iframe remounts when switching edit/view,
           but persists during SPA navigation within the same mode */}
@@ -2907,28 +3238,67 @@ const Iframe = (props) => {
             form={iframeSyncState.formData}
             blockPathMap={iframeSyncState.blockPathMap}
             currentSelection={iframeSyncState.selection}
+            _selectionSource={iframeSyncState._selectionSource}
+            mouseActivityCounter={mouseActivityCounter}
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}
-            onChangeFormData={(formData, selection, formatRequestId) => {
-              log('onChangeFormData callback called, formatRequestId:', formatRequestId);
-              // Update iframeSyncState atomically with formData, selection, and toolbarRequestDone
-              // The FORM_DATA useEffect will:
-              // 1. Send to iframe when it sees toolbarRequestDone (with formatRequestId)
-              // 2. THEN update Redux (to avoid race condition where Redux re-render
-              //    happens before toolbarRequestDone is committed)
+            onChangeFormData={(newFieldValue, selection, formatRequestId, extraBlocks) => {
+              log('onChangeFormData callback called, formatRequestId:', formatRequestId,
+                'hasFieldValue:', newFieldValue != null, 'extraBlocks:', extraBlocks?.length || 0,
+                'selectionPath:', JSON.stringify(selection?.anchor?.path), 'selectionOffset:', selection?.anchor?.offset);
+
+              // Apply field value change and/or extra blocks to the latest
+              // iframeSyncState (via prev), not the stale form prop snapshot.
               setIframeSyncState(prev => {
-                log('setIframeSyncState called, prev toolbarRequestDone:', prev.toolbarRequestDone, 'new:', formatRequestId);
+                let fd = prev.formData;
+                let bpm = prev.blockPathMap;
+                let dataChanged = false;
+
+                // Apply field value change to the selected block
+                if (newFieldValue != null) {
+                  const fieldName = blockUI?.focusedFieldName || 'value';
+                  const block = getBlockById(fd, bpm, selectedBlock);
+                  const updatedBlock = { ...block, [fieldName]: newFieldValue };
+                  fd = updateBlockById(fd, bpm, selectedBlock, updatedBlock);
+                  dataChanged = true;
+                }
+
+                // Insert extra blocks from paste emitter extraction (images,
+                // tables, text blocks split from multi-paragraph paste)
+                let pendingSelectBlockUid = null;
+                if (extraBlocks?.length > 0) {
+                  bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                  const containerConfig = getContainerFieldConfig(
+                    selectedBlock, bpm, fd, config.blocks.blocksConfig, intl,
+                  );
+                  let lastId = selectedBlock;
+                  for (const [newId, blockData] of extraBlocks) {
+                    fd = insertBlockInContainer(fd, bpm, lastId, newId, blockData, containerConfig, 'after');
+                    bpm = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+                    lastId = newId;
+                  }
+                  pendingSelectBlockUid = lastId;
+                  dataChanged = true;
+                }
+
+                const newSel = selection || prev.selection;
+                log('onChangeFormData updater: prevSelPath:', JSON.stringify(prev.selection?.anchor?.path),
+                  'newSelPath:', JSON.stringify(newSel?.anchor?.path), 'newSelOffset:', newSel?.anchor?.offset,
+                  'selSameRef:', selection === prev.selection, 'formatRequestId:', formatRequestId);
                 return {
                   ...prev,
-                  formData: formData,
-                  selection: selection || prev.selection,
-                  toolbarRequestDone: formatRequestId || null,
+                  formData: fd,
+                  blockPathMap: bpm,
+                  selection: newSel,
+                  _selectionSource: selection ? 'onChangeFormData:toolbar' : prev._selectionSource,
+                  toolbarRequestDone: formatRequestId || prev.toolbarRequestDone,
+                  // When data didn't change, tell iframe to skip re-render
+                  // (e.g. link cancel — just unblock and restore focus)
+                  skipRenderOnSend: !dataChanged && !!formatRequestId,
+                  ...(pendingSelectBlockUid ? { pendingSelectBlockUid } : {}),
                 };
               });
-              // NOTE: Don't update Redux here - let the useEffect do it after sending FORM_DATA
-              // This avoids a race condition where Redux dispatch causes re-render before
-              // setIframeSyncState commits, making useEffect see old toolbarRequestDone value
             }}
             blockUI={blockUI}
             blockFieldTypes={blockFieldTypes}
@@ -3362,6 +3732,11 @@ const Iframe = (props) => {
           }
         }}
         onChangeBlock={(blockId, newBlockData) => {
+          // DEBUG: trace facets changes through onChangeBlock
+          if (newBlockData?.facets) {
+            log('[onChangeBlock] blockId:', blockId, 'facets:', newBlockData.facets.length,
+              'ids:', newBlockData.facets.map(f => f['@id']));
+          }
           // Guard: blockId can be undefined when Volto components like BlockDataForm
           // are missing the block prop (e.g., SearchBlockEdit doesn't pass block to BlockDataForm)
           if (!blockId) {
@@ -3387,7 +3762,7 @@ const Iframe = (props) => {
 
           // Get old block data before the update (for sync detection)
           const oldBlockData = getBlockById(properties, currentBlockPathMap, blockId);
-          console.log('[View onChangeBlock] blockId:', blockId, 'oldVariation:', oldBlockData?.variation, 'newVariation:', newBlockData?.variation);
+          log('onChangeBlock: blockId:', blockId, 'oldVariation:', oldBlockData?.variation, 'newVariation:', newBlockData?.variation);
 
           // Find container config (works for both page-level and nested blocks)
           const pathInfo = currentBlockPathMap[blockId];
