@@ -414,6 +414,46 @@ test.describe('Multi-element blocks', () => {
     expect(page2FirstText).not.toBe(firstItemText);
   });
 
+  test('standalone listing block shows paging and navigates between pages', async ({ page }) => {
+    // Tests that standalone listing blocks (block-9-listing) show paging controls
+    // and clicking page links changes the displayed items (in edit mode)
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+
+    // Wait for listing block elements to be visible
+    const listingElements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
+    await expect(listingElements.first()).toBeVisible({ timeout: 10000 });
+
+    // Listing block comes after grid in layout, so its paging nav is last
+    const listingPagingNav = iframe.locator('nav[aria-label="Page Navigation"]').last();
+    await expect(listingPagingNav).toBeVisible({ timeout: 10000 });
+
+    // Verify page 1 is current
+    await expect(listingPagingNav.locator('.paging-page.current')).toHaveText('1');
+
+    // Get first item text on page 1
+    const firstItemText = await listingElements.first().textContent();
+
+    // Click next page
+    await listingPagingNav.locator('.paging-next').click();
+
+    // Wait for page 2 to load — paging nav should show page 2 as current
+    const page2PagingNav = iframe.locator('nav[aria-label="Page Navigation"]').last();
+    await expect(page2PagingNav.locator('.paging-page.current')).toHaveText('2', { timeout: 15000 });
+
+    // Verify items changed
+    const page2Elements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
+    await expect(page2Elements.first()).toBeVisible({ timeout: 10000 });
+    const page2FirstText = await page2Elements.first().textContent();
+    expect(page2FirstText).not.toBe(firstItemText);
+  });
+
   test('drop indicator does not appear between elements with same UID', async ({ page }) => {
     // Tests that when dragging a block over a multi-element block,
     // the drop indicator only shows at the boundaries (before first / after last),

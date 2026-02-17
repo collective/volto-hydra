@@ -217,8 +217,12 @@ async function renderBlock(blockId, block) {
             const summaryEl = document.createElement('div');
             summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
             return summaryEl.firstElementChild;
-        // Note: listing blocks are expanded by expandListingBlocks() into individual
-        // teaser/image blocks BEFORE rendering, so 'listing' case should never be hit
+        case 'listing':
+            if (block.querystring?.query && window._expandListingBlocks) {
+                return await renderListingBlock(block, blockId);
+            }
+            wrapper.textContent = 'Listing block (no query)';
+            break;
         case 'skiplogicTest':
             wrapper.innerHTML = renderSkiplogicTestBlock(block);
             break;
@@ -820,6 +824,79 @@ function renderColumnBlock(block) {
 }
 
 /**
+ * Render paging controls for listing/grid blocks.
+ * @param {Object} paging - Paging object from computePagingUI
+ * @param {string} blockId - Block ID for URL params
+ * @returns {string} HTML string
+ */
+function renderPaging(paging, blockId) {
+    const buildUrl = (page) => {
+        const url = new URL(window.location.href);
+        if (page > 0) {
+            url.searchParams.set(`pg_${blockId}`, page);
+        } else {
+            url.searchParams.delete(`pg_${blockId}`);
+        }
+        return url.pathname + url.search;
+    };
+
+    let html = '<nav class="grid-paging" aria-label="Page Navigation" style="margin-top: 15px; text-align: center;">';
+
+    if (paging.prev !== null) {
+        html += `<a href="${buildUrl(paging.prev)}" data-linkable-allow class="paging-prev" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">← Prev</a>`;
+    }
+
+    paging.pages.forEach(p => {
+        const pageIndex = p.page - 1;
+        const isCurrent = pageIndex === paging.currentPage;
+        const style = isCurrent
+            ? 'margin: 0 3px; padding: 5px 10px; background: #007bff; color: white; border: 1px solid #007bff; text-decoration: none;'
+            : 'margin: 0 3px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;';
+        html += `<a href="${buildUrl(pageIndex)}" data-linkable-allow class="paging-page${isCurrent ? ' current' : ''}" style="${style}">${p.page}</a>`;
+    });
+
+    if (paging.next !== null) {
+        html += `<a href="${buildUrl(paging.next)}" data-linkable-allow class="paging-next" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">Next →</a>`;
+    }
+
+    html += '</nav>';
+    return html;
+}
+
+/**
+ * Render a standalone listing block with paging.
+ * Returns a DocumentFragment so items appear at page level (multi-element block pattern).
+ * @param {Object} block - Listing block data with querystring
+ * @param {string} blockId - Block ID
+ * @returns {Promise<DocumentFragment>} Fragment with listing items + paging
+ */
+async function renderListingBlock(block, blockId) {
+    const fragment = document.createDocumentFragment();
+    const blocks = { [blockId]: block };
+    const layout = [blockId];
+
+    const result = await window._expandListingBlocks(blocks, layout, blockId);
+    const expandedItems = result.items;
+    const paging = result.paging?.totalPages > 1 ? result.paging : null;
+
+    for (const childBlock of expandedItems) {
+        if (!childBlock) continue;
+        const itemEl = await renderBlock(childBlock['@uid'], childBlock);
+        if (itemEl) {
+            fragment.appendChild(itemEl);
+        }
+    }
+
+    if (paging) {
+        const pagingContainer = document.createElement('div');
+        pagingContainer.innerHTML = renderPaging(paging, blockId);
+        fragment.appendChild(pagingContainer.firstElementChild);
+    }
+
+    return fragment;
+}
+
+/**
  * Render a grid block (Volto's built-in container).
  * NO explicit data-block-add attributes - tests automatic direction inference.
  * Calls window._expandListingBlocks for nested listings (set by index.html).
@@ -879,44 +956,8 @@ async function renderGridBlock(block, blockId) {
 
     html += '</div>';
 
-    // Render paging controls if available
-    // data-linkable-allow tells hydra.js to allow navigation without beforeunload warning
-    // Uses query params: ?pg_{blockId}={page} (preserves other params)
     if (paging) {
-        const buildUrl = (page) => {
-            const url = new URL(window.location.href);
-            if (page > 0) {
-                url.searchParams.set(`pg_${blockId}`, page);
-            } else {
-                url.searchParams.delete(`pg_${blockId}`);
-            }
-            return url.pathname + url.search;
-        };
-
-        html += '<nav class="grid-paging" aria-label="Page Navigation" style="margin-top: 15px; text-align: center;">';
-
-        // Previous link
-        if (paging.prev !== null) {
-            html += `<a href="${buildUrl(paging.prev)}" data-linkable-allow class="paging-prev" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">← Prev</a>`;
-        }
-
-        // Page numbers (p.page is 1-indexed display, paging.currentPage is 0-indexed)
-        // URL uses 0-indexed page number, not offset
-        paging.pages.forEach(p => {
-            const pageIndex = p.page - 1; // Convert to 0-indexed
-            const isCurrent = pageIndex === paging.currentPage;
-            const style = isCurrent
-                ? 'margin: 0 3px; padding: 5px 10px; background: #007bff; color: white; border: 1px solid #007bff; text-decoration: none;'
-                : 'margin: 0 3px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;';
-            html += `<a href="${buildUrl(pageIndex)}" data-linkable-allow class="paging-page${isCurrent ? ' current' : ''}" style="${style}">${p.page}</a>`;
-        });
-
-        // Next link
-        if (paging.next !== null) {
-            html += `<a href="${buildUrl(paging.next)}" data-linkable-allow class="paging-next" style="margin: 0 5px; padding: 5px 10px; border: 1px solid #ccc; text-decoration: none;">Next →</a>`;
-        }
-
-        html += '</nav>';
+        html += renderPaging(paging, blockId);
     }
 
     return html;

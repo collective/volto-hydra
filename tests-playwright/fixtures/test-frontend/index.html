@@ -141,20 +141,10 @@
             };
 
             // Convert layout IDs to block objects with @uid
+            // Listing blocks are rendered individually by renderBlock with paging support
             const layout = content.blocks_layout?.items || [];
             const blocks = content.blocks || {};
-            let items;
-
-            // Only call async expandListingBlocks when there are actual listings
-            const hasListings = layout.some(id => blocks[id]?.['@type'] === 'listing' && blocks[id]?.querystring?.query);
-            if (hasListings) {
-                const result = await expandListingBlocks(layout, { blocks, ...baseOptions, itemTypeField: 'variation' });
-                if (myGeneration !== window._renderGeneration) return; // stale render
-                items = result.items;
-            } else {
-                // No listings — convert to items format directly (sync, no fetch)
-                items = layout.map(id => ({ ...blocks[id], '@uid': id }));
-            }
+            const items = layout.map(id => ({ ...blocks[id], '@uid': id }));
 
             // Render main content (pass generation so renderContent can abort if stale)
             await renderContent({ ...content, items }, 'content', myGeneration);
