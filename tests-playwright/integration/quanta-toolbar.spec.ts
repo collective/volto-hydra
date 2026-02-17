@@ -812,4 +812,78 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
     await page.waitForTimeout(6000);
     await expect(toolbar).toHaveCSS('opacity', '1');
   });
+
+  test('arrow keys navigate past fixed blocks without editable fields', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - template merge uses different block IDs');
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Template-test-page layout (after merge):
+    // standalone-block-1 (editable slate)
+    // [template instance: template-header (fixed), ..., user-content-2, template-footer (fixed)]
+    // standalone-block-2 (editable slate)
+
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
+
+    // Start at the last user content block inside the template
+    await helper.clickBlockInIframe('user-content-2');
+    await helper.waitForQuantaToolbar('user-content-2');
+
+    // ArrowDown from user-content-2 reaches fixed template-footer (selected but not editable)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar(footerBlockId);
+
+    // ArrowDown from template-footer crosses template boundary to standalone-block-2
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar('standalone-block-2');
+
+    // ArrowUp from standalone-block-2: first press moves cursor to "home" (start of line),
+    // second press detects edge and crosses template boundary to template-footer
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await helper.waitForQuantaToolbar(footerBlockId);
+
+    // ArrowUp from template-footer returns to user-content-2
+    await page.keyboard.press('ArrowUp');
+    await helper.waitForQuantaToolbar('user-content-2');
+  });
+
+  test('arrow keys navigate across page block field boundaries', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt');
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // test-page has two page-level block fields:
+    // blocks: [block-1-uuid, ..., skiplogic-test]
+    // footer_blocks: [footer-block-1 (slate), footer-block-2 (image)]
+    // ArrowUp from footer-block-1 should cross into main blocks
+
+    // Click footer-block-1 (first block in footer_blocks field)
+    await helper.clickBlockInIframe('footer-block-1');
+    await helper.waitForQuantaToolbar('footer-block-1');
+
+    // ArrowUp should cross the block field boundary into the main blocks area.
+    // First ArrowUp goes "home" (cursor normalization), second triggers edge navigation.
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+
+    // Verify we left footer-block-1 (now in main blocks field)
+    const iframe = helper.getIframe();
+    await expect(async () => {
+      const dragHandle = iframe.locator('.volto-hydra-drag-button');
+      const handleBox = await dragHandle.boundingBox();
+      const footerBlock = iframe.locator('[data-block-uid="footer-block-1"]');
+      const footerBox = await footerBlock.boundingBox();
+      // Drag handle should be ABOVE footer-block-1 (navigated backward)
+      expect(handleBox!.y).toBeLessThan(footerBox!.y);
+    }).toPass({ timeout: 5000 });
+
+    // ArrowDown should return to footer-block-1 (cross back into footer_blocks)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar('footer-block-1');
+  });
 });

@@ -880,12 +880,10 @@ export class Bridge {
       }
     }
 
-    // Navigate to adjacent block, or to parent if at container boundary
-    let adjacentId = this.getAdjacentBlockId(blockUid, direction, isTableVertical);
-    if (!adjacentId && pathInfo.parentId) {
-      // At boundary of a container — navigate to parent block
-      adjacentId = pathInfo.parentId;
-    }
+    // Navigate to adjacent block, resolving through template instance boundaries.
+    // Template instances are virtual containers with no DOM element — we must
+    // drill into them (when entering) or skip past them (when leaving).
+    let adjacentId = this._resolveNavigationTarget(blockUid, direction, isTableVertical);
     if (!adjacentId) return;
 
     const adjacentElement = document.querySelector(`[data-block-uid="${adjacentId}"]`);
@@ -925,6 +923,60 @@ export class Bridge {
         }
       });
     });
+  }
+
+  /**
+   * Resolve the navigation target from a block in a given direction.
+   * Handles template instance boundaries:
+   * - When leaving a template instance (no sibling), skips the virtual parent
+   *   and finds the adjacent sibling of the template instance.
+   * - When entering a template instance (adjacent is virtual), drills into
+   *   its first/last child depending on direction.
+   *
+   * @param {string} blockId - Current block ID
+   * @param {string} direction - 'forward' or 'backward'
+   * @param {boolean} isTableVertical - Whether navigating vertically in a table
+   * @returns {string|null} Target block ID with a DOM element, or null
+   */
+  _resolveNavigationTarget(blockId, direction, isTableVertical = false) {
+    let currentId = blockId;
+    const visited = new Set();
+
+    while (!visited.has(currentId)) {
+      visited.add(currentId);
+
+      let adjacentId = this.getAdjacentBlockId(currentId, direction, isTableVertical);
+
+      if (!adjacentId) {
+        // At boundary of container — try to navigate up
+        const currentInfo = this.blockPathMap?.[currentId];
+        if (!currentInfo?.parentId) return null;
+
+        const parentInfo = this.blockPathMap?.[currentInfo.parentId];
+        if (parentInfo?.isTemplateInstance) {
+          // Parent is a virtual template instance — skip it and find ITS adjacent sibling
+          currentId = currentInfo.parentId;
+          continue;
+        }
+        // Regular container boundary — navigate to parent block
+        adjacentId = currentInfo.parentId;
+      }
+
+      // If adjacent is a virtual template instance, drill into it
+      const adjacentInfo = this.blockPathMap?.[adjacentId];
+      if (adjacentInfo?.isTemplateInstance) {
+        const children = this._getSiblingsByDomOrder(null, adjacentId);
+        if (children.length === 0) return null;
+        adjacentId = direction === 'forward' ? children[0] : children[children.length - 1];
+      }
+
+      // Verify the target has a DOM element
+      if (document.querySelector(`[data-block-uid="${adjacentId}"]`)) {
+        return adjacentId;
+      }
+      return null;
+    }
+    return null;
   }
 
   /**
@@ -4866,9 +4918,10 @@ export class Bridge {
         this.makeBlockContentEditable(valueField);
       }
 
-      // For blocks with no editable fields (e.g., image), make the block element
-      // focusable and attach arrow key navigation so user can navigate away.
-      const hasEditableFields = this.getOwnEditableFields(blockElement).length > 0;
+      // For blocks with no usable editable fields (e.g., image, readOnly template blocks),
+      // make the block element focusable and attach arrow key navigation so user can navigate away.
+      const isReadonly = this.isBlockReadonly(blockUid);
+      const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
       if (!hasEditableFields) {
         if (!blockElement.hasAttribute('tabindex')) {
           blockElement.setAttribute('tabindex', '-1');
