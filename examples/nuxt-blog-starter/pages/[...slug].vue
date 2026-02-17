@@ -150,10 +150,11 @@ const isInEditMode = computed(() => {
     return false;
 });
 
-// Whether we should render blocks - in edit mode, wait for admin data
+// Render blocks immediately - no need to wait for admin data since hydra.js
+// also initializes in onMounted, so no interaction is possible before then.
+// Admin data (with nodeIds) will trigger a re-render when it arrives.
 const shouldRenderBlocks = computed(() => {
-    if (!isInEditMode.value) return true;  // View mode: render from API
-    return hasAdminData.value;  // Edit mode: wait for admin data with nodeIds
+    return true;
 });
 
 /**
