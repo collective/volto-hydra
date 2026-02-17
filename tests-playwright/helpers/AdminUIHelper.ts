@@ -3396,7 +3396,16 @@ export class AdminUIHelper {
   /**
    * Complete the drag operation by releasing the mouse and waiting for cleanup.
    */
-  private async completeDrop(): Promise<void> {
+  private async completeDrop(
+    targetBlock?: Locator,
+    insertAfter?: boolean,
+  ): Promise<void> {
+    // Verify drop indicator is still in correct position right before dropping.
+    // Between moveToDropPosition and here, evaluations and timing could shift things.
+    if (targetBlock && insertAfter !== undefined) {
+      await this.verifyDropIndicatorNearTarget(targetBlock, insertAfter);
+    }
+
     // Get all block order before drop (using body to include all containers)
     const orderBefore = await this.getBlockOrder('body');
 
@@ -3406,8 +3415,11 @@ export class AdminUIHelper {
     await expect(iframe.locator('.volto-hydra-drop-indicator')).not.toBeVisible({ timeout: 5000 });
     await expect(iframe.locator('.dragging')).not.toBeVisible({ timeout: 5000 });
 
-    // Wait for block order to change (indicates formData update and re-render completed)
+    // Wait for block order to change AND render to stabilize.
+    // getStableBlockCount inside the loop ensures we don't catch intermediate
+    // states where container innerHTML is cleared during async re-render.
     await expect(async () => {
+      await this.getStableBlockCount();
       const orderAfter = await this.getBlockOrder('body');
       if (JSON.stringify(orderBefore) === JSON.stringify(orderAfter)) {
         throw new Error('Block order has not changed yet');
@@ -3503,8 +3515,8 @@ export class AdminUIHelper {
     // Step 3: Move to drop position and verify indicator
     await this.moveToDropPosition(targetBlock, insertAfter, dropPosPage);
 
-    // Step 4: Complete the drop
-    await this.completeDrop();
+    // Step 4: Verify indicator is still correct and complete the drop
+    await this.completeDrop(targetBlock, insertAfter);
   }
 
   /**

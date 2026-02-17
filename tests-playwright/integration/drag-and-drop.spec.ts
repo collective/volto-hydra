@@ -402,6 +402,9 @@ test.describe('Block Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
+    // Wait for page to fully render before dragging
+    await helper.getStableBlockCount();
+
     // Get initial footer block order
     const initialFooterBlocks = await helper.getBlockOrder('footer');
     console.log('[TEST] Initial footer blocks:', initialFooterBlocks);
@@ -412,18 +415,8 @@ test.describe('Block Drag and Drop', () => {
     const firstFooterBlock = initialFooterBlocks[0];
     const secondFooterBlock = initialFooterBlocks[1];
 
-    // Select first footer block
-    await helper.clickBlockInIframe(firstFooterBlock);
-    await helper.waitForSidebarOpen();
-
-    // Get the drag handle from the toolbar
-    const dragHandle = await helper.getDragHandle();
-
-    // Get the second footer block element to drag to
-    const secondBlock = iframe.locator(`[data-block-uid="${secondFooterBlock}"]`);
-
-    // Drag using mouse events
-    await helper.dragBlockWithMouse(dragHandle, secondBlock, true);
+    // Drag first footer block after second
+    await helper.dragBlockAfter(firstFooterBlock, secondFooterBlock);
 
     // Verify block order changed
     const newFooterBlocks = await helper.getBlockOrder('footer');
