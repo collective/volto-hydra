@@ -1,0 +1,762 @@
+{
+  "@id": "/Plone",
+  "@type": "Plone Site",
+  "UID": "plone_site_root",
+  "allow_discussion": null,
+  "blocks": {
+    "03511c33-6c36-4135-a60a-0be82ccc7e8f": {
+      "@type": "slate",
+      "plaintext": "Happy Hacking!",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Happy Hacking!"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "0ab1a8f7-2d26-4933-800c-2f10474afe63": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "0c91e9dd-842e-4764-a4f1-8a62c85b731a": {
+      "@type": "slate",
+      "plaintext": "\u2026protects and promotes Plone. \u2026is a registered 501(c)(3) charitable organization. \u2026donations are tax-deductible.  Support the Foundation and help make Plone better! ",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "\u2026protects and promotes Plone."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "\u2026is a registered 501(c)(3) charitable organization."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "\u2026donations are tax-deductible."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Support the Foundation and help make Plone better!"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://plone.org/sponsors/be-a-hero"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "0d0c0506-f9bb-48d8-af0a-1352d81b45de": {
+      "@type": "slate",
+      "plaintext": "Find out more about Hydra",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Find out more about Hydra"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd": {
+      "@type": "slate",
+      "plaintext": " The features of Plone   Plone Documentation   Plone Training   Plone Community Forum   Add-ons for Plone (backend)   Add-ons for Volto (frontend) ",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "The features of Hydra and docs"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "303984b4-693a-408f-83f7-5a88b243d7db": {
+      "@type": "slider",
+      "autoplayDelay": 4000,
+      "autoplayEnabled": false,
+      "autoplayJump": false,
+      "slides": [
+        {
+          "@id": "b09f39ea-36c3-4f09-9a18-30aef3565a22",
+          "buttonText": "See all Content Types",
+          "description": "You can log in and experience currently working features (Volto like but on any frontend)",
+          "flagAlign": "left",
+          "head_title": "Welcome to Hydra",
+          "href": [
+            {
+              "@id": "resolveuid/e8178744e30a418b9a5768997bb29a19",
+              "@type": "Document",
+              "Description": "This section has a sample of content types available in this site.",
+              "Title": "Content Types",
+              "hasPreviewImage": null,
+              "head_title": null,
+              "image_field": "image",
+              "title": "Content Types"
+            }
+          ],
+          "preview_image": [
+            {
+              "@id": "resolveuid/9abc1a813bcf46388e565b277bd8c6bf",
+              "@type": "Image",
+              "CreationDate": "2024-03-07T12:29:54+01:00",
+              "Creator": "admin",
+              "Date": "2024-03-07T12:30:08+01:00",
+              "Description": "",
+              "EffectiveDate": "None",
+              "ExpirationDate": "None",
+              "ModificationDate": "2024-03-07T12:30:08+01:00",
+              "Subject": [],
+              "Title": "testimage",
+              "Type": "Bild",
+              "UID": "9abc1a813bcf46388e565b277bd8c6bf",
+              "author_name": null,
+              "cmf_uid": null,
+              "commentators": [],
+              "created": "2024-03-07T11:29:54+00:00",
+              "description": "",
+              "effective": "1969-12-30T23:00:00+00:00",
+              "end": null,
+              "exclude_from_nav": false,
+              "expires": "2499-12-30T23:00:00+00:00",
+              "getIcon": true,
+              "getId": "testimage.jpg",
+              "getObjSize": "2.0 MB",
+              "getPath": "/Plone/testimage.jpg",
+              "getRemoteUrl": null,
+              "getURL": "http://localhost:3000/testimage.jpg",
+              "hasPreviewImage": null,
+              "head_title": null,
+              "id": "testimage.jpg",
+              "image_field": "image",
+              "in_response_to": null,
+              "is_folderish": false,
+              "last_comment_date": null,
+              "listCreators": [
+                "admin"
+              ],
+              "location": null,
+              "mime_type": "image/jpeg",
+              "modified": "2024-03-07T11:30:08+00:00",
+              "nav_title": null,
+              "portal_type": "Image",
+              "review_state": null,
+              "start": null,
+              "sync_uid": null,
+              "title": "testimage",
+              "total_comments": 0,
+              "type_title": "Bild"
+            }
+          ],
+          "title": "You can use this site to test Hydra"
+        },
+        {
+          "@id": "ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3",
+          "buttonText": "See all blocks",
+          "description": "Frontend freedom makes it easy to create beautiful and fast experiences",
+          "flagAlign": "right",
+          "head_title": "Welcome to Hydra's many frontends",
+          "hideButton": false,
+          "href": [
+            {
+              "@id": "resolveuid/425695d2b7cb47e69374d6f211f17e38",
+              "@type": "Document",
+              "Description": "",
+              "Title": "Blocks",
+              "hasPreviewImage": null,
+              "head_title": null,
+              "image_field": "",
+              "title": "Blocks"
+            }
+          ],
+          "preview_image": [
+            {
+              "@id": "resolveuid/05bace45294c45d5ab93de883e7ce702",
+              "@type": "Image",
+              "CreationDate": "2024-03-08T13:05:46+01:00",
+              "Creator": "admin",
+              "Date": "2024-03-08T13:05:46+01:00",
+              "Description": "",
+              "EffectiveDate": "None",
+              "ExpirationDate": "None",
+              "ModificationDate": "2024-03-08T13:05:46+01:00",
+              "Subject": [],
+              "Title": "penguin2.jpg",
+              "Type": "Bild",
+              "UID": "05bace45294c45d5ab93de883e7ce702",
+              "author_name": null,
+              "cmf_uid": null,
+              "commentators": [],
+              "created": "2024-03-08T12:05:46+00:00",
+              "description": "",
+              "effective": "1969-12-30T23:00:00+00:00",
+              "end": null,
+              "exclude_from_nav": false,
+              "expires": "2499-12-30T23:00:00+00:00",
+              "getIcon": true,
+              "getId": "penguin2.jpg",
+              "getObjSize": "2.8 MB",
+              "getPath": "/Plone/images/penguin2.jpg",
+              "getRemoteUrl": null,
+              "getURL": "http://localhost:3000/images/penguin2.jpg",
+              "hasPreviewImage": null,
+              "head_title": null,
+              "id": "penguin2.jpg",
+              "image_field": "image",
+              "in_response_to": null,
+              "is_folderish": false,
+              "last_comment_date": null,
+              "listCreators": [
+                "admin"
+              ],
+              "location": null,
+              "mime_type": "image/jpeg",
+              "modified": "2024-03-08T12:05:46+00:00",
+              "nav_title": null,
+              "portal_type": "Image",
+              "review_state": null,
+              "start": null,
+              "sync_uid": null,
+              "title": "penguin2.jpg",
+              "total_comments": 0,
+              "type_title": "Bild"
+            }
+          ],
+          "title": "You are enjoying one of many possible frontends"
+        },
+        {
+          "@id": "59d1d748-d722-4b15-8098-037bef1c99de",
+          "description": "Hydra sets your developers free",
+          "flagAlign": "left",
+          "head_title": "Welcome to Hydra",
+          "hideButton": true,
+          "href": [
+            {
+              "@id": "resolveuid/c40a2be214b645338a7ef2e711e2f5c6",
+              "@type": "Document",
+              "Description": "",
+              "Title": "Vertical Spacing",
+              "hasPreviewImage": null,
+              "head_title": null,
+              "image_field": "",
+              "title": "Vertical Spacing"
+            }
+          ],
+          "preview_image": [
+            {
+              "@id": "resolveuid/7de78fea55354a29ad78b909efb07436",
+              "@type": "Image",
+              "CreationDate": "2024-03-08T13:05:46+01:00",
+              "Creator": "admin",
+              "Date": "2024-03-08T13:05:46+01:00",
+              "Description": "",
+              "EffectiveDate": "None",
+              "ExpirationDate": "None",
+              "ModificationDate": "2024-03-08T13:05:46+01:00",
+              "Subject": [],
+              "Title": "penguin3.jpg",
+              "Type": "Bild",
+              "UID": "7de78fea55354a29ad78b909efb07436",
+              "author_name": null,
+              "cmf_uid": null,
+              "commentators": [],
+              "created": "2024-03-08T12:05:46+00:00",
+              "description": "",
+              "effective": "1969-12-30T23:00:00+00:00",
+              "end": null,
+              "exclude_from_nav": false,
+              "expires": "2499-12-30T23:00:00+00:00",
+              "getIcon": true,
+              "getId": "penguin3.jpg",
+              "getObjSize": "1.0 MB",
+              "getPath": "/Plone/images/penguin3.jpg",
+              "getRemoteUrl": null,
+              "getURL": "http://localhost:3000/images/penguin3.jpg",
+              "hasPreviewImage": null,
+              "head_title": null,
+              "id": "penguin3.jpg",
+              "image_field": "image",
+              "in_response_to": null,
+              "is_folderish": false,
+              "last_comment_date": null,
+              "listCreators": [
+                "admin"
+              ],
+              "location": null,
+              "mime_type": "image/jpeg",
+              "modified": "2024-03-08T12:05:46+00:00",
+              "nav_title": null,
+              "portal_type": "Image",
+              "review_state": null,
+              "start": null,
+              "sync_uid": null,
+              "title": "penguin3.jpg",
+              "total_comments": 0,
+              "type_title": "Bild"
+            }
+          ],
+          "title": "Hydra is the key to have any frontend for Plone 6"
+        }
+      ],
+      "styles": {}
+    },
+    "31561f88-873a-4277-8703-ba1183e58bf1": {
+      "@type": "system"
+    },
+    "9567ae6d-191c-43f1-91cc-4288bbb98f88": {
+      "@type": "slate",
+      "plaintext": " Mobile hybrid app using f7-Vue.js ",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "NUXT.js Example"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://hydra-nuxt-flowbrite.netlify.app/"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            },            
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Framework7 Example (mobile app)"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://hydra-vue-f7.netlify.app/"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Next.js Example"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://hydra-blogsite-nextjs.vercel.app"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Edit either of these frontends: hydra.pretagov.com"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://hydra.pretagov.com"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "9e2de314-a99c-4e11-92bd-174301d01073": {
+      "@type": "slate",
+      "plaintext": "Hydra is a Google summer of code project to create a proof of concept of a CMSUI/editor for Plone headless sites that is easy to integrate into any frontend and as easy to use for editors as Volto is.",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Hydra is a Google summer of code project to create a proof of concept of a CMSUI/editor for Plone headless sites that is easy to integrate into any frontend and as easy to use for editors as Volto is. "
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "c187b31d-f521-4ebe-98ec-01f2247599b4": {
+      "@type": "slate",
+      "plaintext": "Technical Details",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Technical Details"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "dd34a386-6054-4a91-83e0-c7b3a6f391cf": {
+      "@type": "slate",
+      "plaintext": "Support the Plone Foundation",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Support the Plone Foundation"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "e972541f-b114-494b-a51e-cc8b11c8207d": {
+      "@type": "slate",
+      "plaintext": "Frontends for this content",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "View this site in other frameworks"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "eadb0f33-16da-4974-9f87-69206f0a1db8": {
+      "@type": "slate",
+      "plaintext": "Plone is made possible only through the efforts of thousands of dedicated individuals and hundreds of companies. The Plone Foundation:",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Plone is made possible only through the efforts of thousands of dedicated individuals and hundreds of companies. The Plone Foundation:"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "fae599f3-e7d4-451b-a413-84355c796b7e": {
+      "@type": "gridBlock",
+      "blocks": {
+        "c9f92df8-81fd-4259-a149-5c8798735350": {
+          "@type": "slate",
+          "plaintext": "  You can use this site to test Plone 6.\n Disclaimer : This instance is reset every night, so all changes will be lost afterwards.",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": "You can use this site to test Hydra Edit.\n"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Disclaimer"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": This instance is reset every night, so all changes will be lost afterwards."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "d105783c-fa27-4c92-a3d9-6323adbe5e72": {
+          "@type": "slate",
+          "plaintext": "This site uses some recommended add-ons :\n and some blocks that are suitable to be used with volto-light-theme.  volto-form-block ",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "This site uses some recommended "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "add-ons"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ":"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Some blocks that are suitable to be used with volto-light-theme."
+                    }
+                  ],
+                  "type": "li"
+                },
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    },
+                    {
+                      "children": [
+                        {
+                          "text": "volto-form-block"
+                        }
+                      ],
+                      "data": {
+                        "url": "https://github.com/collective/volto-form-block"
+                      },
+                      "type": "link"
+                    },
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "type": "li"
+                }
+              ],
+              "type": "ul"
+            }
+          ]
+        },
+        "d78b666f-b07b-4036-9853-efe6263515aa": {
+          "@type": "slate",
+          "plaintext": "You can log in and use it as an admin user using these credentials :\n\nusername: admin password: admin ",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "You can "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "log in"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " and use it as an admin user using these "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "credentials"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ":\n\nusername: "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "admin"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": "\npassword: "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "admin"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "c9f92df8-81fd-4259-a149-5c8798735350",
+          "d78b666f-b07b-4036-9853-efe6263515aa",
+          "d105783c-fa27-4c92-a3d9-6323adbe5e72"
+        ]
+      },
+      "styles": {}
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "303984b4-693a-408f-83f7-5a88b243d7db",
+      "fae599f3-e7d4-451b-a413-84355c796b7e",
+      "03511c33-6c36-4135-a60a-0be82ccc7e8f",
+      "e972541f-b114-494b-a51e-cc8b11c8207d",
+      "9567ae6d-191c-43f1-91cc-4288bbb98f88",
+      "0d0c0506-f9bb-48d8-af0a-1352d81b45de",
+      "9e2de314-a99c-4e11-92bd-174301d01073",
+      "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd",
+      "dd34a386-6054-4a91-83e0-c7b3a6f391cf",
+      "eadb0f33-16da-4974-9f87-69206f0a1db8",
+      "0c91e9dd-842e-4764-a4f1-8a62c85b731a",
+      "0ab1a8f7-2d26-4933-800c-2f10474afe63",
+      "c187b31d-f521-4ebe-98ec-01f2247599b4",
+      "31561f88-873a-4277-8703-ba1183e58bf1"
+    ]
+  },
+  "contributors": [],
+  "creators": [
+    "admin"
+  ],
+  "description": "Site created with a new Plone Distribution",
+  "effective": null,
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "Plone",
+  "is_folderish": true,
+  "items_total": 5,
+  "language": "##DEFAULT##",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "parent": {},
+  "review_state": null,
+  "rights": "",
+  "subjects": [],
+  "table_of_contents": null,
+  "title": "Welcome to Plone Hydra",
+  "type_title": "Plone Site",
+  "workflow_history": {}
+}

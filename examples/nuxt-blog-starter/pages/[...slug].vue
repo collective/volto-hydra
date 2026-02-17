@@ -210,15 +210,15 @@ onMounted(() => {
                         fieldName: 'blocks',
                         title: 'Blocks',
                         allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
-                        allowedTemplates: ['/templates/test-layout'],
-                        allowedLayouts: [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
+                        allowedTemplates: ['resolveuid/test-layout-template-uid'],
+                        allowedLayouts: [null, 'resolveuid/test-layout-template-uid', 'resolveuid/header-footer-layout-uid', 'resolveuid/header-only-layout-uid', 'resolveuid/editable-fixed-layout-uid'],
                     },
                     {
                         fieldName: 'footer_blocks',
                         title: 'Footer',
                         allowedBlocks: ['slate', 'image'],
                         // Force footer layout on /another-page (same as mock frontend)
-                        allowedLayouts: route.path === '/another-page' ? ['/templates/footer-layout'] : null,
+                        allowedLayouts: route.path === '/_test_data/another-page' ? ['resolveuid/footer-layout-uid'] : null,
                     },
                 ],
                 voltoConfig: {
@@ -247,12 +247,12 @@ onMounted(() => {
 const footerAllowedLayouts = computed(() => {
     // Use startsWith to handle trailing slashes and normalize
     const normalizedPath = route.path.replace(/\/$/, '');
-    return normalizedPath === '/another-page' ? ['/templates/footer-layout'] : null;
+    return normalizedPath === '/_test_data/another-page' ? ['resolveuid/footer-layout-uid'] : null;
 });
 
 // Main blocks allowedLayouts (same as bridge config)
 const mainBlocksAllowedLayouts = computed(() => {
-    return [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'];
+    return [null, 'resolveuid/test-layout-template-uid', 'resolveuid/header-footer-layout-uid', 'resolveuid/header-only-layout-uid', 'resolveuid/editable-fixed-layout-uid'];
 });
 
 // Collect all allowedLayouts for template pre-loading

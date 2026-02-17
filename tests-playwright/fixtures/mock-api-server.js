@@ -23,7 +23,10 @@ const PORT = process.env.PORT || 8888;
 function parseContentMounts() {
   const mountsEnv = process.env.CONTENT_MOUNTS;
   if (!mountsEnv) {
-    return [{ mountPath: '/', dirPath: path.join(__dirname, 'content') }];
+    return [
+      { mountPath: '/', dirPath: path.join(__dirname, '../../docs/content/content/content') },
+      { mountPath: '/_test_data', dirPath: path.join(__dirname, 'content') },
+    ];
   }
 
   return mountsEnv.split(',').map(mount => {
@@ -42,6 +45,9 @@ const sessionContent = {};
 
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
+
+// Map UIDs to URL paths (for resolveuid endpoint)
+const uidToPathMap = {};
 
 /**
  * Get session ID from request header.
@@ -209,6 +215,54 @@ function getImageScales(content, baseUrl) {
       }
     ]
   };
+}
+
+/**
+ * Generate scales object for an image field
+ * @param {string} fullUrl - Full URL of the content item
+ * @param {string} fieldName - Image field name (e.g., 'image', 'preview_image')
+ * @param {number} width - Original image width
+ * @param {number} height - Original image height
+ */
+function generateScalesForField(fullUrl, fieldName, width, height) {
+  const scaleConfigs = {
+    icon: 32, tile: 64, thumb: 128, mini: 200,
+    preview: 400, teaser: 600, large: 800, larger: 1000,
+    great: 1200, huge: 1600,
+  };
+  const scales = {};
+  for (const [name, maxDim] of Object.entries(scaleConfigs)) {
+    if (maxDim < width || maxDim < height) {
+      const ratio = Math.min(maxDim / width, maxDim / height);
+      scales[name] = {
+        download: `${fullUrl}/@@images/${fieldName}/${name}`,
+        width: Math.round(width * ratio),
+        height: Math.round(height * ratio),
+      };
+    }
+  }
+  return scales;
+}
+
+/**
+ * Transform distribution blob_path fields to proper download URLs.
+ * Distribution content uses `blob_path` for image/preview_image fields;
+ * the Plone REST API uses `download` URLs and `scales`.
+ */
+function transformBlobPaths(content, fullUrl) {
+  const imageFields = ['image', 'preview_image'];
+  const result = { ...content };
+  for (const field of imageFields) {
+    if (result[field]?.blob_path) {
+      const { blob_path, ...rest } = result[field];
+      result[field] = {
+        ...rest,
+        download: `${fullUrl}/@@images/${field}`,
+        scales: generateScalesForField(fullUrl, field, rest.width || 800, rest.height || 600),
+      };
+    }
+  }
+  return result;
 }
 
 /**
@@ -448,6 +502,32 @@ function generateComponents(urlPath, baseUrl) {
 }
 
 /**
+ * Resolve resolveuid/UID references in content to actual paths.
+ * Like Plone's serializer, converts resolveuid/UID strings to full URLs.
+ * Skips templateId/templateInstanceId keys since those are opaque keys
+ * used for template matching between frontend config and block data.
+ */
+const RESOLVE_UID_SKIP_KEYS = new Set(['templateId', 'templateInstanceId']);
+function resolveUidUrls(obj) {
+  if (typeof obj === 'string') {
+    return obj.replace(/(?:\.\.\/)*resolveuid\/([a-z0-9][-a-z0-9]*)/g, (match, uid) => {
+      const resolvedPath = uidToPathMap[uid];
+      if (!resolvedPath) return match;
+      return `http://localhost:${PORT}${resolvedPath}`;
+    });
+  }
+  if (Array.isArray(obj)) return obj.map(item => resolveUidUrls(item));
+  if (obj && typeof obj === 'object') {
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = RESOLVE_UID_SKIP_KEYS.has(key) ? value : resolveUidUrls(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
  * Enrich content with generated fields (@id, @components, permissions, etc.)
  * Content files use distribution format with relative @id paths.
  */
@@ -471,17 +551,20 @@ function enrichContent(content, urlPath, baseUrl) {
     };
   }
 
-  return {
-    ...content,
+  // Transform distribution blob_path fields to download URLs
+  const transformed = transformBlobPaths(content, fullUrl);
+
+  const enriched = {
+    ...transformed,
     '@id': fullUrl,
-    'UID': content.UID || `${content.id || urlPath.replace(/\//g, '-')}-uid`,
-    'review_state': content.review_state || 'published',
-    'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
-    'allow_discussion': content.allow_discussion !== undefined ? content.allow_discussion : false,
-    'exclude_from_nav': content.exclude_from_nav || false,
-    'created': content.created || '2025-01-01T12:00:00+00:00',
-    'modified': content.modified || '2025-01-01T12:00:00+00:00',
-    'lock': content.lock || { 'locked': false, 'stealable': true },
+    'UID': transformed.UID || `${transformed.id || urlPath.replace(/\//g, '-')}-uid`,
+    'review_state': transformed.review_state || 'published',
+    'is_folderish': transformed.is_folderish !== undefined ? transformed.is_folderish : true,
+    'allow_discussion': transformed.allow_discussion !== undefined ? transformed.allow_discussion : false,
+    'exclude_from_nav': transformed.exclude_from_nav || false,
+    'created': transformed.created || '2025-01-01T12:00:00+00:00',
+    'modified': transformed.modified || '2025-01-01T12:00:00+00:00',
+    'lock': transformed.lock || { 'locked': false, 'stealable': true },
     'parent': parent,
     '@components': generateComponents(urlPath, baseUrl),
     // Permissions - always grant for mock API
@@ -492,6 +575,9 @@ function enrichContent(content, urlPath, baseUrl) {
     'can_add': true,
     'can_list_contents': true
   };
+
+  // Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
+  return resolveUidUrls(enriched);
 }
 
 /**
@@ -519,11 +605,20 @@ function scanContentDir(contentDirPath, mountPath) {
         // Use @id from content if it's a path, otherwise use directory name
         let contentPath = content['@id']?.startsWith('/') ? content['@id'] : '/' + (content.id || dir.name);
 
+        // Handle distribution site root (plone_site_root dir or @id=/Plone)
+        if (dir.name === 'plone_site_root' || contentPath === '/Plone') {
+          contentPath = '/';
+        }
+
         // Apply mount prefix
         const urlPath = mountPath === '/' ? contentPath : mountPath + contentPath;
 
         // Only store the directory mapping, content loaded on-demand
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
+        // Track UID→path for resolveuid endpoint
+        if (content.UID) {
+          uidToPathMap[content.UID] = urlPath;
+        }
         console.log(`Registered content: ${urlPath}`);
       }
       // Always recurse into subdirectories to find nested content (e.g., templates/)
@@ -571,7 +666,7 @@ initContentDirMap();
 
 /**
  * Get content for a path
- * Checks: session uploads -> site root -> disk content
+ * Checks: session uploads -> disk content -> generated site root
  * @param {string} urlPath - Content path
  * @param {string} sessionId - Session ID for session-specific uploads
  */
@@ -581,13 +676,16 @@ function getContent(urlPath, sessionId) {
     return sessionContent[sessionId][urlPath];
   }
 
-  // Handle site root specially (not on disk)
+  // Try disk first (distribution content may have a site root)
+  const diskContent = loadContentFromDisk(urlPath);
+  if (diskContent) return diskContent;
+
+  // Fall back to generated site root
   if (urlPath === '/') {
     return getSiteRoot();
   }
 
-  // Load from disk
-  return loadContentFromDisk(urlPath);
+  return null;
 }
 
 /**
@@ -1475,6 +1573,23 @@ app.delete('*/@lock', (req, res) => {
 });
 
 /**
+ * GET /resolveuid/:uid
+ * Resolve a UID to content - used by distribution content that references
+ * other content via resolveuid/UID links
+ */
+app.get('*/resolveuid/:uid', (req, res) => {
+  const uid = req.params.uid;
+  const contentPath = uidToPathMap[uid];
+  if (contentPath) {
+    const content = getContent(contentPath, getSessionId(req));
+    if (content) return res.json(content);
+  }
+  res.status(404).json({
+    error: { type: 'NotFound', message: `UID not found: ${uid}` }
+  });
+});
+
+/**
  * GET *\/@@images/*
  * Serve images for Plone image scales
  * URLs like: /test-image-1/@@images/image/preview
@@ -1482,16 +1597,18 @@ app.delete('*/@lock', (req, res) => {
  * otherwise falls back to placeholder SVGs.
  */
 app.get('*/@@images/*', (req, res) => {
-  // Extract content path and scale from URL
-  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, scale=preview
-  const pathMatch = req.path.match(/^(.+?)\/@@images\/image(?:\/(\w+))?$/);
+  // Extract content path, field name, and scale from URL
+  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, fieldName=image, scale=preview
+  // e.g., /block/grid-block/@@images/preview_image/large -> fieldName=preview_image, scale=large
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/(\w+)(?:\/(\w+))?$/);
   const contentPath = pathMatch ? pathMatch[1] : '';
-  const scale = pathMatch && pathMatch[2] ? pathMatch[2] : 'preview';
+  const fieldName = pathMatch ? pathMatch[2] : 'image';
+  const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
 
   // Try to serve actual image file from content directory
   // Use contentDirMap to find actual directory for nested paths
   const dirInfo = contentDirMap[contentPath];
-  const imageDir = dirInfo ? path.join(dirInfo.dirPath, 'image') : null;
+  const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
   if (imageDir && fs.existsSync(imageDir)) {
     const files = fs.readdirSync(imageDir);

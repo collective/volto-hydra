@@ -2,11 +2,13 @@
  * Helper class for interacting with Volto Hydra admin UI in tests.
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
+import { TEST_DATA_PREFIX } from './test-paths';
 
 export class AdminUIHelper {
   constructor(
     public readonly page: Page,
-    public readonly adminUrl: string = 'http://localhost:3001'
+    public readonly adminUrl: string = 'http://localhost:3001',
+    public readonly contentPrefix: string = TEST_DATA_PREFIX
   ) {
     // Capture browser console - all logs locally, only errors/warnings in CI
     this.page.on('console', (msg) => {
@@ -129,6 +131,14 @@ export class AdminUIHelper {
   }
 
   /**
+   * Build a full admin URL for a content path, e.g. contentUrl('/test-page', '/edit')
+   * → 'http://localhost:3001/_test_data/test-page/edit'
+   */
+  contentUrl(contentPath: string, suffix: string = ''): string {
+    return `${this.adminUrl}${this.contentPrefix}${contentPath}${suffix}`;
+  }
+
+  /**
    * Navigate to the edit page for a piece of content.
    * If already on the page in view mode, clicks the Edit button.
    * Otherwise uses client-side navigation to avoid SSR auth issues.
@@ -138,6 +148,8 @@ export class AdminUIHelper {
     if (!contentPath.startsWith('/')) {
       contentPath = '/' + contentPath;
     }
+    // Prepend content prefix (e.g., /_test_data) for test content paths
+    contentPath = `${this.contentPrefix}${contentPath}`;
 
     const editPath = `${contentPath}/edit`;
     const currentUrl = this.page.url();
@@ -182,6 +194,8 @@ export class AdminUIHelper {
     if (!contentPath.startsWith('/')) {
       contentPath = '/' + contentPath;
     }
+    // Prepend content prefix (e.g., /_test_data) for test content paths
+    contentPath = `${this.contentPrefix}${contentPath}`;
 
     // Use React Router to navigate client-side
     await this.page.evaluate((path) => {

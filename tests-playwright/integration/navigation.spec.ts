@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { TEST_DATA_PREFIX } from '../helpers/test-paths';
 
 test.describe('Navigation and URL Handling', () => {
   test('External URLs do not load in iframe', async ({ page }, testInfo) => {
@@ -28,8 +29,8 @@ test.describe('Navigation and URL Handling', () => {
 
   // Test hash-based routing with different URL formats
   const hashFormats = [
-    { name: '#/', url: 'http://localhost:8888/#/', expectedHash: '#/test-page' },
-    { name: '#!/', url: 'http://localhost:8888/#!/', expectedHash: '#!/test-page' },
+    { name: '#/', url: 'http://localhost:8888/#/', expectedHash: `#${TEST_DATA_PREFIX}/test-page` },
+    { name: '#!/', url: 'http://localhost:8888/#!/', expectedHash: `#!${TEST_DATA_PREFIX}/test-page` },
   ];
 
   for (const format of hashFormats) {
@@ -249,7 +250,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to view mode (not edit)
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Wait for iframe content to load
     const iframe = helper.getIframe();
@@ -280,7 +281,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to view mode (not edit)
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Wait for all blocks to render (Nuxt async components)
     await helper.getStableBlockCount();
@@ -332,7 +333,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to view mode
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
     await page.waitForLoadState('networkidle');
 
     const iframe = helper.getIframe();
@@ -367,7 +368,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to test-page in view mode
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
@@ -375,7 +376,7 @@ test.describe('Navigation and URL Handling', () => {
     // Get the current iframe src (should be path-based: localhost:8888/test-page)
     const iframeElement = page.locator('#previewIframe');
     const srcBefore = await iframeElement.getAttribute('src');
-    expect(srcBefore).toContain('localhost:8888/test-page');
+    expect(srcBefore).toContain(`localhost:8888${TEST_DATA_PREFIX}/test-page`);
     expect(srcBefore).not.toContain('#');
 
     // Open Personal Preferences
@@ -394,11 +395,11 @@ test.describe('Navigation and URL Handling', () => {
     // Wait for iframe src to change to hash-based format
     await expect(async () => {
       const src = await iframeElement.getAttribute('src');
-      expect(src).toContain('#/test-page');
+      expect(src).toContain(`#${TEST_DATA_PREFIX}/test-page`);
     }).toPass({ timeout: 10000 });
 
     const srcAfter = await iframeElement.getAttribute('src');
-    expect(srcAfter, 'Iframe src should have changed to hash-based URL').toContain('#/test-page');
+    expect(srcAfter, 'Iframe src should have changed to hash-based URL').toContain(`#${TEST_DATA_PREFIX}/test-page`);
 
     // Re-get iframe reference after reload and verify content still shows
     const iframeAfter = helper.getIframe();
@@ -413,7 +414,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Navigate to view mode (not edit) to see Contents action in toolbar
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Look for the contents/folder action in the toolbar
     // This should be visible because test-page is folderish (is_folderish: true in fixture)

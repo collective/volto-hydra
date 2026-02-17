@@ -1,6 +1,7 @@
 {
   "@id": "/templates/editable-fixed-layout",
   "@type": "Document",
+  "UID": "editable-fixed-layout-uid",
   "id": "editable-fixed-layout",
   "title": "Editable Fixed Layout",
   "description": "A layout with fixed blocks that can be edited but not moved",
@@ -8,8 +9,8 @@
     "editable-header": {
       "@type": "slate",
       "fixed": true,
-      "templateId": "/templates/editable-fixed-layout",
-      "templateInstanceId": "/templates/editable-fixed-layout",
+      "templateId": "resolveuid/editable-fixed-layout-uid",
+      "templateInstanceId": "resolveuid/editable-fixed-layout-uid",
       "placeholder": "header",
       "value": [
         {
@@ -21,8 +22,8 @@
     },
     "default-slot": {
       "@type": "slate",
-      "templateId": "/templates/editable-fixed-layout",
-      "templateInstanceId": "/templates/editable-fixed-layout",
+      "templateId": "resolveuid/editable-fixed-layout-uid",
+      "templateInstanceId": "resolveuid/editable-fixed-layout-uid",
       "placeholder": "default",
       "value": [
         {
@@ -35,8 +36,8 @@
     "editable-footer": {
       "@type": "slate",
       "fixed": true,
-      "templateId": "/templates/editable-fixed-layout",
-      "templateInstanceId": "/templates/editable-fixed-layout",
+      "templateId": "resolveuid/editable-fixed-layout-uid",
+      "templateInstanceId": "resolveuid/editable-fixed-layout-uid",
       "placeholder": "footer",
       "value": [
         {

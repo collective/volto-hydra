@@ -60,10 +60,10 @@
         <div id="footer-content"></div>
     </footer>
 
-    <script src="renderer.js"></script>
+    <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from './hydra.js';
-        import { sharedBlocksConfig } from './shared-block-schemas.js';
+        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from '/hydra.js';
+        import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
         function getPagesFromUrl() {
@@ -152,8 +152,8 @@
             // Render footer_blocks if present (or if forced layout will inject content)
             // Determine if we should force footer layout based on page path (same logic as bridge init)
             const pagePath = contextPath.replace(/\/edit$/, '');
-            const forceFooterLayout = pagePath === '/another-page';
-            const footerAllowedLayouts = forceFooterLayout ? ['/templates/footer-layout'] : null;
+            const forceFooterLayout = pagePath === '/_test_data/another-page';
+            const footerAllowedLayouts = forceFooterLayout ? ['resolveuid/footer-layout-uid'] : null;
 
             if (myGeneration !== window._renderGeneration) return; // stale render
 
@@ -314,7 +314,7 @@
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
-                    const forceFooterLayout = pagePath === '/another-page';
+                    const forceFooterLayout = pagePath === '/_test_data/another-page';
 
                     window.bridge = initBridge({
                         pageBlocksFields: [
@@ -322,15 +322,15 @@
                                 fieldName: 'blocks',
                                 title: 'Blocks',
                                 allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
-                                allowedTemplates: ['/templates/test-layout'],
-                                allowedLayouts: [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
+                                allowedTemplates: ['resolveuid/test-layout-template-uid'],
+                                allowedLayouts: [null, 'resolveuid/test-layout-template-uid', 'resolveuid/header-footer-layout-uid', 'resolveuid/header-only-layout-uid', 'resolveuid/editable-fixed-layout-uid'],
                             },
                             {
                                 fieldName: 'footer_blocks',
                                 title: 'Footer',
                                 allowedBlocks: ['slate', 'image'],
                                 // Only force footer layout on /another-page
-                                ...(forceFooterLayout ? { allowedLayouts: ['/templates/footer-layout'] } : {}),
+                                ...(forceFooterLayout ? { allowedLayouts: ['resolveuid/footer-layout-uid'] } : {}),
                             },
                         ],
                         voltoConfig: voltoConfig,

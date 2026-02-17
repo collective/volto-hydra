@@ -96,7 +96,7 @@
     const previewIframe = document.createElement('iframe');
     previewIframe.id = 'previewIframe';
     previewIframe.name = `hydra-edit:${adminOrigin}`;
-    previewIframe.src = `${frontendOrigin}/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
+    previewIframe.src = `${frontendOrigin}/_test_data/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
     document.getElementById('iframe-container').appendChild(previewIframe);
 
     console.log('[MOCK_PARENT] Loaded');
@@ -278,7 +278,7 @@
     // Mock form data with both a slate block and a simple text block
     // This will be sent to iframe to override API content
     let mockFormData = {
-      '@id': 'http://localhost:8888/test-page',
+      '@id': 'http://localhost:8888/_test_data/test-page',
       '@type': 'Document',
       title: 'Mock Test Page',
       blocks: {

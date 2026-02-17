@@ -18,14 +18,10 @@ test.describe('Complex Slate Structures', () => {
   });
 
   test('selecting list block with links does not cause Slate path error', async ({ page }) => {
-    // Navigate to the complex slate page in edit mode
-    await page.goto('http://localhost:3001/complex-slate-page/edit');
+    const helper = new AdminUIHelper(page);
+    await helper.navigateToEdit('/complex-slate-page');
 
-    // Wait for the page to load
-    await page.waitForSelector('iframe');
-
-    // Wait for iframe to be ready
-    const iframe = page.frameLocator('iframe');
+    const iframe = helper.getIframe();
 
     // Wait for the list block to be rendered in the iframe
     const listBlock = iframe.locator('[data-block-uid="block-list-links"]');
@@ -49,10 +45,10 @@ test.describe('Complex Slate Structures', () => {
   });
 
   test('list with links structure is preserved after selection', async ({ page }) => {
-    await page.goto('http://localhost:3001/complex-slate-page/edit');
-    await page.waitForSelector('iframe');
+    const helper = new AdminUIHelper(page);
+    await helper.navigateToEdit('/complex-slate-page');
 
-    const iframe = page.frameLocator('iframe');
+    const iframe = helper.getIframe();
     const listBlock = iframe.locator('[data-block-uid="block-list-links"]');
     await expect(listBlock).toBeVisible({ timeout: 10000 });
 
@@ -75,10 +71,10 @@ test.describe('Complex Slate Structures', () => {
   });
 
   test('clicking into list item for inline edit does not corrupt structure', async ({ page }) => {
-    await page.goto('http://localhost:3001/complex-slate-page/edit');
-    await page.waitForSelector('iframe');
+    const helper = new AdminUIHelper(page);
+    await helper.navigateToEdit('/complex-slate-page');
 
-    const iframe = page.frameLocator('iframe');
+    const iframe = helper.getIframe();
     const listBlock = iframe.locator('[data-block-uid="block-list-links"]');
     await expect(listBlock).toBeVisible({ timeout: 10000 });
 

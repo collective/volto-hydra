@@ -1,6 +1,7 @@
 {
   "@id": "/templates/test-layout",
   "@type": "Document",
+  "UID": "test-layout-template-uid",
   "id": "test-layout",
   "title": "Test Layout Template",
   "description": "A test template with header, grid, footer, and main placeholder",
@@ -9,8 +10,8 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/test-layout",
-      "templateInstanceId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "resolveuid/test-layout-template-uid",
       "placeholder": "header",
       "value": [
         {
@@ -24,16 +25,16 @@
       "@type": "gridBlock",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/test-layout",
-      "templateInstanceId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "resolveuid/test-layout-template-uid",
       "placeholder": "grid",
       "blocks": {
         "tpl-grid-cell-1": {
           "@type": "slate",
           "fixed": true,
           "readOnly": true,
-          "templateId": "/templates/test-layout",
-          "templateInstanceId": "/templates/test-layout",
+          "templateId": "resolveuid/test-layout-template-uid",
+          "templateInstanceId": "resolveuid/test-layout-template-uid",
           "placeholder": "grid-cell-1",
           "value": [{ "type": "p", "children": [{ "text": "Template Grid Cell 1" }] }],
           "plaintext": "Template Grid Cell 1"
@@ -48,8 +49,8 @@
     },
     "main-placeholder": {
       "@type": "slate",
-      "templateId": "/templates/test-layout",
-      "templateInstanceId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "resolveuid/test-layout-template-uid",
       "placeholder": "primary",
       "value": [
         {
@@ -63,8 +64,8 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/test-layout",
-      "templateInstanceId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "resolveuid/test-layout-template-uid",
       "placeholder": "footer",
       "value": [
         {

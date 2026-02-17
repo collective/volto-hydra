@@ -1,6 +1,7 @@
 {
   "@id": "/templates/header-only-layout",
   "@type": "Document",
+  "UID": "header-only-layout-uid",
   "id": "header-only-layout",
   "title": "Header Only Layout",
   "description": "A layout template with only a fixed header",
@@ -9,8 +10,8 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/header-only-layout",
-      "templateInstanceId": "/templates/header-only-layout",
+      "templateId": "resolveuid/header-only-layout-uid",
+      "templateInstanceId": "resolveuid/header-only-layout-uid",
       "placeholder": "header",
       "value": [
         {
@@ -22,8 +23,8 @@
     },
     "default-slot": {
       "@type": "slate",
-      "templateId": "/templates/header-only-layout",
-      "templateInstanceId": "/templates/header-only-layout",
+      "templateId": "resolveuid/header-only-layout-uid",
+      "templateInstanceId": "resolveuid/header-only-layout-uid",
       "placeholder": "default",
       "value": [
         {
