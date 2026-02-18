@@ -1154,6 +1154,37 @@ export class Bridge {
   }
 
   /**
+   * Protect the last real character in a text node from deletion by replacing
+   * it with ZWS. Keeps the text node alive so MutationObserver fires
+   * characterData (not childList) and preserves inline formatting context.
+   *
+   * Called from both the beforeinput handler (native keyboard) and buffer
+   * replay (execCommand doesn't fire beforeinput in headless browsers).
+   *
+   * @returns {boolean} true if handled (last char replaced with ZWS)
+   */
+  preserveLastCharDelete() {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return false;
+
+    const textNode = sel.getRangeAt(0).startContainer;
+    if (textNode.nodeType !== Node.TEXT_NODE) return false;
+
+    const realText = this.stripZeroWidthSpaces(textNode.textContent);
+    if (realText.length !== 1) return false;
+
+    textNode.textContent = '\uFEFF';
+    const r = document.createRange();
+    // Position AFTER ZWS (offset 1) — browsers normalize offset 0 of a
+    // ZWS-only inline element to be OUTSIDE it, losing formatting context.
+    r.setStart(textNode, 1);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    return true;
+  }
+
+  /**
    * Checks text before cursor for markdown shortcut patterns (Space triggers autoformat).
    * Handles both block-level (##, >, -, etc.) and inline (**bold**, __bold__, etc.) patterns.
    * Shared between the live keydown handler and buffer replay.
@@ -2646,13 +2677,20 @@ export class Bridge {
       // block, boundary). Only use native execCommand if handler didn't act.
       if (evt.key === 'Backspace') {
         if (!this.handleDeleteKey(blockId, 'Backspace')) {
-          document.execCommand('delete', false);
+          // preserveLastCharDelete handles the case where execCommand would
+          // remove the last char from an inline element — execCommand doesn't
+          // fire beforeinput so the editableField handler can't catch it.
+          if (!this.preserveLastCharDelete()) {
+            document.execCommand('delete', false);
+          }
         }
         return;
       }
       if (evt.key === 'Delete') {
         if (!this.handleDeleteKey(blockId, 'Delete')) {
-          document.execCommand('forwardDelete', false);
+          if (!this.preserveLastCharDelete()) {
+            document.execCommand('forwardDelete', false);
+          }
         }
         return;
       }
@@ -6991,23 +7029,9 @@ export class Bridge {
       // childList). Part of ZWS lifecycle — see "Whitespace & ZWS Strategy".
       editableField.addEventListener('beforeinput', (e) => {
         if (e.inputType !== 'deleteContentBackward' && e.inputType !== 'deleteContentForward') return;
-        const sel = window.getSelection();
-        if (!sel.rangeCount || !sel.isCollapsed) return;
-
-        const textNode = sel.getRangeAt(0).startContainer;
-        if (textNode.nodeType !== Node.TEXT_NODE) return;
-
-        const realText = this.stripZeroWidthSpaces(textNode.textContent);
-        if (realText.length !== 1) return;
-
-        // Last real character — replace with ZWS instead of letting browser remove the node
-        e.preventDefault();
-        textNode.textContent = '\uFEFF';
-        const r = document.createRange();
-        r.setStart(textNode, e.inputType === 'deleteContentBackward' ? 0 : 1);
-        r.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(r);
+        if (this.preserveLastCharDelete()) {
+          e.preventDefault();
+        }
       });
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
