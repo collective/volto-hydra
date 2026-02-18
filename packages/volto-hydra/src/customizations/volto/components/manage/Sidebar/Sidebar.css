@@ -237,3 +237,44 @@
 .hydra-sidebar #sidebar-properties .header.pulled {
   display: none;
 }
+
+/* Object Browser: selection controls (radio/checkbox) */
+.object-browser .ob-select-control {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.object-browser .ob-select-control input[type="radio"],
+.object-browser .ob-select-control input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+/* Object Browser: loading indicator */
+.object-browser .ob-loading-indicator {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+/* Object Browser: chevron on folderish items */
+.object-browser ul li .right-arrow-icon {
+  opacity: 0.4;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.object-browser ul li:hover .right-arrow-icon {
+  opacity: 1;
+}
+
+/* Object Browser: list items layout with selection controls */
+.object-browser ul.object-listing li {
+  display: flex;
+  align-items: center;
+}

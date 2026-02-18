@@ -4349,22 +4349,18 @@ export class AdminUIHelper {
       const count = await breadcrumbSections.count();
       if (count >= 2) {
         await breadcrumbSections.nth(count - 2).click();
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(1000);
       }
     }
 
     // Try to find and click the folder; if still not found, we're already inside it
-    const nowFound = await folderItem.first().waitFor({ state: 'visible', timeout: 2000 })
+    const nowFound = await folderItem.first().waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
 
     if (nowFound) {
-      const browseArrow = folderItem.first().locator('.right-arrow-link-mode');
-      if (await browseArrow.isVisible().catch(() => false)) {
-        await browseArrow.click({ timeout: 2000 });
-      } else {
-        await folderItem.first().click({ timeout: 2000 });
-      }
+      // With the shadowed OB, clicking a folder row always navigates (all modes)
+      await folderItem.first().click({ timeout: 2000 });
       await expect(this.page.locator('.object-listing li').first()).toBeVisible({ timeout: 5000 });
     }
   }
@@ -4380,33 +4376,33 @@ export class AdminUIHelper {
     const item = this.page.locator('.object-listing li').filter({ hasText: itemName });
 
     // Give the initial @search (componentDidMount) time to populate the listing.
-    // Also ensures React has settled before we interact with buttons — prevents
-    // the SidebarPopup mousedown race where doesNodeContainClick fails when a
-    // React re-render detaches the event target between mousedown and click.
     const itemQuickFound = await item.first().waitFor({ state: 'visible', timeout: 1500 })
       .then(() => true)
       .catch(() => false);
 
     if (!itemQuickFound) {
       // Item not in current listing (e.g. OB opened at a leaf page with no children).
-      // Navigate up one level by clicking the second-to-last breadcrumb section.
-      // For path '/_test_data/test-page', breadcrumbs are [Home, _test_data, test-page]
-      // → clicking _test_data (index 1) navigates to /_test_data where siblings live.
-      const breadcrumbSections = this.page.locator('.object-browser .breadcrumbs .section');
-      const count = await breadcrumbSections.count();
+      // Navigate up by clicking the parent breadcrumb section in the OB.
+      const sections = this.page.locator('.object-browser .breadcrumbs .section');
+      const count = await sections.count();
       if (count >= 2) {
-        const parentSection = breadcrumbSections.nth(count - 2);
-        await parentSection.click();
+        await sections.nth(count - 2).click();
+        await this.page.waitForTimeout(1000);
       }
     }
 
-    await item.first().waitFor({ state: 'visible', timeout: 5000 });
-    // Use force:true — the OB listing re-renders when search results arrive,
-    // which can briefly detach and reattach DOM nodes, failing stability checks.
-    await item.first().click({ force: true });
+    await item.first().waitFor({ state: 'visible', timeout: 10000 });
 
-    // Wait for the object browser to close, or close it manually if it stays open
-    // Check for both "Choose Image" and "Choose Target" headings (different browser types)
+    // Use the radio/checkbox selection control if available (shadowed OB),
+    // otherwise fall back to clicking the row directly.
+    const selectControl = item.first().locator('.ob-select-control');
+    if (await selectControl.isVisible().catch(() => false)) {
+      await selectControl.click();
+    } else {
+      await item.first().click({ force: true });
+    }
+
+    // Wait for the object browser to close (single-select modes auto-close)
     const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
     const chooseTargetHeading = this.page.getByRole('heading', { name: 'Choose Target' });
     const browserHeading = await chooseImageHeading.isVisible().catch(() => false)
@@ -4416,15 +4412,13 @@ export class AdminUIHelper {
     try {
       await expect(browserHeading).not.toBeVisible({ timeout: 2000 });
     } catch {
-      // Object browser didn't auto-close, close it manually via the X button in header
-      // The X button is the last button in the header banner
+      // Object browser didn't auto-close, close it manually via the X button
       const banner = browserHeading.locator('..');
       const closeButton = banner.locator('button').last();
       if (await closeButton.isVisible().catch(() => false)) {
         await closeButton.click();
         await this.page.waitForTimeout(500);
       }
-      // If still visible, press Escape
       if (await browserHeading.isVisible().catch(() => false)) {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);
