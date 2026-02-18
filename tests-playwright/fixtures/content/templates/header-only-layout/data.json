@@ -11,7 +11,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/header-only-layout-uid",
-      "templateInstanceId": "resolveuid/header-only-layout-uid",
+      "templateInstanceId": "header-only-def-instance",
       "placeholder": "header",
       "value": [
         {
@@ -24,7 +24,7 @@
     "default-slot": {
       "@type": "slate",
       "templateId": "resolveuid/header-only-layout-uid",
-      "templateInstanceId": "resolveuid/header-only-layout-uid",
+      "templateInstanceId": "header-only-def-instance",
       "placeholder": "default",
       "value": [
         {

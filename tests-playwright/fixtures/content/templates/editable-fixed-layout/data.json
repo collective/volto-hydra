@@ -10,7 +10,7 @@
       "@type": "slate",
       "fixed": true,
       "templateId": "resolveuid/editable-fixed-layout-uid",
-      "templateInstanceId": "resolveuid/editable-fixed-layout-uid",
+      "templateInstanceId": "editable-fixed-def-instance",
       "placeholder": "header",
       "value": [
         {
@@ -23,7 +23,7 @@
     "default-slot": {
       "@type": "slate",
       "templateId": "resolveuid/editable-fixed-layout-uid",
-      "templateInstanceId": "resolveuid/editable-fixed-layout-uid",
+      "templateInstanceId": "editable-fixed-def-instance",
       "placeholder": "default",
       "value": [
         {
@@ -37,7 +37,7 @@
       "@type": "slate",
       "fixed": true,
       "templateId": "resolveuid/editable-fixed-layout-uid",
-      "templateInstanceId": "resolveuid/editable-fixed-layout-uid",
+      "templateInstanceId": "editable-fixed-def-instance",
       "placeholder": "footer",
       "value": [
         {

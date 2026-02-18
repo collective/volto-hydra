@@ -11,7 +11,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/footer-layout-uid",
-      "templateInstanceId": "resolveuid/footer-layout-uid",
+      "templateInstanceId": "footer-layout-def-instance",
       "placeholder": "branding",
       "value": [
         {
@@ -24,7 +24,7 @@
     "default-slot": {
       "@type": "slate",
       "templateId": "resolveuid/footer-layout-uid",
-      "templateInstanceId": "resolveuid/footer-layout-uid",
+      "templateInstanceId": "footer-layout-def-instance",
       "placeholder": "default",
       "value": [
         {

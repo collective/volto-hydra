@@ -67,7 +67,11 @@ export default async function ploneApi({
 
         // Pre-load templates for SSR (avoids Suspense flicker)
         const loadTemplate = async (templateId) => {
-          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${templateId}`;
+          // templateId may be a path or a full URL — normalise to path
+          const tplPath = templateId.startsWith('http')
+            ? new URL(templateId).pathname
+            : `/${templateId.replace(/^\//, '')}`;
+          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${tplPath}`;
           const response = await fetch(url, { headers });
           if (!response.ok) {
             throw new Error(`Failed to fetch template: ${templateId}`);

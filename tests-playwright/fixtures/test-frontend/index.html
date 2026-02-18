@@ -153,7 +153,7 @@
             // Determine if we should force footer layout based on page path (same logic as bridge init)
             const pagePath = contextPath.replace(/\/edit$/, '');
             const forceFooterLayout = pagePath === '/_test_data/another-page';
-            const footerAllowedLayouts = forceFooterLayout ? ['resolveuid/footer-layout-uid'] : null;
+            const footerAllowedLayouts = forceFooterLayout ? ['/_test_data/templates/footer-layout'] : null;
 
             if (myGeneration !== window._renderGeneration) return; // stale render
 
@@ -169,7 +169,11 @@
                     if (token) {
                         headers['Authorization'] = `Bearer ${token}`;
                     }
-                    const res = await fetch(`${window.location.origin}${templateId}`, { headers });
+                    // templateId may be a resolveuid path or a full URL — normalise to absolute path
+                    const url = templateId.startsWith('http')
+                        ? new URL(templateId).pathname
+                        : `/${templateId.replace(/^\//, '')}`;
+                    const res = await fetch(url, { headers });
                     return res.json();
                 };
                 const expandedItems = await expandTemplates(footerLayout, {
@@ -263,7 +267,11 @@
                     if (token) {
                         headers['Authorization'] = `Bearer ${token}`;
                     }
-                    const res = await fetch(`/++api++${templateId}`, { headers });
+                    // templateId may be a resolveuid path or a full URL — normalise to path
+                    const tplPath = templateId.startsWith('http')
+                        ? new URL(templateId).pathname
+                        : `/${templateId.replace(/^\//, '')}`;
+                    const res = await fetch(`/++api++${tplPath}`, { headers });
                     return res.json();
                 };
 
@@ -322,15 +330,15 @@
                                 fieldName: 'blocks',
                                 title: 'Blocks',
                                 allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
-                                allowedTemplates: ['resolveuid/test-layout-template-uid'],
-                                allowedLayouts: [null, 'resolveuid/test-layout-template-uid', 'resolveuid/header-footer-layout-uid', 'resolveuid/header-only-layout-uid', 'resolveuid/editable-fixed-layout-uid'],
+                                allowedTemplates: ['/_test_data/templates/test-layout'],
+                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },
                             {
                                 fieldName: 'footer_blocks',
                                 title: 'Footer',
                                 allowedBlocks: ['slate', 'image'],
                                 // Only force footer layout on /another-page
-                                ...(forceFooterLayout ? { allowedLayouts: ['resolveuid/footer-layout-uid'] } : {}),
+                                ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
                             },
                         ],
                         voltoConfig: voltoConfig,

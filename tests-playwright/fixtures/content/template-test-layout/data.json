@@ -11,7 +11,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
-      "templateInstanceId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "test-layout-def-instance",
       "placeholder": "header",
       "value": [
         {
@@ -26,7 +26,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
-      "templateInstanceId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "test-layout-def-instance",
       "placeholder": "grid",
       "blocks": {
         "tpl-grid-cell-1": {
@@ -34,7 +34,7 @@
           "fixed": true,
           "readOnly": true,
           "templateId": "resolveuid/test-layout-template-uid",
-          "templateInstanceId": "resolveuid/test-layout-template-uid",
+          "templateInstanceId": "test-layout-def-instance",
           "placeholder": "grid-cell-1",
           "value": [{ "type": "p", "children": [{ "text": "Template Grid Cell 1" }] }],
           "plaintext": "Template Grid Cell 1"
@@ -50,7 +50,7 @@
     "main-placeholder": {
       "@type": "slate",
       "templateId": "resolveuid/test-layout-template-uid",
-      "templateInstanceId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "test-layout-def-instance",
       "placeholder": "primary",
       "value": [
         {
@@ -65,7 +65,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
-      "templateInstanceId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "test-layout-def-instance",
       "placeholder": "footer",
       "value": [
         {

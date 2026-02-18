@@ -11,7 +11,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/header-footer-layout-uid",
-      "templateInstanceId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "header-footer-def-instance",
       "placeholder": "header",
       "value": [
         {
@@ -24,7 +24,7 @@
     "default-slot": {
       "@type": "slate",
       "templateId": "resolveuid/header-footer-layout-uid",
-      "templateInstanceId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "header-footer-def-instance",
       "placeholder": "default",
       "value": [
         {
@@ -39,7 +39,7 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/header-footer-layout-uid",
-      "templateInstanceId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "header-footer-def-instance",
       "placeholder": "footer",
       "value": [
         {

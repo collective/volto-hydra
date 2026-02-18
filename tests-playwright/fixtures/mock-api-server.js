@@ -499,10 +499,9 @@ function generateComponents(urlPath, baseUrl) {
 /**
  * Resolve resolveuid/UID references in content to actual paths.
  * Like Plone's serializer, converts resolveuid/UID strings to full URLs.
- * Skips templateId/templateInstanceId keys since those are opaque keys
- * used for template matching between frontend config and block data.
+ * All string values are resolved, including templateId/templateInstanceId —
+ * these are real Plone paths that the serializer resolves.
  */
-const RESOLVE_UID_SKIP_KEYS = new Set(['templateId', 'templateInstanceId']);
 function resolveUidUrls(obj) {
   if (typeof obj === 'string') {
     return obj.replace(/(?:\.\.\/)*resolveuid\/([a-z0-9][-a-z0-9]*)/g, (match, uid) => {
@@ -515,7 +514,7 @@ function resolveUidUrls(obj) {
   if (obj && typeof obj === 'object') {
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = RESOLVE_UID_SKIP_KEYS.has(key) ? value : resolveUidUrls(value);
+      result[key] = resolveUidUrls(value);
     }
     return result;
   }
