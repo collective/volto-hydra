@@ -7408,7 +7408,26 @@ export class Bridge {
     // Support async callbacks (e.g., renderContentWithListings)
     const callbackResult = callbackFn(this.formData);
 
-    const afterRender = () => this.afterContentRender(afterRenderOptions);
+    const afterRender = () => {
+      if (this._renderCommentObserver) {
+        this._renderCommentObserver.disconnect();
+        this._renderCommentObserver = null;
+      }
+      this.afterContentRender(afterRenderOptions);
+    };
+
+    // For async render callbacks, watch for new DOM nodes and eagerly
+    // materialize hydra comments. This ensures data-block-uid attributes
+    // from comment syntax are available as soon as blocks are appended,
+    // rather than waiting for the entire render (including slow listing/
+    // footer expansion) to complete. Safe to call repeatedly because
+    // applyHydraAttributes skips existing attributes.
+    if (callbackResult && typeof callbackResult.then === 'function') {
+      this._renderCommentObserver = new MutationObserver(() => {
+        this.materializeHydraComments();
+      });
+      this._renderCommentObserver.observe(document.body, { childList: true, subtree: true });
+    }
 
     // Call afterRender after callback completes (async or sync)
     if (callbackResult && typeof callbackResult.then === 'function') {

@@ -420,18 +420,13 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
-    // Verify block exists before trying to click
-    const blockCount = await blockLocator.count();
-    if (blockCount === 0) {
-      throw new Error(`Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`);
-    }
-
     // Use first() for multi-element blocks (multiple elements with same UID)
     const block = blockLocator.first();
 
-    // Wait for the element to be stable (not re-rendering) by checking it's attached
-    // Vue/Nuxt may re-render after hydration, causing element references to become stale
-    await expect(block).toBeAttached({ timeout: 5000 });
+    // Wait for the block to appear in the DOM. This auto-retries, which is
+    // essential for comment-syntax blocks (e.g. hero) where data-block-uid
+    // is added asynchronously by materializeHydraComments after render.
+    await block.waitFor({ state: 'attached', timeout: 10000 });
 
     // Determine click target - either specific selector within block, or block itself
     const clickTarget = selector ? block.locator(selector) : block;
