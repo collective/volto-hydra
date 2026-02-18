@@ -197,17 +197,19 @@ function getImageScales(content, baseUrl) {
   return {
     image: [
       {
-        download: `${baseUrl}${contentPath}/@@images/image`,
+        'content-type': 'image/jpeg',
+        download: `@@images/image`,
+        filename: `${content.id || 'image'}.jpg`,
         width: width,
         height: height,
         scales: {
           preview: {
-            download: `${baseUrl}${contentPath}/@@images/image/preview`,
+            download: `@@images/image/preview`,
             width: Math.min(width, 400),
             height: Math.min(height, 400),
           },
           large: {
-            download: `${baseUrl}${contentPath}/@@images/image/large`,
+            download: `@@images/image/large`,
             width: Math.min(width, 800),
             height: Math.min(height, 800),
           },
@@ -384,6 +386,9 @@ function loadContentFromDisk(urlPath) {
  */
 function formatNavItem(rawContent, urlPath, baseUrl) {
   const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
+  const children = (rawContent.is_folderish !== false)
+    ? getNavigationItems(urlPath, 1)
+    : [];
   return {
     '@id': `${baseUrl}${urlPath}`,
     '@type': rawContent['@type'],
@@ -394,7 +399,7 @@ function formatNavItem(rawContent, urlPath, baseUrl) {
     'UID': rawContent.UID || `${rawContent.id}-uid`,
     'is_folderish': rawContent.is_folderish !== undefined ? rawContent.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
-    'items': [],
+    'items': children,
   };
 }
 
@@ -426,8 +431,11 @@ function getNavigationItems(basePath = '/', depth = 1) {
     })
     .map((itemPath) => {
       const rawContent = loadRawContentFromDisk(itemPath);
+      if (rawContent.exclude_from_nav) return null;
+      if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
       return formatNavItem(rawContent, itemPath, baseUrl);
-    });
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -479,21 +487,8 @@ function generateComponents(urlPath, baseUrl) {
     },
     'navigation': {
       '@id': `${fullUrl}/@navigation`,
-      // Determine navigation root:
-      // - If current path has children (is a folder with content), show its children
-      // - Otherwise show siblings (items at same level)
-      'items': (() => {
-        const hasChildren = Object.keys(contentDirMap).some(p =>
-          p !== cleanPath && p.startsWith(cleanPath + '/'));
-        if (hasChildren) {
-          return getNavigationItems(cleanPath, 1);
-        }
-        // Show siblings - items under parent path
-        const parentPath = pathParts.length > 1
-          ? '/' + pathParts.slice(0, -1).join('/')
-          : '/';
-        return getNavigationItems(parentPath, 1);
-      })()
+      // Always rooted at site root — top-level items with nested children
+      'items': getRootNavigationItems()
     },
     'workflow': {
       '@id': `${fullUrl}/@workflow`
@@ -525,6 +520,39 @@ function resolveUidUrls(obj) {
     return result;
   }
   return obj;
+}
+
+/**
+ * Add image_scales to catalog brain references embedded in block data.
+ * Real Plone includes image_scales in catalog brains; our content export doesn't.
+ * Walks the data and for any object with image_field but no image_scales,
+ * looks up the referenced image content and generates scales.
+ */
+function enrichImageBrains(obj, baseUrl) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => enrichImageBrains(item, baseUrl));
+
+  // Check if this object is a catalog brain reference missing image_scales
+  if (obj.image_field && !obj.image_scales && obj['@id']) {
+    // Extract path from @id URL
+    const idUrl = obj['@id'];
+    const contentPath = idUrl.startsWith('http') ? new URL(idUrl).pathname : idUrl;
+    const rawContent = loadRawContentFromDisk(contentPath);
+    if (rawContent) {
+      const enrichedImage = enrichContent(rawContent, contentPath, baseUrl);
+      const scales = getImageScales(enrichedImage, baseUrl);
+      if (scales) {
+        obj = { ...obj, image_scales: scales };
+      }
+    }
+  }
+
+  // Recurse into nested objects
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = enrichImageBrains(value, baseUrl);
+  }
+  return result;
 }
 
 /**
@@ -577,7 +605,8 @@ function enrichContent(content, urlPath, baseUrl) {
   };
 
   // Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
-  return resolveUidUrls(enriched);
+  // Then add image_scales to catalog brain references (like Plone's serializer)
+  return enrichImageBrains(resolveUidUrls(enriched), baseUrl);
 }
 
 /**
