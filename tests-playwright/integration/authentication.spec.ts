@@ -191,6 +191,7 @@ test.describe('Authentication and Access Control', () => {
   });
 
   test('Unauthenticated access redirects to login', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
     // Try to access edit page without logging in
     await page.goto(helper.contentUrl('/test-page', '/edit'));
 
