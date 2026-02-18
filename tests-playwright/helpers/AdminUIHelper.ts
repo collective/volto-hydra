@@ -4299,50 +4299,19 @@ export class AdminUIHelper {
 
   /**
    * Wait for the object browser popup to be fully visible and ready.
-   * Handles both aside-based and div-based object browsers.
-   * Navigates to root (Home) since the browser may open at current page path.
+   * If the OB opens at a path with no children (e.g. a leaf page), navigates
+   * to the parent folder via the breadcrumb so items are visible.
    *
-   * @param timeout - Maximum time to wait in milliseconds (default: 5000)
+   * @param timeout - Maximum time to wait in milliseconds (default: 10000)
    * @returns Locator for the object browser popup
    */
-  async waitForObjectBrowser(timeout: number = 5000): Promise<Locator> {
-    // Wait for the Home button which appears inside the object browser when it's ready
-    // This is more reliable than waiting for the container, which may appear before content loads
+  async waitForObjectBrowser(timeout: number = 10000): Promise<Locator> {
+    // Wait for the Home button which indicates the OB is fully mounted
+    // (breadcrumbs rendered means componentDidMount has run)
     const homeButton = this.page.getByRole('button', { name: 'Home' });
     await expect(homeButton).toBeVisible({ timeout });
 
-    // Find the object browser container (aside for link editor, or image browser container)
-    const aside = this.page.locator('aside[role="presentation"]').last();
-    const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
-
-    let locator: Locator;
-    if (await aside.isVisible().catch(() => false)) {
-      locator = aside;
-    } else if (await chooseImageHeading.isVisible().catch(() => false)) {
-      // Get the parent container for image browser
-      locator = chooseImageHeading.locator('xpath=ancestor::*[.//ul or .//list]').first();
-      if (!(await locator.count())) {
-        locator = this.page.locator('ul:has(li)').filter({ hasText: /Document|Image/ }).last();
-      }
-    } else {
-      // Fallback to aside even if not detected (Home button was visible so browser is open)
-      locator = aside;
-    }
-
-    // Object browser may open at current page path (e.g., /test-page) which has no children.
-    // Check if we need to navigate to Home (list is empty or no matching items)
-    const listItems = this.page.locator('li').filter({ hasText: /Document|Image|Folder/ });
-    const hasItems = await listItems.first().isVisible().catch(() => false);
-
-    if (!hasItems) {
-      // Click Home to navigate to root where items are available
-      await homeButton.click();
-    }
-
-    // Wait for list items to appear
-    await expect(listItems.first()).toBeVisible({ timeout });
-
-    return locator;
+    return this.page.locator('.object-browser').last();
   }
 
   /**
@@ -4368,15 +4337,36 @@ export class AdminUIHelper {
    * @param folderName - The name of the folder to navigate into (e.g., "Images" or /images/i)
    */
   async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
-    // Find folder by text content since accessible names include full path like "/images (Document)"
-    // Search globally since the object browser container locator may vary
-    const folderItem = this.page.locator('li').filter({ hasText: folderName });
-    await folderItem.first().waitFor({ state: 'visible', timeout: 5000 });
-    await folderItem.first().click();
+    const folderItem = this.page.locator('.object-listing li').filter({ hasText: folderName });
 
-    // Wait for the listing to update - new items should appear
-    await this.page.waitForTimeout(300);
-    await expect(this.page.locator('li').first()).toBeVisible({ timeout: 5000 });
+    const found = await folderItem.first().waitFor({ state: 'visible', timeout: 500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!found) {
+      // Navigate up one level via breadcrumbs
+      const breadcrumbSections = this.page.locator('.object-browser .breadcrumbs .section');
+      const count = await breadcrumbSections.count();
+      if (count >= 2) {
+        await breadcrumbSections.nth(count - 2).click();
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Try to find and click the folder; if still not found, we're already inside it
+    const nowFound = await folderItem.first().waitFor({ state: 'visible', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (nowFound) {
+      const browseArrow = folderItem.first().locator('.right-arrow-link-mode');
+      if (await browseArrow.isVisible().catch(() => false)) {
+        await browseArrow.click({ timeout: 2000 });
+      } else {
+        await folderItem.first().click({ timeout: 2000 });
+      }
+      await expect(this.page.locator('.object-listing li').first()).toBeVisible({ timeout: 5000 });
+    }
   }
 
   /**
@@ -4387,11 +4377,33 @@ export class AdminUIHelper {
    * @param itemName - The name of the item to select (e.g., "Test Image 1" or /test-image-1/i)
    */
   async objectBrowserSelectItem(_objectBrowser: Locator, itemName: string | RegExp): Promise<void> {
-    // Find item by text content since accessible names include full path
-    // Search globally since the object browser container locator may vary
-    const item = this.page.locator('li').filter({ hasText: itemName });
+    const item = this.page.locator('.object-listing li').filter({ hasText: itemName });
+
+    // Give the initial @search (componentDidMount) time to populate the listing.
+    // Also ensures React has settled before we interact with buttons — prevents
+    // the SidebarPopup mousedown race where doesNodeContainClick fails when a
+    // React re-render detaches the event target between mousedown and click.
+    const itemQuickFound = await item.first().waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!itemQuickFound) {
+      // Item not in current listing (e.g. OB opened at a leaf page with no children).
+      // Navigate up one level by clicking the second-to-last breadcrumb section.
+      // For path '/_test_data/test-page', breadcrumbs are [Home, _test_data, test-page]
+      // → clicking _test_data (index 1) navigates to /_test_data where siblings live.
+      const breadcrumbSections = this.page.locator('.object-browser .breadcrumbs .section');
+      const count = await breadcrumbSections.count();
+      if (count >= 2) {
+        const parentSection = breadcrumbSections.nth(count - 2);
+        await parentSection.click();
+      }
+    }
+
     await item.first().waitFor({ state: 'visible', timeout: 5000 });
-    await item.first().click();
+    // Use force:true — the OB listing re-renders when search results arrive,
+    // which can briefly detach and reattach DOM nodes, failing stability checks.
+    await item.first().click({ force: true });
 
     // Wait for the object browser to close, or close it manually if it stays open
     // Check for both "Choose Image" and "Choose Target" headings (different browser types)

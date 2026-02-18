@@ -41,7 +41,8 @@ test.describe('Inline image editing', () => {
     // Open object browser from the overlay (clears existing value if needed)
     const objectBrowser = await helper.openObjectBrowserFromToolbarPopup(imageEditorOverlay, imageButton);
 
-    // Navigate to Images folder (object browser opens at root)
+    // Navigate to Test Data mount, then Images folder
+    await helper.objectBrowserNavigateToFolder(objectBrowser, /Test Data/);
     await helper.objectBrowserNavigateToFolder(objectBrowser, /Images/);
 
     // Select the image
@@ -79,6 +80,7 @@ test.describe('Inline image editing', () => {
 
     // Open object browser from the overlay (clears existing value if needed)
     const objectBrowser = await helper.openObjectBrowserFromToolbarPopup(imageEditorOverlay, imageButton);
+    await helper.objectBrowserNavigateToFolder(objectBrowser, /Test Data/);
     await helper.objectBrowserNavigateToFolder(objectBrowser, /Images/);
     await helper.objectBrowserSelectItem(objectBrowser, /Test Image 1/);
 
@@ -429,7 +431,8 @@ test.describe('Inline link editing', () => {
       objectBrowser = await helper.waitForObjectBrowser();
     }
 
-    // Select "Another Page"
+    // Navigate to Test Data mount, then select "Another Page"
+    await helper.objectBrowserNavigateToFolder(objectBrowser, /Test Data/);
     await helper.objectBrowserSelectItem(objectBrowser, /Another Page/);
 
     // Verify the link was updated in the iframe

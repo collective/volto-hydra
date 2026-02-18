@@ -1450,11 +1450,31 @@ app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
+  const searchableText = req.query['SearchableText'];
+  const portalType = req.query['portal_type'];
   const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
+  // Handle SearchableText (used by ObjectBrowser search input)
+  if (searchableText) {
+    const searchTerm = searchableText.replace(/\*$/, '').toLowerCase();
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => itemPath !== '/')
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
+      .filter((item) => {
+        const title = (item.title || '').toLowerCase();
+        const description = (item.description || '').toLowerCase();
+        return title.includes(searchTerm) || description.includes(searchTerm);
+      });
+    // Filter by portal_type if specified
+    if (portalType) {
+      const types = Array.isArray(portalType) ? portalType : [portalType];
+      items = items.filter((item) => types.includes(item['@type']));
+    }
+  }
   // Handle path.query with path.depth=0 (exact match for specific content)
+  else
   if (pathQuery && pathDepth === '0') {
     const content = loadContentFromDisk(pathQuery);
     if (content) {
@@ -1463,27 +1483,63 @@ app.get('*/@search', (req, res) => {
       items = [];
     }
   } else if (pathDepth === '1') {
-    // Get immediate children of the search path
-    // For site root (/), return all root-level items
-    // For other paths, return their children (if any)
-    if (searchPath === '' || searchPath === '/') {
-      // Root level - use shared helper
-      items = getRootNavigationItems();
-    } else {
-      // Specific path - return its children
-      // For Documents (non-folderish items), this will be empty
-      const searchContent = loadContentFromDisk(searchPath);
-      if (searchContent && searchContent.is_folderish) {
-        // Return children if folder
+    // Get immediate children of the search path (used by ObjectBrowser)
+    // Unlike navigation, search returns ALL content types (including Images, Files)
+    const normalizedSearch = (searchPath === '' || searchPath === '/') ? '/' : searchPath;
+    const searchDepth = normalizedSearch === '/' ? 0 : normalizedSearch.split('/').filter(Boolean).length;
+
+    // Get direct children from contentDirMap (items at searchDepth + 1)
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => {
+        if (itemPath === '/') return false;
+        if (itemPath === normalizedSearch) return false;
+        // Must be under the search path
+        if (normalizedSearch !== '/' && !itemPath.startsWith(normalizedSearch + '/')) return false;
+        // Must be exactly one level deeper
+        const itemParts = itemPath.split('/').filter(Boolean);
+        return itemParts.length === searchDepth + 1;
+      })
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+
+    // For root searches, also include non-root mount points as virtual folders
+    // so the object browser can navigate into them (e.g., _test_data)
+    if (normalizedSearch === '/') {
+      CONTENT_MOUNTS.forEach(({ mountPath }) => {
+        if (mountPath === '/') return;
+        const mountParts = mountPath.split('/').filter(Boolean);
+        if (mountParts.length !== 1) return; // Only top-level mounts
+        const mountName = mountParts[0];
+        // Skip if already in contentDirMap (has its own data.json)
+        if (contentDirMap[mountPath]) return;
+        items.push({
+          '@id': `${baseUrl}${mountPath}`,
+          '@type': 'Folder',
+          'id': mountName,
+          'title': mountName.replace(/[_-]/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()),
+          'description': '',
+          'review_state': 'published',
+          'UID': `virtual-mount-${mountName}`,
+          'is_folderish': true,
+          'hasPreviewImage': false,
+          'image_field': null,
+          'image_scales': null,
+        });
+      });
+    }
+
+    // For non-root paths not in contentDirMap (e.g. mount points like /_test_data),
+    // check if any content exists under this path and list children
+    if (items.length === 0 && normalizedSearch !== '/' && !contentDirMap[normalizedSearch]) {
+      const hasChildren = Object.keys(contentDirMap).some(p => p.startsWith(normalizedSearch + '/'));
+      if (hasChildren) {
         items = Object.keys(contentDirMap)
           .filter((itemPath) => {
-            if (itemPath === searchPath) return false;
-            return itemPath.startsWith(searchPath + '/');
+            if (itemPath === normalizedSearch) return false;
+            if (!itemPath.startsWith(normalizedSearch + '/')) return false;
+            const itemParts = itemPath.split('/').filter(Boolean);
+            return itemParts.length === searchDepth + 1;
           })
           .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
-      } else {
-        // Non-folder or not found - return empty
-        items = [];
       }
     }
   } else {
