@@ -300,7 +300,10 @@ export class Bridge {
         nextElement = nextElement.nextSibling;
       }
 
-      if (!nextElement) continue;
+      if (!nextElement) {
+        console.error('[hydra] Comment syntax found but no next element sibling:', text);
+        continue;
+      }
 
       // Apply attributes to the element
       this.applyHydraAttributes(nextElement, parsed.attrs);
@@ -337,6 +340,10 @@ export class Bridge {
         const targets = selector
           ? element.querySelectorAll(selector)
           : [element];
+
+        if (selector && targets.length === 0) {
+          console.error(`[hydra] Comment selector "${selector}" for ${name}=${value} matched no elements in`, element.tagName, element.className);
+        }
 
         for (const target of targets) {
           // Don't overwrite existing attributes
@@ -4384,9 +4391,14 @@ export class Bridge {
    * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
    */
   afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
+    // Materialize comments immediately so data-block-uid attributes are available
+    // before any waitFor selectors run. The rAF call below handles late-arriving
+    // async framework content (React Suspense, Vue async components).
+    this.materializeHydraComments();
+
     requestAnimationFrame(() => {
       requestAnimationFrame(async () => {
-        // Visual updates that apply to every render
+        // Re-materialize for any async framework content that arrived after initial call
         this.materializeHydraComments();
         this.markEmptyBlocks();
         this.applyReadonlyVisuals();
