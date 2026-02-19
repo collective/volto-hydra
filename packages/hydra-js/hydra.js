@@ -10804,6 +10804,38 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
 }
 
 /**
+ * Extract the pathname from a template ID, which may be a full URL or a path.
+ * Plone's API resolves resolveuid/UID references to full URLs (e.g.
+ * "http://plone.example.com/templates/foo"), but allowedLayouts may use
+ * relative paths (e.g. "/templates/foo").  This helper normalises both
+ * forms to a plain pathname so comparisons work regardless of format.
+ *
+ * @param {string|null} id - Template ID (URL or path)
+ * @returns {string|null} The pathname portion, or the original value
+ */
+export function templateIdToPath(id) {
+  if (!id || typeof id !== 'string') return id;
+  // Fast path: already a relative path
+  if (!id.startsWith('http://') && !id.startsWith('https://')) return id;
+  try {
+    return new URL(id).pathname;
+  } catch {
+    return id;
+  }
+}
+
+/**
+ * Check whether two template IDs refer to the same template, ignoring
+ * URL-vs-path differences.  E.g. "http://localhost:8888/tpl/foo" matches
+ * "/tpl/foo".
+ */
+function templateIdsMatch(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return templateIdToPath(a) === templateIdToPath(b);
+}
+
+/**
  * Get unique template IDs (paths) from page data.
  *
  * @param {Object} formData - Page data with blocks
@@ -11364,7 +11396,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
   const previousTemplateId = templateId;
 
   if (allowedLayouts?.length > 0) {
-    if (!templateId || !allowedLayouts.includes(templateId)) {
+    // Use path-normalised comparison: block templateId may be a full URL
+    // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
+    if (!templateId || !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
       templateId = allowedLayouts[0];
       if (!filterInstanceId) {
         existingInstanceId = null;
