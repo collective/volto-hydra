@@ -1211,6 +1211,9 @@ export class AdminUIHelper {
    * Uses Playwright polling to handle async selection restoration after formatting.
    */
   async verifySelectionMatches(editor: Locator, expectedText: string): Promise<void> {
+    // 5s timeout: after format operations, selection restoration goes through
+    // double-rAF + waitForContentReady + restoreSlateSelection in hydra.js.
+    // On CI with V8 coverage overhead, this can take 2-3s.
     await expect
       .poll(
         async () => {
@@ -1221,7 +1224,7 @@ export class AdminUIHelper {
         },
         {
           message: `Expected selection to be "${expectedText}"`,
-          timeout: 2000,
+          timeout: 5000,
         }
       )
       .toBe(expectedText);
@@ -1539,9 +1542,7 @@ export class AdminUIHelper {
     format: 'bold' | 'italic',
     options: { timeout?: number } = {},
   ): Promise<void> {
-    // 10s default accounts for the full FLUSH_BUFFER round-trip:
-    // click → FLUSH_BUFFER → BUFFER_FLUSHED → format applied → FORM_DATA → iframe render
-    const timeout = options.timeout ?? 10000;
+    const timeout = options.timeout ?? 5000;
     const selector = this.getFormatSelector(format);
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
 
