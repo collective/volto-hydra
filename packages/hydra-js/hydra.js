@@ -2235,6 +2235,30 @@ export class Bridge {
 
           // Send BLOCK_SELECTED with pageField as "block" - blockUid will be PAGE_BLOCK_UID
           this.sendBlockSelected('pageFieldClick', pageField);
+        } else {
+          // No block, no page-level field — check for navigation link clicks.
+          // In edit mode, the beforeunload handler prevents the iframe from
+          // navigating. Intercept the click and tell the admin to navigate
+          // instead, using PATH_CHANGE (same as SPA navigation detection).
+          const linkEl = event.target.closest('a[href]');
+          if (linkEl) {
+            const href = linkEl.getAttribute('href');
+            // Only handle same-origin navigation links (not external links)
+            try {
+              const linkUrl = new URL(href, window.location.origin);
+              if (linkUrl.origin === window.location.origin) {
+                event.preventDefault();
+                const apiPath = this.pathToApiPath(linkUrl.pathname);
+                log('Nav link click intercepted, sending PATH_CHANGE:', apiPath);
+                this.sendMessageToParent({
+                  type: 'PATH_CHANGE',
+                  path: apiPath,
+                });
+              }
+            } catch (e) {
+              // Invalid URL - let browser handle it
+            }
+          }
         }
       }
     };
@@ -4606,6 +4630,21 @@ export class Bridge {
             log('Selection restore failed — dropping', this.eventBuffer.length, 'buffered events to avoid wrong-selection replay');
             this.eventBuffer = [];
           }
+
+          // After a toolbar format operation, collapse the selection to the
+          // focus end. The format is applied and visible; keeping the range
+          // selected is dangerous because the iframe loses focus during the
+          // toolbar click and when focus returns the stale range persists —
+          // any subsequent typing would replace the formatted text instead of
+          // appending. Collapsing to end gives a safe cursor position.
+          if (formatRequestId && selectionRestored) {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+              log('afterContentRender: collapsing format selection to end');
+              sel.collapseToEnd();
+            }
+          }
+
           // Clear after a brief settling period to catch trailing selectionchanges
           // from DOM attribute updates (contenteditable, nodeIds, etc.)
           setTimeout(() => { this.expectedSelectionFromAdmin = null; }, 100);
@@ -10804,6 +10843,38 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
 }
 
 /**
+ * Extract the pathname from a template ID, which may be a full URL or a path.
+ * Plone's API resolves resolveuid/UID references to full URLs (e.g.
+ * "http://plone.example.com/templates/foo"), but allowedLayouts may use
+ * relative paths (e.g. "/templates/foo").  This helper normalises both
+ * forms to a plain pathname so comparisons work regardless of format.
+ *
+ * @param {string|null} id - Template ID (URL or path)
+ * @returns {string|null} The pathname portion, or the original value
+ */
+export function templateIdToPath(id) {
+  if (!id || typeof id !== 'string') return id;
+  // Fast path: already a relative path
+  if (!id.startsWith('http://') && !id.startsWith('https://')) return id;
+  try {
+    return new URL(id).pathname;
+  } catch {
+    return id;
+  }
+}
+
+/**
+ * Check whether two template IDs refer to the same template, ignoring
+ * URL-vs-path differences.  E.g. "http://localhost:8888/tpl/foo" matches
+ * "/tpl/foo".
+ */
+function templateIdsMatch(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return templateIdToPath(a) === templateIdToPath(b);
+}
+
+/**
  * Get unique template IDs (paths) from page data.
  *
  * @param {Object} formData - Page data with blocks
@@ -11364,7 +11435,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
   const previousTemplateId = templateId;
 
   if (allowedLayouts?.length > 0) {
-    if (!templateId || !allowedLayouts.includes(templateId)) {
+    // Use path-normalised comparison: block templateId may be a full URL
+    // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
+    if (!templateId || !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
       templateId = allowedLayouts[0];
       if (!filterInstanceId) {
         existingInstanceId = null;

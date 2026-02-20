@@ -439,10 +439,16 @@ function getNavigationItems(basePath = '/', depth = 1) {
 }
 
 /**
- * Get root-level navigation items (wrapper for @search endpoint)
+ * Get root-level navigation items.
+ * Merges items from all content mounts so test content (/_test_data/*)
+ * appears alongside docs content in the navigation.
  */
 function getRootNavigationItems() {
-  return getNavigationItems('/', 1);
+  const items = [];
+  for (const { mountPath } of CONTENT_MOUNTS) {
+    items.push(...getNavigationItems(mountPath, 1));
+  }
+  return items;
 }
 
 /**
@@ -1354,10 +1360,22 @@ app.post('*/@querystring-search', (req, res) => {
   const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
   console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
 
-  // Get all content items
+  // Get all content items using raw content (no enrichment needed for search).
+  // loadContentFromDisk enriches every item (resolveuid, image scales, components)
+  // which is extremely slow with 70+ items. Search results only need basic fields.
   let allItems = Object.keys(contentDirMap)
     .filter((itemPath) => itemPath !== '/')
-    .map((itemPath) => loadContentFromDisk(itemPath))
+    .map((itemPath) => {
+      const raw = loadRawContentFromDisk(itemPath);
+      if (!raw) return null;
+      // Add @id and UID like enrichContent would, but skip expensive processing
+      return {
+        ...raw,
+        '@id': `${baseUrl}${itemPath}`,
+        UID: raw.UID || `${raw.id || itemPath.split('/').pop()}-uid`,
+        id: raw.id || itemPath.split('/').pop(),
+      };
+    })
     .filter((content) => content !== null);
 
   // Apply query filters

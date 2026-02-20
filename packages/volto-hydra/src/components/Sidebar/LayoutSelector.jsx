@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
-import { mergeTemplatesIntoPage } from '@volto-hydra/hydra-js';
+import { mergeTemplatesIntoPage, templateIdToPath } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 const messages = defineMessages({
@@ -66,8 +66,11 @@ const detectCurrentLayout = (formData, allowedLayouts) => {
   if (!allowedLayouts?.length) return '';
   const blocks = formData?.blocks || {};
   for (const block of Object.values(blocks)) {
-    if (block.templateId && allowedLayouts.includes(block.templateId)) {
-      return block.templateId;
+    if (block.templateId) {
+      // Normalise to pathname so full-URL templateIds match path-based allowedLayouts
+      const blockPath = templateIdToPath(block.templateId);
+      const match = allowedLayouts.find(l => l !== null && templateIdToPath(l) === blockPath);
+      if (match) return match;
     }
   }
   return '';
