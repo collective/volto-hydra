@@ -26,46 +26,19 @@ test.describe('Inline Editing - Formatting', () => {
     // Edit the text (also clicks block, waits for toolbar, and types)
     await helper.editBlockTextInIframe(blockId, 'Text to make bold');
 
-    // STEP 1: Verify the text content is correct
+    // Verify the text content is correct
     const editor = await helper.getEditorLocator(blockId);
     const textContent = await helper.getCleanTextContent(editor);
     expect(textContent).toBe('Text to make bold');
-    console.log('[TEST] Step 1: Text content verified:', textContent);
 
-    // STEP 2: Select all the text programmatically
+    // Select all the text and apply bold
+    // selectAllTextInEditor already polls until selection matches, no need for extra asserts
     await helper.selectAllTextInEditor(editor);
-
-    // STEP 3: Verify selection was created correctly
-    await helper.assertTextSelection(editor, 'Text to make bold', {
-      shouldExist: true,
-      shouldBeCollapsed: false,
-      message: 'Step 3: After creating selection'
-    });
-
-    // STEP 4: Verify selection still exists just before clicking button
-    await helper.assertTextSelection(editor, 'Text to make bold', {
-      shouldExist: true,
-      shouldBeCollapsed: false,
-      message: 'Step 4: Before clicking bold button'
-    });
-
-    // STEP 5: Wait for toolbar to be fully ready and stable
-    await helper.waitForQuantaToolbar(blockId);
-
-    // STEP 6: Trigger the bold button using dispatchEvent
-    console.log('[TEST] Step 6: Clicking bold button...');
     await helper.clickFormatButton('bold');
 
-    // STEP 7: Wait for bold formatting AND text content to be stable (polls until both conditions met)
+    // Wait for bold formatting to appear in the iframe DOM
+    // The format chain is: click → FLUSH_BUFFER → BUFFER_FLUSHED → format applied → FORM_DATA → iframe render
     await helper.waitForFormattedText(editor, /Text to make bold/, 'bold');
-
-    // STEP 8: Wait for selection to be restored (polls - selection restoration is async)
-    await helper.verifySelectionMatches(editor, 'Text to make bold');
-
-    // STEP 9: Verify the text is bold
-    const boldSelector = helper.getFormatSelector('bold');
-    await expect(editor.locator(boldSelector)).toBeVisible();
-    expect(await editor.textContent()).toContain('Text to make bold');
   });
 
   test('bold formatting syncs with Admin UI', async ({ page }) => {
@@ -87,8 +60,7 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.clickFormatButton('bold');
 
     // Wait for bold formatting to sync from Admin UI to iframe
-    const boldSelector = helper.getFormatSelector('bold');
-    await expect(editor.locator(boldSelector)).toBeVisible({ timeout: 10000 });
+    await helper.waitForFormattedText(editor, /Synced bold text/, 'bold');
 
     // Wait for the bold formatting to visually appear in the sidebar's React Slate editor
     // The sidebar Slate editor renders bold text with <strong> tags

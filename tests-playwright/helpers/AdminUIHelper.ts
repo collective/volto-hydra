@@ -1211,6 +1211,9 @@ export class AdminUIHelper {
    * Uses Playwright polling to handle async selection restoration after formatting.
    */
   async verifySelectionMatches(editor: Locator, expectedText: string): Promise<void> {
+    // 5s timeout: after format operations, selection restoration goes through
+    // double-rAF + waitForContentReady + restoreSlateSelection in hydra.js.
+    // On CI with V8 coverage overhead, this can take 2-3s.
     await expect
       .poll(
         async () => {
@@ -1221,7 +1224,7 @@ export class AdminUIHelper {
         },
         {
           message: `Expected selection to be "${expectedText}"`,
-          timeout: 2000,
+          timeout: 5000,
         }
       )
       .toBe(expectedText);
@@ -1710,8 +1713,9 @@ export class AdminUIHelper {
     // Perform the action
     await action();
 
-    // Wait a bit more after action completes to catch any delayed updates
-    await new Promise((r) => setTimeout(r, 100));
+    // Wait after action to catch delayed updates (carousel transitions use 100ms
+    // setTimeout + animation time, so 300ms covers the full transition on CI)
+    await new Promise((r) => setTimeout(r, 300));
 
     // Stop monitoring
     monitoring = false;
@@ -4095,10 +4099,11 @@ export class AdminUIHelper {
     const input = this.page.locator('.add-link input, .slate-inline-toolbar input, input[placeholder*="link" i]').first();
 
     // Wait for input to be visible
-    await input.waitFor({ state: 'visible', timeout: 2000 });
+    await input.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Wait for the input to actually be focused (componentDidMount completed successfully)
-    await expect(input).toBeFocused({ timeout: 2000 });
+    // Wait for the input to actually be focused (componentDidMount uses 50ms setTimeout;
+    // on CI, other async operations may delay focus further)
+    await expect(input).toBeFocused({ timeout: 5000 });
 
     return input;
   }

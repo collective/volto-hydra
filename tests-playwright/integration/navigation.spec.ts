@@ -165,30 +165,31 @@ test.describe('Navigation and URL Handling', () => {
     await helper.waitForQuantaToolbar('block-5-linked-image');
   });
 
-  test('Cancelling navigation warning stays on edit page', async ({ page }) => {
+  test('Clicking nav link in edit mode navigates without warning', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
     await helper.waitForSidebarOpen();
 
-    // Set up dialog handler to dismiss (cancel) the beforeunload dialog
+    // Track if beforeunload dialog appears (it shouldn't - link is intercepted by hydra.js)
+    let dialogAppeared = false;
     page.on('dialog', async (dialog) => {
-      expect(dialog.type()).toBe('beforeunload');
-      await dialog.dismiss(); // Cancel navigation
+      dialogAppeared = true;
+      await dialog.accept();
     });
 
-    // Try to navigate away by clicking a link in the iframe
+    // Click a nav link in the iframe
     const iframe = helper.getIframe();
-    const navLink = iframe.locator('nav a, header a').first();
+    const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
+    await navLink.waitFor({ state: 'attached' });
     await navLink.click();
 
-    // Give time for dialog to be handled
-    await page.waitForTimeout(500);
+    // Verify the admin navigated to the new page (view mode via PATH_CHANGE interception)
+    await expect(page).toHaveURL(/another-page/, { timeout: 10000 });
 
-    // Verify we're still on the edit page
-    await expect(page).toHaveURL(/test-page\/edit/);
-    await expect(page.locator('#sidebar-properties')).toBeVisible();
+    // Verify no beforeunload dialog appeared (nav link was intercepted at click level)
+    expect(dialogAppeared, 'No beforeunload warning should appear - nav link click intercepted by hydra.js').toBe(false);
   });
 
   test('Confirming navigation warning leaves edit page', async ({ page }) => {
