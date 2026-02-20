@@ -2241,9 +2241,10 @@ export class Bridge {
           // navigating. Intercept the click and tell the admin to navigate
           // instead, using PATH_CHANGE (same as SPA navigation detection).
           const linkEl = event.target.closest('a[href]');
-          if (linkEl) {
+          if (linkEl && !allowedElement) {
             const href = linkEl.getAttribute('href');
             // Only handle same-origin navigation links (not external links)
+            // Links with data-linkable-allow (e.g., paging buttons) are skipped
             try {
               const linkUrl = new URL(href, window.location.origin);
               if (linkUrl.origin === window.location.origin) {
