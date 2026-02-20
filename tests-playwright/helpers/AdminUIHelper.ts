@@ -1539,7 +1539,9 @@ export class AdminUIHelper {
     format: 'bold' | 'italic',
     options: { timeout?: number } = {},
   ): Promise<void> {
-    const timeout = options.timeout ?? 5000;
+    // 10s default accounts for the full FLUSH_BUFFER round-trip:
+    // click → FLUSH_BUFFER → BUFFER_FLUSHED → format applied → FORM_DATA → iframe render
+    const timeout = options.timeout ?? 10000;
     const selector = this.getFormatSelector(format);
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
 
@@ -1710,8 +1712,9 @@ export class AdminUIHelper {
     // Perform the action
     await action();
 
-    // Wait a bit more after action completes to catch any delayed updates
-    await new Promise((r) => setTimeout(r, 100));
+    // Wait after action to catch delayed updates (carousel transitions use 100ms
+    // setTimeout + animation time, so 300ms covers the full transition on CI)
+    await new Promise((r) => setTimeout(r, 300));
 
     // Stop monitoring
     monitoring = false;
@@ -4095,10 +4098,11 @@ export class AdminUIHelper {
     const input = this.page.locator('.add-link input, .slate-inline-toolbar input, input[placeholder*="link" i]').first();
 
     // Wait for input to be visible
-    await input.waitFor({ state: 'visible', timeout: 2000 });
+    await input.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Wait for the input to actually be focused (componentDidMount completed successfully)
-    await expect(input).toBeFocused({ timeout: 2000 });
+    // Wait for the input to actually be focused (componentDidMount uses 50ms setTimeout;
+    // on CI, other async operations may delay focus further)
+    await expect(input).toBeFocused({ timeout: 5000 });
 
     return input;
   }
