@@ -439,10 +439,16 @@ function getNavigationItems(basePath = '/', depth = 1) {
 }
 
 /**
- * Get root-level navigation items (wrapper for @search endpoint)
+ * Get root-level navigation items.
+ * Merges items from all content mounts so test content (/_test_data/*)
+ * appears alongside docs content in the navigation.
  */
 function getRootNavigationItems() {
-  return getNavigationItems('/', 1);
+  const items = [];
+  for (const { mountPath } of CONTENT_MOUNTS) {
+    items.push(...getNavigationItems(mountPath, 1));
+  }
+  return items;
 }
 
 /**
