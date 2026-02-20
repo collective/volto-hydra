@@ -4631,20 +4631,6 @@ export class Bridge {
             this.eventBuffer = [];
           }
 
-          // After a toolbar format operation, collapse the selection to the
-          // focus end. The format is applied and visible; keeping the range
-          // selected is dangerous because the iframe loses focus during the
-          // toolbar click and when focus returns the stale range persists —
-          // any subsequent typing would replace the formatted text instead of
-          // appending. Collapsing to end gives a safe cursor position.
-          if (formatRequestId && selectionRestored) {
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
-              log('afterContentRender: collapsing format selection to end');
-              sel.collapseToEnd();
-            }
-          }
-
           // Clear after a brief settling period to catch trailing selectionchanges
           // from DOM attribute updates (contenteditable, nodeIds, etc.)
           setTimeout(() => { this.expectedSelectionFromAdmin = null; }, 100);
