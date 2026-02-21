@@ -2235,30 +2235,6 @@ export class Bridge {
 
           // Send BLOCK_SELECTED with pageField as "block" - blockUid will be PAGE_BLOCK_UID
           this.sendBlockSelected('pageFieldClick', pageField);
-        } else {
-          // No block, no page-level field — check for navigation link clicks.
-          // In edit mode, the beforeunload handler prevents the iframe from
-          // navigating. Intercept the click and tell the admin to navigate
-          // instead, using PATH_CHANGE (same as SPA navigation detection).
-          const linkEl = event.target.closest('a[href]');
-          if (linkEl && !allowedElement) {
-            const href = linkEl.getAttribute('href');
-            // Only handle same-origin navigation links (not external links)
-            try {
-              const linkUrl = new URL(href, window.location.origin);
-              if (linkUrl.origin === window.location.origin) {
-                event.preventDefault();
-                const apiPath = this.pathToApiPath(linkUrl.pathname);
-                log('Nav link click intercepted, sending PATH_CHANGE:', apiPath);
-                this.sendMessageToParent({
-                  type: 'PATH_CHANGE',
-                  path: apiPath,
-                });
-              }
-            } catch (e) {
-              // Invalid URL - let browser handle it
-            }
-          }
         }
       }
     };
