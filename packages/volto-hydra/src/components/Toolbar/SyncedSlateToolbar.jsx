@@ -341,6 +341,11 @@ const SyncedSlateToolbar = ({
   const processedTransformRequestIdRef = useRef(null);
   // Track LinkEditor visibility across effect restarts (persists when dependencies change)
   const linkEditorWasVisibleRef = useRef(false);
+  // Refs for stable access inside the polling useEffect (avoids volatile deps that restart the interval)
+  const currentSelectionRef = useRef(currentSelection);
+  currentSelectionRef.current = currentSelection;
+  const onChangeFormDataRef = useRef(onChangeFormData);
+  onChangeFormDataRef.current = onChangeFormData;
 
   // ── Toolbar auto-fade on inactivity ──────────────────────────────────
   // Toolbar starts hidden on each block selection. Only mouse activity or
@@ -423,7 +428,9 @@ const SyncedSlateToolbar = ({
         // happens automatically: the FORM_DATA useEffect focuses the iframe
         // element after React render, and afterContentRender restores the
         // field selection inside the iframe.
-        onChangeFormData(null, currentSelection, activeFormatRequestIdRef.current);
+        // Use refs for stable access — this interval must not restart on every
+        // selection/form change or it can miss the popup's entire lifecycle.
+        onChangeFormDataRef.current(null, currentSelectionRef.current, activeFormatRequestIdRef.current);
         activeFormatRequestIdRef.current = null;
       }
       // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
@@ -433,7 +440,8 @@ const SyncedSlateToolbar = ({
 
     const intervalId = setInterval(checkVisibility, 100);
     return () => clearInterval(intervalId);
-  }, [form, currentSelection, onChangeFormData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Stable interval — uses refs for currentSelection and onChangeFormData
 
   // Helper function for applying inline format with prospective formatting support
   // Used by both hotkey transforms and toolbar button clicks

@@ -167,6 +167,9 @@ export class Bridge {
     this.prospectiveInlineElement = null;
     // Path transformer for frontends that embed state in URL (e.g., paging)
     this.pathToApiPath = options.pathToApiPath || ((path) => path);
+    // True after INITIAL_DATA is received — block selection is deferred until then
+    this.initialized = false;
+    this._pendingSelectBlock = null;
     // Readonly registry - blocks marked readonly won't have fields collected
     // Set by expandListingBlocks() or frontend code, not persisted to backend
     this._readonlyBlocks = new Set();
@@ -632,8 +635,8 @@ export class Bridge {
       if (current.hasAttribute('data-block-uid')) {
         const blockRect = current.getBoundingClientRect();
         if (blockRect.width > 0 && blockRect.height > 0) {
-          console.log(
-            `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+          log(
+            `data-media-field="${fieldName}" has zero dimensions. ` +
             `Using block element's dimensions (${blockRect.width}x${blockRect.height}).`
           );
           return { top: blockRect.top, left: blockRect.left, width: blockRect.width, height: blockRect.height };
@@ -645,8 +648,8 @@ export class Bridge {
       const parentRect = current.getBoundingClientRect();
 
       if (parentRect.width > 0 && parentRect.height > 0) {
-        console.log(
-          `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+        log(
+          `data-media-field="${fieldName}" has zero dimensions. ` +
           `Using parent's dimensions (${parentRect.width}x${parentRect.height}).`
         );
         return { top: parentRect.top, left: parentRect.left, width: parentRect.width, height: parentRect.height };
@@ -1734,6 +1737,9 @@ export class Bridge {
               // cannot call contentWindow.focus() on a cross-origin iframe.
               window.focus();
 
+              // Mark bridge as initialized — block selection is now allowed
+              this.initialized = true;
+
               // Restore block selection if provided (e.g., after adding a new block)
               if (e.data.selectedBlockUid) {
                 const blockUidToSelect = e.data.selectedBlockUid;
@@ -1954,6 +1960,7 @@ export class Bridge {
               formatRequestId,
               needsBlockSwitch,
               adminSelectedBlockUid,
+              skipRender: !!event.data.skipRender,
             });
           } else {
             throw new Error('No form data has been sent from the adminUI');
@@ -1964,30 +1971,16 @@ export class Bridge {
           const requestId = event.data.requestId;
           log('Received FLUSH_BUFFER request, requestId:', requestId, 'savedSelection:', this.savedSelection);
 
-          // Block input during format operation - will be unblocked when FORM_DATA arrives
-          // This prevents any text changes from being sent while format is being applied
-          // Block input and track requestId for matching with FORM_DATA
-          if (this.selectedBlockUid) {
-            this.setBlockProcessing(this.selectedBlockUid, true, requestId);
+          // If a render is in progress, defer FLUSH_BUFFER until afterContentRender
+          // completes. During render, DOM nodes may be detached (nodeIds stripped),
+          // and serializeSelection() would fail. Process it once the DOM is stable.
+          if (this._renderInProgress) {
+            log('FLUSH_BUFFER: render in progress, queuing');
+            this._flushBufferQueue = event.data;
+            return;
           }
 
-          // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
-          const hadPendingText = this.flushPendingTextUpdates(requestId);
-
-          if (hadPendingText) {
-            // requestId was included in INLINE_EDIT_DATA, parent will handle coordination
-            log('Flushed pending text with requestId, waiting for Redux sync');
-          } else {
-            // No pending text - send BUFFER_FLUSHED immediately (safe to proceed)
-            // Include current selection so toolbar has it when applying format
-            const selection = this.serializeSelection();
-            log('No pending text, sending BUFFER_FLUSHED with selection:', selection);
-            this.sendMessageToParent({
-              type: 'BUFFER_FLUSHED',
-              requestId: requestId,
-              selection: selection,
-            });
-          }
+          this._processFlushBuffer(requestId);
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
@@ -2129,6 +2122,30 @@ export class Bridge {
 
       // Stop propagation for block clicks (but not selector clicks above)
       event.stopPropagation();
+
+      // Defer block selection until INITIAL_DATA is received and render completes.
+      // Save the click point and poll until init + render are done, then resolve
+      // the block via elementFromPoint (DOM may re-render during init).
+      if (!this.initialized) {
+        log('blockClickHandler: deferred — INITIAL_DATA not yet received');
+        const x = event.clientX;
+        const y = event.clientY;
+        const bridge = this;
+        const waitForInit = () => {
+          if (bridge.initialized && !bridge._renderInProgress) {
+            const el = document.elementFromPoint(x, y);
+            const blockEl = el?.closest('[data-block-uid]');
+            if (blockEl) {
+              log('Processing deferred block click, uid:', blockEl.getAttribute('data-block-uid'));
+              bridge.selectBlock(blockEl);
+            }
+          } else {
+            setTimeout(waitForInit, 50);
+          }
+        };
+        setTimeout(waitForInit, 50);
+        return;
+      }
 
       // Skip block selection during carousel/selector navigation
       // (a click on the carousel button can also trigger blockClickHandler for the old slide)
@@ -4651,7 +4668,15 @@ export class Bridge {
           log('Processing queued FORM_DATA after render complete');
           // Re-dispatch as a message event so it goes through the full
           // FORM_DATA handler (stale check, addNodeIds, etc.)
+          // Any queued FLUSH_BUFFER will be processed after this render completes.
           window.postMessage(queued, window.location.origin);
+        } else if (this._flushBufferQueue) {
+          // Process queued FLUSH_BUFFER after render complete and FORM_DATA processed.
+          // Now the DOM is stable with nodeIds, so serializeSelection() will work.
+          const queuedFlush = this._flushBufferQueue;
+          this._flushBufferQueue = null;
+          log('Processing queued FLUSH_BUFFER after render complete');
+          this._processFlushBuffer(queuedFlush.requestId);
         }
 
         // Re-attach text change observer LAST, after all DOM operations
@@ -7463,7 +7488,7 @@ export class Bridge {
       // mutation before proceeding with selection restore and buffer replay.
       const blockId = this.selectedBlockUid;
       const blockEl = blockId && document.querySelector(`[data-block-uid="${blockId}"]`);
-      if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
+      if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
         this._waitForDomMutation(blockEl, afterRender);
       } else {
         afterRender();
@@ -8867,6 +8892,9 @@ export class Bridge {
    * @param {string} [from] - Source of the update for debugging
    */
   bufferUpdate(from = 'unknown') {
+    if (!this.formData) {
+      return;
+    }
     // Always capture BOTH current data and current selection together
     const data = this.getFormDataWithoutNodeIds();
     const currentSeq = this.formData?._editSequence || 0;
@@ -8925,6 +8953,34 @@ export class Bridge {
   /**
    * Flush any pending batched text updates immediately
    * Call this before any operation that needs current state (format, cut, paste, undo, etc.)
+   * Process a FLUSH_BUFFER request. Extracted so it can be called immediately
+   * or deferred until afterContentRender when a render is in progress.
+   * @param {string} requestId - The FLUSH_BUFFER requestId
+   */
+  _processFlushBuffer(requestId) {
+    // Block input during format operation - will be unblocked when FORM_DATA arrives
+    if (this.selectedBlockUid) {
+      this.setBlockProcessing(this.selectedBlockUid, true, requestId);
+    }
+
+    // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
+    const hadPendingText = this.flushPendingTextUpdates(requestId);
+
+    if (hadPendingText) {
+      log('Flushed pending text with requestId, waiting for Redux sync');
+    } else {
+      // No pending text - send BUFFER_FLUSHED immediately
+      const selection = this.serializeSelection();
+      log('No pending text, sending BUFFER_FLUSHED with selection:', selection);
+      this.sendMessageToParent({
+        type: 'BUFFER_FLUSHED',
+        requestId: requestId,
+        selection: selection,
+      });
+    }
+  }
+
+  /**
    * @param {string} [flushRequestId] - Optional requestId to include with the update (for FLUSH_BUFFER coordination)
    * @returns {boolean} - True if there was pending text to flush, false otherwise
    */
@@ -10202,7 +10258,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
           itemDefaults[fieldName] = value;
         }
       }
-      console.log('[HYDRA] expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
+      log('expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
 
       // Convert each query result to a block of itemType
       // All expanded items share the same @uid (the listing block's ID)
@@ -11206,11 +11262,9 @@ export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
     return ids;
   }
 
-  // Collect initial template IDs from data + allowedLayouts
+  // Collect template IDs actually referenced in the page data.
+  // allowedLayouts are just options the user can pick later — don't eagerly load them all.
   let pending = collectTemplateIds(data);
-  for (const layoutId of allowedLayouts) {
-    if (layoutId) pending.add(layoutId);
-  }
 
   // Keep loading until no new templates found
   while (pending.size > 0) {
@@ -11220,11 +11274,18 @@ export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
 
     if (toLoad.length === 0) break;
 
-    // Load in parallel
+    // Load in parallel with a per-template timeout so a hanging request
+    // doesn't block INITIAL_DATA indefinitely.
+    const TEMPLATE_LOAD_TIMEOUT = 5000;
     const results = await Promise.all(
       toLoad.map(async (id) => {
         try {
-          const template = await loadTemplate(id);
+          const template = await Promise.race([
+            loadTemplate(id),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`Template load timed out after ${TEMPLATE_LOAD_TIMEOUT}ms`)), TEMPLATE_LOAD_TIMEOUT)
+            ),
+          ]);
           return { id, template };
         } catch (error) {
           console.warn(`[HYDRA] Failed to load template ${id}:`, error);
@@ -11271,7 +11332,6 @@ export async function expandTemplates(inputItems, options = {}) {
   const {
     blocks: blocksDict,
     loadTemplate,
-    allowedLayouts = [],
   } = options;
 
   // Build data object for loadTemplates to scan
@@ -11279,20 +11339,43 @@ export async function expandTemplates(inputItems, options = {}) {
     ? { blocks: blocksDict, blocks_layout: { items: inputItems } }
     : { items: inputItems };
 
-  // Load all templates (including nested) using existing helper
-  const templates = await loadTemplates(data, loadTemplate, allowedLayouts || []);
+  // Load templates referenced in the page data
+  const templates = await loadTemplates(data, loadTemplate);
 
-  // Delegate to sync version with loaded templates
-  return expandTemplatesSync(inputItems, {
-    ...options,
-    templates,
-  });
+  // Delegate to sync version with loaded templates.
+  // expandTemplatesSync will load missing templates on demand via loadTemplate
+  // (e.g. forced layouts from allowedLayouts not referenced in page data).
+  // Since loadTemplate is async, we retry when expandTemplatesSync reports
+  // a missing template so we can await the load.
+  const loaded = new Set(Object.keys(templates));
+  while (true) {
+    try {
+      return expandTemplatesSync(inputItems, {
+        ...options,
+        templates,
+      });
+    } catch (e) {
+      const match = e.message?.match(/^Template "(.+)" not found/);
+      if (match && loadTemplate && !loaded.has(match[1])) {
+        const missingId = match[1];
+        loaded.add(missingId);
+        try {
+          templates[missingId] = await loadTemplate(missingId);
+          continue;
+        } catch {
+          // loadTemplate failed — fall through to rethrow
+        }
+      }
+      throw e;
+    }
+  }
 }
 
 /**
  * Synchronous version of expandTemplates.
  * Requires all templates to be pre-loaded in options.templates.
- * Throws if a required template is not found in the pre-loaded map.
+ * Falls back to options.loadTemplate (sync) if a required template is not in the
+ * pre-loaded map. Throws if the template still can't be found.
  *
  * This function is called recursively: the top-level BlocksRenderer calls it for
  * the page layout, and the expanded result may contain container blocks (columns,
@@ -11319,6 +11402,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     allowedLayouts,
     uuidGenerator,
     filterInstanceId,
+    loadTemplate,
   } = options;
 
   if (!templates) {
@@ -11536,9 +11620,19 @@ export function expandTemplatesSync(inputItems, options = {}) {
     }
   }
 
-  // Load template from pre-loaded map (sync - throw if not found)
+  // Load template from pre-loaded map, falling back to sync loadTemplate callback.
+  // Async callers should use expandTemplates() which retries on missing templates.
   if (!ctx.template) {
-    const template = templates[templateId];
+    let template = templates[templateId];
+    if (!template && loadTemplate) {
+      const result = loadTemplate(templateId);
+      // Only use sync results — async loadTemplate returns a Promise which
+      // expandTemplates() handles via its retry loop.
+      if (result && typeof result.then !== 'function') {
+        template = result;
+        templates[templateId] = template;
+      }
+    }
     if (!template) {
       throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
     }

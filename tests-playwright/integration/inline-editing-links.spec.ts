@@ -322,13 +322,15 @@ test.describe('Inline Editing - Links', () => {
           const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement | null;
           const iframeActive = iframeEl?.contentDocument?.activeElement;
           return {
+            runId: (window as any).__testRunId,
             topActive: active?.tagName + (active?.id ? '#' + active.id : ''),
             topIsFocused: document.hasFocus(),
             iframeActive: iframeActive?.tagName + (iframeActive?.className ? '.' + iframeActive.className.split(' ')[0] : ''),
             iframeContentEditable: iframeActive?.getAttribute('contenteditable'),
           };
         });
-        console.log('[link-cancel] focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
+        const prefix = debugInfo.runId != null ? `[link-cancel][RUN-${debugInfo.runId}]` : '[link-cancel]';
+        console.log(prefix, 'focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
       }
       expect(selectionInfo.editorHasFocus).toBe(true);
       expect(selectionInfo.isCollapsed).toBe(false);
