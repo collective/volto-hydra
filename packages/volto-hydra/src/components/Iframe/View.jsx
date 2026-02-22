@@ -2255,7 +2255,7 @@ const Iframe = (props) => {
             effectivePageBlocksFields.map(field => [
               field.fieldName,
               {
-                type: 'blocks',
+                widget: 'blocksid_list',
                 allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
                 allowedTemplates: field.allowedTemplates || null, // Template URLs for BlockChooser
                 allowedLayouts: field.allowedLayouts || null, // Template URLs for LayoutSelector dropdown
@@ -2866,13 +2866,18 @@ const Iframe = (props) => {
 
         // First check schema-defined container fields (e.g., columns, accordion)
         for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
-          if (fieldDef.type === 'blocks') {
+          if (fieldDef.widget === 'blocksid_list') {
             const layoutField = `${fieldName}_layout`;
             if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
               allowed = fieldDef.allowedBlocks || null;
               allowedTemplates = fieldDef.allowedTemplates || null;
               break;
             }
+          } else if (fieldDef.widget === 'object_list' && fieldDef.allowedBlocks) {
+            // Typed object_list with allowedBlocks
+            allowed = fieldDef.allowedBlocks;
+            allowedTemplates = fieldDef.allowedTemplates || null;
+            break;
           }
         }
 

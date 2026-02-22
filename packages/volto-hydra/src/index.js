@@ -56,7 +56,7 @@ const applyConfig = (config) => {
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
 
   // Hide container block fields - ChildBlocksWidget handles their UI
-  config.widgets.type.blocks = HiddenBlocksWidget;
+  config.widgets.widget.blocksid_list = HiddenBlocksWidget;
 
   // Hide object_list fields - items are edited via iframe selection
   config.widgets.widget.object_list = HiddenObjectListWidget;
@@ -363,7 +363,7 @@ const applyConfig = (config) => {
       if (schema.properties && !schema.properties.listing) {
         schema.properties.listing = {
           title: 'Results Listing',
-          type: 'blocks', // Required for blockPathMap traversal
+          widget: 'blocksid_list', // Required for blockPathMap traversal
           description: 'Listing block to render search results',
           allowedBlocks: ['listing', 'defaultItem', 'summaryItem', 'teaser', 'image'],
           maxLength: 1,

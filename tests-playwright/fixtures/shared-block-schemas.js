@@ -89,13 +89,13 @@ export const sharedBlocksConfig = {
                 },
                 top_images: {
                     title: 'Top Images',
-                    type: 'blocks',
+                    widget: 'blocksid_list',
                     allowedBlocks: ['image'],
                     defaultBlockType: 'image',
                 },
                 columns: {
                     title: 'Columns',
-                    type: 'blocks',
+                    widget: 'blocksid_list',
                     allowedBlocks: ['column'],
                     // No defaultBlockType - tests single allowedBlock path
                     maxLength: 4,
@@ -125,7 +125,7 @@ export const sharedBlocksConfig = {
                 },
                 blocks: {
                     title: 'Content',
-                    type: 'blocks',
+                    widget: 'blocksid_list',
                     allowedBlocks: ['slate', 'image'],
                     defaultBlockType: 'slate',
                 },
@@ -229,13 +229,13 @@ export const sharedBlocksConfig = {
             properties: {
                 header: {
                     title: 'Header',
-                    type: 'blocks',
+                    widget: 'blocksid_list',
                     allowedBlocks: ['slate'],
                     defaultBlockType: 'slate',
                 },
                 content: {
                     title: 'Content',
-                    type: 'blocks',
+                    widget: 'blocksid_list',
                     allowedBlocks: ['slate', 'image'],
                     defaultBlockType: 'slate',
                 },
