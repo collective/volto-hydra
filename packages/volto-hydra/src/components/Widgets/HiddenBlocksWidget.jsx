@@ -1,7 +1,7 @@
 /**
  * HiddenBlocksWidget - A widget that hides container block fields in sidebar
  *
- * Container fields (type: 'blocks') store nested blocks, but their editing UI
+ * Container fields (widget: 'blocksid_list') store nested blocks, but their editing UI
  * is provided by ChildBlocksWidget. This widget prevents the raw object from
  * showing as "[object Object]" in the sidebar.
  */
