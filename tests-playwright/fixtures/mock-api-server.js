@@ -444,11 +444,10 @@ function getNavigationItems(basePath = '/', depth = 1) {
  * appears alongside docs content in the navigation.
  */
 function getRootNavigationItems() {
-  const items = [];
-  for (const { mountPath } of CONTENT_MOUNTS) {
-    items.push(...getNavigationItems(mountPath, 1));
-  }
-  return items;
+  // Non-root mounts with a root data.json (e.g., /_test_data) appear as
+  // content items at depth 1 under '/', so getNavigationItems('/') finds
+  // them naturally as dropdown folders with their children.
+  return getNavigationItems('/', 1);
 }
 
 /**
@@ -690,6 +689,15 @@ function getSiteRoot() {
 // Scan content directories on startup (content loaded on-demand)
 function initContentDirMap() {
   CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
+    // Register the mount point itself if it has a root data.json (e.g., /_test_data folder page).
+    // The '/' mount is handled via plone_site_root inside scanContentDir.
+    if (mountPath !== '/') {
+      const rootDataPath = path.join(dirPath, 'data.json');
+      if (fs.existsSync(rootDataPath)) {
+        contentDirMap[mountPath] = { dirPath, dirName: path.basename(dirPath) };
+        console.log(`Registered content: ${mountPath}`);
+      }
+    }
     scanContentDir(dirPath, mountPath);
   });
   console.log(`Registered ${Object.keys(contentDirMap).length} content paths`);

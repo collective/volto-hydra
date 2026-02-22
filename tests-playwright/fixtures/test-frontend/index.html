@@ -290,9 +290,20 @@
                 const navElement = document.getElementById('navigation');
                 tfLog('Navigation items from API:', navItems.length, navItems.map(i => i.title));
                 if (navItems.length > 0) {
-                    navElement.innerHTML = navItems.map(item =>
-                        `<a href="${new URL(item['@id']).pathname}">${item.title}</a>`
-                    ).join('');
+                    // Show top-level items; only expand children for the current folder
+                    const currentPath = contentPath.replace(/\/$/, '');
+                    navElement.innerHTML = navItems.map(item => {
+                        const path = new URL(item['@id']).pathname;
+                        const children = item.items || [];
+                        const isCurrent = currentPath === path || currentPath.startsWith(path + '/');
+                        if (children.length > 0 && isCurrent) {
+                            const childLinks = children.map(child =>
+                                `<a href="${new URL(child['@id']).pathname}">${child.title}</a>`
+                            ).join('');
+                            return `<a href="${path}">${item.title}</a> ${childLinks}`;
+                        }
+                        return `<a href="${path}">${item.title}</a>`;
+                    }).join('');
                     tfLog('Navigation rendered, innerHTML length:', navElement.innerHTML.length);
                 } else {
                     tfLog('WARNING: No navigation items to render!');

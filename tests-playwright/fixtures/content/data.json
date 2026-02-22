@@ -1,0 +1,7 @@
+{
+  "@type": "Document",
+  "id": "_test_data",
+  "title": "Test Data",
+  "description": "Test content for automated tests",
+  "is_folderish": true
+}

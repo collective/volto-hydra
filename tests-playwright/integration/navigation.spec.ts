@@ -95,15 +95,15 @@ test.describe('Navigation and URL Handling', () => {
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible();
 
-    // The nav menu may be collapsed on mobile - click hamburger if needed
-    const hamburger = iframe.locator('[data-collapse-toggle="mega-menu"]');
-    if (await hamburger.isVisible()) {
-      await hamburger.click();
-    }
+    // Click "Test Data" in the nav to open the mega menu / show children
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
 
-    // Find and click a navigation link (wait for it since nav loads async)
-    const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
-    await navLink.waitFor({ state: 'attached' });
+    // Click "Another Page" under Test Data (filter by href to avoid matching
+    // a different "Another Page" in another section like Content Types)
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Another Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Verify the admin URL changed to reflect the new page (view mode)
@@ -178,9 +178,14 @@ test.describe('Navigation and URL Handling', () => {
       await dialog.dismiss(); // Cancel navigation
     });
 
-    // Try to navigate away by clicking a link in the iframe
+    // Try to navigate away by clicking a nav link in the iframe
+    // First open the Test Data mega menu, then click a child link to trigger real navigation
     const iframe = helper.getIframe();
-    const navLink = iframe.locator('nav a, header a').first();
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Give time for dialog to be handled
@@ -209,9 +214,12 @@ test.describe('Navigation and URL Handling', () => {
       }
     });
 
-    // Click a nav link to navigate away (wait for it since nav loads async)
-    const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
-    await navLink.waitFor({ state: 'attached' });
+    // Open Test Data mega menu, then click a child link to navigate away
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Wait for navigation to complete - expect to be on the new page in view mode
@@ -235,12 +243,14 @@ test.describe('Navigation and URL Handling', () => {
     // Check that navigation items are visible in the iframe
     const iframe = helper.getIframe();
     // The mock frontend displays navigation from API's @components.navigation.items
-    const navItems = iframe.locator('nav a, header a, .navigation a');
+    // Nuxt mega menu uses buttons for top-level items, mock uses <a> links
+    const navItems = iframe.locator('nav a, nav button, header a, .navigation a');
     await expect(navItems.first()).toBeVisible({ timeout: 10000 });
 
-    // Verify at least one known nav item exists (from mock fixtures)
-    const testPageLink = iframe.locator('a[href*="test-page"], a:has-text("Test Page")');
-    await expect(testPageLink.first()).toBeVisible({ timeout: 5000 });
+    // Verify top-level nav items exist (Test Data is a top-level mount)
+    // Top-level items may be <a> (mock) or <button> (Nuxt mega menu)
+    const testDataLink = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await expect(testDataLink.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('Navigation works in view mode without warning', async ({ page }, testInfo) => {
@@ -263,9 +273,12 @@ test.describe('Navigation and URL Handling', () => {
       await dialog.accept();
     });
 
-    // Click "Accordion Test Page" link in iframe nav (wait for it since nav loads async)
-    const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
-    await navLink.waitFor({ state: 'attached' });
+    // Open Test Data mega menu, then click Accordion Test Page to navigate
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Wait for admin URL to change

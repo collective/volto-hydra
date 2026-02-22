@@ -2120,9 +2120,6 @@ export class Bridge {
         return;
       }
 
-      // Stop propagation for block clicks (but not selector clicks above)
-      event.stopPropagation();
-
       // Defer block selection until INITIAL_DATA is received and render completes.
       // Save the click point and poll until init + render are done, then resolve
       // the block via elementFromPoint (DOM may re-render during init).
@@ -2252,6 +2249,27 @@ export class Bridge {
 
           // Send BLOCK_SELECTED with pageField as "block" - blockUid will be PAGE_BLOCK_UID
           this.sendBlockSelected('pageFieldClick', pageField);
+        } else {
+          // No block, no page-level field — check for navigation link clicks.
+          // In edit mode, let the browser navigate the iframe naturally so the
+          // iframe's beforeunload handler fires a warning dialog. We must
+          // stopPropagation to prevent SPA routers (Vue Router, etc.) from
+          // intercepting the click as client-side navigation (which wouldn't
+          // trigger beforeunload). We do NOT preventDefault — the browser's
+          // default <a> navigation is exactly what we want.
+          const linkEl = event.target.closest('a[href]');
+          if (linkEl && !allowedElement) {
+            const href = linkEl.getAttribute('href');
+            try {
+              const linkUrl = new URL(href, window.location.origin);
+              if (linkUrl.origin === window.location.origin) {
+                event.stopPropagation();
+                log('Nav link click in edit mode — letting browser navigate (triggers beforeunload):', href);
+              }
+            } catch (e) {
+              // Invalid URL - let browser handle it
+            }
+          }
         }
       }
     };
