@@ -178,6 +178,11 @@ export class AdminUIHelper {
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${editPath}`, { timeout: 10000 });
 
+    // Wait for iframe to navigate to the correct content path.
+    // Without this, waitForIframeReady can pass on stale content from the
+    // previous page (e.g., docs root blocks satisfy [data-block-uid] check).
+    await this.waitForIframeUrl(contentPath);
+
     // Wait for iframe to load
     await this.waitForIframeReady();
 
@@ -211,11 +216,27 @@ export class AdminUIHelper {
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${contentPath}`, { timeout: 10000 });
 
+    // Wait for iframe to navigate to the correct content path.
+    await this.waitForIframeUrl(contentPath);
+
     // Wait for iframe to load
     await this.waitForIframeReady();
 
     // Wait for all blocks to render (Nuxt async components may still be loading)
     await this.getStableBlockCount();
+  }
+
+  /**
+   * Wait for the preview iframe's src to contain the expected content path.
+   * Prevents waitForIframeReady from passing on stale content from a previous
+   * page (e.g., docs root blocks satisfy [data-block-uid] before the iframe
+   * has navigated to the new page).
+   */
+  async waitForIframeUrl(contentPath: string, timeout: number = 10000): Promise<void> {
+    await expect(async () => {
+      const src = await this.page.locator('#previewIframe').getAttribute('src');
+      expect(src).toContain(contentPath);
+    }).toPass({ timeout });
   }
 
   /**
