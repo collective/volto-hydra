@@ -109,7 +109,7 @@ const getParentChain = (blockId, blockPathMap) => {
 
 
 /**
- * Filter out container fields from schema (type: 'blocks' or widget: 'object_list')
+ * Filter out container fields from schema (widget: 'blocksid_list' or widget: 'object_list')
  * These fields display as [object Object] and should be managed via the block hierarchy instead
  */
 const filterBlocksFields = (schema) => {
@@ -117,7 +117,7 @@ const filterBlocksFields = (schema) => {
 
   const containerFields = new Set();
   for (const [fieldId, fieldDef] of Object.entries(schema.properties || {})) {
-    if (fieldDef?.type === 'blocks' || fieldDef?.widget === 'object_list') {
+    if (fieldDef?.widget === 'blocksid_list' || fieldDef?.widget === 'object_list') {
       containerFields.add(fieldId);
     }
   }

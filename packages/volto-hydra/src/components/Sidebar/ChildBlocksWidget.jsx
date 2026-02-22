@@ -1,6 +1,6 @@
 /**
  * ChildBlocksWidget - Shows child blocks for each container field in the current block.
- * A block can have multiple `type: 'blocks'` fields, each rendered as a separate section.
+ * A block can have multiple `widget: 'blocksid_list'` fields, each rendered as a separate section.
  *
  * Example: A block with both 'slides' and 'footnotes' fields would show:
  *   Slides        [+]
@@ -38,7 +38,7 @@ const messages = defineMessages({
  * Supports both standard containers (blocks + blocks_layout) and object_list (array with @id)
  * @param {Array|null} dataPath - Path to actual data location (e.g., ['table', 'rows'])
  */
-const getChildBlocks = (blockData, fieldName, formData, isObjectList = false, dataPath = null) => {
+const getChildBlocks = (blockData, fieldName, formData, isObjectList = false, dataPath = null, idField = null, typeField = null) => {
   // Navigate to data using dataPath if provided, otherwise use fieldName
   let data = blockData;
   if (dataPath) {
@@ -56,14 +56,24 @@ const getChildBlocks = (blockData, fieldName, formData, isObjectList = false, da
     if (!Array.isArray(data)) return [];
 
     return data.map((item, index) => {
-      // Use 'key' for slateTable rows/cells, fall back to '@id'
-      const blockId = item['key'] || item['@id'];
-      // object_list items don't have @type, use a generic title or item field
-      const title = item.title || item.plaintext || `Item ${index + 1}`;
+      // Use custom idField, then fall back to 'key' (slateTable), then '@id'
+      const blockId = (idField && item[idField]) || item['key'] || item['@id'];
+
+      // Determine title:
+      // - Typed object_list: look up block config title from typeField
+      // - Single-schema: use item.title or generic
+      let title;
+      if (typeField && item[typeField]) {
+        const itemBlockType = item[typeField];
+        const blockConfig = config.blocks?.blocksConfig?.[itemBlockType];
+        title = item.title || item.plaintext || blockConfig?.title || itemBlockType;
+      } else {
+        title = item.title || item.plaintext || `Item ${index + 1}`;
+      }
 
       return {
         id: blockId,
-        type: 'object_list_item',
+        type: (typeField && item[typeField]) || 'object_list_item',
         title: title,
         data: item,
       };
@@ -470,7 +480,7 @@ const ChildBlocksWidget = ({
         }
 
         // Standard container field
-        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath);
+        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath, field.idField, field.typeField);
         return (
           <ContainerFieldSection
             key={field.fieldName}
