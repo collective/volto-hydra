@@ -6,7 +6,7 @@ export default async function ploneApi({
   watch = [],
   _default = {},
   pages = {},
-  allowedLayouts = [],  // Optional: forced layouts to pre-load
+  preloadTemplates = [],  // Specific templates to eagerly pre-load (forced layouts)
 }) {
   const runtimeConfig = useRuntimeConfig();
   const route = useRoute();
@@ -78,7 +78,7 @@ export default async function ploneApi({
           }
           return response.json();
         };
-        const templates = await loadTemplates(data, loadTemplate, allowedLayouts);
+        const templates = await loadTemplates(data, loadTemplate, preloadTemplates);
 
         return {
           page: data,

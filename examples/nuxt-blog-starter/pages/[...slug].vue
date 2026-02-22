@@ -255,9 +255,8 @@ const mainBlocksAllowedLayouts = computed(() => {
     return [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'];
 });
 
-// Collect all allowedLayouts for template pre-loading
-const allAllowedLayouts = [
-    ...(mainBlocksAllowedLayouts.value || []).filter(Boolean),
+// Templates to eagerly pre-load (forced layouts that won't appear in page data)
+const preloadTemplates = [
     ...(footerAllowedLayouts.value || []).filter(Boolean),
 ];
 
@@ -278,7 +277,7 @@ for (var part of route.params.slug) {
 const { data, error } = await ploneApi({
   path: path,
   pages: pages,
-  allowedLayouts: allAllowedLayouts,
+  preloadTemplates,
 });
 
 // Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)
