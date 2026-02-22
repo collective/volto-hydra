@@ -104,17 +104,7 @@ function togglePanel(item) {
 }
 
 function getUrl(item) {
-    const path = item['@id'].replace(runtimeConfig.public.backendBaseUrl, '');
-    if (import.meta.client && window.location.search) {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('_edit')) {
-            const newParams = new URLSearchParams();
-            if (params.get('access_token')) newParams.set('access_token', params.get('access_token'));
-            if (params.get('_edit')) newParams.set('_edit', params.get('_edit'));
-            return path + '?' + newParams.toString();
-        }
-    }
-    return path;
+    return item['@id'].replace(runtimeConfig.public.backendBaseUrl, '');
 }
 
 function getId(item) {
