@@ -210,15 +210,15 @@ onMounted(() => {
                         fieldName: 'blocks',
                         title: 'Blocks',
                         allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
-                        allowedTemplates: ['/templates/test-layout'],
-                        allowedLayouts: [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
+                        allowedTemplates: ['/_test_data/templates/test-layout'],
+                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                     },
                     {
                         fieldName: 'footer_blocks',
                         title: 'Footer',
                         allowedBlocks: ['slate', 'image'],
                         // Force footer layout on /another-page (same as mock frontend)
-                        allowedLayouts: route.path === '/another-page' ? ['/templates/footer-layout'] : null,
+                        allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
                     },
                 ],
                 voltoConfig: {
@@ -247,17 +247,16 @@ onMounted(() => {
 const footerAllowedLayouts = computed(() => {
     // Use startsWith to handle trailing slashes and normalize
     const normalizedPath = route.path.replace(/\/$/, '');
-    return normalizedPath === '/another-page' ? ['/templates/footer-layout'] : null;
+    return normalizedPath === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null;
 });
 
 // Main blocks allowedLayouts (same as bridge config)
 const mainBlocksAllowedLayouts = computed(() => {
-    return [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'];
+    return [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'];
 });
 
-// Collect all allowedLayouts for template pre-loading
-const allAllowedLayouts = [
-    ...(mainBlocksAllowedLayouts.value || []).filter(Boolean),
+// Templates to eagerly pre-load (forced layouts that won't appear in page data)
+const preloadTemplates = [
     ...(footerAllowedLayouts.value || []).filter(Boolean),
 ];
 
@@ -278,7 +277,7 @@ for (var part of route.params.slug) {
 const { data, error } = await ploneApi({
   path: path,
   pages: pages,
-  allowedLayouts: allAllowedLayouts,
+  preloadTemplates,
 });
 
 // Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)

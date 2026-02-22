@@ -26,7 +26,7 @@
         }
       ],
       "plaintext": "Stale Header - Should Be Replaced By Merge",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
       "placeholder": "header"
     },
@@ -39,7 +39,7 @@
         }
       ],
       "plaintext": "User content - different from template default",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
       "placeholder": "primary"
     },
@@ -52,7 +52,7 @@
         }
       ],
       "plaintext": "Second user content block in placeholder",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
       "placeholder": "primary"
     },
@@ -67,7 +67,7 @@
         }
       ],
       "plaintext": "Stale Footer - Should Be Replaced By Merge",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
       "placeholder": "footer"
     },

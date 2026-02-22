@@ -167,6 +167,9 @@ export class Bridge {
     this.prospectiveInlineElement = null;
     // Path transformer for frontends that embed state in URL (e.g., paging)
     this.pathToApiPath = options.pathToApiPath || ((path) => path);
+    // True after INITIAL_DATA is received — block selection is deferred until then
+    this.initialized = false;
+    this._pendingSelectBlock = null;
     // Readonly registry - blocks marked readonly won't have fields collected
     // Set by expandListingBlocks() or frontend code, not persisted to backend
     this._readonlyBlocks = new Set();
@@ -300,7 +303,10 @@ export class Bridge {
         nextElement = nextElement.nextSibling;
       }
 
-      if (!nextElement) continue;
+      if (!nextElement) {
+        console.error('[hydra] Comment syntax found but no next element sibling:', text);
+        continue;
+      }
 
       // Apply attributes to the element
       this.applyHydraAttributes(nextElement, parsed.attrs);
@@ -337,6 +343,10 @@ export class Bridge {
         const targets = selector
           ? element.querySelectorAll(selector)
           : [element];
+
+        if (selector && targets.length === 0) {
+          console.error(`[hydra] Comment selector "${selector}" for ${name}=${value} matched no elements in`, element.tagName, element.className);
+        }
 
         for (const target of targets) {
           // Don't overwrite existing attributes
@@ -625,8 +635,8 @@ export class Bridge {
       if (current.hasAttribute('data-block-uid')) {
         const blockRect = current.getBoundingClientRect();
         if (blockRect.width > 0 && blockRect.height > 0) {
-          console.log(
-            `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+          log(
+            `data-media-field="${fieldName}" has zero dimensions. ` +
             `Using block element's dimensions (${blockRect.width}x${blockRect.height}).`
           );
           return { top: blockRect.top, left: blockRect.left, width: blockRect.width, height: blockRect.height };
@@ -638,8 +648,8 @@ export class Bridge {
       const parentRect = current.getBoundingClientRect();
 
       if (parentRect.width > 0 && parentRect.height > 0) {
-        console.log(
-          `[HYDRA] data-media-field="${fieldName}" has zero dimensions. ` +
+        log(
+          `data-media-field="${fieldName}" has zero dimensions. ` +
           `Using parent's dimensions (${parentRect.width}x${parentRect.height}).`
         );
         return { top: parentRect.top, left: parentRect.left, width: parentRect.width, height: parentRect.height };
@@ -1144,6 +1154,37 @@ export class Bridge {
     }
 
     return false;
+  }
+
+  /**
+   * Protect the last real character in a text node from deletion by replacing
+   * it with ZWS. Keeps the text node alive so MutationObserver fires
+   * characterData (not childList) and preserves inline formatting context.
+   *
+   * Called from both the beforeinput handler (native keyboard) and buffer
+   * replay (execCommand doesn't fire beforeinput in headless browsers).
+   *
+   * @returns {boolean} true if handled (last char replaced with ZWS)
+   */
+  preserveLastCharDelete() {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return false;
+
+    const textNode = sel.getRangeAt(0).startContainer;
+    if (textNode.nodeType !== Node.TEXT_NODE) return false;
+
+    const realText = this.stripZeroWidthSpaces(textNode.textContent);
+    if (realText.length !== 1) return false;
+
+    textNode.textContent = '\uFEFF';
+    const r = document.createRange();
+    // Position AFTER ZWS (offset 1) — browsers normalize offset 0 of a
+    // ZWS-only inline element to be OUTSIDE it, losing formatting context.
+    r.setStart(textNode, 1);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    return true;
   }
 
   /**
@@ -1696,6 +1737,9 @@ export class Bridge {
               // cannot call contentWindow.focus() on a cross-origin iframe.
               window.focus();
 
+              // Mark bridge as initialized — block selection is now allowed
+              this.initialized = true;
+
               // Restore block selection if provided (e.g., after adding a new block)
               if (e.data.selectedBlockUid) {
                 const blockUidToSelect = e.data.selectedBlockUid;
@@ -1916,6 +1960,7 @@ export class Bridge {
               formatRequestId,
               needsBlockSwitch,
               adminSelectedBlockUid,
+              skipRender: !!event.data.skipRender,
             });
           } else {
             throw new Error('No form data has been sent from the adminUI');
@@ -1926,30 +1971,16 @@ export class Bridge {
           const requestId = event.data.requestId;
           log('Received FLUSH_BUFFER request, requestId:', requestId, 'savedSelection:', this.savedSelection);
 
-          // Block input during format operation - will be unblocked when FORM_DATA arrives
-          // This prevents any text changes from being sent while format is being applied
-          // Block input and track requestId for matching with FORM_DATA
-          if (this.selectedBlockUid) {
-            this.setBlockProcessing(this.selectedBlockUid, true, requestId);
+          // If a render is in progress, defer FLUSH_BUFFER until afterContentRender
+          // completes. During render, DOM nodes may be detached (nodeIds stripped),
+          // and serializeSelection() would fail. Process it once the DOM is stable.
+          if (this._renderInProgress) {
+            log('FLUSH_BUFFER: render in progress, queuing');
+            this._flushBufferQueue = event.data;
+            return;
           }
 
-          // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
-          const hadPendingText = this.flushPendingTextUpdates(requestId);
-
-          if (hadPendingText) {
-            // requestId was included in INLINE_EDIT_DATA, parent will handle coordination
-            log('Flushed pending text with requestId, waiting for Redux sync');
-          } else {
-            // No pending text - send BUFFER_FLUSHED immediately (safe to proceed)
-            // Include current selection so toolbar has it when applying format
-            const selection = this.serializeSelection();
-            log('No pending text, sending BUFFER_FLUSHED with selection:', selection);
-            this.sendMessageToParent({
-              type: 'BUFFER_FLUSHED',
-              requestId: requestId,
-              selection: selection,
-            });
-          }
+          this._processFlushBuffer(requestId);
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
@@ -2089,8 +2120,29 @@ export class Bridge {
         return;
       }
 
-      // Stop propagation for block clicks (but not selector clicks above)
-      event.stopPropagation();
+      // Defer block selection until INITIAL_DATA is received and render completes.
+      // Save the click point and poll until init + render are done, then resolve
+      // the block via elementFromPoint (DOM may re-render during init).
+      if (!this.initialized) {
+        log('blockClickHandler: deferred — INITIAL_DATA not yet received');
+        const x = event.clientX;
+        const y = event.clientY;
+        const bridge = this;
+        const waitForInit = () => {
+          if (bridge.initialized && !bridge._renderInProgress) {
+            const el = document.elementFromPoint(x, y);
+            const blockEl = el?.closest('[data-block-uid]');
+            if (blockEl) {
+              log('Processing deferred block click, uid:', blockEl.getAttribute('data-block-uid'));
+              bridge.selectBlock(blockEl);
+            }
+          } else {
+            setTimeout(waitForInit, 50);
+          }
+        };
+        setTimeout(waitForInit, 50);
+        return;
+      }
 
       // Skip block selection during carousel/selector navigation
       // (a click on the carousel button can also trigger blockClickHandler for the old slide)
@@ -2197,6 +2249,27 @@ export class Bridge {
 
           // Send BLOCK_SELECTED with pageField as "block" - blockUid will be PAGE_BLOCK_UID
           this.sendBlockSelected('pageFieldClick', pageField);
+        } else {
+          // No block, no page-level field — check for navigation link clicks.
+          // In edit mode, let the browser navigate the iframe naturally so the
+          // iframe's beforeunload handler fires a warning dialog. We must
+          // stopPropagation to prevent SPA routers (Vue Router, etc.) from
+          // intercepting the click as client-side navigation (which wouldn't
+          // trigger beforeunload). We do NOT preventDefault — the browser's
+          // default <a> navigation is exactly what we want.
+          const linkEl = event.target.closest('a[href]');
+          if (linkEl && !allowedElement) {
+            const href = linkEl.getAttribute('href');
+            try {
+              const linkUrl = new URL(href, window.location.origin);
+              if (linkUrl.origin === window.location.origin) {
+                event.stopPropagation();
+                log('Nav link click in edit mode — letting browser navigate (triggers beforeunload):', href);
+              }
+            } catch (e) {
+              // Invalid URL - let browser handle it
+            }
+          }
         }
       }
     };
@@ -2639,13 +2712,20 @@ export class Bridge {
       // block, boundary). Only use native execCommand if handler didn't act.
       if (evt.key === 'Backspace') {
         if (!this.handleDeleteKey(blockId, 'Backspace')) {
-          document.execCommand('delete', false);
+          // preserveLastCharDelete handles the case where execCommand would
+          // remove the last char from an inline element — execCommand doesn't
+          // fire beforeinput so the editableField handler can't catch it.
+          if (!this.preserveLastCharDelete()) {
+            document.execCommand('delete', false);
+          }
         }
         return;
       }
       if (evt.key === 'Delete') {
         if (!this.handleDeleteKey(blockId, 'Delete')) {
-          document.execCommand('forwardDelete', false);
+          if (!this.preserveLastCharDelete()) {
+            document.execCommand('forwardDelete', false);
+          }
         }
         return;
       }
@@ -4384,9 +4464,14 @@ export class Bridge {
    * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
    */
   afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
+    // Materialize comments immediately so data-block-uid attributes are available
+    // before any waitFor selectors run. The rAF call below handles late-arriving
+    // async framework content (React Suspense, Vue async components).
+    this.materializeHydraComments();
+
     requestAnimationFrame(() => {
       requestAnimationFrame(async () => {
-        // Visual updates that apply to every render
+        // Re-materialize for any async framework content that arrived after initial call
         this.materializeHydraComments();
         this.markEmptyBlocks();
         this.applyReadonlyVisuals();
@@ -4556,6 +4641,7 @@ export class Bridge {
             log('Selection restore failed — dropping', this.eventBuffer.length, 'buffered events to avoid wrong-selection replay');
             this.eventBuffer = [];
           }
+
           // Clear after a brief settling period to catch trailing selectionchanges
           // from DOM attribute updates (contenteditable, nodeIds, etc.)
           setTimeout(() => { this.expectedSelectionFromAdmin = null; }, 100);
@@ -4600,7 +4686,15 @@ export class Bridge {
           log('Processing queued FORM_DATA after render complete');
           // Re-dispatch as a message event so it goes through the full
           // FORM_DATA handler (stale check, addNodeIds, etc.)
+          // Any queued FLUSH_BUFFER will be processed after this render completes.
           window.postMessage(queued, window.location.origin);
+        } else if (this._flushBufferQueue) {
+          // Process queued FLUSH_BUFFER after render complete and FORM_DATA processed.
+          // Now the DOM is stable with nodeIds, so serializeSelection() will work.
+          const queuedFlush = this._flushBufferQueue;
+          this._flushBufferQueue = null;
+          log('Processing queued FLUSH_BUFFER after render complete');
+          this._processFlushBuffer(queuedFlush.requestId);
         }
 
         // Re-attach text change observer LAST, after all DOM operations
@@ -6979,23 +7073,9 @@ export class Bridge {
       // childList). Part of ZWS lifecycle — see "Whitespace & ZWS Strategy".
       editableField.addEventListener('beforeinput', (e) => {
         if (e.inputType !== 'deleteContentBackward' && e.inputType !== 'deleteContentForward') return;
-        const sel = window.getSelection();
-        if (!sel.rangeCount || !sel.isCollapsed) return;
-
-        const textNode = sel.getRangeAt(0).startContainer;
-        if (textNode.nodeType !== Node.TEXT_NODE) return;
-
-        const realText = this.stripZeroWidthSpaces(textNode.textContent);
-        if (realText.length !== 1) return;
-
-        // Last real character — replace with ZWS instead of letting browser remove the node
-        e.preventDefault();
-        textNode.textContent = '\uFEFF';
-        const r = document.createRange();
-        r.setStart(textNode, e.inputType === 'deleteContentBackward' ? 0 : 1);
-        r.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(r);
+        if (this.preserveLastCharDelete()) {
+          e.preventDefault();
+        }
       });
 
       // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
@@ -7396,7 +7476,26 @@ export class Bridge {
     // Support async callbacks (e.g., renderContentWithListings)
     const callbackResult = callbackFn(this.formData);
 
-    const afterRender = () => this.afterContentRender(afterRenderOptions);
+    const afterRender = () => {
+      if (this._renderCommentObserver) {
+        this._renderCommentObserver.disconnect();
+        this._renderCommentObserver = null;
+      }
+      this.afterContentRender(afterRenderOptions);
+    };
+
+    // For async render callbacks, watch for new DOM nodes and eagerly
+    // materialize hydra comments. This ensures data-block-uid attributes
+    // from comment syntax are available as soon as blocks are appended,
+    // rather than waiting for the entire render (including slow listing/
+    // footer expansion) to complete. Safe to call repeatedly because
+    // applyHydraAttributes skips existing attributes.
+    if (callbackResult && typeof callbackResult.then === 'function') {
+      this._renderCommentObserver = new MutationObserver(() => {
+        this.materializeHydraComments();
+      });
+      this._renderCommentObserver.observe(document.body, { childList: true, subtree: true });
+    }
 
     // Call afterRender after callback completes (async or sync)
     if (callbackResult && typeof callbackResult.then === 'function') {
@@ -7407,7 +7506,7 @@ export class Bridge {
       // mutation before proceeding with selection restore and buffer replay.
       const blockId = this.selectedBlockUid;
       const blockEl = blockId && document.querySelector(`[data-block-uid="${blockId}"]`);
-      if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
+      if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
         this._waitForDomMutation(blockEl, afterRender);
       } else {
         afterRender();
@@ -8811,6 +8910,9 @@ export class Bridge {
    * @param {string} [from] - Source of the update for debugging
    */
   bufferUpdate(from = 'unknown') {
+    if (!this.formData) {
+      return;
+    }
     // Always capture BOTH current data and current selection together
     const data = this.getFormDataWithoutNodeIds();
     const currentSeq = this.formData?._editSequence || 0;
@@ -8869,6 +8971,34 @@ export class Bridge {
   /**
    * Flush any pending batched text updates immediately
    * Call this before any operation that needs current state (format, cut, paste, undo, etc.)
+   * Process a FLUSH_BUFFER request. Extracted so it can be called immediately
+   * or deferred until afterContentRender when a render is in progress.
+   * @param {string} requestId - The FLUSH_BUFFER requestId
+   */
+  _processFlushBuffer(requestId) {
+    // Block input during format operation - will be unblocked when FORM_DATA arrives
+    if (this.selectedBlockUid) {
+      this.setBlockProcessing(this.selectedBlockUid, true, requestId);
+    }
+
+    // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
+    const hadPendingText = this.flushPendingTextUpdates(requestId);
+
+    if (hadPendingText) {
+      log('Flushed pending text with requestId, waiting for Redux sync');
+    } else {
+      // No pending text - send BUFFER_FLUSHED immediately
+      const selection = this.serializeSelection();
+      log('No pending text, sending BUFFER_FLUSHED with selection:', selection);
+      this.sendMessageToParent({
+        type: 'BUFFER_FLUSHED',
+        requestId: requestId,
+        selection: selection,
+      });
+    }
+  }
+
+  /**
    * @param {string} [flushRequestId] - Optional requestId to include with the update (for FLUSH_BUFFER coordination)
    * @returns {boolean} - True if there was pending text to flush, false otherwise
    */
@@ -10146,7 +10276,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
           itemDefaults[fieldName] = value;
         }
       }
-      console.log('[HYDRA] expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
+      log('expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
 
       // Convert each query result to a block of itemType
       // All expanded items share the same @uid (the listing block's ID)
@@ -10749,6 +10879,38 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
 }
 
 /**
+ * Extract the pathname from a template ID, which may be a full URL or a path.
+ * Plone's API resolves resolveuid/UID references to full URLs (e.g.
+ * "http://plone.example.com/templates/foo"), but allowedLayouts may use
+ * relative paths (e.g. "/templates/foo").  This helper normalises both
+ * forms to a plain pathname so comparisons work regardless of format.
+ *
+ * @param {string|null} id - Template ID (URL or path)
+ * @returns {string|null} The pathname portion, or the original value
+ */
+export function templateIdToPath(id) {
+  if (!id || typeof id !== 'string') return id;
+  // Fast path: already a relative path
+  if (!id.startsWith('http://') && !id.startsWith('https://')) return id;
+  try {
+    return new URL(id).pathname;
+  } catch {
+    return id;
+  }
+}
+
+/**
+ * Check whether two template IDs refer to the same template, ignoring
+ * URL-vs-path differences.  E.g. "http://localhost:8888/tpl/foo" matches
+ * "/tpl/foo".
+ */
+function templateIdsMatch(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return templateIdToPath(a) === templateIdToPath(b);
+}
+
+/**
  * Get unique template IDs (paths) from page data.
  *
  * @param {Object} formData - Page data with blocks
@@ -11083,10 +11245,10 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
  *
  * @param {Object} data - Page data to scan for template references
  * @param {Function} loadTemplate - Async function: (templateId) => Promise<templateData>
- * @param {Array} allowedLayouts - Optional forced layouts to include
+ * @param {Array} preloadTemplates - Additional template IDs to eagerly load (e.g. forced layouts)
  * @returns {Promise<Object>} Map of templateId -> template data
  */
-export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
+export async function loadTemplates(data, loadTemplate, preloadTemplates = []) {
   const templates = {};
   const loaded = new Set();
   const failed = new Set();
@@ -11118,10 +11280,12 @@ export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
     return ids;
   }
 
-  // Collect initial template IDs from data + allowedLayouts
+  // Collect template IDs referenced in the page data, plus any explicitly requested.
   let pending = collectTemplateIds(data);
-  for (const layoutId of allowedLayouts) {
-    if (layoutId) pending.add(layoutId);
+  if (preloadTemplates?.length) {
+    for (const id of preloadTemplates) {
+      if (id) pending.add(id);
+    }
   }
 
   // Keep loading until no new templates found
@@ -11132,11 +11296,18 @@ export async function loadTemplates(data, loadTemplate, allowedLayouts = []) {
 
     if (toLoad.length === 0) break;
 
-    // Load in parallel
+    // Load in parallel with a per-template timeout so a hanging request
+    // doesn't block INITIAL_DATA indefinitely.
+    const TEMPLATE_LOAD_TIMEOUT = 5000;
     const results = await Promise.all(
       toLoad.map(async (id) => {
         try {
-          const template = await loadTemplate(id);
+          const template = await Promise.race([
+            loadTemplate(id),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`Template load timed out after ${TEMPLATE_LOAD_TIMEOUT}ms`)), TEMPLATE_LOAD_TIMEOUT)
+            ),
+          ]);
           return { id, template };
         } catch (error) {
           console.warn(`[HYDRA] Failed to load template ${id}:`, error);
@@ -11183,7 +11354,6 @@ export async function expandTemplates(inputItems, options = {}) {
   const {
     blocks: blocksDict,
     loadTemplate,
-    allowedLayouts = [],
   } = options;
 
   // Build data object for loadTemplates to scan
@@ -11191,20 +11361,43 @@ export async function expandTemplates(inputItems, options = {}) {
     ? { blocks: blocksDict, blocks_layout: { items: inputItems } }
     : { items: inputItems };
 
-  // Load all templates (including nested) using existing helper
-  const templates = await loadTemplates(data, loadTemplate, allowedLayouts || []);
+  // Load templates referenced in the page data
+  const templates = await loadTemplates(data, loadTemplate);
 
-  // Delegate to sync version with loaded templates
-  return expandTemplatesSync(inputItems, {
-    ...options,
-    templates,
-  });
+  // Delegate to sync version with loaded templates.
+  // expandTemplatesSync will load missing templates on demand via loadTemplate
+  // (e.g. forced layouts from allowedLayouts not referenced in page data).
+  // Since loadTemplate is async, we retry when expandTemplatesSync reports
+  // a missing template so we can await the load.
+  const loaded = new Set(Object.keys(templates));
+  while (true) {
+    try {
+      return expandTemplatesSync(inputItems, {
+        ...options,
+        templates,
+      });
+    } catch (e) {
+      const match = e.message?.match(/^Template "(.+)" not found/);
+      if (match && loadTemplate && !loaded.has(match[1])) {
+        const missingId = match[1];
+        loaded.add(missingId);
+        try {
+          templates[missingId] = await loadTemplate(missingId);
+          continue;
+        } catch {
+          // loadTemplate failed — fall through to rethrow
+        }
+      }
+      throw e;
+    }
+  }
 }
 
 /**
  * Synchronous version of expandTemplates.
  * Requires all templates to be pre-loaded in options.templates.
- * Throws if a required template is not found in the pre-loaded map.
+ * Falls back to options.loadTemplate (sync) if a required template is not in the
+ * pre-loaded map. Throws if the template still can't be found.
  *
  * This function is called recursively: the top-level BlocksRenderer calls it for
  * the page layout, and the expanded result may contain container blocks (columns,
@@ -11231,6 +11424,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     allowedLayouts,
     uuidGenerator,
     filterInstanceId,
+    loadTemplate,
   } = options;
 
   if (!templates) {
@@ -11309,7 +11503,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
   const previousTemplateId = templateId;
 
   if (allowedLayouts?.length > 0) {
-    if (!templateId || !allowedLayouts.includes(templateId)) {
+    // Use path-normalised comparison: block templateId may be a full URL
+    // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
+    if (!templateId || !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
       templateId = allowedLayouts[0];
       if (!filterInstanceId) {
         existingInstanceId = null;
@@ -11446,9 +11642,19 @@ export function expandTemplatesSync(inputItems, options = {}) {
     }
   }
 
-  // Load template from pre-loaded map (sync - throw if not found)
+  // Load template from pre-loaded map, falling back to sync loadTemplate callback.
+  // Async callers should use expandTemplates() which retries on missing templates.
   if (!ctx.template) {
-    const template = templates[templateId];
+    let template = templates[templateId];
+    if (!template && loadTemplate) {
+      const result = loadTemplate(templateId);
+      // Only use sync results — async loadTemplate returns a Promise which
+      // expandTemplates() handles via its retry loop.
+      if (result && typeof result.then !== 'function') {
+        template = result;
+        templates[templateId] = template;
+      }
+    }
     if (!template) {
       throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
     }

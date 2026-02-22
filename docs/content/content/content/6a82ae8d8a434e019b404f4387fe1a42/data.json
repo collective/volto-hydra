@@ -1,0 +1,362 @@
+{
+  "@id": "/vertical-spacing/highlight-and-text",
+  "@type": "Document",
+  "UID": "6a82ae8d8a434e019b404f4387fe1a42",
+  "allow_discussion": false,
+  "blocks": {
+    "429c0a28-cf90-4d4d-ad8a-acc904bf3070": {
+      "@type": "highlight",
+      "allow_image_download": true,
+      "alt": "",
+      "blurhash": "1.3398:L89aT~e:0MMcRln3MwSiZ~EQs6x]",
+      "button": true,
+      "buttonLink": [
+        {
+          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+          "@type": "Document",
+          "CreationDate": "2023-07-06T23:35:20+02:00",
+          "Creator": "admin",
+          "Date": "2023-07-06T18:35:00+02:00",
+          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
+          "EffectiveDate": "2023-07-06T18:35:00+02:00",
+          "ExpirationDate": "None",
+          "ModificationDate": "2023-09-22T16:25:49+02:00",
+          "Subject": [],
+          "Title": "Page",
+          "Type": "Page",
+          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
+          "author_name": null,
+          "cmf_uid": null,
+          "commentators": [],
+          "created": "2023-07-06T21:35:20+00:00",
+          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
+          "effective": "2023-07-06T16:35:00+00:00",
+          "end": null,
+          "exclude_from_nav": false,
+          "expires": "2499-12-30T22:00:00+00:00",
+          "getIcon": null,
+          "getId": "page",
+          "getObjSize": "676.8 KB",
+          "getPath": "/Plone/content-types/page",
+          "getRemoteUrl": null,
+          "getURL": "http://localhost:8080/Plone/content-types/page",
+          "hasPreviewImage": true,
+          "head_title": null,
+          "id": "page",
+          "image_field": "preview_image",
+          "in_response_to": null,
+          "is_folderish": true,
+          "last_comment_date": null,
+          "listCreators": [
+            "admin"
+          ],
+          "location": null,
+          "mime_type": "text/plain",
+          "modified": "2023-09-22T14:25:49+00:00",
+          "nav_title": null,
+          "portal_type": "Document",
+          "review_state": "published",
+          "start": null,
+          "sync_uid": null,
+          "title": "Page",
+          "total_comments": 0,
+          "type_title": "Page"
+        }
+      ],
+      "buttonText": "Mehr Infos",
+      "credit": {
+        "data": "<a href=\"/de/service/impressum\">DLR (CC BY-NC-ND 3.0)</a>"
+      },
+      "description_color": "blue3",
+      "image_field": "image",
+      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
+      "styles": {
+        "descriptionColor": "highlight-custom-color-3"
+      },
+      "title": "Highlight-Block",
+      "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "4974677f-f93a-41ba-9136-73c7b487754f": {
+      "@type": "slate",
+      "plaintext": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus magna justo, lacinia eget consectetur sed, convallis at tellus. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui.",
+      "styles": {
+        "backgroundColor": "grey"
+      },
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus magna justo, lacinia eget consectetur sed, convallis at tellus. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "94ef94a6-33af-47b4-a848-473d585b91dd": {
+      "@type": "heading",
+      "alignment": "left",
+      "heading": "Grey variant",
+      "tag": "h2"
+    },
+    "a117798d-06a3-4c57-92a9-672f1ce5dc90": {
+      "@type": "highlight",
+      "allow_image_download": true,
+      "alt": "",
+      "blurhash": "1.3398:L89aT~e:0MMcRln3MwSiZ~EQs6x]",
+      "button": true,
+      "buttonLink": [
+        {
+          "@id": "/de/das-dlr",
+          "@type": "Document",
+          "CreationDate": "2022-05-31T17:16:44+02:00",
+          "Creator": "admin",
+          "Date": "2022-05-31T17:16:45+02:00",
+          "Description": "Das DLR ist das Forschungszentrum der Bundesrepublik Deutschland f\u00fcr Luft- und Raumfahrt. Wir betreiben Forschung und Entwicklung in Luftfahrt, Raumfahrt, Energie und Verkehr, Sicherheit und Digitalisierung. Die Deutsche Raumfahrtagentur im DLR ist im Auftrag der Bundesregierung f\u00fcr die Planung und Umsetzung der deutschen Raumfahrtaktivit\u00e4ten zust\u00e4ndig. Zwei DLR Projekttr\u00e4ger betreuen F\u00f6rderprogramme und unterst\u00fctzen den Wissenstransfer.",
+          "EffectiveDate": "2022-05-31T17:16:45+02:00",
+          "ExpirationDate": "None",
+          "Language": "de",
+          "ModificationDate": "2022-05-31T17:20:31+02:00",
+          "Subject": [],
+          "Title": "Das DLR",
+          "TranslationGroup": "0feca0b2e07945ee8c61c60ad49005cc",
+          "Type": "Seite",
+          "UID": "0835c0b72abf4c7aaf509b3b65b88ab5",
+          "academic": null,
+          "administrational_units": [],
+          "author_name": null,
+          "award_date_month": null,
+          "award_date_year": null,
+          "award_type": null,
+          "building": null,
+          "cmf_uid": 3,
+          "commentators": [],
+          "created": "2022-05-31T15:16:44+00:00",
+          "description": "Das DLR ist das Forschungszentrum der Bundesrepublik Deutschland f\u00fcr Luft- und Raumfahrt. Wir betreiben Forschung und Entwicklung in Luftfahrt, Raumfahrt, Energie und Verkehr, Sicherheit und Digitalisierung. Die Deutsche Raumfahrtagentur im DLR ist im Auftrag der Bundesregierung f\u00fcr die Planung und Umsetzung der deutschen Raumfahrtaktivit\u00e4ten zust\u00e4ndig. Zwei DLR Projekttr\u00e4ger betreuen F\u00f6rderprogramme und unterst\u00fctzen den Wissenstransfer.",
+          "detailed_description": null,
+          "effective": "2022-05-31T15:16:45+00:00",
+          "email": null,
+          "end": null,
+          "event_type": null,
+          "exclude_from_nav": false,
+          "expires": "2499-12-30T22:00:00+00:00",
+          "external_funding_provider_1": null,
+          "external_funding_provider_1_link": null,
+          "external_funding_provider_2": null,
+          "external_funding_provider_2_link": null,
+          "external_funding_provider_3": null,
+          "external_funding_provider_3_link": null,
+          "firstname": null,
+          "getIcon": true,
+          "getId": "das-dlr",
+          "getObjSize": "0 KB",
+          "getPath": "/Plone/de/das-dlr",
+          "getRemoteUrl": null,
+          "getURL": "http://localhost:3000/de/das-dlr",
+          "hasPreviewImage": false,
+          "head_title": null,
+          "id": "das-dlr",
+          "image_field": "image",
+          "in_response_to": null,
+          "institute": [],
+          "institutes": [],
+          "is_folderish": true,
+          "is_geschaeftsbereich_or_stabstelle": null,
+          "is_young_research_group": null,
+          "job_offer_category": null,
+          "job_offer_fingerprint": null,
+          "job_offer_institute": null,
+          "job_offer_location": null,
+          "job_offer_target_group": null,
+          "last_comment_date": null,
+          "listCreators": [
+            "admin"
+          ],
+          "location": null,
+          "member_fullnames": null,
+          "member_source": null,
+          "members": [],
+          "mime_type": "text/plain",
+          "modified": "2022-05-31T15:20:31+00:00",
+          "name": null,
+          "nav_title": null,
+          "phone": null,
+          "portal_type": "Document",
+          "positions": null,
+          "project_end_month": null,
+          "project_end_year": null,
+          "project_start_month": null,
+          "project_start_year": null,
+          "project_type": null,
+          "research_group": [],
+          "research_topics": [],
+          "review_state": "published",
+          "rights": "",
+          "room": null,
+          "show_navigation_portlet": false,
+          "sort_id": 1,
+          "start": null,
+          "sync_uid": null,
+          "title": "Das DLR",
+          "topic": [],
+          "total_comments": 0,
+          "website_link": null,
+          "year": "2022"
+        }
+      ],
+      "buttonText": "Mehr Infos",
+      "credit": {
+        "data": "<a href=\"/de/service/impressum\">DLR (CC BY-NC-ND 3.0)</a>"
+      },
+      "description_color": "blue3",
+      "image_field": "image",
+      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
+      "styles": {
+        "descriptionColor": "highlight-custom-color-2"
+      },
+      "title": "Highlight-Block",
+      "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "c006d4d9-ccbc-43f2-938c-af4d091defed": {
+      "@type": "slate",
+      "plaintext": "",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": ""
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "c9a5a276-8e30-4cec-b5e2-d1c2c29d130c": {
+      "@type": "slate",
+      "plaintext": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus magna justo, lacinia eget consectetur sed, convallis at tellus. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus magna justo, lacinia eget consectetur sed, convallis at tellus. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "d73dd331-8c5b-4719-85b5-db5039fb938e": {
+      "@type": "slate",
+      "plaintext": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus magna justo, lacinia eget consectetur sed, convallis at tellus. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui.",
+      "styles": {
+        "backgroundColor": "grey"
+      },
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus magna justo, lacinia eget consectetur sed, convallis at tellus. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus. Vestibulum ac diam sit amet quam vehicula elementum sed sit amet dui."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "eb96fbff-47dd-498b-8bd3-2ec5097ce673": {
+      "@type": "title"
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "eb96fbff-47dd-498b-8bd3-2ec5097ce673",
+      "a117798d-06a3-4c57-92a9-672f1ce5dc90",
+      "c9a5a276-8e30-4cec-b5e2-d1c2c29d130c",
+      "94ef94a6-33af-47b4-a848-473d585b91dd",
+      "c006d4d9-ccbc-43f2-938c-af4d091defed",
+      "429c0a28-cf90-4d4d-ad8a-acc904bf3070",
+      "4974677f-f93a-41ba-9136-73c7b487754f",
+      "d73dd331-8c5b-4719-85b5-db5039fb938e"
+    ]
+  },
+  "contributors": [],
+  "created": "2023-07-06T21:35:23+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "",
+  "effective": "2023-07-06T18:35:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "highlight-and-text",
+  "is_folderish": true,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2024-03-09T09:17:17+00:00",
+  "parent": {
+    "@id": "/vertical-spacing",
+    "@type": "Document",
+    "UID": "c40a2be214b645338a7ef2e711e2f5c6",
+    "description": "",
+    "image_field": null,
+    "image_scales": {},
+    "review_state": "published",
+    "title": "Vertical Spacing",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Highlight and Text",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": null,
+        "actor": "admin",
+        "comments": "",
+        "review_state": "private",
+        "time": "2023-07-06T21:35:23+00:00"
+      },
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2023-07-06T21:35:23+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

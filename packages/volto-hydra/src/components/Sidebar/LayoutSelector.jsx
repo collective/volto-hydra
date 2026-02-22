@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
-import { mergeTemplatesIntoPage } from '@volto-hydra/hydra-js';
+import { mergeTemplatesIntoPage, templateIdToPath } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 const messages = defineMessages({
@@ -27,15 +27,33 @@ const messages = defineMessages({
   },
 });
 
-// Extract display name from template URL path
-// Returns "None" for null (no layout option)
+// Module-level cache: url → title (fetched once, reused across all mounts)
+const _titleCache = {};
+
+// Fetch and cache the title for a layout URL. Returns cached value immediately if available.
+const fetchTitle = async (url) => {
+  if (_titleCache[url]) return _titleCache[url];
+  try {
+    const api = new Api();
+    const data = await api.get(url);
+    if (data.title) {
+      _titleCache[url] = data.title;
+    }
+  } catch {
+    // Fall back to URL-derived name
+  }
+  return _titleCache[url];
+};
+
+// Get display name: use cached API title, or fall back to URL-derived name
 const getDisplayName = (url, intl) => {
   if (url === null) {
     return intl ? intl.formatMessage(messages.noLayout) : 'None';
   }
+  if (_titleCache[url]) return _titleCache[url];
+  // Fallback: derive from URL path
   const parts = url.split('/');
   const lastPart = parts[parts.length - 1] || parts[parts.length - 2];
-  // Convert kebab-case to Title Case
   return lastPart
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -48,8 +66,11 @@ const detectCurrentLayout = (formData, allowedLayouts) => {
   if (!allowedLayouts?.length) return '';
   const blocks = formData?.blocks || {};
   for (const block of Object.values(blocks)) {
-    if (block.templateId && allowedLayouts.includes(block.templateId)) {
-      return block.templateId;
+    if (block.templateId) {
+      // Normalise to pathname so full-URL templateIds match path-based allowedLayouts
+      const blockPath = templateIdToPath(block.templateId);
+      const match = allowedLayouts.find(l => l !== null && templateIdToPath(l) === blockPath);
+      if (match) return match;
     }
   }
   return '';
@@ -62,6 +83,17 @@ const LayoutSelector = ({
 }) => {
   const intl = useIntl();
   const [loading, setLoading] = React.useState(false);
+  const [, setTitlesLoaded] = React.useState(0); // trigger re-render when titles arrive
+
+  // Fetch titles once when allowedLayouts arrives (module-level cache prevents refetching)
+  React.useEffect(() => {
+    if (!allowedLayouts?.length) return;
+    allowedLayouts
+      .filter((url) => url !== null && !_titleCache[url])
+      .forEach((url) => {
+        fetchTitle(url).then(() => setTitlesLoaded((n) => n + 1));
+      });
+  }, [allowedLayouts]);
 
   // Detect the currently applied layout from formData
   const currentLayout = React.useMemo(

@@ -3427,11 +3427,22 @@ const Iframe = (props) => {
                 if (metadata?.image_scales) {
                   const imageField = metadata.image_field || 'image';
                   const scaleInfo = metadata.image_scales[imageField]?.[0];
+                  // Resolve relative download paths in scales against the content URL
+                  const rawScales = scaleInfo?.scales || {};
+                  const resolvedScales = {};
+                  for (const [scaleName, scaleData] of Object.entries(rawScales)) {
+                    resolvedScales[scaleName] = {
+                      ...scaleData,
+                      download: scaleData.download?.startsWith('http')
+                        ? scaleData.download
+                        : `${url}/${scaleData.download}`,
+                    };
+                  }
                   // Construct NamedBlobImage object format
                   const imageValue = {
                     '@type': 'Image',
                     'download': `${url}/@@images/${imageField}`,
-                    'scales': scaleInfo?.scales || {},
+                    'scales': resolvedScales,
                   };
                   updatedProperties = { ...properties, [fieldName]: imageValue };
                 } else {

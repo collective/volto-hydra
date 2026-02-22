@@ -1250,13 +1250,21 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 
 **Sync vs Async:**
 - `expandTemplatesSync` - Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous.
-- `expandTemplates` - Use when you need to lazy-load templates on demand.
+- `expandTemplates` - Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data.
+
+**Pre-loading with `loadTemplates`:**
+
+`loadTemplates(data, loadTemplate)` scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
+
+All frontends and the admin use this with their own fetch callback:
 
 ```js
-import { expandTemplatesSync, expandTemplates } from '@hydra-js/hydra.js';
+import { loadTemplates, expandTemplatesSync, expandTemplates } from '@hydra-js/hydra.js';
+
+const loadTemplate = async (id) => fetch(`${apiBase}${id}`).then(r => r.json());
 
 // Sync approach: pre-fetch templates at page level, use in computed properties
-const templates = await fetchTemplates(templateIds);  // Do once at page load
+const templates = await loadTemplates(pageData, loadTemplate);
 const templateState = {};  // Share across all expandTemplatesSync calls
 const items = expandTemplatesSync(layout, { blocks, templateState, templates });
 

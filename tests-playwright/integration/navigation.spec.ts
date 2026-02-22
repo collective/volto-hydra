@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { TEST_DATA_PREFIX } from '../helpers/test-paths';
 
 test.describe('Navigation and URL Handling', () => {
   test('External URLs do not load in iframe', async ({ page }, testInfo) => {
@@ -28,8 +29,8 @@ test.describe('Navigation and URL Handling', () => {
 
   // Test hash-based routing with different URL formats
   const hashFormats = [
-    { name: '#/', url: 'http://localhost:8888/#/', expectedHash: '#/test-page' },
-    { name: '#!/', url: 'http://localhost:8888/#!/', expectedHash: '#!/test-page' },
+    { name: '#/', url: 'http://localhost:8888/#/', expectedHash: `#${TEST_DATA_PREFIX}/test-page` },
+    { name: '#!/', url: 'http://localhost:8888/#!/', expectedHash: `#!${TEST_DATA_PREFIX}/test-page` },
   ];
 
   for (const format of hashFormats) {
@@ -94,15 +95,15 @@ test.describe('Navigation and URL Handling', () => {
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible();
 
-    // The nav menu may be collapsed on mobile - click hamburger if needed
-    const hamburger = iframe.locator('[data-collapse-toggle="mega-menu"]');
-    if (await hamburger.isVisible()) {
-      await hamburger.click();
-    }
+    // Click "Test Data" in the nav to open the mega menu / show children
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
 
-    // Find and click a navigation link (wait for it since nav loads async)
-    const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
-    await navLink.waitFor({ state: 'attached' });
+    // Click "Another Page" under Test Data (filter by href to avoid matching
+    // a different "Another Page" in another section like Content Types)
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Another Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Verify the admin URL changed to reflect the new page (view mode)
@@ -177,9 +178,14 @@ test.describe('Navigation and URL Handling', () => {
       await dialog.dismiss(); // Cancel navigation
     });
 
-    // Try to navigate away by clicking a link in the iframe
+    // Try to navigate away by clicking a nav link in the iframe
+    // First open the Test Data mega menu, then click a child link to trigger real navigation
     const iframe = helper.getIframe();
-    const navLink = iframe.locator('nav a, header a').first();
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Give time for dialog to be handled
@@ -208,9 +214,12 @@ test.describe('Navigation and URL Handling', () => {
       }
     });
 
-    // Click a nav link to navigate away (wait for it since nav loads async)
-    const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
-    await navLink.waitFor({ state: 'attached' });
+    // Open Test Data mega menu, then click a child link to navigate away
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Wait for navigation to complete - expect to be on the new page in view mode
@@ -234,12 +243,14 @@ test.describe('Navigation and URL Handling', () => {
     // Check that navigation items are visible in the iframe
     const iframe = helper.getIframe();
     // The mock frontend displays navigation from API's @components.navigation.items
-    const navItems = iframe.locator('nav a, header a, .navigation a');
+    // Nuxt mega menu uses buttons for top-level items, mock uses <a> links
+    const navItems = iframe.locator('nav a, nav button, header a, .navigation a');
     await expect(navItems.first()).toBeVisible({ timeout: 10000 });
 
-    // Verify at least one known nav item exists (from mock fixtures)
-    const testPageLink = iframe.locator('a[href*="test-page"], a:has-text("Test Page")');
-    await expect(testPageLink.first()).toBeVisible({ timeout: 5000 });
+    // Verify top-level nav items exist (Test Data is a top-level mount)
+    // Top-level items may be <a> (mock) or <button> (Nuxt mega menu)
+    const testDataLink = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await expect(testDataLink.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('Navigation works in view mode without warning', async ({ page }, testInfo) => {
@@ -249,7 +260,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to view mode (not edit)
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Wait for iframe content to load
     const iframe = helper.getIframe();
@@ -262,9 +273,12 @@ test.describe('Navigation and URL Handling', () => {
       await dialog.accept();
     });
 
-    // Click "Accordion Test Page" link in iframe nav (wait for it since nav loads async)
-    const navLink = iframe.locator('a').filter({ hasText: 'Accordion Test Page' }).first();
-    await navLink.waitFor({ state: 'attached' });
+    // Open Test Data mega menu, then click Accordion Test Page to navigate
+    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
+    await testDataNav.waitFor({ state: 'visible' });
+    await testDataNav.click();
+    const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
+    await navLink.waitFor({ state: 'visible' });
     await navLink.click();
 
     // Wait for admin URL to change
@@ -280,7 +294,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to view mode (not edit)
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Wait for all blocks to render (Nuxt async components)
     await helper.getStableBlockCount();
@@ -332,7 +346,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to view mode
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
     await page.waitForLoadState('networkidle');
 
     const iframe = helper.getIframe();
@@ -367,7 +381,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Go to test-page in view mode
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
@@ -375,7 +389,7 @@ test.describe('Navigation and URL Handling', () => {
     // Get the current iframe src (should be path-based: localhost:8888/test-page)
     const iframeElement = page.locator('#previewIframe');
     const srcBefore = await iframeElement.getAttribute('src');
-    expect(srcBefore).toContain('localhost:8888/test-page');
+    expect(srcBefore).toContain(`localhost:8888${TEST_DATA_PREFIX}/test-page`);
     expect(srcBefore).not.toContain('#');
 
     // Open Personal Preferences
@@ -394,11 +408,11 @@ test.describe('Navigation and URL Handling', () => {
     // Wait for iframe src to change to hash-based format
     await expect(async () => {
       const src = await iframeElement.getAttribute('src');
-      expect(src).toContain('#/test-page');
+      expect(src).toContain(`#${TEST_DATA_PREFIX}/test-page`);
     }).toPass({ timeout: 10000 });
 
     const srcAfter = await iframeElement.getAttribute('src');
-    expect(srcAfter, 'Iframe src should have changed to hash-based URL').toContain('#/test-page');
+    expect(srcAfter, 'Iframe src should have changed to hash-based URL').toContain(`#${TEST_DATA_PREFIX}/test-page`);
 
     // Re-get iframe reference after reload and verify content still shows
     const iframeAfter = helper.getIframe();
@@ -413,7 +427,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Navigate to view mode (not edit) to see Contents action in toolbar
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Look for the contents/folder action in the toolbar
     // This should be visible because test-page is folderish (is_folderish: true in fixture)

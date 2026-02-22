@@ -15,6 +15,24 @@ const props = defineProps({
 
 // Inject shared templateState from page level
 const templateState = inject('templateState', {});
+const apiUrl = inject('apiUrl', '');
+
+// Sync fallback for templates not in the pre-loaded map (e.g. forced layouts).
+// Uses sync XHR so expandTemplatesSync can load on demand without async.
+function syncLoadTemplate(templateId) {
+  const tplPath = templateId.startsWith('http')
+    ? new URL(templateId).pathname
+    : `/${templateId.replace(/^\//, '')}`;
+  const url = `${apiUrl}${tplPath}`;
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', url, false);
+  xhr.setRequestHeader('Accept', 'application/json');
+  xhr.send();
+  if (xhr.status === 200) {
+    return JSON.parse(xhr.responseText);
+  }
+  throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
+}
 
 const items = computed(() => {
   // In edit mode, admin handles template merging - just pass through with @uid
@@ -31,6 +49,7 @@ const items = computed(() => {
     templateState,
     templates: props.templates,
     allowedLayouts: props.allowedLayouts,
+    loadTemplate: syncLoadTemplate,
   });
 });
 </script>

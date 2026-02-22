@@ -2,11 +2,13 @@
  * Helper class for interacting with Volto Hydra admin UI in tests.
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
+import { TEST_DATA_PREFIX } from './test-paths';
 
 export class AdminUIHelper {
   constructor(
     public readonly page: Page,
-    public readonly adminUrl: string = 'http://localhost:3001'
+    public readonly adminUrl: string = 'http://localhost:3001',
+    public readonly contentPrefix: string = TEST_DATA_PREFIX
   ) {
     // Capture browser console - all logs locally, only errors/warnings in CI
     this.page.on('console', (msg) => {
@@ -129,6 +131,14 @@ export class AdminUIHelper {
   }
 
   /**
+   * Build a full admin URL for a content path, e.g. contentUrl('/test-page', '/edit')
+   * → 'http://localhost:3001/_test_data/test-page/edit'
+   */
+  contentUrl(contentPath: string, suffix: string = ''): string {
+    return `${this.adminUrl}${this.contentPrefix}${contentPath}${suffix}`;
+  }
+
+  /**
    * Navigate to the edit page for a piece of content.
    * If already on the page in view mode, clicks the Edit button.
    * Otherwise uses client-side navigation to avoid SSR auth issues.
@@ -138,6 +148,8 @@ export class AdminUIHelper {
     if (!contentPath.startsWith('/')) {
       contentPath = '/' + contentPath;
     }
+    // Prepend content prefix (e.g., /_test_data) for test content paths
+    contentPath = `${this.contentPrefix}${contentPath}`;
 
     const editPath = `${contentPath}/edit`;
     const currentUrl = this.page.url();
@@ -166,6 +178,11 @@ export class AdminUIHelper {
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${editPath}`, { timeout: 10000 });
 
+    // Wait for iframe to navigate to the correct content path.
+    // Without this, waitForIframeReady can pass on stale content from the
+    // previous page (e.g., docs root blocks satisfy [data-block-uid] check).
+    await this.waitForIframeUrl(contentPath);
+
     // Wait for iframe to load
     await this.waitForIframeReady();
 
@@ -182,6 +199,8 @@ export class AdminUIHelper {
     if (!contentPath.startsWith('/')) {
       contentPath = '/' + contentPath;
     }
+    // Prepend content prefix (e.g., /_test_data) for test content paths
+    contentPath = `${this.contentPrefix}${contentPath}`;
 
     // Use React Router to navigate client-side
     await this.page.evaluate((path) => {
@@ -197,11 +216,27 @@ export class AdminUIHelper {
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${contentPath}`, { timeout: 10000 });
 
+    // Wait for iframe to navigate to the correct content path.
+    await this.waitForIframeUrl(contentPath);
+
     // Wait for iframe to load
     await this.waitForIframeReady();
 
     // Wait for all blocks to render (Nuxt async components may still be loading)
     await this.getStableBlockCount();
+  }
+
+  /**
+   * Wait for the preview iframe's src to contain the expected content path.
+   * Prevents waitForIframeReady from passing on stale content from a previous
+   * page (e.g., docs root blocks satisfy [data-block-uid] before the iframe
+   * has navigated to the new page).
+   */
+  async waitForIframeUrl(contentPath: string, timeout: number = 10000): Promise<void> {
+    await expect(async () => {
+      const src = await this.page.locator('#previewIframe').getAttribute('src');
+      expect(src).toContain(contentPath);
+    }).toPass({ timeout });
   }
 
   /**
@@ -406,18 +441,13 @@ export class AdminUIHelper {
     const iframe = this.getIframe();
     const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
-    // Verify block exists before trying to click
-    const blockCount = await blockLocator.count();
-    if (blockCount === 0) {
-      throw new Error(`Block with id "${blockId}" not found in iframe. Check if the block exists in the content.`);
-    }
-
     // Use first() for multi-element blocks (multiple elements with same UID)
     const block = blockLocator.first();
 
-    // Wait for the element to be stable (not re-rendering) by checking it's attached
-    // Vue/Nuxt may re-render after hydration, causing element references to become stale
-    await expect(block).toBeAttached({ timeout: 5000 });
+    // Wait for the block to appear in the DOM. This auto-retries, which is
+    // essential for comment-syntax blocks (e.g. hero) where data-block-uid
+    // is added asynchronously by materializeHydraComments after render.
+    await block.waitFor({ state: 'attached', timeout: 10000 });
 
     // Determine click target - either specific selector within block, or block itself
     const clickTarget = selector ? block.locator(selector) : block;
@@ -4285,50 +4315,19 @@ export class AdminUIHelper {
 
   /**
    * Wait for the object browser popup to be fully visible and ready.
-   * Handles both aside-based and div-based object browsers.
-   * Navigates to root (Home) since the browser may open at current page path.
+   * If the OB opens at a path with no children (e.g. a leaf page), navigates
+   * to the parent folder via the breadcrumb so items are visible.
    *
-   * @param timeout - Maximum time to wait in milliseconds (default: 5000)
+   * @param timeout - Maximum time to wait in milliseconds (default: 10000)
    * @returns Locator for the object browser popup
    */
-  async waitForObjectBrowser(timeout: number = 5000): Promise<Locator> {
-    // Wait for the Home button which appears inside the object browser when it's ready
-    // This is more reliable than waiting for the container, which may appear before content loads
+  async waitForObjectBrowser(timeout: number = 10000): Promise<Locator> {
+    // Wait for the Home button which indicates the OB is fully mounted
+    // (breadcrumbs rendered means componentDidMount has run)
     const homeButton = this.page.getByRole('button', { name: 'Home' });
     await expect(homeButton).toBeVisible({ timeout });
 
-    // Find the object browser container (aside for link editor, or image browser container)
-    const aside = this.page.locator('aside[role="presentation"]').last();
-    const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
-
-    let locator: Locator;
-    if (await aside.isVisible().catch(() => false)) {
-      locator = aside;
-    } else if (await chooseImageHeading.isVisible().catch(() => false)) {
-      // Get the parent container for image browser
-      locator = chooseImageHeading.locator('xpath=ancestor::*[.//ul or .//list]').first();
-      if (!(await locator.count())) {
-        locator = this.page.locator('ul:has(li)').filter({ hasText: /Document|Image/ }).last();
-      }
-    } else {
-      // Fallback to aside even if not detected (Home button was visible so browser is open)
-      locator = aside;
-    }
-
-    // Object browser may open at current page path (e.g., /test-page) which has no children.
-    // Check if we need to navigate to Home (list is empty or no matching items)
-    const listItems = this.page.locator('li').filter({ hasText: /Document|Image|Folder/ });
-    const hasItems = await listItems.first().isVisible().catch(() => false);
-
-    if (!hasItems) {
-      // Click Home to navigate to root where items are available
-      await homeButton.click();
-    }
-
-    // Wait for list items to appear
-    await expect(listItems.first()).toBeVisible({ timeout });
-
-    return locator;
+    return this.page.locator('.object-browser').last();
   }
 
   /**
@@ -4354,15 +4353,32 @@ export class AdminUIHelper {
    * @param folderName - The name of the folder to navigate into (e.g., "Images" or /images/i)
    */
   async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
-    // Find folder by text content since accessible names include full path like "/images (Document)"
-    // Search globally since the object browser container locator may vary
-    const folderItem = this.page.locator('li').filter({ hasText: folderName });
-    await folderItem.first().waitFor({ state: 'visible', timeout: 5000 });
-    await folderItem.first().click();
+    const folderItem = this.page.locator('.object-listing li').filter({ hasText: folderName });
 
-    // Wait for the listing to update - new items should appear
-    await this.page.waitForTimeout(300);
-    await expect(this.page.locator('li').first()).toBeVisible({ timeout: 5000 });
+    const found = await folderItem.first().waitFor({ state: 'visible', timeout: 500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!found) {
+      // Navigate up one level via breadcrumbs
+      const breadcrumbSections = this.page.locator('.object-browser .breadcrumbs .section');
+      const count = await breadcrumbSections.count();
+      if (count >= 2) {
+        await breadcrumbSections.nth(count - 2).click();
+        await this.page.waitForTimeout(1000);
+      }
+    }
+
+    // Try to find and click the folder; if still not found, we're already inside it
+    const nowFound = await folderItem.first().waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (nowFound) {
+      // With the shadowed OB, clicking a folder row always navigates (all modes)
+      await folderItem.first().click({ timeout: 2000 });
+      await expect(this.page.locator('.object-listing li').first()).toBeVisible({ timeout: 5000 });
+    }
   }
 
   /**
@@ -4373,14 +4389,36 @@ export class AdminUIHelper {
    * @param itemName - The name of the item to select (e.g., "Test Image 1" or /test-image-1/i)
    */
   async objectBrowserSelectItem(_objectBrowser: Locator, itemName: string | RegExp): Promise<void> {
-    // Find item by text content since accessible names include full path
-    // Search globally since the object browser container locator may vary
-    const item = this.page.locator('li').filter({ hasText: itemName });
-    await item.first().waitFor({ state: 'visible', timeout: 5000 });
-    await item.first().click();
+    const item = this.page.locator('.object-listing li').filter({ hasText: itemName });
 
-    // Wait for the object browser to close, or close it manually if it stays open
-    // Check for both "Choose Image" and "Choose Target" headings (different browser types)
+    // Give the initial @search (componentDidMount) time to populate the listing.
+    const itemQuickFound = await item.first().waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!itemQuickFound) {
+      // Item not in current listing (e.g. OB opened at a leaf page with no children).
+      // Navigate up by clicking the parent breadcrumb section in the OB.
+      const sections = this.page.locator('.object-browser .breadcrumbs .section');
+      const count = await sections.count();
+      if (count >= 2) {
+        await sections.nth(count - 2).click();
+        await this.page.waitForTimeout(1000);
+      }
+    }
+
+    await item.first().waitFor({ state: 'visible', timeout: 10000 });
+
+    // Use the radio/checkbox selection control if available (shadowed OB),
+    // otherwise fall back to clicking the row directly.
+    const selectControl = item.first().locator('.ob-select-control');
+    if (await selectControl.isVisible().catch(() => false)) {
+      await selectControl.click();
+    } else {
+      await item.first().click({ force: true });
+    }
+
+    // Wait for the object browser to close (single-select modes auto-close)
     const chooseImageHeading = this.page.getByRole('heading', { name: 'Choose Image' });
     const chooseTargetHeading = this.page.getByRole('heading', { name: 'Choose Target' });
     const browserHeading = await chooseImageHeading.isVisible().catch(() => false)
@@ -4390,15 +4428,13 @@ export class AdminUIHelper {
     try {
       await expect(browserHeading).not.toBeVisible({ timeout: 2000 });
     } catch {
-      // Object browser didn't auto-close, close it manually via the X button in header
-      // The X button is the last button in the header banner
+      // Object browser didn't auto-close, close it manually via the X button
       const banner = browserHeading.locator('..');
       const closeButton = banner.locator('button').last();
       if (await closeButton.isVisible().catch(() => false)) {
         await closeButton.click();
         await this.page.waitForTimeout(500);
       }
-      // If still visible, press Escape
       if (await browserHeading.isVisible().catch(() => false)) {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(500);

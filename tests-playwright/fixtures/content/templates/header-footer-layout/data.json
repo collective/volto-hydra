@@ -1,6 +1,7 @@
 {
   "@id": "/templates/header-footer-layout",
   "@type": "Document",
+  "UID": "header-footer-layout-uid",
   "id": "header-footer-layout",
   "title": "Header Footer Layout",
   "description": "A simple layout template with fixed header and footer",
@@ -9,8 +10,8 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/header-footer-layout",
-      "templateInstanceId": "/templates/header-footer-layout",
+      "templateId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "header-footer-def-instance",
       "placeholder": "header",
       "value": [
         {
@@ -22,8 +23,8 @@
     },
     "default-slot": {
       "@type": "slate",
-      "templateId": "/templates/header-footer-layout",
-      "templateInstanceId": "/templates/header-footer-layout",
+      "templateId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "header-footer-def-instance",
       "placeholder": "default",
       "value": [
         {
@@ -37,8 +38,8 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/header-footer-layout",
-      "templateInstanceId": "/templates/header-footer-layout",
+      "templateId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "header-footer-def-instance",
       "placeholder": "footer",
       "value": [
         {

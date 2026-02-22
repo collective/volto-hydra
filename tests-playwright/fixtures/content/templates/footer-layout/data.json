@@ -1,6 +1,7 @@
 {
   "@id": "/templates/footer-layout",
   "@type": "Document",
+  "UID": "footer-layout-uid",
   "id": "footer-layout",
   "title": "Footer Layout",
   "description": "A simple layout template for footer blocks with fixed branding",
@@ -9,8 +10,8 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/footer-layout",
-      "templateInstanceId": "/templates/footer-layout",
+      "templateId": "resolveuid/footer-layout-uid",
+      "templateInstanceId": "footer-layout-def-instance",
       "placeholder": "branding",
       "value": [
         {
@@ -22,8 +23,8 @@
     },
     "default-slot": {
       "@type": "slate",
-      "templateId": "/templates/footer-layout",
-      "templateInstanceId": "/templates/footer-layout",
+      "templateId": "resolveuid/footer-layout-uid",
+      "templateInstanceId": "footer-layout-def-instance",
       "placeholder": "default",
       "value": [
         {

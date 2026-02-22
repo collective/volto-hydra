@@ -6,7 +6,7 @@ export default async function ploneApi({
   watch = [],
   _default = {},
   pages = {},
-  allowedLayouts = [],  // Optional: forced layouts to pre-load
+  preloadTemplates = [],  // Specific templates to eagerly pre-load (forced layouts)
 }) {
   const runtimeConfig = useRuntimeConfig();
   const route = useRoute();
@@ -67,14 +67,18 @@ export default async function ploneApi({
 
         // Pre-load templates for SSR (avoids Suspense flicker)
         const loadTemplate = async (templateId) => {
-          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${templateId}`;
+          // templateId may be a path or a full URL — normalise to path
+          const tplPath = templateId.startsWith('http')
+            ? new URL(templateId).pathname
+            : `/${templateId.replace(/^\//, '')}`;
+          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${tplPath}`;
           const response = await fetch(url, { headers });
           if (!response.ok) {
             throw new Error(`Failed to fetch template: ${templateId}`);
           }
           return response.json();
         };
-        const templates = await loadTemplates(data, loadTemplate, allowedLayouts);
+        const templates = await loadTemplates(data, loadTemplate, preloadTemplates);
 
         return {
           page: data,

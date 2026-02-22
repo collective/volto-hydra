@@ -152,6 +152,7 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         PORT: '8888',
+        CONTENT_MOUNTS: '/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content',
       },
     },
     // Use prebuilt production server in CI, dev server locally

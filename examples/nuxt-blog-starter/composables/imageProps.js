@@ -109,7 +109,7 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         // image block without scale info - add default image scale
         image_url = `${image_url}/@@images/image`;
     }
-    else if (!/\.[a-zA-Z]+$/.test(image_url)) {
+    else if (!image_url.includes('@@images') && !/\.[a-zA-Z]+$/.test(image_url)) {
         image_url = "";
     }
     // `${['hidden', 'duration-700', 'ease-linear', 'bg-center',  ] + (block?.preview_image? ['bg-cover', imageProps(block.preview_image[0]).bg]:['bg-gray-700', 'bg-blend-multiply', 'bg-no-repeat'])}`

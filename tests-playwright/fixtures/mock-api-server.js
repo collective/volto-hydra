@@ -23,7 +23,10 @@ const PORT = process.env.PORT || 8888;
 function parseContentMounts() {
   const mountsEnv = process.env.CONTENT_MOUNTS;
   if (!mountsEnv) {
-    return [{ mountPath: '/', dirPath: path.join(__dirname, 'content') }];
+    return [
+      { mountPath: '/', dirPath: path.join(__dirname, '../../docs/content/content/content') },
+      { mountPath: '/_test_data', dirPath: path.join(__dirname, 'content') },
+    ];
   }
 
   return mountsEnv.split(',').map(mount => {
@@ -42,6 +45,9 @@ const sessionContent = {};
 
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
+
+// Map UIDs to URL paths (for resolveuid endpoint)
+const uidToPathMap = {};
 
 /**
  * Get session ID from request header.
@@ -191,17 +197,19 @@ function getImageScales(content, baseUrl) {
   return {
     image: [
       {
-        download: `${baseUrl}${contentPath}/@@images/image`,
+        'content-type': 'image/jpeg',
+        download: `@@images/image`,
+        filename: `${content.id || 'image'}.jpg`,
         width: width,
         height: height,
         scales: {
           preview: {
-            download: `${baseUrl}${contentPath}/@@images/image/preview`,
+            download: `@@images/image/preview`,
             width: Math.min(width, 400),
             height: Math.min(height, 400),
           },
           large: {
-            download: `${baseUrl}${contentPath}/@@images/image/large`,
+            download: `@@images/image/large`,
             width: Math.min(width, 800),
             height: Math.min(height, 800),
           },
@@ -209,6 +217,54 @@ function getImageScales(content, baseUrl) {
       }
     ]
   };
+}
+
+/**
+ * Generate scales object for an image field
+ * @param {string} fullUrl - Full URL of the content item
+ * @param {string} fieldName - Image field name (e.g., 'image', 'preview_image')
+ * @param {number} width - Original image width
+ * @param {number} height - Original image height
+ */
+function generateScalesForField(fullUrl, fieldName, width, height) {
+  const scaleConfigs = {
+    icon: 32, tile: 64, thumb: 128, mini: 200,
+    preview: 400, teaser: 600, large: 800, larger: 1000,
+    great: 1200, huge: 1600,
+  };
+  const scales = {};
+  for (const [name, maxDim] of Object.entries(scaleConfigs)) {
+    if (maxDim < width || maxDim < height) {
+      const ratio = Math.min(maxDim / width, maxDim / height);
+      scales[name] = {
+        download: `${fullUrl}/@@images/${fieldName}/${name}`,
+        width: Math.round(width * ratio),
+        height: Math.round(height * ratio),
+      };
+    }
+  }
+  return scales;
+}
+
+/**
+ * Transform distribution blob_path fields to proper download URLs.
+ * Distribution content uses `blob_path` for image/preview_image fields;
+ * the Plone REST API uses `download` URLs and `scales`.
+ */
+function transformBlobPaths(content, fullUrl) {
+  const imageFields = ['image', 'preview_image'];
+  const result = { ...content };
+  for (const field of imageFields) {
+    if (result[field]?.blob_path) {
+      const { blob_path, ...rest } = result[field];
+      result[field] = {
+        ...rest,
+        download: `${fullUrl}/@@images/${field}`,
+        scales: generateScalesForField(fullUrl, field, rest.width || 800, rest.height || 600),
+      };
+    }
+  }
+  return result;
 }
 
 /**
@@ -330,6 +386,9 @@ function loadContentFromDisk(urlPath) {
  */
 function formatNavItem(rawContent, urlPath, baseUrl) {
   const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
+  const children = (rawContent.is_folderish !== false)
+    ? getNavigationItems(urlPath, 1)
+    : [];
   return {
     '@id': `${baseUrl}${urlPath}`,
     '@type': rawContent['@type'],
@@ -340,7 +399,7 @@ function formatNavItem(rawContent, urlPath, baseUrl) {
     'UID': rawContent.UID || `${rawContent.id}-uid`,
     'is_folderish': rawContent.is_folderish !== undefined ? rawContent.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
-    'items': [],
+    'items': children,
   };
 }
 
@@ -372,14 +431,22 @@ function getNavigationItems(basePath = '/', depth = 1) {
     })
     .map((itemPath) => {
       const rawContent = loadRawContentFromDisk(itemPath);
+      if (rawContent.exclude_from_nav) return null;
+      if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
       return formatNavItem(rawContent, itemPath, baseUrl);
-    });
+    })
+    .filter(Boolean);
 }
 
 /**
- * Get root-level navigation items (wrapper for @search endpoint)
+ * Get root-level navigation items.
+ * Merges items from all content mounts so test content (/_test_data/*)
+ * appears alongside docs content in the navigation.
  */
 function getRootNavigationItems() {
+  // Non-root mounts with a root data.json (e.g., /_test_data) appear as
+  // content items at depth 1 under '/', so getNavigationItems('/') finds
+  // them naturally as dropdown folders with their children.
   return getNavigationItems('/', 1);
 }
 
@@ -425,26 +492,71 @@ function generateComponents(urlPath, baseUrl) {
     },
     'navigation': {
       '@id': `${fullUrl}/@navigation`,
-      // Determine navigation root:
-      // - If current path has children (is a folder with content), show its children
-      // - Otherwise show siblings (items at same level)
-      'items': (() => {
-        const hasChildren = Object.keys(contentDirMap).some(p =>
-          p !== cleanPath && p.startsWith(cleanPath + '/'));
-        if (hasChildren) {
-          return getNavigationItems(cleanPath, 1);
-        }
-        // Show siblings - items under parent path
-        const parentPath = pathParts.length > 1
-          ? '/' + pathParts.slice(0, -1).join('/')
-          : '/';
-        return getNavigationItems(parentPath, 1);
-      })()
+      // Always rooted at site root — top-level items with nested children
+      'items': getRootNavigationItems()
     },
     'workflow': {
       '@id': `${fullUrl}/@workflow`
     }
   };
+}
+
+/**
+ * Resolve resolveuid/UID references in content to actual paths.
+ * Like Plone's serializer, converts resolveuid/UID strings to full URLs.
+ * All string values are resolved, including templateId/templateInstanceId —
+ * these are real Plone paths that the serializer resolves.
+ */
+function resolveUidUrls(obj) {
+  if (typeof obj === 'string') {
+    return obj.replace(/(?:\.\.\/)*resolveuid\/([a-z0-9][-a-z0-9]*)/g, (match, uid) => {
+      const resolvedPath = uidToPathMap[uid];
+      if (!resolvedPath) return match;
+      return `http://localhost:${PORT}${resolvedPath}`;
+    });
+  }
+  if (Array.isArray(obj)) return obj.map(item => resolveUidUrls(item));
+  if (obj && typeof obj === 'object') {
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = resolveUidUrls(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
+ * Add image_scales to catalog brain references embedded in block data.
+ * Real Plone includes image_scales in catalog brains; our content export doesn't.
+ * Walks the data and for any object with image_field but no image_scales,
+ * looks up the referenced image content and generates scales.
+ */
+function enrichImageBrains(obj, baseUrl) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => enrichImageBrains(item, baseUrl));
+
+  // Check if this object is a catalog brain reference missing image_scales
+  if (obj.image_field && !obj.image_scales && obj['@id']) {
+    // Extract path from @id URL
+    const idUrl = obj['@id'];
+    const contentPath = idUrl.startsWith('http') ? new URL(idUrl).pathname : idUrl;
+    const rawContent = loadRawContentFromDisk(contentPath);
+    if (rawContent) {
+      const enrichedImage = enrichContent(rawContent, contentPath, baseUrl);
+      const scales = getImageScales(enrichedImage, baseUrl);
+      if (scales) {
+        obj = { ...obj, image_scales: scales };
+      }
+    }
+  }
+
+  // Recurse into nested objects
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = enrichImageBrains(value, baseUrl);
+  }
+  return result;
 }
 
 /**
@@ -471,17 +583,20 @@ function enrichContent(content, urlPath, baseUrl) {
     };
   }
 
-  return {
-    ...content,
+  // Transform distribution blob_path fields to download URLs
+  const transformed = transformBlobPaths(content, fullUrl);
+
+  const enriched = {
+    ...transformed,
     '@id': fullUrl,
-    'UID': content.UID || `${content.id || urlPath.replace(/\//g, '-')}-uid`,
-    'review_state': content.review_state || 'published',
-    'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
-    'allow_discussion': content.allow_discussion !== undefined ? content.allow_discussion : false,
-    'exclude_from_nav': content.exclude_from_nav || false,
-    'created': content.created || '2025-01-01T12:00:00+00:00',
-    'modified': content.modified || '2025-01-01T12:00:00+00:00',
-    'lock': content.lock || { 'locked': false, 'stealable': true },
+    'UID': transformed.UID || `${transformed.id || urlPath.replace(/\//g, '-')}-uid`,
+    'review_state': transformed.review_state || 'published',
+    'is_folderish': transformed.is_folderish !== undefined ? transformed.is_folderish : true,
+    'allow_discussion': transformed.allow_discussion !== undefined ? transformed.allow_discussion : false,
+    'exclude_from_nav': transformed.exclude_from_nav || false,
+    'created': transformed.created || '2025-01-01T12:00:00+00:00',
+    'modified': transformed.modified || '2025-01-01T12:00:00+00:00',
+    'lock': transformed.lock || { 'locked': false, 'stealable': true },
     'parent': parent,
     '@components': generateComponents(urlPath, baseUrl),
     // Permissions - always grant for mock API
@@ -492,6 +607,10 @@ function enrichContent(content, urlPath, baseUrl) {
     'can_add': true,
     'can_list_contents': true
   };
+
+  // Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
+  // Then add image_scales to catalog brain references (like Plone's serializer)
+  return enrichImageBrains(resolveUidUrls(enriched), baseUrl);
 }
 
 /**
@@ -519,11 +638,20 @@ function scanContentDir(contentDirPath, mountPath) {
         // Use @id from content if it's a path, otherwise use directory name
         let contentPath = content['@id']?.startsWith('/') ? content['@id'] : '/' + (content.id || dir.name);
 
+        // Handle distribution site root (plone_site_root dir or @id=/Plone)
+        if (dir.name === 'plone_site_root' || contentPath === '/Plone') {
+          contentPath = '/';
+        }
+
         // Apply mount prefix
         const urlPath = mountPath === '/' ? contentPath : mountPath + contentPath;
 
         // Only store the directory mapping, content loaded on-demand
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
+        // Track UID→path for resolveuid endpoint
+        if (content.UID) {
+          uidToPathMap[content.UID] = urlPath;
+        }
         console.log(`Registered content: ${urlPath}`);
       }
       // Always recurse into subdirectories to find nested content (e.g., templates/)
@@ -561,6 +689,15 @@ function getSiteRoot() {
 // Scan content directories on startup (content loaded on-demand)
 function initContentDirMap() {
   CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
+    // Register the mount point itself if it has a root data.json (e.g., /_test_data folder page).
+    // The '/' mount is handled via plone_site_root inside scanContentDir.
+    if (mountPath !== '/') {
+      const rootDataPath = path.join(dirPath, 'data.json');
+      if (fs.existsSync(rootDataPath)) {
+        contentDirMap[mountPath] = { dirPath, dirName: path.basename(dirPath) };
+        console.log(`Registered content: ${mountPath}`);
+      }
+    }
     scanContentDir(dirPath, mountPath);
   });
   console.log(`Registered ${Object.keys(contentDirMap).length} content paths`);
@@ -571,7 +708,7 @@ initContentDirMap();
 
 /**
  * Get content for a path
- * Checks: session uploads -> site root -> disk content
+ * Checks: session uploads -> disk content -> generated site root
  * @param {string} urlPath - Content path
  * @param {string} sessionId - Session ID for session-specific uploads
  */
@@ -581,13 +718,16 @@ function getContent(urlPath, sessionId) {
     return sessionContent[sessionId][urlPath];
   }
 
-  // Handle site root specially (not on disk)
+  // Try disk first (distribution content may have a site root)
+  const diskContent = loadContentFromDisk(urlPath);
+  if (diskContent) return diskContent;
+
+  // Fall back to generated site root
   if (urlPath === '/') {
     return getSiteRoot();
   }
 
-  // Load from disk
-  return loadContentFromDisk(urlPath);
+  return null;
 }
 
 /**
@@ -1228,10 +1368,22 @@ app.post('*/@querystring-search', (req, res) => {
   const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
   console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
 
-  // Get all content items
+  // Get all content items using raw content (no enrichment needed for search).
+  // loadContentFromDisk enriches every item (resolveuid, image scales, components)
+  // which is extremely slow with 70+ items. Search results only need basic fields.
   let allItems = Object.keys(contentDirMap)
     .filter((itemPath) => itemPath !== '/')
-    .map((itemPath) => loadContentFromDisk(itemPath))
+    .map((itemPath) => {
+      const raw = loadRawContentFromDisk(itemPath);
+      if (!raw) return null;
+      // Add @id and UID like enrichContent would, but skip expensive processing
+      return {
+        ...raw,
+        '@id': `${baseUrl}${itemPath}`,
+        UID: raw.UID || `${raw.id || itemPath.split('/').pop()}-uid`,
+        id: raw.id || itemPath.split('/').pop(),
+      };
+    })
     .filter((content) => content !== null);
 
   // Apply query filters
@@ -1323,11 +1475,31 @@ app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
+  const searchableText = req.query['SearchableText'];
+  const portalType = req.query['portal_type'];
   const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
+  // Handle SearchableText (used by ObjectBrowser search input)
+  if (searchableText) {
+    const searchTerm = searchableText.replace(/\*$/, '').toLowerCase();
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => itemPath !== '/')
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
+      .filter((item) => {
+        const title = (item.title || '').toLowerCase();
+        const description = (item.description || '').toLowerCase();
+        return title.includes(searchTerm) || description.includes(searchTerm);
+      });
+    // Filter by portal_type if specified
+    if (portalType) {
+      const types = Array.isArray(portalType) ? portalType : [portalType];
+      items = items.filter((item) => types.includes(item['@type']));
+    }
+  }
   // Handle path.query with path.depth=0 (exact match for specific content)
+  else
   if (pathQuery && pathDepth === '0') {
     const content = loadContentFromDisk(pathQuery);
     if (content) {
@@ -1336,27 +1508,63 @@ app.get('*/@search', (req, res) => {
       items = [];
     }
   } else if (pathDepth === '1') {
-    // Get immediate children of the search path
-    // For site root (/), return all root-level items
-    // For other paths, return their children (if any)
-    if (searchPath === '' || searchPath === '/') {
-      // Root level - use shared helper
-      items = getRootNavigationItems();
-    } else {
-      // Specific path - return its children
-      // For Documents (non-folderish items), this will be empty
-      const searchContent = loadContentFromDisk(searchPath);
-      if (searchContent && searchContent.is_folderish) {
-        // Return children if folder
+    // Get immediate children of the search path (used by ObjectBrowser)
+    // Unlike navigation, search returns ALL content types (including Images, Files)
+    const normalizedSearch = (searchPath === '' || searchPath === '/') ? '/' : searchPath;
+    const searchDepth = normalizedSearch === '/' ? 0 : normalizedSearch.split('/').filter(Boolean).length;
+
+    // Get direct children from contentDirMap (items at searchDepth + 1)
+    items = Object.keys(contentDirMap)
+      .filter((itemPath) => {
+        if (itemPath === '/') return false;
+        if (itemPath === normalizedSearch) return false;
+        // Must be under the search path
+        if (normalizedSearch !== '/' && !itemPath.startsWith(normalizedSearch + '/')) return false;
+        // Must be exactly one level deeper
+        const itemParts = itemPath.split('/').filter(Boolean);
+        return itemParts.length === searchDepth + 1;
+      })
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+
+    // For root searches, also include non-root mount points as virtual folders
+    // so the object browser can navigate into them (e.g., _test_data)
+    if (normalizedSearch === '/') {
+      CONTENT_MOUNTS.forEach(({ mountPath }) => {
+        if (mountPath === '/') return;
+        const mountParts = mountPath.split('/').filter(Boolean);
+        if (mountParts.length !== 1) return; // Only top-level mounts
+        const mountName = mountParts[0];
+        // Skip if already in contentDirMap (has its own data.json)
+        if (contentDirMap[mountPath]) return;
+        items.push({
+          '@id': `${baseUrl}${mountPath}`,
+          '@type': 'Folder',
+          'id': mountName,
+          'title': mountName.replace(/[_-]/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()),
+          'description': '',
+          'review_state': 'published',
+          'UID': `virtual-mount-${mountName}`,
+          'is_folderish': true,
+          'hasPreviewImage': false,
+          'image_field': null,
+          'image_scales': null,
+        });
+      });
+    }
+
+    // For non-root paths not in contentDirMap (e.g. mount points like /_test_data),
+    // check if any content exists under this path and list children
+    if (items.length === 0 && normalizedSearch !== '/' && !contentDirMap[normalizedSearch]) {
+      const hasChildren = Object.keys(contentDirMap).some(p => p.startsWith(normalizedSearch + '/'));
+      if (hasChildren) {
         items = Object.keys(contentDirMap)
           .filter((itemPath) => {
-            if (itemPath === searchPath) return false;
-            return itemPath.startsWith(searchPath + '/');
+            if (itemPath === normalizedSearch) return false;
+            if (!itemPath.startsWith(normalizedSearch + '/')) return false;
+            const itemParts = itemPath.split('/').filter(Boolean);
+            return itemParts.length === searchDepth + 1;
           })
           .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
-      } else {
-        // Non-folder or not found - return empty
-        items = [];
       }
     }
   } else {
@@ -1475,6 +1683,23 @@ app.delete('*/@lock', (req, res) => {
 });
 
 /**
+ * GET /resolveuid/:uid
+ * Resolve a UID to content - used by distribution content that references
+ * other content via resolveuid/UID links
+ */
+app.get('*/resolveuid/:uid', (req, res) => {
+  const uid = req.params.uid;
+  const contentPath = uidToPathMap[uid];
+  if (contentPath) {
+    const content = getContent(contentPath, getSessionId(req));
+    if (content) return res.json(content);
+  }
+  res.status(404).json({
+    error: { type: 'NotFound', message: `UID not found: ${uid}` }
+  });
+});
+
+/**
  * GET *\/@@images/*
  * Serve images for Plone image scales
  * URLs like: /test-image-1/@@images/image/preview
@@ -1482,16 +1707,18 @@ app.delete('*/@lock', (req, res) => {
  * otherwise falls back to placeholder SVGs.
  */
 app.get('*/@@images/*', (req, res) => {
-  // Extract content path and scale from URL
-  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, scale=preview
-  const pathMatch = req.path.match(/^(.+?)\/@@images\/image(?:\/(\w+))?$/);
+  // Extract content path, field name, and scale from URL
+  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, fieldName=image, scale=preview
+  // e.g., /block/grid-block/@@images/preview_image/large -> fieldName=preview_image, scale=large
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/(\w+)(?:\/(\w+))?$/);
   const contentPath = pathMatch ? pathMatch[1] : '';
-  const scale = pathMatch && pathMatch[2] ? pathMatch[2] : 'preview';
+  const fieldName = pathMatch ? pathMatch[2] : 'image';
+  const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
 
   // Try to serve actual image file from content directory
   // Use contentDirMap to find actual directory for nested paths
   const dirInfo = contentDirMap[contentPath];
-  const imageDir = dirInfo ? path.join(dirInfo.dirPath, 'image') : null;
+  const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
   if (imageDir && fs.existsSync(imageDir)) {
     const files = fs.readdirSync(imageDir);

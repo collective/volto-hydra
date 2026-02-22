@@ -60,10 +60,10 @@
         <div id="footer-content"></div>
     </footer>
 
-    <script src="renderer.js"></script>
+    <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from './hydra.js';
-        import { sharedBlocksConfig } from './shared-block-schemas.js';
+        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from '/hydra.js';
+        import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
         function getPagesFromUrl() {
@@ -152,8 +152,8 @@
             // Render footer_blocks if present (or if forced layout will inject content)
             // Determine if we should force footer layout based on page path (same logic as bridge init)
             const pagePath = contextPath.replace(/\/edit$/, '');
-            const forceFooterLayout = pagePath === '/another-page';
-            const footerAllowedLayouts = forceFooterLayout ? ['/templates/footer-layout'] : null;
+            const forceFooterLayout = pagePath === '/_test_data/another-page';
+            const footerAllowedLayouts = forceFooterLayout ? ['/_test_data/templates/footer-layout'] : null;
 
             if (myGeneration !== window._renderGeneration) return; // stale render
 
@@ -169,7 +169,11 @@
                     if (token) {
                         headers['Authorization'] = `Bearer ${token}`;
                     }
-                    const res = await fetch(`${window.location.origin}${templateId}`, { headers });
+                    // templateId may be a resolveuid path or a full URL — normalise to absolute path
+                    const url = templateId.startsWith('http')
+                        ? new URL(templateId).pathname
+                        : `/${templateId.replace(/^\//, '')}`;
+                    const res = await fetch(url, { headers });
                     return res.json();
                 };
                 const expandedItems = await expandTemplates(footerLayout, {
@@ -263,7 +267,11 @@
                     if (token) {
                         headers['Authorization'] = `Bearer ${token}`;
                     }
-                    const res = await fetch(`/++api++${templateId}`, { headers });
+                    // templateId may be a resolveuid path or a full URL — normalise to path
+                    const tplPath = templateId.startsWith('http')
+                        ? new URL(templateId).pathname
+                        : `/${templateId.replace(/^\//, '')}`;
+                    const res = await fetch(`/++api++${tplPath}`, { headers });
                     return res.json();
                 };
 
@@ -282,9 +290,20 @@
                 const navElement = document.getElementById('navigation');
                 tfLog('Navigation items from API:', navItems.length, navItems.map(i => i.title));
                 if (navItems.length > 0) {
-                    navElement.innerHTML = navItems.map(item =>
-                        `<a href="${new URL(item['@id']).pathname}">${item.title}</a>`
-                    ).join('');
+                    // Show top-level items; only expand children for the current folder
+                    const currentPath = contentPath.replace(/\/$/, '');
+                    navElement.innerHTML = navItems.map(item => {
+                        const path = new URL(item['@id']).pathname;
+                        const children = item.items || [];
+                        const isCurrent = currentPath === path || currentPath.startsWith(path + '/');
+                        if (children.length > 0 && isCurrent) {
+                            const childLinks = children.map(child =>
+                                `<a href="${new URL(child['@id']).pathname}">${child.title}</a>`
+                            ).join('');
+                            return `<a href="${path}">${item.title}</a> ${childLinks}`;
+                        }
+                        return `<a href="${path}">${item.title}</a>`;
+                    }).join('');
                     tfLog('Navigation rendered, innerHTML length:', navElement.innerHTML.length);
                 } else {
                     tfLog('WARNING: No navigation items to render!');
@@ -314,7 +333,7 @@
                     // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
-                    const forceFooterLayout = pagePath === '/another-page';
+                    const forceFooterLayout = pagePath === '/_test_data/another-page';
 
                     window.bridge = initBridge({
                         pageBlocksFields: [
@@ -322,15 +341,15 @@
                                 fieldName: 'blocks',
                                 title: 'Blocks',
                                 allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
-                                allowedTemplates: ['/templates/test-layout'],
-                                allowedLayouts: [null, '/templates/test-layout', '/templates/header-footer-layout', '/templates/header-only-layout', '/templates/editable-fixed-layout'],
+                                allowedTemplates: ['/_test_data/templates/test-layout'],
+                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },
                             {
                                 fieldName: 'footer_blocks',
                                 title: 'Footer',
                                 allowedBlocks: ['slate', 'image'],
                                 // Only force footer layout on /another-page
-                                ...(forceFooterLayout ? { allowedLayouts: ['/templates/footer-layout'] } : {}),
+                                ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
                             },
                         ],
                         voltoConfig: voltoConfig,

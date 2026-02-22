@@ -43,8 +43,9 @@ test.describe('Authentication and Access Control', () => {
   });
 
   test('Edit page requires authentication', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
     // Try to access edit page without logging in
-    await page.goto('http://localhost:3001/test-page/edit');
+    await page.goto(helper.contentUrl('/test-page', '/edit'));
 
     // Should show Unauthorized page (not the edit form)
     const unauthorized = page.locator('text=Unauthorized');
@@ -52,8 +53,9 @@ test.describe('Authentication and Access Control', () => {
   });
 
   test('View page requires authentication', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
     // Try to access view page without logging in
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
 
     // Should redirect to login or show Unauthorized
     // Wait for either login page or unauthorized message
@@ -120,7 +122,7 @@ test.describe('Authentication and Access Control', () => {
     await helper.login();
 
     // Navigate to view page (not edit)
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
     await page.waitForLoadState();
 
     // The left toolbar should be visible with Edit button
@@ -145,7 +147,7 @@ test.describe('Authentication and Access Control', () => {
     await helper.login();
 
     // Navigate to view page
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
     await page.waitForLoadState('networkidle');
 
     // Click the Edit button
@@ -171,7 +173,7 @@ test.describe('Authentication and Access Control', () => {
     await helper.login();
 
     // Navigate to view page (not edit) where PersonalTools is visible
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(helper.contentUrl('/test-page'));
     await page.waitForLoadState('networkidle');
 
     // Verify toolbar with PersonalTools is visible
@@ -189,8 +191,9 @@ test.describe('Authentication and Access Control', () => {
   });
 
   test('Unauthenticated access redirects to login', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
     // Try to access edit page without logging in
-    await page.goto('http://localhost:3001/test-page/edit');
+    await page.goto(helper.contentUrl('/test-page', '/edit'));
 
     // Wait for page to load and potentially redirect
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});

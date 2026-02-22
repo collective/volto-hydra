@@ -172,37 +172,19 @@ test.describe('Inline Editing - Links', () => {
     const browseButton = await helper.getLinkEditorBrowseButton();
     await browseButton.click();
 
-    // Wait for object browser to open (use last() to get the newly opened sidebar)
-    const objectBrowser = page.locator('aside[role="presentation"]').last();
-    await objectBrowser.waitFor({ state: 'visible', timeout: 5000 });
+    // Wait for object browser to be ready. The OB opens at /_test_data/test-page
+    // (no children), so the helper navigates to the parent folder /_test_data
+    // where Another Page is visible as a sibling.
+    const objectBrowser = await helper.waitForObjectBrowser();
 
-    // Verify the object browser is visible
-    await expect(objectBrowser).toBeVisible();
+    // Select "Another Page" from the list (OB auto-submits the link)
+    await helper.objectBrowserSelectItem(objectBrowser, /Another Page/);
 
-    // Wait for ObjectBrowser animation to complete (slide-in animation)
-    await page.waitForTimeout(600);
-
-    // Click the home icon in breadcrumb to navigate to root (test-page has no children)
-    // The error context shows: button "Home" with img "Home" inside
-    const homeBreadcrumb = objectBrowser.getByRole('button', { name: 'Home' });
-    await homeBreadcrumb.waitFor({ state: 'visible', timeout: 2000 });
-    await homeBreadcrumb.click();
-
-    // Wait for the page list to populate with root-level pages
-    await page.waitForTimeout(500); // Wait for API call to complete
-
-    // Click on "Another Page" from the list - it's a listitem, not a button
-    const anotherPageItem = objectBrowser.getByRole('listitem', { name: /Another Page/ });
-    await anotherPageItem.waitFor({ state: 'visible', timeout: 2000 });
-    await anotherPageItem.click();
-
-    // Wait for ObjectBrowser to close and URL to be populated in LinkEditor
-    await page.waitForTimeout(500);
-
-    // Now click Submit button in LinkEditor to create the link
+    // Click Submit if the LinkEditor is still open
     const submitButton = page.getByRole('button', { name: 'Submit' });
-    await submitButton.waitFor({ state: 'visible', timeout: 2000 });
-    await submitButton.click();
+    if (await submitButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await submitButton.click();
+    }
 
     // Wait for the link to be created in the editor
     await page.waitForTimeout(500);
@@ -340,13 +322,15 @@ test.describe('Inline Editing - Links', () => {
           const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement | null;
           const iframeActive = iframeEl?.contentDocument?.activeElement;
           return {
+            runId: (window as any).__testRunId,
             topActive: active?.tagName + (active?.id ? '#' + active.id : ''),
             topIsFocused: document.hasFocus(),
             iframeActive: iframeActive?.tagName + (iframeActive?.className ? '.' + iframeActive.className.split(' ')[0] : ''),
             iframeContentEditable: iframeActive?.getAttribute('contenteditable'),
           };
         });
-        console.log('[link-cancel] focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
+        const prefix = debugInfo.runId != null ? `[link-cancel][RUN-${debugInfo.runId}]` : '[link-cancel]';
+        console.log(prefix, 'focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
       }
       expect(selectionInfo.editorHasFocus).toBe(true);
       expect(selectionInfo.isCollapsed).toBe(false);

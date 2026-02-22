@@ -26,7 +26,7 @@
         }
       ],
       "plaintext": "Stale Header Page 2 - Should Be Replaced By Merge",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-2",
       "placeholder": "header"
     },
@@ -39,7 +39,7 @@
         }
       ],
       "plaintext": "Page 2 user content in placeholder",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-2",
       "placeholder": "primary"
     },
@@ -54,7 +54,7 @@
         }
       ],
       "plaintext": "Stale Footer Page 2 - Should Be Replaced By Merge",
-      "templateId": "/templates/test-layout",
+      "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-2",
       "placeholder": "footer"
     }
