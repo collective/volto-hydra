@@ -568,7 +568,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const initialFacets = iframe.locator('.facet-item[data-block-uid]');
     await expect(initialFacets.first()).toBeVisible({ timeout: 10000 });
     const initialCount = await initialFacets.count();
-    expect(initialCount).toBe(2); // facet-type and facet-state
+    expect(initialCount).toBe(3); // facet-type, facet-state, facet-subject
 
     // Wait for iframe to finish re-rendering after initial load —
     // expanding facets triggers multiple FORM_DATA updates to iframe.
@@ -601,14 +601,14 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await expect(addButton).toBeVisible({ timeout: 5000 });
     await addButton.click();
 
-    // Wait for the new facet to be added (count goes from 2 to 3)
+    // Wait for the new facet to be added (count goes from 3 to 4)
     const allFacets = iframe.locator('.facet-item[data-block-uid]');
-    await expect(allFacets).toHaveCount(3, { timeout: 10000 });
+    await expect(allFacets).toHaveCount(4, { timeout: 10000 });
 
-    // Find the new facet ID (not facet-type or facet-state)
-    const knownIds = ['facet-type', 'facet-state'];
+    // Find the new facet ID (not one of the known initial facets)
+    const knownIds = ['facet-type', 'facet-state', 'facet-subject'];
     let newFacetId: string | null = null;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const uid = await allFacets.nth(i).getAttribute('data-block-uid');
       if (uid && !knownIds.includes(uid)) {
         newFacetId = uid;

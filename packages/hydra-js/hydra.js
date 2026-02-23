@@ -11739,25 +11739,37 @@ export function expandTemplatesSync(inputItems, options = {}) {
         if (nextTplBlock?.fixed) break; // Stop at next fixed block
       }
 
-      // For container blocks, compute childPlaceholders: a map of blocks field name
-      // to the first placeholder in that field. Handles containers with multiple
-      // blocks fields (columns, accordions) where the placeholder may be the first/only child.
+      // For container blocks, filter nested blocks to only those with template markers
+      // (placeholder or templateId). Blocks without these are template-internal details
+      // that should not be synced to pages. Also compute childPlaceholders.
       let childPlaceholders = undefined;
+      let filteredBlocks = blockContent.blocks;
+      let filteredLayout = blockContent.blocks_layout;
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
         const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        const newNestedBlocks = {};
+        const newNestedLayout = [];
         for (const nestedId of nestedLayout) {
           const nested = tplBlock.blocks[nestedId];
-          if (nested && !nested.fixed && nested.placeholder) {
-            if (!childPlaceholders) childPlaceholders = {};
-            childPlaceholders['blocks'] = nested.placeholder;
-            break;
+          if (!nested) continue;
+          if (nested.placeholder || nested.templateId) {
+            newNestedBlocks[nestedId] = nested;
+            newNestedLayout.push(nestedId);
+            if (!nested.fixed && nested.placeholder) {
+              if (!childPlaceholders) childPlaceholders = {};
+              if (!childPlaceholders['blocks']) childPlaceholders['blocks'] = nested.placeholder;
+            }
           }
         }
+        filteredBlocks = newNestedBlocks;
+        filteredLayout = { items: newNestedLayout };
       }
 
       addItem(
         {
           ...blockContent,
+          blocks: filteredBlocks,
+          blocks_layout: filteredLayout,
           templateId: templateId,
           templateInstanceId: instanceId,
           ...(nextPlaceholder && { nextPlaceholder }),
@@ -11767,11 +11779,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
       );
 
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
-        templateState.nestedContainers.set(tplBlock.blocks, {
+        templateState.nestedContainers.set(filteredBlocks, {
           templateBlockId: tplBlockId,
-          templateBlocks: tplBlock.blocks,
-          templateLayout: nestedLayout,
+          templateBlocks: filteredBlocks,
+          templateLayout: filteredLayout.items,
         });
       }
     } else {
