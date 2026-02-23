@@ -2566,7 +2566,10 @@ const Iframe = (props) => {
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
           pendingInitialDataRef.current = null;
-        })();
+        })().catch(err => {
+          log('[INITIAL_DATA] ERROR in forced-layout merge:', err.message, err.stack);
+          console.error('[INITIAL_DATA] Error (forced-layout):', err);
+        });
         return;
       }
 
@@ -2649,7 +2652,10 @@ const Iframe = (props) => {
 
         // Update Redux with merged data (without empty block additions - those are UI-only)
         onChangeFormData(mergedFormData);
-      })();
+      })().catch(err => {
+        log('[INITIAL_DATA] ERROR in template loading/merge:', err.message, err.stack);
+        console.error('[INITIAL_DATA] Error:', err);
+      });
 
       return; // Don't continue to Case 2 while templates are loading
     }

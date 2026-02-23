@@ -10968,16 +10968,25 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
   let result = { ...page };
   const allNewTemplateIds = new Set();
 
-  // Helper to recursively process blocks and their nested containers
-  async function processBlocksRecursive(blocks, layout, allowedLayouts, templateState) {
-    const items = await expandTemplates(layout, {
-      blocks,
-      templateState,
-      loadTemplate,
-      allowedLayouts,
-      uuidGenerator,
-      filterInstanceId,
-    });
+  // Helper to expand templates at one level, then recurse into nested containers.
+  // Only the top call for each blocks field does template expansion;
+  // nested containers just need their inner containers processed (templates
+  // inside containers were already merged by expandTemplatesSync).
+  async function processBlocksRecursive(blocks, layout, allowedLayouts, templateState, skipExpand = false) {
+    let items;
+    if (skipExpand) {
+      // Already expanded — just convert layout IDs to block objects
+      items = layout.map(id => blocks[id] ? { ...blocks[id], '@uid': id } : null).filter(Boolean);
+    } else {
+      items = await expandTemplates(layout, {
+        blocks,
+        templateState,
+        loadTemplate,
+        allowedLayouts,
+        uuidGenerator,
+        filterInstanceId,
+      });
+    }
 
     // Convert items back to blocks/layout format
     const newBlocks = {};
@@ -11000,11 +11009,13 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
             for (const id of value.items) {
               if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
             }
+            // skipExpand=true: nested containers' templates were already merged
             const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
               fieldBlocks,
               value.items,
               null, // No forced layouts for nested containers
-              templateState
+              templateState,
+              true, // skip template expansion — already done
             );
             Object.assign(mergedBlocks, newFieldBlocks);
             processedBlock[key] = { items: newFieldLayout };
@@ -11270,9 +11281,14 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
  * @param {Array} preloadTemplates - Additional template IDs to eagerly load (e.g. forced layouts)
  * @returns {Promise<Object>} Map of templateId -> template data
  */
+// Module-level template cache — persists across calls to loadTemplates/expandTemplates
+// so templates are only fetched once per page session.
+const _templateCache = {};
+
 export async function loadTemplates(data, loadTemplate, preloadTemplates = []) {
-  const templates = {};
-  const loaded = new Set();
+  // Start with cached templates
+  const templates = { ..._templateCache };
+  const loaded = new Set(Object.keys(_templateCache));
   const failed = new Set();
 
   // Helper to scan an object for templateId references
@@ -11343,6 +11359,7 @@ export async function loadTemplates(data, loadTemplate, preloadTemplates = []) {
       if (template) {
         loaded.add(id);
         templates[id] = template;
+        _templateCache[id] = template; // Persist across calls
 
         // Scan this template for nested template references
         const nestedIds = collectTemplateIds(template);
