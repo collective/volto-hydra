@@ -2538,6 +2538,7 @@ const Iframe = (props) => {
           // Merge templates with forced layouts
           const { merged: mergedFormData } = await mergeTemplatesIntoPage(preparedFormData, {
             loadTemplate,
+            preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
@@ -2619,6 +2620,7 @@ const Iframe = (props) => {
         // Merge templates (both newly fetched and already cached) with forced layouts
         const { merged: mergedFormData, newTemplateIds: moreTemplateIds } = await mergeTemplatesIntoPage(baseFormData, {
           loadTemplate,
+          preloadedTemplates: templateCacheRef.current,
           pageBlocksFields,
         });
         if (moreTemplateIds.length > 0) {

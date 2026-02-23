@@ -1740,9 +1740,15 @@ export function reorderBlocksInContainer(
   blocksConfig = null,
   intl = null,
 ) {
+  // If parent is a virtual template instance, resolve to the instance's actual parent
+  let effectiveParentId = parentBlockId;
+  if (blockPathMap[parentBlockId]?.isTemplateInstance) {
+    effectiveParentId = blockPathMap[parentBlockId].parentId;
+  }
+
   // parentPath is [] for page-level (parentBlockId === PAGE_BLOCK_UID)
-  const parentPath = parentBlockId === PAGE_BLOCK_UID ? [] : blockPathMap[parentBlockId]?.path;
-  if (parentBlockId !== PAGE_BLOCK_UID && !parentPath) {
+  const parentPath = effectiveParentId === PAGE_BLOCK_UID ? [] : blockPathMap[effectiveParentId]?.path;
+  if (effectiveParentId !== PAGE_BLOCK_UID && !parentPath) {
     console.error('[REORDER] Could not find parent path for:', parentBlockId);
     return formData;
   }
@@ -1755,7 +1761,7 @@ export function reorderBlocksInContainer(
 
   // Detect if this is an object_list field
   // For page-level, parent type is '_page'
-  const parentType = parentBlockId === PAGE_BLOCK_UID ? '_page' : parentBlock['@type'];
+  const parentType = effectiveParentId === PAGE_BLOCK_UID ? '_page' : parentBlock['@type'];
   const schema = getBlockSchema(parentType, intl, blocksConfig);
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';

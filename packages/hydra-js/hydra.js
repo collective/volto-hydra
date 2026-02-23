@@ -10937,33 +10937,18 @@ export function getUniqueTemplateIds(formData) {
  * @param {Object} options - Configuration
  * @param {Function} options.loadTemplate - Async function to load template: (templateId) => Promise<templateData>
  * @param {Object} options.pageBlocksFields - Field configs { fieldName: { allowedLayouts, ... } }
+ * @param {Object} options.preloadedTemplates - Already-loaded templates: { templateId: templateData }. Caller owns the cache.
  * @param {Function} options.uuidGenerator - UUID generator function (default: generateUUID)
  * @returns {Promise<{merged: Object, newTemplateIds: string[]}>}
  */
 export async function mergeTemplatesIntoPage(page, options = {}) {
-  // Support old signature: mergeTemplatesIntoPage(page, templates, uuidGenerator)
-  // where templates is a pre-loaded cache object
-  let loadTemplate, pageBlocksFields, uuidGenerator, filterInstanceId;
-  if (typeof options.loadTemplate === 'function') {
-    // New signature with options object including loadTemplate function
-    loadTemplate = options.loadTemplate;
-    pageBlocksFields = options.pageBlocksFields || { blocks_layout: {} };
-    uuidGenerator = options.uuidGenerator || generateUUID;
-    filterInstanceId = options.filterInstanceId; // For reverse merge: only process specific instance
-  } else {
-    // Old signature: templates cache is second arg, uuidGenerator is third
-    const templates = options || {};
-    uuidGenerator = arguments[2] || generateUUID;
-    pageBlocksFields = { blocks_layout: {} };
-    filterInstanceId = undefined;
-    // Create loadTemplate from templates cache (old behavior)
-    loadTemplate = async (templateId) => {
-      if (templates[templateId]) {
-        return templates[templateId];
-      }
-      throw new Error(`Template ${templateId} not in cache`);
-    };
-  }
+  const {
+    loadTemplate,
+    pageBlocksFields = { blocks_layout: {} },
+    uuidGenerator = generateUUID,
+    filterInstanceId,
+    preloadedTemplates = {},
+  } = options;
 
   let result = { ...page };
   const allNewTemplateIds = new Set();
@@ -10982,6 +10967,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
         blocks,
         templateState,
         loadTemplate,
+        preloadedTemplates,
         allowedLayouts,
         uuidGenerator,
         filterInstanceId,
@@ -11278,17 +11264,13 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
  *
  * @param {Object} data - Page data to scan for template references
  * @param {Function} loadTemplate - Async function: (templateId) => Promise<templateData>
- * @param {Array} preloadTemplates - Additional template IDs to eagerly load (e.g. forced layouts)
- * @returns {Promise<Object>} Map of templateId -> template data
+ * @param {Object} preloadedTemplates - Already-loaded templates: { templateId: templateData }. Caller owns the cache.
+ * @returns {Promise<Object>} Map of templateId -> template data (includes preloaded + newly fetched)
  */
-// Module-level template cache — persists across calls to loadTemplates/expandTemplates
-// so templates are only fetched once per page session.
-const _templateCache = {};
-
-export async function loadTemplates(data, loadTemplate, preloadTemplates = []) {
-  // Start with cached templates
-  const templates = { ..._templateCache };
-  const loaded = new Set(Object.keys(_templateCache));
+export async function loadTemplates(data, loadTemplate, preloadedTemplates = {}) {
+  // Start with caller-provided templates (caller owns the cache)
+  const templates = { ...preloadedTemplates };
+  const loaded = new Set(Object.keys(preloadedTemplates));
   const failed = new Set();
 
   // Helper to scan an object for templateId references
@@ -11318,13 +11300,8 @@ export async function loadTemplates(data, loadTemplate, preloadTemplates = []) {
     return ids;
   }
 
-  // Collect template IDs referenced in the page data, plus any explicitly requested.
+  // Collect template IDs referenced in the page data.
   let pending = collectTemplateIds(data);
-  if (preloadTemplates?.length) {
-    for (const id of preloadTemplates) {
-      if (id) pending.add(id);
-    }
-  }
 
   // Keep loading until no new templates found
   while (pending.size > 0) {
@@ -11359,7 +11336,6 @@ export async function loadTemplates(data, loadTemplate, preloadTemplates = []) {
       if (template) {
         loaded.add(id);
         templates[id] = template;
-        _templateCache[id] = template; // Persist across calls
 
         // Scan this template for nested template references
         const nestedIds = collectTemplateIds(template);
@@ -11393,6 +11369,7 @@ export async function expandTemplates(inputItems, options = {}) {
   const {
     blocks: blocksDict,
     loadTemplate,
+    preloadedTemplates,
   } = options;
 
   // Build data object for loadTemplates to scan
@@ -11400,8 +11377,8 @@ export async function expandTemplates(inputItems, options = {}) {
     ? { blocks: blocksDict, blocks_layout: { items: inputItems } }
     : { items: inputItems };
 
-  // Load templates referenced in the page data
-  const templates = await loadTemplates(data, loadTemplate);
+  // Load templates referenced in the page data, seeded with caller's cache
+  const templates = await loadTemplates(data, loadTemplate, preloadedTemplates);
 
   // Delegate to sync version with loaded templates.
   // expandTemplatesSync will load missing templates on demand via loadTemplate
