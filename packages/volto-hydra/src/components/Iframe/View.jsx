@@ -5,7 +5,6 @@ import Cookies from 'js-cookie';
 import { Node } from 'slate';
 import {
   applyBlockDefaults,
-  previousBlockId,
 } from '@plone/volto/helpers';
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
@@ -89,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
 import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
@@ -908,17 +907,31 @@ const Iframe = (props) => {
     let fieldDef;
 
     if (action === 'inside') {
-      const parentBlock = getBlockById(formData, blockPathMap, blockId);
-      const parentType = blockPathMap[blockId]?.blockType;
-      const parentSchema =
-        typeof mergedBlocksConfig?.[parentType]?.blockSchema === 'function'
-          ? mergedBlocksConfig[parentType].blockSchema({
-              formData: {},
-              intl: { formatMessage: (m) => m.defaultMessage },
-            })
-          : mergedBlocksConfig?.[parentType]?.blockSchema;
-      fieldDef = parentSchema?.properties?.[fieldName];
-      isObjectList = fieldDef?.widget === 'object_list';
+      // Get field info from blockPathMap (already resolved by buildBlockPathMap, includes schemaEnhancer)
+      const childEntry = Object.values(blockPathMap || {}).find(
+        (info) => info.parentId === blockId && info.containerField === fieldName
+      );
+      if (childEntry?.isObjectListItem) {
+        isObjectList = true;
+        fieldDef = {
+          typeField: childEntry.typeField || null,
+          allowedBlocks: childEntry.allowedSiblingTypes,
+          idField: childEntry.idField,
+          widget: 'object_list',
+        };
+      } else {
+        // blocks_layout container or no existing children — try schema as fallback
+        const parentType = blockPathMap[blockId]?.blockType;
+        const parentSchema =
+          typeof mergedBlocksConfig?.[parentType]?.blockSchema === 'function'
+            ? mergedBlocksConfig[parentType].blockSchema({
+                formData: {},
+                intl: { formatMessage: (m) => m.defaultMessage },
+              })
+            : mergedBlocksConfig?.[parentType]?.blockSchema;
+        fieldDef = parentSchema?.properties?.[fieldName];
+        isObjectList = fieldDef?.widget === 'object_list';
+      }
       containerConfig = { parentId: blockId, fieldName, isObjectList };
     } else {
       containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig, intl);
@@ -971,19 +984,22 @@ const Iframe = (props) => {
     if (customBlockData) {
       blockData = customBlockData;
     } else if (isObjectList) {
-      // object_list items: use virtual type to initialize containers
-      // For before/after: get idField from containerConfig, virtualType from pathInfo
-      // For inside: get from fieldDef
+      // object_list items: typeField defaults to '@type' — no special casing needed
       const idField = containerConfig?.idField || fieldDef?.idField || '@id';
-      let virtualType;
-      if (action === 'inside') {
-        // Get parent type and append field name (use blockPathMap for type lookup)
-        virtualType = `${blockPathMap[blockId]?.blockType}:${fieldName}`;
+      const typeFieldName = (action === 'inside' ? fieldDef?.typeField : blockPathMap[blockId]?.typeField) || '@type';
+
+      let effectiveType;
+      if (typeFieldName !== '@type' && blockType) {
+        // Typed object_list: use the chosen block type (from BlockChooser)
+        effectiveType = blockType;
+      } else if (action === 'inside') {
+        // Single-schema or no explicit type: virtual type from parent:field
+        effectiveType = `${blockPathMap[blockId]?.blockType}:${fieldName}`;
       } else {
-        // For before/after, use the existing item's virtual type
-        virtualType = blockPathMap[blockId]?.blockType;
+        // Before/after: use existing item's type
+        effectiveType = blockPathMap[blockId]?.blockType;
       }
-      blockData = { [idField]: newBlockId, '@type': virtualType };
+      blockData = { [idField]: newBlockId, '@type': effectiveType };
 
       // For table mode rows, pass sibling data so cells count is copied
       let siblingData = null;
@@ -1018,7 +1034,12 @@ const Iframe = (props) => {
 
       // Initialize nested containers (e.g., cells in a row)
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData });
-      delete blockData['@type']; // object_list items don't store @type in data
+
+      // Store type in typeField, clean up @type if typeField is different
+      blockData[typeFieldName] = effectiveType;
+      if (typeFieldName !== '@type') {
+        delete blockData['@type']; // @type was only used for schema resolution
+      }
     } else {
       // Standard block with @type
       blockData = { '@type': blockType };
@@ -1215,8 +1236,10 @@ const Iframe = (props) => {
       intl,
     );
 
-    // Get previous block for selection (within same container or page)
-    const previous = previousBlockId(properties, id);
+    // Compute which block to select after deletion (previous sibling, or parent if last)
+    const selectAfterDelete = getSelectAfterDelete(
+      id, containerConfig, iframeSyncState.blockPathMap, properties,
+    );
 
     // Unified deletion - works for both page and container
     let newFormData = deleteBlockFromContainer(
@@ -1244,7 +1267,7 @@ const Iframe = (props) => {
       blockPathMap: newBlockPathMap,
     }));
     onChangeFormData(newFormData);
-    onSelectBlock(selectPrev ? previous : null);
+    onSelectBlock(selectPrev ? selectAfterDelete : null);
     setAddNewBlockOpened(false);
     dispatch(setSidebarTab(1));
   };
@@ -2844,46 +2867,23 @@ const Iframe = (props) => {
       }
       parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
       parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
-      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
-      const resolvedSchema = typeof parentSchema === 'function'
-        ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : parentSchema;
-      allowed = resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
-      allowedTemplates = resolvedSchema?.properties?.[fieldName]?.allowedTemplates || null;
+      // Find any child in this container field to get allowedSiblingTypes from blockPathMap
+      const childEntry = Object.entries(iframeSyncState.blockPathMap || {}).find(
+        ([, info]) => info.parentId === parentBlockId && info.containerField === fieldName
+      );
+      if (childEntry) {
+        allowed = childEntry[1].allowedSiblingTypes || null;
+        allowedTemplates = childEntry[1].allowedTemplates || null;
+      }
     } else {
-      // Iframe add: get allowed blocks from parent container of afterBlockId
+      // Iframe add: get allowed blocks from blockPathMap (already resolved by buildBlockPathMap)
       const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
-      const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
-      if (parentId) {
-        parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
-        parentType = iframeSyncState.blockPathMap?.[parentId]?.blockType;
-        const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
-        const parentSchema = parentBlockConfig?.blockSchema;
-        const resolvedSchema = typeof parentSchema === 'function'
-          ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-          : parentSchema;
-
-        // First check schema-defined container fields (e.g., columns, accordion)
-        for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
-          if (fieldDef.widget === 'blocks_layout') {
-            if (parentBlockData?.[fieldName]?.items?.includes(afterBlockId)) {
-              allowed = fieldDef.allowedBlocks || null;
-              allowedTemplates = fieldDef.allowedTemplates || null;
-              break;
-            }
-          } else if (fieldDef.widget === 'object_list' && fieldDef.allowedBlocks) {
-            // Typed object_list with allowedBlocks
-            allowed = fieldDef.allowedBlocks;
-            allowedTemplates = fieldDef.allowedTemplates || null;
-            break;
-          }
-        }
-
-        // Check for implicit container (uses blocks/blocks_layout directly)
-        // These have allowedBlocks on the block config, not in schema
-        if (!allowed && parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
-          allowed = parentBlockConfig?.allowedBlocks || null;
-        }
+      const afterPathInfo = iframeSyncState.blockPathMap?.[afterBlockId];
+      if (afterPathInfo?.parentId) {
+        parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[afterPathInfo.parentId]?.path);
+        parentType = iframeSyncState.blockPathMap?.[afterPathInfo.parentId]?.blockType;
+        allowed = afterPathInfo.allowedSiblingTypes || null;
+        allowedTemplates = afterPathInfo.allowedTemplates || null;
       } else {
         // No parent - page-level, get templates from _page schema
         const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
@@ -3027,9 +3027,9 @@ const Iframe = (props) => {
     const isObjectList = fieldConfig?.isObjectList || false;
     const containerAllowed = fieldConfig?.allowedBlocks || null;
 
-    // Auto-insert if object_list or single allowedBlock
-    if (isObjectList || containerAllowed?.length === 1) {
-      const blockType = isObjectList ? null : containerAllowed[0];
+    // Auto-insert if single-schema object_list (no allowedBlocks) or single allowedBlock
+    if ((isObjectList && (!containerAllowed || containerAllowed.length <= 1)) || (!isObjectList && containerAllowed?.length === 1)) {
+      const blockType = isObjectList ? (containerAllowed?.[0] || null) : containerAllowed[0];
       insertAndSelectBlock(parentBlockId, blockType, 'inside', fieldName);
     } else {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });

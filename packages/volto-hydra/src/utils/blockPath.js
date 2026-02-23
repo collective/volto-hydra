@@ -451,6 +451,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
         allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
+        allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: fieldDef.maxLength || null,
         siblingCount: layout.length, // Total siblings in this container
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
@@ -787,6 +788,51 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   }
 
   return null;
+}
+
+/**
+ * Get the ID of the adjacent sibling to select after deleting a block from its container.
+ * Returns previous sibling if available, otherwise next sibling, otherwise the parent.
+ *
+ * Works consistently for both page-level blocks and container children.
+ *
+ * @param {string} blockId - The block being deleted
+ * @param {Object} containerConfig - Container config from getContainerFieldConfig
+ * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
+ * @param {Object} formData - The form data
+ * @returns {string|null} ID of the block to select after deletion
+ */
+export function getSelectAfterDelete(blockId, containerConfig, blockPathMap, formData) {
+  if (!containerConfig) return null;
+
+  const { parentId, isObjectList } = containerConfig;
+
+  const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) return parentId !== PAGE_BLOCK_UID ? parentId : null;
+
+  const items = getContainerItems(parentBlock, containerConfig);
+
+  if (isObjectList) {
+    const idField = containerConfig.idField || '@id';
+    const index = items.findIndex(item => item[idField] === blockId);
+    if (index === -1) return parentId !== PAGE_BLOCK_UID ? parentId : null;
+    // If more than one item, pick adjacent sibling
+    if (items.length > 1) {
+      const adjacentItem = index > 0 ? items[index - 1] : items[index + 1];
+      return adjacentItem[idField];
+    }
+    // Last item — select parent (unless page-level)
+    return parentId !== PAGE_BLOCK_UID ? parentId : null;
+  }
+
+  // blocks_layout container: items are string IDs
+  const index = items.indexOf(blockId);
+  if (index === -1) return parentId !== PAGE_BLOCK_UID ? parentId : null;
+  if (items.length > 1) {
+    return index > 0 ? items[index - 1] : items[index + 1];
+  }
+  return parentId !== PAGE_BLOCK_UID ? parentId : null;
 }
 
 /**

@@ -4244,10 +4244,18 @@ export class AdminUIHelper {
       .catch(() => false);
 
     if (chooserVisible && blockType) {
-      // Select the specified block type
+      // Select the specified block type (may be in a collapsed accordion section)
       const blockButton = blockChooser.getByRole('button', {
         name: new RegExp(blockType, 'i'),
       });
+      // If not visible, try expanding accordion sections to find it
+      if (!(await blockButton.isVisible({ timeout: 500 }).catch(() => false))) {
+        const sections = blockChooser.locator('.accordion .title');
+        for (let i = 0; i < (await sections.count()); i++) {
+          await sections.nth(i).click();
+          if (await blockButton.isVisible({ timeout: 300 }).catch(() => false)) break;
+        }
+      }
       await blockButton.click();
       // Wait for chooser to close
       await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });

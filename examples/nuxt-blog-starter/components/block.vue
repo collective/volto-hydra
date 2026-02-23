@@ -283,28 +283,51 @@
     <template v-if="!block.variation || block.variation === 'facetsTopSide'">
       <!-- Facets horizontal -->
       <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
-        <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
-             :data-block-uid="facet['@id']" data-block-add="right"
-             class="facet-item p-3 border border-gray-200 rounded min-w-48">
-          <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
-          <template v-if="facet.type === 'selectFacet'">
-            <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                    :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
-              <option value="">Select...</option>
-              <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
-            </select>
-          </template>
-          <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
-            <div class="facet-checkboxes space-y-1" data-linkable-allow>
-              <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
-                <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
-                       :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
-                       @change="handleFacetCheckboxChange" />
-                {{ opt.title }}
-              </label>
+        <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
+          <!-- Non-facet types (slate, image) rendered as generic blocks -->
+          <template v-if="facet.type === 'slate' || facet.type === 'image'">
+            <div :data-block-uid="facet['@id']" data-block-add="right" class="p-3 border border-gray-200 rounded min-w-48">
+              <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
             </div>
           </template>
-        </div>
+          <!-- Facet types -->
+          <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="right"
+               class="facet-item p-3 border border-gray-200 rounded min-w-48">
+            <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+            <template v-if="facet.type === 'selectFacet'">
+              <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                      :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
+                <option value="">Select...</option>
+                <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
+              </select>
+            </template>
+            <template v-else-if="facet.type === 'daterangeFacet'">
+              <div class="facet-daterange flex gap-2 mt-1">
+                <input type="date" class="px-2 py-1 border border-gray-300 rounded text-sm" />
+                <span class="text-gray-400">—</span>
+                <input type="date" class="px-2 py-1 border border-gray-300 rounded text-sm" />
+              </div>
+            </template>
+            <template v-else-if="facet.type === 'toggleFacet'">
+              <div class="facet-toggle mt-1">
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" class="rounded border-gray-300" />
+                  {{ getFacetOptions(facet)?.[0]?.title || 'Toggle' }}
+                </label>
+              </div>
+            </template>
+            <template v-else>
+              <div class="facet-checkboxes space-y-1" data-linkable-allow>
+                <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
+                         :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
+                         @change="handleFacetCheckboxChange" />
+                  {{ opt.title }}
+                </label>
+              </div>
+            </template>
+          </div>
+        </template>
       </div>
 
       <!-- Sort and results count -->
@@ -335,28 +358,52 @@
         <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
           <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
             <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
-            <div v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx"
-                 :data-block-uid="facet['@id']" data-block-add="bottom"
-                 class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
-              <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
-              <template v-if="facet.type === 'selectFacet'">
-                <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                        :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
-                  <option value="">Select...</option>
-                  <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
-                </select>
-              </template>
-              <template v-else-if="facet.type === 'checkboxFacet' || !facet.type">
-                <div class="facet-checkboxes space-y-1" data-linkable-allow>
-                  <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
-                           :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
-                           @change="handleFacetCheckboxChange" />
-                    {{ opt.title }}
-                  </label>
+            <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
+              <!-- Non-facet types (slate, image) rendered as generic blocks -->
+              <template v-if="facet.type === 'slate' || facet.type === 'image'">
+                <div :data-block-uid="facet['@id']" data-block-add="bottom"
+                     class="mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+                  <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
                 </div>
               </template>
-            </div>
+              <!-- Facet types -->
+              <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
+                   class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+                <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+                <template v-if="facet.type === 'selectFacet'">
+                  <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
+                    <option value="">Select...</option>
+                    <option v-for="opt in getFacetOptions(facet)" :key="opt.value" :value="opt.value">{{ opt.title }}</option>
+                  </select>
+                </template>
+                <template v-else-if="facet.type === 'daterangeFacet'">
+                  <div class="facet-daterange flex gap-2 mt-1">
+                    <input type="date" class="px-2 py-1 border border-gray-300 rounded text-sm" />
+                    <span class="text-gray-400">—</span>
+                    <input type="date" class="px-2 py-1 border border-gray-300 rounded text-sm" />
+                  </div>
+                </template>
+                <template v-else-if="facet.type === 'toggleFacet'">
+                  <div class="facet-toggle mt-1">
+                    <label class="flex items-center gap-2 text-sm">
+                      <input type="checkbox" class="rounded border-gray-300" />
+                      {{ getFacetOptions(facet)?.[0]?.title || 'Toggle' }}
+                    </label>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="facet-checkboxes space-y-1" data-linkable-allow>
+                    <label v-for="opt in getFacetOptions(facet)" :key="opt.value" class="flex items-center gap-2 text-sm">
+                      <input type="checkbox" :value="opt.value" class="facet-checkbox rounded border-gray-300"
+                             :data-field="getFacetField(facet)" :checked="isFacetChecked(facet, opt.value)"
+                             @change="handleFacetCheckboxChange" />
+                      {{ opt.title }}
+                    </label>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
         </aside>
 

@@ -1255,6 +1255,19 @@ function renderFacetWidget(facet) {
         </div>`;
     }
 
+    if (facetType === 'daterangeFacet') {
+        return `<div class="facet-widget facet-daterange" style="margin-top: 4px;">
+            <input type="date" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px;" /> —
+            <input type="date" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px;" />
+        </div>`;
+    }
+
+    if (facetType === 'toggleFacet') {
+        return `<div class="facet-widget facet-toggle" style="margin-top: 4px;">
+            <label><input type="checkbox" /> ${options[0]?.title || 'Toggle'}</label>
+        </div>`;
+    }
+
     // Default: just show field name
     return '<div class="facet-widget" style="font-size: 11px; color: #999;">Widget not implemented</div>';
 }
@@ -1315,11 +1328,20 @@ async function renderSearchBlock(block, blockId) {
         html += '<div style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">FACETS</div>';
         for (const facet of facets) {
             const facetId = facet['@id'] || facet.id || '';
-            html += `<div class="facet-item" data-block-uid="${facetId}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
-                <div data-editable-field="title" style="font-weight: bold;">${facet.title || ''}</div>
-                <div style="font-size: 12px; color: #666;">Field: ${typeof facet.field === 'object' ? facet.field?.value : facet.field || ''}</div>
-                ${renderFacetWidget(facet)}
-            </div>`;
+            const facetType = facet.type || '';
+            // For typed object_list: non-facet items (slate, image) get rendered differently
+            if (facetType === 'slate' || facetType === 'image') {
+                // Render as generic block inside facets container
+                html += `<div data-block-uid="${facetId}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">`;
+                html += renderBlock(facet, facetId);
+                html += '</div>';
+            } else {
+                html += `<div class="facet-item" data-block-uid="${facetId}" data-block-type="${facetType}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                    <div data-editable-field="title" style="font-weight: bold;">${facet.title || ''}</div>
+                    <div style="font-size: 12px; color: #666;">Field: ${typeof facet.field === 'object' ? facet.field?.value : facet.field || ''}</div>
+                    ${renderFacetWidget(facet)}
+                </div>`;
+            }
         }
         html += '</div>';
     }

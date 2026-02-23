@@ -28,6 +28,12 @@
           "field": "review_state",
           "type": "checkboxFacet",
           "multiple": false
+        },
+        {
+          "@id": "facet-subject",
+          "title": "Subject",
+          "field": "Subject",
+          "type": "selectFacet"
         }
       ],
       "sortOnOptions": ["effective", "created", "sortable_title"],

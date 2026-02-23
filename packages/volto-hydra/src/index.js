@@ -1,3 +1,4 @@
+import filterSVG from '@plone/volto/icons/filter.svg';
 import frontendPreviewUrl from './reducers';
 import {
   getAllowedBlocksList,
@@ -338,9 +339,115 @@ const applyConfig = (config) => {
     },
   };
 
-  // Configure search block to add listing container field
-  // Volto's search block already has facets with widget: 'object_list'
-  // We add listing/listing_layout so search can contain a listing block child
+  // Facet block types for typed object_list in search block
+  // Each facet type has its own schema, resolved via blocksConfig
+  config.blocks.blocksConfig.checkboxFacet = {
+    ...config.blocks.blocksConfig.checkboxFacet,
+    id: 'checkboxFacet',
+    title: 'Checkbox',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Checkbox Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'multiple', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: { title: 'Field', type: 'string' },
+        multiple: {
+          title: 'Multiple choices?',
+          type: 'boolean',
+          default: false,
+        },
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  config.blocks.blocksConfig.selectFacet = {
+    ...config.blocks.blocksConfig.selectFacet,
+    id: 'selectFacet',
+    title: 'Select',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Select Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: { title: 'Field', type: 'string' },
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  config.blocks.blocksConfig.daterangeFacet = {
+    ...config.blocks.blocksConfig.daterangeFacet,
+    id: 'daterangeFacet',
+    title: 'Date Range',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Date Range Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: { title: 'Field', type: 'string' },
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  config.blocks.blocksConfig.toggleFacet = {
+    ...config.blocks.blocksConfig.toggleFacet,
+    id: 'toggleFacet',
+    title: 'Toggle',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Toggle Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: { title: 'Field', type: 'string' },
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  // Configure search block to add listing container field and typed facets
+  // Facets converted to typed object_list: allowedBlocks controls facet types
   const existingSearchSchemaEnhancer =
     config.blocks.blocksConfig.search?.schemaEnhancer;
   config.blocks.blocksConfig.search = {
@@ -369,6 +476,27 @@ const applyConfig = (config) => {
           maxLength: 1,
           defaultBlockType: 'listing',
         };
+      }
+
+      // Convert facets to typed object_list: each facet type has its own schema
+      // from blocksConfig (checkboxFacet, selectFacet, etc.)
+      // Keep Volto's original schema (needed by Volto's form rendering to avoid crashes)
+      // but add allowedBlocks + typeField so processObjectListContainer uses typed mode
+      if (schema.properties.facets) {
+        schema.properties.facets = {
+          ...schema.properties.facets,
+          allowedBlocks: [
+            'checkboxFacet',
+            'selectFacet',
+            'daterangeFacet',
+            'toggleFacet',
+            'slate',
+            'image',
+          ],
+          typeField: 'type',
+        };
+        // Remove schemaExtender (would override our typed behavior)
+        delete schema.properties.facets.schemaExtender;
       }
 
       // Remove fields not needed for Hydra (query handled by child listing, no views selector)
