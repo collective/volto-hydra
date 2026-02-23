@@ -157,9 +157,9 @@
 
             if (myGeneration !== window._renderGeneration) return; // stale render
 
-            if (content.footer_blocks && content.footer_blocks_layout?.items?.length > 0 || footerAllowedLayouts) {
-                const footerBlocks = content.footer_blocks || {};
-                const footerLayout = content.footer_blocks_layout?.items || [];
+            if (content.footer_blocks?.items?.length > 0 || footerAllowedLayouts) {
+                const footerBlocks = content.blocks || {};
+                const footerLayout = content.footer_blocks?.items || [];
 
                 // Expand templates (handles both existing content and forced layouts)
                 const templateState = {};
@@ -338,7 +338,7 @@
                     window.bridge = initBridge({
                         pageBlocksFields: [
                             {
-                                fieldName: 'blocks',
+                                fieldName: 'blocks_layout',
                                 title: 'Blocks',
                                 allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],

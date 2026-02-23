@@ -869,7 +869,7 @@ const Iframe = (props) => {
               if (!response.ok) throw new Error(`Failed to fetch template: ${response.status}`);
               return response.json();
             },
-            pageBlocksFields: { blocks: { allowedLayouts: [templateConfig.templateUrl] } },
+            pageBlocksFields: { blocks_layout: { allowedLayouts: [templateConfig.templateUrl] } },
           });
 
           // Merge with existing formData (preserve other fields like title, description)
@@ -1030,7 +1030,7 @@ const Iframe = (props) => {
       const containerId = containerConfig?.parentId || 'page';
       const containerField = containerConfig?.fieldName || 'blocks_layout';
       const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
-      const layoutItems = container?.[containerField]?.items || container?.blocks_layout?.items || [];
+      const layoutItems = container?.[containerField]?.items || [];
       const refIndex = layoutItems.indexOf(blockId);
       const position = action === 'after' ? refIndex + 1 : refIndex;
 
@@ -1820,7 +1820,7 @@ const Iframe = (props) => {
             const parentId = currentBlockPathMap[blockId]?.parentId || 'page';
             const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
             const containerField = currentBlockPathMap[blockId]?.containerField || 'blocks_layout';
-            const layoutItems = parentBlock?.[containerField]?.items || parentBlock?.blocks_layout?.items || [];
+            const layoutItems = parentBlock?.[containerField]?.items || [];
 
             // Find all child blocks of this template instance in layout order
             blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
@@ -1887,8 +1887,7 @@ const Iframe = (props) => {
               const { parentId: containerId, fieldName: containerField } = targetContainerConfig;
               const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
               const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
-              const layoutFieldName = `${containerField}_layout`;
-              const layoutItems = container?.[layoutFieldName]?.items || [];
+              const layoutItems = container?.[containerField]?.items || [];
               const position = layoutItems.indexOf(moveBlockId);
 
               // Apply defaults with context - this derives template fields from neighbors
@@ -2188,24 +2187,24 @@ const Iframe = (props) => {
             }
           }
 
-          // 2. Process pageBlocksFields - merge with default 'blocks' field
-          // Default: [{ fieldName: 'blocks', title: 'Blocks' }] with all non-restricted block types
-          // If provided, merge with default (unless 'blocks' is explicitly configured)
+          // 2. Process pageBlocksFields - merge with default 'blocks_layout' field
+          // Default: [{ fieldName: 'blocks_layout', title: 'Blocks' }] with all non-restricted block types
+          // If provided, merge with default (unless 'blocks_layout' is explicitly configured)
           let effectivePageBlocksFields;
-          const defaultBlocksField = { fieldName: 'blocks', title: 'Blocks' };
+          const defaultBlocksField = { fieldName: 'blocks_layout', title: 'Blocks' };
 
           if (event.data.pageBlocksFields) {
-            // Check if 'blocks' field is already configured
-            const hasBlocksField = event.data.pageBlocksFields.some(f => f.fieldName === 'blocks');
+            // Check if 'blocks_layout' field is already configured
+            const hasBlocksField = event.data.pageBlocksFields.some(f => f.fieldName === 'blocks_layout');
             if (hasBlocksField) {
               // Use provided config as-is
               effectivePageBlocksFields = event.data.pageBlocksFields;
             } else {
-              // Merge with default 'blocks' field
+              // Merge with default 'blocks_layout' field
               effectivePageBlocksFields = [defaultBlocksField, ...event.data.pageBlocksFields];
             }
           } else {
-            // No config provided - use default 'blocks' field
+            // No config provided - use default 'blocks_layout' field
             effectivePageBlocksFields = [defaultBlocksField];
           }
 
@@ -2233,18 +2232,18 @@ const Iframe = (props) => {
           }
 
           // 2c. Auto-initialize missing page fields with empty blocks/layout
+          // All page fields share formData.blocks; each field has its own layout (fieldName: { items: [...] })
           let formWithPageFields = form ? { ...form } : form;
           if (form) {
+            // Ensure shared blocks dict exists
+            if (!formWithPageFields.blocks) {
+              formWithPageFields.blocks = {};
+            }
             effectivePageBlocksFields.forEach(field => {
               const { fieldName } = field;
-              const layoutFieldName = `${fieldName}_layout`;
-              // Initialize missing blocks field
-              if (!formWithPageFields[fieldName]) {
-                formWithPageFields[fieldName] = {};
-              }
               // Initialize missing layout field
-              if (!formWithPageFields[layoutFieldName]) {
-                formWithPageFields[layoutFieldName] = { items: [] };
+              if (!formWithPageFields[fieldName]) {
+                formWithPageFields[fieldName] = { items: [] };
               }
             });
           }
@@ -2255,7 +2254,7 @@ const Iframe = (props) => {
             effectivePageBlocksFields.map(field => [
               field.fieldName,
               {
-                widget: 'blocksid_list',
+                widget: 'blocks_layout',
                 allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
                 allowedTemplates: field.allowedTemplates || null, // Template URLs for BlockChooser
                 allowedLayouts: field.allowedLayouts || null, // Template URLs for LayoutSelector dropdown
@@ -2866,9 +2865,8 @@ const Iframe = (props) => {
 
         // First check schema-defined container fields (e.g., columns, accordion)
         for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
-          if (fieldDef.widget === 'blocksid_list') {
-            const layoutField = `${fieldName}_layout`;
-            if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
+          if (fieldDef.widget === 'blocks_layout') {
+            if (parentBlockData?.[fieldName]?.items?.includes(afterBlockId)) {
               allowed = fieldDef.allowedBlocks || null;
               allowedTemplates = fieldDef.allowedTemplates || null;
               break;
@@ -2889,7 +2887,7 @@ const Iframe = (props) => {
       } else {
         // No parent - page-level, get templates from _page schema
         const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
-        const pageFieldDef = pageSchema?.properties?.blocks;
+        const pageFieldDef = pageSchema?.properties?.blocks_layout;
         allowedTemplates = pageFieldDef?.allowedTemplates;
       }
     }

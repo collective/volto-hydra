@@ -127,7 +127,7 @@
       // In Layout.js or App.js
       const bridge = initBridge({
         pageBlocksFields: [
-          { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
+          { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
         ],
       });
 

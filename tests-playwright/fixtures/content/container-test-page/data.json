@@ -18,7 +18,7 @@
     "columns-1": {
       "@type": "columns",
       "title": "My Columns Section",
-      "top_images": {
+      "blocks": {
         "top-img-1": {
           "@type": "image",
           "url": "http://localhost:8888/test-image-1.jpg",
@@ -28,10 +28,7 @@
           "@type": "image",
           "url": "http://localhost:8888/test-image-2.jpg",
           "alt": "Top Image 2"
-        }
-      },
-      "top_images_layout": {"items": ["top-img-1", "top-img-2"]},
-      "columns": {
+        },
         "col-1": {
           "@type": "column",
           "title": "Left Column",
@@ -62,7 +59,8 @@
           "blocks_layout": {"items": ["text-2a"]}
         }
       },
-      "columns_layout": {"items": ["col-1", "col-2"]}
+      "top_images": {"items": ["top-img-1", "top-img-2"]},
+      "columns": {"items": ["col-1", "col-2"]}
     },
     "text-after": {
       "@type": "slate",

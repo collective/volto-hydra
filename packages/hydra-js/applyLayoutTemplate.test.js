@@ -5,7 +5,7 @@ async function applyLayoutTemplate(pageData, templateData, uuidGenerator) {
   const templateUrl = templateData['@id'];
   const { merged } = await mergeTemplatesIntoPage(pageData, {
     loadTemplate: async () => templateData,
-    pageBlocksFields: { blocks: { allowedLayouts: [templateUrl] } },
+    pageBlocksFields: { blocks_layout: { allowedLayouts: [templateUrl] } },
     uuidGenerator,
   });
   return merged;
@@ -17,7 +17,7 @@ async function mergeTemplateContent(target, source, filterTemplateId = null) {
   // This simulates the old merge behavior
   const { merged } = await mergeTemplatesIntoPage(target, {
     loadTemplate: async () => source,
-    pageBlocksFields: { blocks: {} },
+    pageBlocksFields: { blocks_layout: {} },
   });
   return { merged };
 }
@@ -578,7 +578,7 @@ describe('reverse merge - page to template (for saving)', () => {
     // This simulates what happens on save
     const { merged } = await mergeTemplatesIntoPage(template, {
       loadTemplate: async () => pageWithEdits, // The "template" to load is actually the page
-      pageBlocksFields: { blocks: { allowedLayouts: ['/templates/header-footer'] } },
+      pageBlocksFields: { blocks_layout: { allowedLayouts: ['/templates/header-footer'] } },
       uuidGenerator,
     });
 
@@ -640,7 +640,7 @@ describe('reverse merge - page to template (for saving)', () => {
 
     const { merged } = await mergeTemplatesIntoPage(template, {
       loadTemplate: async () => pageWithEdits,
-      pageBlocksFields: { blocks: { allowedLayouts: ['/templates/mixed'] } },
+      pageBlocksFields: { blocks_layout: { allowedLayouts: ['/templates/mixed'] } },
       uuidGenerator,
     });
 

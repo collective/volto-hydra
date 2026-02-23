@@ -61,9 +61,9 @@
         <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
             <BlocksRenderer
                 v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks"
-                :key="JSON.stringify(data.page?.footer_blocks_layout?.items || [])"
-                :blocks="data.page?.footer_blocks || {}"
-                :layout="data.page?.footer_blocks_layout?.items || []"
+                :key="JSON.stringify(data.page?.footer_blocks?.items || [])"
+                :blocks="data.page?.blocks || {}"
+                :layout="data.page?.footer_blocks?.items || []"
                 :templates="data.templates || {}"
                 :allowed-layouts="footerAllowedLayouts"
                 v-slot="{ items }"
@@ -207,7 +207,7 @@ onMounted(() => {
                 debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
                 pageBlocksFields: [
                     {
-                        fieldName: 'blocks',
+                        fieldName: 'blocks_layout',
                         title: 'Blocks',
                         allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
                         allowedTemplates: ['/_test_data/templates/test-layout'],

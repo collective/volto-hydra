@@ -89,13 +89,13 @@ export const sharedBlocksConfig = {
                 },
                 top_images: {
                     title: 'Top Images',
-                    widget: 'blocksid_list',
+                    widget: 'blocks_layout',
                     allowedBlocks: ['image'],
                     defaultBlockType: 'image',
                 },
                 columns: {
                     title: 'Columns',
-                    widget: 'blocksid_list',
+                    widget: 'blocks_layout',
                     allowedBlocks: ['column'],
                     // No defaultBlockType - tests single allowedBlock path
                     maxLength: 4,
@@ -115,7 +115,7 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['title', 'blocks'],
+                    fields: ['title', 'blocks_layout'],
                 },
             ],
             properties: {
@@ -123,9 +123,9 @@ export const sharedBlocksConfig = {
                     title: 'Title',
                     type: 'string',
                 },
-                blocks: {
+                blocks_layout: {
                     title: 'Content',
-                    widget: 'blocksid_list',
+                    widget: 'blocks_layout',
                     allowedBlocks: ['slate', 'image'],
                     defaultBlockType: 'slate',
                 },
@@ -229,13 +229,13 @@ export const sharedBlocksConfig = {
             properties: {
                 header: {
                     title: 'Header',
-                    widget: 'blocksid_list',
+                    widget: 'blocks_layout',
                     allowedBlocks: ['slate'],
                     defaultBlockType: 'slate',
                 },
                 content: {
                     title: 'Content',
-                    widget: 'blocksid_list',
+                    widget: 'blocks_layout',
                     allowedBlocks: ['slate', 'image'],
                     defaultBlockType: 'slate',
                 },
@@ -246,7 +246,7 @@ export const sharedBlocksConfig = {
     // Grid block: schema inheritance recipe
     // variation field is created by inheritSchemaFrom with computed choices
     // allowedBlocks on config controls what children can be added
-    // blocksField: 'blocks' tells inheritSchemaFrom to derive choices from it
+    // blocksField: 'blocks_layout' tells inheritSchemaFrom to derive choices from it
     // When variation is set, BlockChooser only shows that type
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
@@ -254,7 +254,7 @@ export const sharedBlocksConfig = {
             inheritSchemaFrom: {
                 typeField: 'variation',
                 defaultsField: 'itemDefaults',
-                blocksField: 'blocks',
+                blocksField: 'blocks_layout',
                 title: 'Item Type',
             },
         },

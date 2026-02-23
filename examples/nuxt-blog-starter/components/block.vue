@@ -88,9 +88,9 @@
     <h3 data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
 
     <!-- Top images row - horizontal layout for images above columns -->
-    <div v-if="block.top_images_layout?.items?.length" class="top-images-row flex gap-4 mb-4">
+    <div v-if="block.top_images?.items?.length" class="top-images-row flex gap-4 mb-4">
       <BlockExpander
-        :items="expandTemplatesSync(block.top_images_layout?.items || [], { blocks: block.top_images || {}, templateState, templates })"
+        :items="expandTemplatesSync(block.top_images?.items || [], { blocks: block.blocks || {}, templateState, templates })"
         :data="data" :api-url="effectiveApiUrl" :contained="true">
         <template #item="{ item }">
           <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" data-block-add="right" />
@@ -100,15 +100,15 @@
 
     <!-- Columns row - horizontal layout -->
     <div class="columns-row flex gap-4">
-      <div v-for="columnId in (block.columns_layout?.items || [])" :key="columnId"
+      <div v-for="columnId in (block.columns?.items || [])" :key="columnId"
            :data-block-uid="columnId" data-block-add="right"
            class="column flex-1 p-3 border border-dashed border-gray-300 rounded">
         <!-- Column title -->
-        <h4 v-if="block.columns?.[columnId]?.title" data-editable-field="title"
-            class="column-title mb-2 text-sm font-medium">{{ block.columns[columnId].title }}</h4>
+        <h4 v-if="block.blocks?.[columnId]?.title" data-editable-field="title"
+            class="column-title mb-2 text-sm font-medium">{{ block.blocks[columnId].title }}</h4>
         <!-- Column content blocks -->
         <BlockExpander
-          :items="expandTemplatesSync(block.columns?.[columnId]?.blocks_layout?.items || [], { blocks: block.columns?.[columnId]?.blocks || {}, templateState, templates })"
+          :items="expandTemplatesSync(block.blocks?.[columnId]?.blocks_layout?.items || [], { blocks: block.blocks?.[columnId]?.blocks || {}, templateState, templates })"
           :data="data" :api-url="effectiveApiUrl" :contained="true" />
       </div>
     </div>
@@ -237,7 +237,7 @@
         :aria-controls="`accordion-collapse-body-${block_uid}`">
         <span>
           <BlockExpander
-            :items="expandTemplatesSync(block.header_layout?.items || [], { blocks: block.header || {}, templateState, templates })"
+            :items="expandTemplatesSync(block.header?.items || [], { blocks: block.blocks || {}, templateState, templates })"
             :data="data" :api-url="effectiveApiUrl" />
         </span>
         <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
@@ -250,7 +250,7 @@
     <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
       <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
         <BlockExpander
-          :items="expandTemplatesSync(block.content_layout?.items || [], { blocks: block.content || {}, templateState, templates })"
+          :items="expandTemplatesSync(block.content?.items || [], { blocks: block.blocks || {}, templateState, templates })"
           :data="data" :api-url="effectiveApiUrl" />
       </div>
     </div>
@@ -323,7 +323,7 @@
       <!-- Results -->
       <div class="search-results">
         <BlockExpander
-          :items="expandTemplatesSync(block.listing_layout?.items || [], { blocks: block.listing || {}, templateState, templates })"
+          :items="expandTemplatesSync(block.listing?.items || [], { blocks: block.blocks || {}, templateState, templates })"
           :data="data" :api-url="effectiveApiUrl" />
       </div>
     </template>
@@ -374,7 +374,7 @@
             </div>
           </div>
           <BlockExpander
-            :items="expandTemplatesSync(block.listing_layout?.items || [], { blocks: block.listing || {}, templateState, templates })"
+            :items="expandTemplatesSync(block.listing?.items || [], { blocks: block.blocks || {}, templateState, templates })"
             :data="data" :api-url="effectiveApiUrl" />
         </div>
       </div>
@@ -614,10 +614,10 @@ const getTeaserDescription = (block) => {
 
 // Search block helpers
 const getListingTotalResults = (searchBlock) => {
-  // Get total results from the listing child block
-  const listingUid = searchBlock.listing_layout?.items?.[0];
+  // Get total results from the listing child block (shared blocks dict)
+  const listingUid = searchBlock.listing?.items?.[0];
   if (!listingUid) return null;
-  const listingBlock = searchBlock.listing?.[listingUid];
+  const listingBlock = searchBlock.blocks?.[listingUid];
   return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;
 };
 

@@ -443,7 +443,7 @@ const bridge = initBridge({
               },
               slides: {
                 title: "Slides",
-                type: 'blocks',
+                widget: 'blocksid_list',
                 allowedBlocks: ['slide', 'image'],
                 defaultBlockType: 'slide',
                 maxLength: 10,
@@ -509,10 +509,10 @@ Now we can add a slider block using the sidebar and slides to the slider block. 
     ...
 ```
 
-What we can see is that a field of type blocks is turned into a ```{fieldname}``` of type object and ```{fieldname}_layout``` which is a list of block ids.
+What we can see is that a `blocksid_list` field is turned into a ```{fieldname}``` dict of blocks and ```{fieldname}_layout``` which is an ordered list of block ids.
 
 We can add this as a slide and slider block to our block templates on the frontend and now our editors can add, remove slider blocks and the slides inside of them.
-A detail sidebar UI for any "blocks" type allows for managing even complex composable blocks like a slider (TODO)
+A detail sidebar UI for any container field allows for managing even complex composable blocks like a slider (TODO)
 
 You can configure any Volto settings during init. Such as:
    - change allowedBlock types
@@ -644,28 +644,24 @@ performance reasons (TODO)
 Container blocks are ones that have one or more block fields which can container other blocks.
 These blocks can added, removed and DND around the page.
 
-There are two syntax you can use in your block schema to define blocks fields.
+There are two widgets you can use in your block schema to define blocks fields. Both look the same in the editing UI and blocks can be dragged between them.
 
-Block type: allows a choice of blocks to add.
+##### `blocksid_list` — typed blocks with separate schemas
+
+Each child block has its own `@type` and schema (looked up from `blocksConfig`).
+Stored as a dict of blocks + an ordered ID list.
+
 ```js
-...
-slider: {
-  ...
-  blockSchema: {
-    properties: {
-      slides: {
-        title:"Slides", 
-        type: 'blocks',                                                                       allowedBlocks: ['slide', 'image'],                                                     defaultBlockType: 'slide',
-        maxLength: 10,             
-      }
-    }
-  }  
+slides: {
+  title: "Slides",
+  widget: 'blocksid_list',
+  allowedBlocks: ['slide', 'image'],
+  defaultBlockType: 'slide',
+  maxLength: 10,
 }
-
 ```
 
-which results in a block structure like
-
+Resulting data:
 
 ```json
 {
@@ -678,14 +674,16 @@ which results in a block structure like
 }
 ```
 
-or the object_list syntax, which allows for a single schema
+##### `object_list` — items sharing a single schema
+
+All items share one inline schema. Stored as an array with an ID field.
 
 ```js
 slides: {
   title: "Slides",
   widget: 'object_list',
   idField: '@id',  // Field used as unique identifier (default: '@id')
-  dataPath: ['data', 'rows'],  // optional path in case you need a nested structure
+  dataPath: ['data', 'rows'],  // optional path when data is nested
   schema: {
     properties: {
       title: { title: "Title" },
@@ -696,8 +694,7 @@ slides: {
 }
 ```
 
-which results in block structure where the blocks are stored in an array with their id.
-
+Resulting data:
 
 ```json
 {
@@ -711,8 +708,29 @@ which results in block structure where the blocks are stored in an array with th
 }
 ```
 
+##### `object_list` with `allowedBlocks` — typed items
 
-Both look the same in the editing UI and both are rendered the same way
+When `allowedBlocks` is set on an `object_list`, items can have different types
+(like `blocksid_list`) but are still stored as an array. Each item's type is
+stored in the field specified by `typeField` (defaults to `'@type'`) and its
+schema is looked up from `blocksConfig`.
+
+```js
+slides: {
+  title: "Slides",
+  widget: 'object_list',
+  allowedBlocks: ['slide', 'image'],
+  typeField: '@type',  // which field holds the block type (default: '@type')
+  defaultBlockType: 'slide',
+}
+```
+
+This is useful when you want the array storage format of `object_list` but need
+multiple block types like `blocksid_list`.
+
+Both `blocksid_list` and `object_list` look the same in the editing UI and
+blocks can be dragged between them — data is automatically adapted when moving
+between formats (ID fields added/stripped, type fields set appropriately)
 
 In your frontend, render each item with ```data-block-uid``` set to the item's ID:
 

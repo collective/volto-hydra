@@ -8,7 +8,7 @@ import { fetchContent } from '#utils/api';
 export default function Home({ params }) {
   const bridge = initBridge({
     pageBlocksFields: [
-      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
+      { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
     ],
   });
   const [data, setData] = useState(null);

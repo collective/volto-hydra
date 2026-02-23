@@ -141,9 +141,8 @@ function getContainerItems(parentBlock, containerConfig) {
     return [...(container || [])];
   }
 
-  // blocks container: items are in fieldName_layout.items
-  const layoutFieldName = `${fieldName}_layout`;
-  return [...(parentBlock[layoutFieldName]?.items || [])];
+  // blocks container: layout is in fieldName.items, blocks in shared parent.blocks
+  return [...(parentBlock[fieldName]?.items || [])];
 }
 
 /**
@@ -186,12 +185,11 @@ function setContainerItems(parentBlock, containerConfig, items, blocksObj = null
     return updatedParent;
   }
 
-  // blocks container: update both fieldName (blocks) and fieldName_layout (items)
-  const layoutFieldName = `${fieldName}_layout`;
+  // blocks container: update shared blocks dict + layout field
   return {
     ...parentBlock,
-    [fieldName]: blocksObj || parentBlock[fieldName],
-    [layoutFieldName]: { items },
+    blocks: blocksObj || parentBlock.blocks,
+    [fieldName]: { items },
   };
 }
 
@@ -234,7 +232,7 @@ function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
 
 /**
  * Build a map of blockId -> path for all blocks in formData.
- * Uses unified traversal for both `widget: 'blocksid_list'` and `widget: 'object_list'` containers.
+ * Uses unified traversal for both `widget: 'blocks_layout'` and `widget: 'object_list'` containers.
  *
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry (must have _page registered for multiple page fields)
@@ -261,17 +259,18 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
   // This contains the blocks container fields (blocks, footer_blocks, etc.)
   const rootConfig = blocksConfig?.['_page'];
   const pageSchema = rootConfig?.schema?.({ intl }) || {
-    // Fallback before INIT: default to single 'blocks' field
-    properties: { blocks: { widget: 'blocksid_list' } },
+    // Fallback before INIT: default to single 'blocks_layout' field
+    properties: { blocks_layout: { widget: 'blocks_layout' } },
   };
 
   // Get field names from page schema to check for data
   const pageFieldNames = Object.keys(pageSchema.properties || {})
-    .filter(fieldName => pageSchema.properties[fieldName]?.widget === 'blocksid_list');
+    .filter(fieldName => pageSchema.properties[fieldName]?.widget === 'blocks_layout');
 
   // Check if any page fields have data
+  // All layout fields use fieldName.items; blocks are in shared formData.blocks
   const hasAnyPageData = pageFieldNames.some(
-    fieldName => formData?.[fieldName] || formData?.[`${fieldName}_layout`]?.items?.length > 0
+    fieldName => formData?.[fieldName]?.items?.length > 0
   );
   if (!hasAnyPageData) {
     return pathMap;
@@ -331,7 +330,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       }
 
       // Container field - process its contents
-      if (fieldDef.widget === 'blocksid_list') {
+      if (fieldDef.widget === 'blocks_layout') {
         processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef);
       } else if (fieldDef.widget === 'object_list') {
         // Use dataPath if provided to find data in a different location
@@ -352,7 +351,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     if (item.blocks && item.blocks_layout?.items && firstBlockId && !pathMap[firstBlockId]) {
       const blockType = item['@type'];
       const blockConfig = blocksConfig?.[blockType];
-      processBlocksContainer(item, itemId, itemPath, 'blocks', {
+      processBlocksContainer(item, itemId, itemPath, 'blocks_layout', {
         allowedBlocks: blockConfig?.allowedBlocks || null,
         maxLength: blockConfig?.maxLength || null,
       });
@@ -360,13 +359,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
   }
 
   /**
-   * Process a widget: 'blocksid_list' container field.
-   * Items are stored in object + layout array pattern.
+   * Process a widget: 'blocks_layout' container field.
+   * Blocks are in shared parent.blocks dict; layout is parent[fieldName].items.
    */
   function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef) {
-    const blocks = parent[fieldName];
-    const layoutFieldName = `${fieldName}_layout`;
-    const layout = parent[layoutFieldName]?.items;
+    const blocks = parent.blocks;
+    const layout = parent[fieldName]?.items;
     if (!blocks || !layout) return;
 
     // First pass: collect fixed status for all blocks to determine insert restrictions
@@ -382,7 +380,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
       const block = blocks[blockId];
       if (!block) return;
 
-      const blockPath = [...parentPath, fieldName, blockId];
+      const blockPath = [...parentPath, 'blocks', blockId];
       const blockType = block['@type'];
       const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
 
@@ -762,7 +760,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   // Check schema-defined container field
   if (schema?.properties && fieldName) {
     const fieldDef = schema.properties[fieldName];
-    if (fieldDef?.widget === 'blocksid_list') {
+    if (fieldDef?.widget === 'blocks_layout') {
       return {
         fieldName,
         parentId,
@@ -780,7 +778,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const includesBlock = layoutItems?.includes(blockId);
   if (hasBlocks && includesBlock) {
     return {
-      fieldName: 'blocks',
+      fieldName: 'blocks_layout',
       parentId,
       allowedBlocks: parentConfig?.allowedBlocks || null,
       defaultBlockType: parentConfig?.defaultBlockType || null,
@@ -793,7 +791,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
 
 /**
  * Get ALL container fields for a block (supports multiple container fields).
- * Returns both schema-defined container fields (widget: 'blocksid_list') and implicit containers.
+ * Returns both schema-defined container fields (widget: 'blocks_layout') and implicit containers.
  *
  * @param {string} blockId - The block ID to check
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId }
@@ -859,17 +857,16 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
       }
       return Array.isArray(data) ? data.length : 0;
     }
-    // blocks container: count items in layout
-    const layoutField = `${fieldName}_layout`;
-    return block[layoutField]?.items?.length || 0;
+    // blocks container: count items in layout (fieldName IS the layout)
+    return block[fieldName]?.items?.length || 0;
   };
 
   const containerFields = [];
 
-  // Check for schema-defined container fields (widget: 'blocksid_list' or widget: 'object_list')
+  // Check for schema-defined container fields (widget: 'blocks_layout' or widget: 'object_list')
   if (schema?.properties) {
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-      if (fieldDef.widget === 'blocksid_list') {
+      if (fieldDef.widget === 'blocks_layout') {
         const maxLength = fieldDef.maxLength || blockConfig?.maxLength || null;
         const currentCount = getFieldCount(fieldName);
         const maxLengthOk = !maxLength || currentCount < maxLength;
@@ -921,10 +918,10 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlockType;
   if (containerFields.length === 0 && isImplicitContainer) {
     const maxLength = blockConfig?.maxLength || null;
-    const currentCount = getFieldCount('blocks');
+    const currentCount = getFieldCount('blocks_layout');
     const maxLengthOk = !maxLength || currentCount < maxLength;
     containerFields.push({
-      fieldName: 'blocks',
+      fieldName: 'blocks_layout',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
       defaultBlockType: blockConfig?.defaultBlockType || null,
@@ -983,8 +980,8 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
     items.splice(insertIndex, 0, { [idField]: newBlockId, ...newBlockData });
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
-    // Standard container: blocks object + blocks_layout
-    const newContainerBlocks = { ...parentBlock[fieldName], [newBlockId]: newBlockData };
+    // Standard container: shared blocks dict + layout field
+    const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: newBlockData };
     const refIndex = items.indexOf(refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
     items.splice(insertIndex, 0, newBlockId);
@@ -1027,8 +1024,8 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
     const filteredItems = items.filter(item => item[idField] !== blockId);
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, filteredItems);
   } else {
-    // Standard container: remove from blocks object and layout
-    const { [blockId]: removed, ...remainingBlocks } = parentBlock[fieldName];
+    // Standard container: remove from shared blocks dict and layout
+    const { [blockId]: removed, ...remainingBlocks } = parentBlock.blocks;
     const filteredItems = items.filter(id => id !== blockId);
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, filteredItems, remainingBlocks);
   }
@@ -1131,10 +1128,11 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
   }
 
   // Get current layout
-  const layoutPath = containerField === 'blocks'
+  // All container fields use fieldName.items for layout; blocks are in shared parent.blocks
+  const layoutPath = containerField === 'blocks_layout'
     ? 'blocks_layout.items'
-    : `${containerField}.blocks_layout.items`;
-  const blocksPath = containerField === 'blocks' ? 'blocks' : `${containerField}.blocks`;
+    : `${containerField}.items`;
+  const blocksPath = 'blocks';
 
   const layout = get(parentBlock, layoutPath, []);
   const blocks = get(parentBlock, blocksPath, {});
@@ -1168,23 +1166,12 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
   }
 
   // Build updated parent block
-  let updatedParentBlock;
-  if (containerField === 'blocks') {
-    updatedParentBlock = {
-      ...parentBlock,
-      blocks: newBlocks,
-      blocks_layout: { ...parentBlock.blocks_layout, items: newLayout },
-    };
-  } else {
-    updatedParentBlock = {
-      ...parentBlock,
-      [containerField]: {
-        ...parentBlock[containerField],
-        blocks: newBlocks,
-        blocks_layout: { ...parentBlock[containerField].blocks_layout, items: newLayout },
-      },
-    };
-  }
+  // All fields use shared parent.blocks + fieldName.items layout
+  const updatedParentBlock = {
+    ...parentBlock,
+    blocks: newBlocks,
+    [containerField]: { ...parentBlock[containerField], items: newLayout },
+  };
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
 }
@@ -1400,8 +1387,8 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
     );
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, updatedItems);
   } else {
-    // Standard container: update block in blocks object
-    const blocksObj = { ...parentBlock[fieldName], [blockId]: newBlockData };
+    // Standard container: update block in shared blocks dict
+    const blocksObj = { ...parentBlock.blocks, [blockId]: newBlockData };
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items, blocksObj);
   }
 
@@ -1529,7 +1516,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties }, blocksConfig);
   }
 
-  const blocksObj = { ...parentBlock[fieldName], [newBlockId]: blockData };
+  const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [newBlockId], blocksObj);
   return setBlockByPath(formData, parentPath, updatedParentBlock);
 }
@@ -1562,7 +1549,7 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     return blockData;
   }
 
-  // Find ALL container fields (widget: 'blocksid_list') and initialize each one
+  // Find ALL container fields (widget: 'blocks_layout') and initialize each one
   let result = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
@@ -1623,7 +1610,7 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       continue;
     }
 
-    if (fieldDef.widget !== 'blocksid_list') {
+    if (fieldDef.widget !== 'blocks_layout') {
       continue;
     }
 
@@ -1635,14 +1622,12 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       childBlockType = fieldDef.allowedBlocks[0];
     }
 
-    const layoutFieldName = `${fieldName}_layout`;
-
     // No determinable child type - initialize with empty container structure
     if (!childBlockType) {
       result = {
         ...result,
-        [fieldName]: {},
-        [layoutFieldName]: { items: [] },
+        blocks: { ...(result.blocks || {}) },
+        [fieldName]: { items: [] },
       };
       continue;
     }
@@ -1673,13 +1658,14 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     // Recursively initialize the child if it's also a container
     childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, options);
 
-    // Add child to this container field
+    // Add child to shared blocks dict + layout field
     result = {
       ...result,
-      [fieldName]: {
+      blocks: {
+        ...(result.blocks || {}),
         [childBlockId]: childBlockData,
       },
-      [layoutFieldName]: { items: [childBlockId] },
+      [fieldName]: { items: [childBlockId] },
     };
   }
 
@@ -1887,7 +1873,6 @@ function reorderBlockInContainer(
   }
 
   const { fieldName } = containerConfig;
-  const layoutFieldName = `${fieldName}_layout`;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -1898,7 +1883,7 @@ function reorderBlockInContainer(
     return null;
   }
 
-  const items = [...(parentBlock[layoutFieldName]?.items || [])];
+  const items = [...(parentBlock[fieldName]?.items || [])];
   const currentIndex = items.indexOf(blockId);
   const targetIndex = items.indexOf(targetBlockId);
 
@@ -1924,7 +1909,7 @@ function reorderBlockInContainer(
 
   const updatedParentBlock = {
     ...parentBlock,
-    [layoutFieldName]: { items },
+    [fieldName]: { items },
   };
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -1939,12 +1924,11 @@ function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, c
   }
 
   const { parentId, fieldName } = containerConfig;
-  const layoutFieldName = `${fieldName}_layout`;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
-  const items = parentBlock?.[layoutFieldName]?.items || [];
+  const items = parentBlock?.[fieldName]?.items || [];
 
   const targetIndex = items.indexOf(targetBlockId);
   if (targetIndex === -1) {

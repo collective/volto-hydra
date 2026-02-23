@@ -10947,14 +10947,14 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
   if (typeof options.loadTemplate === 'function') {
     // New signature with options object including loadTemplate function
     loadTemplate = options.loadTemplate;
-    pageBlocksFields = options.pageBlocksFields || { blocks: {} };
+    pageBlocksFields = options.pageBlocksFields || { blocks_layout: {} };
     uuidGenerator = options.uuidGenerator || generateUUID;
     filterInstanceId = options.filterInstanceId; // For reverse merge: only process specific instance
   } else {
     // Old signature: templates cache is second arg, uuidGenerator is third
     const templates = options || {};
     uuidGenerator = arguments[2] || generateUUID;
-    pageBlocksFields = { blocks: {} };
+    pageBlocksFields = { blocks_layout: {} };
     filterInstanceId = undefined;
     // Create loadTemplate from templates cache (old behavior)
     loadTemplate = async (templateId) => {
@@ -10988,22 +10988,33 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
       newLayout.push(blockId);
 
       // Check for nested container blocks and process recursively
-      // Container blocks have a blocks field with @type values
+      // In shared blocks format: block.blocks is the shared dict, layout fields are { items: [...] }
       const processedBlock = { ...block };
-      for (const [key, value] of Object.entries(block)) {
-        if (isBlocksMap(value)) {
-          const nestedLayoutKey = `${key}_layout`;
-          const nestedLayout = block[nestedLayoutKey]?.items || Object.keys(value);
-          // Recursively process nested blocks with same templateState
-          const { blocks: nestedBlocks, layout: nestedNewLayout } = await processBlocksRecursive(
-            value,
-            nestedLayout,
-            null, // No forced layouts for nested containers
-            templateState
-          );
-          processedBlock[key] = nestedBlocks;
-          processedBlock[nestedLayoutKey] = { items: nestedNewLayout };
+      if (isBlocksMap(block.blocks)) {
+        let mergedBlocks = {};
+        // Process each layout field separately (columns, top_images, blocks_layout, etc.)
+        for (const [key, value] of Object.entries(block)) {
+          if (key !== 'blocks' && value?.items && Array.isArray(value.items)) {
+            // This is a layout field — extract its blocks subset and process
+            const fieldBlocks = {};
+            for (const id of value.items) {
+              if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
+            }
+            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
+              fieldBlocks,
+              value.items,
+              null, // No forced layouts for nested containers
+              templateState
+            );
+            Object.assign(mergedBlocks, newFieldBlocks);
+            processedBlock[key] = { items: newFieldLayout };
+          }
         }
+        // Keep any blocks not referenced by layout fields (orphaned/utility blocks)
+        for (const [id, blockData] of Object.entries(block.blocks)) {
+          if (!mergedBlocks[id]) mergedBlocks[id] = blockData;
+        }
+        processedBlock.blocks = mergedBlocks;
       }
 
       newBlocks[blockId] = processedBlock;
@@ -11018,37 +11029,41 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
   }
 
   // Process each page-level blocks field
+  // All fields share result.blocks; each field has its own layout (fieldName: { items: [...] })
   const fieldsToProcess = Object.keys(pageBlocksFields).length > 0
     ? pageBlocksFields
-    : { blocks: {} }; // Default to main blocks field
+    : { blocks_layout: {} }; // Default to main blocks_layout field
 
   for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
-    const blocksData = fieldName === 'blocks' ? result.blocks : result[fieldName];
-    const layoutFieldName = fieldName === 'blocks' ? 'blocks_layout' : `${fieldName}_layout`;
-    const layoutData = result[layoutFieldName];
-    const layout = layoutData?.items || Object.keys(blocksData || {});
+    const blocksData = result.blocks || {};
+    const layoutData = result[fieldName];
+    const layout = layoutData?.items || [];
     const allowedLayouts = fieldDef?.allowedLayouts || null;
 
-    if (!blocksData && !allowedLayouts) {
-      // No data and no forced layout - skip
+    if (layout.length === 0 && !allowedLayouts) {
+      // No layout items and no forced layout - skip this field
       continue;
+    }
+
+    // Build a blocks subset for this field (only blocks referenced by this field's layout)
+    const fieldBlocks = {};
+    for (const blockId of layout) {
+      if (blocksData[blockId]) {
+        fieldBlocks[blockId] = blocksData[blockId];
+      }
     }
 
     const templateState = {};
     const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
-      blocksData || {},
+      fieldBlocks,
       layout,
       allowedLayouts,
       templateState
     );
 
-    if (fieldName === 'blocks') {
-      result.blocks = newBlocks;
-      result.blocks_layout = { items: newLayout };
-    } else {
-      result[fieldName] = newBlocks;
-      result[`${fieldName}_layout`] = { items: newLayout };
-    }
+    // Merge processed blocks back into shared dict (don't replace — other fields' blocks must remain)
+    result.blocks = { ...result.blocks, ...newBlocks };
+    result[fieldName] = { items: newLayout };
   }
 
   return {

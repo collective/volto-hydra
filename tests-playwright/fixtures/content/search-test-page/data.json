@@ -31,7 +31,7 @@
         }
       ],
       "sortOnOptions": ["effective", "created", "sortable_title"],
-      "listing": {
+      "blocks": {
         "results-listing": {
           "@type": "listing",
           "variation": "teaser",
@@ -54,7 +54,7 @@
           }
         }
       },
-      "listing_layout": {
+      "listing": {
         "items": ["results-listing"]
       }
     }

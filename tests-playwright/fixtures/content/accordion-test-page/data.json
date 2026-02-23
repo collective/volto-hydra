@@ -17,15 +17,12 @@
     },
     "accordion-1": {
       "@type": "accordion",
-      "header": {
+      "blocks": {
         "header-text-1": {
           "@type": "slate",
           "value": [{"type": "p", "children": [{"text": "Accordion Header Text"}]}],
           "plaintext": "Accordion Header Text"
-        }
-      },
-      "header_layout": {"items": ["header-text-1"]},
-      "content": {
+        },
         "content-text-1": {
           "@type": "slate",
           "value": [{"type": "p", "children": [{"text": "Accordion Content Text"}]}],
@@ -37,7 +34,8 @@
           "plaintext": "More content"
         }
       },
-      "content_layout": {"items": ["content-text-1", "content-text-2"]}
+      "header": {"items": ["header-text-1"]},
+      "content": {"items": ["content-text-1", "content-text-2"]}
     },
     "text-after": {
       "@type": "slate",

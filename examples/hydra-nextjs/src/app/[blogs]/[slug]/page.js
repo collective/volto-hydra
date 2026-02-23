@@ -9,7 +9,7 @@ import { fetchContent } from '#utils/api';
 export default function Blog({ params }) {
   const bridge = initBridge({
     pageBlocksFields: [
-      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+      { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
     ],
   });
   const [data, setData] = useState(null);

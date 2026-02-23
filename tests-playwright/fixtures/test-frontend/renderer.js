@@ -708,16 +708,13 @@ function renderVideoBlock(block) {
  * Render a columns container block.
  * Has TWO container fields: top_images and columns (tests multi-field routing)
  * Calls window._expandListingBlocks for nested listings in columns.
- * @param {Object} block - Columns block data with top_images/top_images_layout and columns/columns_layout
+ * @param {Object} block - Columns block data with shared blocks dict + top_images/columns layout fields
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
-    const topImages = block.top_images || {};
-    const topImagesLayout = block.top_images_layout || { items: [] };
-    const topImagesItems = topImagesLayout.items || [];
-    const columns = block.columns || {};
-    const columnsLayout = block.columns_layout || { items: [] };
-    const columnsItems = columnsLayout.items || [];
+    const blocks = block.blocks || {};
+    const topImagesItems = block.top_images?.items || [];
+    const columnsItems = block.columns?.items || [];
     const title = block.title || '';
 
     let html = '';
@@ -733,7 +730,7 @@ async function renderColumnsBlock(block) {
         html += '<div class="field-label" style="font-weight: bold; color: #666; font-size: 12px; writing-mode: vertical-rl; text-orientation: mixed;">TOP IMAGES</div>';
 
         for (const imgId of topImagesItems) {
-            const img = topImages[imgId];
+            const img = blocks[imgId];
             if (!img) continue;
 
             // Render image as a nested block with data-block-uid and data-block-add="right"
@@ -749,7 +746,7 @@ async function renderColumnsBlock(block) {
     html += '<div class="columns-row" style="display: flex; gap: 20px;">';
 
     for (const columnId of columnsItems) {
-        const column = columns[columnId];
+        const column = blocks[columnId];
         if (!column) continue;
 
         // Render column as a nested block with data-block-uid and data-block-add="right"
@@ -1132,17 +1129,16 @@ function renderSlideBlock(block) {
  * Render an accordion block with separate header and content containers.
  * Calls window._expandListingBlocks for nested listings in content.
  *
- * @param {Object} block - Accordion block data with header/header_layout and content/content_layout
+ * @param {Object} block - Accordion block data with shared blocks dict + header/content layout fields
  * @param {string} blockId - Accordion block ID
  * @returns {Promise<string>} HTML string
  */
 async function renderAccordionBlock(block, blockId) {
-    let header = block.header || {};
-    let headerItems = block.header_layout?.items || [];
-    let content = block.content || {};
-    let contentItems = block.content_layout?.items || [];
+    const blocks = block.blocks || {};
+    let headerItems = block.header?.items || [];
+    let contentItems = block.content?.items || [];
 
-    const { items: expandedItems } = await expandItems(content, contentItems, `${blockId}-content`);
+    const { items: expandedItems } = await expandItems(blocks, contentItems, `${blockId}-content`);
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
@@ -1151,7 +1147,7 @@ async function renderAccordionBlock(block, blockId) {
     html += '<div class="header-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">HEADER</div>';
 
     for (const childId of headerItems) {
-        const childBlock = header[childId];
+        const childBlock = blocks[childId];
         if (childBlock) {
             html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
@@ -1267,7 +1263,7 @@ function renderFacetWidget(facet) {
  * Render a search block with facets and listing container.
  * The listing child is expanded via expandListingBlocks before rendering.
  *
- * @param {Object} block - Search block data with facets and listing/listing_layout
+ * @param {Object} block - Search block data with facets and shared blocks dict + listing layout
  * @param {string} blockId - Search block ID
  * @returns {Promise<string>} HTML string
  */
@@ -1277,8 +1273,8 @@ async function renderSearchBlock(block, blockId) {
     const showSortOn = block.showSortOn;
     const facets = block.facets || [];
     const sortOnOptions = block.sortOnOptions || [];
-    const listing = block.listing || {};
-    const listingLayout = block.listing_layout?.items || [];
+    const blocks = block.blocks || {};
+    const listingLayout = block.listing?.items || [];
 
     let html = '<div class="search-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
 
@@ -1334,7 +1330,7 @@ async function renderSearchBlock(block, blockId) {
     // Expand listing blocks if we have the helper
     // expandListingBlocks returns { items, paging } where each item has @uid
     if (window._expandListingBlocks && listingLayout.length > 0) {
-        const result = await window._expandListingBlocks(listing, listingLayout, `${blockId}-listing`);
+        const result = await window._expandListingBlocks(blocks, listingLayout, `${blockId}-listing`);
         const expandedItems = result.items;
 
         for (const childBlock of expandedItems) {

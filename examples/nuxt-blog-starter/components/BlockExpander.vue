@@ -76,8 +76,8 @@ const allBlocks = computed(() => {
     return [{ id: props.block_uid, block: props.block }];
   } else {
     // Container (gridBlock etc.) - get children
-    const blocks = props.block.blocks || props.block.listing || {};
-    const layout = props.block.blocks_layout?.items || props.block.listing_layout?.items || [];
+    const blocks = props.block.blocks || {};
+    const layout = props.block.blocks_layout?.items || props.block.listing?.items || [];
     return layout.map(id => ({ id, block: blocks[id] })).filter(item => item.block);
   }
 });
