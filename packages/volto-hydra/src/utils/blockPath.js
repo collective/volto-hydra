@@ -1918,47 +1918,34 @@ function reorderBlockInContainer(
     return null;
   }
 
-  const { fieldName } = containerConfig;
-
-  // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
-
   if (!parentBlock) {
     console.error('[MOVE_BLOCK] Could not find parent block:', parentId);
     return null;
   }
 
-  const items = [...(parentBlock[fieldName]?.items || [])];
-  const currentIndex = items.indexOf(blockId);
-  const targetIndex = items.indexOf(targetBlockId);
+  // Compute new ID order from blockId + targetBlockId + insertAfter
+  const items = getContainerItems(parentBlock, containerConfig);
+  const idField = containerConfig.isObjectList ? (containerConfig.idField || '@id') : null;
+  const getId = idField ? (item => item[idField]) : (item => item);
+
+  const ids = items.map(getId);
+  const currentIndex = ids.indexOf(blockId);
+  const targetIndex = ids.indexOf(targetBlockId);
 
   if (currentIndex === -1 || targetIndex === -1) {
-    console.error('[MOVE_BLOCK] Block not found in layout:', { blockId, targetBlockId, items });
+    console.error('[MOVE_BLOCK] Block not found in container:', { blockId, targetBlockId, ids });
     return null;
   }
 
-  // Remove from current position
-  items.splice(currentIndex, 1);
+  ids.splice(currentIndex, 1);
+  let newIndex = currentIndex < targetIndex ? targetIndex - 1 : targetIndex;
+  if (insertAfter) newIndex++;
+  ids.splice(newIndex, 0, blockId);
 
-  // Calculate new position (adjust if moving down)
-  let newIndex = targetIndex;
-  if (currentIndex < targetIndex) {
-    newIndex--;
-  }
-  if (insertAfter) {
-    newIndex++;
-  }
-
-  // Insert at new position
-  items.splice(newIndex, 0, blockId);
-
-  const updatedParentBlock = {
-    ...parentBlock,
-    [fieldName]: { items },
-  };
-
-  return setBlockByPath(formData, parentPath, updatedParentBlock);
+  // Delegate to reorderBlocksInContainer which handles both formats
+  return reorderBlocksInContainer(formData, blockPathMap, parentId, containerConfig.fieldName, ids, blocksConfig, intl);
 }
 
 /**

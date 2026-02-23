@@ -335,7 +335,7 @@ You can use whatever frontend technology you want but a basic vue.js example mig
 <template>
     <Header :data="data"/>
     <content>
-            <Block  :block_id="block_id" :block="data.blocks[block_id]" :data="data" v-for="block_id in data.blocks_layout"/>
+            <Block  :block_id="block_id" :block="data.blocks[block_id]" :data="data" v-for="block_id in data.blocks_layout.items"/>
     </content>
     <Footer :data="data/>  
 </template>
@@ -443,7 +443,7 @@ const bridge = initBridge({
               },
               slides: {
                 title: "Slides",
-                widget: 'blocksid_list',
+                widget: 'blocks_layout',
                 allowedBlocks: ['slide', 'image'],
                 defaultBlockType: 'slide',
                 maxLength: 10,
@@ -497,11 +497,11 @@ Now we can add a slider block using the sidebar and slides to the slider block. 
     ...
     <div v-else-if="block['@type'] == 'slider'" class="slider">
       <div>
-        <div class="slide" v-for="slide_id in block.slides_layout">
-          <img :src="block.slides[slide_id].image"/>
-          <h2>{{block.slides[slide_id].title}</h2>
-          <div><RichText v-for="node in block.slides[slide_id].description" :key="node" :node="node" /></div>
-          <div><a :href="block.slides[slide_id].url">block.slides[slide_id].link_text</a><div>
+        <div class="slide" v-for="slide_id in block.slides.items">
+          <img :src="block.blocks[slide_id].image"/>
+          <h2>{{block.blocks[slide_id].title}</h2>
+          <div><RichText v-for="node in block.blocks[slide_id].description" :key="node" :node="node" /></div>
+          <div><a :href="block.blocks[slide_id].url">block.blocks[slide_id].link_text</a><div>
         </div>
       </div>
       <a link="">Prev></a><a link="">Next></a>
@@ -509,7 +509,7 @@ Now we can add a slider block using the sidebar and slides to the slider block. 
     ...
 ```
 
-What we can see is that a `blocksid_list` field is turned into a ```{fieldname}``` dict of blocks and ```{fieldname}_layout``` which is an ordered list of block ids.
+What we can see is that a `blocks_layout` field stores child blocks in a shared `blocks` dict on the parent, with `{fieldname}: { items: [...] }` holding the ordered list of block IDs.
 
 We can add this as a slide and slider block to our block templates on the frontend and now our editors can add, remove slider blocks and the slides inside of them.
 A detail sidebar UI for any container field allows for managing even complex composable blocks like a slider (TODO)
@@ -646,15 +646,15 @@ These blocks can added, removed and DND around the page.
 
 There are two widgets you can use in your block schema to define blocks fields. Both look the same in the editing UI and blocks can be dragged between them.
 
-##### `blocksid_list` — typed blocks with separate schemas
+##### `blocks_layout` — typed blocks with separate schemas
 
 Each child block has its own `@type` and schema (looked up from `blocksConfig`).
-Stored as a dict of blocks + an ordered ID list.
+Child blocks are stored in a shared `blocks` dict on the parent block, with the field holding `{ items: [...] }` for ordering.
 
 ```js
 slides: {
   title: "Slides",
-  widget: 'blocksid_list',
+  widget: 'blocks_layout',
   allowedBlocks: ['slide', 'image'],
   defaultBlockType: 'slide',
   maxLength: 10,
@@ -666,13 +666,15 @@ Resulting data:
 ```json
 {
   "@type": "slider",
-  "slides": {
+  "blocks": {
     "slide-1": { "@type": "slide", "title": "First Slide", "image": "..." },
     "slide-2": { "@type": "image", "title": "Second Slide", "image": "..." }
   },
-  "slides_layout": ["slide-1", "slide-2"]
+  "slides": { "items": ["slide-1", "slide-2"] }
 }
 ```
+
+Note: All `blocks_layout` fields on the same block share the same `blocks` dict. This means a block can have multiple container fields (e.g., `header` and `footer`) whose child blocks all live in the parent's `blocks`.
 
 ##### `object_list` — items sharing a single schema
 
@@ -711,24 +713,36 @@ Resulting data:
 ##### `object_list` with `allowedBlocks` — typed items
 
 When `allowedBlocks` is set on an `object_list`, items can have different types
-(like `blocksid_list`) but are still stored as an array. Each item's type is
+(like `blocks_layout`) but are still stored as an array. Each item's type is
 stored in the field specified by `typeField` (defaults to `'@type'`) and its
 schema is looked up from `blocksConfig`.
 
 ```js
-slides: {
-  title: "Slides",
+facets: {
+  title: "Facets",
   widget: 'object_list',
-  allowedBlocks: ['slide', 'image'],
-  typeField: '@type',  // which field holds the block type (default: '@type')
-  defaultBlockType: 'slide',
+  allowedBlocks: ['checkboxFacet', 'selectFacet'],
+  typeField: 'type',  // which field holds the block type (default: '@type')
+  defaultBlockType: 'checkboxFacet',
+}
+```
+
+Resulting data:
+
+```json
+{
+  "@type": "search",
+  "facets": [
+    { "@id": "facet-1", "type": "checkboxFacet", "title": "Content Type", "field": "portal_type" },
+    { "@id": "facet-2", "type": "selectFacet", "title": "Subject", "field": "Subject" }
+  ]
 }
 ```
 
 This is useful when you want the array storage format of `object_list` but need
-multiple block types like `blocksid_list`.
+multiple block types like `blocks_layout`.
 
-Both `blocksid_list` and `object_list` look the same in the editing UI and
+Both `blocks_layout` and `object_list` look the same in the editing UI and
 blocks can be dragged between them — data is automatically adapted when moving
 between formats (ID fields added/stripped, type fields set appropriately)
 

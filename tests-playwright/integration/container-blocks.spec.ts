@@ -4415,4 +4415,35 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
       expect(newFirstText).not.toContain('Content Type');
     }).toPass({ timeout: 5000 });
   });
+
+  test('DnD reorder within typed object_list via iframe drag', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+
+    // Verify initial facet order: facet-type, facet-state, facet-subject
+    const facetItems = iframe.locator('.facet-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+    expect(await facetItems.first().getAttribute('data-block-uid')).toBe('facet-type');
+    expect(await facetItems.last().getAttribute('data-block-uid')).toBe('facet-subject');
+
+    // Click on facet title to select it (avoid checkboxes in the facet body)
+    await helper.clickBlockInIframe('facet-type', { selector: '[data-editable-field="title"]' });
+    await helper.waitForQuantaToolbar('facet-type');
+
+    // Drag after last facet
+    const targetBlock = iframe.locator('[data-block-uid="facet-subject"]').first();
+    await helper.dragBlockWithMouse(targetBlock, targetBlock, true);
+
+    // Verify the order changed: facet-type should now be last
+    await expect(async () => {
+      const newFirstId = await facetItems.first().getAttribute('data-block-uid');
+      expect(newFirstId).not.toBe('facet-type');
+    }).toPass({ timeout: 5000 });
+    expect(await facetItems.last().getAttribute('data-block-uid')).toBe('facet-type');
+  });
 });
