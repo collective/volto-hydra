@@ -1,0 +1,454 @@
+{
+  "@id": "/concepts/templates",
+  "@type": "Document",
+  "UID": "concepts-templates-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "Templates let you centrally control page layouts with fixed headers/footers and named placeholder slots where editors add their content. Configure which templates are available in initBridge, then use the expand helpers in your renderer.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Templates let you centrally control page layouts with fixed headers/footers and named placeholder slots where editors add their content. Configure which templates are available in initBridge, then use the expand helpers in your renderer."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "sep-1": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "config-heading": {
+      "@type": "slate",
+      "plaintext": "Configuring Templates in initBridge",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Configuring Templates in initBridge"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "config-text": {
+      "@type": "slate",
+      "plaintext": "Add allowedTemplates and allowedLayouts to your pageBlocksFields configuration.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Add "
+            },
+            {
+              "children": [
+                {
+                  "text": "allowedTemplates"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " and "
+            },
+            {
+              "children": [
+                {
+                  "text": "allowedLayouts"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to your pageBlocksFields:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "initBridge({\n    pageBlocksFields: [{\n        fieldName: 'blocks',\n        allowedTemplates: ['/templates/form-snippet'],\n        allowedLayouts: ['/templates/article-layout'],\n    }]\n});"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "allowedTemplates"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — shown in the BlockChooser's \"Templates\" group. Editors insert them as blocks."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "allowedLayouts"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — shown in the Layout dropdown. They replace/merge the entire container content. If none are already applied, the first is applied automatically."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "blocks-heading": {
+      "@type": "slate",
+      "plaintext": "Template Block Properties",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Template Block Properties"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "blocks-text": {
+      "@type": "slate",
+      "plaintext": "Template blocks use fixed, readOnly, and placeholder properties to control what editors can do.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Template blocks use these properties to control what editors can do:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"placeholder\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"footer\" }\n  }\n}"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "fixed + readOnly"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Can't be edited or moved (branded headers, footers)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "fixed"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Can be edited but not moved (required sections)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "placeholder"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Named slot where editors add their own blocks. The \"default\" placeholder receives leftover content."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "render-heading": {
+      "@type": "slate",
+      "plaintext": "Rendering with Template Expansion",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Rendering with Template Expansion"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "render-text": {
+      "@type": "slate",
+      "plaintext": "Use loadTemplates to pre-fetch, then expandTemplatesSync in your renderer to merge template content with page content.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Use "
+            },
+            {
+              "children": [
+                {
+                  "text": "loadTemplates"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to pre-fetch, then "
+            },
+            {
+              "children": [
+                {
+                  "text": "expandTemplatesSync"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " in your renderer:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "import { loadTemplates, expandTemplatesSync }\n    from '@hydra-js/hydra.js';\n\nconst loadTemplate = async (id) =>\n    fetch(`${apiBase}${id}`).then(r => r.json());\n\n// Pre-fetch all templates referenced in the page\nconst templates = await loadTemplates(pageData,\n                                      loadTemplate);\nconst templateState = {};\n\n// Expand — merges template fixed blocks with user content\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n});\n\n// Render\nfor (const item of items) {\n    renderBlock(item['@uid'], item);\n}"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "Or use the async version if you prefer on-demand loading:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "const items = await expandTemplates(layout, {\n    blocks,\n    templateState: {},\n    loadTemplate,\n});"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "merge-heading": {
+      "@type": "slate",
+      "plaintext": "How the Merge Works",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "How the Merge Works"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "merge-text": {
+      "@type": "slate",
+      "plaintext": "The merge algorithm replaces template blocks with user content matched by placeholder name.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The merge replaces template blocks with user content matched by placeholder name:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Fixed+readOnly blocks are inserted as-is (can't be changed)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Fixed blocks copy field content from page blocks with the same placeholder name"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Placeholder slots are replaced with the user's blocks that have the same placeholder name"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Leftover blocks go into the \"default\" placeholder, or are dropped"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        },
+        {
+          "children": [
+            {
+              "text": "Before:  [User Block A] [User Block B]\nLayout:  [Fixed Header] [default] [Fixed Footer]\nAfter:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "To force a layout (e.g., ensure a footer always applies), pass "
+            },
+            {
+              "children": [
+                {
+                  "text": "allowedLayouts"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to the expand function:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "const items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n    allowedLayouts: ['/templates/footer-layout'],\n});"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "sep-1",
+      "config-heading",
+      "config-text",
+      "blocks-heading",
+      "blocks-text",
+      "render-heading",
+      "render-text",
+      "merge-heading",
+      "merge-text"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Configure templates in initBridge, use fixed/placeholder blocks, and render with expandTemplatesSync",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "templates",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Templates & Layouts",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

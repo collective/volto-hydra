@@ -1,0 +1,573 @@
+{
+  "@id": "/concepts/integration-levels",
+  "@type": "Document",
+  "UID": "concepts-integration-levels-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "To make your site editable with Hydra you load hydra.js in your frontend and configure it with your block types. Then you progressively add HTML annotations to enable visual editing features.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "To make your site editable with Hydra you load hydra.js in your frontend and configure it with your block types. Then you progressively add HTML annotations to enable visual editing features."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "sep-1": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "bridge-heading": {
+      "@type": "slate",
+      "plaintext": "Setting Up the Bridge",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Setting Up the Bridge"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "bridge-text": {
+      "@type": "slate",
+      "plaintext": "Include hydra.js in your frontend and call initBridge() to create a two-way communication channel between Hydra and your frontend.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Include hydra.js in your frontend and call "
+            },
+            {
+              "children": [
+                {
+                  "text": "initBridge()"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to create a two-way communication channel between Hydra and your frontend. The bridge handles authentication, page navigation syncing, and block data transfer."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "import { initBridge } from './hydra.js';\n\nlet bridge;\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n        pageBlocksFields: [\n            { fieldName: 'blocks', title: 'Content',\n              allowedBlocks: ['slate', 'grid', 'myimage'] },\n        ],\n    });\n}"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "The "
+            },
+            {
+              "children": [
+                {
+                  "text": "pageBlocksFields"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " array configures which blocks fields your page has. Each entry specifies the field name, a display title, and which block types are allowed. If you don't specify a 'blocks' field, one is automatically added with all non-restricted block types."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "multi-heading": {
+      "@type": "slate",
+      "plaintext": "Multiple Page Blocks Fields",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Multiple Page Blocks Fields"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "multi-text": {
+      "@type": "slate",
+      "plaintext": "Pages can have multiple blocks fields for different areas like header, content and footer.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Pages can have multiple blocks fields for different areas (e.g., header, content, footer). Each shows as a separate section in the sidebar when no block is selected:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "bridge = initBridge({\n    pageBlocksFields: [\n        { fieldName: 'header_blocks', title: 'Header',\n          allowedBlocks: ['slate', 'image'], maxLength: 3 },\n        { fieldName: 'blocks', title: 'Content',\n          allowedBlocks: ['slate', 'image', 'hero', 'columns'] },\n        { fieldName: 'footer_blocks', title: 'Footer',\n          allowedBlocks: ['slate', 'link'] }\n    ],\n});"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "callback-heading": {
+      "@type": "slate",
+      "plaintext": "The Update Callback",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The Update Callback"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "callback-text": {
+      "@type": "slate",
+      "plaintext": "Register onEditChange to receive live content updates as the user edits. Your frontend re-renders in realtime using the same data format as the Plone REST API.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Register "
+            },
+            {
+              "children": [
+                {
+                  "text": "onEditChange"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to receive live content updates as the user edits. Your frontend re-renders in realtime using the same data format as the Plone REST API."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "const bridge = initBridge({ ... });\n\nif (window.name.startsWith('hydra-edit')) {\n    // Live updates during editing\n    bridge.onEditChange((formData) => renderPage(formData));\n} else {\n    // Normal page render from server\n    renderPage(await fetchContent(path));\n}"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "Since the data structure is the same as returned by the Plone REST API, it's normally easy to re-render your page dynamically using the same code your frontend used to render the page initially."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "With onEditChange registered, editors get:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Changes appear on the frontend as they type in the sidebar"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Adding and removing blocks shows immediately in the preview"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Drag and drop block reordering with live preview"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "A '+' icon on the frontend to add blocks after the current block"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        },
+        {
+          "children": [
+            {
+              "text": "Note: For live updates you need a frontend deployed as SPA or hybrid rather than SSR or SSG. If your production deploy is SSG/SSR, deploy another edit-only preview frontend in SPA mode."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "custom-heading": {
+      "@type": "slate",
+      "plaintext": "Custom Blocks",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Custom Blocks"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "custom-text": {
+      "@type": "slate",
+      "plaintext": "Define custom block types directly in your frontend configuration via voltoConfig.blocks.blocksConfig. No Volto plugin required.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Define custom block types directly in your frontend configuration via "
+            },
+            {
+              "children": [
+                {
+                  "text": "voltoConfig.blocks.blocksConfig"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": ". No Volto plugin deployment required. Each block type needs an id, title, and a blockSchema with its field properties."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "const bridge = initBridge({\n    pageBlocksFields: [\n        { fieldName: 'blocks', title: 'Content',\n          allowedBlocks: ['slate', 'image', 'video', 'slider'] },\n    ],\n    voltoConfig: {\n        blocks: {\n            blocksConfig: {\n                slider: {\n                    id: 'slider',\n                    title: 'Slider',\n                    group: 'common',\n                    blockSchema: {\n                        properties: {\n                            slider_timing: {\n                                title: 'Delay',\n                                widget: 'float',\n                            },\n                            slides: {\n                                title: 'Slides',\n                                widget: 'blocks_layout',\n                                allowedBlocks: ['slide', 'image'],\n                                defaultBlockType: 'slide',\n                            }\n                        },\n                    }\n                },\n                slide: {\n                    id: 'slide',\n                    title: 'Slide',\n                    blockSchema: {\n                        properties: {\n                            url: { title: 'Link', widget: 'url' },\n                            title: { title: 'Title' },\n                            image: { title: 'Image', widget: 'image' },\n                            description: { title: 'Description',\n                                           widget: 'slate' },\n                        },\n                    },\n                },\n            },\n        },\n    },\n});"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "Child block types (like 'slide' above) must be defined at the top level of blocksConfig. You can also:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Set "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "restricted: true"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " to hide a block from the block chooser (only usable as child blocks)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Set "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "mostUsed: true"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " to pin a block to the top of the chooser"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Set "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "sidebarSchemaOnly: true"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " to use only the schema form in the sidebar (no custom edit component)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Use "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "fieldsets"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " in the schema to organize fields into tabs"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "annotations-heading": {
+      "@type": "slate",
+      "plaintext": "HTML Annotations for Visual Editing",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "HTML Annotations for Visual Editing"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "annotations-text": {
+      "@type": "slate",
+      "plaintext": "Add data attributes to your rendered HTML to enable progressively richer visual editing.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Add data attributes to your rendered HTML to enable progressively richer visual editing:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-block-uid=\"blockId\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-editable-field=\"fieldName\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-media-field=\"fieldName\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-linkable-field=\"fieldName\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        },
+        {
+          "children": [
+            {
+              "text": "Example of a fully annotated slide block:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "<div class=\"slide\" data-block-uid=\"slide-1\">\n    <img data-media-field=\"image\" src=\"/big_news.jpg\"/>\n    <h2 data-editable-field=\"title\">Big News</h2>\n    <div data-editable-field=\"description\">\n        Check out <b>hydra</b>, it will change everything\n    </div>\n    <a data-linkable-field=\"url\"\n       data-editable-field=\"buttonText\"\n       href=\"/big_news\">Read more</a>\n</div>"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax instead:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "<!-- hydra block-uid=block-123\n     editable-field=title(.card-title)\n     media-field=image(img)\n     linkable-field=href(a.link) -->\n<div class=\"third-party-card\">...</div>\n<!-- /hydra -->"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "sep-1",
+      "bridge-heading",
+      "bridge-text",
+      "multi-heading",
+      "multi-text",
+      "callback-heading",
+      "callback-text",
+      "custom-heading",
+      "custom-text",
+      "annotations-heading",
+      "annotations-text"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "How to set up hydra.js, receive live updates, and define custom block types",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "integration-levels",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "The Bridge, Callbacks & Custom Blocks",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

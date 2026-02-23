@@ -4,18 +4,134 @@
   "UID": "plone_site_root",
   "allow_discussion": null,
   "blocks": {
-    "03511c33-6c36-4135-a60a-0be82ccc7e8f": {
+    "quickstart-heading": {
       "@type": "slate",
-      "plaintext": "Happy Hacking!",
-      "styles": {},
+      "plaintext": "Quick Start",
       "value": [
         {
           "children": [
             {
-              "text": "Happy Hacking!"
+              "text": "Quick Start"
             }
           ],
           "type": "h2"
+        }
+      ]
+    },
+    "quickstart-text": {
+      "@type": "slate",
+      "plaintext": "Try the online demo at hydra.pretagov.com. Or run locally: clone the repo, start Plone, start a frontend, start Hydra.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Try the "
+            },
+            {
+              "children": [
+                {
+                  "text": "online demo"
+                }
+              ],
+              "data": {
+                "url": "https://hydra.pretagov.com"
+              },
+              "type": "link"
+            },
+            {
+              "text": " — log in, go to user preferences and select a preset frontend or paste in your own frontend URL."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "To make your own site editable with Hydra, add the hydra.js bridge to your frontend and annotate your HTML with block markers:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Load "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "hydra.js"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " and call initBridge() with your block configuration"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Add "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "data-block-uid"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " attributes to enable click-to-select blocks"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Register "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "onEditChange"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " callback for realtime preview updates"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Add "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "data-editable-field"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " for inline text, media and link editing"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
         }
       ]
     },
@@ -27,7 +143,7 @@
     },
     "0c91e9dd-842e-4764-a4f1-8a62c85b731a": {
       "@type": "slate",
-      "plaintext": "\u2026protects and promotes Plone. \u2026is a registered 501(c)(3) charitable organization. \u2026donations are tax-deductible.  Support the Foundation and help make Plone better! ",
+      "plaintext": "Quick to enable Visual editing of frontend blocks regardless of framework. Switch between multiple frontends mid visual edit. Enterprise features such as versioning, i18n, workflow and automated content rules. Customisable Administration Interface. Scalable and Secure with a mature battle hardened backend. Open source means flexibility to host where and how you want.",
       "styles": {},
       "value": [
         {
@@ -35,7 +151,7 @@
             {
               "children": [
                 {
-                  "text": "\u2026protects and promotes Plone."
+                  "text": "Quick to enable Visual editing of frontend blocks regardless of framework by just using tags. No required React or Vue in your frontend."
                 }
               ],
               "type": "li"
@@ -43,7 +159,7 @@
             {
               "children": [
                 {
-                  "text": "\u2026is a registered 501(c)(3) charitable organization."
+                  "text": "Switch between multiple frontends mid visual edit. Perfect for omni-channel."
                 }
               ],
               "type": "li"
@@ -51,7 +167,7 @@
             {
               "children": [
                 {
-                  "text": "\u2026donations are tax-deductible."
+                  "text": "Enterprise features such as versioning, i18n, workflow and automated content rules."
                 }
               ],
               "type": "li"
@@ -59,21 +175,31 @@
             {
               "children": [
                 {
-                  "text": ""
-                },
+                  "text": "Easier to implement design systems that enforce governance of content and design."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
                 {
-                  "children": [
-                    {
-                      "text": "Support the Foundation and help make Plone better!"
-                    }
-                  ],
-                  "data": {
-                    "url": "https://plone.org/sponsors/be-a-hero"
-                  },
-                  "type": "link"
-                },
+                  "text": "Customisable Administration Interface. Choice of Python or JavaScript for your server."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
                 {
-                  "text": ""
+                  "text": "Scalable and Secure with a mature battle hardened backend."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Open source means flexibility to host where and how you want and optimise costs and security."
                 }
               ],
               "type": "li"
@@ -99,7 +225,7 @@
     },
     "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd": {
       "@type": "slate",
-      "plaintext": " The features of Plone   Plone Documentation   Plone Training   Plone Community Forum   Add-ons for Plone (backend)   Add-ons for Volto (frontend) ",
+      "plaintext": "GitHub Repository, Plone Documentation, Plone Community Forum",
       "styles": {},
       "value": [
         {
@@ -112,11 +238,55 @@
                 {
                   "children": [
                     {
-                      "text": "The features of Hydra and docs"
+                      "text": "Hydra on GitHub — source code, issues, and documentation"
                     }
                   ],
                   "data": {
                     "url": "https://github.com/collective/volto-hydra"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Plone 6 Documentation"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://6.docs.plone.org"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ""
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Plone Community Forum"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://community.plone.org"
                   },
                   "type": "link"
                 },
@@ -463,45 +633,15 @@
         }
       ]
     },
-    "9e2de314-a99c-4e11-92bd-174301d01073": {
-      "@type": "slate",
-      "plaintext": "Hydra is a Google summer of code project to create a proof of concept of a CMSUI/editor for Plone headless sites that is easy to integrate into any frontend and as easy to use for editors as Volto is.",
-      "styles": {},
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Hydra is a Google summer of code project to create a proof of concept of a CMSUI/editor for Plone headless sites that is easy to integrate into any frontend and as easy to use for editors as Volto is. "
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "c187b31d-f521-4ebe-98ec-01f2247599b4": {
-      "@type": "slate",
-      "plaintext": "Technical Details",
-      "styles": {},
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Technical Details"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
     "dd34a386-6054-4a91-83e0-c7b3a6f391cf": {
       "@type": "slate",
-      "plaintext": "Support the Plone Foundation",
+      "plaintext": "Why Hydra",
       "styles": {},
       "value": [
         {
           "children": [
             {
-              "text": "Support the Plone Foundation"
+              "text": "Why Hydra"
             }
           ],
           "type": "h2"
@@ -525,13 +665,13 @@
     },
     "eadb0f33-16da-4974-9f87-69206f0a1db8": {
       "@type": "slate",
-      "plaintext": "Plone is made possible only through the efforts of thousands of dedicated individuals and hundreds of companies. The Plone Foundation:",
+      "plaintext": "A unique CMS by being Visual, true Headless, and Open Source.",
       "styles": {},
       "value": [
         {
           "children": [
             {
-              "text": "Plone is made possible only through the efforts of thousands of dedicated individuals and hundreds of companies. The Plone Foundation:"
+              "text": "A unique CMS by being Visual, true Headless, and Open Source."
             }
           ],
           "type": "p"
@@ -718,17 +858,16 @@
     "items": [
       "303984b4-693a-408f-83f7-5a88b243d7db",
       "fae599f3-e7d4-451b-a413-84355c796b7e",
-      "03511c33-6c36-4135-a60a-0be82ccc7e8f",
-      "e972541f-b114-494b-a51e-cc8b11c8207d",
-      "9567ae6d-191c-43f1-91cc-4288bbb98f88",
-      "0d0c0506-f9bb-48d8-af0a-1352d81b45de",
-      "9e2de314-a99c-4e11-92bd-174301d01073",
-      "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd",
       "dd34a386-6054-4a91-83e0-c7b3a6f391cf",
       "eadb0f33-16da-4974-9f87-69206f0a1db8",
       "0c91e9dd-842e-4764-a4f1-8a62c85b731a",
       "0ab1a8f7-2d26-4933-800c-2f10474afe63",
-      "c187b31d-f521-4ebe-98ec-01f2247599b4",
+      "quickstart-heading",
+      "quickstart-text",
+      "e972541f-b114-494b-a51e-cc8b11c8207d",
+      "9567ae6d-191c-43f1-91cc-4288bbb98f88",
+      "0d0c0506-f9bb-48d8-af0a-1352d81b45de",
+      "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd",
       "31561f88-873a-4277-8703-ba1183e58bf1"
     ]
   },
@@ -736,7 +875,7 @@
   "creators": [
     "admin"
   ],
-  "description": "Site created with a new Plone Distribution",
+  "description": "A Visual Headless CMS — true visual editing with drag and drop blocks using any frontend stack",
   "effective": null,
   "exclude_from_nav": false,
   "expires": null,
@@ -756,7 +895,7 @@
   "rights": "",
   "subjects": [],
   "table_of_contents": null,
-  "title": "Welcome to Plone Hydra",
+  "title": "Volto Hydra",
   "type_title": "Plone Site",
   "workflow_history": {}
 }

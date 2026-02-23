@@ -1,0 +1,403 @@
+{
+  "@id": "/concepts/deployment",
+  "@type": "Document",
+  "UID": "concepts-deployment-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "Hydra separates your production frontend from the editing experience. Here's how to deploy for different scenarios.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Hydra separates your production frontend from the editing experience. Here's how to deploy for different scenarios."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "sep-1": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "spa-heading": {
+      "@type": "slate",
+      "plaintext": "SPA/Hybrid — Full Visual Editing",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "SPA/Hybrid — Full Visual Editing"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "spa-text": {
+      "@type": "slate",
+      "plaintext": "The simplest setup. Deploy your frontend as SPA or hybrid, deploy Hydra + Plone, set the frontend URL in user preferences.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The simplest setup — your frontend handles both production and editing:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Deploy Hydra and the Plone API server"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Login to Hydra, go to user preferences, set your frontend URL"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        },
+        {
+          "children": [
+            {
+              "text": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "ssg-heading": {
+      "@type": "slate",
+      "plaintext": "SSG/SSR — Production Speed + Visual Editing",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "SSG/SSR — Production Speed + Visual Editing"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "ssg-text": {
+      "@type": "slate",
+      "plaintext": "Deploy your production frontend as SSG/SSR for speed, and a separate SPA version for editing. The editing infrastructure can scale to zero.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Deploy your frontend in SSG or SSR mode (fast, cacheable)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Deploy the same frontend in SPA mode to a separate URL (used only in Hydra)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Only needs to run during editing, so scale-to-zero / serverless works"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "SSG rebuild"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — For SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        }
+      ]
+    },
+    "example-heading": {
+      "@type": "slate",
+      "plaintext": "Example: The Nuxt.js Demo",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Example: The Nuxt.js Demo"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "example-text": {
+      "@type": "slate",
+      "plaintext": "The default demo uses this pattern with SSG on Netlify for production and SPA on Netlify for editing.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The default Hydra demo uses exactly this pattern:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "SSG on Netlify"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://hydra-nuxt-flowbrite.netlify.app/"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": ". All pages statically generated, images optimized, fast globally."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Deployed to "
+                },
+                {
+                  "children": [
+                    {
+                      "text": "fly.io"
+                    }
+                  ],
+                  "data": {
+                    "url": "https://hydra.pretagov.com"
+                  },
+                  "type": "link"
+                },
+                {
+                  "text": " with scale-to-zero. Cost is free or minimal since it only runs during editing."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        },
+        {
+          "children": [
+            {
+              "text": "For most frameworks switching between SSG/SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "twowin-heading": {
+      "@type": "slate",
+      "plaintext": "Without Hydra (Two-Window Editing)",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Without Hydra (Two-Window Editing)"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "twowin-text": {
+      "@type": "slate",
+      "plaintext": "You can use Plone Headless without Hydra using Volto for editing and your frontend for viewing, but it won't be WYSIWYG.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "sep-1",
+      "spa-heading",
+      "spa-text",
+      "ssg-heading",
+      "ssg-text",
+      "example-heading",
+      "example-text",
+      "twowin-heading",
+      "twowin-text"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "How to deploy Hydra with SPA, SSG/SSR, or scale-to-zero setups",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "deployment",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Deployment Patterns",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}
