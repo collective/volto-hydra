@@ -281,8 +281,9 @@
                     content.blocks_layout?.items || [],
                     { blocks: content.blocks || {}, templateState, loadTemplate }
                 );
-                // Convert back to blocks/layout format
-                content.blocks = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
+                // Merge expanded blocks back (preserve blocks from other fields like footer_blocks)
+                const expandedBlocksMap = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
+                content.blocks = { ...content.blocks, ...expandedBlocksMap };
                 content.blocks_layout = { items: expandedItems.map(item => item['@uid']) };
 
                 // Render navigation from @components.navigation.items

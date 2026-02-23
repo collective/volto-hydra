@@ -11061,8 +11061,15 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
       templateState
     );
 
-    // Merge processed blocks back into shared dict (don't replace — other fields' blocks must remain)
-    result.blocks = { ...result.blocks, ...newBlocks };
+    // Remove old field blocks that were dropped during template processing,
+    // then merge in the new blocks. Other fields' blocks must remain.
+    const updatedBlocks = { ...result.blocks };
+    for (const oldId of Object.keys(fieldBlocks)) {
+      if (!newBlocks[oldId]) {
+        delete updatedBlocks[oldId];
+      }
+    }
+    result.blocks = { ...updatedBlocks, ...newBlocks };
     result[fieldName] = { items: newLayout };
   }
 
