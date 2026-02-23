@@ -341,6 +341,18 @@ const applyConfig = (config) => {
 
   // Facet block types for typed object_list in search block
   // Each facet type has its own schema, resolved via blocksConfig
+  // Shared field definitions for facet schemas
+  const facetFieldDef = {
+    title: 'Field',
+    widget: 'select_querystring_field',
+    vocabulary: { '@id': 'plone.app.vocabularies.MetadataFields' },
+  };
+  // Identity mapping — all facet types share the same core fields (title, field, hidden)
+  // Enables "Convert to..." menu in toolbar dropdown
+  const facetFieldMappings = {
+    default: { title: 'title', field: 'field', hidden: 'hidden' },
+  };
+
   config.blocks.blocksConfig.checkboxFacet = {
     ...config.blocks.blocksConfig.checkboxFacet,
     id: 'checkboxFacet',
@@ -348,6 +360,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
+    fieldMappings: facetFieldMappings,
     blockSchema: () => ({
       title: 'Checkbox Facet',
       fieldsets: [
@@ -359,7 +372,7 @@ const applyConfig = (config) => {
       ],
       properties: {
         title: { title: 'Label', type: 'string' },
-        field: { title: 'Field', type: 'string' },
+        field: facetFieldDef,
         multiple: {
           title: 'Multiple choices?',
           type: 'boolean',
@@ -378,6 +391,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
+    fieldMappings: facetFieldMappings,
     blockSchema: () => ({
       title: 'Select Facet',
       fieldsets: [
@@ -389,7 +403,7 @@ const applyConfig = (config) => {
       ],
       properties: {
         title: { title: 'Label', type: 'string' },
-        field: { title: 'Field', type: 'string' },
+        field: facetFieldDef,
         hidden: { title: 'Hide facet?', type: 'boolean', default: false },
       },
       required: [],
@@ -403,6 +417,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
+    fieldMappings: facetFieldMappings,
     blockSchema: () => ({
       title: 'Date Range Facet',
       fieldsets: [
@@ -414,7 +429,7 @@ const applyConfig = (config) => {
       ],
       properties: {
         title: { title: 'Label', type: 'string' },
-        field: { title: 'Field', type: 'string' },
+        field: facetFieldDef,
         hidden: { title: 'Hide facet?', type: 'boolean', default: false },
       },
       required: [],
@@ -428,6 +443,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
+    fieldMappings: facetFieldMappings,
     blockSchema: () => ({
       title: 'Toggle Facet',
       fieldsets: [
@@ -439,7 +455,7 @@ const applyConfig = (config) => {
       ],
       properties: {
         title: { title: 'Label', type: 'string' },
-        field: { title: 'Field', type: 'string' },
+        field: facetFieldDef,
         hidden: { title: 'Hide facet?', type: 'boolean', default: false },
       },
       required: [],

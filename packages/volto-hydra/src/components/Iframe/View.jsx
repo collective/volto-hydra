@@ -3486,13 +3486,15 @@ const Iframe = (props) => {
             }}
             convertibleTypes={(() => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              const blockType = blockData?.['@type'];
+              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
+              const blockType = blockData?.[typeFieldName];
               return getConvertibleTypes(blockType, blocksConfig);
             })()}
             onConvertBlock={(newType) => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
               if (!blockData) return;
-              const newBlockData = convertBlockType(blockData, newType, blocksConfig);
+              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName);
               const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, newBlockData);
               onChangeFormData(updatedProperties);
               // Rebuild blockPathMap and update state

@@ -601,6 +601,17 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await expect(addButton).toBeVisible({ timeout: 5000 });
     await addButton.click();
 
+    // Block chooser opens (multiple facet types + slate/image are allowed)
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+    // Select Checkbox facet type
+    const commonSection = blockChooser.locator('text=Common');
+    if (await commonSection.isVisible()) {
+      await commonSection.click();
+    }
+    await blockChooser.getByRole('button', { name: /Checkbox/i }).click();
+    await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
+
     // Wait for the new facet to be added (count goes from 3 to 4)
     const allFacets = iframe.locator('.facet-item[data-block-uid]');
     await expect(allFacets).toHaveCount(4, { timeout: 10000 });
@@ -655,19 +666,21 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
       { timeout: 5000 },
     );
 
-    // Now find and set the facet type to selectFacet
-    const typeWrapper = page.locator('#sidebar-properties .field-wrapper-type');
-    await expect(typeWrapper).toBeVisible({ timeout: 5000 });
+    // Convert the checkboxFacet to selectFacet via toolbar "Convert to" menu
+    // (fieldMappings on facet types enables this action)
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const moreOptionsButton = toolbar.getByTitle('More options');
+    await moreOptionsButton.click();
 
-    const typeSelect = typeWrapper.locator('.react-select__control');
-    const typeMenu = page.locator('.react-select__menu');
-    await typeSelect.click();
+    const convertToMenu = page.locator('.convert-to-menu');
+    await expect(convertToMenu).toBeVisible({ timeout: 5000 });
+    await convertToMenu.hover();
 
-    const selectFacetOption = typeMenu.locator('.react-select__option', {
+    const selectOption = page.locator('.volto-hydra-submenu .volto-hydra-dropdown-item', {
       hasText: /Select/i,
     });
-    await expect(selectFacetOption).toBeVisible({ timeout: 5000 });
-    await selectFacetOption.click();
+    await expect(selectOption).toBeVisible({ timeout: 5000 });
+    await selectOption.click();
 
     // Verify the facet now renders as a dropdown (select element)
     // This waits for frontend to re-render with the new facet settings

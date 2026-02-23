@@ -1494,14 +1494,14 @@ function invertMapping(mapping) {
  * @param {Object} blocksConfig - Block configuration registry
  * @returns {Object} - New block data with @type set to newType and fields mapped
  */
-export function convertBlockType(blockData, newType, blocksConfig) {
-  const sourceType = blockData['@type'];
+export function convertBlockType(blockData, newType, blocksConfig, typeFieldName = '@type') {
+  const sourceType = blockData[typeFieldName];
 
   // Find the conversion path
   const path = findConversionPath(sourceType, newType, blocksConfig);
   if (!path || path.length < 2) {
     // No path found, just set the type (shouldn't happen if getConvertibleTypes was used)
-    return { '@type': newType };
+    return { [typeFieldName]: newType };
   }
 
   // Apply mappings through each step in the path
@@ -1526,7 +1526,7 @@ export function convertBlockType(blockData, newType, blocksConfig) {
 
     // Step 2: Map canonical/source fields to target using target's mappings
     const targetMappings = targetConfig?.fieldMappings;
-    const newData = { '@type': toType };
+    const newData = { [typeFieldName]: toType };
     // Apply mappings: source-specific first, then default as fallback
     const mappings = { ...targetMappings?.default, ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
@@ -1540,14 +1540,14 @@ export function convertBlockType(blockData, newType, blocksConfig) {
   // Preserve unmapped fields from the original block that aren't in the final result
   // This enables roundtrip conversion (hero → image → hero) to retain fields like buttonText
   // that exist in source and target but aren't explicitly mapped through intermediate types
-  const { '@type': _originalType, ...originalFields } = blockData;
-  const { '@type': finalType, ...convertedFields } = currentData;
+  const { [typeFieldName]: _originalType, ...originalFields } = blockData;
+  const { [typeFieldName]: finalType, ...convertedFields } = currentData;
 
   // Merge: original fields as base, converted fields take priority
   return {
     ...originalFields,
     ...convertedFields,
-    '@type': finalType,
+    [typeFieldName]: finalType,
   };
 }
 
