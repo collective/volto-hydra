@@ -286,12 +286,12 @@
         <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
           <!-- Non-facet types (slate, image) rendered as generic blocks -->
           <template v-if="facet.type === 'slate' || facet.type === 'image'">
-            <div :data-block-uid="facet['@id']" data-block-add="right" class="p-3 border border-gray-200 rounded min-w-48">
+            <div :data-block-uid="facet['@id']" data-block-add="bottom" class="p-3 border border-gray-200 rounded min-w-48">
               <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
             </div>
           </template>
           <!-- Facet types -->
-          <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="right"
+          <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
                class="facet-item p-3 border border-gray-200 rounded min-w-48">
             <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
             <template v-if="facet.type === 'selectFacet'">
