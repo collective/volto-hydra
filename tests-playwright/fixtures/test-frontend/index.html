@@ -137,7 +137,8 @@
                 const size = 6;
                 const pageNum = pages[containerId] || 0;
                 const paging = { start: pageNum * size, size, total: 0, _seen: 0 };
-                return await expandListingBlocks(layout, { blocks, ...baseOptions, paging, itemTypeField: 'variation' });
+                const items = await expandListingBlocks(layout, { blocks, ...baseOptions, paging, itemTypeField: 'variation' });
+                return { items, paging };
             };
 
             // Convert layout IDs to block objects with @uid

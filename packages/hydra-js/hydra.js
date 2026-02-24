@@ -10083,7 +10083,7 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * @param {Object} options - Configuration options
  * @param {Object} options.blocks - Map of blockId -> block data (for ID lookups)
  * @param {Object} options.paging - Paging object { start, size, total, _seen } - mutated
- * @returns {{ items: Array, paging: Object }} Items on current page + updated paging
+ * @returns {Array} Items on current page (paging object is mutated in-place)
  */
 export function staticBlocks(inputItems, options = {}) {
   const { blocks: blocksDict, paging } = options;
@@ -10118,7 +10118,7 @@ export function staticBlocks(inputItems, options = {}) {
   // Compute paging UI values
   computePagingUI(paging);
 
-  return { items, paging };
+  return items;
 }
 
 /**
@@ -10329,7 +10329,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
   // Compute paging UI values
   computePagingUI(paging);
 
-  return { items, paging };
+  return items;
 }
 
 // ============================================================================

@@ -1227,89 +1227,99 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 ## Listings and dynamic blocks
 
-Listings are an example of a dynamic block where its final form might 
-happen only client side and where it might be rendered as multiple
-blocks of different types. Hydra includes helpers to make this easier.
+A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. Since the query runs client-side, Hydra provides two helpers to handle this:
 
-When you render blocks in a page or a container
-- initialise the paging object
-- if a block is can be rendered server-side
-  ```js
-   blockRender(staticBlocks([uid], { block, paging }); 
-  ```
-- if the block is dynamic wrap it in a suspense and call teh async expandListingBlocks
-  ```vue
-  <!-- Usage in Block.vue -->
-  <Suspense v-if="block['@type'] === 'listing'">
-    <template v-for="item in expandListingBlocks(blocks_layout, {blocks, paging})">
-      <Block v-for="item in items" :key="item['@uid']" :block="item" :block_uid="item['@uid']" />
-    </template>
-  </Suspense>
-  <Suspense >
-      <Paging :paging="paging" :build-url="buildPagingUrl" />
-  </Suspense>
-  ```
+- **`staticBlocks(ids, { blocks, paging })`** — returns block objects you can render immediately
+- **`expandListingBlocks(ids, { blocks, paging, ... })`** — async; fetches query results and returns expanded block objects
 
-**Mixed containers**: When a container has both static blocks and listing blocks, pass the same `paging` object to both helpers. `staticBlocks` processes non-listing blocks first, then `expandListingBlocks` continues from that position, giving you unified pagination across all content.
-
-
-Helpers for expanding listing blocks and handling pagination.
+Both take an array of block IDs and return an array of block objects with `@uid` (the block ID for `data-block-uid`) and `@type` (the block type for choosing a renderer). Both accept a shared `paging` object that gets mutated with page totals.
 
 ```js
 import { expandListingBlocks, staticBlocks } from '@volto-hydra/hydra-js';
-
-// Shared paging state across both helpers
-const paging = { start: 0, size: 10, total: 0, _seen: 0 };
-
-// staticBlocks handles non-listing blocks, tracking position in paging
-const { items: staticItems } = staticBlocks(layout, { blocks, paging });
-
-// expandListingBlocks fetches and expands listings, continuing from paging position
-const { items: listingItems } = await expandListingBlocks(layout, {
-  blocks,
-  contextPath: '/news',
-  paging,  // Same paging object - mutated to track combined totals
-  itemTypeField: 'variation',  // Field on listing block that holds item type (default: 'itemType')
-  defaultItemType: 'teaser',   // Fallback type if field not set (default: 'summaryItem')
-  // Either provide apiUrl for built-in fetch:
-  apiUrl: 'https://my-plone-site.com',
-  // Or provide custom fetcher callback:
-  fetcher: async (path, body, headers) => {
-    const res = await fetch(path, { method: 'POST', body: JSON.stringify(body), headers });
-    return res.json();
-  },
-});
-
-// Combine for rendering - paging now has correct totals for both
-const allItems = [...staticItems, ...listingItems];
 ```
 
-**Schema enhancers**: Use `itemType` (or `variation`) on the listing block to control what block type expanded items become. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:
+### Example: container with static blocks and a listing
+
+A grid has teasers and a listing block. Render blocks in layout order — use `staticBlocks` for regular blocks and `expandListingBlocks` (inside `<Suspense>`) for listings. Both share one `paging` object:
+
+```jsx
+import { Suspense } from 'react';
+import { staticBlocks, expandListingBlocks } from '@volto-hydra/hydra-js';
+
+function Grid({ blocks, blocks_layout, pageNum }) {
+  const paging = { start: pageNum * 6, size: 6, total: 0, _seen: 0 };
+  paging._ready = new Promise(resolve => { paging._resolve = resolve; });
+  paging._expectedSources = 1;  // number of expandListingBlocks calls
+
+  return (
+    <div className="grid">
+      {blocks_layout.items.map(id =>
+        blocks[id]['@type'] === 'listing' ? (
+          <Suspense key={id} fallback={<div>Loading...</div>}>
+            <ListingItems id={id} blocks={blocks} paging={paging} />
+          </Suspense>
+        ) : (
+          staticBlocks([id], { blocks, paging }).map(item =>
+            <Block key={item['@uid']} block={item} />
+          )
+        )
+      )}
+      <Suspense>
+        <PagingWhenReady paging={paging} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ListingItems({ id, blocks, paging }) {
+  const items = await expandListingBlocks([id], {
+    blocks, paging, apiUrl, contextPath,
+  });
+  return items.map(item => <Block key={item['@uid']} block={item} />);
+}
+
+async function PagingWhenReady({ paging }) {
+  await paging._ready;  // resolves after all expandListingBlocks calls complete
+  return paging.totalPages > 1 ? <Paging paging={paging} /> : null;
+}
+```
+
+See [BlockExpander.vue](./examples/nuxt-blog-starter/components/BlockExpander.vue) for a Vue equivalent.
+
+### expandListingBlocks options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `blocks` | — | Map of blockId to block data |
+| `paging` | — | Shared paging object `{ start, size, total, _seen: 0 }` (mutated in-place) |
+| `apiUrl` | — | Plone site URL for built-in fetch |
+| `fetcher` | — | Custom fetch callback `(path, body, headers) => Promise<json>` (alternative to apiUrl) |
+| `contextPath` | `'/'` | Path for relative queries |
+| `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
+| `defaultItemType` | `'summaryItem'` | Fallback type when field is not set |
+| `extraCriteria` | `{}` | Additional query parameters (e.g. facets, search text) |
+
+### Item type selection
+
+Use `itemType` (or `variation`) on the listing block to control what `@type` expanded items get. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:
 
 ```js
 listing: {
   schemaEnhancer: ({ schema }) => {
-    schema.properties.itemType = { title: 'Display as', choices: [['teaser', 'Teaser'], ['card', 'Card']] };
+    schema.properties.itemType = {
+      title: 'Display as',
+      choices: [['teaser', 'Teaser'], ['card', 'Card']],
+    };
     return schema;
   },
-  inheritSchemaFrom: { typeField: 'itemType', blocksField: null },  // Show item type's schema
+  inheritSchemaFrom: { typeField: 'itemType', blocksField: null },
 }
 ```
 
+### Notes
 
-**Shared paging for containers**: For grids with mixed static and listing blocks, pass a shared `paging` object. Use `staticBlocks` for non-listings, `ListingExpander` with the same paging for listings. See the [Nuxt example](./examples/nuxt-blog-starter/components/Block.vue) for the full pattern.
-
-**Async paging with `_ready`**: When a container has multiple sources (static + listing blocks), the paging UI should wait for all sources before rendering. Add `_expectedSources` and `_ready` to the paging object:
-
-```js
-paging._expectedSources = 2;  // number of staticBlocks + expandListingBlocks calls
-paging._ready = new Promise(resolve => { paging._resolve = resolve; });
-// _ready resolves after all sources have called computePagingUI
-```
-
-Then use an async component (e.g. Vue `<Suspense>`) that awaits `paging._ready` before rendering. Use a `:key` to remount on page navigation. See [AsyncPaging.vue](./examples/nuxt-blog-starter/components/AsyncPaging.vue) for the full pattern.
-
-Note: Expanded listing items share the listing block's `@uid`. When editing, selecting any item selects the listing block.
+- Both helpers return a plain array — the `paging` object you pass in is mutated with `totalPages`, `currentPage`, `prev`, `next`, etc.
+- Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
 
 ## Templates
 

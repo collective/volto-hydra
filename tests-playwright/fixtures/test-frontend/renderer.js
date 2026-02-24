@@ -872,9 +872,8 @@ async function renderListingBlock(block, blockId) {
     const blocks = { [blockId]: block };
     const layout = [blockId];
 
-    const result = await window._expandListingBlocks(blocks, layout, blockId);
-    const expandedItems = result.items;
-    const paging = result.paging?.totalPages > 1 ? result.paging : null;
+    const { items: expandedItems, paging } = await window._expandListingBlocks(blocks, layout, blockId);
+    const showPaging = paging?.totalPages > 1 ? paging : null;
 
     for (const childBlock of expandedItems) {
         if (!childBlock) continue;
