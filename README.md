@@ -66,55 +66,62 @@ let bridge;
 
 if (window.name.startsWith('hydra')) {
     bridge = initBridge({
-      // Configure page-level blocks fields
-      // Default: [{ fieldName: 'blocks' }] with all non-restricted block types
-      pageBlocksFields: [
-        { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'grid', 'myimage'] },
-      ],
-      voltoConfig: {
-        blocks: {
-          blocksConfig: {
-            // we can add custom blocks (or alter builtin ones)
-            myimage: {
-              blockSchema: {
-                properties: {
-                  image: { widget: 'image' },
-                  url: { widget: 'url' },
-                  caption: { type: 'string' },
-                }
-              }
+      page: {
+        schema: {
+          properties: {
+            blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'grid', 'myimage'] },
+          },
+        },
+      },
+      blocks: {
+        // we can add custom blocks (or alter builtin ones)
+        myimage: {
+          blockSchema: {
+            properties: {
+              image: { widget: 'image' },
+              url: { widget: 'url' },
+              caption: { type: 'string' },
             }
           }
         }
-      }
+      },
+      onEditChange: (formData) => renderPage(formData),
     });
 }
 ```
 
 ### Multiple Page-Level Blocks Fields
 
-Pages can have multiple blocks fields (e.g., header, content, footer). If you don't specify a 'blocks' field, one is automatically added with all non-restricted block types:
+Pages can have multiple blocks fields (e.g., header, content, footer). A `blocks_layout` field is automatically added if not specified:
 
 ```js
 bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'header_blocks', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
-    // 'blocks' field is automatically added if not specified
-    { fieldName: 'footer_blocks', title: 'Footer', allowedBlocks: ['slate', 'link'] }
-  ],
-  voltoConfig: { ... }
+  page: {
+    schema: {
+      properties: {
+        header_blocks: { title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+        // blocks_layout is automatically added if not specified
+        footer_blocks: { title: 'Footer', allowedBlocks: ['slate', 'link'] },
+      },
+    },
+  },
+  onEditChange: (formData) => renderPage(formData),
 });
 ```
 
-Or explicitly configure the 'blocks' field:
+Or explicitly configure the `blocks_layout` field:
 
 ```js
 bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'header_blocks', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
-    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'hero', 'columns'] },
-    { fieldName: 'footer_blocks', title: 'Footer', allowedBlocks: ['slate', 'link'] }
-  ],
+  page: {
+    schema: {
+      properties: {
+        header_blocks: { title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+        blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'hero', 'columns'] },
+        footer_blocks: { title: 'Footer', allowedBlocks: ['slate', 'link'] },
+      },
+    },
+  },
   onEditChange: (formData) => renderPage(formData),
 });
 ```
@@ -374,9 +381,13 @@ We include the hydra iframe bridge which creates a two way link between the hydr
   ```js
   import { initBridge } from './hydra.js';
   const bridge = initBridge({
-    pageBlocksFields: [
-      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-    ],
+    page: {
+      schema: {
+        properties: {
+          blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+        },
+      },
+    },
   });
   ```
 - To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
@@ -396,9 +407,13 @@ If your frontend embeds state in the URL path (like pagination), you need to tel
 
 ```js
 const bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-  ],
+  page: {
+    schema: {
+      properties: {
+        blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+      },
+    },
+  },
   // Transform frontend path to API path by stripping paging segments
   // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
   pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
@@ -468,7 +483,7 @@ const bridge = initBridge({
         },
       }
     },
-    // Child block types must be defined at the top level of blocksConfig
+    // Child block types must be defined at the top level of `blocks`
     slide: {
       id: 'slide',
       title: 'Slide',
@@ -547,7 +562,7 @@ There are two formats you can use in your block schema to define blocks fields. 
 
 ##### `blocks_layout` — typed blocks with separate schemas
 
-Each child block has its own `@type` and schema (looked up from `blocksConfig`).
+Each child block has its own `@type` and schema (looked up from `blocks`).
 Child blocks are stored in a shared `blocks` dict on the parent block, with the field holding `{ items: [...] }` for ordering.
 
 ```js
@@ -614,7 +629,7 @@ Resulting data:
 When `allowedBlocks` is set on an `object_list`, items can have different types
 (like `blocks_layout`) but are still stored as an array. Each item's type is
 stored in the field specified by `typeField` (defaults to `'@type'`) and its
-schema is looked up from `blocksConfig`.
+schema is looked up from `blocks`.
 
 ```js
 facets: {
@@ -680,22 +695,18 @@ Schema enhancers modify block schemas dynamically:
 
 ```js
 const bridge = initBridge({
-  voltoConfig: {
-    blocks: {
-      blocksConfig: {
-        // Conditional field visibility
-        myBlock: {
-          blockSchema: {
-            properties: {
-              mode: { title: 'Mode', widget: 'select', choices: [['simple', 'Simple'], ['advanced', 'Advanced']] },
-              advancedOptions: { title: 'Advanced Options', type: 'string' },
-            },
-          },
-          schemaEnhancer: {
-            skiplogic: {
-              advancedOptions: { field: 'mode', is: 'advanced' },
-            },
-          },
+  blocks: {
+    // Conditional field visibility
+    myBlock: {
+      blockSchema: {
+        properties: {
+          mode: { title: 'Mode', widget: 'select', choices: [['simple', 'Simple'], ['advanced', 'Advanced']] },
+          advancedOptions: { title: 'Advanced Options', type: 'string' },
+        },
+      },
+      schemaEnhancer: {
+        skiplogic: {
+          advancedOptions: { field: 'mode', is: 'advanced' },
         },
       },
     },
@@ -743,30 +754,26 @@ converted to that new type using ```fieldMappings```.
 
 ```js
 const bridge = initBridge({
-  voltoConfig: {
-    blocks: {
-      blocksConfig: {
-        // Parent container: controls child type via 'variation' field
-        // inheritSchemaFrom creates the typeField with computed choices
-        gridBlock: {
-          allowedBlocks: ['teaser', 'image'],  // Allowed child block types
-          schemaEnhancer: {
-            inheritSchemaFrom: {
-              typeField: 'variation',
-            },
-          },
+  blocks: {
+    // Parent container: controls child type via 'variation' field
+    // inheritSchemaFrom creates the typeField with computed choices
+    gridBlock: {
+      allowedBlocks: ['teaser', 'image'],  // Allowed child block types
+      schemaEnhancer: {
+        inheritSchemaFrom: {
+          typeField: 'variation',
         },
-        // Child block: hides fields that parent controls
-        teaser: {
-          schemaEnhancer: {
-            childBlockConfig: {
-              editableFields: ['href', 'title', 'description'],
-            },
-          },
+      },
+    },
+    // Child block: hides fields that parent controls
+    teaser: {
+      schemaEnhancer: {
+        childBlockConfig: {
+          editableFields: ['href', 'title', 'description'],
         },
-        fieldMappings: {
-          default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' }
-        },
+      },
+      fieldMappings: {
+        default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' }
       },
     },
   },
@@ -1289,15 +1296,20 @@ with special properties:
 
 ### allowedTemplates vs allowedLayouts
 
-Configure templates in `pageBlocksFields`:
+Configure templates in `page.schema.properties`:
 
 ```js
 initBridge({
-  pageBlocksFields: [{
-    fieldName: 'blocks',
-    allowedTemplates: ['/templates/form-snippet'],   // Insert via BlockChooser
-    allowedLayouts: ['/templates/article-layout'],   // Apply via Layout dropdown
-  }]
+  page: {
+    schema: {
+      properties: {
+        blocks_layout: {
+          allowedTemplates: ['/templates/form-snippet'],   // Insert via BlockChooser
+          allowedLayouts: ['/templates/article-layout'],   // Apply via Layout dropdown
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -1398,8 +1410,8 @@ const items = await expandTemplates(layout, {
 ```
 
 Note, during editing admin side will load the templates so in order to apply the 
-same rules of forcing a layout you will need to set `allowedLayouts` in `pageBlocksFields` 
-blocks fields to ensure the page loads with the right template.
+same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties`
+to ensure the page loads with the right template.
 
 ## Listing Helpers
 
