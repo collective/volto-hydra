@@ -10087,6 +10087,8 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  */
 export function staticBlocks(inputItems, options = {}) {
   const { blocks: blocksDict, paging } = options;
+  if (paging._seen == null) paging._seen = 0;
+  if (paging.total == null) paging.total = 0;
 
   // Normalize items: convert IDs to objects if blocksDict provided
   const normalizedItems = (inputItems || []).map(item => {
@@ -10143,16 +10145,6 @@ function computePagingUI(paging) {
     paging.next = paging.currentPage < paging.totalPages - 1 ? paging.currentPage + 1 : null;
   }
 
-  // Track completed sources and resolve _ready when all sources have reported.
-  // Frontends set _expectedSources to the number of items that will call
-  // staticBlocks/expandListingBlocks with this paging object, and _resolve
-  // from a _ready Promise. Both are required to use async paging.
-  if (paging._expectedSources && paging._resolve) {
-    paging._completedSources = (paging._completedSources || 0) + 1;
-    if (paging._completedSources >= paging._expectedSources) {
-      paging._resolve(paging);
-    }
-  }
 }
 
 export async function expandListingBlocks(inputItems, options = {}) {
@@ -10187,8 +10179,17 @@ export async function expandListingBlocks(inputItems, options = {}) {
   const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
   const blocksLayout = normalizedItems.map(item => item['@uid']);
 
-  // Create default paging if not provided
-  const paging = pagingIn || { start: 0, size: 1000, total: 0, _seen: 0 };
+  // Create default paging if not provided, and ensure defaults for tracking fields
+  const paging = pagingIn || { start: 0, size: 1000 };
+  if (paging._seen == null) paging._seen = 0;
+  if (paging.total == null) paging.total = 0;
+
+  // Auto-track _ready: create promise on first call, resolve when all calls complete
+  if (!paging._ready) {
+    paging._ready = new Promise(resolve => { paging._resolve = resolve; });
+    paging._pending = 0;
+  }
+  paging._pending++;
 
   const headers = getAuthHeaders();
   headers['Content-Type'] = 'application/json';
@@ -10328,6 +10329,12 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
   // Compute paging UI values
   computePagingUI(paging);
+
+  // Resolve _ready when all pending expandListingBlocks calls have completed
+  paging._pending--;
+  if (paging._pending <= 0 && paging._resolve) {
+    paging._resolve(paging);
+  }
 
   return items;
 }

@@ -1234,22 +1234,18 @@ A listing block fetches content from the server (e.g. latest news) and renders e
 
 Both take an array of block IDs and return an array of block objects with `@uid` (the block ID for `data-block-uid`) and `@type` (the block type for choosing a renderer). Both accept a shared `paging` object that gets mutated with page totals.
 
-```js
-import { expandListingBlocks, staticBlocks } from '@volto-hydra/hydra-js';
-```
 
-### Example: container with static blocks and a listing
+### Example: Mixing listings, blocks and paging.
 
-A grid has teasers and a listing block. Render blocks in layout order — use `staticBlocks` for regular blocks and `expandListingBlocks` (inside `<Suspense>`) for listings. Both share one `paging` object:
+A grid have a mix of listing and other block but we want it to have a single paging
+at the bottom. The listings use suspense so they load client-side.
 
 ```jsx
 import { Suspense } from 'react';
 import { staticBlocks, expandListingBlocks } from '@volto-hydra/hydra-js';
 
 function Grid({ blocks, blocks_layout, pageNum }) {
-  const paging = { start: pageNum * 6, size: 6, total: 0, _seen: 0 };
-  paging._ready = new Promise(resolve => { paging._resolve = resolve; });
-  paging._expectedSources = 1;  // number of expandListingBlocks calls
+  const paging = { start: pageNum * 6, size: 6 };
 
   return (
     <div className="grid">
@@ -1280,7 +1276,19 @@ async function ListingItems({ id, blocks, paging }) {
 
 async function PagingWhenReady({ paging }) {
   await paging._ready;  // resolves after all expandListingBlocks calls complete
-  return paging.totalPages > 1 ? <Paging paging={paging} /> : null;
+  if (paging.totalPages <= 1) return null;
+  return (
+    <nav>
+      {paging.prev != null && <a href={`?start=${paging.prev * paging.size}`}>Prev</a>}
+      {paging.pages.map(p =>
+        <a key={p.page} href={`?start=${p.start}`}
+           className={p.page === paging.currentPage + 1 ? 'active' : ''}>
+          {p.page}
+        </a>
+      )}
+      {paging.next != null && <a href={`?start=${paging.next * paging.size}`}>Next</a>}
+    </nav>
+  );
 }
 ```
 
@@ -1291,7 +1299,7 @@ See [BlockExpander.vue](./examples/nuxt-blog-starter/components/BlockExpander.vu
 | Option | Default | Description |
 |--------|---------|-------------|
 | `blocks` | — | Map of blockId to block data |
-| `paging` | — | Shared paging object `{ start, size, total, _seen: 0 }` (mutated in-place) |
+| `paging` | — | Shared paging object `{ start, size }` (mutated in-place with computed values — see below) |
 | `apiUrl` | — | Plone site URL for built-in fetch |
 | `fetcher` | — | Custom fetch callback `(path, body, headers) => Promise<json>` (alternative to apiUrl) |
 | `contextPath` | `'/'` | Path for relative queries |
@@ -1316,9 +1324,22 @@ listing: {
 }
 ```
 
+### Paging values
+
+You pass `{ start, size }` — both helpers mutate it with computed values:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `currentPage` | `number` | Zero-based current page index |
+| `totalPages` | `number` | Total number of pages |
+| `totalItems` | `number` | Total item count across all blocks |
+| `prev` | `number \| null` | Previous page index, or `null` on first page |
+| `next` | `number \| null` | Next page index, or `null` on last page |
+| `pages` | `array` | Window of ~5 page objects: `{ start, page }` where `page` is 1-based |
+| `_ready` | `Promise` | Resolves after all `expandListingBlocks` calls complete (for async paging UI) |
+
 ### Notes
 
-- Both helpers return a plain array — the `paging` object you pass in is mutated with `totalPages`, `currentPage`, `prev`, `next`, etc.
 - Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
 
 ## Templates
