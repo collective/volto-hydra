@@ -205,29 +205,24 @@ onMounted(() => {
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
             const bridge = initBridge({
                 debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
-                pageBlocksFields: [
-                    {
-                        fieldName: 'blocks_layout',
-                        title: 'Blocks',
-                        allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
-                        allowedTemplates: ['/_test_data/templates/test-layout'],
-                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                page: {
+                    schema: {
+                        properties: {
+                            blocks_layout: {
+                                title: 'Blocks',
+                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
+                                allowedTemplates: ['/_test_data/templates/test-layout'],
+                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                            },
+                            footer_blocks: {
+                                title: 'Footer',
+                                allowedBlocks: ['slate', 'image'],
+                                allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
+                            },
+                        },
                     },
-                    {
-                        fieldName: 'footer_blocks',
-                        title: 'Footer',
-                        allowedBlocks: ['slate', 'image'],
-                        // Force footer layout on /another-page (same as mock frontend)
-                        allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
-                    },
-                ],
-                voltoConfig: {
-                    blocks: {
-                        blocksConfig: newBlocks,
-                    }
                 },
-                // Transform frontend path to API path by stripping paging segments
-                // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
+                blocks: newBlocks,
                 pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
                 // Pass onEditChange before init() sends INIT to avoid race condition
                 onEditChange: (page) => {

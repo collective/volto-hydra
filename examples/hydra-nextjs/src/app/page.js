@@ -11,9 +11,13 @@ export default function Home() {
   const [value, setValue] = useState(data);
 
   const bridge = initBridge({
-    pageBlocksFields: [
-      { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
-    ],
+    page: {
+      schema: {
+        properties: {
+          blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
+        },
+      },
+    },
     onEditChange: (updatedData) => {
       if (updatedData) {
         setValue(updatedData);

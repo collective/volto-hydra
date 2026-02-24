@@ -126,9 +126,13 @@
 
       // In Layout.js or App.js
       const bridge = initBridge({
-        pageBlocksFields: [
-          { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
-        ],
+        page: {
+          schema: {
+            properties: {
+              blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
+            },
+          },
+        },
         onEditChange: (data) => {
           store.state.content = data;
         },

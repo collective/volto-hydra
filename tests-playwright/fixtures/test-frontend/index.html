@@ -321,17 +321,6 @@
                 if (loadHydraBridge) {
                     tfLog('Initializing Hydra bridge');
 
-                    // Define custom blocks via voltoConfig (shared schemas + any test-only overrides)
-                    const voltoConfig = {
-                        blocks: {
-                            blocksConfig: {
-                                ...sharedBlocksConfig,
-                            },
-                        },
-                    };
-
-                    // Initialize bridge - admin origin auto-detected from referrer
-                    // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
                     const forceFooterLayout = pagePath === '/_test_data/another-page';
@@ -341,24 +330,25 @@
                     window._formDataCount = 0;
 
                     window.bridge = initBridge({
-                        pageBlocksFields: [
-                            {
-                                fieldName: 'blocks_layout',
-                                title: 'Blocks',
-                                allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
-                                allowedTemplates: ['/_test_data/templates/test-layout'],
-                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                        page: {
+                            schema: {
+                                properties: {
+                                    blocks_layout: {
+                                        title: 'Blocks',
+                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                                        allowedTemplates: ['/_test_data/templates/test-layout'],
+                                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                    },
+                                    footer_blocks: {
+                                        title: 'Footer',
+                                        allowedBlocks: ['slate', 'image'],
+                                        ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
+                                    },
+                                },
                             },
-                            {
-                                fieldName: 'footer_blocks',
-                                title: 'Footer',
-                                allowedBlocks: ['slate', 'image'],
-                                // Only force footer layout on /another-page
-                                ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
-                            },
-                        ],
-                        voltoConfig: voltoConfig,
-                        debug: true,  // Enable debug logging for tests
+                        },
+                        blocks: { ...sharedBlocksConfig },
+                        debug: true,
                         // Pass onEditChange before init() sends INIT to avoid race condition
                         onEditChange: async (formData) => {
                             window._formDataCount++;

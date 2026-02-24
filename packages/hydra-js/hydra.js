@@ -118,14 +118,14 @@ export class Bridge {
    *
    * @param {URL} adminOrigin - The origin of the adminUI.
    * @param {Object} options - Options for the bridge initialization:
-   *   - pageBlocksFields: Array of page-level blocks fields configuration
-   *                       Each entry: { fieldName, title, allowedBlocks, maxLength }
-   *                       e.g., [{ fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image'] }]
-   *                       Default: [{ fieldName: 'blocks' }] with all non-restricted block types
+   *   - page: { schema: { properties: { fieldName: { title, allowedBlocks, ... } } } }
+   *           Page-level blocks fields. Default field is 'blocks_layout'.
+   *   - blocks: { blockType: { id, title, blockSchema, ... } }
+   *             Custom block definitions merged into the admin config.
+   *   - voltoConfig: Other Volto config (non-block settings)
+   *   - onEditChange: Callback for real-time form data updates
    *   - debug: Enable verbose logging (default: false)
    *   - pathToApiPath: Function to transform frontend path to API/admin path
-   *                    e.g., (path) => path.replace(/\/@pg\/[^/]+\/\d+/, '')
-   *                    Used when frontend embeds paging/state in URL path
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
@@ -1707,12 +1707,16 @@ export class Bridge {
         } else {
           const initMessage = {
             type: 'INIT',
-            voltoConfig: options?.voltoConfig,
             currentPath: currentPath,
           };
-          // Send pageBlocksFields configuration for page-level blocks fields
-          if (options?.pageBlocksFields) {
-            initMessage.pageBlocksFields = options.pageBlocksFields;
+          if (options?.page) {
+            initMessage.page = options.page;
+          }
+          if (options?.blocks) {
+            initMessage.blocks = options.blocks;
+          }
+          if (options?.voltoConfig) {
+            initMessage.voltoConfig = options.voltoConfig;
           }
           window.parent.postMessage(initMessage, this.adminOrigin);
         }

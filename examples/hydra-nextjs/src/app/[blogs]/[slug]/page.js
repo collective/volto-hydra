@@ -13,9 +13,13 @@ export default function Blog({ params }) {
   const pathname = usePathname();
 
   const bridge = initBridge({
-    pageBlocksFields: [
-      { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-    ],
+    page: {
+      schema: {
+        properties: {
+          blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+        },
+      },
+    },
     onEditChange: (updatedData) => {
       if (updatedData) {
         setValue(updatedData);

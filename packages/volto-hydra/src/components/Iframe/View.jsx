@@ -2151,95 +2151,89 @@ const Iframe = (props) => {
             }
           }
 
-          // 1. Merge voltoConfig (adds custom block definitions)
-          if (event.data.voltoConfig) {
-            const frontendConfig = event.data.voltoConfig;
+          // 1. Merge custom block definitions from event.data.blocks
+          const blocksConfig = event.data.blocks;
+          if (blocksConfig) {
             // Inject NoPreview view for frontend blocks that don't have one
             // Also ensure blockSchema has fieldsets if properties exist (for new blocks only)
-            if (frontendConfig?.blocks?.blocksConfig) {
-              Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
-                const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
-                if (blockConfig && !blockConfig.view) {
-                  blockConfig.view = NoPreview;
-                }
-                // Auto-generate default fieldset if missing (only for new blocks, not overrides)
-                // Also ensure required is an array (Volto expects this)
-                const schema = blockConfig?.blockSchema;
-                const isNewBlock = !config.blocks.blocksConfig[blockType];
-                if (isNewBlock && schema?.properties && !schema.fieldsets) {
-                  schema.fieldsets = [{
-                    id: 'default',
-                    title: 'Default',
-                    fields: Object.keys(schema.properties),
-                  }];
-                }
-                if (schema && !schema.required) {
-                  schema.required = [];
-                }
-              });
-            }
-            recurseUpdateVoltoConfig(frontendConfig);
+            Object.keys(blocksConfig).forEach((blockType) => {
+              const blockConfig = blocksConfig[blockType];
+              if (blockConfig && !blockConfig.view) {
+                blockConfig.view = NoPreview;
+              }
+              // Auto-generate default fieldset if missing (only for new blocks, not overrides)
+              // Also ensure required is an array (Volto expects this)
+              const schema = blockConfig?.blockSchema;
+              const isNewBlock = !config.blocks.blocksConfig[blockType];
+              if (isNewBlock && schema?.properties && !schema.fieldsets) {
+                schema.fieldsets = [{
+                  id: 'default',
+                  title: 'Default',
+                  fields: Object.keys(schema.properties),
+                }];
+              }
+              if (schema && !schema.required) {
+                schema.required = [];
+              }
+            });
+            recurseUpdateVoltoConfig({ blocks: { blocksConfig } });
 
             // 1b. Create schemaEnhancers from frontend recipes
-            // New format: { inheritSchemaFrom: {...}, skiplogic: {...} }
-            // Legacy format: { type: 'inheritSchemaFrom', config: {...} }
-            if (frontendConfig?.blocks?.blocksConfig) {
-              const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
-              for (const [blockType, blockConfig] of Object.entries(
-                frontendConfig.blocks.blocksConfig,
-              )) {
-                const recipe = blockConfig.schemaEnhancer;
-                // Check if it's a recipe (has known enhancer keys, type property, or is array)
-                const isRecipe =
-                  recipe &&
-                  typeof recipe === 'object' &&
-                  (recipe.type || // legacy format
-                    Array.isArray(recipe) || // array of recipes
-                    recipeKeys.some((key) => key in recipe)); // new format
-                if (isRecipe) {
-                  const enhancer = createSchemaEnhancerFromRecipe(recipe);
-                  if (enhancer) {
-                    config.blocks.blocksConfig[blockType].schemaEnhancer =
-                      enhancer;
-                  } else {
-                    // Remove invalid recipe to prevent Volto from trying to use it
-                    delete config.blocks.blocksConfig[blockType].schemaEnhancer;
-                  }
+            const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
+            for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
+              const recipe = blockConfig.schemaEnhancer;
+              // Check if it's a recipe (has known enhancer keys, type property, or is array)
+              const isRecipe =
+                recipe &&
+                typeof recipe === 'object' &&
+                (recipe.type || // legacy format
+                  Array.isArray(recipe) || // array of recipes
+                  recipeKeys.some((key) => key in recipe)); // new format
+              if (isRecipe) {
+                const enhancer = createSchemaEnhancerFromRecipe(recipe);
+                if (enhancer) {
+                  config.blocks.blocksConfig[blockType].schemaEnhancer =
+                    enhancer;
+                } else {
+                  // Remove invalid recipe to prevent Volto from trying to use it
+                  delete config.blocks.blocksConfig[blockType].schemaEnhancer;
                 }
               }
             }
           }
 
-          // 2. Process pageBlocksFields - merge with default 'blocks_layout' field
-          // Default: [{ fieldName: 'blocks_layout', title: 'Blocks' }] with all non-restricted block types
-          // If provided, merge with default (unless 'blocks_layout' is explicitly configured)
-          let effectivePageBlocksFields;
-          const defaultBlocksField = { fieldName: 'blocks_layout', title: 'Blocks' };
-
-          if (event.data.pageBlocksFields) {
-            // Check if 'blocks_layout' field is already configured
-            const hasBlocksField = event.data.pageBlocksFields.some(f => f.fieldName === 'blocks_layout');
-            if (hasBlocksField) {
-              // Use provided config as-is
-              effectivePageBlocksFields = event.data.pageBlocksFields;
-            } else {
-              // Merge with default 'blocks_layout' field
-              effectivePageBlocksFields = [defaultBlocksField, ...event.data.pageBlocksFields];
-            }
-          } else {
-            // No config provided - use default 'blocks_layout' field
-            effectivePageBlocksFields = [defaultBlocksField];
+          // 1c. Merge any additional voltoConfig (non-block settings)
+          if (event.data.voltoConfig) {
+            recurseUpdateVoltoConfig(event.data.voltoConfig);
           }
 
-          // 2b. Apply restrictions based on pageBlocksFields
+          // 2. Process page schema — page.schema.properties is an object keyed by fieldName
+          // Default: { blocks_layout: { title: 'Blocks' } }
+          const pageProperties = event.data.page?.schema?.properties || {};
+          const pageBlocksFieldsDef = { ...pageProperties };
+          if (!pageBlocksFieldsDef.blocks_layout) {
+            pageBlocksFieldsDef.blocks_layout = { title: 'Blocks' };
+          }
+          // Ensure each field has widget: 'blocks_layout'
+          for (const [fieldName, fieldDef] of Object.entries(pageBlocksFieldsDef)) {
+            pageBlocksFieldsDef[fieldName] = {
+              widget: 'blocks_layout',
+              allowedBlocks: fieldDef.allowedBlocks || null,
+              allowedTemplates: fieldDef.allowedTemplates || null,
+              allowedLayouts: fieldDef.allowedLayouts || null,
+              maxLength: fieldDef.maxLength || null,
+              title: fieldDef.title || fieldName,
+            };
+          }
+
+          // 2b. Apply restrictions based on page fields
           // Collect all unique allowed blocks across all page fields and restrict the rest
           const allAllowedBlocks = new Set();
-          effectivePageBlocksFields.forEach(field => {
-            if (field.allowedBlocks) {
-              field.allowedBlocks.forEach(blockType => allAllowedBlocks.add(blockType));
+          for (const fieldDef of Object.values(pageBlocksFieldsDef)) {
+            if (fieldDef.allowedBlocks) {
+              fieldDef.allowedBlocks.forEach(blockType => allAllowedBlocks.add(blockType));
             }
-          });
-          // Only apply restrictions if at least one field has allowedBlocks
+          }
           if (allAllowedBlocks.size > 0) {
             validateFrontendConfig({ allowedBlocks: [...allAllowedBlocks] }, config.blocks.blocksConfig);
             Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
@@ -2255,37 +2249,19 @@ const Iframe = (props) => {
           }
 
           // 2c. Auto-initialize missing page fields with empty blocks/layout
-          // All page fields share formData.blocks; each field has its own layout (fieldName: { items: [...] })
           let formWithPageFields = form ? { ...form } : form;
           if (form) {
-            // Ensure shared blocks dict exists
             if (!formWithPageFields.blocks) {
               formWithPageFields.blocks = {};
             }
-            effectivePageBlocksFields.forEach(field => {
-              const { fieldName } = field;
-              // Initialize missing layout field
+            for (const fieldName of Object.keys(pageBlocksFieldsDef)) {
               if (!formWithPageFields[fieldName]) {
                 formWithPageFields[fieldName] = { items: [] };
               }
-            });
+            }
           }
 
           // 3. Register _page as virtual block type in blocksConfig
-          // This allows buildBlockPathMap to look up page schema without parameter passing
-          const pageBlocksFieldsDef = Object.fromEntries(
-            effectivePageBlocksFields.map(field => [
-              field.fieldName,
-              {
-                widget: 'blocks_layout',
-                allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
-                allowedTemplates: field.allowedTemplates || null, // Template URLs for BlockChooser
-                allowedLayouts: field.allowedLayouts || null, // Template URLs for LayoutSelector dropdown
-                maxLength: field.maxLength || null,
-                title: field.title || field.fieldName,
-              },
-            ]),
-          );
           config.blocks.blocksConfig['_page'] = {
             id: '_page',
             schema: () => ({ properties: pageBlocksFieldsDef }),
@@ -2293,10 +2269,9 @@ const Iframe = (props) => {
           };
 
           // 3b. Register template URLs as virtual block types
-          // Templates appear in BlockChooser immediately; data is fetched when user selects one
-          effectivePageBlocksFields.forEach(field => {
-            if (field.allowedTemplates?.length > 0) {
-              field.allowedTemplates.forEach(templateUrl => {
+          for (const fieldDef of Object.values(pageBlocksFieldsDef)) {
+            if (fieldDef.allowedTemplates?.length > 0) {
+              fieldDef.allowedTemplates.forEach(templateUrl => {
                 if (typeof templateUrl === 'string') {
                   const templateName = templateUrl.split('/').filter(Boolean).pop() || 'unknown';
                   const templateBlockType = `Template: ${templateName}`;
@@ -2316,7 +2291,7 @@ const Iframe = (props) => {
                 }
               });
             }
-          });
+          }
 
           // 4. Extract block field types (now includes custom blocks and page-level fields)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
