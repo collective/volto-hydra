@@ -187,7 +187,7 @@
                 if (myGeneration !== window._renderGeneration) return; // stale render
 
                 if (expandedItems.length > 0) {
-                    const { items: footerItems } = await expandListingBlocks(
+                    const footerItems = await expandListingBlocks(
                         expandedItems,
                         { ...baseOptions, itemTypeField: 'variation' }
                     );
