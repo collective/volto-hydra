@@ -248,11 +248,11 @@ export class AdminUIHelper {
       timeout,
     });
 
-    // Wait for iframe to have at least one block attached to the DOM.
-    // Use state: 'attached' instead of default 'visible' because on carousel
-    // pages, all blocks may be inside inactive slides (hidden) initially.
+    // Wait for iframe to have at least one block visible.
+    // This ensures the frontend has actually rendered page content, not just
+    // put elements in the DOM (e.g. Nuxt SSR before hydration).
     const iframe = this.getIframe();
-    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'attached', timeout });
+    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'visible', timeout });
 
     // Propagate run ID from admin page to iframe for log filtering
     const runId = await this.page.evaluate(() => (window as any).__testRunId);
