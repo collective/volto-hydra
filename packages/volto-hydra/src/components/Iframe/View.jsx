@@ -1383,7 +1383,7 @@ const Iframe = (props) => {
           }
           break;
 
-        case 'INLINE_EDIT_DATA':
+        case 'INLINE_EDIT_DATA': {
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
           const incomingSequence = event.data.data?._editSequence || 0;
@@ -1433,6 +1433,7 @@ const Iframe = (props) => {
             }
           }
           break;
+        }
 
         case 'BUFFER_FLUSHED':
           // Iframe had no pending text - update combined state with current form + requestId + selection
@@ -1449,9 +1450,9 @@ const Iframe = (props) => {
           
           break;
 
-        case 'TOGGLE_MARK':
+        case 'TOGGLE_MARK': {
           // console.log('TOGGLE_BOLD', event.data.html);
-          
+
           const deserializedHTMLData = toggleMark(event.data.html);
           // console.log('deserializedHTMLData', deserializedHTMLData);
           onChangeFormData({
@@ -1481,6 +1482,7 @@ const Iframe = (props) => {
             event.origin,
           );
           break;
+        }
 
         case 'SLATE_TRANSFORM_REQUEST':
           // Validate data from postMessage before using it
@@ -1741,7 +1743,7 @@ const Iframe = (props) => {
           }
           break;
 
-        case 'SLATE_UNDO_REQUEST':
+        case 'SLATE_UNDO_REQUEST': {
           // Dispatch a synthetic Ctrl+Z event to trigger Volto's global undo manager
           const undoEvent = new KeyboardEvent('keydown', {
             key: 'z',
@@ -1751,8 +1753,9 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(undoEvent);
           break;
+        }
 
-        case 'SLATE_REDO_REQUEST':
+        case 'SLATE_REDO_REQUEST': {
           // Dispatch a synthetic Ctrl+Y event to trigger Volto's global undo manager
           const redoEvent = new KeyboardEvent('keydown', {
             key: 'y',
@@ -1762,8 +1765,9 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(redoEvent);
           break;
+        }
 
-        case 'SAVE_REQUEST':
+        case 'SAVE_REQUEST': {
           // Dispatch a synthetic Ctrl+S event to trigger Form.jsx save handler
           const saveEvent = new KeyboardEvent('keydown', {
             key: 's',
@@ -1773,6 +1777,7 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(saveEvent);
           break;
+        }
 
         case 'ACTION_REQUEST': {
           // Generic action handler for custom operations like delete row/column
@@ -2133,7 +2138,7 @@ const Iframe = (props) => {
           setMouseActivityCounter(c => c + 1);
           break;
 
-        case 'INIT':
+        case 'INIT': {
           // Combined initialization: merge config first, then send data
           // This ensures blockPathMap is built with complete schema knowledge
           iframeOriginRef.current = event.origin;
@@ -2370,6 +2375,7 @@ const Iframe = (props) => {
           // Trigger the sync effect to fetch templates (if any) and merge
           setTemplateSyncTrigger(prev => prev + 1);
           break;
+        }
 
         // case 'OPEN_OBJECT_BROWSER':
         //   openObjectBrowser({
