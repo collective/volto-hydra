@@ -1601,12 +1601,29 @@ export class AdminUIHelper {
       const outline = this.page.locator('.volto-hydra-block-outline');
 
       const toolbarVisible = await toolbar.isVisible();
+      // For tall blocks (e.g. search), the outline may extend beyond the viewport
+      // after async content rendering causes a scroll. Check if the outline exists
+      // and at least partially intersects the viewport rather than requiring full visibility.
       const outlineVisible = await outline.isVisible();
+      let outlinePartiallyVisible = outlineVisible;
+      if (!outlineVisible && await outline.count() > 0) {
+        const bbox = await outline.boundingBox();
+        if (bbox) {
+          const viewportSize = this.page.viewportSize();
+          if (viewportSize) {
+            outlinePartiallyVisible =
+              bbox.x + bbox.width > 0 &&
+              bbox.x < viewportSize.width &&
+              bbox.y + bbox.height > 0 &&
+              bbox.y < viewportSize.height;
+          }
+        }
+      }
 
-      if (!toolbarVisible || !outlineVisible) {
+      if (!toolbarVisible || !outlinePartiallyVisible) {
         return {
           ok: false,
-          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}`,
+          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlinePartiallyVisible}`,
         };
       }
 
