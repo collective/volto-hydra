@@ -468,6 +468,10 @@ const applyConfig = (config) => {
     config.blocks.blocksConfig.search?.schemaEnhancer;
   config.blocks.blocksConfig.search = {
     ...config.blocks.blocksConfig.search,
+    // Skip Volto's SearchBlockEdit — it renders BlockDataForm without block prop,
+    // causing onChangeBlock(undefined, data) when schema defaults are applied.
+    // Our ParentBlocksWidget renders BlockDataForm with block={blockId} correctly.
+    sidebarSchemaOnly: true,
     schemaEnhancer: (args) => {
       let { schema } = args;
 
