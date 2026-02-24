@@ -169,7 +169,7 @@
         {
           "children": [
             {
-              "text": "const bridge = initBridge({ ... });\n\nif (window.name.startsWith('hydra-edit')) {\n    // Live updates during editing\n    bridge.onEditChange((formData) => renderPage(formData));\n} else {\n    // Normal page render from server\n    renderPage(await fetchContent(path));\n}"
+              "text": "const bridge = initBridge({\n    ...,\n    onEditChange: (formData) => renderPage(formData),\n});\n\nif (!window.name.startsWith('hydra-edit')) {\n    // Normal page render from server\n    renderPage(await fetchContent(path));\n}"
             }
           ],
           "type": "p"

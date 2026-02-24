@@ -336,6 +336,10 @@
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
                     const forceFooterLayout = pagePath === '/_test_data/another-page';
 
+                    // Listen for changes from the admin UI and update blocks
+                    // Return promise from async render so hydra.js can wait for DOM updates
+                    window._formDataCount = 0;
+
                     window.bridge = initBridge({
                         pageBlocksFields: [
                             {
@@ -355,47 +359,42 @@
                         ],
                         voltoConfig: voltoConfig,
                         debug: true,  // Enable debug logging for tests
-                    });
+                        // Pass onEditChange before init() sends INIT to avoid race condition
+                        onEditChange: async (formData) => {
+                            window._formDataCount++;
+                            tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
 
-                    tfLog('Bridge initialized, setting up change listener');
-
-                    // Listen for changes from the admin UI and update blocks
-                    // Return promise from async render so hydra.js can wait for DOM updates
-                    window._formDataCount = 0;
-                    window.bridge.onEditChange(async (formData) => {
-                        window._formDataCount++;
-                        tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
-
-                        // Update page title if provided
-                        if (formData.title) {
-                            document.getElementById('page-title').textContent = formData.title;
-                        }
-
-                        // Update preview image if provided
-                        const previewImg = document.getElementById('preview-image');
-                        if (formData.preview_image?.scales?.preview?.download) {
-                            previewImg.src = formData.preview_image.scales.preview.download;
-                            previewImg.style.display = 'block';
-                        } else if (formData.preview_image?.download) {
-                            previewImg.src = formData.preview_image.download;
-                            previewImg.style.display = 'block';
-                        } else {
-                            previewImg.style.display = 'none';
-                        }
-
-                        // Re-render content with updated data
-                        // Return promise so hydra.js can materialize comments after DOM is ready
-                        if (formData.blocks && formData.blocks_layout) {
-                            // Debug: Log column contents
-                            const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
-                            const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
-                            if (col1 || col2) {
-                                tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
-                                tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
+                            // Update page title if provided
+                            if (formData.title) {
+                                document.getElementById('page-title').textContent = formData.title;
                             }
-                            tfLog('Re-rendering blocks with updated data');
-                            return await renderContentWithListings(formData);
-                        }
+
+                            // Update preview image if provided
+                            const previewImg = document.getElementById('preview-image');
+                            if (formData.preview_image?.scales?.preview?.download) {
+                                previewImg.src = formData.preview_image.scales.preview.download;
+                                previewImg.style.display = 'block';
+                            } else if (formData.preview_image?.download) {
+                                previewImg.src = formData.preview_image.download;
+                                previewImg.style.display = 'block';
+                            } else {
+                                previewImg.style.display = 'none';
+                            }
+
+                            // Re-render content with updated data
+                            // Return promise so hydra.js can materialize comments after DOM is ready
+                            if (formData.blocks && formData.blocks_layout) {
+                                // Debug: Log column contents
+                                const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
+                                const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
+                                if (col1 || col2) {
+                                    tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
+                                    tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
+                                }
+                                tfLog('Re-rendering blocks with updated data');
+                                return await renderContentWithListings(formData);
+                            }
+                        },
                     });
 
                     tfLog('Bridge setup complete, waiting for connection');

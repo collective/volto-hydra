@@ -183,6 +183,11 @@ export class Bridge {
     this._iframeFocused = document.hasFocus();
     window.addEventListener('focus', () => { this._iframeFocused = true; });
     window.addEventListener('blur', () => { this._iframeFocused = false; });
+    // Register onEditChange callback BEFORE init() sends INIT message.
+    // This eliminates the race where INITIAL_DATA arrives before the callback is set.
+    if (options.onEditChange) {
+      this.onEditChange(options.onEditChange);
+    }
     this.init(options); // Initialize the bridge
   }
 
@@ -9894,15 +9899,6 @@ export function getTokenFromCookie() {
   return null;
 }
 
-/**
- * Enable the frontend to listen for changes in the admin and call the callback with updated data
- * @param {Function} callback - this will be called with the updated data
- */
-export function onEditChange(callback) {
-  if (bridgeInstance) {
-    bridgeInstance.onEditChange(callback);
-  }
-}
 
 // ============================================================================
 // Listing/Search API Utilities (fetch-agnostic helpers)

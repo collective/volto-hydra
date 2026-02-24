@@ -129,6 +129,9 @@
         pageBlocksFields: [
           { fieldName: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
         ],
+        onEditChange: (data) => {
+          store.state.content = data;
+        },
       });
 
       onMounted(() => {
@@ -138,20 +141,6 @@
               const path = url.href.split("#!")[1];
               f7.views.main.router.navigate(path);
             });
-
-          bridge.onEditChange((data) => {
-            // f7.views.main.router.navigate(f7.views.main.router.currentRoute.url, {
-            //   reloadCurrent: true,
-            //   ignoreCache: true,
-            //   options: {
-            //     props: {
-            //       data: data
-            //     }
-            //   }
-            // });
-            f7.store.state.content = data;
-        
-           });
 
           // Call F7 APIs here
         });

@@ -229,15 +229,16 @@ onMounted(() => {
                 // Transform frontend path to API path by stripping paging segments
                 // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
                 pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
-            });
-            bridge.onEditChange((page) => {
-                if (page) {
-                    // Mark that we have admin data with nodeIds
-                    hasAdminData.value = true;
-                    // Update page data - BlockExpander components will
-                    // re-render and expand listings via their own Suspense
-                    data.value.page = page;
-                }
+                // Pass onEditChange before init() sends INIT to avoid race condition
+                onEditChange: (page) => {
+                    if (page) {
+                        // Mark that we have admin data with nodeIds
+                        hasAdminData.value = true;
+                        // Update page data - BlockExpander components will
+                        // re-render and expand listings via their own Suspense
+                        data.value.page = page;
+                    }
+                },
             });
         }
     }
