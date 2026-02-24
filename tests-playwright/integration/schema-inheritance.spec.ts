@@ -984,9 +984,9 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     // Verify the grid has 6 items total (1 transformed teaser + 5 listing items)
     // If the listing's @type was wrongly changed to image, we'd only see 2 items
     // (the listing would be an image block, not expanding to 5 items)
+    // Use polling — iframe re-renders asynchronously after variation change
     const gridItems = iframe.locator('[data-block-uid="block-8-grid"] [data-block-uid]');
-    const itemCount = await gridItems.count();
-    expect(itemCount).toBeGreaterThanOrEqual(6);
+    await expect.poll(async () => await gridItems.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(6);
 
     // Click on the listing block to verify it's still a listing (not transformed to image)
     const listingBlock = iframe.locator('[data-block-uid="listing-in-grid"]').first();
