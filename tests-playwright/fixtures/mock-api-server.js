@@ -1398,13 +1398,19 @@ app.post('*/@querystring-search', (req, res) => {
       // Filter by path - items under the specified path
       const basePath = value || '/';
       if (basePath !== '/') {
-        allItems = allItems.filter((item) => item['@id'].startsWith(basePath));
+        allItems = allItems.filter((item) => {
+          const itemPath = new URL(item['@id']).pathname;
+          return itemPath.startsWith(basePath);
+        });
       }
     } else if (index === 'path' && operation.includes('relativePath')) {
       // Filter by relative path from context
       const fullPath = contextPath + (value || '');
       if (fullPath !== '/') {
-        allItems = allItems.filter((item) => item['@id'].startsWith(fullPath));
+        allItems = allItems.filter((item) => {
+          const itemPath = new URL(item['@id']).pathname;
+          return itemPath.startsWith(fullPath);
+        });
       }
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
       // Full-text search - search in title, description, and text content

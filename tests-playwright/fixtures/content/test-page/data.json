@@ -120,6 +120,11 @@
             "i": "portal_type",
             "o": "plone.app.querystring.operation.selection.any",
             "v": ["Document"]
+          },
+          {
+            "i": "path",
+            "o": "plone.app.querystring.operation.string.absolutePath",
+            "v": "/_test_data"
           }
         ],
         "sort_on": "effective",
