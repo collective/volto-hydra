@@ -107,12 +107,13 @@ function deserialize(el, markAttributes = {}) {
   switch (el.nodeName) {
     case 'BODY':
       return jsx('fragment', {}, children);
-    case 'BR':
+    case 'BR': {
       const parent = el.parentNode;
       if (parent && parent.lastChild !== el && isBlockElement(parent)) {
         return '\n';
       }
       return null;
+    }
     case 'BLOCKQUOTE':
       return jsx('element', { type: 'quote' }, children);
     case 'P':

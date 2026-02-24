@@ -1104,14 +1104,9 @@ const Iframe = (props) => {
     // Determine which block to select
     let selectBlockId = newBlockId;
     if (selectChildIndex != null && blockData) {
-      // Find the first object_list field in the block and get the child at that index
+      // Find the first array field in the block and get the child at selectChildIndex
       // This is used when adding a row from a cell - we want to select the corresponding cell
-      const blockSchema = typeof mergedBlocksConfig?.[blockData['@type']?.split(':').slice(0, -1).join(':') + ':' + containerConfig?.fieldName]?.blockSchema === 'function'
-        ? mergedBlocksConfig[blockData['@type']?.split(':').slice(0, -1).join(':') + ':' + containerConfig?.fieldName].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : null;
-
-      // For table rows, cells are in the 'cells' field - look for object_list fields
-      for (const [fieldName, fieldValue] of Object.entries(blockData)) {
+      for (const [, fieldValue] of Object.entries(blockData)) {
         if (Array.isArray(fieldValue) && fieldValue[selectChildIndex]) {
           const childItem = fieldValue[selectChildIndex];
           // Get the ID field - typically 'key' or '@id'

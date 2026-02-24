@@ -23,7 +23,7 @@ const deserialize = (el, markAttributes = {}) => {
   switch (el.nodeName) {
     case 'BODY':
       return jsx('fragment', {}, children);
-    case 'BR':
+    case 'BR': {
       // Add newline only if it's not the last child of a block-level element
       const parent = el.parentNode;
       if (parent && parent.lastChild !== el && isBlockElement(parent)) {
@@ -31,6 +31,7 @@ const deserialize = (el, markAttributes = {}) => {
       } else {
         return null; // Ignore <br> if it's at the end or within an inline element
       }
+    }
     case 'BLOCKQUOTE':
       return jsx('element', { type: 'quote' }, children);
     case 'P':

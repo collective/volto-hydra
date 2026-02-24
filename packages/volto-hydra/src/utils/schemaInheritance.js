@@ -542,7 +542,6 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
  * - editableFields: whitelist of fields that stay on child (everything else hidden)
  * - parentControlledFields: blacklist of fields that go to parent (only these hidden)
  *
- * @param {string[]} defaultsFieldSuffixes - Suffixes to look for in parent (e.g., ['itemDefaults'])
  * @param {Object} options - Configuration options
  * @param {string[]} options.editableFields - Whitelist of fields to keep on child
  * @param {string[]} options.parentControlledFields - Blacklist of fields to hide from child
@@ -552,13 +551,11 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
  * // In schemaEnhancer config (preferred format):
  * schemaEnhancer: {
  *   childBlockConfig: {
- *     defaultsField: 'itemDefaults',
  *     editableFields: ['href', 'title', 'description']
  *   }
  * }
  */
-export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], options = {}) {
-  const { editableFields, parentControlledFields } = options;
+export function hideParentOwnedFields({ editableFields, parentControlledFields } = {}) {
 
   return (args) => {
     const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
@@ -605,18 +602,6 @@ export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], opti
     } else if (parentControlledFields) {
       // Blacklist mode: hide only parentControlledFields
       fieldsToHide = new Set(parentControlledFields);
-    } else {
-      // Legacy behavior: look at what parent has set in *Defaults fields
-      for (const key of Object.keys(parentFormData || {})) {
-        const isDefaultsField = defaultsFieldSuffixes.some((suffix) =>
-          key.startsWith(suffix + '_'),
-        );
-        if (isDefaultsField) {
-          // Extract field name from itemDefaults_fieldName format
-          const fieldName = key.split('_').slice(1).join('_');
-          if (fieldName) fieldsToHide.add(fieldName);
-        }
-      }
     }
 
     if (fieldsToHide.size === 0) return schema;
@@ -1098,8 +1083,8 @@ function createEnhancerByType(type, config) {
       break;
     }
     case 'childBlockConfig': {
-      const { defaultsField = 'itemDefaults', editableFields, parentControlledFields } = config;
-      enhancer = hideParentOwnedFields([defaultsField], { editableFields, parentControlledFields });
+      const { editableFields, parentControlledFields } = config;
+      enhancer = hideParentOwnedFields({ editableFields, parentControlledFields });
       enhancer.config = config;
       break;
     }
