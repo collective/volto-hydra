@@ -30,9 +30,9 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await expect(heroBlock).toBeVisible();
 
     // Verify all editable fields are present
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
-    const subheadingField = heroBlock.locator('[data-editable-field="subheading"]');
-    const buttonTextField = heroBlock.locator('[data-editable-field="buttonText"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
+    const subheadingField = heroBlock.locator('[data-edit-text="subheading"]');
+    const buttonTextField = heroBlock.locator('[data-edit-text="buttonText"]');
 
     await expect(headingField).toBeVisible();
     await expect(subheadingField).toBeVisible();
@@ -56,7 +56,7 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await helper.clickBlockInIframe(HERO_BLOCK_ID);
 
     // Find and click the heading field
-    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`);
+    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="heading"]`);
     await headingField.click();
 
     // Verify it's contenteditable
@@ -82,7 +82,7 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await helper.clickBlockInIframe(HERO_BLOCK_ID);
 
     // Find and click the heading field (a string type field)
-    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`);
+    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="heading"]`);
     await headingField.click();
 
     // Clear and type text
@@ -116,21 +116,21 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await helper.clickBlockInIframe(HERO_BLOCK_ID);
 
     // Edit the heading field
-    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`);
+    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="heading"]`);
     await headingField.click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('Updated Heading');
     await expect(headingField).toHaveText('Updated Heading');
 
     // Now click and edit the subheading field
-    const subheadingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="subheading"]`);
+    const subheadingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="subheading"]`);
     await subheadingField.click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('Updated Subheading');
     await expect(subheadingField).toHaveText('Updated Subheading');
 
     // Now click and edit the button text field
-    const buttonTextField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="buttonText"]`);
+    const buttonTextField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="buttonText"]`);
     await buttonTextField.click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('New Button');
@@ -154,9 +154,9 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await helper.clickBlockInIframe(HERO_BLOCK_ID);
 
     // Get references to all fields
-    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`);
-    const subheadingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="subheading"]`);
-    const buttonTextField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="buttonText"]`);
+    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="heading"]`);
+    const subheadingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="subheading"]`);
+    const buttonTextField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="buttonText"]`);
 
     // Get initial values
     const initialSubheading = await subheadingField.textContent();
@@ -188,7 +188,7 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await helper.clickBlockInIframe(HERO_BLOCK_ID);
 
     // Find and click the heading field
-    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`);
+    const headingField = iframe.locator(`[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="heading"]`);
     await headingField.click();
 
     // Get initial render count after block is selected and ready
@@ -259,7 +259,7 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
 
     // Click the description field (slate type)
     const descriptionField = iframe.locator(
-      `[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="description"]`
+      `[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="description"]`
     );
     await descriptionField.click();
 
@@ -280,7 +280,7 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
 
     // First focus description (slate) to make format buttons appear
     const descriptionField = iframe.locator(
-      `[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="description"]`
+      `[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="description"]`
     );
     await descriptionField.click();
 
@@ -290,7 +290,7 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
 
     // Now focus heading (string type)
     const headingField = iframe.locator(
-      `[data-block-uid="${HERO_BLOCK_ID}"] [data-editable-field="heading"]`
+      `[data-block-uid="${HERO_BLOCK_ID}"] [data-edit-text="heading"]`
     );
     await headingField.click();
 

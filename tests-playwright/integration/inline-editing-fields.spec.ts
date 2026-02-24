@@ -2,28 +2,28 @@
  * Tests for inline editing of linkable and media fields.
  *
  * These tests verify that:
- * - Elements with data-linkable-field show link icon in toolbar
- * - Elements with data-media-field show image icon in toolbar
+ * - Elements with data-edit-link show link icon in toolbar
+ * - Elements with data-edit-media show image icon in toolbar
  * - Link icon opens AddLinkForm popup
  * - Image icon triggers object browser
  *
  * Uses the hero block (block-4-hero) which has:
- * - data-linkable-field="buttonLink" on the button
- * - data-media-field="image" on the image element
+ * - data-edit-link="buttonLink" on the button
+ * - data-edit-media="image" on the image element
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Inline editing - linkable/media fields', () => {
-  test('shows link icon when clicking element with data-linkable-field', async ({ page }) => {
+  test('shows link icon when clicking element with data-edit-link', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // The hero block has a button with data-linkable-field="buttonLink"
+    // The hero block has a button with data-edit-link="buttonLink"
     const iframe = helper.getIframe();
-    const linkableElement = iframe.locator('[data-linkable-field="buttonLink"]');
+    const linkableElement = iframe.locator('[data-edit-link="buttonLink"]');
     await expect(linkableElement).toBeVisible();
 
     // Click the linkable element
@@ -38,15 +38,15 @@ test.describe('Inline editing - linkable/media fields', () => {
     await expect(linkButton).toBeVisible();
   });
 
-  test('shows image icon when clicking element with data-media-field', async ({ page }) => {
+  test('shows image icon when clicking element with data-edit-media', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // The hero block has an image with data-media-field="image"
+    // The hero block has an image with data-edit-media="image"
     const iframe = helper.getIframe();
-    const mediaElement = iframe.locator('[data-media-field="image"]');
+    const mediaElement = iframe.locator('[data-edit-media="image"]');
     await expect(mediaElement).toBeVisible();
 
     // Click the media element
@@ -69,7 +69,7 @@ test.describe('Inline editing - linkable/media fields', () => {
 
     // Click the linkable element (hero button)
     const iframe = helper.getIframe();
-    const linkableElement = iframe.locator('[data-linkable-field="buttonLink"]');
+    const linkableElement = iframe.locator('[data-edit-link="buttonLink"]');
     await linkableElement.click();
 
     // Click the link icon in toolbar
@@ -92,9 +92,9 @@ test.describe('Inline editing - linkable/media fields', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // The hero button has both data-editable-field="buttonText" and data-linkable-field="buttonLink"
+    // The hero button has both data-edit-text="buttonText" and data-edit-link="buttonLink"
     const iframe = helper.getIframe();
-    const buttonElement = iframe.locator('[data-editable-field="buttonText"][data-linkable-field="buttonLink"]');
+    const buttonElement = iframe.locator('[data-edit-text="buttonText"][data-edit-link="buttonLink"]');
     await expect(buttonElement).toBeVisible();
 
     // Click the element
@@ -116,7 +116,7 @@ test.describe('Inline editing - linkable/media fields', () => {
 
     // Hover over the linkable element
     const iframe = helper.getIframe();
-    const linkableElement = iframe.locator('[data-linkable-field="buttonLink"]');
+    const linkableElement = iframe.locator('[data-edit-link="buttonLink"]');
     await linkableElement.hover();
 
     // Check that the ::after pseudo-element creates a dashed border
@@ -136,7 +136,7 @@ test.describe('Inline editing - linkable/media fields', () => {
 
     // Hover over the media element
     const iframe = helper.getIframe();
-    const mediaElement = iframe.locator('[data-media-field="image"]');
+    const mediaElement = iframe.locator('[data-edit-media="image"]');
     await mediaElement.hover();
 
     // Check that the ::after pseudo-element creates a dashed border

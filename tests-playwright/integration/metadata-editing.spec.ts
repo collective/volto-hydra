@@ -22,7 +22,7 @@ test.describe('Page Metadata Editing', () => {
     // Find the page title element (use #page-title for mock to avoid matching teaser titles)
     // Mock frontend uses "title" (without slash) to test shorthand works
     // Nuxt frontend uses "/title" (with slash) to test explicit page-level path
-    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '#page-title';
+    const titleSelector = isNuxt ? '[data-edit-text="/title"]' : '#page-title';
     const pageTitle = iframe.locator(titleSelector);
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await expect(pageTitle).toHaveText(expectedInitialTitle);
@@ -75,7 +75,7 @@ test.describe('Page Metadata Editing', () => {
 
     // Find and click the page title (use #page-title to avoid matching teaser titles)
     // Mock frontend uses "title" (without slash), Nuxt uses "/title"
-    const titleSelector = isNuxt ? '[data-editable-field="/title"]' : '#page-title';
+    const titleSelector = isNuxt ? '[data-edit-text="/title"]' : '#page-title';
     const pageTitle = iframe.locator(titleSelector);
     await expect(pageTitle).toBeVisible({ timeout: 10000 });
     await pageTitle.click();
@@ -115,7 +115,7 @@ test.describe('Page Metadata Editing', () => {
     // Get the original image src
     const originalSrc = await previewImage.getAttribute('src');
 
-    // Click on the preview image (has data-media-field="preview_image")
+    // Click on the preview image (has data-edit-media="preview_image")
     await previewImage.click();
 
     // The toolbar should appear (Quanta toolbar)

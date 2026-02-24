@@ -23,7 +23,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         '<strong data-node-id="0-1"></strong>' +
         '</p>' +
@@ -57,7 +57,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1"></strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -86,7 +86,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1">bold text</strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -113,7 +113,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1"></strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -144,7 +144,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1"></strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -170,7 +170,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         '<strong data-node-id="0-1"><span>nested text</span></strong>' +
         '</p>' +
@@ -199,7 +199,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1">test</strong>' +
         '</div>';
       document.body.appendChild(container);

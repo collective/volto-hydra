@@ -665,9 +665,9 @@ export class AdminUIHelper {
       );
     }
 
-    // Try to click on the block's title element (data-editable-field="title")
+    // Try to click on the block's title element (data-edit-text="title")
     const titleElement = block.locator(
-      '> [data-editable-field="title"], > .column-title, > h3, > h4',
+      '> [data-edit-text="title"], > .column-title, > h3, > h4',
     );
     const hasTitleElement = (await titleElement.count()) > 0;
 
@@ -903,8 +903,8 @@ export class AdminUIHelper {
    */
   getSlateField(blockLocator: Locator): Locator {
     // Try child first (mock renderer), then self (Nuxt where attr is on root)
-    const childField = blockLocator.locator('[data-editable-field="value"]');
-    const selfField = blockLocator.and(this.page.locator('[data-editable-field="value"]'));
+    const childField = blockLocator.locator('[data-edit-text="value"]');
+    const selfField = blockLocator.and(this.page.locator('[data-edit-text="value"]'));
     return childField.or(selfField);
   }
 
@@ -1458,12 +1458,12 @@ export class AdminUIHelper {
    */
   async getBlockTextInIframe(blockId: string): Promise<string> {
     const iframe = this.getIframe();
-    // Try descendant first (mock frontend: data-block-uid > [data-editable-field])
-    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    // Try descendant first (mock frontend: data-block-uid > [data-edit-text])
+    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text]`).first();
 
     if ((await editor.count()) === 0) {
-      // Nuxt pattern: data-block-uid and data-editable-field on same element
-      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`).first();
+      // Nuxt pattern: data-block-uid and data-edit-text on same element
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-edit-text]`).first();
     }
 
     // Wait a moment for any pending mutations to complete
@@ -1486,9 +1486,9 @@ export class AdminUIHelper {
     if (fieldName) {
       // Descendant or same-element (Nuxt puts both attrs on same element)
       return iframe.locator(
-        `[data-block-uid="${blockId}"] [data-editable-field="${fieldName}"]`,
+        `[data-block-uid="${blockId}"] [data-edit-text="${fieldName}"]`,
       ).or(iframe.locator(
-        `[data-block-uid="${blockId}"][data-editable-field="${fieldName}"]`,
+        `[data-block-uid="${blockId}"][data-edit-text="${fieldName}"]`,
       ));
     }
 
@@ -2255,10 +2255,10 @@ export class AdminUIHelper {
       const doc = el.ownerDocument;
       const activeEl = doc.activeElement;
       const activeTag = activeEl?.tagName;
-      const activeEditable = activeEl?.getAttribute?.('data-editable-field');
+      const activeEditable = activeEl?.getAttribute?.('data-edit-text');
       return {
         isFocused: activeEl === el,
-        activeElement: `${activeTag}[data-editable-field="${activeEditable}"]`,
+        activeElement: `${activeTag}[data-edit-text="${activeEditable}"]`,
       };
     });
   }
@@ -2309,7 +2309,7 @@ export class AdminUIHelper {
    * Enter edit mode on a specific block and return the editor element.
    * This helper checks if already editable/focused, and only clicks if necessary.
    *
-   * Uses [data-editable-field] selector instead of [contenteditable="true"] because
+   * Uses [data-edit-text] selector instead of [contenteditable="true"] because
    * contenteditable may be temporarily set to "false" when the editor is blocked
    * during format operations (e.g., waiting for iframe flush to complete).
    *
@@ -2357,7 +2357,7 @@ export class AdminUIHelper {
 
   /**
    * Select a range of text in an editor element.
-   * The editor element should be a contenteditable element (like a <p> with data-editable-field).
+   * The editor element should be a contenteditable element (like a <p> with data-edit-text).
    *
    * @param editor - Locator for the editor element
    * @param startOffset - Character offset to start selection

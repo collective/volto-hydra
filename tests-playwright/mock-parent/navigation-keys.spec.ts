@@ -282,7 +282,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
 
     // Simulate Nuxt's rendering: replace content of <p> with whitespace-only text node.
     // This is what Nuxt does after a re-render — Vue templates produce " " in empty elements.
-    // On mock frontend, data-node-id is on the same element as data-editable-field;
+    // On mock frontend, data-node-id is on the same element as data-edit-text;
     // on Nuxt, data-node-id is on a child <p>. Handle both cases.
     await editable.evaluate((el) => {
       const nodeEl = el.querySelector('[data-node-id="0"]')

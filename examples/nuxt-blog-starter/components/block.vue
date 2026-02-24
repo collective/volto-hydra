@@ -1,39 +1,39 @@
 <template>
-  <div v-if="block['@type'] == 'slate'" class="bg-transparent" :data-block-uid="block_uid" data-editable-field="value">
+  <div v-if="block['@type'] == 'slate'" class="bg-transparent" :data-block-uid="block_uid" data-edit-text="value">
     <RichText v-for="node in block['value']" :key="node" :node="node" />
   </div>
 
-  <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid" data-editable-field="value">
+  <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid" data-edit-text="value">
     <hr />
     <RichText v-for="node in block['value']" :key="node" :node="node" />
     <hr />
   </div>
 
-  <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-editable-field="/title">{{ data.title }}
+  <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">{{ data.title }}
   </h1>
 
-  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-editable-field="/description"><i>{{
+  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-edit-text="/description"><i>{{
     data.description }}</i></p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-linkable-field="href">
-      <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" :src="props.url" :width="props.width"
+    <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
+      <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" :width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
     </a>
-    <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" :width="props.width"
+    <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width"
       :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
   <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
     <figure>
-      <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-linkable-field="href">
-        <NuxtImg v-for="props in [imageProps(block)]" data-media-field="url" :src="props.url" _width="props.width"
+      <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
+        <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" _width="props.width"
           :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       </a>
-      <NuxtImg v-else v-for="props in [imageProps(block)]" data-media-field="url" data-linkable-field="href" :src="props.url" _width="props.width"
+      <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
       <figcaption>
         <h2>{{ block.title }}</h2>
-        <div v-if="block?.description" data-editable-field="description">
+        <div v-if="block?.description" data-edit-text="description">
           <p>{{ block.description }}</p>
         </div>
       </figcaption>
@@ -46,10 +46,10 @@
   </div>
 
   <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
-  <!-- hydra editable-field=heading(.hero-heading) editable-field=subheading(.hero-subheading) media-field=image(.hero-image) editable-field=buttonText(.hero-button) linkable-field=buttonLink(.hero-button) -->
+  <!-- hydra edit-text=heading(.hero-heading) edit-text=subheading(.hero-subheading) edit-media=image(.hero-image) edit-text=buttonText(.hero-button) edit-link=buttonLink(.hero-button) -->
   <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
-    <!-- Image - uses class for selector, no data-media-field -->
+    <!-- Image - uses class for selector, no data-edit-media -->
     <img v-if="block.image" class="hero-image w-full h-auto max-h-64 object-cover mb-4 rounded"
          :src="getImageUrl(block.image)"
          alt="Hero image" />
@@ -57,7 +57,7 @@
     </div>
     <h1 class="hero-heading text-3xl font-bold mb-2">{{ block.heading }}</h1>
     <p class="hero-subheading text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
-    <div class="hero-description mb-4" data-editable-field="description">
+    <div class="hero-description mb-4" data-edit-text="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
     <!-- Button - uses class for selectors -->
@@ -85,7 +85,7 @@
   <!-- Columns container block -->
   <div v-else-if="block['@type'] == 'columns'" :data-block-uid="block_uid" class="columns-block my-4">
     <!-- Title for columns block (always rendered for inline editing) -->
-    <h3 data-editable-field="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
+    <h3 data-edit-text="title" class="columns-title mb-2 font-semibold">{{ block.title }}</h3>
 
     <!-- Top images row - horizontal layout for images above columns -->
     <div v-if="block.top_images?.items?.length" class="top-images-row flex gap-4 mb-4">
@@ -104,7 +104,7 @@
            :data-block-uid="columnId" data-block-add="right"
            class="column flex-1 p-3 border border-dashed border-gray-300 rounded">
         <!-- Column title -->
-        <h4 v-if="block.blocks?.[columnId]?.title" data-editable-field="title"
+        <h4 v-if="block.blocks?.[columnId]?.title" data-edit-text="title"
             class="column-title mb-2 text-sm font-medium">{{ block.blocks[columnId].title }}</h4>
         <!-- Column content blocks -->
         <BlockExpander
@@ -118,29 +118,29 @@
     class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block._blockUid || block_uid">
     <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
-    <!-- data-linkable-field prevents navigation in edit mode -->
-    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage" data-linkable-field="href">
+    <!-- data-edit-link prevents navigation in edit mode -->
+    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage" data-edit-link="href">
       <NuxtImg class="rounded-t-lg" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
       <NuxtImg class="rounded-t-lg" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
     <div class="p-5">
       <!-- Title: use block.title only if overwrite, otherwise use target's title -->
-      <!-- Only add data-editable-field when overwrite is true (field is customizable) -->
+      <!-- Only add data-edit-text when overwrite is true (field is customizable) -->
       <!-- Title link is also linkable (clicking it shows link editor for href) -->
       <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
       <!-- Note: listing items are marked readonly via comment syntax in BlockExpander -->
-      <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-linkable-field="href">
+      <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-edit-link="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
           :key="`title-${block.overwrite}`"
-          :data-editable-field="block.overwrite ? 'title' : undefined">{{ getTeaserTitle(block) }}</h5>
+          :data-edit-text="block.overwrite ? 'title' : undefined">{{ getTeaserTitle(block) }}</h5>
       </NuxtLink>
       <!-- Description: use block.description only if overwrite, otherwise use target's description -->
       <p class="mb-3 font-normal text-gray-700 dark:text-gray-400"
         :key="`description-${block.overwrite}`"
-        :data-editable-field="block.overwrite ? 'description' : undefined"
+        :data-edit-text="block.overwrite ? 'description' : undefined"
         v-if="getTeaserDescription(block)">{{ getTeaserDescription(block) }}</p>
-      <NuxtLink :to="getUrl(block.href)" data-linkable-field="href"
+      <NuxtLink :to="getUrl(block.href)" data-edit-link="href"
         class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Read more
         <svg class="rtl:rotate-180 w-3.5 h-3.5 ms-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -166,21 +166,21 @@
           :style="slide.preview_image ? imageProps(slide, true).class : ''"
           data-block-add="right">
           <!-- Clickable overlay for preview_image editing -->
-          <div data-media-field="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
+          <div data-edit-media="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
           <div
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
             :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
-            <div data-editable-field="head_title">{{ slide.head_title }}</div>
+            <div data-edit-text="head_title">{{ slide.head_title }}</div>
             <h5 :id="`heading-${slide['@id']}`"
-              class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-editable-field="title">
+              class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
               {{ slide.title }}</h5>
-            <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-editable-field="description">
+            <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-edit-text="description">
               {{ slide.description }}</p>
-            <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-editable-field="buttonText" data-linkable-field="href"
+            <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
               :aria-describedby="`heading-${slide['@id']}`">
               {{ slide.buttonText || 'Read More' }}</NuxtLink>
-            <a v-else href="#" data-editable-field="buttonText" data-linkable-field="href"
+            <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
               :aria-describedby="`heading-${slide['@id']}`">
               {{ slide.buttonText || 'Read More' }}</a>
@@ -265,7 +265,7 @@
   <!-- Variations: facetsLeftSide, facetsRightSide, facetsTopSide (default) -->
   <div v-else-if="block['@type'] == 'search'" :data-block-uid="block_uid" class="search-block">
     <!-- Headline -->
-    <h2 v-if="block.headline" data-editable-field="headline" class="text-2xl font-bold mb-4">{{ block.headline }}</h2>
+    <h2 v-if="block.headline" data-edit-text="headline" class="text-2xl font-bold mb-4">{{ block.headline }}</h2>
 
     <!-- Search controls -->
     <div v-if="block.showSearchInput" class="search-controls mb-4">
@@ -293,7 +293,7 @@
           <!-- Facet types -->
           <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
                class="facet-item p-3 border border-gray-200 rounded min-w-48">
-            <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+            <div data-edit-text="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
             <template v-if="facet.type === 'selectFacet'">
               <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
                       :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
@@ -369,7 +369,7 @@
               <!-- Facet types -->
               <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
                    class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
-                <div data-editable-field="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
+                <div data-edit-text="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
                 <template v-if="facet.type === 'selectFacet'">
                   <select class="facet-select w-full px-3 py-2 border border-gray-300 rounded text-sm"
                           :data-field="getFacetField(facet)" @change="handleFacetSelectChange" data-linkable-allow>
@@ -429,7 +429,7 @@
   </div>
 
   <template v-else-if="block['@type'] == 'heading'" :data-block-uid="block_uid">
-    <h2 data-editable-field="heading">{{ block.heading }}</h2>
+    <h2 data-edit-text="heading">{{ block.heading }}</h2>
   </template>
 
   <div v-else-if="block['@type'] == 'slateTable'" class="data-table" :data-block-uid="block_uid">
@@ -442,7 +442,7 @@
           :data-block-uid="cell.key"
           data-block-add="right"
         >
-          <RichText v-for="(node, idx) in cell.value" :key="idx" :node="node" data-editable-field="value" />
+          <RichText v-for="(node, idx) in cell.value" :key="idx" :node="node" data-edit-text="value" />
         </component>
       </tr>
     </table>
@@ -451,7 +451,7 @@
   <div v-else-if="block['@type'] == '__button'">
     <NuxtLink :to="getUrl(block.href)" :data-block-uid="block_uid"
       class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-      data-editable-field="title">
+      data-edit-text="title">
       {{ block.title || 'Read more' }}
     </NuxtLink>
   </div>

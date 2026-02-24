@@ -850,7 +850,7 @@ test.describe('Inline Editing - Basic', () => {
 
   test('empty editable field is visible and clickable', async ({ page }) => {
     // Empty editable fields should have minimum height so they're visible and clickable.
-    // This tests the CSS rule that hydra.js injects for [data-editable-field]:empty
+    // This tests the CSS rule that hydra.js injects for [data-edit-text]:empty
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -872,8 +872,8 @@ test.describe('Inline Editing - Basic', () => {
     await helper.waitForBlockSelected('block-2-uuid');
 
     // Get the editable field locator - handles both Nuxt (attr on root) and mock (attr on child)
-    const editableField = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field="value"]`).or(
-      iframe.locator(`[data-block-uid="${blockId}"][data-editable-field="value"]`)
+    const editableField = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text="value"]`).or(
+      iframe.locator(`[data-block-uid="${blockId}"][data-edit-text="value"]`)
     );
 
     // The empty field should still be visible (have height > 0) even when not selected

@@ -66,7 +66,7 @@ export default function SlateBlock({ value }) {
   }, [value]);
   const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
   return (
-    <div key={uid} data-editable-field="value">
+    <div key={uid} data-edit-text="value">
       {elements}
     </div>
   );

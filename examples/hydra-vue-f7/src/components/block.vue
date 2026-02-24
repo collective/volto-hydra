@@ -1,5 +1,5 @@
 <template>
-    <div v-if="block['@type']=='slate'" :data-block-uid="block_uid" data-editable-field="value">
+    <div v-if="block['@type']=='slate'" :data-block-uid="block_uid" data-edit-text="value">
         <RichText v-for="node in block['value']" :key="node" :node="node" />
     </div>
     <!-- <f7-block-title v-else-if="block['@type']=='title'" :data-block-uid="block_uid">{{ data.title}}</f7-block-title> -->
@@ -14,14 +14,14 @@
     <f7-card v-else-if="block['@type']=='teaser'" :data-block-uid="block_uid">
         <f7-card-header
             valign="bottom"
-            :style="{'background-image': ('url()' ? block.href.hasPreviewImage : false)}" data-editable-field="title"
+            :style="{'background-image': ('url()' ? block.href.hasPreviewImage : false)}" data-edit-text="title"
             >{{block.title}}</f7-card-header
         >
         <f7-card-content>
-            <p data-editable-field="description">{{block.description}}</p>
+            <p data-edit-text="description">{{block.description}}</p>
         </f7-card-content>
         <f7-card-footer>
-            <f7-link :href="getUrl(block.href[0])" data-editable-field="href">Read more</f7-link> 
+            <f7-link :href="getUrl(block.href[0])" data-edit-text="href">Read more</f7-link> 
         </f7-card-footer>
     </f7-card>
     <swiper-container :pagination="true" class="demo-swiper-multiple" :space-between="50"
@@ -32,14 +32,14 @@
           <div>{{ block.head_title }}</div>
         <f7-card-header
             valign="bottom"
-             data-editable-field="title"
+             data-edit-text="title"
             >{{block.title}}</f7-card-header
         >
         <f7-card-content>
-            <p data-editable-field="description">{{block.description}}</p>
+            <p data-edit-text="description">{{block.description}}</p>
         </f7-card-content>
         <f7-card-footer>
-            <f7-link :href="getUrl(block.href[0])" data-editable-field="href">{{block.buttonText}}</f7-link> 
+            <f7-link :href="getUrl(block.href[0])" data-edit-text="href">{{block.buttonText}}</f7-link> 
         </f7-card-footer>
         </f7-card>
        </div>

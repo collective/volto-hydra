@@ -16,7 +16,7 @@ test.describe('Non-Slate Text Field Editing', () => {
     const heroBlock = iframe.locator('[data-block-uid="mock-hero-block"]');
 
     // Verify heading field is editable
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
     await expect(headingField).toBeVisible();
     await expect(headingField).toHaveAttribute('contenteditable', 'true');
 
@@ -26,7 +26,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
   test('should edit heading field content', async ({ helper, page }) => {
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
 
     await headingField.click();
 
@@ -51,7 +51,7 @@ test.describe('Non-Slate Text Field Editing', () => {
     });
 
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
 
     await headingField.click();
     await page.keyboard.type(' edited');
@@ -62,7 +62,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
   test('should maintain cursor position while typing', async ({ helper, page }) => {
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
 
     // Click at the end
     await headingField.click();
@@ -80,7 +80,7 @@ test.describe('Non-Slate Text Field Editing', () => {
     // Pressing Enter should NOT create a new line within the field
 
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
 
     // Clear and type initial text
     await headingField.click();
@@ -101,7 +101,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
   test('ArrowRight moves cursor forward', async ({ helper, page }) => {
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
 
     // Clear and type initial text
     await headingField.click();
@@ -123,7 +123,7 @@ test.describe('Non-Slate Text Field Editing', () => {
 
   test('string field cursor stays in position while typing in middle', async ({ helper, page }) => {
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const headingField = heroBlock.locator('[data-editable-field="heading"]');
+    const headingField = heroBlock.locator('[data-edit-text="heading"]');
 
     // Clear and type initial text
     await headingField.click();
@@ -152,7 +152,7 @@ test.describe('Non-Slate Text Field Editing', () => {
     // Pressing Enter should create a newline character (\n) not <br> HTML
 
     const heroBlock = await helper.clickBlockInIframe('mock-hero-block', { waitForToolbar: false });
-    const subheadingField = heroBlock.locator('[data-editable-field="subheading"]');
+    const subheadingField = heroBlock.locator('[data-edit-text="subheading"]');
 
     // Click the subheading field to focus it
     await subheadingField.click();

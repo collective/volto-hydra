@@ -3896,9 +3896,9 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.waitForSidebarCurrentBlock('Columns', 10000);
 
     // The new columns block should have an image child block in top_images
-    // Find image blocks that have data-media-field directly on them (not deeply nested)
+    // Find image blocks that have data-edit-media directly on them (not deeply nested)
     // These are actual image-type blocks, not container blocks
-    const imageMediaFields = iframe.locator('[data-media-field="url"]');
+    const imageMediaFields = iframe.locator('[data-edit-media="url"]');
 
     // Wait for at least one image field to exist (from new columns block)
     await expect(imageMediaFields.first()).toBeVisible({ timeout: 5000 });
@@ -4432,7 +4432,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     expect(await facetItems.last().getAttribute('data-block-uid')).toBe('facet-subject');
 
     // Click on facet title to select it (avoid checkboxes in the facet body)
-    await helper.clickBlockInIframe('facet-type', { selector: '[data-editable-field="title"]' });
+    await helper.clickBlockInIframe('facet-type', { selector: '[data-edit-text="title"]' });
     await helper.waitForQuantaToolbar('facet-type');
 
     // Drag after last facet

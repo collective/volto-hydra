@@ -256,7 +256,7 @@ export class Bridge {
     const content = text.replace(/^hydra\s*/, '').replace(/\/$/, '').trim();
 
     // Parse attribute=value or attribute=value(selector) patterns
-    // Supports multiple values for the same attribute (e.g., multiple editable-field)
+    // Supports multiple values for the same attribute (e.g., multiple edit-text)
     const attrs = {};
     // Match: word-name=value(selector) or word-name=value or word-name (boolean)
     // Value can contain paths like /page-name
@@ -330,9 +330,9 @@ export class Bridge {
     const attrMap = {
       'block-uid': 'data-block-uid',
       'block-readonly': 'data-block-readonly',
-      'editable-field': 'data-editable-field',
-      'linkable-field': 'data-linkable-field',
-      'media-field': 'data-media-field',
+      'edit-text': 'data-edit-text',
+      'edit-link': 'data-edit-link',
+      'edit-media': 'data-edit-media',
       'block-add': 'data-block-add',
       'block-selector': 'data-block-selector',
       'block-container': 'data-block-container',
@@ -342,7 +342,7 @@ export class Bridge {
       const domAttr = attrMap[name];
       if (!domAttr) continue;
 
-      // Each attribute can have multiple entries (e.g., multiple editable-field)
+      // Each attribute can have multiple entries (e.g., multiple edit-text)
       for (const { value, selector } of entries) {
         // Determine target element(s)
         const targets = selector
@@ -447,7 +447,7 @@ export class Bridge {
    * - "../fieldName" -> parent block's field (or page if at top level)
    * - "/fieldName" -> page-level field
    *
-   * @param {string} fieldPath - The field path from data-editable-field
+   * @param {string} fieldPath - The field path from data-edit-text
    * @param {string|null} blockId - Current block ID (PAGE_BLOCK_UID for page-level)
    * @returns {Object} { blockId: string, fieldName: string }
    */
@@ -496,7 +496,7 @@ export class Bridge {
 
   /**
    * Get editable fields that belong directly to a block, excluding nested blocks' fields.
-   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
+   * Also checks if the blockElement itself has data-edit-text (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement[]} Array of editable field elements that belong to this block
@@ -504,11 +504,11 @@ export class Bridge {
   getOwnEditableFields(blockElement) {
     const result = [];
     // Check if block element itself is an editable field (Nuxt: both attrs on same element)
-    if (blockElement.hasAttribute('data-editable-field')) {
+    if (blockElement.hasAttribute('data-edit-text')) {
       result.push(blockElement);
     }
     // Also check descendants
-    const allFields = blockElement.querySelectorAll('[data-editable-field]');
+    const allFields = blockElement.querySelectorAll('[data-edit-text]');
     for (const field of allFields) {
       if (this.fieldBelongsToBlock(field, blockElement)) {
         result.push(field);
@@ -519,14 +519,14 @@ export class Bridge {
 
   /**
    * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
-   * Also checks if the blockElement itself has data-editable-field (Nuxt pattern).
+   * Also checks if the blockElement itself has data-edit-text (Nuxt pattern).
    *
    * @param {HTMLElement} blockElement - The block element
    * @returns {HTMLElement|null} The first editable field or null if none
    */
   getOwnFirstEditableField(blockElement) {
     const fields = [];
-    this.collectBlockFields(blockElement, 'data-editable-field',
+    this.collectBlockFields(blockElement, 'data-edit-text',
       (el, name, results) => { fields.push(el); });
     return fields[0] || null;
   }
@@ -541,11 +541,11 @@ export class Bridge {
    */
   getEditableFieldByName(blockElement, fieldName) {
     // Check if block element itself is the editable field (Nuxt: both attrs on same element)
-    if (blockElement.getAttribute('data-editable-field') === fieldName) {
+    if (blockElement.getAttribute('data-edit-text') === fieldName) {
       return blockElement;
     }
     // Check descendants
-    return blockElement.querySelector(`[data-editable-field="${fieldName}"]`);
+    return blockElement.querySelector(`[data-edit-text="${fieldName}"]`);
   }
 
   /**
@@ -554,7 +554,7 @@ export class Bridge {
    * Checks both the element itself and its descendants.
    *
    * @param {HTMLElement} blockElement - Any element of the block
-   * @param {string} attrName - Attribute name (e.g., 'data-linkable-field')
+   * @param {string} attrName - Attribute name (e.g., 'data-edit-link')
    * @param {Function} processor - (fieldElement, fieldName, results) => void
    * @returns {Object} Collected results
    */
@@ -610,7 +610,7 @@ export class Bridge {
    * For multi-element blocks, searches ALL elements with the same UID.
    */
   getLinkableFields(blockElement) {
-    return this.collectBlockFields(blockElement, 'data-linkable-field',
+    return this.collectBlockFields(blockElement, 'data-edit-link',
       (el, name, results) => { results[name] = true; });
   }
 
@@ -641,7 +641,7 @@ export class Bridge {
         const blockRect = current.getBoundingClientRect();
         if (blockRect.width > 0 && blockRect.height > 0) {
           log(
-            `data-media-field="${fieldName}" has zero dimensions. ` +
+            `data-edit-media="${fieldName}" has zero dimensions. ` +
             `Using block element's dimensions (${blockRect.width}x${blockRect.height}).`
           );
           return { top: blockRect.top, left: blockRect.left, width: blockRect.width, height: blockRect.height };
@@ -654,7 +654,7 @@ export class Bridge {
 
       if (parentRect.width > 0 && parentRect.height > 0) {
         log(
-          `data-media-field="${fieldName}" has zero dimensions. ` +
+          `data-edit-media="${fieldName}" has zero dimensions. ` +
           `Using parent's dimensions (${parentRect.width}x${parentRect.height}).`
         );
         return { top: parentRect.top, left: parentRect.left, width: parentRect.width, height: parentRect.height };
@@ -667,7 +667,7 @@ export class Bridge {
 
     // No fallback available, warn the developer
     console.warn(
-      `[HYDRA] data-media-field="${fieldName}" has zero dimensions (${rect.width}x${rect.height}). ` +
+      `[HYDRA] data-edit-media="${fieldName}" has zero dimensions (${rect.width}x${rect.height}). ` +
       `The element must have visible width and height for the image picker to position correctly. ` +
       `Set explicit dimensions or use a different element.`,
       element
@@ -680,7 +680,7 @@ export class Bridge {
    * For multi-element blocks, searches ALL elements with the same UID.
    */
   getMediaFields(blockElement) {
-    return this.collectBlockFields(blockElement, 'data-media-field',
+    return this.collectBlockFields(blockElement, 'data-edit-media',
       (el, name, results) => {
         const rect = this.getEffectiveMediaRect(el, name);
         // Skip fields with zero dimensions (e.g., hidden carousel slides)
@@ -1079,7 +1079,7 @@ export class Bridge {
     // Backspace at absolute start of a slate field → send to admin to unwrap
     if (key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
       const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-      const editField = blockEl.closest('[data-editable-field]');
+      const editField = blockEl.closest('[data-edit-text]');
       if (editField) {
         const textRange = document.createRange();
         textRange.setStart(editField, 0);
@@ -1109,7 +1109,7 @@ export class Bridge {
     // Backspace in empty first simple text field → delete block
     if (key === 'Backspace' && !this.isSlateField(blockUid, this.focusedFieldName)) {
       const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-      const editField = blockEl.closest('[data-editable-field]');
+      const editField = blockEl.closest('[data-edit-text]');
       if (editField) {
         const fieldText = (editField.textContent || '').trim();
         if (fieldText === '') {
@@ -1209,7 +1209,7 @@ export class Bridge {
     const range = sel.getRangeAt(0);
     const node = range.startContainer;
     const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-    const editableField = blockEl.closest('[data-editable-field]');
+    const editableField = blockEl.closest('[data-edit-text]');
     if (!editableField) return false;
 
     // Walk up to find the block-level element (p, h2, li, blockquote, etc.)
@@ -1823,7 +1823,7 @@ export class Bridge {
             }
 
             // Focus changed within the currently selected block
-            const editableField = target.getAttribute('data-editable-field');
+            const editableField = target.getAttribute('data-edit-text');
             if (editableField) {
               log('Field focused:', editableField);
               const previousFieldName = this.focusedFieldName;
@@ -2072,10 +2072,10 @@ export class Bridge {
     if (this.lastClickPosition?.target) {
       // Find the clicked editable field - only accept if it belongs to THIS block
       const clickedElement = this.lastClickPosition.target;
-      const clickedField = clickedElement.closest('[data-editable-field]');
+      const clickedField = clickedElement.closest('[data-edit-text]');
       log('Click event path - found clickedField:', !!clickedField);
       if (clickedField && this.fieldBelongsToBlock(clickedField, blockElement)) {
-        fieldToFocus = clickedField.getAttribute('data-editable-field');
+        fieldToFocus = clickedField.getAttribute('data-edit-text');
         log('Got field from click:', fieldToFocus);
       }
     }
@@ -2085,7 +2085,7 @@ export class Bridge {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       log('querySelector path - found:', !!firstEditableField);
       if (firstEditableField) {
-        fieldToFocus = firstEditableField.getAttribute('data-editable-field');
+        fieldToFocus = firstEditableField.getAttribute('data-edit-text');
         log('Got field from querySelector:', fieldToFocus);
       }
     }
@@ -2196,7 +2196,7 @@ export class Bridge {
             event.preventDefault();
           } else {
             // Only prevent if this is a linkable field (opens link editor in sidebar)
-            const isLinkableField = linkElement.closest('[data-linkable-field]');
+            const isLinkableField = linkElement.closest('[data-edit-link]');
             if (isLinkableField) {
               event.preventDefault();
             }
@@ -2207,42 +2207,42 @@ export class Bridge {
         // Using relative coordinates ensures focus()/scroll doesn't invalidate the position
         // Also store the target for field detection
         // Inside readonly blocks, ignore editable/linkable/media fields (they're from query results, not editable)
-        const clickedEditableField = isInsideReadonly ? null : event.target.closest('[data-editable-field]');
-        const editableField = clickedEditableField || (isInsideReadonly ? null : blockElement.querySelector('[data-editable-field]'));
+        const clickedEditableField = isInsideReadonly ? null : event.target.closest('[data-edit-text]');
+        const editableField = clickedEditableField || (isInsideReadonly ? null : blockElement.querySelector('[data-edit-text]'));
 
         // Detect clicked linkable and media fields (ignored inside readonly blocks)
-        const clickedLinkableField = isInsideReadonly ? null : event.target.closest('[data-linkable-field]');
-        const clickedMediaField = isInsideReadonly ? null : event.target.closest('[data-media-field]');
+        const clickedLinkableField = isInsideReadonly ? null : event.target.closest('[data-edit-link]');
+        const clickedMediaField = isInsideReadonly ? null : event.target.closest('[data-edit-media]');
 
         if (editableField) {
           const rect = editableField.getBoundingClientRect();
           this.lastClickPosition = {
             relativeX: event.clientX - rect.left,
             relativeY: event.clientY - rect.top,
-            editableField: editableField.getAttribute('data-editable-field'),
+            editableField: editableField.getAttribute('data-edit-text'),
             target: event.target, // For field detection
-            linkableField: clickedLinkableField?.getAttribute('data-linkable-field') || null,
-            mediaField: clickedMediaField?.getAttribute('data-media-field') || null,
+            linkableField: clickedLinkableField?.getAttribute('data-edit-link') || null,
+            mediaField: clickedMediaField?.getAttribute('data-edit-media') || null,
           };
         } else {
           this.lastClickPosition = {
             target: event.target,
-            linkableField: clickedLinkableField?.getAttribute('data-linkable-field') || null,
-            mediaField: clickedMediaField?.getAttribute('data-media-field') || null,
+            linkableField: clickedLinkableField?.getAttribute('data-edit-link') || null,
+            mediaField: clickedMediaField?.getAttribute('data-edit-media') || null,
           };
         }
         this.selectBlock(blockElement);
       } else {
         // No block - check for page-level fields
-        const pageField = event.target.closest('[data-media-field], [data-linkable-field], [data-editable-field]');
+        const pageField = event.target.closest('[data-edit-media], [data-edit-link], [data-edit-text]');
         if (pageField) {
           event.preventDefault();
           this.selectedBlockUid = PAGE_BLOCK_UID;
 
           // Detect focused field type
-          this.focusedMediaField = pageField.getAttribute('data-media-field');
-          this.focusedLinkableField = pageField.getAttribute('data-linkable-field');
-          this.focusedFieldName = pageField.getAttribute('data-editable-field');
+          this.focusedMediaField = pageField.getAttribute('data-edit-media');
+          this.focusedLinkableField = pageField.getAttribute('data-edit-link');
+          this.focusedFieldName = pageField.getAttribute('data-edit-text');
 
           // Make page-level text fields editable and focusable
           if (this.focusedFieldName) {
@@ -2394,7 +2394,7 @@ export class Bridge {
         if (e.key !== 'Enter' || e.shiftKey) return;
         if (!this.selectedBlockUid) return;
         // Only fire if no editable field is currently focused
-        if (document.activeElement?.closest('[data-editable-field]')) return;
+        if (document.activeElement?.closest('[data-edit-text]')) return;
         // Must be in edit mode
         if (!this.isInlineEditing) return;
 
@@ -2702,7 +2702,7 @@ export class Bridge {
 
       // Manually trigger text change handler since insertNode creates a
       // childList mutation but our MutationObserver only watches characterData
-      const editableField = currentEditable.closest('[data-editable-field]') || currentEditable;
+      const editableField = currentEditable.closest('[data-edit-text]') || currentEditable;
       if (editableField && this.isInlineEditing) {
         this.handleTextChange(editableField, textNode.parentElement, textNode);
       }
@@ -2755,7 +2755,7 @@ export class Bridge {
         if (sel && currentEditable) {
           // Use text node endpoints instead of selectNodeContents on the container,
           // because the selectionchange listener's correctInvalidWhitespaceSelection
-          // treats selections anchored on the data-editable-field container as invalid
+          // treats selections anchored on the data-edit-text container as invalid
           // (since the container has data-node-id children) and "corrects" them.
           const walker = document.createTreeWalker(currentEditable, NodeFilter.SHOW_TEXT);
           const firstText = walker.firstChild();
@@ -2774,7 +2774,7 @@ export class Bridge {
             sel.removeAllRanges();
             sel.addRange(range);
           }
-          log('Ctrl+A replay: selection set to:', JSON.stringify(sel.toString()), 'on', currentEditable.tagName, currentEditable.getAttribute('data-editable-field'));
+          log('Ctrl+A replay: selection set to:', JSON.stringify(sel.toString()), 'on', currentEditable.tagName, currentEditable.getAttribute('data-edit-text'));
         }
         return;
       }
@@ -3054,10 +3054,10 @@ export class Bridge {
 
       // If this element is an editable field itself, check if it has data-node-id children
       // If so, cursor should be inside those children, not on the container
-      if (node.hasAttribute?.('data-editable-field')) {
+      if (node.hasAttribute?.('data-edit-text')) {
         const hasNodeIdChildren = node.querySelector?.('[data-node-id]');
         if (hasNodeIdChildren) {
-          log('isOnInvalidWhitespace: cursor on editable-field container but has nodeId children, needs correction');
+          log('isOnInvalidWhitespace: cursor on edit-text container but has nodeId children, needs correction');
           return true;
         }
         return false;
@@ -3070,7 +3070,7 @@ export class Bridge {
       }
 
       // Check if there's any data-node-id element inside the block
-      // (could be nested or on same element as editable-field)
+      // (could be nested or on same element as edit-text)
       const nodeIdElement = blockElement.querySelector('[data-node-id]');
       if (nodeIdElement && !node.closest?.('[data-node-id]')) {
         // Element is inside a block with slate content but outside data-node-id
@@ -3090,7 +3090,7 @@ export class Bridge {
     let editableField = null;
     let current = node.parentNode;
     while (current) {
-      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-editable-field')) {
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-edit-text')) {
         editableField = current;
         break;
       }
@@ -3143,20 +3143,20 @@ export class Bridge {
     let container = null;
 
     // For element nodes, check if the node itself is the container
-    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-editable-field')) {
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute?.('data-edit-text')) {
       container = node;
     }
     // Check if we can find editable field by walking up
     if (!container) {
       let current = node.parentNode;
-      while (current && !current.hasAttribute?.('data-editable-field')) {
+      while (current && !current.hasAttribute?.('data-edit-text')) {
         current = current.parentNode;
       }
       container = current;
     }
     // For element nodes (like block wrapper), also check inside for editable field
     if (!container && node.nodeType === Node.ELEMENT_NODE) {
-      container = node.querySelector?.('[data-editable-field]');
+      container = node.querySelector?.('[data-edit-text]');
     }
 
     if (!container) {
@@ -3337,8 +3337,8 @@ export class Bridge {
     let foundDataNodeId = false;
     while (current) {
       if (current.nodeType === Node.ELEMENT_NODE) {
-        // Check data-node-id BEFORE data-editable-field because elements
-        // can have both attrs (e.g. <p data-editable-field="value" data-node-id="0">).
+        // Check data-node-id BEFORE data-edit-text because elements
+        // can have both attrs (e.g. <p data-edit-text="value" data-node-id="0">).
         // We must check the element's content before potentially breaking out.
         if (current.hasAttribute?.('data-node-id')) {
           foundDataNodeId = true;
@@ -3348,7 +3348,7 @@ export class Bridge {
             return false;
           }
         }
-        if (current.hasAttribute?.('data-editable-field')) break;
+        if (current.hasAttribute?.('data-edit-text')) break;
       }
       current = current.parentNode;
     }
@@ -3404,7 +3404,7 @@ export class Bridge {
       // Only warn if this is a Slate field (has data-node-id elements)
       // Non-Slate fields (simple text) can't be serialized and that's expected
       let editableField = range.commonAncestorContainer;
-      while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+      while (editableField && !editableField.hasAttribute?.('data-edit-text')) {
         editableField = editableField.parentNode;
       }
       if (editableField && editableField.querySelector('[data-node-id]')) {
@@ -3437,7 +3437,7 @@ export class Bridge {
   validateSelectionPaths(anchor, focus, commonAncestor) {
     // Find the editable field container and block
     let editableField = commonAncestor;
-    while (editableField && !editableField.hasAttribute?.('data-editable-field')) {
+    while (editableField && !editableField.hasAttribute?.('data-edit-text')) {
       editableField = editableField.parentNode;
     }
     if (!editableField) {
@@ -3454,7 +3454,7 @@ export class Bridge {
     }
 
     const blockUid = blockElement.getAttribute('data-block-uid');
-    const fieldName = editableField.getAttribute('data-editable-field');
+    const fieldName = editableField.getAttribute('data-edit-text');
     const blockData = this.getBlockData(blockUid);
 
     if (!blockData || !blockData[fieldName]) {
@@ -3749,7 +3749,7 @@ export class Bridge {
         log('getElementPath: Found node-id', nodeId, '-> path:', parts);
         return parts;
       }
-      if (current.hasAttribute('data-editable-field')) {
+      if (current.hasAttribute('data-edit-text')) {
         // Reached the container without finding a node-id
         // For empty containers, return [0] (first paragraph)
         log('getElementPath: Reached container, returning [0]');
@@ -3809,7 +3809,7 @@ export class Bridge {
         hasValidNodeId &&
         parent.nodeName !== 'P' &&
         parent.nodeName !== 'DIV' &&
-        !parent.hasAttribute?.('data-editable-field')
+        !parent.hasAttribute?.('data-edit-text')
       ) {
         // Parse the parent's path from its node ID
         const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
@@ -3826,7 +3826,7 @@ export class Bridge {
         // Block elements (p, h1-h6, li, etc.) contain multiple children - count text position
         const isWrapper =
           isInlineElement(parent) &&
-          !parent.hasAttribute?.('data-editable-field');
+          !parent.hasAttribute?.('data-edit-text');
 
         if (isWrapper) {
           // Parent is an inline wrapper without nodeId (like Nuxt spans for text leaves)
@@ -3847,7 +3847,7 @@ export class Bridge {
     let foundContainer = false;
     let foundNodeIdInWalk = false;
     while (current) {
-      const hasEditableField = current.hasAttribute?.('data-editable-field');
+      const hasEditableField = current.hasAttribute?.('data-edit-text');
       const hasSlateEditor = current.hasAttribute?.('data-slate-editor');
 
       // Track if we've found an editable container
@@ -3863,7 +3863,7 @@ export class Bridge {
         nodeId && nodeId !== '' && nodeId !== 'undefined';
 
       // Process current node if it has a valid nodeId
-      // Must process BEFORE checking editable-field since element can have both
+      // Must process BEFORE checking edit-text since element can have both
       if (hasValidNodeId) {
         foundNodeIdInWalk = true;
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
@@ -3905,7 +3905,7 @@ export class Bridge {
       let checkNode = current.parentNode;
       while (checkNode) {
         if (
-          checkNode.hasAttribute?.('data-editable-field') ||
+          checkNode.hasAttribute?.('data-edit-text') ||
           checkNode.hasAttribute?.('data-slate-editor')
         ) {
           foundContainer = true;
@@ -3926,12 +3926,12 @@ export class Bridge {
     if (!foundNodeIdInWalk) {
       // Find the editable container for context
       let container = node;
-      while (container && !container.hasAttribute?.('data-editable-field')) {
+      while (container && !container.hasAttribute?.('data-edit-text')) {
         container = container.parentNode;
       }
       const blockElement = container?.closest?.('[data-block-uid]');
       const blockUid = blockElement?.getAttribute('data-block-uid') || null;
-      const fieldName = container?.getAttribute?.('data-editable-field') || null;
+      const fieldName = container?.getAttribute?.('data-edit-text') || null;
 
       // Skip error for readonly blocks - they don't need selection sync
       if (blockUid && this.isBlockReadonly(blockUid)) {
@@ -4023,7 +4023,7 @@ export class Bridge {
 
     // If block is readonly, remove contenteditable from all its editable fields
     if (blockUid && this.isBlockReadonly(blockUid)) {
-      const editableFields = blockElement.querySelectorAll('[data-editable-field][contenteditable="true"]');
+      const editableFields = blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]');
       editableFields.forEach((field) => {
         field.removeAttribute('contenteditable');
       });
@@ -4036,22 +4036,22 @@ export class Bridge {
 
     if (blockUid) {
       // Block-level field - use collectBlockFields to gather from all elements with this UID
-      this.collectBlockFields(blockElement, 'data-editable-field',
+      this.collectBlockFields(blockElement, 'data-edit-text',
         (el) => { editableFields.push(el); });
     } else {
       // Page-level field (no blockUid) - process the element directly
-      // The element itself has data-editable-field (e.g., #page-title)
-      if (blockElement.hasAttribute('data-editable-field')) {
+      // The element itself has data-edit-text (e.g., #page-title)
+      if (blockElement.hasAttribute('data-edit-text')) {
         editableFields.push(blockElement);
       }
-      // Also check any children with data-editable-field
-      blockElement.querySelectorAll('[data-editable-field]').forEach((el) => {
+      // Also check any children with data-edit-text
+      blockElement.querySelectorAll('[data-edit-text]').forEach((el) => {
         editableFields.push(el);
       });
     }
     log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
-      const fieldPath = field.getAttribute('data-editable-field');
+      const fieldPath = field.getAttribute('data-edit-text');
       // Use getFieldType which handles page-level fields (e.g., /title) correctly
       const fieldType = this.getFieldType(blockUid, fieldPath);
       const wasEditable = field.getAttribute('contenteditable') === 'true';
@@ -4115,10 +4115,10 @@ export class Bridge {
       const elBlock = el.closest('[data-block-uid]');
       if (elBlock !== blockElement) return;
 
-      // If element has no data-editable-field, remove contenteditable
-      if (!el.hasAttribute('data-editable-field')) {
+      // If element has no data-edit-text, remove contenteditable
+      if (!el.hasAttribute('data-edit-text')) {
         el.removeAttribute('contenteditable');
-        log(`  Removed stale contenteditable from element without data-editable-field`);
+        log(`  Removed stale contenteditable from element without data-edit-text`);
       }
     });
   }
@@ -4127,7 +4127,7 @@ export class Bridge {
    * Activate an editable field: make it contenteditable, set up observers, focus it, and position cursor.
    * This is the common logic used by both block selection and page-level field clicks.
    *
-   * @param {HTMLElement} fieldElement - The element with data-editable-field
+   * @param {HTMLElement} fieldElement - The element with data-edit-text
    * @param {string} fieldName - The field name (e.g., 'value', 'title')
    * @param {string|null} blockUid - The block UID (null for page-level fields)
    * @param {string} caller - Caller name for debugging
@@ -4289,12 +4289,12 @@ export class Bridge {
     };
 
     // Editable fields need min-height for text cursor
-    document.querySelectorAll('[data-editable-field]').forEach((el) => {
+    document.querySelectorAll('[data-edit-text]').forEach((el) => {
       ensureSize(el, 'auto', '1.5em');
     });
 
     // Media fields need min dimensions for image picker overlay
-    document.querySelectorAll('[data-media-field]').forEach((el) => {
+    document.querySelectorAll('[data-edit-media]').forEach((el) => {
       ensureSize(el, '100px', '100px');
     });
 
@@ -4345,7 +4345,7 @@ export class Bridge {
     tempDiv.appendChild(fragment.cloneNode(true));
 
     // Find editable fields and clean text nodes within them
-    const editableFields = tempDiv.querySelectorAll('[data-editable-field]');
+    const editableFields = tempDiv.querySelectorAll('[data-edit-text]');
     editableFields.forEach((field) => {
       const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT);
       let node;
@@ -4365,7 +4365,7 @@ export class Bridge {
       'data-slate-leaf',
       'data-slate-string',
       'data-block-uid',
-      'data-editable-field',
+      'data-edit-text',
     ];
     tempDiv.querySelectorAll('*').forEach((el) => {
       internalAttrs.forEach((attr) => el.removeAttribute(attr));
@@ -4389,7 +4389,7 @@ export class Bridge {
     let cleanText = this.stripZeroWidthSpaces(selection.toString());
     cleanText = cleanText.replace(/\u00A0/g, ' ');
 
-    // cleanHtmlForClipboard only cleans within [data-editable-field] elements
+    // cleanHtmlForClipboard only cleans within [data-edit-text] elements
     const cleanHtml = this.cleanHtmlForClipboard(range.cloneContents());
 
     log('Copy event - cleaning clipboard');
@@ -4770,8 +4770,8 @@ export class Bridge {
       const slateValue = blockData[fieldName];
       if (!slateValue || !Array.isArray(slateValue)) continue;
 
-      const fieldEl = blockElement.querySelector(`[data-editable-field="${fieldName}"]`)
-        || (blockElement.getAttribute('data-editable-field') === fieldName ? blockElement : null);
+      const fieldEl = blockElement.querySelector(`[data-edit-text="${fieldName}"]`)
+        || (blockElement.getAttribute('data-edit-text') === fieldName ? blockElement : null);
       if (!fieldEl) continue;
 
       const expected = JSON.stringify(slateValue);
@@ -5012,10 +5012,10 @@ export class Bridge {
       // For slate blocks (value field), also set up paste/keydown handlers
       // Check blockElement itself first (Nuxt puts both attributes on same element)
       // then fall back to querying for child elements
-      let valueField = blockElement.hasAttribute('data-editable-field') &&
-                       blockElement.getAttribute('data-editable-field') === 'value'
+      let valueField = blockElement.hasAttribute('data-edit-text') &&
+                       blockElement.getAttribute('data-edit-text') === 'value'
                        ? blockElement
-                       : blockElement.querySelector('[data-editable-field="value"]');
+                       : blockElement.querySelector('[data-edit-text="value"]');
       if (valueField) {
         this.makeBlockContentEditable(valueField);
       }
@@ -5080,9 +5080,9 @@ export class Bridge {
     if (!isTemplateInstance && this.lastClickPosition?.target) {
       // Find the clicked editable field
       const clickedElement = this.lastClickPosition.target;
-      const clickedField = clickedElement.closest('[data-editable-field]');
+      const clickedField = clickedElement.closest('[data-edit-text]');
       if (clickedField) {
-        this.focusedFieldName = clickedField.getAttribute('data-editable-field');
+        this.focusedFieldName = clickedField.getAttribute('data-edit-text');
         log('Detected focused field from click:', this.focusedFieldName);
       }
 
@@ -5101,7 +5101,7 @@ export class Bridge {
     if (!isTemplateInstance && !this.focusedFieldName && blockElement) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
-        this.focusedFieldName = firstEditableField.getAttribute('data-editable-field');
+        this.focusedFieldName = firstEditableField.getAttribute('data-edit-text');
         log('Set focusedFieldName to first editable field:', this.focusedFieldName);
       } else {
         // No editable fields in this block (e.g., image blocks or container blocks)
@@ -5272,7 +5272,7 @@ export class Bridge {
           }
 
           if (contentEditableField) {
-            const fieldPath = contentEditableField.getAttribute('data-editable-field');
+            const fieldPath = contentEditableField.getAttribute('data-edit-text');
             // Use activateEditableField for focus and cursor positioning
             this.activateEditableField(contentEditableField, fieldPath, this.selectedBlockUid, 'selectBlock', {
               skipContentEditable: true, // Already done above
@@ -6873,11 +6873,11 @@ export class Bridge {
           if (this.selectedBlockUid === PAGE_BLOCK_UID) {
             // Page-level field - find element using focused field info
             if (this.focusedMediaField) {
-              element = document.querySelector(`[data-media-field="${this.focusedMediaField}"]`);
+              element = document.querySelector(`[data-edit-media="${this.focusedMediaField}"]`);
             } else if (this.focusedLinkableField) {
-              element = document.querySelector(`[data-linkable-field="${this.focusedLinkableField}"]`);
+              element = document.querySelector(`[data-edit-link="${this.focusedLinkableField}"]`);
             } else if (this.focusedFieldName) {
-              element = document.querySelector(`[data-editable-field="${this.focusedFieldName}"]`);
+              element = document.querySelector(`[data-edit-text="${this.focusedFieldName}"]`);
             }
           } else {
             // Use getAllBlockElements to handle template instances (virtual containers)
@@ -6953,7 +6953,7 @@ export class Bridge {
 
     let blockElement;
 
-    if (elementOrBlock.hasAttribute('data-editable-field')) {
+    if (elementOrBlock.hasAttribute('data-edit-text')) {
       // Called with the editable field directly - find block-uid from parent
       editableField = elementOrBlock;
       blockElement = elementOrBlock.closest('[data-block-uid]');
@@ -7380,8 +7380,8 @@ export class Bridge {
           // Find the editable field element (works for both Slate and non-Slate fields)
           const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
-          const targetElement = parentEl?.closest('[data-editable-field]');
-          log('characterData mutation: parentEl=', parentEl?.tagName, 'targetElement=', targetElement?.tagName, 'targetElement has attr:', targetElement?.hasAttribute?.('data-editable-field'));
+          const targetElement = parentEl?.closest('[data-edit-text]');
+          log('characterData mutation: parentEl=', parentEl?.tagName, 'targetElement=', targetElement?.tagName, 'targetElement has attr:', targetElement?.hasAttribute?.('data-edit-text'));
 
           if (targetElement) {
             // Pass parentEl so handleTextChange can find the actual node that changed
@@ -7758,7 +7758,7 @@ export class Bridge {
   getEditableFields(blockElement) {
     if (!blockElement) return {};
     const blockUid = blockElement.getAttribute('data-block-uid');
-    return this.collectBlockFields(blockElement, 'data-editable-field',
+    return this.collectBlockFields(blockElement, 'data-edit-text',
       (el, name, results) => { results[name] = this.getFieldType(blockUid, name) || 'string'; });
   }
 
@@ -8742,7 +8742,7 @@ export class Bridge {
   ////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * Handle the text changed in the block element with attr data-editable-field,
+   * Handle the text changed in the block element with attr data-edit-text,
    * by getting changed text from DOM and send it to the adminUI
    * @param {HTMLElement} target
    * @param {Node} mutatedTextNode - The actual text node that was modified (optional)
@@ -8750,10 +8750,10 @@ export class Bridge {
   handleTextChange(target, mutatedNodeParent = null, mutatedTextNode = null) {
     const blockElement = target.closest('[data-block-uid]');
     const blockUid = blockElement?.getAttribute('data-block-uid') || null;
-    const editableField = target.getAttribute('data-editable-field');
+    const editableField = target.getAttribute('data-edit-text');
 
     if (!editableField) {
-      console.warn('[HYDRA] handleTextChange: No data-editable-field found');
+      console.warn('[HYDRA] handleTextChange: No data-edit-text found');
       return;
     }
 
@@ -9489,17 +9489,17 @@ export class Bridge {
           outline: 0px solid transparent;
         }
         /* Ensure empty editable fields are visible/clickable */
-        [data-editable-field]:empty {
+        [data-edit-text]:empty {
           min-height: 1.5em;
           display: block;
         }
         /* Linkable field hover styles - indicate clickable link areas */
         /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
-        [data-linkable-field]:not([data-block-readonly] [data-linkable-field]):not([data-block-readonly][data-linkable-field]) {
+        [data-edit-link]:not([data-block-readonly] [data-edit-link]):not([data-block-readonly][data-edit-link]) {
           cursor: pointer;
           position: relative;
         }
-        [data-linkable-field]:not([data-block-readonly] [data-linkable-field]):not([data-block-readonly][data-linkable-field]):hover::after {
+        [data-edit-link]:not([data-block-readonly] [data-edit-link]):not([data-block-readonly][data-edit-link]):hover::after {
           content: "";
           position: absolute;
           inset: -2px;
@@ -9509,11 +9509,11 @@ export class Bridge {
         }
         /* Media field hover styles - indicate clickable image areas */
         /* Exclude fields inside readonly blocks */
-        [data-media-field]:not([data-block-readonly] [data-media-field]):not([data-block-readonly][data-media-field]) {
+        [data-edit-media]:not([data-block-readonly] [data-edit-media]):not([data-block-readonly][data-edit-media]) {
           cursor: pointer;
           position: relative;
         }
-        [data-media-field]:not([data-block-readonly] [data-media-field]):not([data-block-readonly][data-media-field]):hover::after {
+        [data-edit-media]:not([data-block-readonly] [data-edit-media]):not([data-block-readonly][data-edit-media]):hover::after {
           content: "";
           position: absolute;
           inset: -2px;

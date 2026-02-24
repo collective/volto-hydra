@@ -66,8 +66,8 @@ async function getFocusedFieldInfo(helper): Promise<{
     if (!activeEl) return { blockUid: null, fieldName: null, cursorAtStart: false, cursorAtEnd: false, text: '' };
 
     // Find the editable field
-    const editableField = activeEl.closest?.('[data-editable-field]') || activeEl;
-    const fieldName = editableField?.getAttribute('data-editable-field');
+    const editableField = activeEl.closest?.('[data-edit-text]') || activeEl;
+    const fieldName = editableField?.getAttribute('data-edit-text');
 
     // Find the block
     let blockEl = editableField;
@@ -273,7 +273,7 @@ test.describe('Arrow key block-to-block navigation', () => {
       const iframe = helper.getIframe();
 
       // Focus the heading field (first field) and move to end
-      const headingField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-editable-field="heading"]');
+      const headingField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-edit-text="heading"]');
       await headingField.click();
       await page.keyboard.press('End');
 
@@ -296,7 +296,7 @@ test.describe('Arrow key block-to-block navigation', () => {
       await selectBlock(helper, page, 'mock-multi-field-block');
       const iframe = helper.getIframe();
 
-      const btnField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-editable-field="buttonText"]');
+      const btnField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-edit-text="buttonText"]');
       await btnField.click();
       // Press End twice to ensure cursor reaches end (handles any initial position)
       await page.keyboard.press('End');
@@ -318,7 +318,7 @@ test.describe('Arrow key block-to-block navigation', () => {
       const iframe = helper.getIframe();
 
       // Focus subheading field (second) and move to start
-      const subField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-editable-field="subheading"]');
+      const subField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-edit-text="subheading"]');
       await subField.click();
       await page.keyboard.press('Home');
       await page.keyboard.press('Home');
@@ -340,7 +340,7 @@ test.describe('Arrow key block-to-block navigation', () => {
       const iframe = helper.getIframe();
 
       // Focus heading field (first) and move to start
-      const headingField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-editable-field="heading"]');
+      const headingField = iframe.locator('[data-block-uid="mock-multi-field-block"] [data-edit-text="heading"]');
       await headingField.click();
       await page.keyboard.press('Home');
       await page.keyboard.press('Home');

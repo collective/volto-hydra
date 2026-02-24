@@ -23,7 +23,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         '<strong data-node-id="0-1"></strong>' +
         '</p>' +
@@ -56,7 +56,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1"></strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -85,7 +85,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0"></p>' +
         '</div>';
       document.body.appendChild(container);
@@ -117,7 +117,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1"></strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -143,7 +143,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0"></p>' +
         '</div>';
       document.body.appendChild(container);
@@ -185,7 +185,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         '<strong data-node-id="0-0">bold</strong>' +
         '<em data-node-id="0-1">italic</em>' +

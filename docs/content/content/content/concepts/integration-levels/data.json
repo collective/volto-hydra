@@ -422,7 +422,7 @@
                 {
                   "children": [
                     {
-                      "text": "data-editable-field=\"fieldName\""
+                      "text": "data-edit-text=\"fieldName\""
                     }
                   ],
                   "type": "strong"
@@ -438,7 +438,7 @@
                 {
                   "children": [
                     {
-                      "text": "data-media-field=\"fieldName\""
+                      "text": "data-edit-media=\"fieldName\""
                     }
                   ],
                   "type": "strong"
@@ -454,7 +454,7 @@
                 {
                   "children": [
                     {
-                      "text": "data-linkable-field=\"fieldName\""
+                      "text": "data-edit-link=\"fieldName\""
                     }
                   ],
                   "type": "strong"
@@ -479,7 +479,7 @@
         {
           "children": [
             {
-              "text": "<div class=\"slide\" data-block-uid=\"slide-1\">\n    <img data-media-field=\"image\" src=\"/big_news.jpg\"/>\n    <h2 data-editable-field=\"title\">Big News</h2>\n    <div data-editable-field=\"description\">\n        Check out <b>hydra</b>, it will change everything\n    </div>\n    <a data-linkable-field=\"url\"\n       data-editable-field=\"buttonText\"\n       href=\"/big_news\">Read more</a>\n</div>"
+              "text": "<div class=\"slide\" data-block-uid=\"slide-1\">\n    <img data-edit-media=\"image\" src=\"/big_news.jpg\"/>\n    <h2 data-edit-text=\"title\">Big News</h2>\n    <div data-edit-text=\"description\">\n        Check out <b>hydra</b>, it will change everything\n    </div>\n    <a data-edit-link=\"url\"\n       data-edit-text=\"buttonText\"\n       href=\"/big_news\">Read more</a>\n</div>"
             }
           ],
           "type": "p"
@@ -495,7 +495,7 @@
         {
           "children": [
             {
-              "text": "<!-- hydra block-uid=block-123\n     editable-field=title(.card-title)\n     media-field=image(img)\n     linkable-field=href(a.link) -->\n<div class=\"third-party-card\">...</div>\n<!-- /hydra -->"
+              "text": "<!-- hydra block-uid=block-123\n     edit-text=title(.card-title)\n     edit-media=image(img)\n     edit-link=href(a.link) -->\n<div class=\"third-party-card\">...</div>\n<!-- /hydra -->"
             }
           ],
           "type": "p"

@@ -100,8 +100,8 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
     // Then wait for image blocks to appear
-    // Image blocks: element with data-block-uid contains <img data-media-field="url">
-    const imageItems = iframe.locator(`[data-block-uid="${blockId}"] img[data-media-field="url"]`);
+    // Image blocks: element with data-block-uid contains <img data-edit-media="url">
+    const imageItems = iframe.locator(`[data-block-uid="${blockId}"] img[data-edit-media="url"]`);
     await expect(imageItems.first()).toBeVisible({ timeout: 5000 });
 
     // Verify no image editing overlay appears (listing items are readonly)
@@ -384,7 +384,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Click on the search block headline (waits for block, clicks specific element)
     await helper.clickBlockInIframe('search-block-1', {
-      selector: 'h2[data-editable-field="headline"]',
+      selector: 'h2[data-edit-text="headline"]',
     });
 
     // Verify the search block is selected (toolbar visible)
@@ -393,7 +393,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Click on a facet title (waits for block - async expandListingBlocks must complete)
     await helper.clickBlockInIframe('facet-type', {
-      selector: '[data-editable-field="title"]',
+      selector: '[data-edit-text="title"]',
     });
 
     // Toolbar should be visible for the facet

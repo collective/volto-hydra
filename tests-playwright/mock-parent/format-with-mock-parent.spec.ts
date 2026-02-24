@@ -425,8 +425,8 @@ test.describe('Inline Editing with Mock Parent', () => {
     //    cleans up BOM sibling, inserts space → UNBLOCK
     // 4. Next keydown "w" → element keydown handler calls ensureValidInsertionTarget()
     // 5. BUG: ensureValidInsertionTarget sees the space-only text node inside the
-    //    bold <span data-node-id="0.1">, walks up to <p data-editable-field="value"
-    //    data-node-id="0">, hits data-editable-field BEFORE data-node-id → breaks
+    //    bold <span data-node-id="0.1">, walks up to <p data-edit-text="value"
+    //    data-node-id="0">, hits data-edit-text BEFORE data-node-id → breaks
     //    without checking P's content ("Hello ") → replaces space with FEFF
     //
     // We use a transform delay to ensure ONLY the space is buffered,
@@ -576,7 +576,7 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Wait for all renders to settle, then check final DOM.
     // Use the block element directly — rapid FORM_DATA re-renders may transiently
-    // strip data-editable-field before hydra.js re-adds it.
+    // strip data-edit-text before hydra.js re-adds it.
     await expect(async () => {
       const text = await helper.getCleanTextContent(
         iframe.locator('[data-block-uid="mock-block-1"]')

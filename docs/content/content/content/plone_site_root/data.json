@@ -119,7 +119,7 @@
                 {
                   "children": [
                     {
-                      "text": "data-editable-field"
+                      "text": "data-edit-text"
                     }
                   ],
                   "type": "strong"
