@@ -426,13 +426,20 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
             const templatePath = block.templateId || '';
             const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
 
-            const instanceBlockType = `Template: ${templateName}`;
+            // Nested: parent container belongs to the same template (different instanceId
+            // because merge assigns new IDs to top-level but children keep original)
+            const isNestedInTemplate = parent.templateId === block.templateId;
+
+            const instanceBlockType = isNestedInTemplate
+              ? 'Template blocks'
+              : `Template: ${templateName}`;
             pathMap[instanceId] = {
               path: null, // Virtual - no actual storage path
               parentId, // Template instance's parent is the original container
               containerField: fieldName,
               blockType: instanceBlockType, // Virtual type for sidebar display
               isTemplateInstance: true,
+              ...(isNestedInTemplate && { isNestedTemplateInstance: true }),
               templateId: block.templateId,
               // Virtual block data for components that need blockData (e.g., ParentBlocksWidget)
               blockData: { '@type': instanceBlockType, '@uid': instanceId },

@@ -481,8 +481,8 @@ const ParentBlockSection = ({
         return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
 
-      {/* Template instance settings form - uses schema-based BlockDataForm */}
-      {pathInfo?.isTemplateInstance && onChangeTemplateSettings && (() => {
+      {/* Template instance settings form — only for top-level, not nested */}
+      {pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance && onChangeTemplateSettings && (() => {
         // Build form data with editTemplate reflecting current state
         const templateFormData = {
           ...blockData,

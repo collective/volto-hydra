@@ -434,6 +434,41 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const idxNew = finalOrder.indexOf(newBlockId);
     expect(idxNew).toBe(idxContent2 + 1);
   });
+
+  test('nested template instance in grid shows simplified sidebar without settings form', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Wait for template merge
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
+    await expect(headerBlock).toBeVisible({ timeout: 15000 });
+
+    // Click the grid cell to select it, then Escape to parent levels
+    const { locator: gridCell } = await helper.waitForBlockByContent('Template Grid Cell 1');
+    await gridCell.click();
+    await helper.waitForSidebarOpen();
+
+    // The sidebar parent hierarchy should show both template levels:
+    // - "Template: test-layout" (top-level, with settings form)
+    // - "Template blocks" (nested inside grid, no settings form)
+
+    // Verify both labels are visible in the parent hierarchy
+    const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
+    const topLabel = page.locator('button').filter({ hasText: /Template: test-layout/ });
+    await expect(nestedLabel).toBeVisible({ timeout: 5000 });
+    await expect(topLabel).toBeVisible({ timeout: 5000 });
+
+    // The nested "Template blocks" section should NOT have template settings fields
+    expect(await helper.hasSidebarField('title', 'Template blocks')).toBe(false);
+    expect(await helper.hasSidebarField('editTemplate', 'Template blocks')).toBe(false);
+
+    // The top-level "Template: test-layout" section SHOULD have template settings fields
+    expect(await helper.hasSidebarField('title', 'Template: test-layout')).toBe(true);
+    expect(await helper.hasSidebarField('editTemplate', 'Template: test-layout')).toBe(true);
+  });
 });
 
 test.describe('allowedTemplates vs allowedLayouts', () => {
