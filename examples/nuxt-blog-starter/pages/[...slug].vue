@@ -12,18 +12,16 @@
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
 
-                <!-- Render blocks: template expansion in computed, style grouping, then BlocksRenderer per group -->
+                <!-- Render blocks: template expansion in computed, style grouping, then iterate per group -->
                 <template v-if="data.page?.blocks_layout && shouldRenderBlocks">
                     <section v-for="styleGroup in mainStyleGroups" :key="styleGroup.key" :class="styleGroup.style">
                         <div class="flex justify-between px-4 mx-auto max-w-screen-xl">
                             <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                                <BlocksRenderer :items="styleGroup.blocks" :data="data.page" :api-url="apiUrl">
-                                    <template #item="{ item }">
-                                        <div class="mx-auto" :class="{'max-w-4xl': item['@type'] !== 'slider'}">
-                                            <Block :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
-                                        </div>
-                                    </template>
-                                </BlocksRenderer>
+                                <template v-for="item in styleGroup.blocks" :key="item['@uid']">
+                                    <div class="mx-auto" :class="{'max-w-4xl': item['@type'] !== 'slider'}">
+                                        <Block :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </section>
@@ -47,16 +45,10 @@
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
         <!-- Dynamic footer_blocks content (sync - templates pre-loaded) -->
         <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
-            <BlocksRenderer
-                v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks"
-                :key="JSON.stringify(data.page?.footer_blocks?.items || [])"
-                :blocks="data.page?.blocks || {}"
-                :layout="data.page?.footer_blocks?.items || []"
-                :templates="data.templates || {}"
-                :allowed-layouts="footerAllowedLayouts"
-                :data="data.page"
-                :api-url="apiUrl"
-            />
+            <template v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks">
+                <Block v-for="item in footerExpandedItems" :key="item['@uid']"
+                       :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+            </template>
         </div>
         <!-- Static footer content -->
         <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
@@ -164,14 +156,6 @@ const mainExpandedItems = computed(() => {
     const layout = data.value?.page?.blocks_layout?.items || [];
     const blocks = data.value?.page?.blocks || {};
     if (!layout.length) return [];
-
-    if (isEditMode()) {
-        return layout.map(id => {
-            const block = blocks[id];
-            return block ? { ...block, '@uid': id } : null;
-        }).filter(Boolean);
-    }
-
     return expandTemplatesSync(layout, {
         blocks,
         templateState,
@@ -182,6 +166,19 @@ const mainExpandedItems = computed(() => {
 });
 
 const mainStyleGroups = computed(() => groupByStyle(mainExpandedItems.value));
+
+const footerExpandedItems = computed(() => {
+    const layout = data.value?.page?.footer_blocks?.items || [];
+    const blocks = data.value?.page?.blocks || {};
+    if (!layout.length) return [];
+    return expandTemplatesSync(layout, {
+        blocks,
+        templateState,
+        templates: data.value?.templates || {},
+        allowedLayouts: footerAllowedLayouts.value,
+        loadTemplate: syncLoadTemplate,
+    });
+});
 
 // Initialize Flowbite components based on data attribute selectors.
 // Safe to call initFlowbite() (which includes initCarousels) because block.vue

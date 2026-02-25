@@ -1,8 +1,8 @@
 <template>
   <template v-for="entry in processed.blocks" :key="entry.id">
     <!-- Listing: expand async in its own Suspense -->
-    <Suspense v-if="entry.listing" :key="`${entry.id}-${pageFromUrl}-${blocksFingerprint}`">
-      <AsyncExpandedItems :id="entry.id" :block="entry.block" :paging="processed.paging"
+    <Suspense v-if="entry.listing" :key="`${entry.id}-${entry.paging.start}-${blocksFingerprint}`">
+      <AsyncExpandedItems :id="entry.id" :block="entry.block" :paging="entry.paging"
         :api-url="effectiveApiUrl" :context-path="contextPath">
         <template #default="{ items }">
           <div style="display: contents">
@@ -22,17 +22,23 @@
         </div>
       </template>
     </Suspense>
-    <!-- Static block: render immediately (staticBlocks tracks position in paging) -->
-    <template v-else v-for="item in entry.items" :key="item['@uid']">
+    <!-- Per-listing paging (only when not using combined paging) -->
+    <Suspense v-if="entry.listing && !usePaging" :key="`paging-${entry.id}-${entry.paging.start}-${blocksFingerprint}`">
+      <AsyncPaging :paging="entry.paging" :build-url="(pg) => buildListingPagingUrl(entry.id, pg)" />
+    </Suspense>
+    <!-- Static block: render immediately (staticBlocks tracks position when paging) -->
+    <template v-else-if="!entry.listing" v-for="item in entry.items" :key="item['@uid']">
       <slot name="item" :item="item">
         <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="contained" />
       </slot>
     </template>
   </template>
-  <!-- Paging: awaits _ready from expandListingBlocks -->
-  <Suspense v-if="hasListings" :key="`paging-${pageFromUrl}-${blocksFingerprint}`">
-    <AsyncPaging :paging="processed.paging" :build-url="buildPagingUrl" />
-  </Suspense>
+  <!-- Combined paging: shared across all blocks (only when pageSize > 0) -->
+  <slot v-if="usePaging && hasListings" name="paging" :paging="processed.paging" :build-url="buildCombinedPagingUrl">
+    <Suspense :key="`paging-${pageFromUrl}-${blocksFingerprint}`">
+      <AsyncPaging :paging="processed.paging" :build-url="buildCombinedPagingUrl" />
+    </Suspense>
+  </slot>
 </template>
 
 <script setup>
@@ -52,6 +58,8 @@ const props = defineProps({
   apiUrl: { type: String, default: '' },
   block_uid: { type: String, default: null },
   contained: { type: Boolean, default: false },
+  // Combined paging: 0 = per-listing paging (default), > 0 = combined paging across all blocks
+  pageSize: { type: Number, default: 0 },
 });
 
 // Inject shared context from page level
@@ -62,6 +70,7 @@ const effectiveApiUrl = computed(() => props.apiUrl || injectedApiUrl);
 const effectiveTemplates = computed(() => props.templates || injectedTemplates);
 
 const LISTING_TYPES = ['listing'];
+const DEFAULT_LISTING_PAGE_SIZE = 6;
 
 let contextPath = props.data?.['@id'] || '/';
 if (contextPath.startsWith('http')) contextPath = new URL(contextPath).pathname;
@@ -114,28 +123,60 @@ const hasListings = computed(() =>
   allBlocks.value.some(({ block }) => LISTING_TYPES.includes(block['@type']))
 );
 
-const processed = computed(() => {
-  const paging = { start: pageFromUrl.value * pageSize, size: pageSize };
-  const blocks = allBlocks.value.map(({ id, block }) => {
-    if (LISTING_TYPES.includes(block['@type'])) {
-      return { id, block, listing: true };
-    }
-    const items = staticBlocks([id], { blocks: { [id]: block }, paging });
-    return { id, block, listing: false, items };
-  });
-  return { blocks, paging };
-});
+const usePaging = computed(() => props.pageSize > 0);
 
-// Paging
 const route = useRoute();
-const pageSize = 6;
+
+// Per-listing page number from URL (keyed by listing block ID)
+function listingPageFromUrl(listingId) {
+  return parseInt(route.query[`pg_${listingId}`] || '0', 10);
+}
+
+// Combined page number from URL (keyed by container block_uid)
 const pageFromUrl = computed(() => {
-  if (!props.block_uid) return 0;
+  if (!usePaging.value) return 0;
   return parseInt(route.query[`pg_${props.block_uid}`] || '0', 10);
 });
+
+const processed = computed(() => {
+  if (usePaging.value) {
+    // Combined paging: shared paging object across static + listing blocks
+    const paging = { start: pageFromUrl.value * props.pageSize, size: props.pageSize };
+    const blocks = allBlocks.value.map(({ id, block }) => {
+      if (LISTING_TYPES.includes(block['@type'])) {
+        return { id, block, listing: true, paging };
+      }
+      const items = staticBlocks([id], { blocks: { [id]: block }, paging });
+      return { id, block, listing: false, items };
+    });
+    return { blocks, paging };
+  } else {
+    // Per-listing paging: each listing gets its own paging object, static blocks render all
+    const noPaging = { start: 0, size: Infinity };
+    const blocks = allBlocks.value.map(({ id, block }) => {
+      if (LISTING_TYPES.includes(block['@type'])) {
+        const listingSize = block.b_size || DEFAULT_LISTING_PAGE_SIZE;
+        const listingPage = listingPageFromUrl(id);
+        const paging = { start: listingPage * listingSize, size: listingSize };
+        return { id, block, listing: true, paging };
+      }
+      const items = staticBlocks([id], { blocks: { [id]: block }, paging: noPaging });
+      return { id, block, listing: false, items };
+    });
+    return { blocks, paging: noPaging };
+  }
+});
+
 const blocksFingerprint = computed(() => JSON.stringify(props.items || props.blocks));
-const buildPagingUrl = (page) => {
+
+// URL builders
+const buildCombinedPagingUrl = (page) => {
   if (page === 0) return contextPath;
   return `${contextPath}?pg_${props.block_uid || allBlocks.value[0]?.id || 'default'}=${page}`;
+};
+
+const buildListingPagingUrl = (listingId, page) => {
+  if (page === 0) return contextPath;
+  return `${contextPath}?pg_${listingId}=${page}`;
 };
 </script>
