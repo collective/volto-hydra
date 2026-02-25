@@ -70,7 +70,7 @@
         {
           "children": [
             {
-              "text": "Each child has its own @type and schema (from blocksConfig). Children are stored in a shared "
+              "text": "Each child has its own @type and schema (from blocks). Children are stored in a shared "
             },
             {
               "children": [
@@ -131,12 +131,23 @@
     },
     "ol-text": {
       "@type": "slate",
-      "plaintext": "All items share one inline schema, stored as an array. Use idField for the unique identifier and optional dataPath for nested data.",
+      "plaintext": "All items share one inline schema, stored as an array. Supports idField, optional dataPath for nested data.",
       "value": [
         {
           "children": [
             {
-              "text": "All items share one inline schema, stored as an array:"
+              "text": "All items share one inline schema, stored as an array with an ID field. Use "
+            },
+            {
+              "children": [
+                {
+                  "text": "dataPath"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " when the data is nested within the block:"
             }
           ],
           "type": "p"
@@ -144,15 +155,35 @@
         {
           "children": [
             {
-              "text": "// Schema\nslides: {\n    title: 'Slides',\n    widget: 'object_list',\n    idField: '@id',\n    schema: {\n        properties: {\n            title: { title: 'Title' },\n            image: { title: 'Image', widget: 'image' },\n        }\n    }\n}\n\n// Resulting data\n{\n  \"slides\": [\n    { \"@id\": \"slide-1\", \"title\": \"First\", \"image\": \"...\" },\n    { \"@id\": \"slide-2\", \"title\": \"Second\", \"image\": \"...\" }\n  ]\n}"
+              "text": "// Schema\nslides: {\n    title: 'Slides',\n    widget: 'object_list',\n    idField: '@id',\n    dataPath: ['data', 'rows'],  // optional path when data is nested\n    schema: {\n        properties: {\n            title: { title: 'Title' },\n            image: { title: 'Image', widget: 'image' },\n            description: { title: 'Description', widget: 'slate' },\n        }\n    }\n}\n\n// Resulting data (note: nested under dataPath)\n{\n  \"@type\": \"slider\",\n  \"data\": {\n    \"slides\": [\n      { \"@id\": \"slide-1\", \"title\": \"First\", \"image\": \"...\" },\n      { \"@id\": \"slide-2\", \"title\": \"Second\", \"image\": \"...\" }\n    ]\n  }\n}"
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "typed-ol-heading": {
+      "@type": "slate",
+      "plaintext": "object_list with allowedBlocks: Typed Items",
+      "value": [
         {
           "children": [
             {
-              "text": "Add "
+              "text": "object_list with allowedBlocks: Typed Items"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "typed-ol-text": {
+      "@type": "slate",
+      "plaintext": "When allowedBlocks is set on an object_list, items can have different types while keeping array storage.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "When "
             },
             {
               "children": [
@@ -163,7 +194,7 @@
               "type": "strong"
             },
             {
-              "text": " to an object_list to let items have different types (like blocks_layout) while keeping array storage. Set "
+              "text": " is set on an object_list, items can have different types (like blocks_layout) but are still stored as an array. Each item's type is stored in the field specified by "
             },
             {
               "children": [
@@ -174,7 +205,7 @@
               "type": "strong"
             },
             {
-              "text": " to control which field holds the type (defaults to '@type')."
+              "text": " (defaults to '@type') and its schema is looked up from blocks:"
             }
           ],
           "type": "p"
@@ -182,7 +213,15 @@
         {
           "children": [
             {
-              "text": "Both widgets look the same in the editing UI and blocks can be dragged between them — data adapts automatically when moving between formats."
+              "text": "facets: {\n    title: 'Facets',\n    widget: 'object_list',\n    allowedBlocks: ['checkboxFacet', 'selectFacet'],\n    typeField: 'type',\n    defaultBlockType: 'checkboxFacet',\n}\n\n// Resulting data\n{\n  \"@type\": \"search\",\n  \"facets\": [\n    { \"@id\": \"facet-1\", \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\", \"field\": \"portal_type\" },\n    { \"@id\": \"facet-2\", \"type\": \"selectFacet\",\n      \"title\": \"Subject\", \"field\": \"Subject\" }\n  ]\n}"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "Both blocks_layout and object_list look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately)."
             }
           ],
           "type": "p"
@@ -241,13 +280,13 @@
                 {
                   "children": [
                     {
-                      "text": "data-block-add=\"right\""
+                      "text": "data-block-add=\"bottom|right\""
                     }
                   ],
                   "type": "strong"
                 },
                 {
-                  "text": " — The '+' button appears to the right instead of below"
+                  "text": " — Controls where the '+' button appears. By default it will be the opposite of its parent. Use \"bottom\" for vertical stacking, \"right\" for horizontal."
                 }
               ],
               "type": "li"
@@ -257,7 +296,7 @@
                 {
                   "children": [
                     {
-                      "text": "data-block-selector=\"+1\""
+                      "text": "data-block-selector=\"-1|+1|blockId\""
                     }
                   ],
                   "type": "strong"
@@ -336,7 +375,7 @@
     },
     "empty-text": {
       "@type": "slate",
-      "plaintext": "A container can never be empty. When the last child is deleted, a defaultBlockType or a special 'empty' block is inserted. Empty blocks are stripped before saving.",
+      "plaintext": "A container can never be empty. When the last child is deleted, a defaultBlockType or empty block is inserted.",
       "value": [
         {
           "children": [
@@ -367,6 +406,25 @@
             }
           ],
           "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "You can override the look of the '+' button by rendering something inside the empty block and adding "
+            },
+            {
+              "children": [
+                {
+                  "text": "data-block-add=\"button\""
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to it."
+            }
+          ],
+          "type": "p"
         }
       ]
     }
@@ -380,6 +438,8 @@
       "bl-text",
       "ol-heading",
       "ol-text",
+      "typed-ol-heading",
+      "typed-ol-text",
       "render-heading",
       "render-text",
       "table-heading",

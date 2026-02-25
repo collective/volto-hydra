@@ -1,0 +1,574 @@
+{
+  "@id": "/concepts/listings",
+  "@type": "Document",
+  "UID": "concepts-listings-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. Hydra provides two helpers to handle this: staticBlocks and expandListingBlocks.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. Since the query runs client-side, Hydra provides two helpers to handle this:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "staticBlocks(ids, { blocks, paging })"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — returns block objects you can render immediately"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "expandListingBlocks(ids, { blocks, paging, ... })"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — async; fetches query results and returns expanded block objects"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        },
+        {
+          "children": [
+            {
+              "text": "Both take an array of block IDs and return an array of block objects with @uid (the block ID for data-block-uid) and @type (the block type for choosing a renderer). Both accept a shared paging object that gets mutated with page totals."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "sep-1": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "example-heading": {
+      "@type": "slate",
+      "plaintext": "Example: Mixing Listings, Blocks and Paging",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Example: Mixing Listings, Blocks and Paging"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "example-text": {
+      "@type": "slate",
+      "plaintext": "A grid with a mix of listing and other blocks with a single paging at the bottom.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "A grid can have a mix of listing and other blocks but we want it to have a single paging at the bottom. The listings use Suspense so they load client-side:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks } from '@volto-hydra/hydra-js';\n\nfunction Grid({ blocks, blocks_layout, pageNum }) {\n  const paging = { start: pageNum * 6, size: 6 };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        blocks[id]['@type'] === 'listing' ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, apiUrl, contextPath,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?start=${paging.prev * paging.size}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?start=${p.start}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?start=${paging.next * paging.size}`}>Next</a>}\n    </nav>\n  );\n}"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "options-heading": {
+      "@type": "slate",
+      "plaintext": "expandListingBlocks Options",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "expandListingBlocks Options"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "options-text": {
+      "@type": "slate",
+      "plaintext": "Options for expandListingBlocks: blocks, paging, apiUrl, fetcher, contextPath, itemTypeField, defaultItemType, extraCriteria.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "blocks"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Map of blockId to block data"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "paging"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Shared paging object { start, size } (mutated in-place with computed values)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "apiUrl"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Plone site URL for built-in fetch"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "fetcher"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Custom fetch callback (path, body, headers) => Promise<json> (alternative to apiUrl)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "contextPath"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Path for relative queries (default: '/')"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "itemTypeField"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Field on the listing block that holds the item type (default: 'itemType')"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "defaultItemType"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Fallback type when field is not set (default: 'summaryItem')"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "extraCriteria"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Additional query parameters (e.g. facets, search text)"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "itemtype-heading": {
+      "@type": "slate",
+      "plaintext": "Item Type Selection",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Item Type Selection"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "itemtype-text": {
+      "@type": "slate",
+      "plaintext": "Use itemType on the listing block to control what @type expanded items get.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Use "
+            },
+            {
+              "children": [
+                {
+                  "text": "itemType"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " (or variation) on the listing block to control what @type expanded items get. Combined with "
+            },
+            {
+              "children": [
+                {
+                  "text": "inheritSchemaFrom"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": ", the listing's sidebar shows fields from the selected item type:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "listing: {\n    schemaEnhancer: ({ schema }) => {\n        schema.properties.itemType = {\n            title: 'Display as',\n            choices: [['teaser', 'Teaser'], ['card', 'Card']],\n        };\n        return schema;\n    },\n    inheritSchemaFrom: {\n        typeField: 'itemType',\n        blocksField: null,\n    },\n}"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "paging-heading": {
+      "@type": "slate",
+      "plaintext": "Paging Values",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Paging Values"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "paging-text": {
+      "@type": "slate",
+      "plaintext": "You pass { start, size } and both helpers mutate it with computed paging values.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You pass "
+            },
+            {
+              "children": [
+                {
+                  "text": "{ start, size }"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " — both helpers mutate it with computed values:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "currentPage"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number) — Zero-based current page index"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "totalPages"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number) — Total number of pages"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "totalItems"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number) — Total item count across all blocks"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "prev"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number | null) — Previous page index, or null on first page"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "next"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number | null) — Next page index, or null on last page"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "pages"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (array) — Window of ~5 page objects: { start, page } where page is 1-based"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "_ready"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (Promise) — Resolves after all expandListingBlocks calls complete (for async paging UI)"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "notes-heading": {
+      "@type": "slate",
+      "plaintext": "Notes",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Notes"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "notes-text": {
+      "@type": "slate",
+      "plaintext": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "sep-1",
+      "example-heading",
+      "example-text",
+      "options-heading",
+      "options-text",
+      "itemtype-heading",
+      "itemtype-text",
+      "paging-heading",
+      "paging-text",
+      "notes-heading",
+      "notes-text"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Using staticBlocks and expandListingBlocks helpers for listings, paging, and dynamic content",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "listings",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Listings & Dynamic Blocks",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}
