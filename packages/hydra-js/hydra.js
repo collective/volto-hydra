@@ -1581,14 +1581,23 @@ export class Bridge {
         const currentUrlObj = new URL(currentUrl);
         if (window.location.pathname !== currentUrlObj.pathname) {
           const apiPath = this.pathToApiPath(window.location.pathname);
-          log('Sending PATH_CHANGE:', window.location.pathname, '-> apiPath:', apiPath, 'to', this.adminOrigin);
+          // Check if this is in-page navigation (e.g., paging link with data-linkable-allow)
+          const inPageNavTime = sessionStorage.getItem('hydra_in_page_nav_time');
+          const isInPage = inPageNavTime && (Date.now() - parseInt(inPageNavTime, 10)) < 5000;
+          if (isInPage) {
+            sessionStorage.removeItem('hydra_in_page_nav_time');
+          }
+          log('Sending PATH_CHANGE:', window.location.pathname, '-> apiPath:', apiPath, 'inPage:', !!isInPage, 'to', this.adminOrigin);
           window.parent.postMessage(
             {
               type: 'PATH_CHANGE',
               path: apiPath,
+              inPage: !!isInPage,
             },
             this.adminOrigin,
           );
+          // Update lastKnownPath so initBridge re-init won't send a duplicate PATH_CHANGE
+          this.lastKnownPath = window.location.pathname;
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
@@ -9854,11 +9863,18 @@ export function initBridge(adminOriginOrOptions, options = {}) {
     }
     if (bridgeInstance.lastKnownPath && bridgeInstance.lastKnownPath !== currentPath) {
       const apiPath = bridgeInstance.pathToApiPath(currentPath);
-      log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath, '-> apiPath:', apiPath);
-      window.parent.postMessage(
-        { type: 'PATH_CHANGE', path: apiPath },
-        bridgeInstance.adminOrigin,
-      );
+      // Check if this is in-page navigation (paging) — don't send PATH_CHANGE again
+      const inPageNavTime = sessionStorage.getItem('hydra_in_page_nav_time');
+      const isInPage = inPageNavTime && (Date.now() - parseInt(inPageNavTime, 10)) < 5000;
+      if (!isInPage) {
+        log('initBridge: URL changed since last init, sending PATH_CHANGE:', bridgeInstance.lastKnownPath, '->', currentPath, '-> apiPath:', apiPath);
+        window.parent.postMessage(
+          { type: 'PATH_CHANGE', path: apiPath },
+          bridgeInstance.adminOrigin,
+        );
+      } else {
+        log('initBridge: URL changed since last init but in-page nav, skipping PATH_CHANGE');
+      }
     }
     bridgeInstance.lastKnownPath = currentPath;
   }
@@ -10143,8 +10159,8 @@ export function staticBlocks(inputItems, options = {}) {
     }
   }
 
-  // Update total
-  paging.total += paging._seen - startingSeen;
+  // Total is always everything seen so far
+  paging.total = paging._seen;
 
   // Compute paging UI values
   computePagingUI(paging);
@@ -10258,10 +10274,10 @@ export async function expandListingBlocks(inputItems, options = {}) {
     })
   );
 
-  // Compute global total across all blocks (listings + non-listings in this call)
-  let globalTotal = nonListingCount;
+  // Count items contributed by this call (non-listings + listing items_totals)
+  let batchTotal = nonListingCount;
   for (const blockId of listingBlockIds) {
-    globalTotal += listingTotals[blockId];
+    batchTotal += listingTotals[blockId];
   }
 
   // Phase 2: Compute which listings overlap the paging window, fetch only those slices
@@ -10385,8 +10401,9 @@ export async function expandListingBlocks(inputItems, options = {}) {
     }
   }
 
-  // Update paging with global total
-  paging.total = (paging.total || 0) + globalTotal;
+  // Advance _seen by this batch; total is always everything seen
+  paging._seen = (paging._seen || 0) + batchTotal;
+  paging.total = paging._seen;
 
   // Compute paging UI values
   computePagingUI(paging);

@@ -300,6 +300,17 @@ provide('templates', computed(() => data.value?.templates || {}));
 provide('templateState', templateState);  // Shared across all expandTemplatesSync calls
 provide('apiUrl', apiUrl);
 provide('contextPath', contextPath);
+// Reactive pages: re-parses @pg_ segments when route changes (SPA paging navigation)
+provide('pages', computed(() => {
+    const result = {};
+    for (const part of route.params.slug || []) {
+        if (part.startsWith("@pg_")) {
+            const [_, bid, page] = part.split("_");
+            result[bid] = Number(page);
+        }
+    }
+    return result;
+}));
 
 useSeoMeta({
   ogTitle: data.page?.title,

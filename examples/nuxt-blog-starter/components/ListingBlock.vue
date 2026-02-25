@@ -6,6 +6,7 @@
 </template>
 
 <script setup>
+import { inject } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
@@ -19,6 +20,7 @@ const props = defineProps({
 });
 
 const DEFAULT_PAGE_SIZE = 6;
+const injectedPages = inject('pages', {});
 
 // Read facet/search params from URL to pass as extraCriteria
 const route = useRoute();
@@ -33,7 +35,7 @@ for (const [key, value] of Object.entries(route.query)) {
 const ownsPaging = !props.paging;
 const listingPageSize = props.block.b_size || DEFAULT_PAGE_SIZE;
 const listingPage = ownsPaging
-  ? parseInt(route.query[`pg_${props.id}`] || '0', 10)
+  ? ((injectedPages.value || injectedPages)[props.id] || 0)
   : 0;
 const paging = props.paging || { start: listingPage * listingPageSize, size: listingPageSize };
 
@@ -48,6 +50,6 @@ const items = await expandListingBlocks([props.id], {
 let contextPath = props.contextPath;
 const buildPagingUrl = (page) => {
   if (page === 0) return contextPath;
-  return `${contextPath}?pg_${props.id}=${page}`;
+  return `${contextPath}/@pg_${props.id}_${page}`;
 };
 </script>

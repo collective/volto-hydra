@@ -71,7 +71,7 @@
     <div :class="['grid-row grid gap-4 grid-cols-1', ...gridColsClass(block)]">
       <template v-for="entry in gridChildren" :key="entry.id">
         <!-- Listing child: async expand in Suspense, with shared paging -->
-        <Suspense v-if="entry.isListing" :key="`grid-listing-${entry.id}`">
+        <Suspense v-if="entry.isListing" :key="`grid-listing-${entry.id}-pg${gridPageFromUrl}`">
           <ListingBlock :id="entry.id" :block="entry.block" :paging="gridPaging"
             :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
             <template #default="{ items }">
@@ -276,7 +276,7 @@
 
 
   <!-- Listing block: async expansion with own paging (or shared paging from container) -->
-  <Suspense v-else-if="block['@type'] === 'listing'" :key="`listing-${block_uid}`">
+  <Suspense v-else-if="block['@type'] === 'listing'" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}`">
     <ListingBlock :id="block_uid" :block="block" :paging="paging"
       :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
       <template #default="{ items }">
@@ -568,6 +568,7 @@ const injectedApiUrl = inject('apiUrl', '');
 const injectedContextPath = inject('contextPath', '/');
 const injectedTemplates = inject('templates', {});
 const templateState = inject('templateState', {});
+const injectedPages = inject('pages', {});
 
 const props = defineProps({
   block_uid: {
@@ -638,15 +639,14 @@ const expand = (layout, blocks) => expandTemplatesSync(layout, {
 // Grid block: combined paging across all children (mirrors README Grid pattern)
 // Stable object so expandListingBlocks can mutate _ready/_pending/total on it
 const GRID_PAGE_SIZE = 6;
-const gridPageFromUrl = computed(() =>
-  parseInt(route.query[`pg_${block_uid.value}`] || '0', 10)
-);
+const gridPageFromUrl = computed(() => {
+  const pages = injectedPages.value || injectedPages;
+  return pages[block_uid.value] || 0;
+});
 const gridPaging = { start: 0, size: GRID_PAGE_SIZE };
-// Update start when page changes (keeps same object reference)
-watch(gridPageFromUrl, (page) => { gridPaging.start = page * GRID_PAGE_SIZE; }, { immediate: true });
 const gridBuildPagingUrl = (page) => {
   if (page === 0) return effectiveContextPath.value;
-  return `${effectiveContextPath.value}?pg_${block_uid.value}=${page}`;
+  return `${effectiveContextPath.value}/@pg_${block_uid.value}_${page}`;
 };
 
 // Process grid children: listings marked for Suspense, static blocks filtered by paging window
@@ -657,7 +657,8 @@ const LISTING_TYPES = ['listing'];
 const gridChildren = computed(() => {
   const layout = block.value.blocks_layout?.items || [];
   const blocks = block.value.blocks || {};
-  // Reset paging counters for fresh computation (paging object is stable/shared)
+  // Read page number (reactive dependency) and update paging start
+  gridPaging.start = gridPageFromUrl.value * GRID_PAGE_SIZE;
   gridPaging._seen = 0;
   gridPaging.total = 0;
   return layout.map(id => {
