@@ -12,34 +12,22 @@
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
 
-                <!-- Render blocks with template expansion (sync - templates pre-loaded) -->
-                <!-- In edit mode, wait for admin data (with nodeIds) before rendering -->
-                <BlocksRenderer
-                    v-if="data.page?.blocks_layout && shouldRenderBlocks"
-                    :key="JSON.stringify(data.page?.blocks_layout?.items || [])"
-                    :blocks="data.page?.blocks || {}"
-                    :layout="data.page?.blocks_layout?.items || []"
-                    :templates="data.templates || {}"
-                    :allowed-layouts="mainBlocksAllowedLayouts"
-                    v-slot="{ items }"
-                >
-                    <section v-for="styleGroup in groupByStyle(items)" :key="styleGroup.key" :class="styleGroup.style">
+                <!-- Render blocks: template expansion in computed, style grouping, then BlocksRenderer per group -->
+                <template v-if="data.page?.blocks_layout && shouldRenderBlocks">
+                    <section v-for="styleGroup in mainStyleGroups" :key="styleGroup.key" :class="styleGroup.style">
                         <div class="flex justify-between px-4 mx-auto max-w-screen-xl">
                             <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                                <template v-for="block in styleGroup.blocks" :key="block['@uid']">
-                                    <!-- Listing blocks: expand async with paging -->
-                                    <div v-if="block['@type'] === 'listing'" class="mx-auto max-w-4xl">
-                                        <BlockExpander :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                                    </div>
-                                    <!-- Static blocks: render immediately -->
-                                    <div v-else class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
-                                        <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                                    </div>
-                                </template>
+                                <BlocksRenderer :items="styleGroup.blocks" :data="data.page" :api-url="apiUrl">
+                                    <template #item="{ item }">
+                                        <div class="mx-auto" :class="{'max-w-4xl': item['@type'] !== 'slider'}">
+                                            <Block :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+                                        </div>
+                                    </template>
+                                </BlocksRenderer>
                             </div>
                         </div>
                     </section>
-                </BlocksRenderer>
+                </template>
 
                 <div v-else-if="data?.page">
                     <h1>{{ data.page?.title }}</h1>
@@ -66,17 +54,9 @@
                 :layout="data.page?.footer_blocks?.items || []"
                 :templates="data.templates || {}"
                 :allowed-layouts="footerAllowedLayouts"
-                v-slot="{ items }"
-            >
-                <template v-for="block in items" :key="block['@uid']">
-                    <!-- Listing blocks: expand async with paging -->
-                    <BlockExpander v-if="block['@type'] === 'listing'"
-                           :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                    <!-- Static blocks: render immediately -->
-                    <Block v-else
-                           :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                </template>
-            </BlocksRenderer>
+                :data="data.page"
+                :api-url="apiUrl"
+            />
         </div>
         <!-- Static footer content -->
         <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
@@ -97,8 +77,8 @@
 
 <script setup>
 
-import { ref, computed, provide } from 'vue';
-import { initBridge } from '@hydra-js/hydra.js';
+import { ref, computed, provide, inject } from 'vue';
+import { initBridge, expandTemplatesSync, isEditMode } from '@hydra-js/hydra.js';
 import { sharedBlocksConfig } from '@test-fixtures/shared-block-schemas.js';
 import { useRuntimeConfig } from "#imports"
 
@@ -160,6 +140,48 @@ function groupByStyle(items) {
     }
     return groups;
 }
+
+// Shared templateState for all expandTemplatesSync calls (page + nested containers)
+const templateState = {};
+
+// Template expansion for main blocks (page-level only, because of style grouping)
+function syncLoadTemplate(templateId) {
+    const tplPath = templateId.startsWith('http')
+        ? new URL(templateId).pathname
+        : `/${templateId.replace(/^\//, '')}`;
+    const url = `${apiUrl}${tplPath}`;
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.send();
+    if (xhr.status === 200) {
+        return JSON.parse(xhr.responseText);
+    }
+    throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
+}
+
+const mainExpandedItems = computed(() => {
+    const layout = data.value?.page?.blocks_layout?.items || [];
+    const blocks = data.value?.page?.blocks || {};
+    if (!layout.length) return [];
+
+    if (isEditMode()) {
+        return layout.map(id => {
+            const block = blocks[id];
+            return block ? { ...block, '@uid': id } : null;
+        }).filter(Boolean);
+    }
+
+    return expandTemplatesSync(layout, {
+        blocks,
+        templateState,
+        templates: data.value?.templates || {},
+        allowedLayouts: mainBlocksAllowedLayouts.value,
+        loadTemplate: syncLoadTemplate,
+    });
+});
+
+const mainStyleGroups = computed(() => groupByStyle(mainExpandedItems.value));
 
 // Initialize Flowbite components based on data attribute selectors.
 // Safe to call initFlowbite() (which includes initCarousels) because block.vue
@@ -278,7 +300,7 @@ const { data, error } = await ploneApi({
 
 // Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)
 provide('templates', computed(() => data.value?.templates || {}));
-provide('templateState', {});  // Shared across all expandTemplatesSync calls
+provide('templateState', templateState);  // Shared across all expandTemplatesSync calls
 provide('apiUrl', apiUrl);
 provide('contextPath', contextPath);
 

@@ -48,7 +48,7 @@ const props = defineProps({
   contained: { type: Boolean, default: false },
 });
 
-const LISTING_TYPES = ['listing', 'gridBlock'];
+const LISTING_TYPES = ['listing'];
 
 let contextPath = props.data['@id'] || '/';
 if (contextPath.startsWith('http')) contextPath = new URL(contextPath).pathname;

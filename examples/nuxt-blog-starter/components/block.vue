@@ -69,14 +69,14 @@
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
        class="mt-6 mb-6 rounded-lg" :style="gridBgStyle(block)">
     <div :class="['grid-row grid gap-4 grid-cols-1', ...gridColsClass(block)]">
-      <BlockExpander :block_uid="block_uid" :block="block"
-        :data="data" :api-url="effectiveApiUrl" :contained="true">
+      <BlocksRenderer :blocks="block.blocks || {}" :layout="block.blocks_layout?.items || []"
+        :data="data" :api-url="effectiveApiUrl" :block_uid="block_uid" :contained="true">
         <template #item="{ item }">
           <Block :block_uid="item['@uid']" :block="item" :data="data"
                  :contained="true" class="grid-cell p-4"
                  :style="!block.styles?.backgroundColor ? { backgroundColor: '#f1f5f9' } : {}" />
         </template>
-      </BlockExpander>
+      </BlocksRenderer>
     </div>
   </div>
 
@@ -87,13 +87,12 @@
 
     <!-- Top images row - horizontal layout for images above columns -->
     <div v-if="block.top_images?.items?.length" class="top-images-row flex gap-4 mb-4">
-      <BlockExpander
-        :items="expandTemplatesSync(block.top_images?.items || [], { blocks: block.blocks || {}, templateState, templates })"
+      <BlocksRenderer :blocks="block.blocks || {}" :layout="block.top_images?.items || []"
         :data="data" :api-url="effectiveApiUrl" :contained="true">
         <template #item="{ item }">
           <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" data-block-add="right" />
         </template>
-      </BlockExpander>
+      </BlocksRenderer>
     </div>
 
     <!-- Columns row - horizontal layout -->
@@ -105,8 +104,7 @@
         <h4 v-if="block.blocks?.[columnId]?.title" data-edit-text="title"
             class="column-title mb-2 text-sm font-medium">{{ block.blocks[columnId].title }}</h4>
         <!-- Column content blocks -->
-        <BlockExpander
-          :items="expandTemplatesSync(block.blocks?.[columnId]?.blocks_layout?.items || [], { blocks: block.blocks?.[columnId]?.blocks || {}, templateState, templates })"
+        <BlocksRenderer :blocks="block.blocks?.[columnId]?.blocks || {}" :layout="block.blocks?.[columnId]?.blocks_layout?.items || []"
           :data="data" :api-url="effectiveApiUrl" :contained="true" />
       </div>
     </div>
@@ -240,8 +238,7 @@
         :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
         :aria-controls="`accordion-collapse-body-${block_uid}`">
         <span>
-          <BlockExpander
-            :items="expandTemplatesSync(block.header?.items || [], { blocks: block.blocks || {}, templateState, templates })"
+          <BlocksRenderer :blocks="block.blocks || {}" :layout="block.header?.items || []"
             :data="data" :api-url="effectiveApiUrl" />
         </span>
         <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
@@ -253,8 +250,7 @@
     </h2>
     <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
       <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-        <BlockExpander
-          :items="expandTemplatesSync(block.content?.items || [], { blocks: block.blocks || {}, templateState, templates })"
+        <BlocksRenderer :blocks="block.blocks || {}" :layout="block.content?.items || []"
           :data="data" :api-url="effectiveApiUrl" />
       </div>
     </div>
@@ -349,8 +345,7 @@
 
       <!-- Results -->
       <div class="search-results">
-        <BlockExpander
-          :items="expandTemplatesSync(block.listing?.items || [], { blocks: block.blocks || {}, templateState, templates })"
+        <BlocksRenderer :blocks="block.blocks || {}" :layout="block.listing?.items || []"
           :data="data" :api-url="effectiveApiUrl" />
       </div>
     </template>
@@ -424,8 +419,7 @@
               </select>
             </div>
           </div>
-          <BlockExpander
-            :items="expandTemplatesSync(block.listing?.items || [], { blocks: block.blocks || {}, templateState, templates })"
+          <BlocksRenderer :blocks="block.blocks || {}" :layout="block.listing?.items || []"
             :data="data" :api-url="effectiveApiUrl" />
         </div>
       </div>
@@ -533,12 +527,9 @@
 </template>
 <script setup>
 import { ref, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
-import { expandTemplatesSync, staticBlocks, isEditMode } from '@hydra-js/hydra.js';
 import RichText from './richtext.vue';
 
 // Inject page-level context for nested components
-const templates = inject('templates', {});
-const templateState = inject('templateState', {});
 const injectedApiUrl = inject('apiUrl', '');
 const injectedContextPath = inject('contextPath', '/');
 
@@ -568,6 +559,7 @@ const props = defineProps({
 
 // Use toRefs to maintain reactivity (destructuring props directly can lose reactivity in Vue 3)
 const { block_uid, block, data, contained, apiUrl } = toRefs(props);
+
 
 // Use prop apiUrl if provided, otherwise injected value
 const effectiveApiUrl = computed(() => apiUrl.value || injectedApiUrl);
