@@ -4220,7 +4220,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     await helper.login();
     await helper.navigateToEdit('/search-test-page');
-    await helper.getStableBlockCount();
+    const initialBlockCount = await helper.getStableBlockCount();
 
     // Select the search block
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
@@ -4237,6 +4237,9 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     // Add a new selectFacet via sidebar
     await helper.addBlockViaSidebar('Facets', 'Select');
 
+    // Wait for new facet to appear in iframe (ensures iframe state is synced)
+    await helper.waitForBlockCountToBe(initialBlockCount + 1);
+
     // Wait for the new facet to be selected (sidebar shows its form)
     await helper.waitForSidebarCurrentBlock('Facet');
 
@@ -4245,9 +4248,9 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await expect(sidebar.locator('label').filter({ hasText: 'Multiple choices?' })).not.toBeVisible();
     await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
 
-    // Escape back to search block
-    await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar('search-block-1');
+    // Navigate back to search block by clicking current block's parent-nav (goes to parent)
+    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await helper.waitForSidebarCurrentBlock('Search');
 
     await expect(facetItems).toHaveCount(4, { timeout: 5000 });
   });
@@ -4306,8 +4309,8 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await expect(sidebar.locator('label').filter({ hasText: 'Hide facet?' })).toBeVisible({ timeout: 3000 });
     await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
 
-    // Navigate back to search block to verify count
-    await page.keyboard.press('Escape');
+    // Navigate back to search block by clicking current block's parent-nav (goes to parent)
+    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     // Re-scope facets section after navigating back
@@ -4343,9 +4346,8 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     // After deleting facet-state, selection should move to previous sibling (facet-type)
     await helper.waitForQuantaToolbar('facet-type');
 
-    // Navigate back to search to verify facet count
-    await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar('search-block-1');
+    // Navigate back to search by clicking current block's parent-nav
+    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     const updatedFacetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
