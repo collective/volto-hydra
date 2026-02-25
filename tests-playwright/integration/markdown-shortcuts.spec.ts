@@ -395,14 +395,14 @@ test.describe('Markdown Shortcuts', () => {
 
       // Move cursor to "beta" (second item) — click on it directly
       await block.locator('ul li', { hasText: 'beta' }).click();
+      await helper.waitForBlockSelected(blockId);
 
       // Shift+Tab on top-level item should split into 3 blocks:
       // 1) list with "alpha", 2) paragraph "beta", 3) list with "gamma"
       await editor.press('Shift+Tab');
 
       // Block count should increase by 2 (1 block → 3 blocks)
-      const afterBlocks = await helper.getStableBlockCount();
-      expect(afterBlocks).toBe(initialBlocks + 2);
+      await helper.waitForBlockCountToBe(initialBlocks + 2);
 
       // The original block should now be a list with just "alpha"
       await expect(block.locator('ul li')).toHaveCount(1, { timeout: 5000 });

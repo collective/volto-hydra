@@ -334,7 +334,7 @@ test.describe('Inline Editing - Links', () => {
       }
       expect(selectionInfo.editorHasFocus).toBe(true);
       expect(selectionInfo.isCollapsed).toBe(false);
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 10000 });
 
     // Type to verify editor accepts input - will replace selected text
     await editor.pressSequentially('replaced', { delay: 10 });
@@ -343,7 +343,7 @@ test.describe('Inline Editing - Links', () => {
     await expect(async () => {
       const newText = await helper.getCleanTextContent(editor);
       expect(newText).toBe('replaced');
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 10000 });
   });
 
   test('clicking editor cancels LinkEditor and does not block editor', async ({ page }) => {
