@@ -4669,6 +4669,20 @@ export class Bridge {
         // Replay keystrokes buffered during re-render (separate from format op replay)
         if (this._reRenderBlocking) {
           this._reRenderBlocking = false;
+
+          // Restore pre-render cursor position when no transformedSelection was
+          // provided (sidebar-originated FORM_DATA). The DOM re-render may reset
+          // cursor to position 0; we need to put it back before replaying events.
+          if (!transformedSelection && this._preRenderSelection) {
+            log('Restoring pre-render selection for buffer replay:', JSON.stringify(this._preRenderSelection));
+            try {
+              await this.restoreSlateSelection(this._preRenderSelection, this.formData);
+            } catch (e) {
+              log('Pre-render selection restore failed:', e.message);
+            }
+          }
+          this._preRenderSelection = null;
+
           if (this.eventBuffer.length > 0) {
             log('Replaying', this.eventBuffer.length, 're-render buffered events');
             this.pendingBufferReplay = {
@@ -7471,6 +7485,11 @@ export class Bridge {
       this._ensureDocumentKeyboardBlocker();
       this.blockedBlockId = this.selectedBlockUid;
       this._reRenderBlocking = true;
+      // Save cursor position before re-render so we can restore it when
+      // no transformedSelection is provided (e.g. sidebar-originated FORM_DATA).
+      // Without this, the browser resets cursor to position 0 after DOM
+      // replacement and buffered keystrokes replay at the wrong position.
+      this._preRenderSelection = this.savedSelection;
     }
 
     // Disconnect MutationObserver before rendering. The framework

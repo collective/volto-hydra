@@ -162,16 +162,11 @@ export class AdminUIHelper {
       const editButton = this.page.locator('#toolbar a.edit, #toolbar [aria-label="Edit"]');
       await editButton.click({ timeout: 5000 });
     } else {
-      // Use React Router to navigate client-side (avoids SSR)
+      // Client-side navigation via pushState + popstate.
+      // connected-react-router's history library listens for popstate events.
       await this.page.evaluate((path) => {
-        // @ts-ignore - window.__APP_HISTORY__ is set by Volto
-        if (window.__HISTORY__) {
-          window.__HISTORY__.push(path);
-        } else {
-          // Fallback to pushState + popstate event
-          window.history.pushState({}, '', path);
-          window.dispatchEvent(new PopStateEvent('popstate'));
-        }
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
       }, editPath);
     }
 
@@ -202,15 +197,10 @@ export class AdminUIHelper {
     // Prepend content prefix (e.g., /_test_data) for test content paths
     contentPath = `${this.contentPrefix}${contentPath}`;
 
-    // Use React Router to navigate client-side
+    // Client-side navigation via pushState + popstate
     await this.page.evaluate((path) => {
-      // @ts-ignore - window.__HISTORY__ is set by Volto
-      if (window.__HISTORY__) {
-        window.__HISTORY__.push(path);
-      } else {
-        window.history.pushState({}, '', path);
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      }
+      window.history.pushState({}, '', path);
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }, contentPath);
 
     // Wait for the URL to change
