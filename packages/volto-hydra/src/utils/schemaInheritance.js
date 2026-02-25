@@ -1513,7 +1513,7 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     const targetMappings = targetConfig?.fieldMappings;
     const newData = { [typeFieldName]: toType };
     // Apply mappings: source-specific first, then default as fallback
-    const mappings = { ...targetMappings?.default, ...targetMappings?.[fromType] };
+    const mappings = { ...targetMappings?.['@default'], ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
       if (canonicalData[sourceField] !== undefined) {
         newData[targetField] = canonicalData[sourceField];

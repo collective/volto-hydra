@@ -4673,7 +4673,9 @@ export class Bridge {
           // Restore pre-render cursor position when no transformedSelection was
           // provided (sidebar-originated FORM_DATA). The DOM re-render may reset
           // cursor to position 0; we need to put it back before replaying events.
-          if (!transformedSelection && this._preRenderSelection) {
+          // Skip when focus is in the sidebar (skipFocus=true) — restoring selection
+          // calls .focus() inside the iframe which steals focus from the sidebar field.
+          if (!transformedSelection && this._preRenderSelection && !skipFocus) {
             log('Restoring pre-render selection for buffer replay:', JSON.stringify(this._preRenderSelection));
             try {
               await this.restoreSlateSelection(this._preRenderSelection, this.formData);
@@ -10238,6 +10240,10 @@ export async function expandListingBlocks(inputItems, options = {}) {
     (blockId) => !listingBlockIds.includes(blockId)
   ).length;
 
+  // Account for items already counted by prior staticBlocks calls on the same paging object.
+  // staticBlocks increments paging._seen for each static block it processes.
+  const priorSeen = paging._seen || 0;
+
   // Phase 1: Get totals from all listings in parallel
   const listingTotals = {};
   await Promise.all(
@@ -10252,15 +10258,15 @@ export async function expandListingBlocks(inputItems, options = {}) {
     })
   );
 
-  // Compute global total across all blocks (listings + non-listings)
+  // Compute global total across all blocks (listings + non-listings in this call)
   let globalTotal = nonListingCount;
   for (const blockId of listingBlockIds) {
     globalTotal += listingTotals[blockId];
   }
 
   // Phase 2: Compute which listings overlap the paging window, fetch only those slices
-  // Walk the blocks in layout order, tracking global position
-  let globalPos = 0;
+  // Walk the blocks in layout order, tracking global position (starting after prior items)
+  let globalPos = priorSeen;
   const fetchPlan = []; // { blockId, localStart, localSize }
 
   for (const blockId of blocksLayout) {
@@ -10302,7 +10308,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
   // Build items array — walk layout in order, emitting items that fall in the page window
   const items = [];
-  globalPos = 0;
+  globalPos = priorSeen;
 
   for (const blockId of blocksLayout) {
     const block = blocks[blockId];
