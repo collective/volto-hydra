@@ -1404,12 +1404,17 @@ app.post('*/@querystring-search', (req, res) => {
         });
       }
     } else if (index === 'path' && operation.includes('relativePath')) {
-      // Filter by relative path from context
-      const fullPath = contextPath + (value || '');
+      // Filter by relative path from context.
+      // '.' means current context, '..' means parent, etc.
+      let relValue = value || '';
+      if (relValue === '.' || relValue === '') {
+        relValue = '';
+      }
+      const fullPath = (contextPath + (relValue ? '/' + relValue : '')).replace(/\/+/g, '/');
       if (fullPath !== '/') {
         allItems = allItems.filter((item) => {
           const itemPath = new URL(item['@id']).pathname;
-          return itemPath.startsWith(fullPath);
+          return itemPath.startsWith(fullPath + '/');
         });
       }
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
@@ -1431,7 +1436,19 @@ app.post('*/@querystring-search', (req, res) => {
   }
 
   // Sort items
-  if (sort_on) {
+  if (sort_on === 'getObjPositionInParent') {
+    // Folder order: sort by position among siblings in contentDirMap.
+    // contentDirMap keys are in filesystem scan order (alphabetical).
+    const allPaths = Object.keys(contentDirMap);
+    allItems.sort((a, b) => {
+      const aPath = new URL(a['@id']).pathname;
+      const bPath = new URL(b['@id']).pathname;
+      const aIdx = allPaths.indexOf(aPath);
+      const bIdx = allPaths.indexOf(bPath);
+      const cmp = aIdx - bIdx;
+      return sort_order === 'descending' ? -cmp : cmp;
+    });
+  } else if (sort_on) {
     allItems.sort((a, b) => {
       const aVal = a[sort_on] || '';
       const bVal = b[sort_on] || '';
@@ -1948,26 +1965,29 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`Mock Plone API server running on http://localhost:${PORT}`);
-  console.log(`Mock frontend server also running on http://localhost:${PORT}`);
-  console.log(`Health endpoint: http://localhost:${PORT}/health`);
-  console.log(`Content endpoints available:`);
-  console.log(`  - http://localhost:${PORT}/`);
-  Object.keys(contentDirMap).forEach((urlPath) => {
-    console.log(`  - http://localhost:${PORT}${urlPath}`);
+// Start server only when run directly (not when require()'d by tests)
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`Mock Plone API server running on http://localhost:${PORT}`);
+    console.log(`Mock frontend server also running on http://localhost:${PORT}`);
+    console.log(`Health endpoint: http://localhost:${PORT}/health`);
+    console.log(`Content endpoints available:`);
+    console.log(`  - http://localhost:${PORT}/`);
+    Object.keys(contentDirMap).forEach((urlPath) => {
+      console.log(`  - http://localhost:${PORT}${urlPath}`);
+    });
   });
-});
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
   });
-});
+}
 
-// Export the HTTP server instance (not the Express app) for proper teardown
-module.exports = server;
+// Export app for testing, server for direct-run teardown
+module.exports = { app, server };

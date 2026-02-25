@@ -1234,6 +1234,31 @@ A listing block fetches content from the server (e.g. latest news) and renders e
 
 Both take an array of block IDs and return an array of block objects with `@uid` (the block ID for `data-block-uid`) and `@type` (the block type for choosing a renderer). Both accept a shared `paging` object that gets mutated with page totals.
 
+### How expandListingBlocks works
+
+`expandListingBlocks` has two stages: **fetching** and **mapping**. The fetch stage is Plone-specific; the mapping stage is generic.
+
+**Stage 1 — Fetch (Plone-specific)**
+
+For each listing block, `buildQuerystringSearchBody` constructs a Plone `@querystring-search` POST body from the block's `querystring` config. This is Plone REST API specific:
+
+- Query operators like `plone.app.querystring.operation.string.relativePath`
+- Sort fields like `getObjPositionInParent` (Plone folder order) and `effective` (publication date)
+- Facet filters pushed as `plone.app.querystring.operation.selection.any`
+- Metadata fields requested via `metadata_fields: '_all'`
+
+If the listing has no `querystring`, it defaults to Plone's folder listing: `relativePath: '.'` sorted by `getObjPositionInParent` ascending — matching Plone's behavior for unconfigured listing blocks.
+
+To replace the Plone fetch with your own backend, pass a `fetcher` callback instead of `apiUrl`. The fetcher receives `(path, body, headers)` and must return `{ items: [...] }` where each item has the fields referenced in `fieldMapping` (typically `@id`, `title`, `description`, `image_scales`, `image_field`).
+
+**Stage 2 — Mapping (generic)**
+
+After fetching, each query result is converted to a block object using `fieldMapping` (a simple source→target field map stored on the listing block data). This stage has no Plone dependencies — it just copies fields:
+
+- Each result becomes a block with `@type` set to the listing's item type (`variation` field, default `summaryItem`)
+- `fieldMapping` keys are source fields from query results, values are target fields on the block
+- Special handling for `image` source (copies `@id`, `image_field`, `image_scales` as a catalog brain structure) and `href` target (wraps in `[{ '@id': value }]` array format)
+- `itemDefaults` (from the listing's `itemDefaults_*` flat keys) are spread onto each item block
 
 ### Example: Mixing listings, blocks and paging.
 
@@ -1300,27 +1325,42 @@ See [BlockExpander.vue](./examples/nuxt-blog-starter/components/BlockExpander.vu
 |--------|---------|-------------|
 | `blocks` | — | Map of blockId to block data |
 | `paging` | — | Shared paging object `{ start, size }` (mutated in-place with computed values — see below) |
-| `apiUrl` | — | Plone site URL for built-in fetch |
-| `fetcher` | — | Custom fetch callback `(path, body, headers) => Promise<json>` (alternative to apiUrl) |
-| `contextPath` | `'/'` | Path for relative queries |
+| `apiUrl` | — | Plone site URL for built-in fetch (Plone-specific) |
+| `fetcher` | — | Custom fetch callback `(path, body, headers) => Promise<{ items }>` (use this for non-Plone backends) |
+| `contextPath` | `'/'` | Path for relative queries (used by `buildQuerystringSearchBody`) |
 | `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
 | `defaultItemType` | `'summaryItem'` | Fallback type when field is not set |
-| `extraCriteria` | `{}` | Additional query parameters (e.g. facets, search text) |
+| `extraCriteria` | `{}` | Additional query parameters — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys (Plone-specific format) |
 
-### Item type selection
+### Item type and field mapping
 
-Use `itemType` (or `variation`) on the listing block to control what `@type` expanded items get. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:
+Each expanded listing item gets `@type` from the listing block's `variation` field (or `itemType` — controlled by `itemTypeField` option), defaulting to `'summaryItem'`. The item's fields are populated from query results via the listing block's `fieldMapping`.
+
+The admin UI computes `fieldMapping` automatically from the selected item type's `fieldMappings['@default']` (see [Block conversion](#block-conversion)). For example, selecting `summaryItem` as the variation auto-populates:
+
+```json
+"fieldMapping": { "@id": "href", "title": "title", "description": "description", "image": "image" }
+```
+
+This mapping is saved to the block data, so `expandListingBlocks` can apply it without access to the block registry. Each key is a source field from the query result, each value is the target field on the item block.
+
+**Built-in item types:**
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `defaultItem` | `title`, `description`, `href` | Title + description |
+| `summaryItem` | `title`, `description`, `href`, `image` | Title + description + image thumbnail |
+| `teaser` | `title`, `description`, `href`, `preview_image` | Full teaser card |
+
+You can add custom item types or use `inheritSchemaFrom` to let editors choose:
 
 ```js
 listing: {
-  schemaEnhancer: ({ schema }) => {
-    schema.properties.itemType = {
-      title: 'Display as',
-      choices: [['teaser', 'Teaser'], ['card', 'Card']],
-    };
-    return schema;
-  },
-  inheritSchemaFrom: { typeField: 'itemType', blocksField: null },
+  schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
+    filterConvertibleFrom: '@default',
+    title: 'Item Type',
+    default: 'summaryItem',
+  }),
 }
 ```
 
@@ -1341,6 +1381,9 @@ You pass `{ start, size }` — both helpers mutate it with computed values:
 ### Notes
 
 - Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
+- `fieldMapping` must be persisted in the block data. The admin UI computes it from the item type's `fieldMappings['@default']` and saves it. Without a saved `fieldMapping`, `expandListingBlocks` cannot map query result fields to item block fields (it has no access to the block registry in view mode).
+- A listing with no `querystring` defaults to showing current folder contents in folder order (Plone: `relativePath: '.'`, `sort_on: 'getObjPositionInParent'`).
+- `buildQuerystringSearchBody` is exported separately if you need to inspect or modify the Plone query body before fetching.
 
 ## Templates
 

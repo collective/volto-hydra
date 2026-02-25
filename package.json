@@ -26,6 +26,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
+    "test:api": "node --test tests-playwright/fixtures/mock-api-server.test.js",
     "lint": "eslint --max-warnings=0 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "lint:fix": "eslint --fix 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "prettier": "prettier --check 'packages/**/src/**/*.{js,jsx,ts,tsx}'",

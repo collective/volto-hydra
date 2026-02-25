@@ -483,6 +483,30 @@
     </div>
   </section>
 
+  <!-- Default listing item: title + description -->
+  <div v-else-if="block['@type'] == 'defaultItem'" :data-block-uid="block_uid"
+       class="default-item-block py-4 border-b border-gray-200">
+    <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
+      <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
+    </NuxtLink>
+    <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm">{{ block.description }}</p>
+  </div>
+
+  <!-- Summary listing item: image thumbnail + title + description -->
+  <div v-else-if="block['@type'] == 'summaryItem'" :data-block-uid="block_uid"
+       class="summary-item-block py-4 border-b border-gray-200 flex items-start gap-4">
+    <template v-if="block.image" v-for="props in [imageProps(block.image)]" :key="props.url">
+      <NuxtImg v-if="props.url" :src="props.url" alt=""
+        class="w-20 h-16 object-cover rounded shrink-0" />
+    </template>
+    <div class="flex-1">
+      <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
+        <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
+      </NuxtLink>
+      <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm">{{ block.description }}</p>
+    </div>
+  </div>
+
   <!-- Empty block - placeholder for deleted blocks in containers -->
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
   </div>

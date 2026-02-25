@@ -53,7 +53,7 @@ export const sharedBlocksConfig = {
             required: [],
         },
         fieldMappings: {
-            default: {
+            '@default': {
                 'title': 'heading',
                 'description': 'subheading',
                 '@id': 'buttonLink',

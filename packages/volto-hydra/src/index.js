@@ -214,10 +214,10 @@ const applyConfig = (config) => {
     // inheritSchemaFrom creates the variation field with computed choices
     // and adds the inherited_fields fieldset (item type defaults, etc.)
     // blocksField: '..' derives choices from sibling allowed types
-    // filterConvertibleFrom: 'default' filters to types with fieldMappings.default
+    // filterConvertibleFrom: '@default' filters to types with fieldMappings['@default']
     schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
       blocksField: '..',
-      filterConvertibleFrom: 'default',
+      filterConvertibleFrom: '@default',
       title: 'Item Type',
       default: 'summaryItem',
     })({
@@ -241,7 +241,7 @@ const applyConfig = (config) => {
     typeField: 'variation',
     defaultsField: 'itemDefaults',
     blocksField: '..',
-    filterConvertibleFrom: 'default',
+    filterConvertibleFrom: '@default',
   };
   config.blocks.blocksConfig.listing = {
     ...config.blocks.blocksConfig.listing,
@@ -278,7 +278,7 @@ const applyConfig = (config) => {
       };
     },
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+      '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
       // Converting from teaser block
       teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
     },
@@ -302,7 +302,7 @@ const applyConfig = (config) => {
       required: [],
     }),
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'title', 'description': 'description' },
+      '@default': { '@id': 'href', 'title': 'title', 'description': 'description' },
     },
   };
 
@@ -325,7 +325,7 @@ const applyConfig = (config) => {
       required: [],
     }),
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
+      '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
     },
   };
 
@@ -333,7 +333,7 @@ const applyConfig = (config) => {
   config.blocks.blocksConfig.teaser = {
     ...config.blocks.blocksConfig.teaser,
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+      '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
       // Converting from image block
       image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
     },
@@ -350,7 +350,7 @@ const applyConfig = (config) => {
   // Identity mapping — all facet types share the same core fields (title, field, hidden)
   // Enables "Convert to..." menu in toolbar dropdown
   const facetFieldMappings = {
-    default: { title: 'title', field: 'field', hidden: 'hidden' },
+    '@default': { title: 'title', field: 'field', hidden: 'hidden' },
   };
 
   config.blocks.blocksConfig.checkboxFacet = {

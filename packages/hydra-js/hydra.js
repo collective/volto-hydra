@@ -9967,20 +9967,24 @@ export function getAuthHeaders() {
 export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriteria = {}) {
   const { b_start = 0, b_size = 10 } = paging;
 
-  // Ensure query array exists with default if empty
-  let query = queryConfig?.query;
-  if (!query || !Array.isArray(query) || query.length === 0) {
-    // Default: search from root path
+  // When no queryConfig at all (listing with no querystring configured),
+  // default to current folder contents in folder order — matching Plone's
+  // behavior for unconfigured listing blocks.
+  const hasQuery = queryConfig?.query && Array.isArray(queryConfig.query) && queryConfig.query.length > 0;
+
+  let query;
+  if (hasQuery) {
+    // Clone to avoid mutations
+    query = [...queryConfig.query];
+  } else {
+    // Default: relative path "." = current context's children
     query = [
       {
         i: 'path',
-        o: 'plone.app.querystring.operation.string.absolutePath',
-        v: '/',
+        o: 'plone.app.querystring.operation.string.relativePath',
+        v: '.',
       },
     ];
-  } else {
-    // Clone to avoid mutations
-    query = [...query];
   }
 
   // Merge extraCriteria into query
@@ -10004,10 +10008,14 @@ export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriter
     }
   }
 
+  // Default sort: folder order for unconfigured listings, effective date for configured ones
+  const defaultSort = hasQuery ? 'effective' : 'getObjPositionInParent';
+  const defaultOrder = hasQuery ? 'descending' : 'ascending';
+
   const body = {
     query,
-    sort_on: extraCriteria.sort_on || queryConfig?.sort_on || 'effective',
-    sort_order: extraCriteria.sort_order || queryConfig?.sort_order || 'descending',
+    sort_on: extraCriteria.sort_on || queryConfig?.sort_on || defaultSort,
+    sort_order: extraCriteria.sort_order || queryConfig?.sort_order || defaultOrder,
     b_start,
     b_size,
     metadata_fields: '_all',
@@ -10220,9 +10228,10 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
   const listingResults = {}; // Store fetched results per listing
 
-  // Find all listing blocks that need expansion and fetch in parallel
+  // Find all listing blocks that need expansion and fetch in parallel.
+  // Listings without a querystring default to showing current folder contents.
   const listingBlockIds = blocksLayout.filter(
-    (blockId) => blocks[blockId]?.['@type'] === 'listing' && blocks[blockId]?.querystring?.query
+    (blockId) => blocks[blockId]?.['@type'] === 'listing'
   );
 
   // Register listing blocks as readonly on bridge (if editing)

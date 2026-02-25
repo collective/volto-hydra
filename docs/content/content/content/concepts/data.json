@@ -25,7 +25,13 @@
       "@type": "listing",
       "headlineTag": "h2",
       "styles": {},
-      "variation": "default"
+      "variation": "summaryItem",
+      "fieldMapping": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image"
+      }
     }
   },
   "blocks_layout": {

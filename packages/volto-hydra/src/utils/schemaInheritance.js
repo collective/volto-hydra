@@ -234,7 +234,7 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  * @example
  * // In block config:
  * schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
- *   filterConvertibleFrom: 'default',
+ *   filterConvertibleFrom: '@default',
  *   title: 'Item Type',
  *   default: 'summaryItem',
  * })
@@ -662,11 +662,11 @@ export const QUERY_RESULT_FIELDS = {
 export function computeSmartDefaults(sourceFields, targetSchema, declaredMappings) {
   if (!targetSchema?.properties) return {};
 
-  // If declared mappings are provided, use them (merge default + any source-specific)
-  if (declaredMappings?.default || declaredMappings) {
-    // If declaredMappings has a 'default' key, it's the full fieldMappings object
+  // If declared mappings are provided, use them (merge @default + any source-specific)
+  if (declaredMappings?.['@default'] || declaredMappings) {
+    // If declaredMappings has a '@default' key, it's the full fieldMappings object
     // Otherwise it's just the default mapping directly
-    const mappings = declaredMappings.default || declaredMappings;
+    const mappings = declaredMappings['@default'] || declaredMappings;
     // Only return mappings where the target field exists in the target schema
     const validMappings = {};
     for (const [sourceField, targetField] of Object.entries(mappings)) {
@@ -1002,7 +1002,7 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  *
  * Combined example:
  *   {
- *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults', filterConvertibleFrom: 'default' },
+ *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults', filterConvertibleFrom: '@default' },
  *     skiplogic: { advancedOptions: { field: 'mode', is: 'advanced' } },
  *   }
  *
@@ -1261,7 +1261,7 @@ function createSingleEnhancerLegacy(recipe) {
  * @param {Object} options - Configuration options
  * @param {string[]} options.allowedBlocks - Static list of allowed types
  * @param {string} options.blocksField - Container field name to derive allowedBlocks from (e.g., 'blocks')
- * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., 'default')
+ * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., '@default')
  * @param {Object} blocksConfig - Block configuration registry
  * @param {Object} blockPathMap - Block path map (optional, for allowedSiblingTypes)
  * @param {string} blockId - Current block ID (optional, for allowedSiblingTypes)
@@ -1385,7 +1385,7 @@ export function getConvertibleTypes(sourceType, blocksConfig) {
       if (visited.has(blockType)) continue;
       const fieldMappings = blockConfig.fieldMappings;
       // Can convert to this type if it has mapping for current type OR default
-      if (fieldMappings?.[currentType] || fieldMappings?.default) {
+      if (fieldMappings?.[currentType] || fieldMappings?.['@default']) {
         reachable.add(blockType);
         visited.add(blockType);
         // Only continue BFS if this type also has fieldMappings (can be a stepping stone)
@@ -1428,7 +1428,7 @@ function findConversionPath(sourceType, targetType, blocksConfig) {
       const fieldMappings = blockConfig.fieldMappings;
       if (fieldMappings?.[currentType]) {
         directTargets.push(blockType);
-      } else if (fieldMappings?.default) {
+      } else if (fieldMappings?.['@default']) {
         defaultTargets.push(blockType);
       }
     }
@@ -1499,7 +1499,7 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
 
     // Step 1: Normalize source data to canonical fields using inverted default mapping
     // This extracts data FROM the source block
-    const sourceInvertedDefault = invertMapping(sourceConfig?.fieldMappings?.default);
+    const sourceInvertedDefault = invertMapping(sourceConfig?.fieldMappings?.['@default']);
     let canonicalData = {};
     for (const [blockField, canonicalField] of Object.entries(sourceInvertedDefault)) {
       if (currentData[blockField] !== undefined) {
@@ -1570,9 +1570,9 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   let result = formData;
 
   // Reset fieldMapping to the new type's default when variation changes
-  // The new type's fieldMappings.default provides the correct source→target mapping
+  // The new type's fieldMappings['@default'] provides the correct source→target mapping
   const newTypeConfig = blocksConfig?.[newType];
-  const defaultFieldMapping = newTypeConfig?.fieldMappings?.default;
+  const defaultFieldMapping = newTypeConfig?.fieldMappings?.['@default'];
   if (defaultFieldMapping) {
     // Get the current block with the new variation and reset its fieldMapping
     const currentBlock = getBlockById(result, blockPathMap, blockId);
