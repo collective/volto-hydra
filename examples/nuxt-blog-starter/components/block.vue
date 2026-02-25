@@ -71,7 +71,7 @@
     <div :class="['grid-row grid gap-4 grid-cols-1', ...gridColsClass(block)]">
       <template v-for="entry in gridChildren" :key="entry.id">
         <!-- Listing child: async expand in Suspense, with shared paging -->
-        <Suspense v-if="entry.isListing" :key="`grid-listing-${entry.id}-pg${gridPageFromUrl}`">
+        <Suspense v-if="entry.isListing" :key="`grid-listing-${entry.id}-pg${gridPageFromUrl}-${JSON.stringify(entry.block)}`">
           <ListingBlock :id="entry.id" :block="entry.block" :paging="gridPaging"
             :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
             <template #default="{ items }">
@@ -276,7 +276,7 @@
 
 
   <!-- Listing block: async expansion with own paging (or shared paging from container) -->
-  <Suspense v-else-if="block['@type'] === 'listing'" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}`">
+  <Suspense v-else-if="block['@type'] === 'listing'" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}-${JSON.stringify(block)}`">
     <ListingBlock :id="block_uid" :block="block" :paging="paging"
       :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
       <template #default="{ items }">
