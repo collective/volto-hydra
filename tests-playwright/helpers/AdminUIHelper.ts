@@ -3003,7 +3003,23 @@ export class AdminUIHelper {
   async verifyDragShadowVisible(): Promise<void> {
     const iframe = this.getIframe();
     const dragShadow = iframe.locator('.dragging');
-    await dragShadow.waitFor({ state: 'visible', timeout: 5000 });
+    try {
+      await dragShadow.waitFor({ state: 'visible', timeout: 5000 });
+    } catch (e) {
+      // Diagnostic: is the element in the DOM but not visible, or missing entirely?
+      const count = await dragShadow.count();
+      const bodyClass = await iframe.locator('body').getAttribute('class');
+      const iframeDragBtn = iframe.locator('.volto-hydra-drag-button');
+      const dragBtnVisible = await iframeDragBtn.isVisible().catch(() => false);
+      const dragBtnBox = await iframeDragBtn.boundingBox().catch(() => null);
+      console.log(`[DIAG] .dragging count=${count}, body class="${bodyClass}", dragBtn visible=${dragBtnVisible}, dragBtn box=${JSON.stringify(dragBtnBox)}`);
+      if (count > 0) {
+        const box = await dragShadow.first().boundingBox().catch(() => null);
+        const style = await dragShadow.first().getAttribute('style').catch(() => null);
+        console.log(`[DIAG] .dragging exists but not visible: box=${JSON.stringify(box)}, style="${style}"`);
+      }
+      throw e;
+    }
   }
 
   /**
@@ -3268,23 +3284,35 @@ export class AdminUIHelper {
     let lastTargetY: number | null = null;
     let stuckCount = 0;
 
+    // Cache iframe bounds and edge positions — they don't change during drag
+    const iframeEl = this.page.locator('#previewIframe');
+    const iframeRect = await iframeEl.boundingBox();
+    if (!iframeRect) throw new Error('Could not get iframe bounding box');
+    const edgeThreshold = 10;
+    const edgeX = iframeRect.x + iframeRect.width / 2;
+    const edgeYUp = iframeRect.y + edgeThreshold;
+    const edgeYDown = iframeRect.y + iframeRect.height - edgeThreshold;
+
+    // Move cursor to the scroll edge once before the loop, then just jiggle it
+    let currentEdgeY = 0;
+    let edgeInitialized = false;
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await this.verifyDragShadowVisible();
+      // Verify drag shadow is still active (every 20 iterations to reduce overhead)
+      if (attempt % 20 === 0) {
+        await this.verifyDragShadowVisible();
+      }
 
-      // Quick visibility check using relevant element
+      // Check target position
       const quickRect = await this.getCombinedBoundingBox(targetElement);
-      const iframeEl = this.page.locator('#previewIframe');
-      const iframeRect = await iframeEl.boundingBox();
-      if (!iframeRect) throw new Error('Could not get iframe bounding box');
-
       const targetY = iframeRect.y + quickRect.y + quickRect.height / 2;
       const isAboveViewport = targetY < edgeMargin;
       const isBelowViewport = targetY > viewportSize.height - edgeMargin;
       const isVisibleInViewport = targetY > 0 && targetY < viewportSize.height;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
 
-      // Debug logging every 5 attempts
-      if (attempt % 5 === 0) {
+      // Debug logging every 10 attempts
+      if (attempt % 10 === 0) {
         console.log(`[SCROLL] attempt=${attempt} targetY=${targetY.toFixed(0)} edgeMargin=${edgeMargin} viewportH=${viewportSize.height} above=${isAboveViewport} below=${isBelowViewport} visible=${isVisibleInViewport} needsScroll=${needsAutoScroll} t=${Date.now()}`);
       }
 
@@ -3292,10 +3320,24 @@ export class AdminUIHelper {
         // Target is well within viewport (not near edges) - safe to drop
         console.log(`[SCROLL] Target in range! targetY=${targetY.toFixed(0)}`);
         // CRITICAL: Move cursor to safe zone BEFORE returning, to stop auto-scroll.
-        // Otherwise, as cursor moves from edge to target, it passes through scroll zone
-        // and auto-scroll continues, causing the target to move away.
         await this.moveToSafeZone();
         await this.waitForPositionStable(targetElement);
+
+        // Re-verify target is still visible after momentum settles.
+        // moveToSafeZone moves cursor from scroll edge to center, which can trigger
+        // additional scrolling as the cursor passes through the auto-scroll zone.
+        // If the target drifted off-screen, use scrollIntoViewIfNeeded to correct it
+        // rather than re-entering the auto-scroll loop (which would oscillate).
+        const settledRect = await this.getCombinedBoundingBox(targetElement);
+        const freshIframeRect = await iframeEl.boundingBox();
+        if (!freshIframeRect) throw new Error('Could not get iframe bounding box');
+        const settledY = freshIframeRect.y + settledRect.y + settledRect.height / 2;
+        if (settledY < 0 || settledY > viewportSize.height) {
+          console.log(`[SCROLL] Target drifted off-screen after settling! settledY=${settledY.toFixed(0)}, using scrollIntoView to correct`);
+          await targetElement.scrollIntoViewIfNeeded();
+          await this.waitForPositionStable(targetElement);
+        }
+
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
@@ -3307,6 +3349,18 @@ export class AdminUIHelper {
           console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
           await this.moveToSafeZone();
           await this.waitForPositionStable(targetElement);
+
+          // Re-verify after momentum settles
+          const settledRect2 = await this.getCombinedBoundingBox(targetElement);
+          const freshIframeRect2 = await iframeEl.boundingBox();
+          if (!freshIframeRect2) throw new Error('Could not get iframe bounding box');
+          const settledY2 = freshIframeRect2.y + settledRect2.y + settledRect2.height / 2;
+          if (settledY2 < 0 || settledY2 > viewportSize.height) {
+            console.log(`[SCROLL] Target drifted off-screen after scroll limit! settledY=${settledY2.toFixed(0)}, using scrollIntoView to correct`);
+            await targetElement.scrollIntoViewIfNeeded();
+            await this.waitForPositionStable(targetElement);
+          }
+
           return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
         }
       } else {
@@ -3314,12 +3368,24 @@ export class AdminUIHelper {
       }
       lastTargetY = targetY;
 
-      // Target is near edge or off-screen - move to edge to trigger auto-scroll
+      // Move cursor to edge to trigger auto-scroll.
+      // Only do a full move on direction change; otherwise just jiggle by 1px
+      // to keep rAF scrolling alive without expensive multi-step moves.
       const scrollUp = isAboveViewport;
-      await this.moveToScrollEdge(scrollUp);
+      const targetEdgeY = scrollUp ? edgeYUp : edgeYDown;
+      if (!edgeInitialized || Math.abs(currentEdgeY - targetEdgeY) > 20) {
+        // Direction changed or first move — do a proper move
+        await this.page.mouse.move(edgeX, targetEdgeY, { steps: 2 });
+        currentEdgeY = targetEdgeY;
+        edgeInitialized = true;
+      } else {
+        // Same direction — tiny jiggle to keep scroll events flowing
+        currentEdgeY = targetEdgeY + (attempt % 2);
+        await this.page.mouse.move(edgeX, currentEdgeY);
+      }
 
       // Brief wait for scroll to take effect
-      await this.page.waitForTimeout(100);
+      await this.page.waitForTimeout(50);
     }
 
     // If we get here, we've exceeded max attempts
