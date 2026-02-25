@@ -206,6 +206,60 @@ describe('@querystring-search', () => {
   });
 });
 
+describe('folder ordering (__metadata__.json)', () => {
+  it('concepts items are in __metadata__.json order, not alphabetical', async () => {
+    const data = await getContent('/concepts');
+
+    assert.ok(data.items, 'concepts should have items');
+    assert.ok(data.items.length > 0, 'concepts should have children');
+
+    const titles = data.items.map((i) => i.title);
+    // Order defined in concepts/__metadata__.json matches README order:
+    // architecture, integration-levels, container-blocks, listings, templates, deployment, advanced
+    assert.equal(titles[0], 'How Hydra Works');
+    assert.equal(titles[1], 'The Bridge, Callbacks & Custom Blocks');
+    assert.equal(titles[2], 'Container Blocks');
+    assert.equal(titles[3], 'Listings & Dynamic Blocks');
+    assert.equal(titles[4], 'Templates & Layouts');
+    assert.equal(titles[5], 'Deployment Patterns');
+    assert.equal(titles[6], 'Advanced');
+  });
+
+  it('concepts navigation children match __metadata__.json order', async () => {
+    const data = await getContent('/concepts');
+
+    const nav = data['@components']?.navigation;
+    const conceptsNav = nav.items?.find(
+      (i) => new URL(i['@id']).pathname === '/concepts',
+    );
+    assert.ok(conceptsNav, 'should have concepts in navigation');
+
+    const titles = conceptsNav.items.map((i) => i.title);
+    assert.equal(titles[0], 'How Hydra Works');
+    assert.equal(titles[6], 'Advanced');
+  });
+
+  it('getObjPositionInParent uses __metadata__.json for concepts children', async () => {
+    const data = await querystringSearch('/concepts', {
+      query: [
+        {
+          i: 'path',
+          o: 'plone.app.querystring.operation.string.relativePath',
+          v: '.',
+        },
+      ],
+      sort_on: 'getObjPositionInParent',
+      sort_order: 'ascending',
+      b_start: 0,
+      b_size: 50,
+    });
+
+    const titles = data.items.map((i) => i.title);
+    assert.equal(titles[0], 'How Hydra Works');
+    assert.equal(titles[titles.length - 1], 'Advanced');
+  });
+});
+
 describe('navigation', () => {
   it('returns children in folder order', async () => {
     const data = await getContent('/_test_data');
