@@ -11,7 +11,13 @@
     >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
   /></ol>
   <template v-else-if="!node.type">{{ node.text }}</template>
+  <blockquote v-else-if="node.type === 'blockquote'"
+    class="border-l-4 border-gray-300 pl-4 py-2 my-4 italic text-gray-600"
+    :data-node-id="node.nodeId"
+    >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
+  /></blockquote>
   <component v-else :is="node.type" :data-node-id="node.nodeId"
+    :style="node.textAlign ? { textAlign: node.textAlign } : undefined"
     >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
   /></component>
 </template>

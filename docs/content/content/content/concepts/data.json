@@ -25,7 +25,7 @@
       "@type": "listing",
       "headlineTag": "h2",
       "styles": {},
-      "variation": "summaryItem",
+      "variation": "summary",
       "fieldMapping": {
         "@id": "href",
         "title": "title",

@@ -1,19 +1,19 @@
 <template>
-  <div v-if="block['@type'] == 'slate'" class="bg-transparent" :data-block-uid="block_uid" data-edit-text="value">
+  <div v-if="block['@type'] == 'slate'" class="slate-block" :data-block-uid="block_uid" data-edit-text="value">
     <RichText v-for="node in block['value']" :key="node" :node="node" />
   </div>
 
-  <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid" data-edit-text="value">
-    <hr />
+  <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
+       data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
     <RichText v-for="node in block['value']" :key="node" :node="node" />
-    <hr />
   </div>
 
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">{{ data.title }}
   </h1>
 
-  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid" data-edit-text="/description"><i>{{
-    data.description }}</i></p>
+  <p v-else-if="block['@type'] == 'description'" :data-block-uid="block_uid"
+     data-edit-text="/description"
+     class="text-lg text-gray-500 mb-6">{{ data.description }}</p>
 
   <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
     <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
@@ -31,18 +31,16 @@
       </a>
       <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
-      <figcaption>
-        <h2>{{ block.title }}</h2>
-        <div v-if="block?.description" data-edit-text="description">
-          <p>{{ block.description }}</p>
-        </div>
+      <figcaption v-if="block.title || block.description">
+        <strong v-if="block.title">{{ block.title }}</strong>
+        <p v-if="block?.description" data-edit-text="description">{{ block.description }}</p>
       </figcaption>
     </figure>
   </div>
 
-  <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid">
+  <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
     <NuxtImg v-for="props in [imageProps(data)]" :src="props.url"
-      :class="['image-size-' + props.size, 'image-align-' + props.align]" loading="lazy" decoding="async" />
+      class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
   </div>
 
   <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
@@ -69,14 +67,14 @@
   <!-- /hydra -->
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
-       :class="`mt-6 mb-6 bg-${block.styles?.backgroundColor || 'white'}-700`">
-    <div class="grid-row grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+       class="mt-6 mb-6 rounded-lg" :style="gridBgStyle(block)">
+    <div :class="['grid-row grid gap-4 grid-cols-1', ...gridColsClass(block)]">
       <BlockExpander :block_uid="block_uid" :block="block"
         :data="data" :api-url="effectiveApiUrl" :contained="true">
         <template #item="{ item }">
           <Block :block_uid="item['@uid']" :block="item" :data="data"
                  :contained="true" class="grid-cell p-4"
-                 :class="`bg-${!block.styles?.backgroundColor ? 'grey' : 'white'}-700`" />
+                 :style="!block.styles?.backgroundColor ? { backgroundColor: '#f1f5f9' } : {}" />
         </template>
       </BlockExpander>
     </div>
@@ -224,8 +222,14 @@
 
 
 
-  <hr v-else-if="block['@type'] == 'separator'" :data-block-uid="block_uid">
-  </hr>
+  <div v-else-if="block['@type'] == 'separator'" :data-block-uid="block_uid"
+       :class="['my-6', {
+           'mx-auto max-w-xs': block.styles?.align === 'center',
+           'mr-auto max-w-xs': block.styles?.align === 'left'
+       }]">
+    <hr v-if="!block.styles?.noLine" class="border-gray-300" />
+    <div v-else class="py-4"></div>
+  </div>
 
 
 
@@ -428,9 +432,11 @@
     </template>
   </div>
 
-  <template v-else-if="block['@type'] == 'heading'" :data-block-uid="block_uid">
-    <h2 data-edit-text="heading">{{ block.heading }}</h2>
-  </template>
+  <component v-else-if="block['@type'] == 'heading'" :is="block.tag || 'h2'"
+    :data-block-uid="block_uid" data-edit-text="heading"
+    :class="{ 'text-center': block.alignment === 'center', 'text-right': block.alignment === 'right' }">
+    {{ block.heading }}
+  </component>
 
   <div v-else-if="block['@type'] == 'slateTable'" class="data-table" :data-block-uid="block_uid">
     <table>
@@ -448,44 +454,52 @@
     </table>
   </div>
 
-  <div v-else-if="block['@type'] == '__button'">
-    <NuxtLink :to="getUrl(block.href)" :data-block-uid="block_uid"
+  <div v-else-if="block['@type'] == '__button'" :data-block-uid="block_uid"
+       :class="['my-4', {
+           'text-center': block.inneralign === 'center',
+           'text-right': block.inneralign === 'right'
+       }]">
+    <NuxtLink :to="getUrl(block.href)"
       class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
       data-edit-text="title">
       {{ block.title || 'Read more' }}
     </NuxtLink>
   </div>
 
-  <template v-else-if="block['@type'] == 'video'" :data-block-uid="block_uid">
-    <iframe v-if="block.url?.startsWith('https://www.youtube')" width="420" height="315"
-      :src="`https://www.youtube.com/embed/${block.url?.split('v=')[1]}?controls=0`"></iframe>
-    <video v-else-if="block.url" class="w-full h-auto max-w-full" controls>
-      <source :src="block.url" type="video/mp4">
-      Your browser does not support the video tag.
-    </video>
-  </template>
-
-  <section v-else-if="block['@type'] == 'highlight'" class="bg-white dark:bg-gray-900">
-    <div class="py-8 px-4 mx-auto max-w-screen-xl text-center lg:py-16">
-      <NuxtImg v-for="props in [imageProps(block)]" :src="props.url" />
-      <h1
-        class="mb-4 text-4xl font-extrabold tracking-tight leading-none text-gray-900 md:text-5xl lg:text-6xl dark:text-white">
-        {{ block.title }}</h1>
-      <p class="mb-8 text-lg font-normal text-gray-500 lg:text-xl sm:px-16 lg:px-48 dark:text-gray-400">
-        <RichText v-for="node in block['value']" :key="node" :node="node" />
-      </p>
-      <div class="flex flex-col space-y-4 sm:flex-row sm:justify-center sm:space-y-0">
-        <NuxtLink v-if="block.button" :to="getUrl(block.buttonLink)"
-          class="py-3 px-5 sm:ms-4 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
-          {{ block.buttonText }}
-        </NuxtLink>
-      </div>
+  <div v-else-if="block['@type'] == 'video'" :data-block-uid="block_uid" class="my-4">
+    <div v-if="getYouTubeId(block.url)" class="relative w-full pb-[56.25%]">
+      <iframe class="absolute inset-0 w-full h-full rounded-lg"
+          :src="`https://www.youtube.com/embed/${getYouTubeId(block.url)}`"
+          frameborder="0" allowfullscreen></iframe>
     </div>
+    <video v-else-if="block.url" class="w-full h-auto max-w-full rounded-lg" controls>
+      <source :src="block.url" type="video/mp4">
+    </video>
+  </div>
+
+  <section v-else-if="block['@type'] == 'highlight'" :data-block-uid="block_uid"
+           class="relative overflow-hidden rounded-lg my-6">
+    <div v-for="props in [imageProps(block)]" :key="props.url"
+         class="absolute inset-0 bg-cover bg-center"
+         :style="props.url ? { backgroundImage: `url(${props.url})` } : {}" />
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
+      <h2 class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
+        {{ block.title }}</h2>
+      <div class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
+        <RichText v-for="node in block['value']" :key="node" :node="node" />
+      </div>
+      <NuxtLink v-if="block.button" :to="getUrl(block.buttonLink)"
+          class="py-3 px-5 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800">
+        {{ block.buttonText }}
+      </NuxtLink>
+    </div>
+    <div v-if="!imageProps(block).url" class="absolute inset-0 bg-gradient-to-r from-blue-800 to-blue-600 -z-10"></div>
   </section>
 
   <!-- Default listing item: title + description -->
-  <div v-else-if="block['@type'] == 'defaultItem'" :data-block-uid="block_uid"
-       class="default-item-block py-4 border-b border-gray-200">
+  <div v-else-if="block['@type'] == 'default'" :data-block-uid="block_uid"
+       class="default-item-block py-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
     <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
       <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
     </NuxtLink>
@@ -493,11 +507,11 @@
   </div>
 
   <!-- Summary listing item: image thumbnail + title + description -->
-  <div v-else-if="block['@type'] == 'summaryItem'" :data-block-uid="block_uid"
-       class="summary-item-block py-4 border-b border-gray-200 flex items-start gap-4">
+  <div v-else-if="block['@type'] == 'summary'" :data-block-uid="block_uid"
+       class="summary-item-block py-4 border-b border-gray-200 flex items-start gap-4 hover:bg-gray-50 transition-colors">
     <template v-if="block.image" v-for="props in [imageProps(block.image)]" :key="props.url">
       <NuxtImg v-if="props.url" :src="props.url" alt=""
-        class="w-20 h-16 object-cover rounded shrink-0" />
+        class="w-32 h-24 object-cover rounded shrink-0" />
     </template>
     <div class="flex-1">
       <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
@@ -626,6 +640,27 @@ watch(
   },
   { immediate: true }
 );
+
+// Grid block helpers
+const gridBgStyle = (block) => {
+  const bg = block.styles?.backgroundColor;
+  if (!bg || bg === 'white') return {};
+  const colorMap = { grey: '#f1f5f9', blue: '#1d4ed8', red: '#b91c1c', green: '#15803d' };
+  return { backgroundColor: colorMap[bg] || bg };
+};
+
+const gridColsClass = (block) => {
+  const count = block.blocks_layout?.items?.length || 4;
+  const cols = Math.min(count, 4);
+  return [`sm:grid-cols-${Math.min(cols, 2)}`, `md:grid-cols-${Math.min(cols, 3)}`, `lg:grid-cols-${cols}`];
+};
+
+// Helper to extract YouTube video ID from various URL formats
+const getYouTubeId = (url) => {
+  if (!url) return null;
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/);
+  return match?.[1] || null;
+};
 
 // Helper to get image URL from various formats (string, array, or object with @id)
 // Also adds @@images/image suffix for Plone internal paths

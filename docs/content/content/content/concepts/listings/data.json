@@ -235,7 +235,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Fallback type when field is not set (default: 'summaryItem')"
+                  "text": " — Fallback type when field is not set (default: 'summary')"
                 }
               ],
               "type": "li"

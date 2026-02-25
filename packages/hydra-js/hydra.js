@@ -10084,7 +10084,7 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
  * @param {string} [options.extraCriteria.sort_order] - Override sort order ('ascending'|'descending')
  * @param {string|string[]} [options.extraCriteria['facet.*']] - Facet filters (e.g., 'facet.portal_type': ['Document'])
  * @param {string} [options.itemTypeField='itemType'] - Field name to read item block type from (e.g., 'variation')
- * @param {string} [options.defaultItemType='summaryItem'] - Default item type when field is not set
+ * @param {string} [options.defaultItemType='summary'] - Default item type when field is not set
  * @returns {Promise<{items: Array, paging: Object}>}
  *   - items: Array of blocks, each with @uid (block ID for data-block-uid) and @type
  *   - paging: { currentPage, totalPages, totalItems, prev, next, pages }
@@ -10180,7 +10180,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
     fetchItems,          // async (block, { start, size }) => { items, total }
     paging: pagingIn,    // { start, size } - mutated to track position across calls
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
-    defaultItemType = 'summaryItem',  // Default item type when field is not set
+    defaultItemType = 'summary',  // Default item type when field is not set
   } = options;
 
   if (!fetchItems) {
@@ -10340,7 +10340,11 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
           // Apply field mapping: source field -> target field
           // e.g., { 'title': 'headline', '@id': 'href', 'image': 'preview_image' }
-          for (const [sourceField, targetField] of Object.entries(fieldMapping)) {
+          // Fall back to standard @default mapping when no fieldMapping is defined.
+          // This handles listing blocks from standard Volto (which don't set fieldMapping).
+          const DEFAULT_FIELD_MAPPING = { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' };
+          const effectiveMapping = Object.keys(fieldMapping).length > 0 ? fieldMapping : DEFAULT_FIELD_MAPPING;
+          for (const [sourceField, targetField] of Object.entries(effectiveMapping)) {
             if (!targetField) continue;
 
             // Special handling for 'image' source - copy as catalog brain format

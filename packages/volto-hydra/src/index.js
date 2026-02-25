@@ -202,7 +202,7 @@ const applyConfig = (config) => {
     // Inject current variation (item type) into fieldMapping widget props
     // Use default if variation isn't set yet (e.g., new block)
     const itemType =
-      formData?.variation || 'summaryItem';
+      formData?.variation || 'summary';
     if (schema.properties.fieldMapping && itemType) {
       schema.properties.fieldMapping = {
         ...schema.properties.fieldMapping,
@@ -219,7 +219,7 @@ const applyConfig = (config) => {
       blocksField: '..',
       filterConvertibleFrom: '@default',
       title: 'Item Type',
-      default: 'summaryItem',
+      default: 'summary',
     })({
       ...args,
       schema,
@@ -286,9 +286,9 @@ const applyConfig = (config) => {
 
   // Default result item for listings (simple title + description)
   // Matches Volto's DefaultResultItem variation
-  config.blocks.blocksConfig.defaultItem = {
-    ...config.blocks.blocksConfig.defaultItem,
-    id: 'defaultItem',
+  config.blocks.blocksConfig.default = {
+    ...config.blocks.blocksConfig.default,
+    id: 'default',
     title: 'Default',
     restricted: true,
     blockSchema: () => ({
@@ -308,9 +308,9 @@ const applyConfig = (config) => {
 
   // Summary result item for listings (title + description + image)
   // Matches Volto's SummaryResultItem variation - the default for listings
-  config.blocks.blocksConfig.summaryItem = {
-    ...config.blocks.blocksConfig.summaryItem,
-    id: 'summaryItem',
+  config.blocks.blocksConfig.summary = {
+    ...config.blocks.blocksConfig.summary,
+    id: 'summary',
     title: 'Summary',
     restricted: true,
     blockSchema: () => ({
@@ -492,7 +492,7 @@ const applyConfig = (config) => {
           title: 'Results Listing',
           widget: 'blocks_layout',
           description: 'Listing block to render search results',
-          allowedBlocks: ['listing', 'defaultItem', 'summaryItem', 'teaser', 'image'],
+          allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],
           maxLength: 1,
           defaultBlockType: 'listing',
         };

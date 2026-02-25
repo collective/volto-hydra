@@ -236,7 +236,7 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  * schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
  *   filterConvertibleFrom: '@default',
  *   title: 'Item Type',
- *   default: 'summaryItem',
+ *   default: 'summary',
  * })
  */
 export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFieldOptions = {}) {

@@ -276,8 +276,8 @@ test.describe('Multi-element blocks', () => {
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
 
-    // Click the Listing block item in the sidebar - this selects without scrolling first
-    const listingBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Listing' });
+    // Click the first Listing block item in the sidebar - this selects without scrolling first
+    const listingBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Listing' }).first();
     await expect(listingBlockItem).toBeVisible({ timeout: 5000 });
     await listingBlockItem.click();
 
@@ -430,8 +430,8 @@ test.describe('Multi-element blocks', () => {
     const listingElements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
     await expect(listingElements.first()).toBeVisible({ timeout: 10000 });
 
-    // Listing block comes after grid in layout, so its paging nav is last
-    const listingPagingNav = iframe.locator('nav[aria-label="Page Navigation"]').last();
+    // block-9-listing is the second paging nav (grid listing is first, block-10 is third)
+    const listingPagingNav = iframe.locator('nav[aria-label="Page Navigation"]').nth(1);
     await expect(listingPagingNav).toBeVisible({ timeout: 10000 });
 
     // Verify page 1 is current
@@ -444,7 +444,7 @@ test.describe('Multi-element blocks', () => {
     await listingPagingNav.locator('.paging-next').click();
 
     // Wait for page 2 to load — paging nav should show page 2 as current
-    const page2PagingNav = iframe.locator('nav[aria-label="Page Navigation"]').last();
+    const page2PagingNav = iframe.locator('nav[aria-label="Page Navigation"]').nth(1);
     await expect(page2PagingNav.locator('.paging-page.current')).toHaveText('2', { timeout: 15000 });
 
     // Verify items changed
@@ -452,6 +452,38 @@ test.describe('Multi-element blocks', () => {
     await expect(page2Elements.first()).toBeVisible({ timeout: 10000 });
     const page2FirstText = await page2Elements.first().textContent();
     expect(page2FirstText).not.toBe(firstItemText);
+  });
+
+  test('listing block without fieldMapping uses default field mapping', async ({ page }) => {
+    // Tests that listing blocks without an explicit fieldMapping (e.g., from standard Volto)
+    // still render items with title, description, and href using the built-in default mapping
+    const noMappingBlockId = 'block-10-listing-no-mapping';
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for expanded items to appear (default itemType is summary)
+    const elements = iframe.locator(`[data-block-uid="${noMappingBlockId}"]`);
+    await expect(elements.first()).toBeVisible({ timeout: 10000 });
+    const count = await elements.count();
+    console.log('No-mapping listing element count:', count);
+    expect(count).toBeGreaterThan(0);
+
+    // Verify items have titles (mapped from query result title field)
+    const firstTitle = elements.first().locator('h4');
+    await expect(firstTitle).toBeVisible();
+    const titleText = await firstTitle.textContent();
+    expect(titleText?.trim().length).toBeGreaterThan(0);
+
+    // Verify items have links (mapped from query result @id → href)
+    const firstLink = elements.first().locator('a[href]');
+    await expect(firstLink).toBeVisible();
+    const href = await firstLink.getAttribute('href');
+    expect(href).toBeTruthy();
+    expect(href).not.toBe('#');
   });
 
   test('drop indicator does not appear between elements with same UID', async ({ page }) => {

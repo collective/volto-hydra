@@ -42,7 +42,7 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const teaserItems = iframe.locator(`[data-block-uid="${blockId}"].teaser-block`);
     await expect(teaserItems.first()).toBeVisible({ timeout: 10000 });
 
-    // Verify it's NOT showing summaryItem layout (which has image on the side with flexbox)
+    // Verify it's NOT showing summary layout (which has image on the side with flexbox)
     // Teaser layout has image on top (no flex display)
     const summaryItems = iframe.locator(`[data-block-uid="${blockId}"].summary-item-block`);
     await expect(summaryItems).toHaveCount(0);

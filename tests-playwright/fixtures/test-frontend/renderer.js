@@ -209,11 +209,11 @@ async function renderBlock(blockId, block) {
             const teaserEl = document.createElement('div');
             teaserEl.innerHTML = renderTeaserBlock(block, blockId);
             return teaserEl.firstElementChild;
-        case 'defaultItem':
+        case 'default':
             const defaultEl = document.createElement('div');
             defaultEl.innerHTML = renderDefaultItemBlock(block, blockId);
             return defaultEl.firstElementChild;
-        case 'summaryItem':
+        case 'summary':
             const summaryEl = document.createElement('div');
             summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
             return summaryEl.firstElementChild;
@@ -934,10 +934,10 @@ async function renderGridBlock(block, blockId) {
             case 'image':
                 html += renderImageBlock(childBlock);
                 break;
-            case 'summaryItem':
+            case 'summary':
                 html += renderSummaryItemBlock(childBlock, null);
                 break;
-            case 'defaultItem':
+            case 'default':
                 html += renderDefaultItemBlock(childBlock, null);
                 break;
             case 'empty':
@@ -1176,7 +1176,7 @@ async function renderAccordionBlock(block, blockId) {
             case 'teaser':
                 html += renderTeaserBlock(childBlock, null);
                 break;
-            case 'summaryItem':
+            case 'summary':
                 html += renderSummaryItemBlock(childBlock, null);
                 break;
             default:

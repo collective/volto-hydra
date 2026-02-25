@@ -3,6 +3,9 @@ module.exports = {
     plugins: [
         require('flowbite/plugin')
     ],
+    safelist: [
+        { pattern: /grid-cols-[1-4]/, variants: ['sm', 'md', 'lg'] },
+    ],
     content: [
       `components/**/*.{vue,js}`,
       `layouts/**/*.vue`,
