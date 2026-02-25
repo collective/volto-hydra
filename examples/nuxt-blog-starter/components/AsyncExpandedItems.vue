@@ -4,7 +4,7 @@
 </template>
 
 <script setup>
-import { expandListingBlocks } from '@hydra-js/hydra.js';
+import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -25,10 +25,8 @@ for (const [key, value] of Object.entries(route.query)) {
 
 const items = await expandListingBlocks([props.id], {
   blocks: { [props.id]: props.block },
-  apiUrl: props.apiUrl,
-  contextPath: props.contextPath,
+  fetchItems: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }),
   paging: props.paging,
   itemTypeField: 'variation',
-  extraCriteria,
 });
 </script>

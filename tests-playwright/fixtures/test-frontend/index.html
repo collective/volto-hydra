@@ -62,7 +62,7 @@
 
     <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from '/hydra.js';
+        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, getAccessToken } from '/hydra.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
@@ -127,7 +127,7 @@
             const extraCriteria = getSearchCriteriaFromUrl();
             tfLog('extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
             window._searchCriteria = extraCriteria; // Store for form handlers
-            const baseOptions = { apiUrl: window.location.origin, contextPath, extraCriteria };
+            const fetchItems = ploneFetchItems({ apiUrl: window.location.origin, contextPath, extraCriteria });
 
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
@@ -137,7 +137,7 @@
                 const size = 6;
                 const pageNum = pages[containerId] || 0;
                 const paging = { start: pageNum * size, size };
-                const items = await expandListingBlocks(layout, { blocks, ...baseOptions, paging, itemTypeField: 'variation' });
+                const items = await expandListingBlocks(layout, { blocks, fetchItems, paging, itemTypeField: 'variation' });
                 return { items, paging };
             };
 
@@ -189,7 +189,7 @@
                 if (expandedItems.length > 0) {
                     const footerItems = await expandListingBlocks(
                         expandedItems,
-                        { ...baseOptions, itemTypeField: 'variation' }
+                        { fetchItems, itemTypeField: 'variation' }
                     );
                     if (myGeneration !== window._renderGeneration) return; // stale render
                     await renderContent({ items: footerItems }, 'footer-content', myGeneration);

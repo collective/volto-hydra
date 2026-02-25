@@ -10177,14 +10177,15 @@ function computePagingUI(paging) {
 export async function expandListingBlocks(inputItems, options = {}) {
   const {
     blocks: blocksDict,  // Optional: lookup dict for when items are IDs
-    apiUrl,
-    contextPath = '/',
-    paging: pagingIn,  // { start, size, total, _seen } - mutated to track position across calls
-    fetcher,
-    extraCriteria = {},
+    fetchItems,          // async (block, { start, size }) => { items, total }
+    paging: pagingIn,    // { start, size } - mutated to track position across calls
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
     defaultItemType = 'summaryItem',  // Default item type when field is not set
   } = options;
+
+  if (!fetchItems) {
+    throw new Error('expandListingBlocks requires a fetchItems option');
+  }
 
   // Normalize items: convert IDs to objects if blocksDict provided
   // Items can be: objects with @uid, or string IDs (looked up in blocksDict)
@@ -10208,8 +10209,6 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
   // Create default paging if not provided, and ensure defaults for tracking fields
   const paging = pagingIn || { start: 0, size: 1000 };
-  if (paging._seen == null) paging._seen = 0;
-  if (paging.total == null) paging.total = 0;
 
   // Auto-track _ready: create promise on first call, resolve when all calls complete
   if (!paging._ready) {
@@ -10218,18 +10217,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
   }
   paging._pending++;
 
-  const headers = getAuthHeaders();
-  headers['Content-Type'] = 'application/json';
-
-  // Validate: need either apiUrl or fetcher
-  if (!apiUrl && !fetcher) {
-    throw new Error('expandListingBlocks requires either apiUrl or fetcher option');
-  }
-
-  const listingResults = {}; // Store fetched results per listing
-
-  // Find all listing blocks that need expansion and fetch in parallel.
-  // Listings without a querystring default to showing current folder contents.
+  // Find all listing blocks that need expansion
   const listingBlockIds = blocksLayout.filter(
     (blockId) => blocks[blockId]?.['@type'] === 'listing'
   );
@@ -10245,29 +10233,66 @@ export async function expandListingBlocks(inputItems, options = {}) {
     log('expandListingBlocks: no bridgeInstance, skipping readonly registration for:', listingBlockIds);
   }
 
+  // Count non-listing blocks (they contribute 1 item each to the total)
+  const nonListingCount = blocksLayout.filter(
+    (blockId) => !listingBlockIds.includes(blockId)
+  ).length;
+
+  // Phase 1: Get totals from all listings in parallel
+  const listingTotals = {};
   await Promise.all(
     listingBlockIds.map(async (blockId) => {
-      const block = blocks[blockId];
-      const body = buildQuerystringSearchBody(block.querystring, {
-        b_start: 0,
-        b_size: 1000,
-      }, extraCriteria);
-
-      const path = `${contextPath}/++api++/@querystring-search`;
-
       try {
-        let response;
-        if (fetcher) {
-          response = await fetcher(path, body, headers);
-        } else {
-          const res = await fetch(`${apiUrl}${path}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-          });
-          response = await res.json();
-        }
-        listingResults[blockId] = response.items || [];
+        const result = await fetchItems(blocks[blockId], { start: 0, size: 0 });
+        listingTotals[blockId] = result.total || 0;
+      } catch (error) {
+        console.error(`[HYDRA] Failed to get total for listing ${blockId}:`, error);
+        listingTotals[blockId] = 0;
+      }
+    })
+  );
+
+  // Compute global total across all blocks (listings + non-listings)
+  let globalTotal = nonListingCount;
+  for (const blockId of listingBlockIds) {
+    globalTotal += listingTotals[blockId];
+  }
+
+  // Phase 2: Compute which listings overlap the paging window, fetch only those slices
+  // Walk the blocks in layout order, tracking global position
+  let globalPos = 0;
+  const fetchPlan = []; // { blockId, localStart, localSize }
+
+  for (const blockId of blocksLayout) {
+    if (listingBlockIds.includes(blockId)) {
+      const total = listingTotals[blockId];
+      const blockStart = globalPos;
+      const blockEnd = globalPos + total;
+
+      // Does this listing overlap the page window [paging.start, paging.start + paging.size)?
+      const windowStart = paging.start;
+      const windowEnd = paging.start + paging.size;
+
+      if (blockEnd > windowStart && blockStart < windowEnd) {
+        // Compute local offset and size for this listing
+        const localStart = Math.max(0, windowStart - blockStart);
+        const localSize = Math.min(total - localStart, windowEnd - Math.max(blockStart, windowStart));
+        fetchPlan.push({ blockId, localStart, localSize });
+      }
+
+      globalPos += total;
+    } else {
+      globalPos += 1; // Non-listing blocks contribute 1 item
+    }
+  }
+
+  // Fetch slices in parallel
+  const listingResults = {};
+  await Promise.all(
+    fetchPlan.map(async ({ blockId, localStart, localSize }) => {
+      try {
+        const result = await fetchItems(blocks[blockId], { start: localStart, size: localSize });
+        listingResults[blockId] = result.items || [];
       } catch (error) {
         console.error(`[HYDRA] Failed to fetch listing ${blockId}:`, error);
         listingResults[blockId] = [];
@@ -10275,85 +10300,83 @@ export async function expandListingBlocks(inputItems, options = {}) {
     })
   );
 
-  // Build items array - each item has @uid for the block_uid to use when rendering
+  // Build items array — walk layout in order, emitting items that fall in the page window
   const items = [];
-  const startingSeen = paging._seen;  // Track for updating total
-
-  // Helper to process an item through paging
-  const processItem = (item) => {
-    paging._seen++;
-    if (paging._seen <= paging.start) return;  // Before current page
-    if ((paging._seen - paging.start) > paging.size) return;  // Page is full
-    items.push(item);
-  };
+  globalPos = 0;
 
   for (const blockId of blocksLayout) {
     const block = blocks[blockId];
 
-    if (block?.['@type'] === 'listing' && listingResults[blockId]) {
-      const queryResults = listingResults[blockId];
-      const itemType = block[itemTypeField] || defaultItemType;
-      const fieldMapping = block.fieldMapping || {};
+    if (listingBlockIds.includes(blockId)) {
+      const total = listingTotals[blockId];
+      const blockStart = globalPos;
 
-      // Extract itemDefaults from flat keys (e.g., itemDefaults_overwrite -> overwrite)
-      // Volto stores these as flat keys because forms don't handle nested paths
-      const itemDefaults = {};
-      const defaultsPrefix = 'itemDefaults_';
-      for (const [key, value] of Object.entries(block)) {
-        if (key.startsWith(defaultsPrefix)) {
-          const fieldName = key.slice(defaultsPrefix.length);
-          itemDefaults[fieldName] = value;
-        }
-      }
-      log('expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: queryResults.length });
+      if (listingResults[blockId]) {
+        const itemType = block[itemTypeField] || defaultItemType;
+        const fieldMapping = block.fieldMapping || {};
 
-      // Convert each query result to a block of itemType
-      // All expanded items share the same @uid (the listing block's ID)
-      for (const result of queryResults) {
-        const itemBlock = {
-          '@uid': blockId,  // Block UID for data-block-uid attribute
-          '@type': itemType,
-          ...itemDefaults,
-          // readOnly: Volto standard property - disables inline editing
-          // hydra.js checks this in collectBlockFields() to skip all fields
-          readOnly: true,
-        };
-
-        // Apply field mapping: source field -> target field
-        // e.g., { 'title': 'headline', '@id': 'href', 'image': 'preview_image' }
-        for (const [sourceField, targetField] of Object.entries(fieldMapping)) {
-          if (!targetField) continue;
-
-          // Special handling for 'image' source - copy as catalog brain format
-          // Volto's Image component uses: item['@id'], item.image_field, item.image_scales[field][0]
-          if (sourceField === 'image' && result.image_scales) {
-            // Set target field (e.g., preview_image) with catalog brain structure
-            itemBlock[targetField] = {
-              '@id': result['@id'],
-              image_field: result.image_field || 'image',
-              image_scales: result.image_scales,
-            };
-          }
-          // Special handling for href field - wrap in array format expected by link fields
-          else if (targetField === 'href' && result[sourceField] !== undefined) {
-            itemBlock[targetField] = [{ '@id': result[sourceField] }];
-          }
-          // Default: copy value as-is
-          else if (result[sourceField] !== undefined) {
-            itemBlock[targetField] = result[sourceField];
+        // Extract itemDefaults from flat keys (e.g., itemDefaults_overwrite -> overwrite)
+        const itemDefaults = {};
+        const defaultsPrefix = 'itemDefaults_';
+        for (const [key, value] of Object.entries(block)) {
+          if (key.startsWith(defaultsPrefix)) {
+            const fieldName = key.slice(defaultsPrefix.length);
+            itemDefaults[fieldName] = value;
           }
         }
+        log('expandListingBlocks:', { blockId, itemType, fieldMapping: JSON.stringify(fieldMapping), itemDefaults: JSON.stringify(itemDefaults), itemCount: listingResults[blockId].length });
 
-        processItem(itemBlock);
+        // Convert each query result to a block of itemType
+        // All expanded items share the same @uid (the listing block's ID)
+        for (const result of listingResults[blockId]) {
+          const itemBlock = {
+            '@uid': blockId,  // Block UID for data-block-uid attribute
+            '@type': itemType,
+            ...itemDefaults,
+            // readOnly: Volto standard property - disables inline editing
+            // hydra.js checks this in collectBlockFields() to skip all fields
+            readOnly: true,
+          };
+
+          // Apply field mapping: source field -> target field
+          // e.g., { 'title': 'headline', '@id': 'href', 'image': 'preview_image' }
+          for (const [sourceField, targetField] of Object.entries(fieldMapping)) {
+            if (!targetField) continue;
+
+            // Special handling for 'image' source - copy as catalog brain format
+            if (sourceField === 'image' && result.image_scales) {
+              itemBlock[targetField] = {
+                '@id': result['@id'],
+                image_field: result.image_field || 'image',
+                image_scales: result.image_scales,
+              };
+            }
+            // Special handling for href field - wrap in array format expected by link fields
+            else if (targetField === 'href' && result[sourceField] !== undefined) {
+              itemBlock[targetField] = [{ '@id': result[sourceField] }];
+            }
+            // Default: copy value as-is
+            else if (result[sourceField] !== undefined) {
+              itemBlock[targetField] = result[sourceField];
+            }
+          }
+
+          items.push(itemBlock);
+        }
       }
+
+      globalPos += total;
     } else if (block) {
-      // Non-listing blocks: add with their own @uid
-      processItem({ ...block, '@uid': blockId });
+      // Non-listing block: include if it falls in the page window
+      if (globalPos >= paging.start && globalPos < paging.start + paging.size) {
+        items.push({ ...block, '@uid': blockId });
+      }
+      globalPos += 1;
     }
   }
 
-  // Update paging total with items from this call
-  paging.total += paging._seen - startingSeen;
+  // Update paging with global total
+  paging.total = (paging.total || 0) + globalTotal;
 
   // Compute paging UI values
   computePagingUI(paging);
@@ -10365,6 +10388,44 @@ export async function expandListingBlocks(inputItems, options = {}) {
   }
 
   return items;
+}
+
+/**
+ * Create a fetchItems callback for Plone's @querystring-search endpoint.
+ *
+ * @param {Object} options
+ * @param {string} options.apiUrl - Plone site URL (e.g., 'http://localhost:8080/Plone')
+ * @param {string} [options.contextPath='/'] - Path for relative queries
+ * @param {Object} [options.extraCriteria={}] - Additional query params (SearchableText, facet.*, sort_on, sort_order)
+ * @returns {Function} fetchItems(block, { start, size }) => Promise<{ items, total }>
+ */
+export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} } = {}) {
+  if (!apiUrl) {
+    throw new Error('ploneFetchItems requires apiUrl');
+  }
+
+  return async function fetchItems(block, { start, size }) {
+    const body = buildQuerystringSearchBody(block.querystring, {
+      b_start: start,
+      b_size: size,
+    }, extraCriteria);
+
+    const headers = getAuthHeaders();
+    headers['Content-Type'] = 'application/json';
+
+    const path = `${contextPath}/++api++/@querystring-search`;
+    const res = await fetch(`${apiUrl}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    const response = await res.json();
+
+    return {
+      items: response.items || [],
+      total: response.items_total ?? (response.items || []).length,
+    };
+  };
 }
 
 // ============================================================================

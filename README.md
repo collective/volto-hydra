@@ -1236,48 +1236,67 @@ Both take an array of block IDs and return an array of block objects with `@uid`
 
 ### How expandListingBlocks works
 
-`expandListingBlocks` has two stages: **fetching** and **mapping**. The fetch stage is Plone-specific; the mapping stage is generic.
+`expandListingBlocks` is backend-agnostic. You provide a `fetchItems` callback that fetches content items from your backend — Hydra handles shared paging across multiple listings and maps results to block objects via `fieldMapping`.
 
-**Stage 1 — Fetch (Plone-specific)**
+**Fetching — two-phase server-side paging**
 
-For each listing block, `buildQuerystringSearchBody` constructs a Plone `@querystring-search` POST body from the block's `querystring` config. This is Plone REST API specific:
+When multiple listings share a single pager (e.g., in a grid), `expandListingBlocks` needs to know each listing's total before it can compute which slices to fetch. It does this in two parallel rounds:
 
-- Query operators like `plone.app.querystring.operation.string.relativePath`
-- Sort fields like `getObjPositionInParent` (Plone folder order) and `effective` (publication date)
-- Facet filters pushed as `plone.app.querystring.operation.selection.any`
-- Metadata fields requested via `metadata_fields: '_all'`
+1. **Get totals**: calls `fetchItems(block, { start: 0, size: 0 })` for each listing in parallel — your backend returns `{ total }` with no items
+2. **Fetch slices**: computes which listings overlap the current page window, then calls `fetchItems(block, { start, size })` for just those listings with the exact offset and size needed
 
-If the listing has no `querystring`, it defaults to Plone's folder listing: `relativePath: '.'` sorted by `getObjPositionInParent` ascending — matching Plone's behavior for unconfigured listing blocks.
+For Plone backends, use the provided `ploneFetchItems` helper:
 
-To replace the Plone fetch with your own backend, pass a `fetcher` callback instead of `apiUrl`. The fetcher receives `(path, body, headers)` and must return `{ items: [...] }` where each item has the fields referenced in `fieldMapping` (typically `@id`, `title`, `description`, `image_scales`, `image_field`).
+```js
+import { expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
 
-**Stage 2 — Mapping (generic)**
+const items = await expandListingBlocks(layout, {
+  blocks, paging,
+  fetchItems: ploneFetchItems({ apiUrl, contextPath, extraCriteria }),
+});
+```
 
-After fetching, each query result is converted to a block object using `fieldMapping` (a simple source→target field map stored on the listing block data). This stage has no Plone dependencies — it just copies fields:
+For non-Plone backends, provide your own `fetchItems`:
+
+```js
+const items = await expandListingBlocks(layout, {
+  blocks, paging,
+  fetchItems: async (block, { start, size }) => {
+    const res = await fetch(`/api/search?offset=${start}&limit=${size}`);
+    const data = await res.json();
+    return { items: data.results, total: data.count };
+  },
+});
+```
+
+**Mapping (generic)**
+
+After fetching, each query result is converted to a block object using `fieldMapping` (a simple source→target field map stored on the listing block data). This stage has no backend dependencies — it just copies fields:
 
 - Each result becomes a block with `@type` set to the listing's item type (`variation` field, default `summaryItem`)
 - `fieldMapping` keys are source fields from query results, values are target fields on the block
 - Special handling for `image` source (copies `@id`, `image_field`, `image_scales` as a catalog brain structure) and `href` target (wraps in `[{ '@id': value }]` array format)
 - `itemDefaults` (from the listing's `itemDefaults_*` flat keys) are spread onto each item block
 
-### Example: Mixing listings, blocks and paging.
+### Example: Mixing listings, blocks and paging
 
-A grid have a mix of listing and other block but we want it to have a single paging
+A grid has a mix of listing and other blocks but we want a single pager
 at the bottom. The listings use suspense so they load client-side.
 
 ```jsx
 import { Suspense } from 'react';
-import { staticBlocks, expandListingBlocks } from '@volto-hydra/hydra-js';
+import { staticBlocks, expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
 
 function Grid({ blocks, blocks_layout, pageNum }) {
   const paging = { start: pageNum * 6, size: 6 };
+  const fetchItems = ploneFetchItems({ apiUrl, contextPath });
 
   return (
     <div className="grid">
       {blocks_layout.items.map(id =>
         blocks[id]['@type'] === 'listing' ? (
           <Suspense key={id} fallback={<div>Loading...</div>}>
-            <ListingItems id={id} blocks={blocks} paging={paging} />
+            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />
           </Suspense>
         ) : (
           staticBlocks([id], { blocks, paging }).map(item =>
@@ -1292,9 +1311,9 @@ function Grid({ blocks, blocks_layout, pageNum }) {
   );
 }
 
-async function ListingItems({ id, blocks, paging }) {
+async function ListingItems({ id, blocks, paging, fetchItems }) {
   const items = await expandListingBlocks([id], {
-    blocks, paging, apiUrl, contextPath,
+    blocks, paging, fetchItems,
   });
   return items.map(item => <Block key={item['@uid']} block={item} />);
 }
@@ -1325,12 +1344,31 @@ See [BlockExpander.vue](./examples/nuxt-blog-starter/components/BlockExpander.vu
 |--------|---------|-------------|
 | `blocks` | — | Map of blockId to block data |
 | `paging` | — | Shared paging object `{ start, size }` (mutated in-place with computed values — see below) |
-| `apiUrl` | — | Plone site URL for built-in fetch (Plone-specific) |
-| `fetcher` | — | Custom fetch callback `(path, body, headers) => Promise<{ items }>` (use this for non-Plone backends) |
-| `contextPath` | `'/'` | Path for relative queries (used by `buildQuerystringSearchBody`) |
+| `fetchItems` | — | `async (block, { start, size }) => { items, total }` — fetches content items from your backend |
 | `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
 | `defaultItemType` | `'summaryItem'` | Fallback type when field is not set |
-| `extraCriteria` | `{}` | Additional query parameters — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys (Plone-specific format) |
+
+### ploneFetchItems options
+
+`ploneFetchItems` is a factory that returns a `fetchItems` callback for Plone's `@querystring-search` endpoint:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `apiUrl` | — | Plone site URL (e.g., `'http://localhost:8080/Plone'`) |
+| `contextPath` | `'/'` | Path for relative queries |
+| `extraCriteria` | `{}` | Additional query params — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys |
+
+Internally uses `buildQuerystringSearchBody` to construct Plone query bodies. A listing with no `querystring` defaults to showing current folder contents in folder order (`relativePath: '.'`, `sort_on: 'getObjPositionInParent'`).
+
+### fetchItems contract
+
+Your `fetchItems` callback receives a listing block object and a `{ start, size }` pair:
+
+- **`start`**: zero-based offset into this listing's results
+- **`size`**: number of items to return (0 means return no items, just the total)
+- **Returns**: `{ items: [...], total: number }` where `total` is the full count (not just this page)
+
+Each item in `items` should have the fields referenced in the listing block's `fieldMapping` (typically `@id`, `title`, `description`, and image fields).
 
 ### Item type and field mapping
 
@@ -1382,8 +1420,6 @@ You pass `{ start, size }` — both helpers mutate it with computed values:
 
 - Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
 - `fieldMapping` must be persisted in the block data. The admin UI computes it from the item type's `fieldMappings['@default']` and saves it. Without a saved `fieldMapping`, `expandListingBlocks` cannot map query result fields to item block fields (it has no access to the block registry in view mode).
-- A listing with no `querystring` defaults to showing current folder contents in folder order (Plone: `relativePath: '.'`, `sort_on: 'getObjPositionInParent'`).
-- `buildQuerystringSearchBody` is exported separately if you need to inspect or modify the Plone query body before fetching.
 
 ## Templates
 
