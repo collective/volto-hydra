@@ -410,7 +410,7 @@ function recurseUpdateVoltoConfig(newConfig) {
 
 // Module-level state to track iframe's current state across component remounts
 // This prevents unnecessary iframe reloads when React Router remounts the View component
-let persistedIframe = { frontendUrl: null, path: null, isEdit: null };
+let persistedIframe = { frontendUrl: null, path: null, isEdit: null, src: null };
 
 const Iframe = (props) => {
   const {
@@ -769,8 +769,10 @@ const Iframe = (props) => {
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get(getIframeUrlCookieName()) ||
     urlFromEnv[0];
-  // Initialize to null to avoid SSR/client hydration mismatch (token differs)
-  const [iframeSrc, setIframeSrc] = useState(null);
+  // Initialize from persisted state so component remounts don't reset to null
+  // (which would cause a duplicate iframe load for the same URL).
+  // On first-ever load, persistedIframe.src is null (safe for SSR hydration).
+  const [iframeSrc, setIframeSrc] = useState(persistedIframe.src);
 
   // Note: window.name inside iframe is set via the `name` attribute on the <iframe> element.
   // When iframe reloads (e.g., on mode switch), it picks up the current `name` attribute value.
@@ -808,8 +810,9 @@ const Iframe = (props) => {
     // Update if state doesn't match OR if iframeSrc is null (component just mounted)
     if (!stateMatches || !iframeSrc) {
       log('[IFRAME_SRC] Updating iframeSrc (state differs:', !stateMatches, 'iframeSrc null:', !iframeSrc, ')');
-      setIframeSrc(getUrlWithAdminParams(u, token, isEditMode));
-      persistedIframe = { frontendUrl: u, path: adminPath, isEdit: isEditMode };
+      const newSrc = getUrlWithAdminParams(u, token, isEditMode);
+      setIframeSrc(newSrc);
+      persistedIframe = { frontendUrl: u, path: adminPath, isEdit: isEditMode, src: newSrc };
     } else {
       log('[IFRAME_SRC] Skipping - state matches and iframeSrc already set');
     }
