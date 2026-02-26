@@ -4272,7 +4272,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await helper.waitForBlockCountToBe(initialBlockCount + 1);
 
     // Wait for the new facet to be selected (sidebar shows its form)
-    await helper.waitForSidebarCurrentBlock('Facet');
+    await helper.waitForSidebarCurrentBlock('Select');
 
     // Verify it's the selectFacet schema (has "Hide facet?" but NOT "Multiple choices?" or "Facet widget")
     await expect(sidebar.locator('label').filter({ hasText: 'Hide facet?' })).toBeVisible({ timeout: 3000 });
@@ -4333,7 +4333,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await helper.waitForBlockSelected(newBlockId!);
 
     // Sidebar should show the new facet's form
-    await helper.waitForSidebarCurrentBlock('Facet');
+    await helper.waitForSidebarCurrentBlock('Checkbox');
 
     // Verify it's the checkboxFacet schema (has "Multiple choices?" AND "Hide facet?", NOT "Facet widget")
     await expect(sidebar.locator('label').filter({ hasText: 'Multiple choices?' })).toBeVisible({ timeout: 3000 });

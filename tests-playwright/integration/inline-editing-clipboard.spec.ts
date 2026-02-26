@@ -320,6 +320,7 @@ test.describe('Inline Editing - Clipboard', () => {
     // Navigate to the admin UI
     const helper = new AdminUIHelper(page);
     await helper.login();
+    await helper.navigateToEdit('/test-page');
 
     // Create a test element on the parent page
     await page.evaluate(() => {

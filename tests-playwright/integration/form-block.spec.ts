@@ -16,6 +16,10 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Form Block', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name === 'mock', 'Form block not rendered by mock frontend');
+  });
+
   test('renders form fields and validates required fields on submit', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
