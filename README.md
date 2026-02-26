@@ -1271,12 +1271,27 @@ const items = await expandListingBlocks(layout, {
 
 **Mapping (generic)**
 
-After fetching, each query result is converted to a block object using `fieldMapping` (a simple source→target field map stored on the listing block data). This stage has no backend dependencies — it just copies fields:
+After fetching, each query result is converted to a block object using `fieldMapping` — a whitelist stored on the listing block data. Only mapped fields end up on the item block:
 
 - Each result becomes a block with `@type` set to the listing's item type (`variation` field, default `summaryItem`)
-- `fieldMapping` keys are source fields from query results, values are target fields on the block
-- Special handling for `image` source (copies `@id`, `image_field`, `image_scales` as a catalog brain structure) and `href` target (wraps in `[{ '@id': value }]` array format)
+- `fieldMapping` keys are source fields from query results; values specify the target field and optional type conversion
+- Values can be a plain string (`"title": "title"` — simple rename) or an object with `field` and `type` (`"@id": { "field": "href", "type": "link" }` — rename + type conversion)
 - `itemDefaults` (from the listing's `itemDefaults_*` flat keys) are spread onto each item block
+- If no `fieldMapping` is saved, a built-in default is used: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`
+
+**Type conversions**
+
+When a mapping specifies a `type`, `expandListingBlocks` converts the source value to match the target block field's expected format:
+
+| Type | Conversion |
+|------|-----------|
+| `string` | Arrays → joined with `", "`; image objects → resolved URL string; others → `String(value)` |
+| `link` | Wraps string URL as Volto link array: `[{ "@id": url }]`; arrays pass through |
+| `image` | Pass through (use with `ploneFetchItems` which packages image data as `{ "@id", image_field, image_scales }`) |
+| `array` | Wraps non-arrays in `[value]`; arrays pass through |
+| _(none)_ | No conversion — value is copied as-is |
+
+The admin UI's `FieldMappingWidget` automatically detects the target field type from the block schema (e.g., `object_browser` with `mode=link` → `link`, `widget=image` → `image`) and stores the `{ field, type }` format.
 
 ### Example: Mixing listings, blocks and paging
 
@@ -1360,6 +1375,18 @@ See [BlockExpander.vue](./examples/nuxt-blog-starter/components/BlockExpander.vu
 
 Internally uses `buildQuerystringSearchBody` to construct Plone query bodies. A listing with no `querystring` defaults to showing current folder contents in folder order (`relativePath: '.'`, `sort_on: 'getObjPositionInParent'`).
 
+**Image normalization**: `ploneFetchItems` packages Plone's `image_field` + `image_scales` into a self-contained `image` object on each result item. The item's `@id` is duplicated inside the image object (needed by `imageProps` as a base URL for resolving relative `download` paths):
+
+```js
+// Plone search result:
+{ "@id": "/news/article", image_field: "image", image_scales: { image: [{ ... }] }, ... }
+
+// After ploneFetchItems normalization:
+{ "@id": "/news/article", image: { "@id": "/news/article", image_field: "image", image_scales: { image: [{ ... }] } }, ... }
+```
+
+This means `fieldMapping` can map `"image"` to any image-type field and frontends can use `imageProps(item.image)` to resolve URLs with scale support. For non-Plone backends, your `fetchItems` should return items with whatever image format your frontend expects.
+
 ### fetchItems contract
 
 Your `fetchItems` callback receives a listing block object and a `{ start, size }` pair:
@@ -1368,26 +1395,33 @@ Your `fetchItems` callback receives a listing block object and a `{ start, size 
 - **`size`**: number of items to return (0 means return no items, just the total)
 - **Returns**: `{ items: [...], total: number }` where `total` is the full count (not just this page)
 
-Each item in `items` should have the fields referenced in the listing block's `fieldMapping` (typically `@id`, `title`, `description`, and image fields).
+Each item in `items` should have the fields referenced in the listing block's `fieldMapping` (typically `@id`, `title`, `description`, and `image`). For Plone, `ploneFetchItems` normalizes image data into a self-contained `image` object (see above). For other backends, return items with whatever field names and formats your frontend expects.
 
 ### Item type and field mapping
 
-Each expanded listing item gets `@type` from the listing block's `variation` field (or `itemType` — controlled by `itemTypeField` option), defaulting to `'summaryItem'`. The item's fields are populated from query results via the listing block's `fieldMapping`.
+Each expanded listing item gets `@type` from the listing block's `variation` field (or `itemType` — controlled by `itemTypeField` option), defaulting to `'default'`. The item's fields are populated from query results via the listing block's `fieldMapping`.
 
-The admin UI computes `fieldMapping` automatically from the selected item type's `fieldMappings['@default']` (see [Block conversion](#block-conversion)). For example, selecting `summaryItem` as the variation auto-populates:
+The admin UI computes `fieldMapping` automatically from the selected item type's `fieldMappings['@default']` (see [Block conversion](#block-conversion)). For example, selecting `teaser` as the variation auto-populates:
 
 ```json
-"fieldMapping": { "@id": "href", "title": "title", "description": "description", "image": "image" }
+"fieldMapping": {
+  "@id": { "field": "href", "type": "link" },
+  "title": "title",
+  "description": "description",
+  "image": "preview_image"
+}
 ```
 
-This mapping is saved to the block data, so `expandListingBlocks` can apply it without access to the block registry. Each key is a source field from the query result, each value is the target field on the item block.
+Values are either a string (simple rename) or `{ field, type }` (rename + type conversion). The `type` is auto-detected from the target block's schema — e.g., an `object_browser` field with `mode=link` gets type `"link"`, which tells `expandListingBlocks` to wrap the `@id` string as `[{ "@id": value }]`.
+
+This mapping is saved to the block data, so `expandListingBlocks` can apply it without access to the block registry. It acts as a whitelist: only source fields listed in the mapping end up on the item block.
 
 **Built-in item types:**
 
 | Type | Fields | Description |
 |------|--------|-------------|
-| `defaultItem` | `title`, `description`, `href` | Title + description |
-| `summaryItem` | `title`, `description`, `href`, `image` | Title + description + image thumbnail |
+| `default` | `title`, `description`, `href` | Title + description |
+| `summary` | `title`, `description`, `href`, `image` | Title + description + image thumbnail |
 | `teaser` | `title`, `description`, `href`, `preview_image` | Full teaser card |
 
 You can add custom item types or use `inheritSchemaFrom` to let editors choose:
@@ -1419,7 +1453,8 @@ You pass `{ start, size }` — both helpers mutate it with computed values:
 ### Notes
 
 - Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
-- `fieldMapping` must be persisted in the block data. The admin UI computes it from the item type's `fieldMappings['@default']` and saves it. Without a saved `fieldMapping`, `expandListingBlocks` cannot map query result fields to item block fields (it has no access to the block registry in view mode).
+- `fieldMapping` must be persisted in the block data. The admin UI computes it from the item type's `fieldMappings['@default']` and saves it. Without a saved `fieldMapping`, `expandListingBlocks` falls back to a built-in default mapping: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`.
+- The `fieldMapping` format supports both legacy string values (`"title": "title"`) and the new `{ field, type }` format (`"@id": { "field": "href", "type": "link" }`). The admin UI's `FieldMappingWidget` auto-detects the type from the target block schema and saves the appropriate format.
 
 ## Templates
 

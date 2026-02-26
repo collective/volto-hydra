@@ -331,7 +331,10 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
         // Check if current mapping is empty or has invalid target fields
         const hasMapping = Object.keys(effectiveMapping).length > 0;
         const hasInvalidTargets = Object.values(effectiveMapping).some(
-          (targetField) => targetField && !new Set(validTargetFields).has(targetField),
+          (mapping) => {
+            const target = getMappingTarget(mapping);
+            return target && !new Set(validTargetFields).has(target);
+          },
         );
 
         if (!hasMapping || hasInvalidTargets) {
@@ -439,7 +442,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
     // Get mapped fields (these won't be shown - they come from external data)
     // Use effectiveMapping which includes smart defaults if computed
     const mappedFields = new Set(
-      mappingField ? Object.values(effectiveMapping) : [],
+      mappingField ? Object.values(effectiveMapping).map(getMappingTarget) : [],
     );
 
     // Check if child block has editableFields or parentControlledFields in its schemaEnhancer config
@@ -657,8 +660,29 @@ export const QUERY_RESULT_FIELDS = {
  * @param {Object} sourceFields - Source field definitions (e.g., QUERY_RESULT_FIELDS)
  * @param {Object} targetSchema - Target block schema with properties
  * @param {Object} declaredMappings - Optional declared mappings from block's fieldMappings config
- * @returns {Object} - Field mapping { sourceField: targetField, ... }
+ * @returns {Object} - Field mapping { sourceField: targetField | { field, type }, ... }
  */
+
+/**
+ * Determine the hydra type of a field from its schema definition.
+ * Returns 'link', 'image', or the JSON Schema type (string, number, etc.)
+ */
+export function getFieldType(fieldDef) {
+  if (!fieldDef) return 'string';
+  if (fieldDef.widget === 'object_browser' && fieldDef.mode === 'link') return 'link';
+  if (fieldDef.widget === 'object_browser' && fieldDef.mode === 'image') return 'image';
+  if (fieldDef.widget === 'image') return 'image';
+  return fieldDef.type || 'string';
+}
+
+/**
+ * Extract the target field name from a fieldMapping value.
+ * Handles both legacy string format and new { field, type } format.
+ */
+export function getMappingTarget(mapping) {
+  return typeof mapping === 'string' ? mapping : mapping?.field;
+}
+
 export function computeSmartDefaults(sourceFields, targetSchema, declaredMappings) {
   if (!targetSchema?.properties) return {};
 
@@ -668,10 +692,18 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
     // Otherwise it's just the default mapping directly
     const mappings = declaredMappings['@default'] || declaredMappings;
     // Only return mappings where the target field exists in the target schema
+    // Normalize to { field, type } format with type from target schema
     const validMappings = {};
-    for (const [sourceField, targetField] of Object.entries(mappings)) {
-      if (targetSchema.properties[targetField]) {
-        validMappings[sourceField] = targetField;
+    for (const [sourceField, mapping] of Object.entries(mappings)) {
+      const targetField = typeof mapping === 'string' ? mapping : mapping?.field;
+      if (targetField && targetSchema.properties[targetField]) {
+        const fieldType = getFieldType(targetSchema.properties[targetField]);
+        // Use object format for special types, plain string for simple string fields
+        if (fieldType === 'link' || fieldType === 'image') {
+          validMappings[sourceField] = { field: targetField, type: fieldType };
+        } else {
+          validMappings[sourceField] = targetField;
+        }
       }
     }
     return validMappings;
@@ -725,9 +757,9 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
   const usedTargets = new Set();
 
   // Map source fields to best matching target fields by type
-  // @id (URL) → link field
+  // @id (URL) → link field (with type: 'link' for conversion)
   if (sourceFields['@id'] && firstLinkField && !usedTargets.has(firstLinkField)) {
-    mapping['@id'] = firstLinkField;
+    mapping['@id'] = { field: firstLinkField, type: 'link' };
     usedTargets.add(firstLinkField);
   }
 
@@ -743,9 +775,9 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
     usedTargets.add(firstTextareaField);
   }
 
-  // image → image field
+  // image → image field (with type: 'image' for conversion)
   if (sourceFields.image && firstImageField && !usedTargets.has(firstImageField)) {
-    mapping.image = firstImageField;
+    mapping.image = { field: firstImageField, type: 'image' };
     usedTargets.add(firstImageField);
   }
 

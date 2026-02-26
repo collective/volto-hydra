@@ -101,7 +101,7 @@
         {
           "children": [
             {
-              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks } from '@volto-hydra/hydra-js';\n\nfunction Grid({ blocks, blocks_layout, pageNum }) {\n  const paging = { start: pageNum * 6, size: 6 };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        blocks[id]['@type'] === 'listing' ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, apiUrl, contextPath,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?start=${paging.prev * paging.size}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?start=${p.start}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?start=${paging.next * paging.size}`}>Next</a>}\n    </nav>\n  );\n}"
+              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = ploneFetchItems({ apiUrl, contextPath });\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        blocks[id]['@type'] === 'listing' ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
             }
           ],
           "type": "p"
@@ -124,7 +124,7 @@
     },
     "options-text": {
       "@type": "slate",
-      "plaintext": "Options for expandListingBlocks: blocks, paging, apiUrl, fetcher, contextPath, itemTypeField, defaultItemType, extraCriteria.",
+      "plaintext": "Options for expandListingBlocks: blocks, fetchItems, paging, itemTypeField, defaultItemType.",
       "value": [
         {
           "children": [
@@ -149,6 +149,22 @@
                 {
                   "children": [
                     {
+                      "text": "fetchItems"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Required. async (block, { start, size }) => { items, total }. Use ploneFetchItems() for Plone backends."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "text": "paging"
                     }
                   ],
@@ -156,54 +172,6 @@
                 },
                 {
                   "text": " — Shared paging object { start, size } (mutated in-place with computed values)"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "apiUrl"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Plone site URL for built-in fetch"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "fetcher"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Custom fetch callback (path, body, headers) => Promise<json> (alternative to apiUrl)"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "contextPath"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Path for relative queries (default: '/')"
                 }
               ],
               "type": "li"
@@ -239,25 +207,97 @@
                 }
               ],
               "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "extraCriteria"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Additional query parameters (e.g. facets, search text)"
-                }
-              ],
-              "type": "li"
             }
           ],
           "type": "ul"
+        }
+      ]
+    },
+    "plonefetch-heading": {
+      "@type": "slate",
+      "plaintext": "ploneFetchItems Helper",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "ploneFetchItems Helper"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "plonefetch-text": {
+      "@type": "slate",
+      "plaintext": "ploneFetchItems packages image_field + image_scales into a self-contained image object.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "ploneFetchItems({ apiUrl, contextPath, extraCriteria })"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " — creates a fetchItems callback for Plone. Normalizes results by packaging image_field + image_scales into a self-contained image object { @id, image_field, image_scales }."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "For non-Plone backends, write your own: async (block, { start, size }) => { items, total }."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "fieldmapping-heading": {
+      "@type": "slate",
+      "plaintext": "Field Mapping",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Field Mapping"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "fieldmapping-text": {
+      "@type": "slate",
+      "plaintext": "fieldMapping is a whitelist mapping source fields to target block fields with optional type conversions.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "fieldMapping"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " on a listing block is a whitelist: only mapped fields appear on expanded items. Default: { @id → href, title → title, description → description, image → image }. Values can be a string (rename) or { field, type } for conversions:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"
+            }
+          ],
+          "type": "p"
         }
       ]
     },
@@ -513,6 +553,10 @@
       "example-text",
       "options-heading",
       "options-text",
+      "plonefetch-heading",
+      "plonefetch-text",
+      "fieldmapping-heading",
+      "fieldmapping-text",
       "itemtype-heading",
       "itemtype-text",
       "paging-heading",

@@ -10192,6 +10192,51 @@ function computePagingUI(paging) {
 
 }
 
+/**
+ * Convert a field value to match a target JSON Schema type.
+ * Used by expandListingBlocks when fieldMapping specifies a target type.
+ *
+ * Conversions:
+ *   array → string:  join with ", "
+ *   object (image) → string:  extract main image URL
+ *   string → link:   wrap as [{ '@id': value }]
+ *   string → array:  wrap as [value]
+ *   * → string:      String(value)
+ */
+function convertFieldValue(value, targetType) {
+  if (!targetType) return value;  // No type specified = pass through
+
+  switch (targetType) {
+    case 'string':
+      if (Array.isArray(value)) return value.join(', ');
+      if (value && typeof value === 'object') {
+        // Image object: extract main URL from image_scales
+        if (value.image_scales && value.image_field) {
+          const field = value.image_field;
+          const scaleData = value.image_scales[field];
+          if (scaleData?.[0]?.download) {
+            return `${value['@id'] || ''}/${scaleData[0].download}`;
+          }
+        }
+        return String(value);
+      }
+      return String(value);
+
+    case 'link':
+      // Wrap string URL as Volto link array: [{ '@id': url }]
+      if (typeof value === 'string') return [{ '@id': value }];
+      if (Array.isArray(value)) return value;  // Already array
+      return [{ '@id': String(value) }];
+
+    case 'array':
+      if (Array.isArray(value)) return value;
+      return [value];
+
+    default:
+      return value;  // 'object', 'number', 'boolean', 'image', 'integer' — pass through
+  }
+}
+
 export async function expandListingBlocks(inputItems, options = {}) {
   const {
     blocks: blocksDict,  // Optional: lookup dict for when items are IDs
@@ -10350,41 +10395,27 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
         // Convert each query result to a block of itemType
         // All expanded items share the same @uid (the listing block's ID)
+        // fieldMapping is a whitelist: only mapped fields end up on the block.
+        // Format: { source: { field: target, type: jsonSchemaType } }
+        // Or legacy: { source: target } (simple rename, no conversion)
+        const DEFAULT_FIELD_MAPPING = { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' };
+        const effectiveMapping = Object.keys(fieldMapping).length > 0 ? fieldMapping : DEFAULT_FIELD_MAPPING;
+
         for (const result of listingResults[blockId]) {
           const itemBlock = {
             '@uid': blockId,  // Block UID for data-block-uid attribute
             '@type': itemType,
             ...itemDefaults,
-            // readOnly: Volto standard property - disables inline editing
-            // hydra.js checks this in collectBlockFields() to skip all fields
             readOnly: true,
           };
 
-          // Apply field mapping: source field -> target field
-          // e.g., { 'title': 'headline', '@id': 'href', 'image': 'preview_image' }
-          // Fall back to standard @default mapping when no fieldMapping is defined.
-          // This handles listing blocks from standard Volto (which don't set fieldMapping).
-          const DEFAULT_FIELD_MAPPING = { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' };
-          const effectiveMapping = Object.keys(fieldMapping).length > 0 ? fieldMapping : DEFAULT_FIELD_MAPPING;
-          for (const [sourceField, targetField] of Object.entries(effectiveMapping)) {
+          for (const [sourceField, mapping] of Object.entries(effectiveMapping)) {
+            const targetField = typeof mapping === 'string' ? mapping : mapping?.field;
+            const targetType = typeof mapping === 'object' ? mapping?.type : undefined;
             if (!targetField) continue;
+            if (result[sourceField] === undefined) continue;
 
-            // Special handling for 'image' source - copy as catalog brain format
-            if (sourceField === 'image' && result.image_scales) {
-              itemBlock[targetField] = {
-                '@id': result['@id'],
-                image_field: result.image_field || 'image',
-                image_scales: result.image_scales,
-              };
-            }
-            // Special handling for href field - wrap in array format expected by link fields
-            else if (targetField === 'href' && result[sourceField] !== undefined) {
-              itemBlock[targetField] = [{ '@id': result[sourceField] }];
-            }
-            // Default: copy value as-is
-            else if (result[sourceField] !== undefined) {
-              itemBlock[targetField] = result[sourceField];
-            }
+            itemBlock[targetField] = convertFieldValue(result[sourceField], targetType);
           }
 
           items.push(itemBlock);
@@ -10448,9 +10479,25 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
     });
     const response = await res.json();
 
+    const rawItems = response.items || [];
+    // Normalize: package image_field + image_scales into self-contained image object
+    // with @id duplicated inside (imageProps needs it as base URL for relative paths)
+    const items = rawItems.map(item => {
+      if (!item.image_scales || !item.image_field) return item;
+      const normalized = { ...item };
+      normalized.image = {
+        '@id': item['@id'],
+        image_field: item.image_field,
+        image_scales: item.image_scales,
+      };
+      delete normalized.image_scales;
+      delete normalized.image_field;
+      return normalized;
+    });
+
     return {
-      items: response.items || [],
-      total: response.items_total ?? (response.items || []).length,
+      items,
+      total: response.items_total ?? rawItems.length,
     };
   };
 }

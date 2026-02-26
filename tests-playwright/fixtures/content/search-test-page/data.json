@@ -42,7 +42,7 @@
           "@type": "listing",
           "variation": "teaser",
           "fieldMapping": {
-            "@id": "href",
+            "@id": { "field": "href", "type": "link" },
             "title": "title",
             "description": "description",
             "image": "preview_image"
