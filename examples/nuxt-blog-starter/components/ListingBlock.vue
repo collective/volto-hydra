@@ -41,7 +41,7 @@ const paging = props.paging || { start: listingPage * listingPageSize, size: lis
 
 const items = await expandListingBlocks([props.id], {
   blocks: { [props.id]: props.block },
-  fetchItems: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }),
+  fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }) },
   paging,
   itemTypeField: 'variation',
 });

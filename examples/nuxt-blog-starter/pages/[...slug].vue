@@ -248,7 +248,7 @@ onMounted(() => {
                     if (page) {
                         // Mark that we have admin data with nodeIds
                         hasAdminData.value = true;
-                        // Update page data - BlockExpander components will
+                        // Update page data - ListingBlock components will
                         // re-render and expand listings via their own Suspense
                         data.value.page = page;
                     }

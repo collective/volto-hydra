@@ -10240,14 +10240,14 @@ function convertFieldValue(value, targetType) {
 export async function expandListingBlocks(inputItems, options = {}) {
   const {
     blocks: blocksDict,  // Optional: lookup dict for when items are IDs
-    fetchItems,          // async (block, { start, size }) => { items, total }
+    fetchItems,          // { blockType: async (block, { start, size }) => { items, total } }
     paging: pagingIn,    // { start, size } - mutated to track position across calls
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
     defaultItemType = 'summary',  // Default item type when field is not set
   } = options;
 
-  if (!fetchItems) {
-    throw new Error('expandListingBlocks requires a fetchItems option');
+  if (!fetchItems || typeof fetchItems !== 'object') {
+    throw new Error('expandListingBlocks requires a fetchItems map of { blockType: fetcherFn }');
   }
 
   // Normalize items: convert IDs to objects if blocksDict provided
@@ -10280,9 +10280,9 @@ export async function expandListingBlocks(inputItems, options = {}) {
   }
   paging._pending++;
 
-  // Find all listing blocks that need expansion
+  // Find all listing blocks that need expansion (any block whose @type has a fetcher)
   const listingBlockIds = blocksLayout.filter(
-    (blockId) => blocks[blockId]?.['@type'] === 'listing'
+    (blockId) => fetchItems[blocks[blockId]?.['@type']]
   );
 
   // Register listing blocks as readonly on bridge (if editing)
@@ -10333,7 +10333,8 @@ export async function expandListingBlocks(inputItems, options = {}) {
     }
 
     try {
-      const result = await fetchItems(blocks[blockId], { start: localStart, size: localSize });
+      const fetcher = fetchItems[blocks[blockId]['@type']];
+      const result = await fetcher(blocks[blockId], { start: localStart, size: localSize });
       const total = result.total || 0;
       listingTotals[blockId] = total;
       batchTotal += total;
@@ -10380,7 +10381,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
 
         // Convert each query result to a block of itemType
         // All expanded items share the same @uid (the listing block's ID)
-        // fieldMapping is a whitelist: only mapped fields end up on the block.
+        // fieldMapping acts as an allowlist: only mapped fields end up on the block.
         // Format: { source: { field: target, type: jsonSchemaType } }
         // Or legacy: { source: target } (simple rename, no conversion)
         const DEFAULT_FIELD_MAPPING = { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' };

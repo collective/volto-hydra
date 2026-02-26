@@ -137,7 +137,7 @@
                 const size = 6;
                 const pageNum = pages[containerId] || 0;
                 const paging = { start: pageNum * size, size };
-                const items = await expandListingBlocks(layout, { blocks, fetchItems, paging, itemTypeField: 'variation' });
+                const items = await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging, itemTypeField: 'variation' });
                 return { items, paging };
             };
 
@@ -189,7 +189,7 @@
                 if (expandedItems.length > 0) {
                     const footerItems = await expandListingBlocks(
                         expandedItems,
-                        { fetchItems, itemTypeField: 'variation' }
+                        { fetchItems: { listing: fetchItems }, itemTypeField: 'variation' }
                     );
                     if (myGeneration !== window._renderGeneration) return; // stale render
                     await renderContent({ items: footerItems }, 'footer-content', myGeneration);

@@ -542,12 +542,12 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
  *
  * Use this on child block types that can appear in containers with inherited defaults.
  * Specify either:
- * - editableFields: whitelist of fields that stay on child (everything else hidden)
- * - parentControlledFields: blacklist of fields that go to parent (only these hidden)
+ * - editableFields: allowlist of fields that stay on child (everything else hidden)
+ * - parentControlledFields: blocklist of fields that go to parent (only these hidden)
  *
  * @param {Object} options - Configuration options
- * @param {string[]} options.editableFields - Whitelist of fields to keep on child
- * @param {string[]} options.parentControlledFields - Blacklist of fields to hide from child
+ * @param {string[]} options.editableFields - Allowlist of fields to keep on child
+ * @param {string[]} options.parentControlledFields - Blocklist of fields to hide from child
  * @returns {Function} - A schemaEnhancer function
  *
  * @example
@@ -596,14 +596,14 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
     let fieldsToHide = new Set();
 
     if (editableFields) {
-      // Whitelist mode: hide everything except editableFields
+      // Allowlist mode: hide everything except editableFields
       for (const fieldName of Object.keys(schema.properties || {})) {
         if (!editableFields.includes(fieldName)) {
           fieldsToHide.add(fieldName);
         }
       }
     } else if (parentControlledFields) {
-      // Blacklist mode: hide only parentControlledFields
+      // Blocklist mode: hide only parentControlledFields
       fieldsToHide = new Set(parentControlledFields);
     }
 

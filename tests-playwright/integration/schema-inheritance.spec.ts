@@ -666,6 +666,11 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
       { timeout: 5000 },
     );
 
+    // Selecting a field triggers onChangeBlock → Redux → FORM_DATA → iframe
+    // re-render → BLOCK_SELECTED cascade. Wait for blocks to stabilize before
+    // interacting with the toolbar, otherwise it can unmount mid-click.
+    await helper.getStableBlockCount();
+
     // Convert the checkboxFacet to selectFacet via toolbar "Convert to" menu
     // (fieldMappings on facet types enables this action)
     await expect(toolbar).toBeVisible({ timeout: 5000 });

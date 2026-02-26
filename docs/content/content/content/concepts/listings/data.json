@@ -9,12 +9,23 @@
     },
     "intro-1": {
       "@type": "slate",
-      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. Hydra provides two helpers to handle this: staticBlocks and expandListingBlocks.",
+      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. expandListingBlocks walks a layout, fetches results for each listing-type block, and returns expanded block objects.",
       "value": [
         {
           "children": [
             {
-              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. Since the query runs client-side, Hydra provides two helpers to handle this:"
+              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. "
+            },
+            {
+              "children": [
+                {
+                  "text": "expandListingBlocks(layout, options)"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " walks a layout, fetches results for each listing-type block, and returns an array of block objects with @uid and @type."
             }
           ],
           "type": "p"
@@ -22,44 +33,26 @@
         {
           "children": [
             {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "staticBlocks(ids, { blocks, paging })"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — returns block objects you can render immediately"
-                }
-              ],
-              "type": "li"
+              "text": "You tell it which block types need fetching via a "
             },
             {
               "children": [
                 {
-                  "children": [
-                    {
-                      "text": "expandListingBlocks(ids, { blocks, paging, ... })"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — async; fetches query results and returns expanded block objects"
+                  "text": "fetchItems"
                 }
               ],
-              "type": "li"
+              "type": "strong"
+            },
+            {
+              "text": " map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
             }
           ],
-          "type": "ul"
+          "type": "p"
         },
         {
           "children": [
             {
-              "text": "Both take an array of block IDs and return an array of block objects with @uid (the block ID for data-block-uid) and @type (the block type for choosing a renderer). Both accept a shared paging object that gets mutated with page totals."
+              "text": "const items = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n  paging,\n});"
             }
           ],
           "type": "p"
@@ -93,7 +86,18 @@
         {
           "children": [
             {
-              "text": "A grid can have a mix of listing and other blocks but we want it to have a single paging at the bottom. The listings use Suspense so they load client-side:"
+              "text": "A grid can have a mix of listing and static blocks sharing a single paging. The "
+            },
+            {
+              "children": [
+                {
+                  "text": "staticBlocks"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:"
             }
           ],
           "type": "p"
@@ -101,7 +105,7 @@
         {
           "children": [
             {
-              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = ploneFetchItems({ apiUrl, contextPath });\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        blocks[id]['@type'] === 'listing' ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
+              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        fetchItems[blocks[id]['@type']] ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
             }
           ],
           "type": "p"
@@ -124,7 +128,7 @@
     },
     "options-text": {
       "@type": "slate",
-      "plaintext": "Options for expandListingBlocks: blocks, fetchItems, paging, itemTypeField, defaultItemType.",
+      "plaintext": "Options for expandListingBlocks: blocks, fetchItems (type→fetcher map), paging, itemTypeField, defaultItemType.",
       "value": [
         {
           "children": [
@@ -155,7 +159,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Required. async (block, { start, size }) => { items, total }. Use ploneFetchItems() for Plone backends."
+                  "text": " — Required. Map of { blockType: async (block, { start, size }) => { items, total } }. Keys declare which block types to expand; values are fetcher functions. Use ploneFetchItems() for Plone backends."
                 }
               ],
               "type": "li"
@@ -229,7 +233,7 @@
     },
     "plonefetch-text": {
       "@type": "slate",
-      "plaintext": "ploneFetchItems packages image_field + image_scales into a self-contained image object.",
+      "plaintext": "ploneFetchItems creates a fetcher function for Plone backends, suitable as a value in the fetchItems map.",
       "value": [
         {
           "children": [
@@ -242,7 +246,7 @@
               "type": "strong"
             },
             {
-              "text": " — creates a fetchItems callback for Plone. Normalizes results by packaging image_field + image_scales into a self-contained image object { @id, image_field, image_scales }."
+              "text": " — creates a fetcher function for Plone backends, suitable as a value in the fetchItems map. Normalizes results by packaging image_field + image_scales into a self-contained image object { @id, image_field, image_scales }."
             }
           ],
           "type": "p"
@@ -250,7 +254,7 @@
         {
           "children": [
             {
-              "text": "For non-Plone backends, write your own: async (block, { start, size }) => { items, total }."
+              "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: async (block, { start, size }) => { items, total }."
             }
           ],
           "type": "p"
@@ -273,7 +277,7 @@
     },
     "fieldmapping-text": {
       "@type": "slate",
-      "plaintext": "fieldMapping is a whitelist mapping source fields to target block fields with optional type conversions.",
+      "plaintext": "fieldMapping maps source fields to target block fields — only mapped fields appear on expanded items.",
       "value": [
         {
           "children": [
@@ -286,7 +290,7 @@
               "type": "strong"
             },
             {
-              "text": " on a listing block is a whitelist: only mapped fields appear on expanded items. Default: { @id → href, title → title, description → description, image → image }. Values can be a string (rename) or { field, type } for conversions:"
+              "text": " on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: { @id → href, title → title, description → description, image → image }. Values can be a string (rename) or { field, type } for conversions:"
             }
           ],
           "type": "p"
@@ -375,7 +379,7 @@
     },
     "paging-text": {
       "@type": "slate",
-      "plaintext": "You pass { start, size } and both helpers mutate it with computed paging values.",
+      "plaintext": "You pass { start, size } and expandListingBlocks mutates it with computed paging values.",
       "value": [
         {
           "children": [
@@ -391,7 +395,7 @@
               "type": "strong"
             },
             {
-              "text": " — both helpers mutate it with computed values:"
+              "text": " — expandListingBlocks mutates it with computed values:"
             }
           ],
           "type": "p"
@@ -570,7 +574,7 @@
   "creators": [
     "admin"
   ],
-  "description": "Using staticBlocks and expandListingBlocks helpers for listings, paging, and dynamic content",
+  "description": "Using expandListingBlocks with a fetchItems map for listings, paging, and dynamic content",
   "effective": "2025-01-01T00:00:00",
   "exclude_from_nav": false,
   "expires": null,

@@ -141,7 +141,7 @@
       <!-- Only add data-edit-text when overwrite is true (field is customizable) -->
       <!-- Title link is also linkable (clicking it shows link editor for href) -->
       <!-- Key forces Vue to recreate element when overwrite changes (avoids stale contenteditable text) -->
-      <!-- Note: listing items are marked readonly via comment syntax in BlockExpander -->
+      <!-- Note: listing items are marked readonly via comment syntax in ListingBlock -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-edit-link="href">
         <div>{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"

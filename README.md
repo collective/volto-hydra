@@ -691,54 +691,70 @@ const bridge = initBridge({
 - `field`: Field to check (use `../field` for parent/page fields)
 - Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
 
-#### Block conversion
+#### Block conversion and fieldMappings
 
-If a block type has a `fieldMappings` defined it will enable a "Convert to..." UI action.
-You specify either conversions to a specific type, or to a generic search result schema
-(@id, title, preview-image, description)
+`fieldMappings` (plural) on a block config defines how fields map between block types. This enables:
+- **"Convert to..." UI action** — editors can convert between block types (e.g., teaser → image)
+- **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](#listings-and-dynamic-blocks))
+- **Synchronised container children** — a parent controls child type, all children convert together
+
+Each key in `fieldMappings` is either a target block type name or `@default`. The `@default` key maps from a generic schema (`@id`, `title`, `description`, `image`) that query results also use:
 
 ```js
 teaser: {
   fieldMappings: {
-    @default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+    '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
     image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
   },
 },
 image: {
   fieldMappings: {
-    @default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+    '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
     teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
   },
 },
 ```
 
-Note it will perform transitive conversions by using paths through intermediate types (hero → teaser → image). Any fields that don't match will still be kept in the data so if the block
-is converted back that data will reappear.
+Transitive conversions use paths through intermediate types (hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.
 
+**fieldMapping format** — mapping values are either a string (simple field rename) or `{ field, type }` (rename with type conversion):
+
+```json
+{
+  "@id": { "field": "href", "type": "link" },
+  "title": "title",
+  "description": "description",
+  "image": "preview_image"
+}
+```
+
+When `type` is specified, the value is converted at runtime:
+
+| Type | Conversion |
+|------|-----------|
+| `string` | Arrays joined with `", "`; image objects resolved to URL string |
+| `link` | String wrapped as `[{ "@id": value }]` (Volto link format) |
+| `image` | Pass through (expects `{ "@id", image_field, image_scales }` object) |
+| `array` | Non-arrays wrapped in `[value]` |
+| _(none)_ | Copied as-is |
+
+**FieldMappingWidget** — the admin UI provides a widget that lets editors configure field mappings visually. When a listing selects an item type (e.g., `teaser`), the widget shows the `@default` source fields and lets the editor map each one to a field on the target type's schema. It auto-detects the `type` from the target field definition — e.g., an `object_browser` field with `mode=link` becomes `type: "link"`. The resulting `fieldMapping` (singular) is saved on the block data so it can be applied at render time without access to the block registry.
 
 #### Synchronised block types in a container
 
-You might want to have one container
-type that can hold different types of blocks but you want to constrain them to all have
-be the same type with synchronised settings.
-A field on the parent will let the editor select the type and all the blocks will get
-converted to that new type using ```fieldMappings```.
-
+A parent container can control the type of all its children. A field on the parent lets the editor select the type, and all child blocks get converted using `fieldMappings`.
 
 ```js
 const bridge = initBridge({
   blocks: {
-    // Parent container: controls child type via 'variation' field
-    // inheritSchemaFrom creates the typeField with computed choices
     gridBlock: {
-      allowedBlocks: ['teaser', 'image'],  // Allowed child block types
+      allowedBlocks: ['teaser', 'image'],
       schemaEnhancer: {
         inheritSchemaFrom: {
           typeField: 'variation',
         },
       },
     },
-    // Child block: hides fields that parent controls
     teaser: {
       schemaEnhancer: {
         childBlockConfig: {
@@ -746,7 +762,7 @@ const bridge = initBridge({
         },
       },
       fieldMappings: {
-        default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' }
+        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
       },
     },
   },
@@ -757,8 +773,8 @@ const bridge = initBridge({
 - `typeField`: Field name for selecting child type (e.g., `'variation'`)
 - `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
 - `blocksField`: Which blocks field the sub-blocks will be in. Used to get the list
-     of `allowedBlocks`. It can be set to ".." to use the parents `allowedBlocks`
-- `filterConvertibleFrom`: only allow selecting a block type which can convert from the specified type.
+     of `allowedBlocks`. It can be set to `".."` to use the parent's `allowedBlocks`
+- `filterConvertibleFrom`: only allow selecting a block type which can convert from the specified type
 
 **`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
 
@@ -1227,73 +1243,118 @@ The steps involved in creating a frontend are roughly the same for all these fra
 
 ## Listings and dynamic blocks
 
-A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. Since the query runs client-side, Hydra provides two helpers to handle this:
-
-- **`staticBlocks(ids, { blocks, paging })`** — returns block objects you can render immediately
-- **`expandListingBlocks(ids, { blocks, paging, ... })`** — async; fetches query results and returns expanded block objects
-
-Both take an array of block IDs and return an array of block objects with `@uid` (the block ID for `data-block-uid`) and `@type` (the block type for choosing a renderer). Both accept a shared `paging` object that gets mutated with page totals.
-
-### How expandListingBlocks works
-
-`expandListingBlocks` is backend-agnostic. You provide a `fetchItems` callback that fetches content items from your backend — Hydra handles shared paging across multiple listings and maps results to block objects via `fieldMapping`.
-
-**Fetching — sequential single-pass**
-
-`expandListingBlocks` walks listings in layout order, fetching each one sequentially. Each `fetchItems` call returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts — no separate "get totals" phase needed. This means one request per listing instead of two. Listings before or after the page window are fetched with `size: 0` (total only).
-
-For Plone backends, use the provided `ploneFetchItems` helper:
+A listing block fetches content from a query (e.g. latest news) and renders each result as a separate block. `expandListingBlocks` handles fetching, paging, and mapping results to block objects:
 
 ```js
 import { expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
 
+const paging = { start: 0, size: 6 };
 const items = await expandListingBlocks(layout, {
   blocks, paging,
-  fetchItems: ploneFetchItems({ apiUrl, contextPath, extraCriteria }),
+  fetchItems: { listing: ploneFetchItems({ apiUrl, contextPath }) },
 });
+// items = [{ '@uid': 'listing-1', '@type': 'summary', title: 'My Article', href: '/my-article', ... }, ...]
 ```
 
-For non-Plone backends, provide your own `fetchItems`:
+See [ListingBlock.vue](./examples/nuxt-blog-starter/components/ListingBlock.vue) for a Vue equivalent.
+
+### fetchItems
+
+`fetchItems` is a map of block type → fetcher function. The keys tell `expandListingBlocks` which block types to expand; all other blocks are treated as static. Each fetcher receives the block and a `{ start, size }` pair:
+
+```js
+async (block, { start, size }) => ({ items: [...], total: number })
+```
+
+- **`start`**: zero-based offset into results
+- **`size`**: number of items to return (0 = return total only, no items)
+- **Returns**: `{ items, total }` where `total` is the full count, not just this page
+
+Items should have the fields referenced in the listing's `fieldMapping` (typically `@id`, `title`, `description`, `image`).
+
+Different block types can use different fetchers:
 
 ```js
 const items = await expandListingBlocks(layout, {
   blocks, paging,
-  fetchItems: async (block, { start, size }) => {
-    const res = await fetch(`/api/search?offset=${start}&limit=${size}`);
-    const data = await res.json();
-    return { items: data.results, total: data.count };
+  fetchItems: {
+    listing: ploneFetchItems({ apiUrl, contextPath }),
+    rssFeed: async (block, { start, size }) => {
+      const res = await fetch(`/api/rss?url=${block.feedUrl}&offset=${start}&limit=${size}`);
+      const data = await res.json();
+      return { items: data.results, total: data.count };
+    },
   },
 });
 ```
 
-**Mapping (generic)**
+**ploneFetchItems** — factory returning a fetcher for Plone's `@querystring-search` endpoint:
 
-After fetching, each query result is converted to a block object using `fieldMapping` — a whitelist stored on the listing block data. Only mapped fields end up on the item block:
+| Option | Default | Description |
+|--------|---------|-------------|
+| `apiUrl` | — | Plone site URL (e.g., `'http://localhost:8080/Plone'`) |
+| `contextPath` | `'/'` | Path for relative queries |
+| `extraCriteria` | `{}` | Additional query params — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys |
 
-- Each result becomes a block with `@type` set to the listing's item type (`variation` field, default `summaryItem`)
-- `fieldMapping` keys are source fields from query results; values specify the target field and optional type conversion
-- Values can be a plain string (`"title": "title"` — simple rename) or an object with `field` and `type` (`"@id": { "field": "href", "type": "link" }` — rename + type conversion)
-- `itemDefaults` (from the listing's `itemDefaults_*` flat keys) are spread onto each item block
-- If no `fieldMapping` is saved, a built-in default is used: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`
+A listing with no `querystring` defaults to showing current folder contents in folder order. `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
 
-**Type conversions**
+```js
+// Plone search result:
+{ "@id": "/news/article", image_field: "image", image_scales: { image: [{ ... }] } }
 
-When a mapping specifies a `type`, `expandListingBlocks` converts the source value to match the target block field's expected format:
+// After normalization:
+{ "@id": "/news/article", image: { "@id": "/news/article", image_field: "image", image_scales: { ... } } }
+```
 
-| Type | Conversion |
-|------|-----------|
-| `string` | Arrays → joined with `", "`; image objects → resolved URL string; others → `String(value)` |
-| `link` | Wraps string URL as Volto link array: `[{ "@id": url }]`; arrays pass through |
-| `image` | Pass through (use with `ploneFetchItems` which packages image data as `{ "@id", image_field, image_scales }`) |
-| `array` | Wraps non-arrays in `[value]`; arrays pass through |
-| _(none)_ | No conversion — value is copied as-is |
+This self-contained object has everything needed to resolve image URLs with scale support (see the Nuxt example's `composables/imageProps.js` for one approach).
 
-The admin UI's `FieldMappingWidget` automatically detects the target field type from the block schema (e.g., `object_browser` with `mode=link` → `link`, `widget=image` → `image`) and stores the `{ field, type }` format.
+### fieldMapping and item types
 
-### Example: Mixing listings, blocks and paging
+Each listing block stores a `fieldMapping` on its block data that maps query result fields to item block fields. Only mapped fields end up on the item block. See [Block conversion and fieldMappings](#block-conversion-and-fieldmappings) for the format (string values for simple renames, `{ field, type }` for type conversions).
 
-A grid has a mix of listing and other blocks but we want a single pager
-at the bottom. The listings use suspense so they load client-side.
+When no `fieldMapping` is saved, a built-in default is used: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`.
+
+Each item block gets `@type` from the listing's `variation` field, defaulting to `'summary'`. Built-in item types:
+
+| Type | Fields |
+|------|--------|
+| `default` | `title`, `description`, `href` |
+| `summary` | `title`, `description`, `href`, `image` |
+| `teaser` | `title`, `description`, `href`, `preview_image` |
+
+To let editors choose item types and configure mappings, use `inheritSchemaFrom` on the listing block config:
+
+```js
+listing: {
+  schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
+    filterConvertibleFrom: '@default',
+    title: 'Item Type',
+    default: 'summaryItem',
+  }),
+}
+```
+
+This adds a type selector to the listing's sidebar. When the editor picks a type, the `FieldMappingWidget` maps `@default` source fields to the chosen type's schema and saves the result as `fieldMapping`.
+
+### Paging
+
+`expandListingBlocks` accepts a `paging` object `{ start, size }` that gets mutated with computed values:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `currentPage` | `number` | Zero-based current page index |
+| `totalPages` | `number` | Total number of pages |
+| `totalItems` | `number` | Total item count across all blocks |
+| `prev` | `number \| null` | Previous page index, or `null` on first page |
+| `next` | `number \| null` | Next page index, or `null` on last page |
+| `pages` | `array` | Window of ~5 page objects: `{ start, page }` where `page` is 1-based |
+| `_ready` | `Promise` | Resolves after all `expandListingBlocks` calls complete |
+
+When multiple listings share a pager (e.g., in a grid), `expandListingBlocks` walks them sequentially — each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only).
+
+When mixing listings with static blocks in a shared pager, use **`staticBlocks(ids, { blocks, paging })`** for the non-listing blocks — it tracks their position in the paging window so totals stay correct.
+
+**Example: grid with listings, static blocks, and shared paging (React Suspense)**
 
 ```jsx
 import { Suspense } from 'react';
@@ -1301,7 +1362,7 @@ import { staticBlocks, expandListingBlocks, ploneFetchItems } from '@volto-hydra
 
 function Grid({ blocks, blocks_layout, pageNum }) {
   const paging = { start: pageNum * 6, size: 6 };
-  const fetchItems = ploneFetchItems({ apiUrl, contextPath });
+  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };
 
   return (
     <div className="grid">
@@ -1324,14 +1385,12 @@ function Grid({ blocks, blocks_layout, pageNum }) {
 }
 
 async function ListingItems({ id, blocks, paging, fetchItems }) {
-  const items = await expandListingBlocks([id], {
-    blocks, paging, fetchItems,
-  });
+  const items = await expandListingBlocks([id], { blocks, paging, fetchItems });
   return items.map(item => <Block key={item['@uid']} block={item} />);
 }
 
 async function PagingWhenReady({ paging }) {
-  await paging._ready;  // resolves after all expandListingBlocks calls complete
+  await paging._ready;
   if (paging.totalPages <= 1) return null;
   return (
     <nav>
@@ -1348,110 +1407,15 @@ async function PagingWhenReady({ paging }) {
 }
 ```
 
-See [BlockExpander.vue](./examples/nuxt-blog-starter/components/BlockExpander.vue) for a Vue equivalent.
-
 ### expandListingBlocks options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `blocks` | — | Map of blockId to block data |
-| `paging` | — | Shared paging object `{ start, size }` (mutated in-place with computed values — see below) |
-| `fetchItems` | — | `async (block, { start, size }) => { items, total }` — fetches content items from your backend |
+| `paging` | — | Shared paging object `{ start, size }` (mutated in-place) |
+| `fetchItems` | — | `{ blockType: async (block, { start, size }) => { items, total } }` |
 | `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
-| `defaultItemType` | `'summaryItem'` | Fallback type when field is not set |
-
-### ploneFetchItems options
-
-`ploneFetchItems` is a factory that returns a `fetchItems` callback for Plone's `@querystring-search` endpoint:
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `apiUrl` | — | Plone site URL (e.g., `'http://localhost:8080/Plone'`) |
-| `contextPath` | `'/'` | Path for relative queries |
-| `extraCriteria` | `{}` | Additional query params — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys |
-
-Internally uses `buildQuerystringSearchBody` to construct Plone query bodies. A listing with no `querystring` defaults to showing current folder contents in folder order (`relativePath: '.'`, `sort_on: 'getObjPositionInParent'`).
-
-**Image normalization**: `ploneFetchItems` packages Plone's `image_field` + `image_scales` into a self-contained `image` object on each result item. The item's `@id` is duplicated inside the image object (needed by `imageProps` as a base URL for resolving relative `download` paths):
-
-```js
-// Plone search result:
-{ "@id": "/news/article", image_field: "image", image_scales: { image: [{ ... }] }, ... }
-
-// After ploneFetchItems normalization:
-{ "@id": "/news/article", image: { "@id": "/news/article", image_field: "image", image_scales: { image: [{ ... }] } }, ... }
-```
-
-This means `fieldMapping` can map `"image"` to any image-type field and frontends can use `imageProps(item.image)` to resolve URLs with scale support. For non-Plone backends, your `fetchItems` should return items with whatever image format your frontend expects.
-
-### fetchItems contract
-
-Your `fetchItems` callback receives a listing block object and a `{ start, size }` pair:
-
-- **`start`**: zero-based offset into this listing's results
-- **`size`**: number of items to return (0 means return no items, just the total)
-- **Returns**: `{ items: [...], total: number }` where `total` is the full count (not just this page)
-
-Each item in `items` should have the fields referenced in the listing block's `fieldMapping` (typically `@id`, `title`, `description`, and `image`). For Plone, `ploneFetchItems` normalizes image data into a self-contained `image` object (see above). For other backends, return items with whatever field names and formats your frontend expects.
-
-### Item type and field mapping
-
-Each expanded listing item gets `@type` from the listing block's `variation` field (or `itemType` — controlled by `itemTypeField` option), defaulting to `'default'`. The item's fields are populated from query results via the listing block's `fieldMapping`.
-
-The admin UI computes `fieldMapping` automatically from the selected item type's `fieldMappings['@default']` (see [Block conversion](#block-conversion)). For example, selecting `teaser` as the variation auto-populates:
-
-```json
-"fieldMapping": {
-  "@id": { "field": "href", "type": "link" },
-  "title": "title",
-  "description": "description",
-  "image": "preview_image"
-}
-```
-
-Values are either a string (simple rename) or `{ field, type }` (rename + type conversion). The `type` is auto-detected from the target block's schema — e.g., an `object_browser` field with `mode=link` gets type `"link"`, which tells `expandListingBlocks` to wrap the `@id` string as `[{ "@id": value }]`.
-
-This mapping is saved to the block data, so `expandListingBlocks` can apply it without access to the block registry. It acts as a whitelist: only source fields listed in the mapping end up on the item block.
-
-**Built-in item types:**
-
-| Type | Fields | Description |
-|------|--------|-------------|
-| `default` | `title`, `description`, `href` | Title + description |
-| `summary` | `title`, `description`, `href`, `image` | Title + description + image thumbnail |
-| `teaser` | `title`, `description`, `href`, `preview_image` | Full teaser card |
-
-You can add custom item types or use `inheritSchemaFrom` to let editors choose:
-
-```js
-listing: {
-  schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
-    filterConvertibleFrom: '@default',
-    title: 'Item Type',
-    default: 'summaryItem',
-  }),
-}
-```
-
-### Paging values
-
-You pass `{ start, size }` — both helpers mutate it with computed values:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `currentPage` | `number` | Zero-based current page index |
-| `totalPages` | `number` | Total number of pages |
-| `totalItems` | `number` | Total item count across all blocks |
-| `prev` | `number \| null` | Previous page index, or `null` on first page |
-| `next` | `number \| null` | Next page index, or `null` on last page |
-| `pages` | `array` | Window of ~5 page objects: `{ start, page }` where `page` is 1-based |
-| `_ready` | `Promise` | Resolves after all `expandListingBlocks` calls complete (for async paging UI) |
-
-### Notes
-
-- Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
-- `fieldMapping` must be persisted in the block data. The admin UI computes it from the item type's `fieldMappings['@default']` and saves it. Without a saved `fieldMapping`, `expandListingBlocks` falls back to a built-in default mapping: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`.
-- The `fieldMapping` format supports both legacy string values (`"title": "title"`) and the new `{ field, type }` format (`"@id": { "field": "href", "type": "link" }`). The admin UI's `FieldMappingWidget` auto-detects the type from the target block schema and saves the appropriate format.
+| `defaultItemType` | `'summary'` | Fallback type when field is not set |
 
 ## Templates
 
