@@ -28,15 +28,21 @@
           "field": "review_state",
           "type": "checkboxFacet",
           "multiple": false
+        },
+        {
+          "@id": "facet-subject",
+          "title": "Subject",
+          "field": "Subject",
+          "type": "selectFacet"
         }
       ],
       "sortOnOptions": ["effective", "created", "sortable_title"],
-      "listing": {
+      "blocks": {
         "results-listing": {
           "@type": "listing",
           "variation": "teaser",
           "fieldMapping": {
-            "@id": "href",
+            "@id": { "field": "href", "type": "link" },
             "title": "title",
             "description": "description",
             "image": "preview_image"
@@ -54,7 +60,7 @@
           }
         }
       },
-      "listing_layout": {
+      "listing": {
         "items": ["results-listing"]
       }
     }

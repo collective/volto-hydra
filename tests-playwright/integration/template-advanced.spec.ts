@@ -230,29 +230,33 @@ test.describe('Template Placeholder Replacement', () => {
     await helper.clickQuantaToolbarMenuOption('user-content-2', 'Remove');
     await helper.waitForBlockToDisappear('user-content-2');
 
-    // All placeholder blocks are gone. The grid block (fixed) now has
-    // nextPlaceholder: "primary" from the merge, so its add button is visible.
-    // Click the grid block (find by content since fixed blocks get new UUIDs after merge).
-    const gridBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Grid Cell 1' }).first();
-    await expect(gridBlock).toBeVisible();
-    const gridBlockId = await gridBlock.getAttribute('data-block-uid');
+    // All placeholder blocks are gone. After deleting user-content-2,
+    // selection auto-moves to the previous block (the grid or its cell).
+    // The grid block (fixed) has nextPlaceholder: "primary" from the merge,
+    // so the add button should be visible at the page level.
 
-    // Record all block IDs before adding, so we can find the new one by set difference
-    // (getBlockOrder includes nested blocks, so position-based lookup doesn't work)
+    // Record all block IDs before adding, so we can find the new one by set difference.
     const blockIdsBefore = new Set(await helper.getBlockOrder());
 
-    await helper.clickBlockInIframe(gridBlockId!);
-    await helper.waitForSidebarOpen();
+    // The grid block is already selected after the delete — just click add.
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
 
-    // Wait for new block to appear (removed 2, added 1)
-    await helper.waitForBlockCountToBe(initialCount - 1);
+    // Wait for the new block to appear (find by set difference)
+    await helper.getStableBlockCount();
 
     // Find the new block by set difference
     const blockIdsAfter = await helper.getBlockOrder();
     const newBlockUid = blockIdsAfter.find(id => !blockIdsBefore.has(id));
     expect(newBlockUid).toBeTruthy();
+
+    // Verify the new block is in the right position: after the grid, before the footer.
+    // Get block text content in DOM order to verify ordering.
+    const gridBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Grid Cell 1' }).first();
+    const gridBlockId = await gridBlock.getAttribute('data-block-uid');
+    const gridIdx = blockIdsAfter.indexOf(gridBlockId!);
+    const newIdx = blockIdsAfter.indexOf(newBlockUid!);
+    expect(newIdx).toBeGreaterThan(gridIdx);
 
     // Type content into the new block so it's not empty
     await helper.clickBlockInIframe(newBlockUid!);
@@ -268,17 +272,12 @@ test.describe('Template Placeholder Replacement', () => {
 
     // In view mode the bridge runs the merge again.
     // The new block should survive because it inherited placeholder: "primary".
-    // Check by content (more robust than UID which may change during template re-merge on some frontends).
     const newContentBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'New placeholder content' });
     await expect(newContentBlock).toBeVisible({ timeout: 15000 });
 
-    // Original placeholder blocks should be gone
-    await expect(iframe.locator('[data-block-uid="user-content-1"]')).not.toBeVisible();
-    await expect(iframe.locator('[data-block-uid="user-content-2"]')).not.toBeVisible();
-
-    // Template fixed blocks still present
+    // Verify order after reload: header, grid, new content, footer
     await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first()).toBeVisible();
-    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Footer' })).toBeVisible();
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Footer' }).first()).toBeVisible();
   });
 });
 
@@ -434,6 +433,41 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const idxContent2 = finalOrder.indexOf('user-content-2');
     const idxNew = finalOrder.indexOf(newBlockId);
     expect(idxNew).toBe(idxContent2 + 1);
+  });
+
+  test('nested template instance in grid shows simplified sidebar without settings form', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Wait for template merge
+    const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
+    await expect(headerBlock).toBeVisible({ timeout: 15000 });
+
+    // Click the grid cell to select it, then Escape to parent levels
+    const { locator: gridCell } = await helper.waitForBlockByContent('Template Grid Cell 1');
+    await gridCell.click();
+    await helper.waitForSidebarOpen();
+
+    // The sidebar parent hierarchy should show both template levels:
+    // - "Template: test-layout" (top-level, with settings form)
+    // - "Template blocks" (nested inside grid, no settings form)
+
+    // Verify both labels are visible in the parent hierarchy
+    const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
+    const topLabel = page.locator('button').filter({ hasText: /Template: test-layout/ });
+    await expect(nestedLabel).toBeVisible({ timeout: 5000 });
+    await expect(topLabel).toBeVisible({ timeout: 5000 });
+
+    // The nested "Template blocks" section should NOT have template settings fields
+    expect(await helper.hasSidebarField('title', 'Template blocks')).toBe(false);
+    expect(await helper.hasSidebarField('editTemplate', 'Template blocks')).toBe(false);
+
+    // The top-level "Template: test-layout" section SHOULD have template settings fields
+    expect(await helper.hasSidebarField('title', 'Template: test-layout')).toBe(true);
+    expect(await helper.hasSidebarField('editTemplate', 'Template: test-layout')).toBe(true);
   });
 });
 

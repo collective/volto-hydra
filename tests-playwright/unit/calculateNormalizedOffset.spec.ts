@@ -23,7 +23,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">This is a test</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -56,7 +56,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">Hello <strong data-node-id="0-1">bold</strong> world</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -89,7 +89,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">Hello <strong data-node-id="0-1">bold</strong> world</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -122,7 +122,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">Hello <strong data-node-id="0-1">bold</strong> world</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -155,7 +155,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         '<strong data-node-id="0-0">first</strong>' +
         ' middle ' +

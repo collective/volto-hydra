@@ -50,92 +50,68 @@ to demonstrate scale-to-zero editing (free hosting) see [SSG/SSR with Hydra](./s
 ## Quick Start
 
 To make a site editable with hydra you will need to break up your page into
-- slots - areas of the page that contain a list of blocks that make up your page content
+
+- blocks layout - areas of the page that contain a list of blocks that make up your page content
 - blocks - a discrete visual element of the page with a schema and settings that can be moved around and edited
-   -  fields - string, image, link etc each with their own sidebar widget
-   -  container fields/slots - areas on the block where more blocks can be added
-   -  rich text - container field that contains slate blocks each being one paragraph or heading.
+  - type, title, icon etc so the user can pick from a menu 
+  - fields: string, image, link etc each with their own sidebar widget
+    - slate is a special field that contains json representing a single paragraph, heading etc. 
+    - blocks fields: enables a block to hold other blocks 
 
 With a hydra instance running, go to user preferences and enter the url of your frontend.
 
-Modify your front end to work with the editor by loading the hydra bridge.
-
+Modify your front end to work with the editor by loading the hydra bridge and define your 
+blocks and page.
 
 ```js
 let bridge;
 
 if (window.name.startsWith('hydra')) {
     bridge = initBridge({
-      // Configure page-level blocks fields
-      // Default: [{ fieldName: 'blocks' }] with all non-restricted block types
-      pageBlocksFields: [
-        { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'grid', 'myimage'] },
-      ],
-      voltoConfig: {
-        blocks: {
-          blocksConfig: {
-            // we can add custom blocks (or alter builtin ones)
-            myimage: {
-              blockSchema: {
-                properties: {
-                  image: { widget: 'image' },
-                  url: { widget: 'url' },
-                  caption: { type: 'string' },
-                }
-              }
+      page: {
+        schema: {
+          properties: {
+            blocks_layout: { allowedBlocks: ['slate', 'grid', 'myimage'] },
+            header_blocks: { allowedBlocks: ['slate', 'image'], maxLength: 3 },
+            footer_blocks: { allowedBlocks: ['slate', 'link'] },
+          },
+        },
+      },
+      blocks: {
+        // we can add custom blocks (or alter builtin ones)
+        myimage: {
+          blockSchema: {
+            properties: {
+              image: { widget: 'image' },
+              url: { widget: 'url' },
+              caption: { type: 'string' },
             }
           }
         }
-      }
+      },
+      onEditChange: (formData) => renderPage(formData),
     });
 }
+else {
+    // When not editing, render from the server api
+    renderPage(await fetchContent(path));
+}
+
 ```
 
-### Multiple Page-Level Blocks Fields
-
-Pages can have multiple blocks fields (e.g., header, content, footer). If you don't specify a 'blocks' field, one is automatically added with all non-restricted block types:
-
-```js
-bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'header_blocks', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
-    // 'blocks' field is automatically added if not specified
-    { fieldName: 'footer_blocks', title: 'Footer', allowedBlocks: ['slate', 'link'] }
-  ],
-  voltoConfig: { ... }
-});
-```
-
-Or explicitly configure the 'blocks' field:
-
-```js
-bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'header_blocks', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
-    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'hero', 'columns'] },
-    { fieldName: 'footer_blocks', title: 'Footer', allowedBlocks: ['slate', 'link'] }
-  ],
-});
-```
-
-Each page field is shown as a separate section in the sidebar when no block is selected. The page data structure becomes:
+The page data structure becomes:
 
 ```js
 {
-  header_blocks: { 'header-1': { '@type': 'image', ... } },
-  header_blocks_layout: { items: ['header-1'] },
-  blocks: { 'text-1': { '@type': 'slate', ... } },
+  ...
+  blocks: { 
+    'text-1': { '@type': 'slate', ... },
+    'header-1': { '@type': 'image', ... },
+    'footer-1': { '@type': 'slate', ... }  
+  },
   blocks_layout: { items: ['text-1'] },
-  footer_blocks: { 'footer-1': { '@type': 'slate', ... } },
-  footer_blocks_layout: { items: ['footer-1'] }
-}
-
-if (window.name.startsWith('hydra-edit')) {
-    // When the user edits the page we take the content directly from the editor
-    bridge.onEditChange((formData) => renderPage(formData));
-} else {
-    // Otherwise we render from the server api
-    renderPage(await fetchContent(path));
+  header_blocks: { items: ['header-1'] },
+  footer_blocks: { items: ['footer-1'] }
 }
 ```
 
@@ -143,11 +119,11 @@ Finally augment the frontend's rendered html telling hydra where your blocks are
 the fields are.
 
 ```html
-<!-- hydra editable-field=title -->
+<!-- hydra edit-text=title -->
 <div>Page Title</div>
 
 <div id=content>
-  <!-- hydra block-uid="1234" editable-field=title(p) media-field=image(img) linkable-field=url -->
+  <!-- hydra block-uid="1234" edit-text=title(p) edit-media=image(img) edit-link=url -->
   <a href="http://go.to">
     <img src="http://my.img"/>
     <p>A caption</p>
@@ -156,7 +132,7 @@ the fields are.
 ```
 
 Note you can just embed the hydra tags directly if you want,
-e.g. `<p data-editable-field="title">A caption</p>`
+e.g. `<p data-edit-text="title">A caption</p>`
 
 
 ## Run locally
@@ -220,6 +196,7 @@ building a Headless Frontend to Plone RESTAPI](./#building-a-frontend-for-headle
 ### SPA/Hybrid with Hydra
 
 Hydra requires a SPA or Hybrid frontend if you want to have full Visual Editing.
+
 - Deploy your frontend in as either a Single Page App (SPA) or Hybrid (Server side rendering with client side rendering after first load)
 - Deploy Hydra and the plone api server.
 - Login in to hydra and set your frontend url.
@@ -231,21 +208,21 @@ while still getting the benefits of Visual Editing with Hydra. Or you might requ
 pure Server Side Rendered (SSR) mode.
 
 To achieve this
+
 - deploy your production frontend in SSG or SSR mode
 - deploy Hydra and Plone api server
-   - note this only has to run during editing so scale-to-zero/serverless is an option
+  - note this only has to run during editing so scale-to-zero/serverless is an option
 - deploy your same frontend in SPA mode to another url which is only used in Hydra for editing
 - For SSG you will also need [c.webhook](https://github.com/collective/collective.webhook) and configure this to rebuild your SSG on edit.
-   - For a SSR frontend c.webhook is not needed 
-
+  - For a SSR frontend c.webhook is not needed 
 
 For example, fro the default Nuxt.js demo frontend:
+
 - The production frontend is deployed as a [SSG on netlify](https://hydra-nuxt-flowbrite.netlify.app/).
-   - Images and listings are all statically generated
-   - Search can't be SSG but with scale-to-zero and suspend hosting the cold start delay of a search might be an acceptable tradeoff.
+  - Images and listings are all statically generated
+  - Search can't be SSG but with scale-to-zero and suspend hosting the cold start delay of a search might be an acceptable tradeoff.
 - The Administration interface (https://hydra.pretagrov.com) and Plone server is deployed to fly.io using scale-to-zero so the cost is free or minimal
 - During editing, a different deployment ([SPA on netlify](https://hydra-nuxt-flowbrite-edit.netlify.app/)) of the same frontend is used
-
 
 ### Two-Window editing (without hydra)
 
@@ -262,7 +239,7 @@ You can use Plone Headless without Hydra using Volto instead
   - Any new blocks you create will have a skeleton presentation within the preview
   - Any header/footer css etc won't reflect your frontend
   - Once done editing a page, you can ask users to switch to another tab and use the frontend URL and see how the changes look on your frontend
-     - if the page is private you will additionally have to implement a way to login on your frontend to see these pages
+    - if the page is private you will additionally have to implement a way to login on your frontend to see these pages
 - If you need a more WYSIWYG editing experience
   - Use Volto theming to recreate design inside volto, or close enough so your editors are happy.
     - this would be a duplicate any effort you did on the frontend.
@@ -323,7 +300,7 @@ CMS-Toolbar           Frontend in iframe (hydra adds minimal block select/edit U
 - Level 5: lets the user edit text, images and links directly on the preview
 - Level 6: if needed, customise CMS UI or more complex visual editing in the frontend
 
-### Level 0: Headless frontend with vanila volto (no hydra visual editing)
+### Level 0: Headless frontend with vanilla volto (no hydra visual editing)
 
 First is to start with a frontend technology of your choice.
 Since our goal is to not modify the CMS we will initially be stuck with the out of the box CMS block types and content types.
@@ -335,7 +312,7 @@ You can use whatever frontend technology you want but a basic vue.js example mig
 <template>
     <Header :data="data"/>
     <content>
-            <Block  :block_id="block_id" :block="data.blocks[block_id]" :data="data" v-for="block_id in data.blocks_layout"/>
+            <Block  :block_id="block_id" :block="data.blocks[block_id]" :data="data" v-for="block_id in data.blocks_layout.items"/>
     </content>
     <Footer :data="data/>  
 </template>
@@ -344,28 +321,26 @@ const { data, error } = await ploneApi({});
 </script>
 ```
 
-
 Now you have true headless site where the deployment of your frontend is not tightly integrated with your editor.
 
-
 At this your Editor can :-
+
 - login to hydra and see the frontend in an iframe. The result will look similar to Volto.
-   - but they can't see private pages yet because your renderer is not yet logged in 
+  - but they can't see private pages yet because your renderer is not yet logged in 
 - browse in hydra (contents view) and your frontend page will change. 
-   - but browse in your frontend and the CMS won't yet change context as it can't detect the page switch
+  - but browse in your frontend and the CMS won't yet change context as it can't detect the page switch
 - add a page in hydra.
-   - Note: since pages are created private you won't see a preview unless you publish first.
-   - Note: You now need to create a page and give it a title before editing.
-      - This has the benefit that images added during editing always default to being contained inside the page.  
+  - Note: since pages are created private you won't see a preview unless you publish first.
+  - Note: You now need to create a page and give it a title before editing.
+    - This has the benefit that images added during editing always default to being contained inside the page.  
 - edit a page
-   - selecting, adding, editing and rearranging the block layout all is done via the sidebar
-      - You will see more fields than normal volto to make this possible 
-   - only after you save it will reload the iframe and the changes will appear on your frontend.
-   - (later it should be possible do live updates even with SSR but via the RESTAPI) - TODO
+  - selecting, adding, editing and rearranging the block layout all is done via the sidebar
+    - You will see more fields than normal volto to make this possible 
+  - only after you save it will reload the iframe and the changes will appear on your frontend.
+  - (later it should be possible do live updates even with SSR but via the RESTAPI) - TODO
 - remove a page.
 - all other CMS features such as site setup, contents, worklow will work the same as Volto
-   - History won't show a visual diff (TODO explore if there is a way...) 
-
+  - History won't show a visual diff (TODO explore if there is a way...) 
 
 ### Level 1: Preview with Page Switching and authentication
 
@@ -373,21 +348,28 @@ We include the hydra iframe bridge which creates a two way link between the hydr
 
 - Take the latest [hydra.js](https://github.com/collective/volto-hydra/tree/main/packages/hydra-js) frome hydra-js package and include it in your frontend
 - During admin, initilize it with Volto settings
+
   ```js
   import { initBridge } from './hydra.js';
   const bridge = initBridge({
-    pageBlocksFields: [
-      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-    ],
+    page: {
+      schema: {
+        properties: {
+          blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+        },
+      },
+    },
   });
   ```
+
 - To know you are in being managed by hydra by an extra url param is added to your frontend ```_edit=``` (see [Lazy Loading](#lazy-load-the-bridge)) or ```window.name``` starts with hydra.
 - To see private content you will need to [change your authentication token]((#authenticatitee-frontend-to-access-private-content))
 
 This will enable an Editor to :-
+
 - browse in your frontend and Hydra will change context so AdminUI actions are on the current page you are seeing.
 - add a page in hydra and it will appear.
-   - now the frontend has the same editor authentication it can see private content
+  - now the frontend has the same editor authentication it can see private content
 - edit a page the content still won't change until after save
 
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
@@ -398,9 +380,13 @@ If your frontend embeds state in the URL path (like pagination), you need to tel
 
 ```js
 const bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-  ],
+  page: {
+    schema: {
+      properties: {
+        blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+      },
+    },
+  },
   // Transform frontend path to API path by stripping paging segments
   // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
   pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
@@ -409,11 +395,24 @@ const bridge = initBridge({
 
 The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
 
-### Level 2: Custom Blocks
+### Level 2: Block Definitions
+
+During the initialisation you can have full control over the blocks that will be stored,
+their schema and where to can be added.
+
+- `page` > `schema` > `properties`: lets you specify regions of the page where blocks can be added. The default is `blocks_layout`
+  - `allowedBlocks`: you can enable or disable any builtin blocks (note this will stop
+      new blocks being added by not filter blocks already saved.)
+  - Note you can't currently change the page metadata schema itself.  
+    - Currently custom content types are created via "Site Setup > Content types".
+- `blocks`: Override settings of builtin blocks or add new block definitions
+  - `blockSchema` > `properties`: field definitions for your block such as `title`, `type` or `widget`. 
+- `voltoConfig`: in the future will let you change other settings like slate formats
+  ([TODO](https://github.com/collective/volto-hydra/issues/109)) or toolbar actions.
+-  
 
 Let's take a specific example of a slider block you want to have available for your editors. This is not a default block type so 
 you will need to add it custom. Normally this would require developing a volto plugin and installing it into your custom volto instance.
-
 
 For our slider example, we can configure this new block directly in the frontend
 
@@ -421,87 +420,105 @@ For our slider example, we can configure this new block directly in the frontend
 import { initBridge } from './hydra.js';
 
 const bridge = initBridge({
-  pageBlocksFields: [
-    { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'slider'] },
-  ],
-  voltoConfig: {
-    blocks: {
-      blocksConfig: {
-        slider: {
-          id: 'slider', // The name (id) of the block
-          title: 'Slider', // The display name of the block
-          icon: 'data:...', // The icon used in the block chooser
-          group: 'common', // The group (blocks can be grouped, displayed in the chooser)
-          restricted: false,
-          mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
-          sidebarSchemaOnly: false, // Set true to disable Edit component in sidebar (use schema form only)
-          blockSchema: {
-            properties: {
-              slider_timing: {
-                title: "time",
-                widget: 'float',
-              },
-              slides: {
-                title: "Slides",
-                type: 'blocks',
-                allowedBlocks: ['slide', 'image'],
-                defaultBlockType: 'slide',
-                maxLength: 10,
-              }
-            },
+  page: {
+    schema: {
+      properties: {
+        'blocks_layout': {
+          title: 'Content',
+          widget: 'blocks_layout', 
+          allowedBlocks: ['slate', 'image', 'video', 'slider'] 
+        },
+      }
+    }
+  },
+  blocks: {
+    slider: {
+      id: 'slider', // The name (id) of the block
+      title: 'Slider', // The display name of the block
+      icon: 'data:...', // The icon used in the block chooser
+      group: 'common', // The group (blocks can be grouped, displayed in the chooser)
+      restricted: false,
+      mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
+      sidebarSchemaOnly: false, // Some volto plugins might Set true to disable Edit component in sidebar (use schema form only)
+      blockSchema: {
+        properties: {
+          slider_timing: {
+            title: "time",
+            widget: 'float',
+          },
+          slides: {
+            title: "Slides",
+            widget: 'blocks_layout',
+            allowedBlocks: ['slide', 'image'],
+            defaultBlockType: 'slide',
+            maxLength: 10,
           }
         },
-        // Child block types must be defined at the top level of blocksConfig
-        slide: {
-          id: 'slide',
-          title: 'Slide',
-          blockSchema: {
-            fieldsets: [
-              {
-                id: 'default',
-                title: "Settings",
-                fields: ['url', 'title', 'image', 'description'],
-              },
-            ],
-            properties: {
-              url: {
-                title: "Link",
-                widget: 'url',
-              },
-              title: {
-                title: "Title",
-              },
-              image: {
-                title: "Image",
-                widget: "image"
-              },
-              description: {
-                title: "Description",
-                widget: "slate"
-              },
-            },
-            required: [],
+      }
+    },
+    // Child block types must be defined at the top level of `blocks`
+    slide: {
+      id: 'slide',
+      title: 'Slide',
+      blockSchema: {
+        fieldsets: [
+          {
+            id: 'default',
+            title: "Settings",
+            fields: ['url', 'title', 'image', 'description'],
+          },
+        ],
+        properties: {
+          url: {
+            title: "Link",
+            widget: 'url',
+          },
+          title: {
+            title: "Title",
+          },
+          image: {
+            title: "Image",
+            widget: "image"
+          },
+          description: {
+            title: "Description",
+            widget: "slate"
           },
         },
+        required: [],
       },
     },
   },
 });
 ```
 
-Now we can add a slider block using the sidebar and slides to the slider block. Once saved we can render this block (in this case it's a vue.js example)
+Now we can add a slider block using the sidebar and slides to the slider block. 
+Once saved the page data will include a block json
+
+```json
+{
+  "@type": "slider",
+  "blocks": {
+    "slide-1": { "@type": "slide", "title": "First Slide", "image": "..." },
+    "slide-2": { "@type": "image", "title": "Second Slide", "image": "..." }
+  },
+  "slides": { "items": ["slide-1", "slide-2"] }
+}
+```
+
+Which we can render (in this case it's a vue.js example)
 
 "Block.vue"
-``` vue.js
+``` js
 <template>
     ...
     <div v-else-if="block['@type'] == 'slider'" class="slider">
       <div>
-        <div class="slide" v-for="slide_id in block.slides_layout">
-          <img :src="block.slides[slide_id].image"/>
-          <h2>{{block.slides[slide_id].title}</h2>
-          <div><RichText v-for="node in block.slides[slide_id].description" :key="node" :node="node" /></div>
-          <div><a :href="block.slides[slide_id].url">block.slides[slide_id].link_text</a><div>
+        <div class="slide" v-for="slide_id in block.slides.items">
+          <img :src="block.blocks[slide_id].image"/>
+          <h2>{{block.blocks[slide_id].title}</h2>
+          <div><RichText v-for="node in block.blocks[slide_id].description" :key="node" :node="node" /></div>
+          <div><a :href="block.blocks[slide_id].url">block.blocks[slide_id].link_text</a><div>
         </div>
       </div>
       <a link="">Prev></a><a link="">Next></a>
@@ -509,183 +526,53 @@ Now we can add a slider block using the sidebar and slides to the slider block. 
     ...
 ```
 
-What we can see is that a field of type blocks is turned into a ```{fieldname}``` of type object and ```{fieldname}_layout``` which is a list of block ids.
-
-We can add this as a slide and slider block to our block templates on the frontend and now our editors can add, remove slider blocks and the slides inside of them.
-A detail sidebar UI for any "blocks" type allows for managing even complex composable blocks like a slider (TODO)
-
-You can configure any Volto settings during init. Such as:
-   - change allowedBlock types
-   - Add a new block type including it's schema (TODO)
-   - disable existing blocks or adjust their schema (TODO)
-   - You can also install content type definitions. (TODO)
-      - Currently custom content types are created via "Site Setup > Content types".
-   - determine which types of text format (node) appear on the quanta toolbar when editing rich text, including adding custom formats ([TODO](https://github.com/collective/volto-hydra/issues/109))
-   - determine which shortcuts appear on the quanta toolbar for a given block (TODO)
-
-### Level 3: Enable Frontend block selection and Quanta Toolbar
-
-In your frontend insert the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most html element of the rendered block html.
-(Note, this only needs to be done during editing)
-
-So for our slider example, while editing we render our slider to include these extra data attributes.
-
-``` html
-<div class="slider" data-block-uid="....">
-  <div>
-    <div class="slide" data-block-uid="....">
-      <img src="/big_news.jpg"/>
-      <h2>Big News</h2>
-      <div>Check out <b>hydra</b>, it will change everything</div>
-      <div><a href="/big_news">Read more</a><div>
-    </div>
-    <div class="slide" data-block-uid="....">
-      ...
-    </div>
-  </div>
-  <a link="">Prev></a><a link="">Next></a>
-</div>
-```
-
-Hydra.js will find these block markers and register click handlers and show a blue line around your blocks when selected.
-
-This will enable an Editor to :-
-- click directly on your block on the frontend preview to select it and edit the block settings in the sidebar. 
-   - The block will be highlighted and a toolbar (called the quanta toolbar) will appear above it.
-- selecting a block in the sidebar will highlight that block on the frontend
-
-
-#### Comment Syntax
-
-If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
-
-``` html
-<!-- hydra block-uid=block-123 editable-field=title(.card-title) media-field=url(img) linkable-field=href(a.link) -->
-<div class="third-party-card">
-  <h3 class="card-title">Title</h3>
-  <img src="image.jpg">
-  <a class="link" href="...">Read more</a>
-</div>
-<!-- /hydra -->
-```
-
-- Attributes without selectors apply to the root element: `block-uid=xxx`
-- Attributes with selectors target child elements: `editable-field=title(.card-title)`
-- Closing `<!-- /hydra -->` marks end of scope
-- Self-closing `<!-- hydra block-uid=xxx /-->` applies only to next sibling element
-
-Supported attributes: `block-uid`, `block-readonly`, `editable-field`, `linkable-field`, `media-field`, `block-add`
-
-
-#### Readonly Regions
-
-Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
-
-``` html
-<div class="teaser" data-block-uid="teaser-1">
-  <div data-block-readonly>
-    <h2 data-editable-field="title">Target Page Title</h2>
-  </div>
-  <a data-linkable-field="href" href="/target">Read more</a>
-</div>
-```
-
-Or using comment syntax:
-``` html
-<!-- hydra block-readonly -->
-<div class="listing-item" data-block-uid="item-1">...</div>
-```
-
-#### Allowed Navigation (data-linkable-allow)
-
-Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
-
-``` html
-<a href="/page?pg=2" data-linkable-allow>Next</a>
-<select data-linkable-allow @change="handleFilter">...</select>
-```
-
-### Level 4: Enable Realtime changes while editing and preview Block controls
-
-The `onEditChange` callback can be registered with the hydra.js bridge at initialisation.
-When the user clicks edit on a page your frontend will now get an updated 'data' object that
-follows the same format as you get from the 
-[ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
-
-e.g.
-```js
-const bridge = initBridge();
-bridge.onEditChange(handleEditChange);
-```
-
-Since the data structure is that same as returned by the contents [RESTApi](https://6.docs.plone.org/plone.restapi/docs/source/index.html) it's normally easy to rerender your page dynamically using the same
-code your frontend used to render the page previously.
-
-This will enable an Editor to:-
-- Change a block in the sidebar and have it change on the frontend even as you type
-- Change page metadata and have blocks that depend on this like the "Title" block change.
-- Add and remove blocks in the sidebar and have them appear on the frontend preview
-  - click on '+' Icon directly on the frontend to add a block after the current block. This will make the BlockChooser popup appear.
-     - The '+' Icon appears outside the corner of the element with ```data-block-uid="<<BLOCK_UID>>>"``` in the direction the block will be added.
-  - remove a block via the Quanta toolbar dropdown
-- drag and drop and cut, copy and paste on the preview ([TODO](https://github.com/collective/volto-hydra/issues/67))
-- open or close the block settings [TODO](https://github.com/collective/volto-hydra/issues/81)
-- multiple block selection to move, delete, or copy in bulk ([TODO](https://github.com/collective/volto-hydra/issues/104))
-- and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
-
-Note: For level 4 and beyond you need a frontend deployed as SPA or hybrid (rather than SSR or SSG). If your production deploy is
-SSG or SSR then deploy another edit only preview frontend. For many modern frameworks this is just a settings toggle.
-
-These updates are sent frequently as the user makes changes in the sidebar but can adjust the frequency of updates for
-performance reasons (TODO)
-
 #### Container Blocks
 
 Container blocks are ones that have one or more block fields which can container other blocks.
 These blocks can added, removed and DND around the page.
 
-There are two syntax you can use in your block schema to define blocks fields.
+There are two formats you can use in your block schema to define blocks fields. Both look the same in the editing UI and blocks can be dragged between them.
 
-Block type: allows a choice of blocks to add.
+##### `blocks_layout` — typed blocks with separate schemas
+
+Each child block has its own `@type` and schema (looked up from `blocks`).
+Child blocks are stored in a shared `blocks` dict on the parent block, with the field holding `{ items: [...] }` for ordering.
+
 ```js
-...
-slider: {
-  ...
-  blockSchema: {
-    properties: {
-      slides: {
-        title:"Slides", 
-        type: 'blocks',                                                                       allowedBlocks: ['slide', 'image'],                                                     defaultBlockType: 'slide',
-        maxLength: 10,             
-      }
-    }
-  }  
+slides: {
+  title: "Slides",
+  widget: 'blocks_layout',
+  allowedBlocks: ['slide', 'image'],
+  defaultBlockType: 'slide',
+  maxLength: 10,
 }
-
 ```
 
-which results in a block structure like
-
+Resulting data:
 
 ```json
 {
   "@type": "slider",
-  "slides": {
+  "blocks": {
     "slide-1": { "@type": "slide", "title": "First Slide", "image": "..." },
     "slide-2": { "@type": "image", "title": "Second Slide", "image": "..." }
   },
-  "slides_layout": ["slide-1", "slide-2"]
+  "slides": { "items": ["slide-1", "slide-2"] }
 }
 ```
 
-or the object_list syntax, which allows for a single schema
+Note: All `blocks_layout` fields on the same block share the same `blocks` dict. This means a block can have multiple container fields (e.g., `header` and `footer`) whose child blocks all live in the parent's `blocks`.
+
+##### `object_list` — items sharing a single schema
+
+All items share one inline schema. Stored as an array with an ID field.
 
 ```js
 slides: {
   title: "Slides",
   widget: 'object_list',
   idField: '@id',  // Field used as unique identifier (default: '@id')
-  dataPath: ['data', 'rows'],  // optional path in case you need a nested structure
+  dataPath: ['data', 'rows'],  // optional path when data is nested
   schema: {
     properties: {
       title: { title: "Title" },
@@ -696,8 +583,7 @@ slides: {
 }
 ```
 
-which results in block structure where the blocks are stored in an array with their id.
-
+Resulting data:
 
 ```json
 {
@@ -711,51 +597,41 @@ which results in block structure where the blocks are stored in an array with th
 }
 ```
 
+##### `object_list` with `allowedBlocks` — typed items
 
-Both look the same in the editing UI and both are rendered the same way
+When `allowedBlocks` is set on an `object_list`, items can have different types
+(like `blocks_layout`) but are still stored as an array. Each item's type is
+stored in the field specified by `typeField` (defaults to `'@type'`) and its
+schema is looked up from `blocks`.
 
-In your frontend, render each item with ```data-block-uid``` set to the item's ID:
-
-
-``` html
-<div class="slider" data-block-uid="....">
-  <div>
-    <div class="slide" data-block-uid="...." data-block-add="right">
-      <img src="/big_news.jpg"/>
-      <h2>Big News</h2>
-      <div>Check out <b data-node-id="...">hydra</b>, it will change everything</div>
-      <div><a href="/big_news">Read more</a><div>
-    </div>
-    <div class="slide" data-block-uid="...." data-block-add="right">
-      ...
-    </div>
-  </div>
-  <a data-block-selector="-1" link="">Prev></a>
-  <a data-block-selector="+1" link="">Next></a>
-</div>
+```js
+facets: {
+  title: "Facets",
+  widget: 'object_list',
+  allowedBlocks: ['checkboxFacet', 'selectFacet'],
+  typeField: 'type',  // which field holds the block type (default: '@type')
+  defaultBlockType: 'checkboxFacet',
+}
 ```
 
-Note: 
+Resulting data:
 
-- You don't need to mark where the element that contains the child blocks is, or even have one.
-- ```data-block-add="bottom|right"``` is useful if blocks are going to be added in a non standard direction. By default it will be the opposite of its parent.
-- If you blocks are rendered with paging you can enable the UI allow selection of a block
-  from the sidebar by tagging your paging buttons with 
-  ```data-block-selector="-x|+y|<<block_uid>>>"```
+```json
+{
+  "@type": "search",
+  "facets": [
+    { "@id": "facet-1", "type": "checkboxFacet", "title": "Content Type", "field": "portal_type" },
+    { "@id": "facet-2", "type": "selectFacet", "title": "Subject", "field": "Subject" }
+  ]
+}
+```
 
-##### Empty Blocks
+This is useful when you want the array storage format of `object_list` but need
+multiple block types like `blocks_layout`.
 
-For the UI work a blocks field can never be left empty. If the last child block
-is deleted then while editing either the defaultBlockType will be added,
-or if not defined a special block of type "empty" will be added.
-
-- These will be stripped out before saving.
-- they will have @type: "empty" and have a random id like any other block.
-- You should render them as empty but ensure they table up teh space of a typical sub-block would
-- hydra will put a "+" button in it's middle which the user can use to replace this block with 
-  the block type of their choice.
-  - you can override the look of this button by rendering something else inside the empty block and adding ```data-block-add="button"``` to it.
-
+Both `blocks_layout` and `object_list` look the same in the editing UI and
+blocks can be dragged between them — data is automatically adapted when moving
+between formats (ID fields added/stripped, type fields set appropriately)
 
 
 #### Table Mode (addMode: 'table')
@@ -785,28 +661,25 @@ rows: {
 ```
 
 
+
 #### Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:
 
 ```js
 const bridge = initBridge({
-  voltoConfig: {
-    blocks: {
-      blocksConfig: {
-        // Conditional field visibility
-        myBlock: {
-          blockSchema: {
-            properties: {
-              mode: { title: 'Mode', widget: 'select', choices: [['simple', 'Simple'], ['advanced', 'Advanced']] },
-              advancedOptions: { title: 'Advanced Options', type: 'string' },
-            },
-          },
-          schemaEnhancer: {
-            skiplogic: {
-              advancedOptions: { field: 'mode', is: 'advanced' },
-            },
-          },
+  blocks: {
+    // Conditional field visibility
+    myBlock: {
+      blockSchema: {
+        properties: {
+          mode: { title: 'Mode', widget: 'select', choices: [['simple', 'Simple'], ['advanced', 'Advanced']] },
+          advancedOptions: { title: 'Advanced Options', type: 'string' },
+        },
+      },
+      schemaEnhancer: {
+        skiplogic: {
+          advancedOptions: { field: 'mode', is: 'advanced' },
         },
       },
     },
@@ -818,29 +691,107 @@ const bridge = initBridge({
 - `field`: Field to check (use `../field` for parent/page fields)
 - Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
 
-#### Block conversion
+#### Block conversion and fieldMappings
 
-If a block type has a `fieldMappings` defined it will enable a "Convert to..." UI action.
-You specify either conversions to a specific type, or to a generic search result schema
-(@id, title, preview-image, description)
+`fieldMappings` (plural) on a block config defines how fields map between block types. This enables:
+- **"Convert to..." UI action** — editors can convert between block types (e.g., teaser → image)
+- **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](#listings-and-dynamic-blocks))
+- **Synchronised container children** — a parent controls child type, all children convert together
+
+Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.
+
+**`@default` is a virtual type** representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide (see `DEFAULT_FIELD_MAPPING` in `expandListingBlocks`). A block with `fieldMappings['@default']` is saying "I can be populated from standard content item fields." The keys in `@default` must only use these four canonical fields — using other fields (e.g., `label`, `field`, `required`) is invalid and will produce a console warning.
+
+**Explicit type-to-type mappings** (e.g., `fieldMappings: { image: {...} }`) define direct conversion between specific block types. Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
 ```js
+// Content item types: use @default (canonical fields) + explicit cross-mappings
 teaser: {
   fieldMappings: {
-    @default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+    '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
     image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
   },
 },
 image: {
   fieldMappings: {
-    @default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+    '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
     teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
   },
 },
+
+// Non-content types: use explicit hub-type mappings (NOT @default)
+// All facet types map through checkboxFacet as hub
+selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
+checkboxFacet: { fieldMappings: { selectFacet: {...}, daterangeFacet: {...}, toggleFacet: {...} } },
 ```
 
-Note it will perform transitive conversions by using paths through intermediate types (hero → teaser → image). Any fields that don't match will still be kept in the data so if the block
-is converted back that data will reappear.
+**Conversion graph rules:**
+- Explicit `fieldMappings[typeName]` always creates a conversion edge.
+- `@default` only creates edges between types that both have valid `@default` mappings (keys from `{ @id, title, description, image }`). Types with non-canonical `@default` keys are ignored.
+- Types without `fieldMappings` never appear in the "Convert to..." menu.
+
+Transitive conversions use paths through intermediate types (hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.
+
+**fieldMapping format** — mapping values are either a string (simple field rename) or `{ field, type }` (rename with type conversion):
+
+```json
+{
+  "@id": { "field": "href", "type": "link" },
+  "title": "title",
+  "description": "description",
+  "image": "preview_image"
+}
+```
+
+When `type` is specified, the value is converted at runtime:
+
+| Type | Conversion |
+|------|-----------|
+| `string` | Arrays joined with `", "`; image objects resolved to URL string |
+| `link` | String wrapped as `[{ "@id": value }]` (Volto link format) |
+| `image` | Pass through (expects `{ "@id", image_field, image_scales }` object) |
+| `array` | Non-arrays wrapped in `[value]` |
+| _(none)_ | Copied as-is |
+
+**FieldMappingWidget** — the admin UI provides a widget that lets editors configure field mappings visually. When a listing selects an item type (e.g., `teaser`), the widget shows the `@default` source fields and lets the editor map each one to a field on the target type's schema. It auto-detects the `type` from the target field definition — e.g., an `object_browser` field with `mode=link` becomes `type: "link"`. The resulting `fieldMapping` (singular) is saved on the block data so it can be applied at render time without access to the block registry.
+
+#### Synchronised block types in a container
+
+A parent container can control the type of all its children. A field on the parent lets the editor select the type, and all child blocks get converted using `fieldMappings`.
+
+```js
+const bridge = initBridge({
+  blocks: {
+    gridBlock: {
+      allowedBlocks: ['teaser', 'image'],
+      schemaEnhancer: {
+        inheritSchemaFrom: {
+          typeField: 'variation',
+        },
+      },
+    },
+    teaser: {
+      schemaEnhancer: {
+        childBlockConfig: {
+          editableFields: ['href', 'title', 'description'],
+        },
+      },
+      fieldMappings: {
+        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+      },
+    },
+  },
+});
+```
+
+**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
+- `typeField`: Field name for selecting child type (e.g., `'variation'`)
+- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
+- `blocksField`: Which blocks field the sub-blocks will be in. Used to get the list
+     of `allowedBlocks`. It can be set to `".."` to use the parent's `allowedBlocks`
+- `filterConvertibleFrom`: only allow selecting a block type which can convert from the specified type
+
+**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
 
 #### HTML Paste support (TODO)
 
@@ -858,103 +809,171 @@ video: {
 TODO: need to do this via htmlTagsToSlate to bypass conversion to slate or handle encoding into slate so we don't lose attributes and classes we need? 
 TODO: how this works for container blocks.
 
-#### Synchronised bI lock types in a container
+### Level 3: Enable Frontend block selection and Quanta Toolbar
 
-You might want to have one container
-type that can hold different types of blocks but you want to constrain them to all have
-be the same type with synchronised settings.
-A field on the parent will let the editor select the type and all the blocks will get
-converted to that new type using ```fieldMappings```.
+Now that you have defined your blocks you get your frontend to render them.
+In edit mode you can make blocks selectable using a tag that the bridge will
+use to locate which html represents your block
 
+This will enable an Editor to :-
 
-```js
-const bridge = initBridge({
-  voltoConfig: {
-    blocks: {
-      blocksConfig: {
-        // Parent container: controls child type via 'variation' field
-        // inheritSchemaFrom creates the typeField with computed choices
-        gridBlock: {
-          allowedBlocks: ['teaser', 'image'],  // Allowed child block types
-          schemaEnhancer: {
-            inheritSchemaFrom: {
-              typeField: 'variation',
-            },
-          },
-        },
-        // Child block: hides fields that parent controls
-        teaser: {
-          schemaEnhancer: {
-            childBlockConfig: {
-              editableFields: ['href', 'title', 'description'],
-            },
-          },
-        },
-        fieldMappings: {
-          default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' }
-        },
-      },
-    },
-  },
-});
+- click directly on your block on the frontend preview to select it and edit the block settings in the sidebar.
+  - The block will be highlighted and a toolbar (called the quanta toolbar) will appear above it.
+- selecting a block in the sidebar will highlight that block on the frontend and scroll it 
+  into view.
+- If your block is rendered as multiple items give each one the same `data-block-uid`. 
+  Selecting one will select all of them.
+
+In your frontend insert the `data-block-uid={<<BLOCK_UID>>}` attribute to your outer most html element of the rendered block html.
+(Note, this only needs to be done during editing)
+
+So for our slider example, while editing we render our slider to include these extra data attributes.
+
+``` html
+<div class="slider" data-block-uid="....">
+  <div>
+    <div class="slide" data-block-uid="....">
+      <img src="/big_news.jpg"/>
+      <h2>Big News</h2>
+      <div>Check out <b>hydra</b>, it will change everything</div>
+      <div><a href="/big_news">Read more</a><div>
+    </div>
+    <div class="slide" data-block-uid="....">
+      ...
+    </div>
+  </div>
+  <a link="">Prev></a><a link="">Next></a>
+</div>
 ```
 
-**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
-- `typeField`: Field name for selecting child type (e.g., `'variation'`)
-- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
-- `blocksField`: Which blocks field the sub-blocks will be in. Used to get the list
-     of `allowedBlocks`. It can be set to ".." to use the parents `allowedBlocks`
-- `filterConvertibleFrom`: only allow selecting a block type which can convert from the specified type.
+Hydra.js will find these block markers and register click handlers and show a blue line around your blocks when selected.
 
-**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+#### Comment Syntax
+
+If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
+
+``` html
+<!-- hydra block-uid=block-123 edit-text=title(.card-title) edit-media=url(img) edit-link=href(a.link) -->
+<div class="third-party-card">
+  <h3 class="card-title">Title</h3>
+  <img src="image.jpg">
+  <a class="link" href="...">Read more</a>
+</div>
+<!-- /hydra -->
+```
+
+- Attributes without selectors apply to the root element: `block-uid=xxx`
+- Attributes with selectors target child elements: `edit-text=title(.card-title)`
+- Closing `<!-- /hydra -->` marks end of scope
+- Self-closing `<!-- hydra block-uid=xxx /-->` applies only to next sibling element
+
+Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `edit-media`, `block-add`
+
+#### Sub Blocks
+
+You don't need a mark the element sub-blocks live in, but just render the blocks
+with the uid like top level blocks.
 
 
-### Level 5: Enable Visual frontend editing of Text, Media and links
+``` html
+<div class="slider" data-block-uid="....">
+  <div>
+    <div class="slide" data-block-uid="...." data-block-add="right">
+      <img src="/big_news.jpg"/>
+      <h2>Big News</h2>
+      <div>Check out <b data-node-id="...">hydra</b>, it will change everything</div>
+      <div><a href="/big_news">Read more</a><div>
+    </div>
+    <div class="slide" data-block-uid="...." data-block-add="right">
+      ...
+    </div>
+  </div>
+  <a data-block-selector="-1" link="">Prev></a>
+  <a data-block-selector="+1" link="">Next></a>
+</div>
+```
+
+Note: 
+
+- ```data-block-add="bottom|right"``` is useful if blocks are going to be added in a non standard direction. By default it will be the opposite of its parent.
+- If you blocks are rendered with paging you can enable the UI allow selection of a block
+  from the sidebar by tagging your paging buttons with 
+  ```data-block-selector="-x|+y|<<block_uid>>>"```
+
+##### Empty Blocks
+
+For the UI work a blocks field can never be left empty. If the last child block
+is deleted then while editing either the defaultBlockType will be added,
+or if not defined a special block of type "empty" will be added.
+
+- These will be stripped out before saving.
+- they will have @type: "empty" and have a random id like any other block.
+- You can render then how you like but ensure they take up teh space of a typical sub-block would
+- hydra will put a "+" button in it's middle which the user can use to replace this block with the block type of their choice.
+  - you can override the look of this button by rendering something else inside the empty block and adding ```data-block-add="button"``` to it.
+
+### Level 4: Realtime changes while editing
+
+Without this step any edits in the sidebar won't result in the preview pane changing.
+
+To enable realtime preview first ensure the frontend used for editing is SPA or hydra,
+ie can rerender the whole page client-side. 
+(Note: you can still use SSG or SSR for your production frontend by using a different 
+build of your frontend with client-side renderer enabled.)
+
+Next the `onEditChange` callback can be registered with the hydra.js bridge at initialisation. Your frontend can now disable loading content via the api in editmode
+and instead rely on content sent over the bridge via the callback in exactly the same
+format as the content api 
+[ploneClient](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
+
+e.g.
+
+``` js
+const bridge = initBridge(..., onEditChange(handleEditChange));
+```
+
+Since the data structure is that same as returned by the contents [RESTApi](https://6.docs.plone.org/plone.restapi/docs/source/index.html) it's normally easy to rerender your page dynamically using the same
+code your frontend used to render the page previously.
+
+In addition to the preview changing as you type in the sidebar:
+
+- click on '+' Icon directly on the frontend to add a block after the current block. This will make the BlockChooser popup appear.
+   - The '+' Icon appears outside the corner of the element with ```data-block-uid="<<BLOCK_UID>>>"``` in the direction the block will be added.
+- remove a block via the Quanta toolbar dropdown
+- drag and drop and cut, copy and paste on the preview
+- open or close the block settings
+- multiple block selection to move, delete, or copy in bulk ([TODO](https://github.com/collective/volto-hydra/issues/104))
+- and more ([TODO](https://github.com/collective/volto-hydra/issues/4))
 
 
-If you want to make the editing experience the most intuitive, you can enable real-time visual block editing, where an editor
-can change text, links or media directly on your frontend page instead of via fields on the sidebar.
+### Level 5: Direct edit in your frontend
 
-This is done using ```data-editable|media|linkable-field="<<fieldname>>"``` and the element it is applied will now allow
+This is the most unique element of Hydra. Instead of the editor having to
+work out where on the sidebar they need to go to make a change on their page
+they can click directly on text, images and links and make those changes
+directly on the frontend.
+
+This requires no special components or choice of frontend framework.
+
+This is done using ```data-edit-text|edit-media|edit-link="<<fieldname>>"``` and the element it is applied will now allow
 direct html changes in your frontend which are then sent back to the CMS and reflected in the settings in the sidebar.
 
 ``` html
 <div class="slide" data-block-uid="....">
-  <img data-media-field="image" src="/big_news.jpg"/>
-  <h2 data-editable-field="title">Big News</h2>
-  <div data-editable-field="description">Check out <b>hydra</b>, it will change everything</div>
-  <div><a data-linkable-field="url" href="/big_news" data-editable-field="buttonText">Read more</a><div>
+  <img data-edit-media="image" src="/big_news.jpg"/>
+  <h2 data-edit-text="title">Big News</h2>
+  <div data-edit-text="description">Check out <b>hydra</b>, it will change everything</div>
+  <div><a data-edit-link="url" href="/big_news" data-edit-text="buttonText">Read more</a><div>
 </div>
 ```
 
-#### Path Syntax for Editing Parent or Page Fields
-
-The `data-editable|media|linkable-field` attribute supports Unix-style paths to edit fields outside the current block:
-
-- `fieldName` - edit the block's own field (default)
-- `../fieldName` - edit the parent block's field
-- `../../fieldName` - edit the grandparent's field
-- `/fieldName` - edit the page metadata field
-
-``` html
-<!-- Edit the page title (not inside any block) -->
-<h1 data-editable-field="/title">My Page Title</h1>
-
-<!-- Edit the page description -->
-<p data-editable-field="/description">Page description here</p>
-
-<!-- Inside a nested block, edit the parent container's title -->
-<h3 data-editable-field="../title">Column Title</h3>
-```
-
-This allows fixed parts of the page (like headers) to be editable without being inside a block.
 
 #### Visual Text editing
 
 If the field is simple text (no slate widget) the this will enable an Editor to :-
 - click into the rendered text on the frontend and type, adding, removing and cut and pasting.
-- type a "/" shortcut to change an empty text block ([TODO](https://github.com/collective/volto-hydra/issues/34))
-    - Using the enter key to split the block into two text blocks and backspace to join them ([TODO](https://github.com/collective/volto-hydra/issues/33))
+- type a "/" shortcut to change an empty text block
+    - Using the enter key to split the block into two text blocks and backspace to join them
 
 If the widget is slate, then Editor can also :-
 - select text to see what formatting has been applied and can be applied via buttons on the quanta toolbar
@@ -965,7 +984,7 @@ If the widget is slate, then Editor can also :-
 - paste rich text from the clipboard (TODO)
 - and more ([TODO](https://github.com/collective/volto-hydra/issues/5))
 
-For rich text (slate) you add ```data-editable-field``` to the html element contains the rich text but in addition you
+For rich text (slate) you add ```data-edit-text``` to the html element contains the rich text but in addition you
 will also need insert ```data-node-id``` on each formatting element in your rendered slate text. This let's hydra.js
 map your custom html to the internal data structure so formatting works as expected. (note these nodeids are only in
 data returned by ```onEditChange```)
@@ -1030,7 +1049,7 @@ function renderSlate(nodes) {
 
 **Usage:**
 ```html
-<div data-block-uid="block-1" data-editable-field="value">
+<div data-block-uid="block-1" data-edit-text="value">
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
@@ -1050,8 +1069,62 @@ This will enable an Editor to :-
 
 
 You might have a block with a link field like the Slide block. You can also make this visually
-editable using ```data-linkable-field```. In edit mode the click behaviour of that element will be disabled and instead
+editable using ```data-edit-link```. In edit mode the click behaviour of that element will be disabled and instead
 the editor can pick content to link to, enter an external url of open the url in a separate tab.
+
+
+#### Allowed Navigation (data-linkable-allow)
+
+Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
+
+``` html
+<a href="/page?pg=2" data-linkable-allow>Next</a>
+<select data-linkable-allow @change="handleFilter">...</select>
+```
+
+
+#### Path Syntax for Editing Parent or Page Fields
+
+The `data-edit-text|edit-media|edit-link` attribute supports Unix-style paths to edit fields outside the current block:
+
+- `fieldName` - edit the block's own field (default)
+- `../fieldName` - edit the parent block's field
+- `../../fieldName` - edit the grandparent's field
+- `/fieldName` - edit the page metadata field
+
+``` html
+<!-- Edit the page title (not inside any block) -->
+<h1 data-edit-text="/title">My Page Title</h1>
+
+<!-- Edit the page description -->
+<p data-edit-text="/description">Page description here</p>
+
+<!-- Inside a nested block, edit the parent container's title -->
+<h3 data-edit-text="../title">Column Title</h3>
+```
+
+This allows fixed parts of the page (like headers) to be editable without being inside a block.
+
+#### Readonly Regions
+
+Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
+
+``` html
+<div class="teaser" data-block-uid="teaser-1">
+  <div data-block-readonly>
+    <h2 data-edit-text="title">Target Page Title</h2>
+  </div>
+  <a data-edit-link="href" href="/target">Read more</a>
+</div>
+```
+
+Or using comment syntax:
+
+``` html
+<!-- hydra block-readonly -->
+<div class="listing-item" data-block-uid="item-1">...</div>
+```
+
 
 ### Level 6: Custom UI
 
@@ -1077,6 +1150,7 @@ might display a form to set the initial number of columns and rows. In this case
 With an open source headless CMS you have a choice between creating custom server side functionality as 
 - a separately deployed microservice or 
 - by [adding API endpoints as addons](https://2022.training.plone.org/mastering-plone/endpoints.html) to the backend api server. 
+
 
 
 ## How Hydra works
@@ -1164,22 +1238,199 @@ The steps involved in creating a frontend are roughly the same for all these fra
    - Use the [Listing Helpers](#listing-helpers) or do your own [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
    - You can come up with your own pagination scheme (e.g., embed page in URL for static generation)
    - Render the items and pagination
-9.  Redirects
-   1.  if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
-   2.  if you are using SSG then you will need to some special code to [query all the redirects](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json) at generate time add in redirect routes
+9. Redirects
+   1. if your contents call results in a redirect then you will need also do an internal redirect in the framework so the path shown is correct
+   2. if you are using SSG then you will need to some special code to [query all the redirects](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json) at generate time add in redirect routes
 10. Error Pages
-    1.  If your [RESTAPI call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html) you will need to handle this within the framework to display the error and set the status code
+    1. If your [RESTAPI call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html) you will need to handle this within the framework to display the error and set the status code
 11. Search Blocks
     - if you choose to allow Voltos builtin Search Block for end user customisable search
     - you will need to render Facets/Filters (currently not as subblocks but this could change in the future)
     - build your query and do [RESTAPI call to query the items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html) 
 12. Form Blocks
-   - Form-block is a plugin that allows a visual form builder
-   - Currently not a container with sub-blocks but this could change in the future
-   - Render each field type component (or limit which are available)
-   - Produce a compatible json submission to the form-block endpoint
-   - handle field validation errors
-   - handle thank you page
+    - Form-block is a plugin that allows a visual form builder
+    - Currently not a container with sub-blocks but this could change in the future
+    - Render each field type component (or limit which are available)
+    - Produce a compatible json submission to the form-block endpoint
+    - handle field validation errors
+    - handle thank you page
+
+
+## Listings and dynamic blocks
+
+A listing block fetches content from a query (e.g. latest news) and renders each result as a separate block. `expandListingBlocks` handles fetching, paging, and mapping results to block objects:
+
+```js
+import { expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
+
+const paging = { start: 0, size: 6 };
+const items = await expandListingBlocks(layout, {
+  blocks, paging,
+  fetchItems: { listing: ploneFetchItems({ apiUrl, contextPath }) },
+});
+// items = [{ '@uid': 'listing-1', '@type': 'summary', title: 'My Article', href: '/my-article', ... }, ...]
+```
+
+See [ListingBlock.vue](./examples/nuxt-blog-starter/components/ListingBlock.vue) for a Vue equivalent.
+
+### fetchItems
+
+`fetchItems` is a map of block type → fetcher function. The keys tell `expandListingBlocks` which block types to expand; all other blocks are treated as static. Each fetcher receives the block and a `{ start, size }` pair:
+
+```js
+async (block, { start, size }) => ({ items: [...], total: number })
+```
+
+- **`start`**: zero-based offset into results
+- **`size`**: number of items to return (0 = return total only, no items)
+- **Returns**: `{ items, total }` where `total` is the full count, not just this page
+
+Items should have the fields referenced in the listing's `fieldMapping` (typically `@id`, `title`, `description`, `image`).
+
+Different block types can use different fetchers:
+
+```js
+const items = await expandListingBlocks(layout, {
+  blocks, paging,
+  fetchItems: {
+    listing: ploneFetchItems({ apiUrl, contextPath }),
+    rssFeed: async (block, { start, size }) => {
+      const res = await fetch(`/api/rss?url=${block.feedUrl}&offset=${start}&limit=${size}`);
+      const data = await res.json();
+      return { items: data.results, total: data.count };
+    },
+  },
+});
+```
+
+**ploneFetchItems** — factory returning a fetcher for Plone's `@querystring-search` endpoint:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `apiUrl` | — | Plone site URL (e.g., `'http://localhost:8080/Plone'`) |
+| `contextPath` | `'/'` | Path for relative queries |
+| `extraCriteria` | `{}` | Additional query params — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys |
+
+A listing with no `querystring` defaults to showing current folder contents in folder order. `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
+
+```js
+// Plone search result:
+{ "@id": "/news/article", image_field: "image", image_scales: { image: [{ ... }] } }
+
+// After normalization:
+{ "@id": "/news/article", image: { "@id": "/news/article", image_field: "image", image_scales: { ... } } }
+```
+
+This self-contained object has everything needed to resolve image URLs with scale support (see the Nuxt example's `composables/imageProps.js` for one approach).
+
+### fieldMapping and item types
+
+Each listing block stores a `fieldMapping` on its block data that maps query result fields to item block fields. Only mapped fields end up on the item block. See [Block conversion and fieldMappings](#block-conversion-and-fieldmappings) for the format (string values for simple renames, `{ field, type }` for type conversions).
+
+When no `fieldMapping` is saved, a built-in default is used: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`.
+
+Each item block gets `@type` from the listing's `variation` field, defaulting to `'summary'`. Built-in item types:
+
+| Type | Fields |
+|------|--------|
+| `default` | `title`, `description`, `href` |
+| `summary` | `title`, `description`, `href`, `image` |
+| `teaser` | `title`, `description`, `href`, `preview_image` |
+
+To let editors choose item types and configure mappings, use `inheritSchemaFrom` on the listing block config:
+
+```js
+listing: {
+  schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
+    filterConvertibleFrom: '@default',
+    title: 'Item Type',
+    default: 'summaryItem',
+  }),
+}
+```
+
+This adds a type selector to the listing's sidebar. When the editor picks a type, the `FieldMappingWidget` maps `@default` source fields to the chosen type's schema and saves the result as `fieldMapping`.
+
+### Paging
+
+`expandListingBlocks` accepts a `paging` object `{ start, size }` that gets mutated with computed values:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `currentPage` | `number` | Zero-based current page index |
+| `totalPages` | `number` | Total number of pages |
+| `totalItems` | `number` | Total item count across all blocks |
+| `prev` | `number \| null` | Previous page index, or `null` on first page |
+| `next` | `number \| null` | Next page index, or `null` on last page |
+| `pages` | `array` | Window of ~5 page objects: `{ start, page }` where `page` is 1-based |
+| `_ready` | `Promise` | Resolves after all `expandListingBlocks` calls complete |
+
+When multiple listings share a pager (e.g., in a grid), `expandListingBlocks` walks them sequentially — each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only).
+
+When mixing listings with static blocks in a shared pager, use **`staticBlocks(ids, { blocks, paging })`** for the non-listing blocks — it tracks their position in the paging window so totals stay correct.
+
+**Example: grid with listings, static blocks, and shared paging (React Suspense)**
+
+```jsx
+import { Suspense } from 'react';
+import { staticBlocks, expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
+
+function Grid({ blocks, blocks_layout, pageNum }) {
+  const paging = { start: pageNum * 6, size: 6 };
+  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };
+
+  return (
+    <div className="grid">
+      {blocks_layout.items.map(id =>
+        blocks[id]['@type'] === 'listing' ? (
+          <Suspense key={id} fallback={<div>Loading...</div>}>
+            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />
+          </Suspense>
+        ) : (
+          staticBlocks([id], { blocks, paging }).map(item =>
+            <Block key={item['@uid']} block={item} />
+          )
+        )
+      )}
+      <Suspense>
+        <PagingWhenReady paging={paging} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ListingItems({ id, blocks, paging, fetchItems }) {
+  const items = await expandListingBlocks([id], { blocks, paging, fetchItems });
+  return items.map(item => <Block key={item['@uid']} block={item} />);
+}
+
+async function PagingWhenReady({ paging }) {
+  await paging._ready;
+  if (paging.totalPages <= 1) return null;
+  return (
+    <nav>
+      {paging.prev != null && <a href={`?start=${paging.prev * paging.size}`}>Prev</a>}
+      {paging.pages.map(p =>
+        <a key={p.page} href={`?start=${p.start}`}
+           className={p.page === paging.currentPage + 1 ? 'active' : ''}>
+          {p.page}
+        </a>
+      )}
+      {paging.next != null && <a href={`?start=${paging.next * paging.size}`}>Next</a>}
+    </nav>
+  );
+}
+```
+
+### expandListingBlocks options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `blocks` | — | Map of blockId to block data |
+| `paging` | — | Shared paging object `{ start, size }` (mutated in-place) |
+| `fetchItems` | — | `{ blockType: async (block, { start, size }) => { items, total } }` |
+| `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
+| `defaultItemType` | `'summary'` | Fallback type when field is not set |
 
 ## Templates
 
@@ -1227,15 +1478,20 @@ with special properties:
 
 ### allowedTemplates vs allowedLayouts
 
-Configure templates in `pageBlocksFields`:
+Configure templates in `page.schema.properties`:
 
 ```js
 initBridge({
-  pageBlocksFields: [{
-    fieldName: 'blocks',
-    allowedTemplates: ['/templates/form-snippet'],   // Insert via BlockChooser
-    allowedLayouts: ['/templates/article-layout'],   // Apply via Layout dropdown
-  }]
+  page: {
+    schema: {
+      properties: {
+        blocks_layout: {
+          allowedTemplates: ['/templates/form-snippet'],   // Insert via BlockChooser
+          allowedLayouts: ['/templates/article-layout'],   // Apply via Layout dropdown
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -1336,81 +1592,9 @@ const items = await expandTemplates(layout, {
 ```
 
 Note, during editing admin side will load the templates so in order to apply the 
-same rules of forcing a layout you will need to set `allowedLayouts` in `pageBlocksFields` 
-blocks fields to ensure the page loads with the right template.
+same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties`
+to ensure the page loads with the right template.
 
-## Listing Helpers
-
-Helpers for expanding listing blocks and handling pagination.
-
-```js
-import { expandListingBlocks, staticBlocks } from '@volto-hydra/hydra-js';
-
-// Shared paging state across both helpers
-const paging = { start: 0, size: 10, total: 0, _seen: 0 };
-
-// staticBlocks handles non-listing blocks, tracking position in paging
-const { items: staticItems } = staticBlocks(layout, { blocks, paging });
-
-// expandListingBlocks fetches and expands listings, continuing from paging position
-const { items: listingItems } = await expandListingBlocks(layout, {
-  blocks,
-  contextPath: '/news',
-  paging,  // Same paging object - mutated to track combined totals
-  itemTypeField: 'variation',  // Field on listing block that holds item type (default: 'itemType')
-  defaultItemType: 'teaser',   // Fallback type if field not set (default: 'summaryItem')
-  // Either provide apiUrl for built-in fetch:
-  apiUrl: 'https://my-plone-site.com',
-  // Or provide custom fetcher callback:
-  fetcher: async (path, body, headers) => {
-    const res = await fetch(path, { method: 'POST', body: JSON.stringify(body), headers });
-    return res.json();
-  },
-});
-
-// Combine for rendering - paging now has correct totals for both
-const allItems = [...staticItems, ...listingItems];
-```
-
-**Mixed containers**: When a container has both static blocks and listing blocks, pass the same `paging` object to both helpers. `staticBlocks` processes non-listing blocks first, then `expandListingBlocks` continues from that position, giving you unified pagination across all content.
-
-**Schema enhancers**: Use `itemType` (or `variation`) on the listing block to control what block type expanded items become. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:
-
-```js
-listing: {
-  schemaEnhancer: ({ schema }) => {
-    schema.properties.itemType = { title: 'Display as', choices: [['teaser', 'Teaser'], ['card', 'Card']] };
-    return schema;
-  },
-  inheritSchemaFrom: { typeField: 'itemType', blocksField: null },  // Show item type's schema
-}
-```
-
-**Suspense/streaming**: Since `expandListingBlocks` is async, wrap listing blocks in Suspense. Create a `ListingExpander` component that calls `expandListingBlocks` and exposes results via scoped slot:
-
-```vue
-<!-- Usage in Block.vue -->
-<Suspense v-if="block['@type'] === 'listing'">
-  <ListingExpander :block="block" :block-uid="block_uid" v-slot="{ items, paging, buildPagingUrl }">
-    <Block v-for="item in items" :key="item['@uid']" :block="item" :block_uid="item['@uid']" />
-    <Paging :paging="paging" :build-url="buildPagingUrl" />
-  </ListingExpander>
-</Suspense>
-```
-
-**Shared paging for containers**: For grids with mixed static and listing blocks, pass a shared `paging` object. Use `staticBlocks` for non-listings, `ListingExpander` with the same paging for listings. See the [Nuxt example](./examples/nuxt-blog-starter/components/Block.vue) for the full pattern.
-
-**Async paging with `_ready`**: When a container has multiple sources (static + listing blocks), the paging UI should wait for all sources before rendering. Add `_expectedSources` and `_ready` to the paging object:
-
-```js
-paging._expectedSources = 2;  // number of staticBlocks + expandListingBlocks calls
-paging._ready = new Promise(resolve => { paging._resolve = resolve; });
-// _ready resolves after all sources have called computePagingUI
-```
-
-Then use an async component (e.g. Vue `<Suspense>`) that awaits `paging._ready` before rendering. Use a `:key` to remount on page navigation. See [AsyncPaging.vue](./examples/nuxt-blog-starter/components/AsyncPaging.vue) for the full pattern.
-
-Note: Expanded listing items share the listing block's `@uid`. When editing, selecting any item selects the listing block.
 
 ## Advanced
 
@@ -1453,8 +1637,9 @@ if (!isHydraEdit) {
 // Load bridge only in admin iframe
 if (inAdminIframe) {
     loadBridge(() => {
-        const bridge = initBridge();
-        bridge.onEditChange((formData) => renderPage(formData));
+        initBridge({
+            onEditChange: (formData) => renderPage(formData),
+        });
     });
 }
 ```
@@ -1508,39 +1693,4 @@ export default function Blog({ params }) {
 #### Preventing reloads ([TODO](https://github.com/collective/volto-hydra/issues/55))
 If you wish to make the editing experience smoother you can register for ```onRoute``` callbacks to prevent the frontend being forced to reload
 at certain times using the hydra editor.
-
-#### Simple rendering clickable blocks
-
-This is an example of how you could write code to render your blocks, inserting the ```data-block-id``` so
-that the hydra bridge can make those blocks selectable.
-
-Vanilla JS example:
-```js
-
-// Function to create the block list
-function createBlockList(data) {
-  const blockList = document.createElement('ul');
-
-  data.blocks_layout.items.forEach(id => {
-    if (data.blocks[id]["@type"] === "slate") {
-      const slateValue = data.blocks[id].value;
-      const listItem = document.createElement('li');
-      listItem.className = 'blog-list-item';
-      listItem.setAttribute('data-block-uid', id); // Set Attribute to enable Clicking on Blocks
-
-      const pre = document.createElement('pre');
-      pre.className = 'pre-block';
-      pre.textContent = JSON.stringify(slateValue, null, 2);
-
-      listItem.appendChild(pre);
-      blockList.appendChild(listItem);
-    }
-  });
-
-  document.body.appendChild(blockList);
-}
-
-// Call the function to render the blocks
-createBlockList(data);
-```
 

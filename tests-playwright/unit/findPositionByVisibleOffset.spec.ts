@@ -25,7 +25,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">hello world</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -52,7 +52,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">hello world</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -79,7 +79,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<strong data-node-id="0-1"></strong>' +
         '</div>';
       document.body.appendChild(container);
@@ -109,7 +109,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0"></p>' +
         '</div>';
       document.body.appendChild(container);
@@ -141,7 +141,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">test</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -168,7 +168,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">before <strong data-node-id="0-1">bold</strong> after</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -197,7 +197,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">before <strong data-node-id="0-1">bold</strong> after</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -226,7 +226,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0"></p>' +
         '</div>';
       document.body.appendChild(container);
@@ -264,7 +264,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0"><strong data-node-id="0-0">This</strong> bold text</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -298,7 +298,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">Hello <span data-node-id="0-1"></span></p>' +
         '</div>';
       document.body.appendChild(container);
@@ -333,7 +333,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       p.appendChild(document.createTextNode('Hello '));
@@ -370,7 +370,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       p.appendChild(document.createTextNode('Hello '));
@@ -408,7 +408,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       p.appendChild(document.createTextNode('Hello '));

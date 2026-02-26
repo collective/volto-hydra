@@ -3,7 +3,7 @@
  * Renders blocks based on their @type.
  *
  * IMPORTANT: This renderer ONLY generates HTML markup following the Hydra specification.
- * It uses data attributes (like data-editable-field, data-node-id) to mark what SHOULD
+ * It uses data attributes (like data-edit-text, data-node-id) to mark what SHOULD
  * be editable, but it does NOT set contenteditable attributes directly.
  *
  * The hydra.js bridge is responsible for:
@@ -166,7 +166,7 @@ async function renderBlock(blockId, block) {
             // This tests the hydra comment parser with selectors
             const heroFragment = document.createDocumentFragment();
             // Comment specifies block-uid and field selectors
-            const heroComment = document.createComment(` hydra block-uid=${blockId} editable-field=heading(.hero-heading) editable-field=subheading(.hero-subheading) media-field=image(.hero-image) editable-field=buttonText(.hero-button) linkable-field=buttonLink(.hero-button) `);
+            const heroComment = document.createComment(` hydra block-uid=${blockId} edit-text=heading(.hero-heading) edit-text=subheading(.hero-subheading) edit-media=image(.hero-image) edit-text=buttonText(.hero-button) edit-link=buttonLink(.hero-button) `);
             heroFragment.appendChild(heroComment);
             const heroEl = document.createElement('div');
             heroEl.innerHTML = renderHeroBlockClean(block);
@@ -209,11 +209,11 @@ async function renderBlock(blockId, block) {
             const teaserEl = document.createElement('div');
             teaserEl.innerHTML = renderTeaserBlock(block, blockId);
             return teaserEl.firstElementChild;
-        case 'defaultItem':
+        case 'default':
             const defaultEl = document.createElement('div');
             defaultEl.innerHTML = renderDefaultItemBlock(block, blockId);
             return defaultEl.firstElementChild;
-        case 'summaryItem':
+        case 'summary':
             const summaryEl = document.createElement('div');
             summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
             return summaryEl.firstElementChild;
@@ -262,42 +262,42 @@ function renderSlateBlock(block) {
         // Render based on node type
         switch (node.type) {
             case 'p':
-                html += `<p data-editable-field="value"${nodeIdAttr}>${text}</p>`;
+                html += `<p data-edit-text="value"${nodeIdAttr}>${text}</p>`;
                 break;
             case 'h1':
-                html += `<h1 data-editable-field="value"${nodeIdAttr}>${text}</h1>`;
+                html += `<h1 data-edit-text="value"${nodeIdAttr}>${text}</h1>`;
                 break;
             case 'h2':
-                html += `<h2 data-editable-field="value"${nodeIdAttr}>${text}</h2>`;
+                html += `<h2 data-edit-text="value"${nodeIdAttr}>${text}</h2>`;
                 break;
             case 'h3':
-                html += `<h3 data-editable-field="value"${nodeIdAttr}>${text}</h3>`;
+                html += `<h3 data-edit-text="value"${nodeIdAttr}>${text}</h3>`;
                 break;
             case 'h4':
-                html += `<h4 data-editable-field="value"${nodeIdAttr}>${text}</h4>`;
+                html += `<h4 data-edit-text="value"${nodeIdAttr}>${text}</h4>`;
                 break;
             case 'h5':
-                html += `<h5 data-editable-field="value"${nodeIdAttr}>${text}</h5>`;
+                html += `<h5 data-edit-text="value"${nodeIdAttr}>${text}</h5>`;
                 break;
             case 'h6':
-                html += `<h6 data-editable-field="value"${nodeIdAttr}>${text}</h6>`;
+                html += `<h6 data-edit-text="value"${nodeIdAttr}>${text}</h6>`;
                 break;
             case 'blockquote':
-                html += `<blockquote data-editable-field="value"${nodeIdAttr}>${text}</blockquote>`;
+                html += `<blockquote data-edit-text="value"${nodeIdAttr}>${text}</blockquote>`;
                 break;
             case 'ul':
-                html += `<ul data-editable-field="value"${nodeIdAttr}>${renderListItems(node.children)}</ul>`;
+                html += `<ul data-edit-text="value"${nodeIdAttr}>${renderListItems(node.children)}</ul>`;
                 break;
             case 'ol':
-                html += `<ol data-editable-field="value"${nodeIdAttr}>${renderListItems(node.children)}</ol>`;
+                html += `<ol data-edit-text="value"${nodeIdAttr}>${renderListItems(node.children)}</ol>`;
                 break;
             default:
                 // Fallback for unknown block types
-                html += `<p data-editable-field="value"${nodeIdAttr}>${text}</p>`;
+                html += `<p data-edit-text="value"${nodeIdAttr}>${text}</p>`;
         }
     });
 
-    return html || '<p data-editable-field="value">Empty block</p>';
+    return html || '<p data-edit-text="value">Empty block</p>';
 }
 
 /**
@@ -395,7 +395,7 @@ function renderTextBlock(block) {
     const text = block.text || '';
     // Mark as editable field - hydra.js will read this and set contenteditable="true"
     // No data-node-id needed for simple text blocks
-    return `<div data-editable-field="text">${text}</div>`;
+    return `<div data-edit-text="text">${text}</div>`;
 }
 
 /**
@@ -409,7 +409,7 @@ function renderTextareaBlock(block) {
     // No data-node-id needed for textarea blocks
     // Preserve newlines by replacing \n with <br> for display (hydra.js will convert back to \n when sending)
     const displayContent = content.replace(/\n/g, '<br>');
-    return `<div data-editable-field="content">${displayContent}</div>`;
+    return `<div data-edit-text="content">${displayContent}</div>`;
 }
 
 /**
@@ -421,7 +421,7 @@ function renderMultiFieldBlock(block) {
     const title = block.title || '';
     const description = block.description || [];
 
-    let html = `<div data-editable-field="title">${title}</div>`;
+    let html = `<div data-edit-text="title">${title}</div>`;
 
     // Render description as slate field
     description.forEach((node) => {
@@ -429,7 +429,7 @@ function renderMultiFieldBlock(block) {
             // nodeId is optional for view mode
             const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
             const text = renderChildren(node.children);
-            html += `<p data-editable-field="description"${nodeIdAttr}>${text}</p>`;
+            html += `<p data-edit-text="description"${nodeIdAttr}>${text}</p>`;
         }
     });
 
@@ -461,29 +461,29 @@ function renderHeroBlock(block) {
         const text = renderChildren(node.children);
         switch (node.type) {
             case 'h1':
-                descriptionHtml += `<h1 data-editable-field="description"${nodeIdAttr}>${text}</h1>`;
+                descriptionHtml += `<h1 data-edit-text="description"${nodeIdAttr}>${text}</h1>`;
                 break;
             case 'h2':
-                descriptionHtml += `<h2 data-editable-field="description"${nodeIdAttr}>${text}</h2>`;
+                descriptionHtml += `<h2 data-edit-text="description"${nodeIdAttr}>${text}</h2>`;
                 break;
             case 'p':
             default:
-                descriptionHtml += `<p data-editable-field="description"${nodeIdAttr}>${text}</p>`;
+                descriptionHtml += `<p data-edit-text="description"${nodeIdAttr}>${text}</p>`;
         }
     });
 
-    // Image with data-media-field for inline image selection
+    // Image with data-edit-media for inline image selection
     const imageHtml = imageSrc
-        ? `<img data-media-field="image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
-        : `<div data-media-field="image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
+        ? `<img data-edit-media="image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
+        : `<div data-edit-media="image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
 
     return `
         <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
             ${imageHtml}
-            <h1 data-editable-field="heading">${heading}</h1>
-            <p data-editable-field="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
+            <h1 data-edit-text="heading">${heading}</h1>
+            <p data-edit-text="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
             <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
-            <a data-editable-field="buttonText" data-linkable-field="buttonLink" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+            <a data-edit-text="buttonText" data-edit-link="buttonLink" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
         </div>
     `;
 }
@@ -513,18 +513,18 @@ function renderHeroBlockClean(block) {
         const text = renderChildren(node.children);
         switch (node.type) {
             case 'h1':
-                descriptionHtml += `<h1 class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</h1>`;
+                descriptionHtml += `<h1 class="hero-description-node" data-edit-text="description"${nodeIdAttr}>${text}</h1>`;
                 break;
             case 'h2':
-                descriptionHtml += `<h2 class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</h2>`;
+                descriptionHtml += `<h2 class="hero-description-node" data-edit-text="description"${nodeIdAttr}>${text}</h2>`;
                 break;
             case 'p':
             default:
-                descriptionHtml += `<p class="hero-description-node" data-editable-field="description"${nodeIdAttr}>${text}</p>`;
+                descriptionHtml += `<p class="hero-description-node" data-edit-text="description"${nodeIdAttr}>${text}</p>`;
         }
     });
 
-    // Image - uses class instead of data-media-field
+    // Image - uses class instead of data-edit-media
     const imageHtml = imageSrc
         ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
         : `<div class="hero-image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
@@ -572,7 +572,9 @@ function renderTeaserBlock(block, blockUid) {
     const description = useBlockData ? (block.description || '') : (hrefObj?.description || '');
 
     let imageSrc = '';
-    if (useBlockData && block.preview_image) {
+    if (block.preview_image) {
+        // Use block's own preview_image if available (covers both overwrite=true
+        // and conversion cases where block has image data but link target doesn't)
         imageSrc = getImageUrl(block.preview_image);
     } else if (!useBlockData && hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
         imageSrc = hrefObj['@id'] + '/@@images/preview_image';
@@ -593,8 +595,8 @@ function renderTeaserBlock(block, blockUid) {
 
     // Show teaser content when href has value
     const imageHtml = imageSrc
-        ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
-        : '';
+        ? `<img data-edit-media="preview_image" src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
+        : `<div data-edit-media="preview_image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 4px; cursor: pointer;">Click to add image</div>`;
 
     // When overwrite is false, add data-block-readonly to prevent editing
     // User must check "Customize teaser content" checkbox to enable editing
@@ -604,11 +606,11 @@ function renderTeaserBlock(block, blockUid) {
     return `
         <div ${blockUidAttr} ${readonlyAttr} class="teaser-block" style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
             ${imageHtml}
-            <a href="${href || '#'}" data-linkable-field="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
-                <h3 data-editable-field="title" style="margin: 0;">${title}</h3>
+            <a href="${href || '#'}" data-edit-link="href" style="display: block; margin: 0 0 10px 0; text-decoration: none; color: inherit;">
+                <h3 data-edit-text="title" style="margin: 0;">${title}</h3>
             </a>
-            <p data-editable-field="description" style="color: #666; margin: 0;">${description}</p>
-            <a href="${href || '#'}" data-linkable-field="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
+            <p data-edit-text="description" style="color: #666; margin: 0;">${description}</p>
+            <a href="${href || '#'}" data-edit-link="href" style="display: inline-block; margin-top: 10px; color: #007eb1; text-decoration: none;">Read more →</a>
         </div>
     `;
 }
@@ -621,17 +623,17 @@ function renderTeaserBlock(block, blockUid) {
  */
 function renderDefaultItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = hrefObj?.['@id'] || '';
+    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
     return `
         <div ${blockUidAttr} class="default-item-block" style="padding: 15px; border-bottom: 1px solid #eee;">
-            <a href="${href || '#'}" data-linkable-field="href" style="text-decoration: none; color: inherit;">
-                <h4 data-editable-field="title" style="margin: 0 0 5px 0;">${title}</h4>
+            <a href="${href || '#'}" data-edit-link="href" style="text-decoration: none; color: inherit;">
+                <h4 data-edit-text="title" style="margin: 0 0 5px 0;">${title}</h4>
             </a>
-            <p data-editable-field="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
+            <p data-edit-text="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
         </div>
     `;
 }
@@ -644,7 +646,7 @@ function renderDefaultItemBlock(block, blockUid) {
  */
 function renderSummaryItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = hrefObj?.['@id'] || '';
+    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
@@ -659,10 +661,10 @@ function renderSummaryItemBlock(block, blockUid) {
         <div ${blockUidAttr} class="summary-item-block" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start;">
             ${imageHtml}
             <div style="flex: 1;">
-                <a href="${href || '#'}" data-linkable-field="href" style="text-decoration: none; color: inherit;">
-                    <h4 data-editable-field="title" style="margin: 0 0 5px 0;">${title}</h4>
+                <a href="${href || '#'}" data-edit-link="href" style="text-decoration: none; color: inherit;">
+                    <h4 data-edit-text="title" style="margin: 0 0 5px 0;">${title}</h4>
                 </a>
-                <p data-editable-field="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
+                <p data-edit-text="description" style="color: #666; margin: 0; font-size: 14px;">${description}</p>
             </div>
         </div>
     `;
@@ -680,16 +682,16 @@ function renderImageBlock(block) {
     const alt = block.placeholder || block.alt || '';
     const href = getLinkUrl(block.href);
 
-    // Add data-media-field="url" for inline image editing
-    const img = `<img data-media-field="url" src="${imageSrc}" alt="${alt}" />`;
+    // Add data-edit-media="url" for inline image editing
+    const img = `<img data-edit-media="url" src="${imageSrc}" alt="${alt}" />`;
 
-    // If href is set, wrap in link with data-linkable-field on the <a>
+    // If href is set, wrap in link with data-edit-link on the <a>
     // This ensures hydra.js prevents navigation in edit mode
     if (href) {
-        return `<a href="${href}" class="image-link" data-linkable-field="href">${img}</a>`;
+        return `<a href="${href}" class="image-link" data-edit-link="href">${img}</a>`;
     }
-    // No href yet - put data-linkable-field on img so users can add a link
-    return `<img data-media-field="url" data-linkable-field="href" src="${imageSrc}" alt="${alt}" />`;
+    // No href yet - put data-edit-link on img so users can add a link
+    return `<img data-edit-media="url" data-edit-link="href" src="${imageSrc}" alt="${alt}" />`;
 }
 
 /**
@@ -708,23 +710,20 @@ function renderVideoBlock(block) {
  * Render a columns container block.
  * Has TWO container fields: top_images and columns (tests multi-field routing)
  * Calls window._expandListingBlocks for nested listings in columns.
- * @param {Object} block - Columns block data with top_images/top_images_layout and columns/columns_layout
+ * @param {Object} block - Columns block data with shared blocks dict + top_images/columns layout fields
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
-    const topImages = block.top_images || {};
-    const topImagesLayout = block.top_images_layout || { items: [] };
-    const topImagesItems = topImagesLayout.items || [];
-    const columns = block.columns || {};
-    const columnsLayout = block.columns_layout || { items: [] };
-    const columnsItems = columnsLayout.items || [];
+    const blocks = block.blocks || {};
+    const topImagesItems = block.top_images?.items || [];
+    const columnsItems = block.columns?.items || [];
     const title = block.title || '';
 
     let html = '';
 
     // Render editable title for columns block
     if (title) {
-        html += `<h3 data-editable-field="title" class="columns-title" style="margin-bottom: 10px;">${title}</h3>`;
+        html += `<h3 data-edit-text="title" class="columns-title" style="margin-bottom: 10px;">${title}</h3>`;
     }
 
     // Render top_images container field (images go right)
@@ -733,7 +732,7 @@ async function renderColumnsBlock(block) {
         html += '<div class="field-label" style="font-weight: bold; color: #666; font-size: 12px; writing-mode: vertical-rl; text-orientation: mixed;">TOP IMAGES</div>';
 
         for (const imgId of topImagesItems) {
-            const img = topImages[imgId];
+            const img = blocks[imgId];
             if (!img) continue;
 
             // Render image as a nested block with data-block-uid and data-block-add="right"
@@ -749,7 +748,7 @@ async function renderColumnsBlock(block) {
     html += '<div class="columns-row" style="display: flex; gap: 20px;">';
 
     for (const columnId of columnsItems) {
-        const column = columns[columnId];
+        const column = blocks[columnId];
         if (!column) continue;
 
         // Render column as a nested block with data-block-uid and data-block-add="right"
@@ -781,7 +780,7 @@ async function renderColumnContent(column, columnId) {
 
     // Render editable title for column block
     if (title) {
-        html += `<h4 data-editable-field="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
+        html += `<h4 data-edit-text="title" class="column-title" style="margin-bottom: 8px; font-size: 14px;">${title}</h4>`;
     }
 
     const itemsToRender = expandedItems;
@@ -875,9 +874,8 @@ async function renderListingBlock(block, blockId) {
     const blocks = { [blockId]: block };
     const layout = [blockId];
 
-    const result = await window._expandListingBlocks(blocks, layout, blockId);
-    const expandedItems = result.items;
-    const paging = result.paging?.totalPages > 1 ? result.paging : null;
+    const { items: expandedItems, paging } = await window._expandListingBlocks(blocks, layout, blockId);
+    const showPaging = paging?.totalPages > 1 ? paging : null;
 
     for (const childBlock of expandedItems) {
         if (!childBlock) continue;
@@ -938,10 +936,10 @@ async function renderGridBlock(block, blockId) {
             case 'image':
                 html += renderImageBlock(childBlock);
                 break;
-            case 'summaryItem':
+            case 'summary':
                 html += renderSummaryItemBlock(childBlock, null);
                 break;
-            case 'defaultItem':
+            case 'default':
                 html += renderDefaultItemBlock(childBlock, null);
                 break;
             case 'empty':
@@ -1114,16 +1112,16 @@ function renderSlideBlock(block) {
 
     // Preview image (background image area)
     if (imageSrc) {
-        html += `<div data-media-field="preview_image" style="height: 100px; background: url('${imageSrc}') center/cover; margin-bottom: 8px; border-radius: 4px;"></div>`;
+        html += `<div data-edit-media="preview_image" style="height: 100px; background: url('${imageSrc}') center/cover; margin-bottom: 8px; border-radius: 4px;"></div>`;
     } else {
-        html += `<div data-media-field="preview_image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; border-radius: 4px; cursor: pointer;">Click to add image</div>`;
+        html += `<div data-edit-media="preview_image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; border-radius: 4px; cursor: pointer;">Click to add image</div>`;
     }
 
     if (headTitle) {
-        html += `<div data-editable-field="head_title" style="font-size: 12px; color: #888; margin-bottom: 4px;">${headTitle}</div>`;
+        html += `<div data-edit-text="head_title" style="font-size: 12px; color: #888; margin-bottom: 4px;">${headTitle}</div>`;
     }
-    html += `<h4 data-editable-field="title" style="margin: 0 0 8px 0;">${title}</h4>`;
-    html += `<p data-editable-field="description" style="margin: 0; color: #666;">${description}</p>`;
+    html += `<h4 data-edit-text="title" style="margin: 0 0 8px 0;">${title}</h4>`;
+    html += `<p data-edit-text="description" style="margin: 0; color: #666;">${description}</p>`;
 
     return html;
 }
@@ -1132,17 +1130,16 @@ function renderSlideBlock(block) {
  * Render an accordion block with separate header and content containers.
  * Calls window._expandListingBlocks for nested listings in content.
  *
- * @param {Object} block - Accordion block data with header/header_layout and content/content_layout
+ * @param {Object} block - Accordion block data with shared blocks dict + header/content layout fields
  * @param {string} blockId - Accordion block ID
  * @returns {Promise<string>} HTML string
  */
 async function renderAccordionBlock(block, blockId) {
-    let header = block.header || {};
-    let headerItems = block.header_layout?.items || [];
-    let content = block.content || {};
-    let contentItems = block.content_layout?.items || [];
+    const blocks = block.blocks || {};
+    let headerItems = block.header?.items || [];
+    let contentItems = block.content?.items || [];
 
-    const { items: expandedItems } = await expandItems(content, contentItems, `${blockId}-content`);
+    const { items: expandedItems } = await expandItems(blocks, contentItems, `${blockId}-content`);
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
@@ -1151,7 +1148,7 @@ async function renderAccordionBlock(block, blockId) {
     html += '<div class="header-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">HEADER</div>';
 
     for (const childId of headerItems) {
-        const childBlock = header[childId];
+        const childBlock = blocks[childId];
         if (childBlock) {
             html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
             html += renderNestedSlateBlock(childBlock);
@@ -1181,7 +1178,7 @@ async function renderAccordionBlock(block, blockId) {
             case 'teaser':
                 html += renderTeaserBlock(childBlock, null);
                 break;
-            case 'summaryItem':
+            case 'summary':
                 html += renderSummaryItemBlock(childBlock, null);
                 break;
             default:
@@ -1259,6 +1256,19 @@ function renderFacetWidget(facet) {
         </div>`;
     }
 
+    if (facetType === 'daterangeFacet') {
+        return `<div class="facet-widget facet-daterange" style="margin-top: 4px;">
+            <input type="date" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px;" /> —
+            <input type="date" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px;" />
+        </div>`;
+    }
+
+    if (facetType === 'toggleFacet') {
+        return `<div class="facet-widget facet-toggle" style="margin-top: 4px;">
+            <label><input type="checkbox" /> ${options[0]?.title || 'Toggle'}</label>
+        </div>`;
+    }
+
     // Default: just show field name
     return '<div class="facet-widget" style="font-size: 11px; color: #999;">Widget not implemented</div>';
 }
@@ -1267,7 +1277,7 @@ function renderFacetWidget(facet) {
  * Render a search block with facets and listing container.
  * The listing child is expanded via expandListingBlocks before rendering.
  *
- * @param {Object} block - Search block data with facets and listing/listing_layout
+ * @param {Object} block - Search block data with facets and shared blocks dict + listing layout
  * @param {string} blockId - Search block ID
  * @returns {Promise<string>} HTML string
  */
@@ -1277,14 +1287,14 @@ async function renderSearchBlock(block, blockId) {
     const showSortOn = block.showSortOn;
     const facets = block.facets || [];
     const sortOnOptions = block.sortOnOptions || [];
-    const listing = block.listing || {};
-    const listingLayout = block.listing_layout?.items || [];
+    const blocks = block.blocks || {};
+    const listingLayout = block.listing?.items || [];
 
     let html = '<div class="search-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
 
     // Headline
     if (headline) {
-        html += `<h2 data-editable-field="headline" style="margin-bottom: 15px;">${headline}</h2>`;
+        html += `<h2 data-edit-text="headline" style="margin-bottom: 15px;">${headline}</h2>`;
     }
 
     // Search input
@@ -1319,11 +1329,20 @@ async function renderSearchBlock(block, blockId) {
         html += '<div style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">FACETS</div>';
         for (const facet of facets) {
             const facetId = facet['@id'] || facet.id || '';
-            html += `<div class="facet-item" data-block-uid="${facetId}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
-                <div data-editable-field="title" style="font-weight: bold;">${facet.title || ''}</div>
-                <div style="font-size: 12px; color: #666;">Field: ${typeof facet.field === 'object' ? facet.field?.value : facet.field || ''}</div>
-                ${renderFacetWidget(facet)}
-            </div>`;
+            const facetType = facet.type || '';
+            // For typed object_list: non-facet items (slate, image) get rendered differently
+            if (facetType === 'slate' || facetType === 'image') {
+                // Render as generic block inside facets container
+                html += `<div data-block-uid="${facetId}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">`;
+                html += renderBlock(facet, facetId);
+                html += '</div>';
+            } else {
+                html += `<div class="facet-item" data-block-uid="${facetId}" data-block-type="${facetType}" data-block-add="bottom" style="margin-bottom: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
+                    <div data-edit-text="title" style="font-weight: bold;">${facet.title || ''}</div>
+                    <div style="font-size: 12px; color: #666;">Field: ${typeof facet.field === 'object' ? facet.field?.value : facet.field || ''}</div>
+                    ${renderFacetWidget(facet)}
+                </div>`;
+            }
         }
         html += '</div>';
     }
@@ -1334,7 +1353,7 @@ async function renderSearchBlock(block, blockId) {
     // Expand listing blocks if we have the helper
     // expandListingBlocks returns { items, paging } where each item has @uid
     if (window._expandListingBlocks && listingLayout.length > 0) {
-        const result = await window._expandListingBlocks(listing, listingLayout, `${blockId}-listing`);
+        const result = await window._expandListingBlocks(blocks, listingLayout, `${blockId}-listing`);
         const expandedItems = result.items;
 
         for (const childBlock of expandedItems) {
@@ -1375,13 +1394,13 @@ async function renderSearchBlock(block, blockId) {
  */
 function renderNestedSlateBlock(block) {
     const plaintext = block.plaintext || '';
-    return `<p data-editable-field="value" style="margin: 0;">${plaintext}</p>`;
+    return `<p data-edit-text="value" style="margin: 0;">${plaintext}</p>`;
 }
 
 /**
  * Render a slateTable block.
  * Each row and cell gets data-block-uid for selection.
- * Cell content is editable via data-editable-field="value".
+ * Cell content is editable via data-edit-text="value".
  * @param {Object} block - slateTable block data
  * @returns {string} HTML string
  */
@@ -1405,7 +1424,7 @@ function renderSlateTableBlock(block) {
             value.forEach((node) => {
                 const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
                 const text = renderChildren(node.children || []);
-                cellContent += `<p data-editable-field="value"${nodeIdAttr}>${text}</p>`;
+                cellContent += `<p data-edit-text="value"${nodeIdAttr}>${text}</p>`;
             });
 
             // Cells add to the right (new column)

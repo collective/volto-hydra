@@ -6,13 +6,24 @@ import { fetchContent } from "#utils/api";
 import BlocksList from "@/components/BlocksList";
 
 export default function Home() {
-  const bridge = initBridge({
-    pageBlocksFields: [
-      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
-    ],
-  });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [value, setValue] = useState(data);
+
+  const bridge = initBridge({
+    page: {
+      schema: {
+        properties: {
+          blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser'] },
+        },
+      },
+    },
+    onEditChange: (updatedData) => {
+      if (updatedData) {
+        setValue(updatedData);
+      }
+    },
+  });
 
   useEffect(() => {
     async function getData(token = null) {
@@ -33,18 +44,6 @@ export default function Home() {
       url.searchParams.get("access_token") || getTokenFromCookie();
     getData(tokenFromUrl);
   }, []);
-
-  const [value, setValue] = useState(data);
-  // useEffect(() => {
-  //   console.log(value?.blocks["38ff6b46-4cbd-4933-a462-251c3e963b7a"]);
-  // },[value]);
-  useEffect(() => {
-    bridge.onEditChange((updatedData) => {
-      if (updatedData) {
-        setValue(updatedData);
-      }
-    });
-  }, [bridge]);
 
   if (loading) {
     return <div>Loading...</div>;

@@ -4,6 +4,10 @@
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
 
+// Hardcoded test JWT — mock API only checks for "Bearer " prefix, never validates.
+// sub=admin, exp=4102444800 (2100-01-01). Shared with mock-api-server.js.
+export const TEST_AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6NDEwMjQ0NDgwMH0.fake-signature';
+
 export class AdminUIHelper {
   constructor(
     public readonly page: Page,
@@ -97,37 +101,18 @@ export class AdminUIHelper {
   /**
    * Log in to the Volto admin UI.
    */
-  async login(username: string = 'admin', password: string = 'admin'): Promise<void> {
-    // For testing, bypass the login form and set the auth cookie directly
-    // This avoids Redux/middleware complexity in the test environment
-
-    // Create a valid JWT format token (header.payload.signature)
-    // Header: {"alg":"HS256","typ":"JWT"}
-    // Payload: {"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400} (expires in 24 hours)
-    // Signature: fake but valid base64
-    const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
-    const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400})).toString('base64').replace(/=/g, '');
-    const signature = 'fake-signature';
-    const authToken = `${header}.${payload}.${signature}`;
-
-    // Set the auth_token cookie
+  async login(): Promise<void> {
+    // Set the auth_token cookie. Volto SSR reads this cookie and forwards it
+    // as Authorization: Bearer to the API, so page.goto() to any URL works.
     await this.page.context().addCookies([{
       name: 'auth_token',
-      value: authToken,
+      value: TEST_AUTH_TOKEN,
       domain: 'localhost',
       path: '/',
       httpOnly: false,
       secure: false,
       sameSite: 'Lax',
     }]);
-
-
-    // Navigate to homepage first (doesn't require SSR auth)
-    await this.page.goto(`${this.adminUrl}/`, {
-      timeout: 60000,
-      waitUntil: 'networkidle',
-    });
-
   }
 
   /**
@@ -140,8 +125,9 @@ export class AdminUIHelper {
 
   /**
    * Navigate to the edit page for a piece of content.
-   * If already on the page in view mode, clicks the Edit button.
-   * Otherwise uses client-side navigation to avoid SSR auth issues.
+   * Goes directly via page.goto() — Volto SSR reads the auth_token cookie
+   * and forwards it as Authorization: Bearer to the API.
+   * If already on a Volto page, uses client-side navigation (faster).
    */
   async navigateToEdit(contentPath: string): Promise<void> {
     // Ensure path starts with /
@@ -153,26 +139,18 @@ export class AdminUIHelper {
 
     const editPath = `${contentPath}/edit`;
     const currentUrl = this.page.url();
+    const isOnVoltoPage = currentUrl.startsWith(this.adminUrl);
 
-    // Check if we're already on this page (view mode)
-    const isOnViewPage = currentUrl.includes(contentPath) && !currentUrl.includes('/edit');
-
-    if (isOnViewPage) {
-      // Click the Edit button in the toolbar
-      const editButton = this.page.locator('#toolbar a.edit, #toolbar [aria-label="Edit"]');
-      await editButton.click({ timeout: 5000 });
-    } else {
-      // Use React Router to navigate client-side (avoids SSR)
+    if (isOnVoltoPage) {
+      // Already on a Volto page — use client-side navigation (no SSR round-trip).
+      // connected-react-router's history library listens for popstate events.
       await this.page.evaluate((path) => {
-        // @ts-ignore - window.__APP_HISTORY__ is set by Volto
-        if (window.__HISTORY__) {
-          window.__HISTORY__.push(path);
-        } else {
-          // Fallback to pushState + popstate event
-          window.history.pushState({}, '', path);
-          window.dispatchEvent(new PopStateEvent('popstate'));
-        }
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
       }, editPath);
+    } else {
+      // First navigation — go directly to the edit URL.
+      await this.page.goto(`${this.adminUrl}${editPath}`, { timeout: 60000 });
     }
 
     // Wait for the URL to change
@@ -192,7 +170,7 @@ export class AdminUIHelper {
 
   /**
    * Navigate to a content page in view mode (not editing).
-   * Uses client-side navigation to avoid SSR auth issues.
+   * Goes directly via page.goto() or client-side navigation if already on Volto.
    */
   async navigateToView(contentPath: string): Promise<void> {
     // Ensure path starts with /
@@ -202,16 +180,18 @@ export class AdminUIHelper {
     // Prepend content prefix (e.g., /_test_data) for test content paths
     contentPath = `${this.contentPrefix}${contentPath}`;
 
-    // Use React Router to navigate client-side
-    await this.page.evaluate((path) => {
-      // @ts-ignore - window.__HISTORY__ is set by Volto
-      if (window.__HISTORY__) {
-        window.__HISTORY__.push(path);
-      } else {
+    const currentUrl = this.page.url();
+    const isOnVoltoPage = currentUrl.startsWith(this.adminUrl);
+
+    if (isOnVoltoPage) {
+      // Client-side navigation via pushState + popstate
+      await this.page.evaluate((path) => {
         window.history.pushState({}, '', path);
         window.dispatchEvent(new PopStateEvent('popstate'));
-      }
-    }, contentPath);
+      }, contentPath);
+    } else {
+      await this.page.goto(`${this.adminUrl}${contentPath}`, { timeout: 60000 });
+    }
 
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${contentPath}`, { timeout: 10000 });
@@ -248,11 +228,11 @@ export class AdminUIHelper {
       timeout,
     });
 
-    // Wait for iframe to have at least one block attached to the DOM.
-    // Use state: 'attached' instead of default 'visible' because on carousel
-    // pages, all blocks may be inside inactive slides (hidden) initially.
+    // Wait for iframe to have at least one block visible.
+    // This ensures the frontend has actually rendered page content, not just
+    // put elements in the DOM (e.g. Nuxt SSR before hydration).
     const iframe = this.getIframe();
-    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'attached', timeout });
+    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'visible', timeout });
 
     // Propagate run ID from admin page to iframe for log filtering
     const runId = await this.page.evaluate(() => (window as any).__testRunId);
@@ -665,9 +645,9 @@ export class AdminUIHelper {
       );
     }
 
-    // Try to click on the block's title element (data-editable-field="title")
+    // Try to click on the block's title element (data-edit-text="title")
     const titleElement = block.locator(
-      '> [data-editable-field="title"], > .column-title, > h3, > h4',
+      '> [data-edit-text="title"], > .column-title, > h3, > h4',
     );
     const hasTitleElement = (await titleElement.count()) > 0;
 
@@ -825,8 +805,9 @@ export class AdminUIHelper {
    */
   async waitForSidebarCurrentBlock(blockTypeTitle: string, timeout: number = 10000): Promise<void> {
     const sidebar = this.page.locator('.sidebar-container');
-    // The current block header has data-is-current="true" and contains the block type title
-    const currentBlockHeader = sidebar.locator('[data-is-current="true"]').filter({ hasText: blockTypeTitle });
+    // The current block header has data-is-current="true" with a nav button showing the type title
+    // Use the span inside parent-nav for exact text match to avoid substring matches (e.g., "Image" in "Top Images")
+    const currentBlockHeader = sidebar.locator('[data-is-current="true"] .parent-nav > span:not(.nav-prefix)').filter({ hasText: blockTypeTitle });
     await expect(currentBlockHeader).toBeVisible({ timeout });
   }
 
@@ -903,8 +884,8 @@ export class AdminUIHelper {
    */
   getSlateField(blockLocator: Locator): Locator {
     // Try child first (mock renderer), then self (Nuxt where attr is on root)
-    const childField = blockLocator.locator('[data-editable-field="value"]');
-    const selfField = blockLocator.and(this.page.locator('[data-editable-field="value"]'));
+    const childField = blockLocator.locator('[data-edit-text="value"]');
+    const selfField = blockLocator.and(this.page.locator('[data-edit-text="value"]'));
     return childField.or(selfField);
   }
 
@@ -1458,12 +1439,12 @@ export class AdminUIHelper {
    */
   async getBlockTextInIframe(blockId: string): Promise<string> {
     const iframe = this.getIframe();
-    // Try descendant first (mock frontend: data-block-uid > [data-editable-field])
-    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-editable-field]`).first();
+    // Try descendant first (mock frontend: data-block-uid > [data-edit-text])
+    let editor = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text]`).first();
 
     if ((await editor.count()) === 0) {
-      // Nuxt pattern: data-block-uid and data-editable-field on same element
-      editor = iframe.locator(`[data-block-uid="${blockId}"][data-editable-field]`).first();
+      // Nuxt pattern: data-block-uid and data-edit-text on same element
+      editor = iframe.locator(`[data-block-uid="${blockId}"][data-edit-text]`).first();
     }
 
     // Wait a moment for any pending mutations to complete
@@ -1486,9 +1467,9 @@ export class AdminUIHelper {
     if (fieldName) {
       // Descendant or same-element (Nuxt puts both attrs on same element)
       return iframe.locator(
-        `[data-block-uid="${blockId}"] [data-editable-field="${fieldName}"]`,
+        `[data-block-uid="${blockId}"] [data-edit-text="${fieldName}"]`,
       ).or(iframe.locator(
-        `[data-block-uid="${blockId}"][data-editable-field="${fieldName}"]`,
+        `[data-block-uid="${blockId}"][data-edit-text="${fieldName}"]`,
       ));
     }
 
@@ -1601,12 +1582,29 @@ export class AdminUIHelper {
       const outline = this.page.locator('.volto-hydra-block-outline');
 
       const toolbarVisible = await toolbar.isVisible();
+      // For tall blocks (e.g. search), the outline may extend beyond the viewport
+      // after async content rendering causes a scroll. Check if the outline exists
+      // and at least partially intersects the viewport rather than requiring full visibility.
       const outlineVisible = await outline.isVisible();
+      let outlinePartiallyVisible = outlineVisible;
+      if (!outlineVisible && await outline.count() > 0) {
+        const bbox = await outline.boundingBox();
+        if (bbox) {
+          const viewportSize = this.page.viewportSize();
+          if (viewportSize) {
+            outlinePartiallyVisible =
+              bbox.x + bbox.width > 0 &&
+              bbox.x < viewportSize.width &&
+              bbox.y + bbox.height > 0 &&
+              bbox.y < viewportSize.height;
+          }
+        }
+      }
 
-      if (!toolbarVisible || !outlineVisible) {
+      if (!toolbarVisible || !outlinePartiallyVisible) {
         return {
           ok: false,
-          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlineVisible}`,
+          reason: `Overlays not visible: toolbar=${toolbarVisible}, outline=${outlinePartiallyVisible}`,
         };
       }
 
@@ -2238,10 +2236,10 @@ export class AdminUIHelper {
       const doc = el.ownerDocument;
       const activeEl = doc.activeElement;
       const activeTag = activeEl?.tagName;
-      const activeEditable = activeEl?.getAttribute?.('data-editable-field');
+      const activeEditable = activeEl?.getAttribute?.('data-edit-text');
       return {
         isFocused: activeEl === el,
-        activeElement: `${activeTag}[data-editable-field="${activeEditable}"]`,
+        activeElement: `${activeTag}[data-edit-text="${activeEditable}"]`,
       };
     });
   }
@@ -2292,7 +2290,7 @@ export class AdminUIHelper {
    * Enter edit mode on a specific block and return the editor element.
    * This helper checks if already editable/focused, and only clicks if necessary.
    *
-   * Uses [data-editable-field] selector instead of [contenteditable="true"] because
+   * Uses [data-edit-text] selector instead of [contenteditable="true"] because
    * contenteditable may be temporarily set to "false" when the editor is blocked
    * during format operations (e.g., waiting for iframe flush to complete).
    *
@@ -2340,7 +2338,7 @@ export class AdminUIHelper {
 
   /**
    * Select a range of text in an editor element.
-   * The editor element should be a contenteditable element (like a <p> with data-editable-field).
+   * The editor element should be a contenteditable element (like a <p> with data-edit-text).
    *
    * @param editor - Locator for the editor element
    * @param startOffset - Character offset to start selection
@@ -2986,7 +2984,23 @@ export class AdminUIHelper {
   async verifyDragShadowVisible(): Promise<void> {
     const iframe = this.getIframe();
     const dragShadow = iframe.locator('.dragging');
-    await dragShadow.waitFor({ state: 'visible', timeout: 5000 });
+    try {
+      await dragShadow.waitFor({ state: 'visible', timeout: 5000 });
+    } catch (e) {
+      // Diagnostic: is the element in the DOM but not visible, or missing entirely?
+      const count = await dragShadow.count();
+      const bodyClass = await iframe.locator('body').getAttribute('class');
+      const iframeDragBtn = iframe.locator('.volto-hydra-drag-button');
+      const dragBtnVisible = await iframeDragBtn.isVisible().catch(() => false);
+      const dragBtnBox = await iframeDragBtn.boundingBox().catch(() => null);
+      console.log(`[DIAG] .dragging count=${count}, body class="${bodyClass}", dragBtn visible=${dragBtnVisible}, dragBtn box=${JSON.stringify(dragBtnBox)}`);
+      if (count > 0) {
+        const box = await dragShadow.first().boundingBox().catch(() => null);
+        const style = await dragShadow.first().getAttribute('style').catch(() => null);
+        console.log(`[DIAG] .dragging exists but not visible: box=${JSON.stringify(box)}, style="${style}"`);
+      }
+      throw e;
+    }
   }
 
   /**
@@ -3251,23 +3265,35 @@ export class AdminUIHelper {
     let lastTargetY: number | null = null;
     let stuckCount = 0;
 
+    // Cache iframe bounds and edge positions — they don't change during drag
+    const iframeEl = this.page.locator('#previewIframe');
+    const iframeRect = await iframeEl.boundingBox();
+    if (!iframeRect) throw new Error('Could not get iframe bounding box');
+    const edgeThreshold = 10;
+    const edgeX = iframeRect.x + iframeRect.width / 2;
+    const edgeYUp = iframeRect.y + edgeThreshold;
+    const edgeYDown = iframeRect.y + iframeRect.height - edgeThreshold;
+
+    // Move cursor to the scroll edge once before the loop, then just jiggle it
+    let currentEdgeY = 0;
+    let edgeInitialized = false;
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await this.verifyDragShadowVisible();
+      // Verify drag shadow is still active (every 20 iterations to reduce overhead)
+      if (attempt % 20 === 0) {
+        await this.verifyDragShadowVisible();
+      }
 
-      // Quick visibility check using relevant element
+      // Check target position
       const quickRect = await this.getCombinedBoundingBox(targetElement);
-      const iframeEl = this.page.locator('#previewIframe');
-      const iframeRect = await iframeEl.boundingBox();
-      if (!iframeRect) throw new Error('Could not get iframe bounding box');
-
       const targetY = iframeRect.y + quickRect.y + quickRect.height / 2;
       const isAboveViewport = targetY < edgeMargin;
       const isBelowViewport = targetY > viewportSize.height - edgeMargin;
       const isVisibleInViewport = targetY > 0 && targetY < viewportSize.height;
       const needsAutoScroll = isAboveViewport || isBelowViewport;
 
-      // Debug logging every 5 attempts
-      if (attempt % 5 === 0) {
+      // Debug logging every 10 attempts
+      if (attempt % 10 === 0) {
         console.log(`[SCROLL] attempt=${attempt} targetY=${targetY.toFixed(0)} edgeMargin=${edgeMargin} viewportH=${viewportSize.height} above=${isAboveViewport} below=${isBelowViewport} visible=${isVisibleInViewport} needsScroll=${needsAutoScroll} t=${Date.now()}`);
       }
 
@@ -3275,10 +3301,24 @@ export class AdminUIHelper {
         // Target is well within viewport (not near edges) - safe to drop
         console.log(`[SCROLL] Target in range! targetY=${targetY.toFixed(0)}`);
         // CRITICAL: Move cursor to safe zone BEFORE returning, to stop auto-scroll.
-        // Otherwise, as cursor moves from edge to target, it passes through scroll zone
-        // and auto-scroll continues, causing the target to move away.
         await this.moveToSafeZone();
         await this.waitForPositionStable(targetElement);
+
+        // Re-verify target is still visible after momentum settles.
+        // moveToSafeZone moves cursor from scroll edge to center, which can trigger
+        // additional scrolling as the cursor passes through the auto-scroll zone.
+        // If the target drifted off-screen, use scrollIntoViewIfNeeded to correct it
+        // rather than re-entering the auto-scroll loop (which would oscillate).
+        const settledRect = await this.getCombinedBoundingBox(targetElement);
+        const freshIframeRect = await iframeEl.boundingBox();
+        if (!freshIframeRect) throw new Error('Could not get iframe bounding box');
+        const settledY = freshIframeRect.y + settledRect.y + settledRect.height / 2;
+        if (settledY < 0 || settledY > viewportSize.height) {
+          console.log(`[SCROLL] Target drifted off-screen after settling! settledY=${settledY.toFixed(0)}, using scrollIntoView to correct`);
+          await targetElement.scrollIntoViewIfNeeded();
+          await this.waitForPositionStable(targetElement);
+        }
+
         return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
       }
 
@@ -3290,6 +3330,18 @@ export class AdminUIHelper {
           console.log(`[SCROLL] Accepting position after scroll limit reached. targetY=${targetY.toFixed(0)}`);
           await this.moveToSafeZone();
           await this.waitForPositionStable(targetElement);
+
+          // Re-verify after momentum settles
+          const settledRect2 = await this.getCombinedBoundingBox(targetElement);
+          const freshIframeRect2 = await iframeEl.boundingBox();
+          if (!freshIframeRect2) throw new Error('Could not get iframe bounding box');
+          const settledY2 = freshIframeRect2.y + settledRect2.y + settledRect2.height / 2;
+          if (settledY2 < 0 || settledY2 > viewportSize.height) {
+            console.log(`[SCROLL] Target drifted off-screen after scroll limit! settledY=${settledY2.toFixed(0)}, using scrollIntoView to correct`);
+            await targetElement.scrollIntoViewIfNeeded();
+            await this.waitForPositionStable(targetElement);
+          }
+
           return await this.getDropPositionInPageCoords(targetBlock, insertAfter);
         }
       } else {
@@ -3297,12 +3349,24 @@ export class AdminUIHelper {
       }
       lastTargetY = targetY;
 
-      // Target is near edge or off-screen - move to edge to trigger auto-scroll
+      // Move cursor to edge to trigger auto-scroll.
+      // Only do a full move on direction change; otherwise just jiggle by 1px
+      // to keep rAF scrolling alive without expensive multi-step moves.
       const scrollUp = isAboveViewport;
-      await this.moveToScrollEdge(scrollUp);
+      const targetEdgeY = scrollUp ? edgeYUp : edgeYDown;
+      if (!edgeInitialized || Math.abs(currentEdgeY - targetEdgeY) > 20) {
+        // Direction changed or first move — do a proper move
+        await this.page.mouse.move(edgeX, targetEdgeY, { steps: 2 });
+        currentEdgeY = targetEdgeY;
+        edgeInitialized = true;
+      } else {
+        // Same direction — tiny jiggle to keep scroll events flowing
+        currentEdgeY = targetEdgeY + (attempt % 2);
+        await this.page.mouse.move(edgeX, currentEdgeY);
+      }
 
       // Brief wait for scroll to take effect
-      await this.page.waitForTimeout(100);
+      await this.page.waitForTimeout(50);
     }
 
     // If we get here, we've exceeded max attempts
@@ -4244,10 +4308,18 @@ export class AdminUIHelper {
       .catch(() => false);
 
     if (chooserVisible && blockType) {
-      // Select the specified block type
+      // Select the specified block type (may be in a collapsed accordion section)
       const blockButton = blockChooser.getByRole('button', {
         name: new RegExp(blockType, 'i'),
       });
+      // If not visible, try expanding accordion sections to find it
+      if (!(await blockButton.isVisible({ timeout: 500 }).catch(() => false))) {
+        const sections = blockChooser.locator('.accordion .title');
+        for (let i = 0; i < (await sections.count()); i++) {
+          await sections.nth(i).click();
+          if (await blockButton.isVisible({ timeout: 300 }).catch(() => false)) break;
+        }
+      }
       await blockButton.click();
       // Wait for chooser to close
       await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });

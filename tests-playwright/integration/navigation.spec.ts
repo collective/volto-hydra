@@ -41,6 +41,7 @@ test.describe('Navigation and URL Handling', () => {
       const helper = new AdminUIHelper(page);
 
       await helper.login();
+      await helper.navigateToView('/test-page');
 
       // Open Personal Preferences to set hash-based frontend URL
       await page.locator('#toolbar-personal').click();

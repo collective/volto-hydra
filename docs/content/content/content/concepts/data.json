@@ -1,0 +1,94 @@
+{
+  "@id": "/concepts",
+  "@type": "Document",
+  "UID": "concepts-folder-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "Learn about the key concepts behind Hydra's visual headless CMS architecture.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Learn about the key concepts behind Hydra's visual headless CMS architecture. Each section covers a major area of how Hydra works and how to integrate it with your frontend."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "listing-1": {
+      "@type": "listing",
+      "headlineTag": "h2",
+      "styles": {},
+      "variation": "summary",
+      "fieldMapping": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image"
+      }
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "listing-1"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Key concepts behind Hydra's visual headless CMS architecture",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "concepts",
+  "is_folderish": true,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/",
+    "@type": "Plone Site",
+    "UID": "plone_site_root",
+    "description": "A Visual Headless CMS",
+    "title": "Volto Hydra",
+    "type_title": "Plone Site"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Concepts",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

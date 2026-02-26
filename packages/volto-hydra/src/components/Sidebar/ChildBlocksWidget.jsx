@@ -1,6 +1,6 @@
 /**
  * ChildBlocksWidget - Shows child blocks for each container field in the current block.
- * A block can have multiple `widget: 'blocksid_list'` fields, each rendered as a separate section.
+ * A block can have multiple `widget: 'blocks_layout'` fields, each rendered as a separate section.
  *
  * Example: A block with both 'slides' and 'footnotes' fields would show:
  *   Slides        [+]
@@ -80,10 +80,9 @@ const getChildBlocks = (blockData, fieldName, formData, isObjectList = false, da
     });
   }
 
-  // Standard container: blocks object + blocks_layout
-  const layoutField = `${fieldName}_layout`;
-  const items = blockData[layoutField]?.items || [];
-  const blocksData = blockData[fieldName] || {};
+  // Standard container: shared blocks dict + layout field
+  const items = blockData[fieldName]?.items || [];
+  const blocksData = blockData.blocks || {};
 
   return items.map((blockId) => {
     const childBlock = blocksData[blockId];
@@ -288,9 +287,8 @@ const ContainerFieldSection = ({
  */
 const getChildBlocksForPageField = (formData, fieldConfig) => {
   const { fieldName } = fieldConfig;
-  const layoutField = `${fieldName}_layout`;
-  const pageBlocks = formData?.[layoutField]?.items || [];
-  const blocksData = formData?.[fieldName] || {};
+  const pageBlocks = formData?.[fieldName]?.items || [];
+  const blocksData = formData?.blocks || {};
 
   return pageBlocks.map((blockId) => {
     const blockData = blocksData[blockId];
@@ -440,8 +438,7 @@ const ChildBlocksWidget = ({
               const realParent = realParentId === PAGE_BLOCK_UID
                 ? formData
                 : getBlockById(formData, blockPathMap, realParentId);
-              const layoutField = `${realFieldName}_layout`;
-              const fullLayout = [...(realParent?.[layoutField]?.items || [])];
+              const fullLayout = [...(realParent?.[realFieldName]?.items || [])];
               let idx = 0;
               const newLayout = fullLayout.map((id) =>
                 sectionBlockIds.includes(id) ? reorderedIds[idx++] : id,

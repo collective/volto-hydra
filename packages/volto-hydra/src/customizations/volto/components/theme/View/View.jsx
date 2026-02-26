@@ -237,56 +237,41 @@ class View extends Component {
       );
     }
 
-    // Always render Iframe even when content is loading - it manages its own state
-    // and shouldn't remount during navigation (which would reload the frontend)
-    if (!this.props.content) {
-      return (
-        <div id="view">
-          <Iframe token={this.props.token} />
-        </div>
-      );
-    }
-
-    const RenderedView =
-      this.getViewByLayout() || this.getViewByType() || this.getViewDefault();
+    const RenderedView = this.props.content
+      ? this.getViewByLayout() || this.getViewByType() || this.getViewDefault()
+      : null;
 
     return (
       <div id="view">
-        <ContentMetadataTags content={this.props.content} />
-        {/* Body class if displayName in component is set */}
-        <BodyClass
-          className={
-            RenderedView.displayName
-              ? `view-${this.cleanViewName(RenderedView.displayName)}`
-              : null
-          }
-        />
-        <SlotRenderer name="aboveContent" content={this.props.content} />
-        {/* <RenderedView
-          key={this.props.content['@id']}
-          content={this.props.content}
-          location={this.props.location}
-          token={this.props.token}
-          history={this.props.history}
-        /> */}
-
-        {/* We can add Iframe Preview Component Here to Render View of the Frontend */}
+        {/* Iframe must be first child so it stays at the same React tree position
+            whether content is null (loading) or loaded — prevents remount */}
         <Iframe token={this.props.token} />
+        {this.props.content && (
+          <ContentMetadataTags content={this.props.content} />
+        )}
+        {RenderedView && (
+          <BodyClass
+            className={
+              RenderedView.displayName
+                ? `view-${this.cleanViewName(RenderedView.displayName)}`
+                : null
+            }
+          />
+        )}
+        {this.props.content && (
+          <SlotRenderer name="aboveContent" content={this.props.content} />
+        )}
 
-        <SlotRenderer name="belowContent" content={this.props.content} />
-        {config.settings.showTags &&
+        {this.props.content && (
+          <SlotRenderer name="belowContent" content={this.props.content} />
+        )}
+        {this.props.content &&
+          config.settings.showTags &&
           this.props.content.subjects &&
           this.props.content.subjects.length > 0 && (
             <Tags tags={this.props.content.subjects} />
           )}
-        {/* Add opt-in social sharing if required, disabled by default */}
-        {/* In the future this might be parameterized from the app config */}
-        {/* <SocialSharing
-          url={typeof window === 'undefined' ? '' : window.location.href}
-          title={this.props.content.title}
-          description={this.props.content.description || ''}
-        /> */}
-        {this.props.content.allow_discussion && (
+        {this.props.content?.allow_discussion && (
           <Comments pathname={this.props.pathname} />
         )}
         {this.state.isClient &&

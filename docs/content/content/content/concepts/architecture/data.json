@@ -1,0 +1,265 @@
+{
+  "@id": "/concepts/architecture",
+  "@type": "Document",
+  "UID": "concepts-architecture-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "Instead of combining editing and rendering into one framework, Hydra separates them and uses an iframe bridge for two-way communication during editing.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Hydra which is running in the same browser window."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "sep-1": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "diagram-heading": {
+      "@type": "slate",
+      "plaintext": "Architecture Overview",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Architecture Overview"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "diagram-text": {
+      "@type": "slate",
+      "plaintext": "Volto is split into Rendering and CMS UI/Admin UI, with the Rendering part replaceable with other implementations.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "                      Browser            RestAPI             Server\n\n                  ┌──────────────┐                       ┌─────────────┐\n Anon/Editing     │    Volto     │◄─────────────────────►│    Plone    │\n                  └──────────────┘                       └─────────────┘\n\n─────────────────────────────────────────────────────────────────────────\n\n              │   ┌──────────────┐                       ┌─────────────┐\n              │   │   Frontend   │◄──────────────────────┤    Plone    │\n              │   └──hydra.js────┘                       └─────────────┘\n              │          ▲                                  ▲\n Editing     UI          │ iFrame Bridge                    │\n              │          ▼                                  │\n              │   ┌──────────────┐                          │\n              │   │    Hydra     │◄─────────────────────────┘\n              │   └──────────────┘\n\n                  ┌──────────────┐                       ┌─────────────┐\n Anon             │   Frontend   │◄──────────────────────┤    Plone    │\n                  └──────────────┘                       └─────────────┘"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "guide-heading": {
+      "@type": "slate",
+      "plaintext": "Building a Frontend for Headless Plone",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Building a Frontend for Headless Plone"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "guide-text": {
+      "@type": "slate",
+      "plaintext": "A 12-step guide to building a frontend for Headless Plone, applicable to any framework.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The steps involved in creating a frontend are roughly the same for all frameworks:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Create a route for any path which goes to a single page (e.g., in Nuxt.js create pages/[..slug].vue)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "The page has a template with static parts of your theme like header and footer. Check content type to render each differently."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "On page setup, take the path and make a REST API call to the contents endpoint to get the JSON for this page."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Fill title etc from the content metadata."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "For navigation, use @expand to return navigation data in the same call. Create a nav component using this JSON."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "For Blocks: create a Block component that takes id and block JSON, check @type to determine rendering, call recursively for containers, iterate blocks_layout to render."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Create helpers: URL generation for links (convert API-relative URLs to frontend URLs), image URL generation (blocks have image data in many formats)."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Listing Blocks: Use the Listing Helpers (staticBlocks/expandListingBlocks) or make your own REST API query calls."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Redirects: Handle REST API redirects as internal redirects in your framework. For SSG, query all redirects at generate time."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Error Pages: Handle REST API errors with appropriate status codes."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Search Blocks: Render facets/filters, build queries using the REST API querystring endpoint."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Form Blocks: Render field types, produce compatible JSON submissions to the form-block endpoint, handle validation and thank you page."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        },
+        {
+          "children": [
+            {
+              "text": "See the example frontends for reference implementations: Nuxt.js, Next.js, and F7-Vue."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "sep-1",
+      "diagram-heading",
+      "diagram-text",
+      "guide-heading",
+      "guide-text"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "How Hydra separates editing from rendering using an iframe bridge, and a guide to building a frontend",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "architecture",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "How Hydra Works",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

@@ -5,7 +5,6 @@ import Cookies from 'js-cookie';
 import { Node } from 'slate';
 import {
   applyBlockDefaults,
-  previousBlockId,
 } from '@plone/volto/helpers';
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
@@ -89,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
+import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
 import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
@@ -97,6 +96,7 @@ import {
   syncChildBlockTypes,
   getConvertibleTypes,
   convertBlockType,
+  validateFieldMappings,
 } from '../../utils/schemaInheritance';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
@@ -411,7 +411,7 @@ function recurseUpdateVoltoConfig(newConfig) {
 
 // Module-level state to track iframe's current state across component remounts
 // This prevents unnecessary iframe reloads when React Router remounts the View component
-let persistedIframe = { frontendUrl: null, path: null, isEdit: null };
+let persistedIframe = { frontendUrl: null, path: null, isEdit: null, src: null };
 
 const Iframe = (props) => {
   const {
@@ -770,8 +770,10 @@ const Iframe = (props) => {
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get(getIframeUrlCookieName()) ||
     urlFromEnv[0];
-  // Initialize to null to avoid SSR/client hydration mismatch (token differs)
-  const [iframeSrc, setIframeSrc] = useState(null);
+  // Initialize from persisted state so component remounts don't reset to null
+  // (which would cause a duplicate iframe load for the same URL).
+  // On first-ever load, persistedIframe.src is null (safe for SSR hydration).
+  const [iframeSrc, setIframeSrc] = useState(persistedIframe.src);
 
   // Note: window.name inside iframe is set via the `name` attribute on the <iframe> element.
   // When iframe reloads (e.g., on mode switch), it picks up the current `name` attribute value.
@@ -809,8 +811,9 @@ const Iframe = (props) => {
     // Update if state doesn't match OR if iframeSrc is null (component just mounted)
     if (!stateMatches || !iframeSrc) {
       log('[IFRAME_SRC] Updating iframeSrc (state differs:', !stateMatches, 'iframeSrc null:', !iframeSrc, ')');
-      setIframeSrc(getUrlWithAdminParams(u, token, isEditMode));
-      persistedIframe = { frontendUrl: u, path: adminPath, isEdit: isEditMode };
+      const newSrc = getUrlWithAdminParams(u, token, isEditMode);
+      setIframeSrc(newSrc);
+      persistedIframe = { frontendUrl: u, path: adminPath, isEdit: isEditMode, src: newSrc };
     } else {
       log('[IFRAME_SRC] Skipping - state matches and iframeSrc already set');
     }
@@ -869,7 +872,7 @@ const Iframe = (props) => {
               if (!response.ok) throw new Error(`Failed to fetch template: ${response.status}`);
               return response.json();
             },
-            pageBlocksFields: { blocks: { allowedLayouts: [templateConfig.templateUrl] } },
+            pageBlocksFields: { blocks_layout: { allowedLayouts: [templateConfig.templateUrl] } },
           });
 
           // Merge with existing formData (preserve other fields like title, description)
@@ -908,17 +911,31 @@ const Iframe = (props) => {
     let fieldDef;
 
     if (action === 'inside') {
-      const parentBlock = getBlockById(formData, blockPathMap, blockId);
-      const parentType = blockPathMap[blockId]?.blockType;
-      const parentSchema =
-        typeof mergedBlocksConfig?.[parentType]?.blockSchema === 'function'
-          ? mergedBlocksConfig[parentType].blockSchema({
-              formData: {},
-              intl: { formatMessage: (m) => m.defaultMessage },
-            })
-          : mergedBlocksConfig?.[parentType]?.blockSchema;
-      fieldDef = parentSchema?.properties?.[fieldName];
-      isObjectList = fieldDef?.widget === 'object_list';
+      // Get field info from blockPathMap (already resolved by buildBlockPathMap, includes schemaEnhancer)
+      const childEntry = Object.values(blockPathMap || {}).find(
+        (info) => info.parentId === blockId && info.containerField === fieldName
+      );
+      if (childEntry?.isObjectListItem) {
+        isObjectList = true;
+        fieldDef = {
+          typeField: childEntry.typeField || null,
+          allowedBlocks: childEntry.allowedSiblingTypes,
+          idField: childEntry.idField,
+          widget: 'object_list',
+        };
+      } else {
+        // blocks_layout container or no existing children — try schema as fallback
+        const parentType = blockPathMap[blockId]?.blockType;
+        const parentSchema =
+          typeof mergedBlocksConfig?.[parentType]?.blockSchema === 'function'
+            ? mergedBlocksConfig[parentType].blockSchema({
+                formData: {},
+                intl: { formatMessage: (m) => m.defaultMessage },
+              })
+            : mergedBlocksConfig?.[parentType]?.blockSchema;
+        fieldDef = parentSchema?.properties?.[fieldName];
+        isObjectList = fieldDef?.widget === 'object_list';
+      }
       containerConfig = { parentId: blockId, fieldName, isObjectList };
     } else {
       containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig, intl);
@@ -971,19 +988,22 @@ const Iframe = (props) => {
     if (customBlockData) {
       blockData = customBlockData;
     } else if (isObjectList) {
-      // object_list items: use virtual type to initialize containers
-      // For before/after: get idField from containerConfig, virtualType from pathInfo
-      // For inside: get from fieldDef
+      // object_list items: typeField defaults to '@type' — no special casing needed
       const idField = containerConfig?.idField || fieldDef?.idField || '@id';
-      let virtualType;
-      if (action === 'inside') {
-        // Get parent type and append field name (use blockPathMap for type lookup)
-        virtualType = `${blockPathMap[blockId]?.blockType}:${fieldName}`;
+      const typeFieldName = (action === 'inside' ? fieldDef?.typeField : blockPathMap[blockId]?.typeField) || '@type';
+
+      let effectiveType;
+      if (typeFieldName !== '@type' && blockType) {
+        // Typed object_list: use the chosen block type (from BlockChooser)
+        effectiveType = blockType;
+      } else if (action === 'inside') {
+        // Single-schema or no explicit type: virtual type from parent:field
+        effectiveType = `${blockPathMap[blockId]?.blockType}:${fieldName}`;
       } else {
-        // For before/after, use the existing item's virtual type
-        virtualType = blockPathMap[blockId]?.blockType;
+        // Before/after: use existing item's type
+        effectiveType = blockPathMap[blockId]?.blockType;
       }
-      blockData = { [idField]: newBlockId, '@type': virtualType };
+      blockData = { [idField]: newBlockId, '@type': effectiveType };
 
       // For table mode rows, pass sibling data so cells count is copied
       let siblingData = null;
@@ -1018,7 +1038,12 @@ const Iframe = (props) => {
 
       // Initialize nested containers (e.g., cells in a row)
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData });
-      delete blockData['@type']; // object_list items don't store @type in data
+
+      // Store type in typeField, clean up @type if typeField is different
+      blockData[typeFieldName] = effectiveType;
+      if (typeFieldName !== '@type') {
+        delete blockData['@type']; // @type was only used for schema resolution
+      }
     } else {
       // Standard block with @type
       blockData = { '@type': blockType };
@@ -1030,7 +1055,7 @@ const Iframe = (props) => {
       const containerId = containerConfig?.parentId || 'page';
       const containerField = containerConfig?.fieldName || 'blocks_layout';
       const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
-      const layoutItems = container?.[containerField]?.items || container?.blocks_layout?.items || [];
+      const layoutItems = container?.[containerField]?.items || [];
       const refIndex = layoutItems.indexOf(blockId);
       const position = action === 'after' ? refIndex + 1 : refIndex;
 
@@ -1083,14 +1108,9 @@ const Iframe = (props) => {
     // Determine which block to select
     let selectBlockId = newBlockId;
     if (selectChildIndex != null && blockData) {
-      // Find the first object_list field in the block and get the child at that index
+      // Find the first array field in the block and get the child at selectChildIndex
       // This is used when adding a row from a cell - we want to select the corresponding cell
-      const blockSchema = typeof mergedBlocksConfig?.[blockData['@type']?.split(':').slice(0, -1).join(':') + ':' + containerConfig?.fieldName]?.blockSchema === 'function'
-        ? mergedBlocksConfig[blockData['@type']?.split(':').slice(0, -1).join(':') + ':' + containerConfig?.fieldName].blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : null;
-
-      // For table rows, cells are in the 'cells' field - look for object_list fields
-      for (const [fieldName, fieldValue] of Object.entries(blockData)) {
+      for (const [, fieldValue] of Object.entries(blockData)) {
         if (Array.isArray(fieldValue) && fieldValue[selectChildIndex]) {
           const childItem = fieldValue[selectChildIndex];
           // Get the ID field - typically 'key' or '@id'
@@ -1215,8 +1235,10 @@ const Iframe = (props) => {
       intl,
     );
 
-    // Get previous block for selection (within same container or page)
-    const previous = previousBlockId(properties, id);
+    // Compute which block to select after deletion (previous sibling, or parent if last)
+    const selectAfterDelete = getSelectAfterDelete(
+      id, containerConfig, iframeSyncState.blockPathMap, properties,
+    );
 
     // Unified deletion - works for both page and container
     let newFormData = deleteBlockFromContainer(
@@ -1244,7 +1266,7 @@ const Iframe = (props) => {
       blockPathMap: newBlockPathMap,
     }));
     onChangeFormData(newFormData);
-    onSelectBlock(selectPrev ? previous : null);
+    onSelectBlock(selectPrev ? selectAfterDelete : null);
     setAddNewBlockOpened(false);
     dispatch(setSidebarTab(1));
   };
@@ -1339,9 +1361,17 @@ const Iframe = (props) => {
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
-        case 'ADD_BLOCK_AFTER':
-          insertAndSelectBlock(event.data.blockId, 'slate', 'after');
+        case 'ADD_BLOCK_AFTER': {
+          // Determine the default block type from the container's schema
+          const containerFieldConfig = getContainerFieldConfig(
+            event.data.blockId, iframeSyncState.blockPathMap, properties, config.blocks.blocksConfig, intl
+          );
+          const defaultType = containerFieldConfig?.defaultBlockType
+            || (containerFieldConfig?.allowedBlocks?.length === 1 ? containerFieldConfig.allowedBlocks[0] : null)
+            || 'slate';
+          insertAndSelectBlock(event.data.blockId, defaultType, 'after');
           break;
+        }
 
         case 'SLASH_MENU':
           if (event.data.action === 'filter') {
@@ -1360,7 +1390,7 @@ const Iframe = (props) => {
           }
           break;
 
-        case 'INLINE_EDIT_DATA':
+        case 'INLINE_EDIT_DATA': {
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'INLINE_EDIT_DATA', blockFieldTypes);
           const incomingSequence = event.data.data?._editSequence || 0;
@@ -1410,6 +1440,7 @@ const Iframe = (props) => {
             }
           }
           break;
+        }
 
         case 'BUFFER_FLUSHED':
           // Iframe had no pending text - update combined state with current form + requestId + selection
@@ -1426,9 +1457,9 @@ const Iframe = (props) => {
           
           break;
 
-        case 'TOGGLE_MARK':
+        case 'TOGGLE_MARK': {
           // console.log('TOGGLE_BOLD', event.data.html);
-          
+
           const deserializedHTMLData = toggleMark(event.data.html);
           // console.log('deserializedHTMLData', deserializedHTMLData);
           onChangeFormData({
@@ -1458,6 +1489,7 @@ const Iframe = (props) => {
             event.origin,
           );
           break;
+        }
 
         case 'SLATE_TRANSFORM_REQUEST':
           // Validate data from postMessage before using it
@@ -1526,7 +1558,7 @@ const Iframe = (props) => {
                     }));
                   });
                   onChangeFormData(mutatedFormData);
-                  insertAndSelectBlock(enterBlockId, 'slate', 'after', null, {
+                  insertAndSelectBlock(enterBlockId, currentBlock['@type'] || 'slate', 'after', null, {
                     formatRequestId: enterRequestId,
                     formData: mutatedFormData,
                     blockPathMap: syncedBpm,
@@ -1718,7 +1750,7 @@ const Iframe = (props) => {
           }
           break;
 
-        case 'SLATE_UNDO_REQUEST':
+        case 'SLATE_UNDO_REQUEST': {
           // Dispatch a synthetic Ctrl+Z event to trigger Volto's global undo manager
           const undoEvent = new KeyboardEvent('keydown', {
             key: 'z',
@@ -1728,8 +1760,9 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(undoEvent);
           break;
+        }
 
-        case 'SLATE_REDO_REQUEST':
+        case 'SLATE_REDO_REQUEST': {
           // Dispatch a synthetic Ctrl+Y event to trigger Volto's global undo manager
           const redoEvent = new KeyboardEvent('keydown', {
             key: 'y',
@@ -1739,8 +1772,9 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(redoEvent);
           break;
+        }
 
-        case 'SAVE_REQUEST':
+        case 'SAVE_REQUEST': {
           // Dispatch a synthetic Ctrl+S event to trigger Form.jsx save handler
           const saveEvent = new KeyboardEvent('keydown', {
             key: 's',
@@ -1750,6 +1784,7 @@ const Iframe = (props) => {
           });
           document.dispatchEvent(saveEvent);
           break;
+        }
 
         case 'ACTION_REQUEST': {
           // Generic action handler for custom operations like delete row/column
@@ -1820,7 +1855,7 @@ const Iframe = (props) => {
             const parentId = currentBlockPathMap[blockId]?.parentId || 'page';
             const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
             const containerField = currentBlockPathMap[blockId]?.containerField || 'blocks_layout';
-            const layoutItems = parentBlock?.[containerField]?.items || parentBlock?.blocks_layout?.items || [];
+            const layoutItems = parentBlock?.[containerField]?.items || [];
 
             // Find all child blocks of this template instance in layout order
             blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
@@ -1887,8 +1922,7 @@ const Iframe = (props) => {
               const { parentId: containerId, fieldName: containerField } = targetContainerConfig;
               const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
               const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
-              const layoutFieldName = `${containerField}_layout`;
-              const layoutItems = container?.[layoutFieldName]?.items || [];
+              const layoutItems = container?.[containerField]?.items || [];
               const position = layoutItems.indexOf(moveBlockId);
 
               // Apply defaults with context - this derives template fields from neighbors
@@ -2111,7 +2145,7 @@ const Iframe = (props) => {
           setMouseActivityCounter(c => c + 1);
           break;
 
-        case 'INIT':
+        case 'INIT': {
           // Combined initialization: merge config first, then send data
           // This ensures blockPathMap is built with complete schema knowledge
           iframeOriginRef.current = event.origin;
@@ -2129,95 +2163,108 @@ const Iframe = (props) => {
             }
           }
 
-          // 1. Merge voltoConfig (adds custom block definitions)
-          if (event.data.voltoConfig) {
-            const frontendConfig = event.data.voltoConfig;
+          // 1. Merge custom block definitions from event.data.blocks
+          const blocksConfig = event.data.blocks;
+          if (blocksConfig) {
             // Inject NoPreview view for frontend blocks that don't have one
             // Also ensure blockSchema has fieldsets if properties exist (for new blocks only)
-            if (frontendConfig?.blocks?.blocksConfig) {
-              Object.keys(frontendConfig.blocks.blocksConfig).forEach((blockType) => {
-                const blockConfig = frontendConfig.blocks.blocksConfig[blockType];
-                if (blockConfig && !blockConfig.view) {
-                  blockConfig.view = NoPreview;
-                }
-                // Auto-generate default fieldset if missing (only for new blocks, not overrides)
-                // Also ensure required is an array (Volto expects this)
-                const schema = blockConfig?.blockSchema;
-                const isNewBlock = !config.blocks.blocksConfig[blockType];
-                if (isNewBlock && schema?.properties && !schema.fieldsets) {
-                  schema.fieldsets = [{
-                    id: 'default',
-                    title: 'Default',
-                    fields: Object.keys(schema.properties),
-                  }];
-                }
-                if (schema && !schema.required) {
-                  schema.required = [];
-                }
-              });
-            }
-            recurseUpdateVoltoConfig(frontendConfig);
+            Object.keys(blocksConfig).forEach((blockType) => {
+              const blockConfig = blocksConfig[blockType];
+              if (!blockConfig) return;
+              // Ensure id matches the key
+              if (!blockConfig.id) {
+                blockConfig.id = blockType;
+              }
+              // Default title from the key name (e.g. 'single_choice' -> 'Single Choice')
+              if (!blockConfig.title) {
+                blockConfig.title = blockType.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              }
+              if (!blockConfig.view) {
+                blockConfig.view = NoPreview;
+              }
+              // Default group to 'common' so blocks appear in the block chooser
+              if (!blockConfig.group) {
+                blockConfig.group = 'common';
+              }
+              // Show sidebar settings tab when block has a schema
+              if (blockConfig.blockSchema && blockConfig.sidebarTab === undefined) {
+                blockConfig.sidebarTab = 1;
+              }
+              // Auto-generate default fieldset if missing (only for new blocks, not overrides)
+              // Also ensure required is an array (Volto expects this)
+              const schema = blockConfig?.blockSchema;
+              const isNewBlock = !config.blocks.blocksConfig[blockType];
+              if (isNewBlock && schema?.properties && !schema.fieldsets) {
+                schema.fieldsets = [{
+                  id: 'default',
+                  title: 'Default',
+                  fields: Object.keys(schema.properties),
+                }];
+              }
+              if (schema && !schema.required) {
+                schema.required = [];
+              }
+              // Validate fieldMappings: warn about invalid @default keys
+              validateFieldMappings(blockType, blockConfig);
+            });
+            recurseUpdateVoltoConfig({ blocks: { blocksConfig } });
 
             // 1b. Create schemaEnhancers from frontend recipes
-            // New format: { inheritSchemaFrom: {...}, skiplogic: {...} }
-            // Legacy format: { type: 'inheritSchemaFrom', config: {...} }
-            if (frontendConfig?.blocks?.blocksConfig) {
-              const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
-              for (const [blockType, blockConfig] of Object.entries(
-                frontendConfig.blocks.blocksConfig,
-              )) {
-                const recipe = blockConfig.schemaEnhancer;
-                // Check if it's a recipe (has known enhancer keys, type property, or is array)
-                const isRecipe =
-                  recipe &&
-                  typeof recipe === 'object' &&
-                  (recipe.type || // legacy format
-                    Array.isArray(recipe) || // array of recipes
-                    recipeKeys.some((key) => key in recipe)); // new format
-                if (isRecipe) {
-                  const enhancer = createSchemaEnhancerFromRecipe(recipe);
-                  if (enhancer) {
-                    config.blocks.blocksConfig[blockType].schemaEnhancer =
-                      enhancer;
-                  } else {
-                    // Remove invalid recipe to prevent Volto from trying to use it
-                    delete config.blocks.blocksConfig[blockType].schemaEnhancer;
-                  }
+            const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
+            for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
+              const recipe = blockConfig.schemaEnhancer;
+              // Check if it's a recipe (has known enhancer keys, type property, or is array)
+              const isRecipe =
+                recipe &&
+                typeof recipe === 'object' &&
+                (recipe.type || // legacy format
+                  Array.isArray(recipe) || // array of recipes
+                  recipeKeys.some((key) => key in recipe)); // new format
+              if (isRecipe) {
+                const enhancer = createSchemaEnhancerFromRecipe(recipe);
+                if (enhancer) {
+                  config.blocks.blocksConfig[blockType].schemaEnhancer =
+                    enhancer;
+                } else {
+                  // Remove invalid recipe to prevent Volto from trying to use it
+                  delete config.blocks.blocksConfig[blockType].schemaEnhancer;
                 }
               }
             }
           }
 
-          // 2. Process pageBlocksFields - merge with default 'blocks' field
-          // Default: [{ fieldName: 'blocks', title: 'Blocks' }] with all non-restricted block types
-          // If provided, merge with default (unless 'blocks' is explicitly configured)
-          let effectivePageBlocksFields;
-          const defaultBlocksField = { fieldName: 'blocks', title: 'Blocks' };
-
-          if (event.data.pageBlocksFields) {
-            // Check if 'blocks' field is already configured
-            const hasBlocksField = event.data.pageBlocksFields.some(f => f.fieldName === 'blocks');
-            if (hasBlocksField) {
-              // Use provided config as-is
-              effectivePageBlocksFields = event.data.pageBlocksFields;
-            } else {
-              // Merge with default 'blocks' field
-              effectivePageBlocksFields = [defaultBlocksField, ...event.data.pageBlocksFields];
-            }
-          } else {
-            // No config provided - use default 'blocks' field
-            effectivePageBlocksFields = [defaultBlocksField];
+          // 1c. Merge any additional voltoConfig (non-block settings)
+          if (event.data.voltoConfig) {
+            recurseUpdateVoltoConfig(event.data.voltoConfig);
           }
 
-          // 2b. Apply restrictions based on pageBlocksFields
+          // 2. Process page schema — page.schema.properties is an object keyed by fieldName
+          // Default: { blocks_layout: { title: 'Blocks' } }
+          const pageProperties = event.data.page?.schema?.properties || {};
+          const pageBlocksFieldsDef = { ...pageProperties };
+          if (!pageBlocksFieldsDef.blocks_layout) {
+            pageBlocksFieldsDef.blocks_layout = { title: 'Blocks' };
+          }
+          // Ensure each field has widget: 'blocks_layout'
+          for (const [fieldName, fieldDef] of Object.entries(pageBlocksFieldsDef)) {
+            pageBlocksFieldsDef[fieldName] = {
+              widget: 'blocks_layout',
+              allowedBlocks: fieldDef.allowedBlocks || null,
+              allowedTemplates: fieldDef.allowedTemplates || null,
+              allowedLayouts: fieldDef.allowedLayouts || null,
+              maxLength: fieldDef.maxLength || null,
+              title: fieldDef.title || fieldName,
+            };
+          }
+
+          // 2b. Apply restrictions based on page fields
           // Collect all unique allowed blocks across all page fields and restrict the rest
           const allAllowedBlocks = new Set();
-          effectivePageBlocksFields.forEach(field => {
-            if (field.allowedBlocks) {
-              field.allowedBlocks.forEach(blockType => allAllowedBlocks.add(blockType));
+          for (const fieldDef of Object.values(pageBlocksFieldsDef)) {
+            if (fieldDef.allowedBlocks) {
+              fieldDef.allowedBlocks.forEach(blockType => allAllowedBlocks.add(blockType));
             }
-          });
-          // Only apply restrictions if at least one field has allowedBlocks
+          }
           if (allAllowedBlocks.size > 0) {
             validateFrontendConfig({ allowedBlocks: [...allAllowedBlocks] }, config.blocks.blocksConfig);
             Object.keys(config.blocks.blocksConfig).forEach((blockType) => {
@@ -2235,35 +2282,17 @@ const Iframe = (props) => {
           // 2c. Auto-initialize missing page fields with empty blocks/layout
           let formWithPageFields = form ? { ...form } : form;
           if (form) {
-            effectivePageBlocksFields.forEach(field => {
-              const { fieldName } = field;
-              const layoutFieldName = `${fieldName}_layout`;
-              // Initialize missing blocks field
+            if (!formWithPageFields.blocks) {
+              formWithPageFields.blocks = {};
+            }
+            for (const fieldName of Object.keys(pageBlocksFieldsDef)) {
               if (!formWithPageFields[fieldName]) {
-                formWithPageFields[fieldName] = {};
+                formWithPageFields[fieldName] = { items: [] };
               }
-              // Initialize missing layout field
-              if (!formWithPageFields[layoutFieldName]) {
-                formWithPageFields[layoutFieldName] = { items: [] };
-              }
-            });
+            }
           }
 
           // 3. Register _page as virtual block type in blocksConfig
-          // This allows buildBlockPathMap to look up page schema without parameter passing
-          const pageBlocksFieldsDef = Object.fromEntries(
-            effectivePageBlocksFields.map(field => [
-              field.fieldName,
-              {
-                widget: 'blocksid_list',
-                allowedBlocks: field.allowedBlocks || null, // null = use default (all non-restricted)
-                allowedTemplates: field.allowedTemplates || null, // Template URLs for BlockChooser
-                allowedLayouts: field.allowedLayouts || null, // Template URLs for LayoutSelector dropdown
-                maxLength: field.maxLength || null,
-                title: field.title || field.fieldName,
-              },
-            ]),
-          );
           config.blocks.blocksConfig['_page'] = {
             id: '_page',
             schema: () => ({ properties: pageBlocksFieldsDef }),
@@ -2271,10 +2300,9 @@ const Iframe = (props) => {
           };
 
           // 3b. Register template URLs as virtual block types
-          // Templates appear in BlockChooser immediately; data is fetched when user selects one
-          effectivePageBlocksFields.forEach(field => {
-            if (field.allowedTemplates?.length > 0) {
-              field.allowedTemplates.forEach(templateUrl => {
+          for (const fieldDef of Object.values(pageBlocksFieldsDef)) {
+            if (fieldDef.allowedTemplates?.length > 0) {
+              fieldDef.allowedTemplates.forEach(templateUrl => {
                 if (typeof templateUrl === 'string') {
                   const templateName = templateUrl.split('/').filter(Boolean).pop() || 'unknown';
                   const templateBlockType = `Template: ${templateName}`;
@@ -2294,7 +2322,7 @@ const Iframe = (props) => {
                 }
               });
             }
-          });
+          }
 
           // 4. Extract block field types (now includes custom blocks and page-level fields)
           const initialBlockFieldTypes = extractBlockFieldTypes(intl, schema);
@@ -2373,6 +2401,7 @@ const Iframe = (props) => {
           // Trigger the sync effect to fetch templates (if any) and merge
           setTemplateSyncTrigger(prev => prev + 1);
           break;
+        }
 
         // case 'OPEN_OBJECT_BROWSER':
         //   openObjectBrowser({
@@ -2516,6 +2545,7 @@ const Iframe = (props) => {
           // Merge templates with forced layouts
           const { merged: mergedFormData } = await mergeTemplatesIntoPage(preparedFormData, {
             loadTemplate,
+            preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
@@ -2544,7 +2574,10 @@ const Iframe = (props) => {
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
           pendingInitialDataRef.current = null;
-        })();
+        })().catch(err => {
+          log('[INITIAL_DATA] ERROR in forced-layout merge:', err.message, err.stack);
+          console.error('[INITIAL_DATA] Error (forced-layout):', err);
+        });
         return;
       }
 
@@ -2594,6 +2627,7 @@ const Iframe = (props) => {
         // Merge templates (both newly fetched and already cached) with forced layouts
         const { merged: mergedFormData, newTemplateIds: moreTemplateIds } = await mergeTemplatesIntoPage(baseFormData, {
           loadTemplate,
+          preloadedTemplates: templateCacheRef.current,
           pageBlocksFields,
         });
         if (moreTemplateIds.length > 0) {
@@ -2627,7 +2661,10 @@ const Iframe = (props) => {
 
         // Update Redux with merged data (without empty block additions - those are UI-only)
         onChangeFormData(mergedFormData);
-      })();
+      })().catch(err => {
+        log('[INITIAL_DATA] ERROR in template loading/merge:', err.message, err.stack);
+        console.error('[INITIAL_DATA] Error:', err);
+      });
 
       return; // Don't continue to Case 2 while templates are loading
     }
@@ -2845,51 +2882,27 @@ const Iframe = (props) => {
       }
       parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
       parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
-      const parentSchema = config.blocks.blocksConfig?.[parentType]?.blockSchema;
-      const resolvedSchema = typeof parentSchema === 'function'
-        ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-        : parentSchema;
-      allowed = resolvedSchema?.properties?.[fieldName]?.allowedBlocks || null;
-      allowedTemplates = resolvedSchema?.properties?.[fieldName]?.allowedTemplates || null;
+      // Find any child in this container field to get allowedSiblingTypes from blockPathMap
+      const childEntry = Object.entries(iframeSyncState.blockPathMap || {}).find(
+        ([, info]) => info.parentId === parentBlockId && info.containerField === fieldName
+      );
+      if (childEntry) {
+        allowed = childEntry[1].allowedSiblingTypes || null;
+        allowedTemplates = childEntry[1].allowedTemplates || null;
+      }
     } else {
-      // Iframe add: get allowed blocks from parent container of afterBlockId
+      // Iframe add: get allowed blocks from blockPathMap (already resolved by buildBlockPathMap)
       const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
-      const parentId = iframeSyncState.blockPathMap?.[afterBlockId]?.parentId;
-      if (parentId) {
-        parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[parentId]?.path);
-        parentType = iframeSyncState.blockPathMap?.[parentId]?.blockType;
-        const parentBlockConfig = config.blocks.blocksConfig?.[parentType];
-        const parentSchema = parentBlockConfig?.blockSchema;
-        const resolvedSchema = typeof parentSchema === 'function'
-          ? parentSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-          : parentSchema;
-
-        // First check schema-defined container fields (e.g., columns, accordion)
-        for (const [fieldName, fieldDef] of Object.entries(resolvedSchema?.properties || {})) {
-          if (fieldDef.widget === 'blocksid_list') {
-            const layoutField = `${fieldName}_layout`;
-            if (parentBlockData?.[layoutField]?.items?.includes(afterBlockId)) {
-              allowed = fieldDef.allowedBlocks || null;
-              allowedTemplates = fieldDef.allowedTemplates || null;
-              break;
-            }
-          } else if (fieldDef.widget === 'object_list' && fieldDef.allowedBlocks) {
-            // Typed object_list with allowedBlocks
-            allowed = fieldDef.allowedBlocks;
-            allowedTemplates = fieldDef.allowedTemplates || null;
-            break;
-          }
-        }
-
-        // Check for implicit container (uses blocks/blocks_layout directly)
-        // These have allowedBlocks on the block config, not in schema
-        if (!allowed && parentBlockData?.blocks_layout?.items?.includes(afterBlockId)) {
-          allowed = parentBlockConfig?.allowedBlocks || null;
-        }
+      const afterPathInfo = iframeSyncState.blockPathMap?.[afterBlockId];
+      if (afterPathInfo?.parentId) {
+        parentBlockData = getBlockByPath(properties, iframeSyncState.blockPathMap?.[afterPathInfo.parentId]?.path);
+        parentType = iframeSyncState.blockPathMap?.[afterPathInfo.parentId]?.blockType;
+        allowed = afterPathInfo.allowedSiblingTypes || null;
+        allowedTemplates = afterPathInfo.allowedTemplates || null;
       } else {
         // No parent - page-level, get templates from _page schema
         const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
-        const pageFieldDef = pageSchema?.properties?.blocks;
+        const pageFieldDef = pageSchema?.properties?.blocks_layout;
         allowedTemplates = pageFieldDef?.allowedTemplates;
       }
     }
@@ -3029,9 +3042,9 @@ const Iframe = (props) => {
     const isObjectList = fieldConfig?.isObjectList || false;
     const containerAllowed = fieldConfig?.allowedBlocks || null;
 
-    // Auto-insert if object_list or single allowedBlock
-    if (isObjectList || containerAllowed?.length === 1) {
-      const blockType = isObjectList ? null : containerAllowed[0];
+    // Auto-insert if single-schema object_list (no allowedBlocks) or single allowedBlock
+    if ((isObjectList && (!containerAllowed || containerAllowed.length <= 1)) || (!isObjectList && containerAllowed?.length === 1)) {
+      const blockType = isObjectList ? (containerAllowed?.[0] || null) : containerAllowed[0];
       insertAndSelectBlock(parentBlockId, blockType, 'inside', fieldName);
     } else {
       setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
@@ -3480,13 +3493,16 @@ const Iframe = (props) => {
             }}
             convertibleTypes={(() => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              const blockType = blockData?.['@type'];
-              return getConvertibleTypes(blockType, blocksConfig);
+              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
+              const blockType = blockData?.[typeFieldName];
+              const allowedTypes = iframeSyncState.blockPathMap?.[selectedBlock]?.allowedSiblingTypes;
+              return getConvertibleTypes(blockType, blocksConfig, allowedTypes);
             })()}
             onConvertBlock={(newType) => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
               if (!blockData) return;
-              const newBlockData = convertBlockType(blockData, newType, blocksConfig);
+              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
               const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, newBlockData);
               onChangeFormData(updatedProperties);
               // Rebuild blockPathMap and update state
@@ -3809,6 +3825,7 @@ const Iframe = (props) => {
             oldBlockData,
             newBlockData,
             config.blocks.blocksConfig,
+            intl,
           );
 
           // Validate data from sidebar before using it

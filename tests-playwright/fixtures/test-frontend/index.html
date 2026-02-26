@@ -52,8 +52,8 @@
     </header>
     <div id="render-counter" style="position: fixed; top: 0; right: 0; background: #333; color: #fff; padding: 4px 8px; font-size: 12px; z-index: 9999;">0</div>
     <main>
-        <h1 id="page-title" data-editable-field="title">Loading...</h1>
-        <img id="preview-image" data-media-field="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
+        <h1 id="page-title" data-edit-text="title">Loading...</h1>
+        <img id="preview-image" data-edit-media="preview_image" style="display: none; max-width: 300px; margin: 10px 0;" alt="Preview image" />
         <div id="content"></div>
     </main>
     <footer>
@@ -62,7 +62,7 @@
 
     <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, expandTemplates, getAccessToken } from '/hydra.js';
+        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, getAccessToken } from '/hydra.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
@@ -127,17 +127,18 @@
             const extraCriteria = getSearchCriteriaFromUrl();
             tfLog('extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
             window._searchCriteria = extraCriteria; // Store for form handlers
-            const baseOptions = { apiUrl: window.location.origin, contextPath, extraCriteria };
+            const fetchItems = ploneFetchItems({ apiUrl: window.location.origin, contextPath, extraCriteria });
 
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
             // Returns { items, paging } where each item has @uid
-            // paging object: { start, size, total, _seen }
+            // paging object: { start, size } — total and _seen are auto-initialized
             window._expandListingBlocks = async (blocks, layout, containerId) => {
                 const size = 6;
                 const pageNum = pages[containerId] || 0;
-                const paging = { start: pageNum * size, size, total: 0, _seen: 0 };
-                return await expandListingBlocks(layout, { blocks, ...baseOptions, paging, itemTypeField: 'variation' });
+                const paging = { start: pageNum * size, size };
+                const items = await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging, itemTypeField: 'variation' });
+                return { items, paging };
             };
 
             // Convert layout IDs to block objects with @uid
@@ -157,9 +158,9 @@
 
             if (myGeneration !== window._renderGeneration) return; // stale render
 
-            if (content.footer_blocks && content.footer_blocks_layout?.items?.length > 0 || footerAllowedLayouts) {
-                const footerBlocks = content.footer_blocks || {};
-                const footerLayout = content.footer_blocks_layout?.items || [];
+            if (content.footer_blocks?.items?.length > 0 || footerAllowedLayouts) {
+                const footerBlocks = content.blocks || {};
+                const footerLayout = content.footer_blocks?.items || [];
 
                 // Expand templates (handles both existing content and forced layouts)
                 const templateState = {};
@@ -186,9 +187,9 @@
                 if (myGeneration !== window._renderGeneration) return; // stale render
 
                 if (expandedItems.length > 0) {
-                    const { items: footerItems } = await expandListingBlocks(
+                    const footerItems = await expandListingBlocks(
                         expandedItems,
-                        { ...baseOptions, itemTypeField: 'variation' }
+                        { fetchItems: { listing: fetchItems }, itemTypeField: 'variation' }
                     );
                     if (myGeneration !== window._renderGeneration) return; // stale render
                     await renderContent({ items: footerItems }, 'footer-content', myGeneration);
@@ -281,8 +282,9 @@
                     content.blocks_layout?.items || [],
                     { blocks: content.blocks || {}, templateState, loadTemplate }
                 );
-                // Convert back to blocks/layout format
-                content.blocks = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
+                // Merge expanded blocks back (preserve blocks from other fields like footer_blocks)
+                const expandedBlocksMap = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
+                content.blocks = { ...content.blocks, ...expandedBlocksMap };
                 content.blocks_layout = { items: expandedItems.map(item => item['@uid']) };
 
                 // Render navigation from @components.navigation.items
@@ -320,81 +322,70 @@
                 if (loadHydraBridge) {
                     tfLog('Initializing Hydra bridge');
 
-                    // Define custom blocks via voltoConfig (shared schemas + any test-only overrides)
-                    const voltoConfig = {
-                        blocks: {
-                            blocksConfig: {
-                                ...sharedBlocksConfig,
-                            },
-                        },
-                    };
-
-                    // Initialize bridge - admin origin auto-detected from referrer
-                    // Note: 'column' and 'slide' are NOT in page-level allowedBlocks - they're only allowed inside their parent containers
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
                     const forceFooterLayout = pagePath === '/_test_data/another-page';
 
-                    window.bridge = initBridge({
-                        pageBlocksFields: [
-                            {
-                                fieldName: 'blocks',
-                                title: 'Blocks',
-                                allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
-                                allowedTemplates: ['/_test_data/templates/test-layout'],
-                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
-                            },
-                            {
-                                fieldName: 'footer_blocks',
-                                title: 'Footer',
-                                allowedBlocks: ['slate', 'image'],
-                                // Only force footer layout on /another-page
-                                ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
-                            },
-                        ],
-                        voltoConfig: voltoConfig,
-                        debug: true,  // Enable debug logging for tests
-                    });
-
-                    tfLog('Bridge initialized, setting up change listener');
-
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
                     window._formDataCount = 0;
-                    window.bridge.onEditChange(async (formData) => {
-                        window._formDataCount++;
-                        tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
 
-                        // Update page title if provided
-                        if (formData.title) {
-                            document.getElementById('page-title').textContent = formData.title;
-                        }
+                    window.bridge = initBridge({
+                        page: {
+                            schema: {
+                                properties: {
+                                    blocks_layout: {
+                                        title: 'Blocks',
+                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                                        allowedTemplates: ['/_test_data/templates/test-layout'],
+                                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                    },
+                                    footer_blocks: {
+                                        title: 'Footer',
+                                        allowedBlocks: ['slate', 'image'],
+                                        ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
+                                    },
+                                },
+                            },
+                        },
+                        blocks: { ...sharedBlocksConfig },
+                        debug: true,
+                        // Pass onEditChange before init() sends INIT to avoid race condition
+                        onEditChange: async (formData) => {
+                            window._formDataCount++;
+                            tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
 
-                        // Update preview image if provided
-                        const previewImg = document.getElementById('preview-image');
-                        if (formData.preview_image?.scales?.preview?.download) {
-                            previewImg.src = formData.preview_image.scales.preview.download;
-                            previewImg.style.display = 'block';
-                        } else if (formData.preview_image?.download) {
-                            previewImg.src = formData.preview_image.download;
-                            previewImg.style.display = 'block';
-                        } else {
-                            previewImg.style.display = 'none';
-                        }
-
-                        // Re-render content with updated data
-                        // Return promise so hydra.js can materialize comments after DOM is ready
-                        if (formData.blocks && formData.blocks_layout) {
-                            // Debug: Log column contents
-                            const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
-                            const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
-                            if (col1 || col2) {
-                                tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
-                                tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
+                            // Update page title if provided
+                            if (formData.title) {
+                                document.getElementById('page-title').textContent = formData.title;
                             }
-                            tfLog('Re-rendering blocks with updated data');
-                            return await renderContentWithListings(formData);
-                        }
+
+                            // Update preview image if provided
+                            const previewImg = document.getElementById('preview-image');
+                            if (formData.preview_image?.scales?.preview?.download) {
+                                previewImg.src = formData.preview_image.scales.preview.download;
+                                previewImg.style.display = 'block';
+                            } else if (formData.preview_image?.download) {
+                                previewImg.src = formData.preview_image.download;
+                                previewImg.style.display = 'block';
+                            } else {
+                                previewImg.style.display = 'none';
+                            }
+
+                            // Re-render content with updated data
+                            // Return promise so hydra.js can materialize comments after DOM is ready
+                            if (formData.blocks && formData.blocks_layout) {
+                                // Debug: Log column contents
+                                const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
+                                const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
+                                if (col1 || col2) {
+                                    tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
+                                    tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
+                                }
+                                tfLog('Re-rendering blocks with updated data');
+                                return await renderContentWithListings(formData);
+                            }
+                        },
                     });
 
                     tfLog('Bridge setup complete, waiting for connection');

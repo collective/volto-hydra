@@ -55,3 +55,26 @@ h5 {
 p {
     @apply text-base leading-base;
 }
+
+/* Image sizes */
+.image-size-l { max-width: 100%; }
+.image-size-m { max-width: 50%; }
+.image-size-s { max-width: 25%; }
+
+/* Image alignment */
+.image-align-center { display: block; margin-left: auto; margin-right: auto; }
+.image-align-left { float: left; margin-right: 1.5rem; margin-bottom: 1rem; }
+.image-align-right { float: right; margin-left: 1.5rem; margin-bottom: 1rem; }
+.image-align-full, .image-align-wide { width: 100%; }
+
+/* Clear floats after image blocks */
+.slate-block { clear: both; }
+
+/* Table styling */
+.data-table table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td { padding: 0.75rem 1rem; border: 1px solid #e5e7eb; text-align: left; }
+.data-table th { background-color: #f9fafb; font-weight: 600; }
+.data-table tr:nth-child(even) { background-color: #f9fafb; }
+
+/* Slate paragraph spacing */
+.slate-block p + p { margin-top: 1em; }

@@ -30,7 +30,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       // Create test DOM structure inside a test container
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">Hello world</p>';
+        '<p data-edit-text="value" data-node-id="0">Hello world</p>';
       document.body.appendChild(container);
 
       const textNode = container.querySelector('p')!.firstChild;
@@ -51,7 +51,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">Hello <span style="font-weight: bold" data-node-id="0-1">world</span></p>';
+        '<p data-edit-text="value" data-node-id="0">Hello <span style="font-weight: bold" data-node-id="0-1">world</span></p>';
       document.body.appendChild(container);
 
       const p = container.querySelector('p')!;
@@ -79,7 +79,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">This is <span data-node-id="0-1">bold</span> text</p>';
+        '<p data-edit-text="value" data-node-id="0">This is <span data-node-id="0-1">bold</span> text</p>';
       document.body.appendChild(container);
 
       const p = container.querySelector('p')!;
@@ -111,7 +111,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">' +
+        '<p data-edit-text="value" data-node-id="0">' +
         '<span data-node-id="0-0">bold</span>' +
         '<span data-node-id="0-1">italic</span>' +
         '<span data-node-id="0-2">underline</span>' +
@@ -141,7 +141,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">' +
+        '<p data-edit-text="value" data-node-id="0">' +
         '<span data-node-id="0-0">' +
         '<span data-node-id="0-0-0">nested</span>' +
         '</span>' +
@@ -165,7 +165,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value"><p data-node-id="0">Hello world</p></div>';
+        '<div data-edit-text="value"><p data-node-id="0">Hello world</p></div>';
       document.body.appendChild(container);
 
       const textNode = container.querySelector('p')!.firstChild;
@@ -185,7 +185,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value"><p data-node-id="0">text</p></div>';
+        '<div data-edit-text="value"><p data-node-id="0">text</p></div>';
       document.body.appendChild(container);
 
       const pElement = container.querySelector('p')!;
@@ -227,7 +227,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
 
       // Build DOM manually to ensure we get 3 child nodes
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const text1 = document.createTextNode('text1');
@@ -266,7 +266,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const span = document.createElement('span');
@@ -302,7 +302,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const text1 = document.createTextNode('This is a ');
@@ -341,7 +341,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
@@ -389,7 +389,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
@@ -441,7 +441,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
@@ -482,7 +482,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       // <span data-node-id="0.1">This</span>
@@ -540,7 +540,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
@@ -590,7 +590,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0"><br></p>';
+        '<p data-edit-text="value" data-node-id="0"><br></p>';
       document.body.appendChild(container);
 
       const brElement = container.querySelector('br');
@@ -611,7 +611,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value"><div><div><p data-node-id="0">text</p></div></div></div>';
+        '<div data-edit-text="value"><div><div><p data-node-id="0">text</p></div></div></div>';
       document.body.appendChild(container);
 
       const textNode = container.querySelector('p')!.firstChild;
@@ -632,7 +632,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="1">' +
         '<strong data-node-id="1-1"><span>Disclaimer</span></strong>' +
         '</p>' +
@@ -657,7 +657,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="1">' +
         '<strong data-node-id="1-1">Disclaimer</strong>' +
         '</p>' +
@@ -681,7 +681,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">' +
+        '<p data-edit-text="value" data-node-id="0">' +
         '<strong data-node-id="0-0"><em data-node-id="0-0">styled text</em></strong>' +
         '</p>';
       document.body.appendChild(container);
@@ -704,7 +704,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-editable-field="value" data-node-id="0">' +
+        '<p data-edit-text="value" data-node-id="0">' +
         'before <strong data-node-id="0-1"><em data-node-id="0-1">bold</em></strong> after' +
         '</p>';
       document.body.appendChild(container);
@@ -736,7 +736,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">First paragraph</p>' +
         '<p data-node-id="1"><strong data-node-id="1-1">Disclaimer</strong>: This instance is reset every night</p>' +
         '</div>';
@@ -761,7 +761,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">First paragraph</p>' +
         '<p data-node-id="1">' +
         '<span></span>' +
@@ -791,7 +791,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<ul class="list-disc">' +
         '<li data-node-id="0.0"><span></span><a data-node-id="0.0.1" href="#"><span>NUXT.js Example</span></a><span></span></li>' +
         '</ul>' +
@@ -817,7 +817,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const path = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<div data-editable-field="value">' +
+        '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         'This text appears after the slider. Click on ' +
         '<strong data-node-id="0-1">bold text</strong>' +
@@ -845,7 +845,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const result = await body.evaluate(() => {
       // Use the injected helper that preserves whitespace text nodes
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-whitespace-container" data-editable-field="value">\n' +
+        '<div id="test-whitespace-container" data-edit-text="value">\n' +
         '  <p data-node-id="0">Hello world</p>\n' +
         '</div>'
       );
@@ -908,7 +908,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const result = await body.evaluate(() => {
       // Create DOM with whitespace before and after content (Vue template artifacts)
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-range-whitespace" data-editable-field="value">\n' +
+        '<div id="test-range-whitespace" data-edit-text="value">\n' +
         '  <p data-node-id="0">Grid Cell 2</p>\n' +
         '</div>'
       );
@@ -972,7 +972,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
   });
 
   test('element-based selection on editable field with nodeId children needs correction', async () => {
-    // When cursor lands on editable-field container (not inside data-node-id children),
+    // When cursor lands on edit-text container (not inside data-node-id children),
     // it needs to be corrected so typing goes into the right place.
     // This happens when clicking at the edge of a block or after add button creates new block.
     const iframe = helper.getIframe();
@@ -981,7 +981,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const result = await body.evaluate(() => {
       const container = document.createElement('div');
       container.id = 'test-element-selection';
-      container.setAttribute('data-editable-field', 'value');
+      container.setAttribute('data-edit-text', 'value');
       container.innerHTML = '<p data-node-id="0">Grid Cell 2</p>';
       document.body.appendChild(container);
 
@@ -1018,14 +1018,14 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
 
     const result = await body.evaluate(() => {
       // Structure after typing "Hello ", bold "world", then toggling bold off:
-      // <p data-editable-field="value" data-node-id="0">
+      // <p data-edit-text="value" data-node-id="0">
       //   "Hello "
       //   <span data-node-id="0.1"><strong>world</strong></span>
       //   "﻿"  <-- ZWS for cursor positioning after cursor exit
       // </p>
       const container = document.createElement('p');
       container.id = 'test-cursor-exit-zws';
-      container.setAttribute('data-editable-field', 'value');
+      container.setAttribute('data-edit-text', 'value');
       container.setAttribute('data-node-id', '0');
 
       // Create the structure
@@ -1074,7 +1074,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const result = await body.evaluate(() => {
       // Create DOM like Nuxt renders with Vue template whitespace artifacts
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-serialize-element" data-editable-field="value">\n' +
+        '<div id="test-serialize-element" data-edit-text="value">\n' +
         '  <p data-node-id="0">Grid Cell 2</p>\n' +
         '</div>'
       );
@@ -1125,7 +1125,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
 
     const path = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-vue-whitespace" data-editable-field="value">\n' +
+        '<div id="test-vue-whitespace" data-edit-text="value">\n' +
         '  <p data-node-id="0">\n' +
         '    This text appears after the slider. Click on \n' +
         '    <strong data-node-id="0.1">bold text</strong>\n' +
@@ -1160,7 +1160,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const result = await body.evaluate(() => {
       // Two strongs with Vue template whitespace
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-leading-whitespace" data-editable-field="value">\n' +
+        '<div id="test-leading-whitespace" data-edit-text="value">\n' +
         '  <p data-node-id="0">\n' +
         '    This text appears after the \n' +
         '    <strong data-node-id="0.1">slider</strong>\n' +
@@ -1294,7 +1294,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
       // Note: empty text node at Slate index 2 doesn't render in DOM
       // Using unique nodeIds to avoid collision with existing mock content
       const p = document.createElement('p');
-      p.setAttribute('data-editable-field', 'value');
+      p.setAttribute('data-edit-text', 'value');
       p.setAttribute('data-node-id', 'test-0');
 
       const text1 = document.createTextNode('Hello ');
@@ -1445,7 +1445,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
 
     const paths = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-zws-after" data-editable-field="value">' +
+        '<div id="test-zws-after" data-edit-text="value">' +
         '<p data-node-id="0">Hello <span data-node-id="0-1">world</span>\uFEFF</p>' +
         '</div>'
       );
@@ -1479,7 +1479,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
 
     const paths = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-zws-inside" data-editable-field="value">' +
+        '<div id="test-zws-inside" data-edit-text="value">' +
         '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFF</span></p>' +
         '</div>'
       );
@@ -1511,7 +1511,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
 
     const paths = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-zws-both" data-editable-field="value">' +
+        '<div id="test-zws-both" data-edit-text="value">' +
         '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFFworld</span>\uFEFF</p>' +
         '</div>'
       );
@@ -1550,12 +1550,12 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     const result = await body.evaluate(() => {
       // Structure: block wrapper DIV containing editable P with data-node-id
       // <div data-block-uid="test-block">
-      //   <p data-editable-field="value" data-node-id="0">Hello</p>
+      //   <p data-edit-text="value" data-node-id="0">Hello</p>
       // </div>
       const wrapper = document.createElement('div');
       wrapper.id = 'test-element-outside-nodeid';
       wrapper.setAttribute('data-block-uid', 'test-block');
-      wrapper.innerHTML = '<p data-editable-field="value" data-node-id="0">Hello</p>';
+      wrapper.innerHTML = '<p data-edit-text="value" data-node-id="0">Hello</p>';
       document.body.appendChild(wrapper);
 
       const bridge = (window as any).bridge;
@@ -1600,7 +1600,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     // When cursor is at end, offset should be 7 (length of " normal"), not 8
     const result = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-serialize-zws" data-block-uid="test-block" data-editable-field="value">' +
+        '<div id="test-serialize-zws" data-block-uid="test-block" data-edit-text="value">' +
         '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong>\uFEFF normal</p>' +
         '</div>'
       );

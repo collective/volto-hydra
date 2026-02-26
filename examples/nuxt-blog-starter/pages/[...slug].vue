@@ -12,34 +12,20 @@
 
                 <h1 v-if="route.path === '/'" class="sr-only">{{ data.page?.title }}</h1>
 
-                <!-- Render blocks with template expansion (sync - templates pre-loaded) -->
-                <!-- In edit mode, wait for admin data (with nodeIds) before rendering -->
-                <BlocksRenderer
-                    v-if="data.page?.blocks_layout && shouldRenderBlocks"
-                    :key="JSON.stringify(data.page?.blocks_layout?.items || [])"
-                    :blocks="data.page?.blocks || {}"
-                    :layout="data.page?.blocks_layout?.items || []"
-                    :templates="data.templates || {}"
-                    :allowed-layouts="mainBlocksAllowedLayouts"
-                    v-slot="{ items }"
-                >
-                    <section v-for="styleGroup in groupByStyle(items)" :key="styleGroup.key" :class="styleGroup.style">
+                <!-- Render blocks: template expansion in computed, style grouping, then iterate per group -->
+                <template v-if="data.page?.blocks_layout && shouldRenderBlocks">
+                    <section v-for="styleGroup in mainStyleGroups" :key="styleGroup.key" :class="styleGroup.style">
                         <div class="flex justify-between px-4 mx-auto max-w-screen-xl">
                             <div class="mx-auto w-full format format-sm sm:format-base lg:format-lg format-blue dark:format-invert">
-                                <template v-for="block in styleGroup.blocks" :key="block['@uid']">
-                                    <!-- Listing blocks: expand async with paging -->
-                                    <div v-if="block['@type'] === 'listing'" class="mx-auto max-w-4xl">
-                                        <BlockExpander :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                                    </div>
-                                    <!-- Static blocks: render immediately -->
-                                    <div v-else class="mx-auto" :class="{'max-w-4xl': block['@type'] !== 'slider'}">
-                                        <Block :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
+                                <template v-for="item in styleGroup.blocks" :key="item['@uid']">
+                                    <div class="mx-auto" :class="{'max-w-4xl': item['@type'] !== 'slider'}">
+                                        <Block :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
                                     </div>
                                 </template>
                             </div>
                         </div>
                     </section>
-                </BlocksRenderer>
+                </template>
 
                 <div v-else-if="data?.page">
                     <h1>{{ data.page?.title }}</h1>
@@ -59,24 +45,10 @@
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
         <!-- Dynamic footer_blocks content (sync - templates pre-loaded) -->
         <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
-            <BlocksRenderer
-                v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks"
-                :key="JSON.stringify(data.page?.footer_blocks_layout?.items || [])"
-                :blocks="data.page?.footer_blocks || {}"
-                :layout="data.page?.footer_blocks_layout?.items || []"
-                :templates="data.templates || {}"
-                :allowed-layouts="footerAllowedLayouts"
-                v-slot="{ items }"
-            >
-                <template v-for="block in items" :key="block['@uid']">
-                    <!-- Listing blocks: expand async with paging -->
-                    <BlockExpander v-if="block['@type'] === 'listing'"
-                           :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                    <!-- Static blocks: render immediately -->
-                    <Block v-else
-                           :block_uid="block['@uid']" :block="block" :data="data.page" :api-url="apiUrl" />
-                </template>
-            </BlocksRenderer>
+            <template v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks">
+                <Block v-for="item in footerExpandedItems" :key="item['@uid']"
+                       :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
+            </template>
         </div>
         <!-- Static footer content -->
         <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
@@ -97,8 +69,8 @@
 
 <script setup>
 
-import { ref, computed, provide } from 'vue';
-import { initBridge } from '@hydra-js/hydra.js';
+import { ref, computed, provide, inject } from 'vue';
+import { initBridge, expandTemplatesSync, isEditMode } from '@hydra-js/hydra.js';
 import { sharedBlocksConfig } from '@test-fixtures/shared-block-schemas.js';
 import { useRuntimeConfig } from "#imports"
 
@@ -161,6 +133,53 @@ function groupByStyle(items) {
     return groups;
 }
 
+// Shared templateState for all expandTemplatesSync calls (page + nested containers)
+const templateState = {};
+
+// Template expansion for main blocks (page-level only, because of style grouping)
+function syncLoadTemplate(templateId) {
+    const tplPath = templateId.startsWith('http')
+        ? new URL(templateId).pathname
+        : `/${templateId.replace(/^\//, '')}`;
+    const url = `${apiUrl}${tplPath}`;
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.send();
+    if (xhr.status === 200) {
+        return JSON.parse(xhr.responseText);
+    }
+    throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
+}
+
+const mainExpandedItems = computed(() => {
+    const layout = data.value?.page?.blocks_layout?.items || [];
+    const blocks = data.value?.page?.blocks || {};
+    if (!layout.length) return [];
+    return expandTemplatesSync(layout, {
+        blocks,
+        templateState,
+        templates: data.value?.templates || {},
+        allowedLayouts: mainBlocksAllowedLayouts.value,
+        loadTemplate: syncLoadTemplate,
+    });
+});
+
+const mainStyleGroups = computed(() => groupByStyle(mainExpandedItems.value));
+
+const footerExpandedItems = computed(() => {
+    const layout = data.value?.page?.footer_blocks?.items || [];
+    const blocks = data.value?.page?.blocks || {};
+    if (!layout.length) return [];
+    return expandTemplatesSync(layout, {
+        blocks,
+        templateState,
+        templates: data.value?.templates || {},
+        allowedLayouts: footerAllowedLayouts.value,
+        loadTemplate: syncLoadTemplate,
+    });
+});
+
 // Initialize Flowbite components based on data attribute selectors.
 // Safe to call initFlowbite() (which includes initCarousels) because block.vue
 // removes data-carousel after init, so initCarousels() finds no elements here.
@@ -205,39 +224,35 @@ onMounted(() => {
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
             const bridge = initBridge({
                 debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
-                pageBlocksFields: [
-                    {
-                        fieldName: 'blocks',
-                        title: 'Blocks',
-                        allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
-                        allowedTemplates: ['/_test_data/templates/test-layout'],
-                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                page: {
+                    schema: {
+                        properties: {
+                            blocks_layout: {
+                                title: 'Blocks',
+                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
+                                allowedTemplates: ['/_test_data/templates/test-layout'],
+                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                            },
+                            footer_blocks: {
+                                title: 'Footer',
+                                allowedBlocks: ['slate', 'image'],
+                                allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
+                            },
+                        },
                     },
-                    {
-                        fieldName: 'footer_blocks',
-                        title: 'Footer',
-                        allowedBlocks: ['slate', 'image'],
-                        // Force footer layout on /another-page (same as mock frontend)
-                        allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
-                    },
-                ],
-                voltoConfig: {
-                    blocks: {
-                        blocksConfig: newBlocks,
+                },
+                blocks: newBlocks,
+                pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
+                // Pass onEditChange before init() sends INIT to avoid race condition
+                onEditChange: (page) => {
+                    if (page) {
+                        // Mark that we have admin data with nodeIds
+                        hasAdminData.value = true;
+                        // Update page data - ListingBlock components will
+                        // re-render and expand listings via their own Suspense
+                        data.value.page = page;
                     }
                 },
-                // Transform frontend path to API path by stripping paging segments
-                // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
-                pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
-            });
-            bridge.onEditChange((page) => {
-                if (page) {
-                    // Mark that we have admin data with nodeIds
-                    hasAdminData.value = true;
-                    // Update page data - BlockExpander components will
-                    // re-render and expand listings via their own Suspense
-                    data.value.page = page;
-                }
             });
         }
     }
@@ -282,9 +297,20 @@ const { data, error } = await ploneApi({
 
 // Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)
 provide('templates', computed(() => data.value?.templates || {}));
-provide('templateState', {});  // Shared across all expandTemplatesSync calls
+provide('templateState', templateState);  // Shared across all expandTemplatesSync calls
 provide('apiUrl', apiUrl);
 provide('contextPath', contextPath);
+// Reactive pages: re-parses @pg_ segments when route changes (SPA paging navigation)
+provide('pages', computed(() => {
+    const result = {};
+    for (const part of route.params.slug || []) {
+        if (part.startsWith("@pg_")) {
+            const [_, bid, page] = part.split("_");
+            result[bid] = Number(page);
+        }
+    }
+    return result;
+}));
 
 useSeoMeta({
   ogTitle: data.page?.title,

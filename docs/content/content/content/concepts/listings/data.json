@@ -1,0 +1,622 @@
+{
+  "@id": "/concepts/listings",
+  "@type": "Document",
+  "UID": "concepts-listings-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "intro-1": {
+      "@type": "slate",
+      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. expandListingBlocks walks a layout, fetches results for each listing-type block, and returns expanded block objects.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. "
+            },
+            {
+              "children": [
+                {
+                  "text": "expandListingBlocks(layout, options)"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " walks a layout, fetches results for each listing-type block, and returns an array of block objects with @uid and @type."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "You tell it which block types need fetching via a "
+            },
+            {
+              "children": [
+                {
+                  "text": "fetchItems"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "const items = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n  paging,\n});"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "sep-1": {
+      "@type": "separator",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "example-heading": {
+      "@type": "slate",
+      "plaintext": "Example: Mixing Listings, Blocks and Paging",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Example: Mixing Listings, Blocks and Paging"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "example-text": {
+      "@type": "slate",
+      "plaintext": "A grid with a mix of listing and other blocks with a single paging at the bottom.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "A grid can have a mix of listing and static blocks sharing a single paging. The "
+            },
+            {
+              "children": [
+                {
+                  "text": "staticBlocks"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        fetchItems[blocks[id]['@type']] ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "options-heading": {
+      "@type": "slate",
+      "plaintext": "expandListingBlocks Options",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "expandListingBlocks Options"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "options-text": {
+      "@type": "slate",
+      "plaintext": "Options for expandListingBlocks: blocks, fetchItems (type→fetcher map), paging, itemTypeField, defaultItemType.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "blocks"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Map of blockId to block data"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "fetchItems"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Required. Map of { blockType: async (block, { start, size }) => { items, total } }. Keys declare which block types to expand; values are fetcher functions. Use ploneFetchItems() for Plone backends."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "paging"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Shared paging object { start, size } (mutated in-place with computed values)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "itemTypeField"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Field on the listing block that holds the item type (default: 'itemType')"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "defaultItemType"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " — Fallback type when field is not set (default: 'summary')"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "plonefetch-heading": {
+      "@type": "slate",
+      "plaintext": "ploneFetchItems Helper",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "ploneFetchItems Helper"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "plonefetch-text": {
+      "@type": "slate",
+      "plaintext": "ploneFetchItems creates a fetcher function for Plone backends, suitable as a value in the fetchItems map.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "ploneFetchItems({ apiUrl, contextPath, extraCriteria })"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " — creates a fetcher function for Plone backends, suitable as a value in the fetchItems map. Normalizes results by packaging image_field + image_scales into a self-contained image object { @id, image_field, image_scales }."
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: async (block, { start, size }) => { items, total }."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "fieldmapping-heading": {
+      "@type": "slate",
+      "plaintext": "Field Mapping",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Field Mapping"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "fieldmapping-text": {
+      "@type": "slate",
+      "plaintext": "fieldMapping maps source fields to target block fields — only mapped fields appear on expanded items.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "fieldMapping"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: { @id → href, title → title, description → description, image → image }. Values can be a string (rename) or { field, type } for conversions:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "itemtype-heading": {
+      "@type": "slate",
+      "plaintext": "Item Type Selection",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Item Type Selection"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "itemtype-text": {
+      "@type": "slate",
+      "plaintext": "Use itemType on the listing block to control what @type expanded items get.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Use "
+            },
+            {
+              "children": [
+                {
+                  "text": "itemType"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " (or variation) on the listing block to control what @type expanded items get. Combined with "
+            },
+            {
+              "children": [
+                {
+                  "text": "inheritSchemaFrom"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": ", the listing's sidebar shows fields from the selected item type:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "text": "listing: {\n    schemaEnhancer: ({ schema }) => {\n        schema.properties.itemType = {\n            title: 'Display as',\n            choices: [['teaser', 'Teaser'], ['card', 'Card']],\n        };\n        return schema;\n    },\n    inheritSchemaFrom: {\n        typeField: 'itemType',\n        blocksField: null,\n    },\n}"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "paging-heading": {
+      "@type": "slate",
+      "plaintext": "Paging Values",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Paging Values"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "paging-text": {
+      "@type": "slate",
+      "plaintext": "You pass { start, size } and expandListingBlocks mutates it with computed paging values.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You pass "
+            },
+            {
+              "children": [
+                {
+                  "text": "{ start, size }"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " — expandListingBlocks mutates it with computed values:"
+            }
+          ],
+          "type": "p"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "currentPage"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number) — Zero-based current page index"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "totalPages"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number) — Total number of pages"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "totalItems"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number) — Total item count across all blocks"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "prev"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number | null) — Previous page index, or null on first page"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "next"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (number | null) — Next page index, or null on last page"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "pages"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (array) — Window of ~5 page objects: { start, page } where page is 1-based"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "_ready"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " (Promise) — Resolves after all expandListingBlocks calls complete (for async paging UI)"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "notes-heading": {
+      "@type": "slate",
+      "plaintext": "Notes",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Notes"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "notes-text": {
+      "@type": "slate",
+      "plaintext": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "intro-1",
+      "sep-1",
+      "example-heading",
+      "example-text",
+      "options-heading",
+      "options-text",
+      "plonefetch-heading",
+      "plonefetch-text",
+      "fieldmapping-heading",
+      "fieldmapping-text",
+      "itemtype-heading",
+      "itemtype-text",
+      "paging-heading",
+      "paging-text",
+      "notes-heading",
+      "notes-text"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Using expandListingBlocks with a fetchItems map for listings, paging, and dynamic content",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "listings",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Listings & Dynamic Blocks",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

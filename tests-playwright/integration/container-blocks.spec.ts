@@ -343,6 +343,37 @@ test.describe('Adding Blocks to Containers', () => {
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
 
+  test('pressing Enter in container with single allowedBlock creates that type, not slate', async ({
+    page,
+  }) => {
+    // top_images field on the columns block allows only 'image' blocks.
+    // Pressing Enter on an image block there should create another image block,
+    // not a slate block (which is the hardcoded default in View.jsx).
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Count initial top_images blocks (should be 2: top-img-1, top-img-2)
+    const topImagesLocator = iframe.locator('.top-images-row > [data-block-uid]');
+    await expect(topImagesLocator).toHaveCount(2);
+
+    // Click on top-img-1 (an image block in the top_images container)
+    await helper.clickBlockInIframe('top-img-1');
+
+    // Press Enter to create a new block after top-img-1
+    await page.keyboard.press('Enter');
+
+    // Wait for a third block to appear in the top_images row
+    await expect(topImagesLocator).toHaveCount(3);
+
+    // The new block should be an image block, not slate.
+    // Verify via sidebar: the newly selected block should show "Image" as the current type.
+    await helper.waitForSidebarCurrentBlock('Image');
+  });
+
   test('sidebar add at page level adds block to page blocks', async ({
     page,
   }) => {
@@ -3896,9 +3927,9 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.waitForSidebarCurrentBlock('Columns', 10000);
 
     // The new columns block should have an image child block in top_images
-    // Find image blocks that have data-media-field directly on them (not deeply nested)
+    // Find image blocks that have data-edit-media directly on them (not deeply nested)
     // These are actual image-type blocks, not container blocks
-    const imageMediaFields = iframe.locator('[data-media-field="url"]');
+    const imageMediaFields = iframe.locator('[data-edit-media="url"]');
 
     // Wait for at least one image field to exist (from new columns block)
     await expect(imageMediaFields.first()).toBeVisible({ timeout: 5000 });
@@ -3948,5 +3979,504 @@ test.describe('Multi-Container Field Operations', () => {
     // They are not in gridBlock's allowedBlocks but currently appear
     expect(await helper.isBlockTypeVisible('gridBlock')).toBe(false);
     expect(await helper.isBlockTypeVisible('hero')).toBe(false);
+  });
+});
+
+test.describe('Single-Schema Object_List (slider)', () => {
+  /**
+   * Tests for single-schema object_list containers.
+   * The slider block uses widget: 'object_list' with a shared schema
+   * for all items (slides). All items get the same schema.
+   */
+
+  test('no block chooser appears when adding a slide (single-schema auto-creates)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+    await helper.getStableBlockCount();
+
+    // Navigate to slider: click slide-1, then Escape to select slider-1
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Click the add button in the Slides section
+    // For single-schema object_list, no block chooser should appear — auto-creates
+    await helper.addBlockViaSidebar('Slides');
+
+    // The block chooser should NOT have appeared (no type selection needed)
+    const blockChooser = page.locator('.blocks-chooser');
+    const chooserVisible = await blockChooser
+      .isVisible()
+      .catch(() => false);
+    expect(chooserVisible).toBe(false);
+
+    // A new slide should have been added and selected (sidebar shows slide fields)
+    const kickerInput = sidebar.getByLabel('Kicker');
+    await expect(kickerInput).toBeVisible({ timeout: 10000 });
+  });
+
+  test('deleting a slide selects previous sibling and removes it from array', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+    await helper.getStableBlockCount();
+
+    // Navigate to slider: click slide-1, then Escape to slider-1
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    const slideItems = sidebar.locator('.child-block-item');
+    await expect(slideItems).toHaveCount(3, { timeout: 5000 });
+
+    // Delete slide-2 (middle item) — should select slide-1 (previous sibling)
+    // Slides order: slide-1, slide-2, slide-3
+    await slideItems.nth(1).click();
+    const currentBlockHeader = sidebar.locator('[data-is-current="true"]');
+    await expect(currentBlockHeader.filter({ hasText: 'Slide' })).toBeVisible({ timeout: 5000 });
+
+    // Delete via the current block's sidebar dropdown
+    const menuTrigger = currentBlockHeader.locator('.menu-trigger');
+    await menuTrigger.click();
+    const removeOption = page.locator('.volto-hydra-dropdown-item').filter({ hasText: 'Remove' });
+    await expect(removeOption).toBeVisible({ timeout: 3000 });
+    await removeOption.click();
+
+    // After deleting slide-2, selection should move to previous sibling (slide-1)
+    await helper.waitForQuantaToolbar('slide-1');
+
+    // Navigate to slider to verify child count
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+    await expect(sidebar.locator('.child-block-item')).toHaveCount(2, { timeout: 5000 });
+  });
+
+  test('reordering slides in sidebar updates the array order', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/carousel-test-page');
+    await helper.getStableBlockCount();
+
+    // Navigate to slider: click slide-1, then Escape to select slider-1
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar('slider-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+
+    // Get initial order
+    const slideItems = sidebar.locator('.child-block-item');
+    await expect(slideItems).toHaveCount(3);
+
+    // Get initial first item text
+    const firstItemText = await slideItems.first().textContent();
+    expect(firstItemText).toContain('Slide 1'); // slide-1 title
+
+    // Drag first item below last to reorder (manual mouse moves for react-beautiful-dnd)
+    const firstDragHandle = slideItems.first().locator('.drag-handle');
+    const lastItem = slideItems.last();
+
+    await firstDragHandle.scrollIntoViewIfNeeded();
+    await lastItem.scrollIntoViewIfNeeded();
+    await firstDragHandle.scrollIntoViewIfNeeded();
+
+    const firstHandleBox = await firstDragHandle.boundingBox();
+    const lastBox = await lastItem.boundingBox();
+    expect(firstHandleBox).not.toBeNull();
+    expect(lastBox).not.toBeNull();
+
+    await page.mouse.move(
+      firstHandleBox!.x + firstHandleBox!.width / 2,
+      firstHandleBox!.y + firstHandleBox!.height / 2,
+    );
+    await page.mouse.down();
+    // Small initial move to trigger DnD activation
+    await page.mouse.move(
+      firstHandleBox!.x + firstHandleBox!.width / 2,
+      firstHandleBox!.y + firstHandleBox!.height / 2 + 5,
+      { steps: 5 },
+    );
+    await page.waitForTimeout(200);
+    await page.mouse.move(
+      lastBox!.x + lastBox!.width / 2,
+      lastBox!.y + lastBox!.height + 10,
+      { steps: 10 },
+    );
+    await page.waitForTimeout(200);
+    await page.mouse.up();
+
+    // Verify order changed - first item should now be different
+    await expect(async () => {
+      const newFirstText = await slideItems.first().textContent();
+      expect(newFirstText).not.toContain('Slide 1');
+    }).toPass({ timeout: 5000 });
+  });
+});
+
+test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
+  /**
+   * Tests for typed object_list containers.
+   * The search block's facets field uses widget: 'object_list' with
+   * allowedBlocks: ['checkboxFacet', 'selectFacet', ...] and typeField: 'type'.
+   * Items have real types and schemas from blocksConfig.
+   */
+
+  test('facets are selectable via sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    // Select the search block
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    // Scope to Facets section (search block also has Results Listing section)
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Click on the first facet in the sidebar to select it
+    await facetItems.first().click();
+
+    // Wait for facet-type to be selected (quanta toolbar visible on it)
+    await helper.waitForQuantaToolbar('facet-type');
+    expect(
+      await helper.isQuantaToolbarVisibleInIframe('facet-type')
+    ).toBe(true);
+  });
+
+  test('sidebar shows typed facet items with correct labels', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    // Select the search block
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    // Scope to Facets section (search block also has Results Listing section)
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+
+    // We have 3 facets: 2 checkboxFacet + 1 selectFacet
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Verify the facet titles are shown correctly
+    // ChildBlocksWidget shows item.title (the facet label), not the block type
+    const facetLabels = await facetItems
+      .locator('.block-type')
+      .allTextContents();
+    expect(facetLabels[0]).toBe('Content Type');
+    expect(facetLabels[1]).toBe('Review State');
+    expect(facetLabels[2]).toBe('Subject');
+  });
+
+  test('block chooser shows only allowed facet types', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    // Select search block, then select a facet via sidebar
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Click first facet in sidebar to select it
+    await facetItems.first().click();
+    await helper.waitForQuantaToolbar('facet-type');
+
+    // Click add button
+    await helper.clickAddBlockButton();
+
+    // Wait for block chooser
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Expand the Common section (facet types are grouped there, collapsed by default)
+    const commonSection = blockChooser.locator('text=Common');
+    if (await commonSection.isVisible()) {
+      await commonSection.click();
+    }
+
+    // Allowed types use display names from blocksConfig.title
+    expect(await helper.isBlockTypeVisible('Checkbox')).toBe(true);
+    expect(await helper.isBlockTypeVisible('Select')).toBe(true);
+    expect(await helper.isBlockTypeVisible('slate')).toBe(true);
+    expect(await helper.isBlockTypeVisible('image')).toBe(true);
+
+    // NOT allowed: hero, columns, slider
+    expect(await helper.isBlockTypeVisible('hero')).toBe(false);
+    expect(await helper.isBlockTypeVisible('columns')).toBe(false);
+    expect(await helper.isBlockTypeVisible('slider')).toBe(false);
+  });
+
+  test('adding a typed item (selectFacet) via sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    const initialBlockCount = await helper.getStableBlockCount();
+
+    // Select the search block
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    // Scope to Facets section
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Add a new selectFacet via sidebar
+    await helper.addBlockViaSidebar('Facets', 'Select');
+
+    // Wait for new facet to appear in iframe (ensures iframe state is synced)
+    await helper.waitForBlockCountToBe(initialBlockCount + 1);
+
+    // Wait for the new facet to be selected (sidebar shows its form)
+    await helper.waitForSidebarCurrentBlock('Select');
+
+    // Verify it's the selectFacet schema (has "Hide facet?" but NOT "Multiple choices?" or "Facet widget")
+    await expect(sidebar.locator('label').filter({ hasText: 'Hide facet?' })).toBeVisible({ timeout: 3000 });
+    await expect(sidebar.locator('label').filter({ hasText: 'Multiple choices?' })).not.toBeVisible();
+    await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
+
+    // Navigate back to search block by clicking current block's parent-nav (goes to parent)
+    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    await expect(facetItems).toHaveCount(4, { timeout: 5000 });
+  });
+
+  test('adding a typed item (checkboxFacet) via toolbar add button', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    const initialBlockCount = await helper.getStableBlockCount();
+
+    // Select search block, then select a facet via sidebar
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Select a facet to enable the toolbar add button
+    await facetItems.first().click();
+    await helper.waitForQuantaToolbar('facet-type');
+
+    // Click the toolbar add button (iframe "+")
+    await helper.clickAddBlockButton();
+
+    // Block chooser should appear with filtered types
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+
+    // Expand Common section and select Checkbox
+    const commonSection = blockChooser.locator('text=Common');
+    if (await commonSection.isVisible()) {
+      await commonSection.click();
+    }
+    await blockChooser.getByRole('button', { name: /Checkbox/i }).click();
+    await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
+
+    // Wait for the new facet to appear in iframe and be selected
+    await helper.waitForBlockCountToBe(initialBlockCount + 1);
+    const iframe = helper.getIframe();
+    const newFacet = iframe.locator('.facet-item').nth(3); // 4th facet (0-indexed)
+    await expect(newFacet).toBeVisible({ timeout: 5000 });
+    const newBlockId = await newFacet.getAttribute('data-block-uid');
+    await helper.waitForBlockSelected(newBlockId!);
+
+    // Sidebar should show the new facet's form
+    await helper.waitForSidebarCurrentBlock('Checkbox');
+
+    // Verify it's the checkboxFacet schema (has "Multiple choices?" AND "Hide facet?", NOT "Facet widget")
+    await expect(sidebar.locator('label').filter({ hasText: 'Multiple choices?' })).toBeVisible({ timeout: 3000 });
+    await expect(sidebar.locator('label').filter({ hasText: 'Hide facet?' })).toBeVisible({ timeout: 3000 });
+    await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
+
+    // Navigate back to search block by clicking current block's parent-nav (goes to parent)
+    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    // Re-scope facets section after navigating back
+    const facetsSectionAfter = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    await expect(facetsSectionAfter.locator('.child-block-item')).toHaveCount(4, { timeout: 5000 });
+  });
+
+  test('deleting a typed facet selects previous sibling and removes it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    // Select search block, then select second facet via sidebar
+    // Facets order: facet-type, facet-state, facet-subject
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Delete facet-state (second item) — should select facet-type (previous sibling)
+    await facetItems.nth(1).click();
+    await helper.waitForQuantaToolbar('facet-state');
+
+    await helper.openQuantaToolbarMenu('facet-state');
+    await helper.clickQuantaToolbarMenuOption('facet-state', 'Remove');
+
+    // After deleting facet-state, selection should move to previous sibling (facet-type)
+    await helper.waitForQuantaToolbar('facet-type');
+
+    // Navigate back to search by clicking current block's parent-nav
+    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    const updatedFacetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    await expect(updatedFacetsSection.locator('.child-block-item')).toHaveCount(2, { timeout: 5000 });
+  });
+
+  test('reordering typed facets in sidebar updates order', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    // Select the search block
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForQuantaToolbar('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+    const facetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();
+    const facetItems = facetsSection.locator('.child-block-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+
+    // Get initial order - first should be "Content Type" (checkboxFacet)
+    const firstItemText = await facetItems.first().textContent();
+    expect(firstItemText).toContain('Content Type');
+
+    // Drag first item below last to reorder (manual mouse moves for react-beautiful-dnd)
+    const firstDragHandle = facetItems.first().locator('.drag-handle');
+    const lastItem = facetItems.last();
+
+    // Scroll both into view within the sidebar
+    await firstDragHandle.scrollIntoViewIfNeeded();
+    await lastItem.scrollIntoViewIfNeeded();
+    await firstDragHandle.scrollIntoViewIfNeeded();
+
+    const firstHandleBox = await firstDragHandle.boundingBox();
+    const lastBox = await lastItem.boundingBox();
+    expect(firstHandleBox).not.toBeNull();
+    expect(lastBox).not.toBeNull();
+
+    await page.mouse.move(
+      firstHandleBox!.x + firstHandleBox!.width / 2,
+      firstHandleBox!.y + firstHandleBox!.height / 2,
+    );
+    await page.mouse.down();
+    // Small initial move to trigger DnD activation
+    await page.mouse.move(
+      firstHandleBox!.x + firstHandleBox!.width / 2,
+      firstHandleBox!.y + firstHandleBox!.height / 2 + 5,
+      { steps: 5 },
+    );
+    await page.waitForTimeout(200);
+    await page.mouse.move(
+      lastBox!.x + lastBox!.width / 2,
+      lastBox!.y + lastBox!.height + 10,
+      { steps: 10 },
+    );
+    await page.waitForTimeout(200);
+    await page.mouse.up();
+
+    // Verify order changed - first item should no longer be "Content Type"
+    await expect(async () => {
+      const newFirstText = await facetItems.first().textContent();
+      expect(newFirstText).not.toContain('Content Type');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('DnD reorder within typed object_list via iframe drag', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+
+    // Verify initial facet order: facet-type, facet-state, facet-subject
+    const facetItems = iframe.locator('.facet-item');
+    await expect(facetItems).toHaveCount(3, { timeout: 5000 });
+    expect(await facetItems.first().getAttribute('data-block-uid')).toBe('facet-type');
+    expect(await facetItems.last().getAttribute('data-block-uid')).toBe('facet-subject');
+
+    // Click on facet title to select it (avoid checkboxes in the facet body)
+    await helper.clickBlockInIframe('facet-type', { selector: '[data-edit-text="title"]' });
+    await helper.waitForQuantaToolbar('facet-type');
+
+    // Drag after last facet
+    const targetBlock = iframe.locator('[data-block-uid="facet-subject"]').first();
+    await helper.dragBlockWithMouse(targetBlock, targetBlock, true);
+
+    // Verify the order changed: facet-type should now be last
+    await expect(async () => {
+      const newFirstId = await facetItems.first().getAttribute('data-block-uid');
+      expect(newFirstId).not.toBe('facet-type');
+    }).toPass({ timeout: 5000 });
+    expect(await facetItems.last().getAttribute('data-block-uid')).toBe('facet-type');
   });
 });

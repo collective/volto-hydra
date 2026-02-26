@@ -49,6 +49,9 @@ const contentDirMap = {};
 // Map UIDs to URL paths (for resolveuid endpoint)
 const uidToPathMap = {};
 
+// Map UIDs to their getObjPositionInParent value (from __metadata__.json ordering)
+const uidPositionMap = {};
+
 /**
  * Get session ID from request header.
  * Uses auth token as session identifier - each test login generates a unique
@@ -415,7 +418,7 @@ function getNavigationItems(basePath = '/', depth = 1) {
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
 
-  return Object.keys(contentDirMap)
+  const items = Object.keys(contentDirMap)
     .filter((itemPath) => {
       if (itemPath === '/') return false;
       if (itemPath === normalizedBase) return false; // Exclude the base itself
@@ -436,6 +439,19 @@ function getNavigationItems(basePath = '/', depth = 1) {
       return formatNavItem(rawContent, itemPath, baseUrl);
     })
     .filter(Boolean);
+
+  // Sort by __metadata__.json ordering (UID→position), preserving
+  // contentDirMap key order (filesystem alphabetical) as fallback.
+  items.sort((a, b) => {
+    const aPos = a.UID ? uidPositionMap[a.UID] : undefined;
+    const bPos = b.UID ? uidPositionMap[b.UID] : undefined;
+    if (aPos !== undefined && bPos !== undefined) return aPos - bPos;
+    if (aPos !== undefined) return -1;
+    if (bPos !== undefined) return 1;
+    return 0; // preserve original order
+  });
+
+  return items;
 }
 
 /**
@@ -560,6 +576,49 @@ function enrichImageBrains(obj, baseUrl) {
 }
 
 /**
+ * Get folder child items sorted by __metadata__.json ordering.
+ * Like Plone's content serializer, returns summary representations of children.
+ */
+function getFolderChildItems(folderPath, baseUrl) {
+  const normalizedFolder = folderPath.replace(/\/$/, '') || '/';
+  const folderDepth = normalizedFolder === '/' ? 0 : normalizedFolder.split('/').filter(Boolean).length;
+
+  const items = Object.keys(contentDirMap)
+    .filter((itemPath) => {
+      if (itemPath === '/') return false;
+      if (itemPath === normalizedFolder) return false;
+      if (normalizedFolder !== '/' && !itemPath.startsWith(normalizedFolder + '/')) return false;
+      const itemParts = itemPath.split('/').filter(Boolean);
+      return itemParts.length === folderDepth + 1;
+    })
+    .map((itemPath) => {
+      const rawContent = loadRawContentFromDisk(itemPath);
+      if (!rawContent) return null;
+      return {
+        '@id': `${baseUrl}${itemPath}`,
+        '@type': rawContent['@type'],
+        'description': rawContent.description || '',
+        'review_state': rawContent.review_state || 'published',
+        'title': rawContent.title,
+        'UID': rawContent.UID,
+      };
+    })
+    .filter(Boolean);
+
+  // Sort by __metadata__.json ordering (UID→position)
+  items.sort((a, b) => {
+    const aPos = a.UID ? uidPositionMap[a.UID] : undefined;
+    const bPos = b.UID ? uidPositionMap[b.UID] : undefined;
+    if (aPos !== undefined && bPos !== undefined) return aPos - bPos;
+    if (aPos !== undefined) return -1;
+    if (bPos !== undefined) return 1;
+    return 0;
+  });
+
+  return items;
+}
+
+/**
  * Enrich content with generated fields (@id, @components, permissions, etc.)
  * Content files use distribution format with relative @id paths.
  */
@@ -586,18 +645,25 @@ function enrichContent(content, urlPath, baseUrl) {
   // Transform distribution blob_path fields to download URLs
   const transformed = transformBlobPaths(content, fullUrl);
 
+  // Dynamically build items (folder children) like Plone does,
+  // sorted by __metadata__.json ordering
+  const isFolderish = transformed.is_folderish !== undefined ? transformed.is_folderish : true;
+  const childItems = isFolderish ? getFolderChildItems(cleanPath, baseUrl) : [];
+
   const enriched = {
     ...transformed,
     '@id': fullUrl,
     'UID': transformed.UID || `${transformed.id || urlPath.replace(/\//g, '-')}-uid`,
     'review_state': transformed.review_state || 'published',
-    'is_folderish': transformed.is_folderish !== undefined ? transformed.is_folderish : true,
+    'is_folderish': isFolderish,
     'allow_discussion': transformed.allow_discussion !== undefined ? transformed.allow_discussion : false,
     'exclude_from_nav': transformed.exclude_from_nav || false,
     'created': transformed.created || '2025-01-01T12:00:00+00:00',
     'modified': transformed.modified || '2025-01-01T12:00:00+00:00',
     'lock': transformed.lock || { 'locked': false, 'stealable': true },
     'parent': parent,
+    'items': childItems,
+    'items_total': childItems.length,
     '@components': generateComponents(urlPath, baseUrl),
     // Permissions - always grant for mock API
     'can_manage_portlets': true,
@@ -624,6 +690,17 @@ function scanContentDir(contentDirPath, mountPath) {
   }
 
   console.log(`Scanning content from ${contentDirPath} mounted at ${mountPath}`);
+
+  // Read __metadata__.json ordering if present (Plone distribution format)
+  const metadataPath = path.join(contentDirPath, '__metadata__.json');
+  if (fs.existsSync(metadataPath)) {
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+    if (metadata.ordering) {
+      for (const [uid, position] of Object.entries(metadata.ordering)) {
+        uidPositionMap[uid] = position;
+      }
+    }
+  }
 
   const dirs = fs.readdirSync(contentDirPath, { withFileTypes: true });
   dirs.forEach((dir) => {
@@ -815,8 +892,8 @@ app.post('/@logout', (req, res) => {
  * Used by ImageWidget for file uploads
  */
 app.post('/*', (req, res, next) => {
-  // Skip special endpoints (already handled above)
-  if (req.path.startsWith('/@')) {
+  // Skip special endpoints (already handled above or below)
+  if (req.path.startsWith('/@') || req.path.includes('/@')) {
     return next();
   }
 
@@ -1398,13 +1475,24 @@ app.post('*/@querystring-search', (req, res) => {
       // Filter by path - items under the specified path
       const basePath = value || '/';
       if (basePath !== '/') {
-        allItems = allItems.filter((item) => item['@id'].startsWith(basePath));
+        allItems = allItems.filter((item) => {
+          const itemPath = new URL(item['@id']).pathname;
+          return itemPath.startsWith(basePath);
+        });
       }
     } else if (index === 'path' && operation.includes('relativePath')) {
-      // Filter by relative path from context
-      const fullPath = contextPath + (value || '');
+      // Filter by relative path from context.
+      // '.' means current context, '..' means parent, etc.
+      let relValue = value || '';
+      if (relValue === '.' || relValue === '') {
+        relValue = '';
+      }
+      const fullPath = (contextPath + (relValue ? '/' + relValue : '')).replace(/\/+/g, '/');
       if (fullPath !== '/') {
-        allItems = allItems.filter((item) => item['@id'].startsWith(fullPath));
+        allItems = allItems.filter((item) => {
+          const itemPath = new URL(item['@id']).pathname;
+          return itemPath.startsWith(fullPath + '/');
+        });
       }
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
       // Full-text search - search in title, description, and text content
@@ -1425,7 +1513,29 @@ app.post('*/@querystring-search', (req, res) => {
   }
 
   // Sort items
-  if (sort_on) {
+  if (sort_on === 'getObjPositionInParent') {
+    // Folder order: use __metadata__.json ordering (UID→position),
+    // falling back to contentDirMap key order (filesystem alphabetical).
+    const allPaths = Object.keys(contentDirMap);
+    allItems.sort((a, b) => {
+      const aPos = a.UID ? uidPositionMap[a.UID] : undefined;
+      const bPos = b.UID ? uidPositionMap[b.UID] : undefined;
+      let cmp;
+      if (aPos !== undefined && bPos !== undefined) {
+        cmp = aPos - bPos;
+      } else if (aPos !== undefined) {
+        cmp = -1; // items with ordering come first
+      } else if (bPos !== undefined) {
+        cmp = 1;
+      } else {
+        // Fallback to contentDirMap key order
+        const aPath = new URL(a['@id']).pathname;
+        const bPath = new URL(b['@id']).pathname;
+        cmp = allPaths.indexOf(aPath) - allPaths.indexOf(bPath);
+      }
+      return sort_order === 'descending' ? -cmp : cmp;
+    });
+  } else if (sort_on) {
     allItems.sort((a, b) => {
       const aVal = a[sort_on] || '';
       const bVal = b[sort_on] || '';
@@ -1658,6 +1768,18 @@ app.get('*/@contents', (req, res) => {
     'items': items,
     'items_total': items.length,
   });
+});
+
+/**
+ * POST /:path/@submit-form
+ * Form submission endpoint (collective.volto.formsupport)
+ * Accepts { block_id, data: [{ field_id, label, value }] }
+ */
+app.post('*/@submit-form', (req, res) => {
+  if (process.env.DEBUG) {
+    console.log(`POST @submit-form: path=${req.path}`);
+  }
+  res.status(204).end();
 });
 
 /**
@@ -1942,26 +2064,29 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`Mock Plone API server running on http://localhost:${PORT}`);
-  console.log(`Mock frontend server also running on http://localhost:${PORT}`);
-  console.log(`Health endpoint: http://localhost:${PORT}/health`);
-  console.log(`Content endpoints available:`);
-  console.log(`  - http://localhost:${PORT}/`);
-  Object.keys(contentDirMap).forEach((urlPath) => {
-    console.log(`  - http://localhost:${PORT}${urlPath}`);
+// Start server only when run directly (not when require()'d by tests)
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`Mock Plone API server running on http://localhost:${PORT}`);
+    console.log(`Mock frontend server also running on http://localhost:${PORT}`);
+    console.log(`Health endpoint: http://localhost:${PORT}/health`);
+    console.log(`Content endpoints available:`);
+    console.log(`  - http://localhost:${PORT}/`);
+    Object.keys(contentDirMap).forEach((urlPath) => {
+      console.log(`  - http://localhost:${PORT}${urlPath}`);
+    });
   });
-});
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
   });
-});
+}
 
-// Export the HTTP server instance (not the Express app) for proper teardown
-module.exports = server;
+// Export app for testing, server for direct-run teardown
+module.exports = { app, server };

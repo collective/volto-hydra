@@ -1,3 +1,4 @@
+import filterSVG from '@plone/volto/icons/filter.svg';
 import frontendPreviewUrl from './reducers';
 import {
   getAllowedBlocksList,
@@ -56,7 +57,7 @@ const applyConfig = (config) => {
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
 
   // Hide container block fields - ChildBlocksWidget handles their UI
-  config.widgets.widget.blocksid_list = HiddenBlocksWidget;
+  config.widgets.widget.blocks_layout = HiddenBlocksWidget;
 
   // Hide object_list fields - items are edited via iframe selection
   config.widgets.widget.object_list = HiddenObjectListWidget;
@@ -201,7 +202,7 @@ const applyConfig = (config) => {
     // Inject current variation (item type) into fieldMapping widget props
     // Use default if variation isn't set yet (e.g., new block)
     const itemType =
-      formData?.variation || 'summaryItem';
+      formData?.variation || 'summary';
     if (schema.properties.fieldMapping && itemType) {
       schema.properties.fieldMapping = {
         ...schema.properties.fieldMapping,
@@ -213,12 +214,12 @@ const applyConfig = (config) => {
     // inheritSchemaFrom creates the variation field with computed choices
     // and adds the inherited_fields fieldset (item type defaults, etc.)
     // blocksField: '..' derives choices from sibling allowed types
-    // filterConvertibleFrom: 'default' filters to types with fieldMappings.default
+    // filterConvertibleFrom: '@default' filters to types with fieldMappings['@default']
     schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
       blocksField: '..',
-      filterConvertibleFrom: 'default',
+      filterConvertibleFrom: '@default',
       title: 'Item Type',
-      default: 'summaryItem',
+      default: 'summary',
     })({
       ...args,
       schema,
@@ -240,7 +241,7 @@ const applyConfig = (config) => {
     typeField: 'variation',
     defaultsField: 'itemDefaults',
     blocksField: '..',
-    filterConvertibleFrom: 'default',
+    filterConvertibleFrom: '@default',
   };
   config.blocks.blocksConfig.listing = {
     ...config.blocks.blocksConfig.listing,
@@ -277,7 +278,7 @@ const applyConfig = (config) => {
       };
     },
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'alt', 'image': 'url' },
+      '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
       // Converting from teaser block
       teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
     },
@@ -285,9 +286,9 @@ const applyConfig = (config) => {
 
   // Default result item for listings (simple title + description)
   // Matches Volto's DefaultResultItem variation
-  config.blocks.blocksConfig.defaultItem = {
-    ...config.blocks.blocksConfig.defaultItem,
-    id: 'defaultItem',
+  config.blocks.blocksConfig.default = {
+    ...config.blocks.blocksConfig.default,
+    id: 'default',
     title: 'Default',
     restricted: true,
     blockSchema: () => ({
@@ -301,15 +302,15 @@ const applyConfig = (config) => {
       required: [],
     }),
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'title', 'description': 'description' },
+      '@default': { '@id': 'href', 'title': 'title', 'description': 'description' },
     },
   };
 
   // Summary result item for listings (title + description + image)
   // Matches Volto's SummaryResultItem variation - the default for listings
-  config.blocks.blocksConfig.summaryItem = {
-    ...config.blocks.blocksConfig.summaryItem,
-    id: 'summaryItem',
+  config.blocks.blocksConfig.summary = {
+    ...config.blocks.blocksConfig.summary,
+    id: 'summary',
     title: 'Summary',
     restricted: true,
     blockSchema: () => ({
@@ -324,7 +325,7 @@ const applyConfig = (config) => {
       required: [],
     }),
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
+      '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
     },
   };
 
@@ -332,19 +333,151 @@ const applyConfig = (config) => {
   config.blocks.blocksConfig.teaser = {
     ...config.blocks.blocksConfig.teaser,
     fieldMappings: {
-      default: { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+      '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
       // Converting from image block
       image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
     },
   };
 
-  // Configure search block to add listing container field
-  // Volto's search block already has facets with widget: 'object_list'
-  // We add listing/listing_layout so search can contain a listing block child
+  // Facet block types for typed object_list in search block
+  // Each facet type has its own schema, resolved via blocksConfig
+  // Shared field definitions for facet schemas
+  const facetFieldDef = {
+    title: 'Field',
+    widget: 'select_querystring_field',
+    vocabulary: { '@id': 'plone.app.vocabularies.MetadataFields' },
+  };
+  // Facet field mappings — explicit type-to-type using checkboxFacet as hub.
+  // All facet types share the same core fields (title, field, hidden).
+  // @default is NOT used here because these fields are facet-specific,
+  // not from the canonical @default type (@id, title, description, image).
+  const facetBaseFields = { title: 'title', field: 'field', hidden: 'hidden' };
+  const facetHubMappings = {
+    selectFacet: facetBaseFields,
+    daterangeFacet: facetBaseFields,
+    toggleFacet: facetBaseFields,
+  };
+  const facetSpokeMappings = { checkboxFacet: facetBaseFields };
+
+  config.blocks.blocksConfig.checkboxFacet = {
+    ...config.blocks.blocksConfig.checkboxFacet,
+    id: 'checkboxFacet',
+    title: 'Checkbox',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    fieldMappings: facetHubMappings,
+    blockSchema: () => ({
+      title: 'Checkbox Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'multiple', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: facetFieldDef,
+        multiple: {
+          title: 'Multiple choices?',
+          type: 'boolean',
+          default: false,
+        },
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  config.blocks.blocksConfig.selectFacet = {
+    ...config.blocks.blocksConfig.selectFacet,
+    id: 'selectFacet',
+    title: 'Select',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    fieldMappings: facetSpokeMappings,
+    blockSchema: () => ({
+      title: 'Select Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: facetFieldDef,
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  config.blocks.blocksConfig.daterangeFacet = {
+    ...config.blocks.blocksConfig.daterangeFacet,
+    id: 'daterangeFacet',
+    title: 'Date Range',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    fieldMappings: facetSpokeMappings,
+    blockSchema: () => ({
+      title: 'Date Range Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: facetFieldDef,
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  config.blocks.blocksConfig.toggleFacet = {
+    ...config.blocks.blocksConfig.toggleFacet,
+    id: 'toggleFacet',
+    title: 'Toggle',
+    icon: filterSVG,
+    group: 'common',
+    restricted: true,
+    fieldMappings: facetSpokeMappings,
+    blockSchema: () => ({
+      title: 'Toggle Facet',
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['title', 'field', 'hidden'],
+        },
+      ],
+      properties: {
+        title: { title: 'Label', type: 'string' },
+        field: facetFieldDef,
+        hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+      },
+      required: [],
+    }),
+  };
+
+  // Configure search block to add listing container field and typed facets
+  // Facets converted to typed object_list: allowedBlocks controls facet types
   const existingSearchSchemaEnhancer =
     config.blocks.blocksConfig.search?.schemaEnhancer;
   config.blocks.blocksConfig.search = {
     ...config.blocks.blocksConfig.search,
+    // Skip Volto's SearchBlockEdit — it renders BlockDataForm without block prop,
+    // causing onChangeBlock(undefined, data) when schema defaults are applied.
+    // Our ParentBlocksWidget renders BlockDataForm with block={blockId} correctly.
+    sidebarSchemaOnly: true,
     schemaEnhancer: (args) => {
       let { schema } = args;
 
@@ -363,16 +496,33 @@ const applyConfig = (config) => {
       if (schema.properties && !schema.properties.listing) {
         schema.properties.listing = {
           title: 'Results Listing',
-          widget: 'blocksid_list', // Required for blockPathMap traversal
+          widget: 'blocks_layout',
           description: 'Listing block to render search results',
-          allowedBlocks: ['listing', 'defaultItem', 'summaryItem', 'teaser', 'image'],
+          allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],
           maxLength: 1,
           defaultBlockType: 'listing',
         };
-        schema.properties.listing_layout = {
-          title: 'Results Layout',
-          type: 'blocks_layout',
+      }
+
+      // Convert facets to typed object_list: each facet type has its own schema
+      // from blocksConfig (checkboxFacet, selectFacet, etc.)
+      // Keep Volto's original schema (needed by Volto's form rendering to avoid crashes)
+      // but add allowedBlocks + typeField so processObjectListContainer uses typed mode
+      if (schema.properties.facets) {
+        schema.properties.facets = {
+          ...schema.properties.facets,
+          allowedBlocks: [
+            'checkboxFacet',
+            'selectFacet',
+            'daterangeFacet',
+            'toggleFacet',
+            'slate',
+            'image',
+          ],
+          typeField: 'type',
         };
+        // Remove schemaExtender (would override our typed behavior)
+        delete schema.properties.facets.schemaExtender;
       }
 
       // Remove fields not needed for Hydra (query handled by child listing, no views selector)

@@ -7,7 +7,7 @@
  */
 import config from '@plone/volto/registry';
 import { getBlockSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
-import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, convertFieldValue } from '@volto-hydra/hydra-js';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 
 // Re-export getBlockSchema from blockPath for convenience
@@ -234,9 +234,9 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  * @example
  * // In block config:
  * schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
- *   filterConvertibleFrom: 'default',
+ *   filterConvertibleFrom: '@default',
  *   title: 'Item Type',
- *   default: 'summaryItem',
+ *   default: 'summary',
  * })
  */
 export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFieldOptions = {}) {
@@ -331,7 +331,10 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
         // Check if current mapping is empty or has invalid target fields
         const hasMapping = Object.keys(effectiveMapping).length > 0;
         const hasInvalidTargets = Object.values(effectiveMapping).some(
-          (targetField) => targetField && !new Set(validTargetFields).has(targetField),
+          (mapping) => {
+            const target = getMappingTarget(mapping);
+            return target && !new Set(validTargetFields).has(target);
+          },
         );
 
         if (!hasMapping || hasInvalidTargets) {
@@ -439,7 +442,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
     // Get mapped fields (these won't be shown - they come from external data)
     // Use effectiveMapping which includes smart defaults if computed
     const mappedFields = new Set(
-      mappingField ? Object.values(effectiveMapping) : [],
+      mappingField ? Object.values(effectiveMapping).map(getMappingTarget) : [],
     );
 
     // Check if child block has editableFields or parentControlledFields in its schemaEnhancer config
@@ -539,26 +542,23 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
  *
  * Use this on child block types that can appear in containers with inherited defaults.
  * Specify either:
- * - editableFields: whitelist of fields that stay on child (everything else hidden)
- * - parentControlledFields: blacklist of fields that go to parent (only these hidden)
+ * - editableFields: allowlist of fields that stay on child (everything else hidden)
+ * - parentControlledFields: blocklist of fields that go to parent (only these hidden)
  *
- * @param {string[]} defaultsFieldSuffixes - Suffixes to look for in parent (e.g., ['itemDefaults'])
  * @param {Object} options - Configuration options
- * @param {string[]} options.editableFields - Whitelist of fields to keep on child
- * @param {string[]} options.parentControlledFields - Blacklist of fields to hide from child
+ * @param {string[]} options.editableFields - Allowlist of fields to keep on child
+ * @param {string[]} options.parentControlledFields - Blocklist of fields to hide from child
  * @returns {Function} - A schemaEnhancer function
  *
  * @example
  * // In schemaEnhancer config (preferred format):
  * schemaEnhancer: {
  *   childBlockConfig: {
- *     defaultsField: 'itemDefaults',
  *     editableFields: ['href', 'title', 'description']
  *   }
  * }
  */
-export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], options = {}) {
-  const { editableFields, parentControlledFields } = options;
+export function hideParentOwnedFields({ editableFields, parentControlledFields } = {}) {
 
   return (args) => {
     const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
@@ -596,27 +596,15 @@ export function hideParentOwnedFields(defaultsFieldSuffixes = ['Defaults'], opti
     let fieldsToHide = new Set();
 
     if (editableFields) {
-      // Whitelist mode: hide everything except editableFields
+      // Allowlist mode: hide everything except editableFields
       for (const fieldName of Object.keys(schema.properties || {})) {
         if (!editableFields.includes(fieldName)) {
           fieldsToHide.add(fieldName);
         }
       }
     } else if (parentControlledFields) {
-      // Blacklist mode: hide only parentControlledFields
+      // Blocklist mode: hide only parentControlledFields
       fieldsToHide = new Set(parentControlledFields);
-    } else {
-      // Legacy behavior: look at what parent has set in *Defaults fields
-      for (const key of Object.keys(parentFormData || {})) {
-        const isDefaultsField = defaultsFieldSuffixes.some((suffix) =>
-          key.startsWith(suffix + '_'),
-        );
-        if (isDefaultsField) {
-          // Extract field name from itemDefaults_fieldName format
-          const fieldName = key.split('_').slice(1).join('_');
-          if (fieldName) fieldsToHide.add(fieldName);
-        }
-      }
     }
 
     if (fieldsToHide.size === 0) return schema;
@@ -672,21 +660,50 @@ export const QUERY_RESULT_FIELDS = {
  * @param {Object} sourceFields - Source field definitions (e.g., QUERY_RESULT_FIELDS)
  * @param {Object} targetSchema - Target block schema with properties
  * @param {Object} declaredMappings - Optional declared mappings from block's fieldMappings config
- * @returns {Object} - Field mapping { sourceField: targetField, ... }
+ * @returns {Object} - Field mapping { sourceField: targetField | { field, type }, ... }
  */
+
+/**
+ * Determine the hydra type of a field from its schema definition.
+ * Returns 'link', 'image', or the JSON Schema type (string, number, etc.)
+ */
+export function getFieldType(fieldDef) {
+  if (!fieldDef) return 'string';
+  if (fieldDef.widget === 'object_browser' && fieldDef.mode === 'link') return 'link';
+  if (fieldDef.widget === 'object_browser' && fieldDef.mode === 'image') return 'image';
+  if (fieldDef.widget === 'image') return 'image';
+  return fieldDef.type || 'string';
+}
+
+/**
+ * Extract the target field name from a fieldMapping value.
+ * Handles both legacy string format and new { field, type } format.
+ */
+export function getMappingTarget(mapping) {
+  return typeof mapping === 'string' ? mapping : mapping?.field;
+}
+
 export function computeSmartDefaults(sourceFields, targetSchema, declaredMappings) {
   if (!targetSchema?.properties) return {};
 
-  // If declared mappings are provided, use them (merge default + any source-specific)
-  if (declaredMappings?.default || declaredMappings) {
-    // If declaredMappings has a 'default' key, it's the full fieldMappings object
+  // If declared mappings are provided, use them (merge @default + any source-specific)
+  if (declaredMappings?.['@default'] || declaredMappings) {
+    // If declaredMappings has a '@default' key, it's the full fieldMappings object
     // Otherwise it's just the default mapping directly
-    const mappings = declaredMappings.default || declaredMappings;
+    const mappings = declaredMappings['@default'] || declaredMappings;
     // Only return mappings where the target field exists in the target schema
+    // Normalize to { field, type } format with type from target schema
     const validMappings = {};
-    for (const [sourceField, targetField] of Object.entries(mappings)) {
-      if (targetSchema.properties[targetField]) {
-        validMappings[sourceField] = targetField;
+    for (const [sourceField, mapping] of Object.entries(mappings)) {
+      const targetField = typeof mapping === 'string' ? mapping : mapping?.field;
+      if (targetField && targetSchema.properties[targetField]) {
+        const fieldType = getFieldType(targetSchema.properties[targetField]);
+        // Use object format for special types, plain string for simple string fields
+        if (fieldType === 'link' || fieldType === 'image') {
+          validMappings[sourceField] = { field: targetField, type: fieldType };
+        } else {
+          validMappings[sourceField] = targetField;
+        }
       }
     }
     return validMappings;
@@ -740,9 +757,9 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
   const usedTargets = new Set();
 
   // Map source fields to best matching target fields by type
-  // @id (URL) → link field
+  // @id (URL) → link field (with type: 'link' for conversion)
   if (sourceFields['@id'] && firstLinkField && !usedTargets.has(firstLinkField)) {
-    mapping['@id'] = firstLinkField;
+    mapping['@id'] = { field: firstLinkField, type: 'link' };
     usedTargets.add(firstLinkField);
   }
 
@@ -758,9 +775,9 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
     usedTargets.add(firstTextareaField);
   }
 
-  // image → image field
+  // image → image field (with type: 'image' for conversion)
   if (sourceFields.image && firstImageField && !usedTargets.has(firstImageField)) {
-    mapping.image = firstImageField;
+    mapping.image = { field: firstImageField, type: 'image' };
     usedTargets.add(firstImageField);
   }
 
@@ -1017,7 +1034,7 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  *
  * Combined example:
  *   {
- *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults', filterConvertibleFrom: 'default' },
+ *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults', filterConvertibleFrom: '@default' },
  *     skiplogic: { advancedOptions: { field: 'mode', is: 'advanced' } },
  *   }
  *
@@ -1098,8 +1115,8 @@ function createEnhancerByType(type, config) {
       break;
     }
     case 'childBlockConfig': {
-      const { defaultsField = 'itemDefaults', editableFields, parentControlledFields } = config;
-      enhancer = hideParentOwnedFields([defaultsField], { editableFields, parentControlledFields });
+      const { editableFields, parentControlledFields } = config;
+      enhancer = hideParentOwnedFields({ editableFields, parentControlledFields });
       enhancer.config = config;
       break;
     }
@@ -1276,7 +1293,7 @@ function createSingleEnhancerLegacy(recipe) {
  * @param {Object} options - Configuration options
  * @param {string[]} options.allowedBlocks - Static list of allowed types
  * @param {string} options.blocksField - Container field name to derive allowedBlocks from (e.g., 'blocks')
- * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., 'default')
+ * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., '@default')
  * @param {Object} blocksConfig - Block configuration registry
  * @param {Object} blockPathMap - Block path map (optional, for allowedSiblingTypes)
  * @param {string} blockId - Current block ID (optional, for allowedSiblingTypes)
@@ -1371,24 +1388,71 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
 }
 
 /**
+ * The canonical @default virtual type fields.
+ * These are the standard Plone content item fields that listing query results
+ * provide (see DEFAULT_FIELD_MAPPING in expandListingBlocks).
+ * A fieldMappings['@default'] entry must use only these keys.
+ */
+const DEFAULT_TYPE_FIELDS = new Set(['@id', 'title', 'description', 'image']);
+
+/**
+ * Check if a block config has a valid @default mapping.
+ * Valid means all keys are from the canonical @default field set.
+ */
+function hasValidDefault(blockConfig) {
+  const defaultMapping = blockConfig?.fieldMappings?.['@default'];
+  if (!defaultMapping) return false;
+  return Object.keys(defaultMapping).every(key => DEFAULT_TYPE_FIELDS.has(key));
+}
+
+/**
+ * Validate fieldMappings on a block config. Logs warnings for invalid entries.
+ * Call during INIT to catch configuration errors early.
+ */
+export function validateFieldMappings(blockType, blockConfig) {
+  const fieldMappings = blockConfig?.fieldMappings;
+  if (!fieldMappings) return;
+
+  const defaultMapping = fieldMappings['@default'];
+  if (defaultMapping) {
+    const invalidKeys = Object.keys(defaultMapping).filter(
+      key => !DEFAULT_TYPE_FIELDS.has(key),
+    );
+    if (invalidKeys.length > 0) {
+      console.warn(
+        `[HYDRA] Block type "${blockType}" has fieldMappings['@default'] with ` +
+        `invalid keys: ${invalidKeys.join(', ')}. @default is a virtual type ` +
+        `whose keys must be from: ${[...DEFAULT_TYPE_FIELDS].join(', ')}. ` +
+        `Use explicit type-to-type mappings instead (e.g., fieldMappings: { otherType: { ... } }).`,
+      );
+    }
+  }
+}
+
+/**
  * Get block types that the given source type can be converted to.
  *
- * Scans all blocks to find ones that have fieldMappings defined for the source type
- * or have a default mapping. Returns an array of convertible block types.
+ * Scans all blocks to find ones reachable from the source type through
+ * fieldMappings. Types without fieldMappings never appear in results.
+ *
+ * Edge rules:
+ * - Explicit fieldMappings[currentType] always creates an edge.
+ * - @default only creates an edge if BOTH types have valid @default mappings
+ *   (keys from the canonical set: @id, title, description, image).
+ *   Types with invalid @default keys (e.g., form fields, facets) are ignored.
  *
  * @param {string} sourceType - The current block's @type
  * @param {Object} blocksConfig - Block configuration registry
  * @returns {Array} - Array of { type, title } objects for convertible types
  */
-export function getConvertibleTypes(sourceType, blocksConfig) {
+export function getConvertibleTypes(sourceType, blocksConfig, allowedTypes = null) {
   if (!sourceType || !blocksConfig) return [];
 
   // Source block must have fieldMappings defined to be convertible
   const sourceConfig = blocksConfig[sourceType];
   if (!sourceConfig?.fieldMappings) return [];
 
-  // Find all types reachable from source (direct + transitive)
-  // Use BFS to find all reachable types through the conversion graph
+  // BFS to find all reachable types through the conversion graph
   const reachable = new Set();
   const queue = [sourceType];
   const visited = new Set([sourceType]);
@@ -1398,30 +1462,44 @@ export function getConvertibleTypes(sourceType, blocksConfig) {
 
     for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
       if (visited.has(blockType)) continue;
-      const fieldMappings = blockConfig.fieldMappings;
-      // Can convert to this type if it has mapping for current type OR default
-      if (fieldMappings?.[currentType] || fieldMappings?.default) {
+      if (!blockConfig.fieldMappings) continue;
+
+      // Explicit mapping from currentType → blockType
+      if (blockConfig.fieldMappings[currentType]) {
         reachable.add(blockType);
         visited.add(blockType);
-        // Only continue BFS if this type also has fieldMappings (can be a stepping stone)
-        if (blockConfig.fieldMappings) {
-          queue.push(blockType);
-        }
+        queue.push(blockType);
+        continue;
+      }
+
+      // @default: only if BOTH types have valid @default (canonical keys)
+      if (blockConfig.fieldMappings['@default'] &&
+          hasValidDefault(blockConfig) &&
+          hasValidDefault(blocksConfig[currentType])) {
+        reachable.add(blockType);
+        visited.add(blockType);
+        queue.push(blockType);
       }
     }
   }
 
+  // Filter by container's allowedTypes if provided
+  const allowedSet = allowedTypes ? new Set(allowedTypes) : null;
+
   // Convert to array of { type, title }
-  return Array.from(reachable).map(blockType => ({
-    type: blockType,
-    title: blocksConfig[blockType]?.title || blockType,
-  }));
+  return Array.from(reachable)
+    .filter(blockType => !allowedSet || allowedSet.has(blockType))
+    .map(blockType => ({
+      type: blockType,
+      title: blocksConfig[blockType]?.title || blockType,
+    }));
 }
 
 /**
  * Find the conversion path from source to target type.
  * Returns array of types representing the path, or null if no path exists.
  * Prefers direct mappings over default mappings.
+ * Uses the same @default compatibility rules as getConvertibleTypes.
  */
 function findConversionPath(sourceType, targetType, blocksConfig) {
   if (sourceType === targetType) return [sourceType];
@@ -1434,16 +1512,19 @@ function findConversionPath(sourceType, targetType, blocksConfig) {
     const path = queue.shift();
     const currentType = path[path.length - 1];
 
-    // Separate into direct and default targets, process direct first
+    // Separate into direct and compatible-default targets, process direct first
     const directTargets = [];
     const defaultTargets = [];
 
     for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
       if (visited.has(blockType)) continue;
-      const fieldMappings = blockConfig.fieldMappings;
-      if (fieldMappings?.[currentType]) {
+      if (!blockConfig.fieldMappings) continue;
+
+      if (blockConfig.fieldMappings[currentType]) {
         directTargets.push(blockType);
-      } else if (fieldMappings?.default) {
+      } else if (blockConfig.fieldMappings['@default'] &&
+                 hasValidDefault(blockConfig) &&
+                 hasValidDefault(blocksConfig[currentType])) {
         defaultTargets.push(blockType);
       }
     }
@@ -1457,10 +1538,7 @@ function findConversionPath(sourceType, targetType, blocksConfig) {
       if (blockType === targetType) {
         return newPath;
       }
-      // Only continue if this type has fieldMappings (can be stepping stone)
-      if (blocksConfig[blockType]?.fieldMappings) {
-        queue.push(newPath);
-      }
+      queue.push(newPath);
     }
   }
   return null;
@@ -1480,6 +1558,37 @@ function invertMapping(mapping) {
 }
 
 /**
+ * Get the resolved schema for a block type from blocksConfig.
+ * Handles both static objects and factory functions.
+ */
+function getResolvedSchema(blocksConfig, blockType, intl) {
+  const cfg = blocksConfig?.[blockType];
+  if (!cfg?.blockSchema) return null;
+  if (typeof cfg.blockSchema !== 'function') return cfg.blockSchema;
+  return cfg.blockSchema({ intl });
+}
+
+/**
+ * Map a schema widget to a convertFieldValue targetType.
+ * Returns null if no coercion is needed (pass-through).
+ * @param {string} widget - The widget name from the schema field
+ * @param {Object} fieldDef - The full field definition (to check mode, etc.)
+ */
+function widgetToTargetType(widget, fieldDef) {
+  if (widget === 'object_browser') {
+    // object_browser in image mode: array format [{ '@id': url, image_field?, image_scales? }]
+    if (fieldDef?.mode === 'image') return 'image_link';
+    return 'link';
+  }
+  // ImageWidget: string value + sibling image_field/image_scales fields on the block
+  if (widget === 'image') return 'image';
+  if (widget === 'url') return 'string';
+  if (widget === 'slate') return 'slate';
+  if (widget === 'textarea') return 'textarea';
+  return null;
+}
+
+/**
  * Convert a block from one type to another using fieldMappings.
  *
  * Supports transitive conversions - if Image→Teaser and Teaser→Hero exist,
@@ -1492,20 +1601,40 @@ function invertMapping(mapping) {
  * @param {Object} blockData - The source block's data
  * @param {string} newType - The target block type
  * @param {Object} blocksConfig - Block configuration registry
+ * @param {string} typeFieldName - Field name for block type (default '@type')
+ * @param {Object} intl - react-intl intl object for resolving blockSchema factories
  * @returns {Object} - New block data with @type set to newType and fields mapped
  */
-export function convertBlockType(blockData, newType, blocksConfig) {
-  const sourceType = blockData['@type'];
+export function convertBlockType(blockData, newType, blocksConfig, typeFieldName = '@type', intl = null) {
+  const sourceType = blockData[typeFieldName];
 
   // Find the conversion path
   const path = findConversionPath(sourceType, newType, blocksConfig);
   if (!path || path.length < 2) {
     // No path found, just set the type (shouldn't happen if getConvertibleTypes was used)
-    return { '@type': newType };
+    return { [typeFieldName]: newType };
   }
 
-  // Apply mappings through each step in the path
+  // Pack image widget fields into canonical image format: [{ '@id': url, image_field?, image_scales? }]
+  // widget:'image' can store value as string (content path) or array [{ '@id': url }],
+  // with optional image_field/image_scales as separate block-level fields
   let currentData = { ...blockData };
+  const sourceSchema = getResolvedSchema(blocksConfig, sourceType, intl);
+  if (sourceSchema?.properties) {
+    for (const [fieldName, fieldDef] of Object.entries(sourceSchema.properties)) {
+      if (fieldDef.widget === 'image' && currentData[fieldName] !== undefined) {
+        const val = currentData[fieldName];
+        if (typeof val === 'string') {
+          const packed = { '@id': val };
+          if (currentData.image_field) packed.image_field = currentData.image_field;
+          if (currentData.image_scales) packed.image_scales = currentData.image_scales;
+          currentData[fieldName] = [packed];
+        }
+        break;
+      }
+    }
+  }
+
   for (let i = 1; i < path.length; i++) {
     const fromType = path[i - 1];
     const toType = path[i];
@@ -1514,7 +1643,7 @@ export function convertBlockType(blockData, newType, blocksConfig) {
 
     // Step 1: Normalize source data to canonical fields using inverted default mapping
     // This extracts data FROM the source block
-    const sourceInvertedDefault = invertMapping(sourceConfig?.fieldMappings?.default);
+    const sourceInvertedDefault = invertMapping(sourceConfig?.fieldMappings?.['@default']);
     let canonicalData = {};
     for (const [blockField, canonicalField] of Object.entries(sourceInvertedDefault)) {
       if (currentData[blockField] !== undefined) {
@@ -1525,13 +1654,26 @@ export function convertBlockType(blockData, newType, blocksConfig) {
     canonicalData = { ...currentData, ...canonicalData };
 
     // Step 2: Map canonical/source fields to target using target's mappings
+    // Coerce values to match target field widget types (e.g., object_browser ↔ url)
     const targetMappings = targetConfig?.fieldMappings;
-    const newData = { '@type': toType };
+    const targetSchema = getResolvedSchema(blocksConfig, toType, intl);
+    const newData = { [typeFieldName]: toType };
     // Apply mappings: source-specific first, then default as fallback
-    const mappings = { ...targetMappings?.default, ...targetMappings?.[fromType] };
+    const mappings = { ...targetMappings?.['@default'], ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
       if (canonicalData[sourceField] !== undefined) {
-        newData[targetField] = canonicalData[sourceField];
+        const targetFieldDef = targetSchema?.properties?.[targetField];
+        const targetType = widgetToTargetType(targetFieldDef?.widget, targetFieldDef);
+        // Unpack: when target is widget:'image' (string + siblings), hoist image_field/image_scales
+        // from the packed array before convertFieldValue extracts just the string
+        if (targetType === 'image') {
+          const srcVal = canonicalData[sourceField];
+          if (Array.isArray(srcVal) && srcVal.length > 0 && srcVal[0]?.['@id']) {
+            if (srcVal[0].image_field) newData.image_field = srcVal[0].image_field;
+            if (srcVal[0].image_scales) newData.image_scales = srcVal[0].image_scales;
+          }
+        }
+        newData[targetField] = convertFieldValue(canonicalData[sourceField], targetType);
       }
     }
     currentData = newData;
@@ -1540,14 +1682,28 @@ export function convertBlockType(blockData, newType, blocksConfig) {
   // Preserve unmapped fields from the original block that aren't in the final result
   // This enables roundtrip conversion (hero → image → hero) to retain fields like buttonText
   // that exist in source and target but aren't explicitly mapped through intermediate types
-  const { '@type': _originalType, ...originalFields } = blockData;
-  const { '@type': finalType, ...convertedFields } = currentData;
+  const { [typeFieldName]: _originalType, ...originalFields } = blockData;
+  const { [typeFieldName]: finalType, ...convertedFields } = currentData;
+
+  // Coerce preserved fields to match target schema widget types
+  // e.g., description (string from summary) → Slate array for hero
+  const targetSchema = getResolvedSchema(blocksConfig, finalType, intl);
+  if (targetSchema?.properties) {
+    for (const [field, value] of Object.entries(originalFields)) {
+      if (convertedFields[field] !== undefined) continue; // Already mapped
+      const fieldDef = targetSchema.properties[field];
+      const targetType = widgetToTargetType(fieldDef?.widget, fieldDef);
+      if (targetType) {
+        originalFields[field] = convertFieldValue(value, targetType);
+      }
+    }
+  }
 
   // Merge: original fields as base, converted fields take priority
   return {
     ...originalFields,
     ...convertedFields,
-    '@type': finalType,
+    [typeFieldName]: finalType,
   };
 }
 
@@ -1564,9 +1720,10 @@ export function convertBlockType(blockData, newType, blocksConfig) {
  * @param {Object} oldBlockData - Previous parent block data
  * @param {Object} newBlockData - Updated parent block data
  * @param {Object} blocksConfig - Block configuration registry
+ * @param {Object} intl - react-intl intl object for resolving blockSchema factories
  * @returns {Object} Updated formData with synced children
  */
-export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockData, newBlockData, blocksConfig) {
+export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockData, newBlockData, blocksConfig, intl = null) {
   const blockType = newBlockData['@type'];
   const blockConfig = blocksConfig?.[blockType];
 
@@ -1585,9 +1742,9 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   let result = formData;
 
   // Reset fieldMapping to the new type's default when variation changes
-  // The new type's fieldMappings.default provides the correct source→target mapping
+  // The new type's fieldMappings['@default'] provides the correct source→target mapping
   const newTypeConfig = blocksConfig?.[newType];
-  const defaultFieldMapping = newTypeConfig?.fieldMappings?.default;
+  const defaultFieldMapping = newTypeConfig?.fieldMappings?.['@default'];
   if (defaultFieldMapping) {
     // Get the current block with the new variation and reset its fieldMapping
     const currentBlock = getBlockById(result, blockPathMap, blockId);
@@ -1628,12 +1785,12 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
         const updatedChild = { ...childBlock, [childTypeField]: newType };
         result = updateBlockById(result, blockPathMap, childId, updatedChild);
         // Recursive: sync this child's children too
-        result = syncChildBlockTypes(result, blockPathMap, childId, childBlock, updatedChild, blocksConfig);
+        result = syncChildBlockTypes(result, blockPathMap, childId, childBlock, updatedChild, blocksConfig, intl);
       }
     } else {
       // Child is a regular block - convert its type using fieldMappings
       if (childType !== newType) {
-        const updatedChild = convertBlockType(childBlock, newType, blocksConfig);
+        const updatedChild = convertBlockType(childBlock, newType, blocksConfig, '@type', intl);
         result = updateBlockById(result, blockPathMap, childId, updatedChild);
       }
     }

@@ -26,8 +26,11 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
             url: null,
             class: bg_class
         }
+    } else if (typeof block === 'string') {
+        // Plain URL string (e.g., data URI, external URL)
+        image_url = block;
     } else if ('@id' in block && block?.image_scales) {
-        // It's an image content object
+        // It's an image content object with scales
         image_url = block['@id'];
     } else if ('@id' in block && block?.hasPreviewImage) {
         // It's an href object with a preview image (e.g., teaser target)
@@ -39,6 +42,9 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
             url: image_url,
             class: bg_class,
         };
+    } else if ('@id' in block) {
+        // Image reference without scales (e.g., external URL, data URI, or from block conversion)
+        image_url = block['@id'];
     } else if (block?.download) {
         image_url = block.download;
     }
@@ -105,11 +111,11 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         // image block with image_field and url
         image_url = `${image_url}/@@images/${block?.image_field}`;
     }
-    else if (block['@type'] == "image" && !image_url.includes('@@images')) {
+    else if (block['@type'] == "image" && !image_url.includes('@@images') && !image_url.startsWith('data:')) {
         // image block without scale info - add default image scale
         image_url = `${image_url}/@@images/image`;
     }
-    else if (!image_url.includes('@@images') && !/\.[a-zA-Z]+$/.test(image_url)) {
+    else if (!image_url.startsWith('data:') && !image_url.includes('@@images') && !/\.[a-zA-Z]+$/.test(image_url)) {
         image_url = "";
     }
     // `${['hidden', 'duration-700', 'ease-linear', 'bg-center',  ] + (block?.preview_image? ['bg-cover', imageProps(block.preview_image[0]).bg]:['bg-gray-700', 'bg-blend-multiply', 'bg-no-repeat'])}`

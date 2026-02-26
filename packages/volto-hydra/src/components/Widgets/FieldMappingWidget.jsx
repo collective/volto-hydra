@@ -17,6 +17,7 @@ import { injectLazyLibs } from '@plone/volto/helpers/Loadable/Loadable';
 import {
   getBlockSchema,
   computeSmartDefaults,
+  getFieldType,
 } from '../../utils/schemaInheritance';
 
 /**
@@ -52,9 +53,13 @@ const FieldMappingWidget = (props) => {
     : {};
 
   // Filter out any saved mappings that reference fields not in the current target type
+  // Handle both legacy format (string) and new format ({ field, type })
   const validTargetFields = new Set(Object.keys(targetSchema?.properties || {}));
   const filteredValue = Object.fromEntries(
-    Object.entries(value || {}).filter(([, targetField]) => validTargetFields.has(targetField))
+    Object.entries(value || {}).filter(([, mapping]) => {
+      const targetField = typeof mapping === 'string' ? mapping : mapping?.field;
+      return validTargetFields.has(targetField);
+    })
   );
 
   // Use smart defaults for any unmapped fields, filtered values override defaults
@@ -69,10 +74,17 @@ const FieldMappingWidget = (props) => {
   ];
 
   // Handle change for a specific source field
+  // Stores { field, type } for link/image target fields, plain string otherwise
   const handleChange = (sourceKey, targetValue) => {
     const newValue = { ...value };
     if (targetValue) {
-      newValue[sourceKey] = targetValue;
+      const fieldDef = targetSchema?.properties?.[targetValue];
+      const fieldType = getFieldType(fieldDef);
+      if (fieldType === 'link' || fieldType === 'image') {
+        newValue[sourceKey] = { field: targetValue, type: fieldType };
+      } else {
+        newValue[sourceKey] = targetValue;
+      }
     } else {
       delete newValue[sourceKey];
     }
@@ -115,7 +127,11 @@ const FieldMappingWidget = (props) => {
               <td style={{ padding: '4px 8px' }}>
                 <Select
                   value={targetFieldOptions.find(
-                    (opt) => opt.value === effectiveValue?.[sourceKey],
+                    (opt) => {
+                      const mapping = effectiveValue?.[sourceKey];
+                      const targetField = typeof mapping === 'string' ? mapping : mapping?.field;
+                      return opt.value === targetField;
+                    },
                   )}
                   options={targetFieldOptions}
                   onChange={(selected) =>

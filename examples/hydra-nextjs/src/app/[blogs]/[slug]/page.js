@@ -7,14 +7,26 @@ import BlocksList from "@/components/BlocksList";
 import { fetchContent } from '#utils/api';
 
 export default function Blog({ params }) {
-  const bridge = initBridge({
-    pageBlocksFields: [
-      { fieldName: 'blocks', title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-    ],
-  });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [value, setValue] = useState(data);
   const pathname = usePathname();
+
+  const bridge = initBridge({
+    page: {
+      schema: {
+        properties: {
+          blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
+        },
+      },
+    },
+    onEditChange: (updatedData) => {
+      if (updatedData) {
+        setValue(updatedData);
+      }
+    },
+  });
+
   useEffect(() => {
     async function getData(token = null) {
       try {
@@ -34,16 +46,6 @@ export default function Blog({ params }) {
       url.searchParams.get("access_token") || getTokenFromCookie();
     getData(tokenFromUrl);
   }, [pathname]);
-
-  const [value, setValue] = useState(data);
-
-  useEffect(() => {
-    bridge.onEditChange((updatedData) => {
-      if (updatedData) {
-        setValue(updatedData);
-      }
-    });
-  },[bridge]);
 
   if (loading) {
     return <div>Loading...</div>;

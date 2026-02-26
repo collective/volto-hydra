@@ -131,21 +131,20 @@
             processContainer(block, blockId, path, null);
           }
 
-          // Handle columns-style container fields (columns/columns_layout, top_images/top_images_layout)
-          const containerFields = [
-            { data: 'columns', layout: 'columns_layout' },
-            { data: 'top_images', layout: 'top_images_layout' },
-          ];
-          containerFields.forEach(({ data, layout }) => {
-            if (block[data] && block[layout]?.items) {
-              block[layout].items.forEach(childId => {
-                const child = block[data][childId];
+          // Handle extra layout fields (columns, top_images, etc.)
+          // In shared blocks dict format, these are { items: [...] } pointing to block.blocks entries.
+          const knownNonLayout = new Set(['blocks', 'blocks_layout', '@type', 'title', 'table', 'description']);
+          for (const [key, value] of Object.entries(block)) {
+            if (knownNonLayout.has(key)) continue;
+            if (value?.items && Array.isArray(value.items) && block.blocks) {
+              value.items.forEach(childId => {
+                const child = block.blocks[childId];
                 if (!child) return;
-                const childPath = [...path, data, childId];
+                const childPath = [...path, 'blocks', childId];
                 pathMap[childId] = {
                   path: childPath,
                   parentId: blockId,
-                  blockType: child['@type'] || data,
+                  blockType: child['@type'] || key,
                 };
                 // Recurse if child has blocks/blocks_layout
                 if (child.blocks && child.blocks_layout) {
@@ -153,7 +152,7 @@
                 }
               });
             }
-          });
+          }
 
           // Handle slateTable: rows and cells use .key as blockId
           if (blockType === 'slateTable' && block.table?.rows) {
@@ -337,9 +336,11 @@
           ],
         },
         // Columns container with two columns, each containing a slate block
+        // Uses shared blocks dict format: all child blocks in mock-columns.blocks,
+        // layout fields (columns) reference them by ID.
         'mock-columns': {
           '@type': 'columns',
-          columns: {
+          blocks: {
             'mock-col-1': {
               '@type': 'column',
               blocks: {
@@ -361,7 +362,7 @@
               blocks_layout: { items: ['mock-col2-slate'] },
             },
           },
-          columns_layout: { items: ['mock-col-1', 'mock-col-2'] },
+          columns: { items: ['mock-col-1', 'mock-col-2'] },
         },
         // slateTable: 2x2 grid for table-mode navigation tests
         // Uses the existing slateTable renderer format: table.rows[].cells[]

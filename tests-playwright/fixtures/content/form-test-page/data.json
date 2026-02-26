@@ -1,0 +1,84 @@
+{
+  "@id": "/form-test-page",
+  "@type": "Document",
+  "UID": "form-test-page-uid",
+  "id": "form-test-page",
+  "title": "Form Test Page",
+  "description": "Test page for form block",
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "form-block-1": {
+      "@type": "form",
+      "title": "Contact Form",
+      "description": "Please fill out this form",
+      "default_to": "admin@example.com",
+      "default_from": "noreply@example.com",
+      "default_subject": "New form submission: ${field-subject}",
+      "submit_label": "Submit",
+      "show_cancel": true,
+      "cancel_label": "Reset",
+      "captcha": "honeypot",
+      "email_otp_verification": false,
+      "store": true,
+      "send": true,
+      "send_message": "Thank you, your form has been submitted.",
+      "remove_data_after_days": -1,
+      "subblocks": [
+        {
+          "field_id": "field-name",
+          "field_type": "text",
+          "label": "Full Name",
+          "plaintext": "Full Name",
+          "required": true
+        },
+        {
+          "field_id": "field-email",
+          "field_type": "from",
+          "label": "Email Address",
+          "plaintext": "Email Address",
+          "required": true,
+          "use_as_reply_to": true,
+          "use_as_bcc": false
+        },
+        {
+          "field_id": "field-subject",
+          "field_type": "select",
+          "label": "Subject",
+          "plaintext": "Subject",
+          "required": true,
+          "input_values": ["General Inquiry", "Bug Report", "Feature Request"]
+        },
+        {
+          "field_id": "field-message",
+          "field_type": "textarea",
+          "label": "Message",
+          "plaintext": "Message",
+          "required": false
+        },
+        {
+          "field_id": "field-priority",
+          "field_type": "single_choice",
+          "label": "Priority",
+          "plaintext": "Priority",
+          "required": false,
+          "input_values": ["Low", "Medium", "High"]
+        },
+        {
+          "field_id": "field-agree",
+          "field_type": "checkbox",
+          "label": "I agree to the terms",
+          "plaintext": "I agree to the terms",
+          "required": true
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "form-block-1"]
+  },
+  "review_state": "published",
+  "is_folderish": false,
+  "type_title": "Page"
+}

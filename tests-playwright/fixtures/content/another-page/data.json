@@ -26,12 +26,7 @@
         }
       ],
       "plaintext": "This is another test page"
-    }
-  },
-  "blocks_layout": {
-    "items": ["block-1-uuid"]
-  },
-  "footer_blocks": {
+    },
     "footer-user-content": {
       "@type": "slate",
       "value": [
@@ -43,7 +38,10 @@
       "plaintext": "Footer user content - no layout markers"
     }
   },
-  "footer_blocks_layout": {
+  "blocks_layout": {
+    "items": ["block-1-uuid"]
+  },
+  "footer_blocks": {
     "items": ["footer-user-content"]
   },
   "allow_discussion": false,

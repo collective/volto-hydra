@@ -82,7 +82,7 @@
           "headline": "Featured Items",
           "variation": "teaser",
           "fieldMapping": {
-            "@id": "href",
+            "@id": { "field": "href", "type": "link" },
             "title": "title",
             "description": "description",
             "image": "preview_image"
@@ -109,7 +109,7 @@
       "headline": "Featured Items",
       "variation": "teaser",
       "fieldMapping": {
-        "@id": "href",
+        "@id": { "field": "href", "type": "link" },
         "title": "title",
         "description": "description",
         "image": "preview_image"
@@ -120,6 +120,31 @@
             "i": "portal_type",
             "o": "plone.app.querystring.operation.selection.any",
             "v": ["Document"]
+          },
+          {
+            "i": "path",
+            "o": "plone.app.querystring.operation.string.absolutePath",
+            "v": "/_test_data"
+          }
+        ],
+        "sort_on": "effective",
+        "sort_order": "descending"
+      }
+    },
+    "block-10-listing-no-mapping": {
+      "@type": "listing",
+      "headline": "No Mapping Listing",
+      "querystring": {
+        "query": [
+          {
+            "i": "portal_type",
+            "o": "plone.app.querystring.operation.selection.any",
+            "v": ["Document"]
+          },
+          {
+            "i": "path",
+            "o": "plone.app.querystring.operation.string.absolutePath",
+            "v": "/_test_data"
           }
         ],
         "sort_on": "effective",
@@ -131,12 +156,7 @@
       "mode": null,
       "columns": 1,
       "basicTitle": "Test Title"
-    }
-  },
-  "blocks_layout": {
-    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing", "skiplogic-test"]
-  },
-  "footer_blocks": {
+    },
     "footer-block-1": {
       "@type": "slate",
       "value": [
@@ -153,7 +173,10 @@
       "alt": "Footer image"
     }
   },
-  "footer_blocks_layout": {
+  "blocks_layout": {
+    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing", "block-10-listing-no-mapping", "skiplogic-test"]
+  },
+  "footer_blocks": {
     "items": ["footer-block-1", "footer-block-2"]
   }
 }

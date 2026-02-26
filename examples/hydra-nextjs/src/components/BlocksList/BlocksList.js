@@ -59,13 +59,13 @@ const BlocksList = ({ data }) => {
                   <h3 className="teaser-head-title">{teaserHeadTitle}</h3>
                 )}
                 {teaserTitle && (
-                  <h2 className="teaser-title" data-editable-field="title">
+                  <h2 className="teaser-title" data-edit-text="title">
                     {teaserTitle}
                   </h2>
                 )}
                 {teaserDescription && (
                   <p
-                    data-editable-field="description"
+                    data-edit-text="description"
                     className="teaser-description">
                     {teaserDescription}
                   </p>

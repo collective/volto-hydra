@@ -21,9 +21,9 @@ test.describe('Inline image editing', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero block's image element (has data-media-field="image")
+    // Click the hero block's image element (has data-edit-media="image")
     const iframe = helper.getIframe();
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible();
     await heroImage.click();
 
@@ -63,7 +63,7 @@ test.describe('Inline image editing', () => {
 
     // Click the hero block's image
     const iframe = helper.getIframe();
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await heroImage.click();
 
     // Get the current image src
@@ -101,7 +101,7 @@ test.describe('Inline image editing', () => {
 
     // Click the hero block's image element
     const iframe = helper.getIframe();
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible();
     await heroImage.click();
 
@@ -143,7 +143,7 @@ test.describe('Inline image editing', () => {
     // Click the hero block (not specifically the image) to select it
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroBlock).toBeVisible();
 
     // Verify the image has a src (not empty)
@@ -165,7 +165,7 @@ test.describe('Inline image editing', () => {
 
     // Verify the image was cleared - the element should now be the empty placeholder
     // or have an empty/placeholder src
-    const heroImagePlaceholder = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImagePlaceholder = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImagePlaceholder).toBeVisible({ timeout: 5000 });
 
     // Check that either:
@@ -218,7 +218,7 @@ test.describe('Readonly media fields', () => {
 
     // Find an image inside the listing items (should be wrapped in data-block-readonly)
     const listingImage = iframe.locator(
-      '[data-block-uid="block-9-listing"] [data-block-readonly] img[data-media-field]',
+      '[data-block-uid="block-9-listing"] [data-block-readonly] img[data-edit-media]',
     );
 
     // If no readonly images exist, try the image block inside a readonly context
@@ -252,10 +252,10 @@ test.describe('Inline link editing', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero button (has data-linkable-field="buttonLink")
+    // Click the hero button (has data-edit-link="buttonLink")
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
-    const heroButton = heroBlock.locator('[data-linkable-field="buttonLink"]');
+    const heroButton = heroBlock.locator('[data-edit-link="buttonLink"]');
 
     // Scroll hero block to center first, then click the button
     await helper.scrollBlockIntoViewWithToolbarRoom('block-4-hero');
@@ -299,7 +299,7 @@ test.describe('Inline link editing', () => {
 
     // Click the hero button to select it
     const iframe = helper.getIframe();
-    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-linkable-field="buttonLink"]');
+    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-link="buttonLink"]');
     await expect(heroButton).toBeVisible();
     await heroButton.click();
 
@@ -359,9 +359,10 @@ test.describe('Inline link editing', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero block
+    // Click the hero block (scroll into view first - it may be below the fold)
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    await heroBlock.scrollIntoViewIfNeeded();
     await heroBlock.click();
     await helper.waitForSidebarOpen();
     await helper.waitForSidebarCurrentBlock('Hero');
@@ -387,11 +388,14 @@ test.describe('Inline link editing', () => {
     await urlInput.click();
     await urlInput.fill('https://example.com/external-link');
 
-    // Press Enter to confirm
-    await urlInput.press('Enter');
+    // Press Enter to confirm — the widget may auto-accept the URL on fill
+    // (removing the input), so only press Enter if the input is still visible
+    if (await urlInput.isVisible()) {
+      await urlInput.press('Enter');
+    }
 
     // Verify the URL was saved - check the iframe's button href
-    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-linkable-field="buttonLink"]');
+    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-link="buttonLink"]');
     await expect(heroButton).toHaveAttribute('href', 'https://example.com/external-link', { timeout: 5000 });
   });
 
@@ -436,7 +440,7 @@ test.describe('Inline link editing', () => {
     await helper.objectBrowserSelectItem(objectBrowser, /Another Page/);
 
     // Verify the link was updated in the iframe
-    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-linkable-field="buttonLink"]');
+    const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-link="buttonLink"]');
     await expect(heroButton).toHaveAttribute('href', /another-page/, { timeout: 5000 });
   });
 });
@@ -459,7 +463,7 @@ test.describe('Image upload and drag-drop', () => {
     await expect(clearButton).toBeVisible({ timeout: 5000 });
 
     // Track image src to detect when it's cleared
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     const initialSrc = await heroImage.getAttribute('src');
     // Force click in case the button position is awkward
     await clearButton.click({ force: true });
@@ -486,7 +490,7 @@ test.describe('Image upload and drag-drop', () => {
 
     // Click the hero block's image element
     const iframe = helper.getIframe();
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible();
     await heroImage.click();
 
@@ -519,7 +523,7 @@ test.describe('Image upload and drag-drop', () => {
     await heroBlock.click();
 
     // Get the hero image element
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     const initialSrc = await heroImage.getAttribute('src');
     expect(initialSrc).toBeTruthy();
 
@@ -589,7 +593,7 @@ test.describe('Image upload and drag-drop', () => {
     await heroBlock.click();
 
     // Get the hero image element
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible({ timeout: 5000 });
 
     // Wait for clear button to appear
@@ -623,7 +627,7 @@ test.describe('Image upload and drag-drop', () => {
 
     // Click the hero block's image element
     const iframe = helper.getIframe();
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible();
 
     // Get initial src
@@ -671,7 +675,7 @@ test.describe('Image upload and drag-drop', () => {
     await heroBlock.click();
 
     // Get hero image and clear it
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible({ timeout: 5000 });
     await heroImage.scrollIntoViewIfNeeded();
 
@@ -735,7 +739,7 @@ test.describe('Image upload and drag-drop', () => {
     await heroBlock.scrollIntoViewIfNeeded();
 
     // Get hero image and wait for it to be visible
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible({ timeout: 5000 });
     const initialSrc = await heroImage.getAttribute('src');
     expect(initialSrc).toBeTruthy();
@@ -808,7 +812,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await heroBlock.click();
 
     // Get initial image src in iframe
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     const initialSrc = await heroImage.getAttribute('src');
     expect(initialSrc).toBeTruthy();
 
@@ -862,7 +866,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await helper.waitForQuantaToolbar('block-4-hero');
 
     // Get iframe image
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     const initialSrc = await heroImage.getAttribute('src');
     expect(initialSrc).toBeTruthy();
 
@@ -907,7 +911,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await heroBlock.click();
 
     // Get iframe image and sidebar
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-media-field="image"]');
+    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible({ timeout: 5000 });
 
     const sidebar = page.locator('[aria-label="Sidebar"]');
@@ -1004,7 +1008,7 @@ test.describe('Slider image positioning', () => {
 
     // Try to get the media field element's box if it has dimensions
     // Some frontends use absolute inset-0 (zero dimensions), others have explicit dimensions
-    const mediaField = slide1.locator('[data-media-field="preview_image"]');
+    const mediaField = slide1.locator('[data-edit-media="preview_image"]');
     const mediaFieldBox = await mediaField.boundingBox();
 
     // Determine the expected position - use media field if it has dimensions, else slide
@@ -1017,7 +1021,7 @@ test.describe('Slider image positioning', () => {
     expect(iframeBox).not.toBeNull();
 
     // Click on the slide to select it and show the starter widget
-    // Use force:true in case the media-field overlay intercepts clicks
+    // Use force:true in case the edit-media overlay intercepts clicks
     await slide1.click({ force: true });
 
     // Wait for the starter widget (empty image overlay) to appear
@@ -1178,7 +1182,10 @@ test.describe('Teaser starter UI and overwrite', () => {
     const titleElement = filledTeaser.locator('h3, h5');
     await expect(titleElement).toHaveText('Target Page');
 
-    // Initially overwrite is false - clicking on title should NOT make it editable
+    // Initially overwrite is false - block should be readonly
+    await expect(filledTeaser).toHaveAttribute('data-block-readonly', '', { timeout: 5000 });
+
+    // Clicking on title should NOT make it editable (block is readonly)
     await titleElement.click();
     await expect(titleElement).not.toHaveAttribute('contenteditable', 'true');
 
@@ -1187,9 +1194,12 @@ test.describe('Teaser starter UI and overwrite', () => {
     await expect(customizeCheckbox).toBeVisible({ timeout: 5000 });
     await customizeCheckbox.click();
 
-    // After enabling customize, clicking on title should make it editable
-    // Wait for the frontend to re-render with the overwrite change
-    await expect(titleElement).toHaveAttribute('data-editable-field', 'title', { timeout: 10000 });
+    // After enabling customize, block should no longer be readonly
+    await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 10000 });
+
+    // Media overlay should be visible since there's no block-level preview_image
+    const mediaOverlay = page.locator('.empty-image-overlay');
+    await expect(mediaOverlay).toBeVisible({ timeout: 5000 });
 
     // Click on title to make it editable
     await titleElement.click();
@@ -1199,14 +1209,23 @@ test.describe('Teaser starter UI and overwrite', () => {
     await titleElement.fill('Custom Title');
     await expect(titleElement).toHaveText('Custom Title');
 
+    // Verify the sidebar title field syncs with the inline edit
+    const titleField = page.locator('#sidebar-properties .field-wrapper-title');
+    await expect(titleField).toBeVisible({ timeout: 5000 });
+    const titleInput = titleField.locator('input, textarea');
+    await expect(titleInput).toHaveValue('Custom Title', { timeout: 5000 });
+
     // Click the checkbox again to uncustomize
     await customizeCheckbox.click();
 
     // After disabling customize:
-    // 1. Title should revert to target's title
+    // 1. Block should be readonly again
+    await expect(filledTeaser).toHaveAttribute('data-block-readonly', '', { timeout: 5000 });
+
+    // 2. Title should revert to target's title
     await expect(titleElement).toHaveText('Target Page', { timeout: 5000 });
 
-    // 2. Click directly on the title - it should NOT become contenteditable
+    // 3. Click directly on the title - it should NOT become contenteditable
     await titleElement.click();
     await expect(titleElement).not.toHaveAttribute('contenteditable', 'true');
   });
@@ -1282,7 +1301,7 @@ test.describe('Teaser starter UI and overwrite', () => {
     await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 5000 });
 
     // Now click the "Read more" link
-    const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]').last();
+    const readMoreLink = filledTeaser.locator('a[data-edit-link="href"]').last();
     await expect(readMoreLink).toBeVisible();
 
     // Get current URL before clicking
@@ -1324,7 +1343,7 @@ test.describe('Teaser starter UI and overwrite', () => {
     await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 5000 });
 
     // Now click the title link
-    const titleLink = filledTeaser.locator('a[data-linkable-field="href"]').first();
+    const titleLink = filledTeaser.locator('a[data-edit-link="href"]').first();
     await expect(titleLink).toBeVisible();
 
     // Get current URL before clicking
@@ -1362,7 +1381,7 @@ test.describe('Teaser starter UI and overwrite', () => {
 
     // Now click the "Read more" link in the teaser (which is NOT selected)
     const filledTeaser = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
-    const readMoreLink = filledTeaser.locator('a[data-linkable-field="href"]').last();
+    const readMoreLink = filledTeaser.locator('a[data-edit-link="href"]').last();
     await expect(readMoreLink).toBeVisible();
     await readMoreLink.click();
 

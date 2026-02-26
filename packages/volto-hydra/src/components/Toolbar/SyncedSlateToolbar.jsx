@@ -1119,10 +1119,6 @@ const SyncedSlateToolbar = ({
   const blockIsReadonly = isBlockReadonly(block, templateEditMode);
   const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly;
 
-  // Debug: Check what blockFieldTypes the toolbar is receiving
-  if (blockType === 'hero') {
-  }
-
   // CRITICAL: Only show Slate if we actually have a valid field value array
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;
 

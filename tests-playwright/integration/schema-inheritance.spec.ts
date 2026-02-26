@@ -42,7 +42,7 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const teaserItems = iframe.locator(`[data-block-uid="${blockId}"].teaser-block`);
     await expect(teaserItems.first()).toBeVisible({ timeout: 10000 });
 
-    // Verify it's NOT showing summaryItem layout (which has image on the side with flexbox)
+    // Verify it's NOT showing summary layout (which has image on the side with flexbox)
     // Teaser layout has image on top (no flex display)
     const summaryItems = iframe.locator(`[data-block-uid="${blockId}"].summary-item-block`);
     await expect(summaryItems).toHaveCount(0);
@@ -100,8 +100,8 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
     // Then wait for image blocks to appear
-    // Image blocks: element with data-block-uid contains <img data-media-field="url">
-    const imageItems = iframe.locator(`[data-block-uid="${blockId}"] img[data-media-field="url"]`);
+    // Image blocks: element with data-block-uid contains <img data-edit-media="url">
+    const imageItems = iframe.locator(`[data-block-uid="${blockId}"] img[data-edit-media="url"]`);
     await expect(imageItems.first()).toBeVisible({ timeout: 5000 });
 
     // Verify no image editing overlay appears (listing items are readonly)
@@ -384,7 +384,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Click on the search block headline (waits for block, clicks specific element)
     await helper.clickBlockInIframe('search-block-1', {
-      selector: 'h2[data-editable-field="headline"]',
+      selector: 'h2[data-edit-text="headline"]',
     });
 
     // Verify the search block is selected (toolbar visible)
@@ -393,7 +393,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Click on a facet title (waits for block - async expandListingBlocks must complete)
     await helper.clickBlockInIframe('facet-type', {
-      selector: '[data-editable-field="title"]',
+      selector: '[data-edit-text="title"]',
     });
 
     // Toolbar should be visible for the facet
@@ -568,7 +568,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const initialFacets = iframe.locator('.facet-item[data-block-uid]');
     await expect(initialFacets.first()).toBeVisible({ timeout: 10000 });
     const initialCount = await initialFacets.count();
-    expect(initialCount).toBe(2); // facet-type and facet-state
+    expect(initialCount).toBe(3); // facet-type, facet-state, facet-subject
 
     // Wait for iframe to finish re-rendering after initial load —
     // expanding facets triggers multiple FORM_DATA updates to iframe.
@@ -601,14 +601,25 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await expect(addButton).toBeVisible({ timeout: 5000 });
     await addButton.click();
 
-    // Wait for the new facet to be added (count goes from 2 to 3)
-    const allFacets = iframe.locator('.facet-item[data-block-uid]');
-    await expect(allFacets).toHaveCount(3, { timeout: 10000 });
+    // Block chooser opens (multiple facet types + slate/image are allowed)
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+    // Select Checkbox facet type
+    const commonSection = blockChooser.locator('text=Common');
+    if (await commonSection.isVisible()) {
+      await commonSection.click();
+    }
+    await blockChooser.getByRole('button', { name: /Checkbox/i }).click();
+    await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
 
-    // Find the new facet ID (not facet-type or facet-state)
-    const knownIds = ['facet-type', 'facet-state'];
+    // Wait for the new facet to be added (count goes from 3 to 4)
+    const allFacets = iframe.locator('.facet-item[data-block-uid]');
+    await expect(allFacets).toHaveCount(4, { timeout: 10000 });
+
+    // Find the new facet ID (not one of the known initial facets)
+    const knownIds = ['facet-type', 'facet-state', 'facet-subject'];
     let newFacetId: string | null = null;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const uid = await allFacets.nth(i).getAttribute('data-block-uid');
       if (uid && !knownIds.includes(uid)) {
         newFacetId = uid;
@@ -655,19 +666,26 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
       { timeout: 5000 },
     );
 
-    // Now find and set the facet type to selectFacet
-    const typeWrapper = page.locator('#sidebar-properties .field-wrapper-type');
-    await expect(typeWrapper).toBeVisible({ timeout: 5000 });
+    // Selecting a field triggers onChangeBlock → Redux → FORM_DATA → iframe
+    // re-render → BLOCK_SELECTED cascade. Wait for blocks to stabilize before
+    // interacting with the toolbar, otherwise it can unmount mid-click.
+    await helper.getStableBlockCount();
 
-    const typeSelect = typeWrapper.locator('.react-select__control');
-    const typeMenu = page.locator('.react-select__menu');
-    await typeSelect.click();
+    // Convert the checkboxFacet to selectFacet via toolbar "Convert to" menu
+    // (fieldMappings on facet types enables this action)
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const moreOptionsButton = toolbar.getByTitle('More options');
+    await moreOptionsButton.click();
 
-    const selectFacetOption = typeMenu.locator('.react-select__option', {
+    const convertToMenu = page.locator('.convert-to-menu');
+    await expect(convertToMenu).toBeVisible({ timeout: 5000 });
+    await convertToMenu.hover();
+
+    const selectOption = page.locator('.volto-hydra-submenu .volto-hydra-dropdown-item', {
       hasText: /Select/i,
     });
-    await expect(selectFacetOption).toBeVisible({ timeout: 5000 });
-    await selectFacetOption.click();
+    await expect(selectOption).toBeVisible({ timeout: 5000 });
+    await selectOption.click();
 
     // Verify the facet now renders as a dropdown (select element)
     // This waits for frontend to re-render with the new facet settings
@@ -971,9 +989,9 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     // Verify the grid has 6 items total (1 transformed teaser + 5 listing items)
     // If the listing's @type was wrongly changed to image, we'd only see 2 items
     // (the listing would be an image block, not expanding to 5 items)
+    // Use polling — iframe re-renders asynchronously after variation change
     const gridItems = iframe.locator('[data-block-uid="block-8-grid"] [data-block-uid]');
-    const itemCount = await gridItems.count();
-    expect(itemCount).toBeGreaterThanOrEqual(6);
+    await expect.poll(async () => await gridItems.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(6);
 
     // Click on the listing block to verify it's still a listing (not transformed to image)
     const listingBlock = iframe.locator('[data-block-uid="listing-in-grid"]').first();
@@ -1507,6 +1525,14 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     // Verify converted to Image
     await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
 
+    // Verify iframe renders as image block with a working image
+    const imageBlockImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(imageBlockImg).toBeVisible({ timeout: 5000 });
+    const imageSrc = await imageBlockImg.getAttribute('src');
+    expect(imageSrc).toContain('Hero Image'); // The SVG data URL contains "Hero Image"
+    const imageNaturalWidth = await imageBlockImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(imageNaturalWidth).toBeGreaterThan(0);
+
     // Verify Image has alt field with the converted heading value
     const altField = page.locator('#sidebar-properties .field-wrapper-alt');
     await expect(altField).toBeVisible({ timeout: 5000 });
@@ -1530,6 +1556,14 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     // Verify converted back to Hero
     await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
 
+    // Verify hero image is preserved and renders through roundtrip
+    const heroImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(heroImg).toBeVisible({ timeout: 5000 });
+    const heroImgSrc = await heroImg.getAttribute('src');
+    expect(heroImgSrc).toContain('Hero Image');
+    const heroNaturalWidth = await heroImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(heroNaturalWidth).toBeGreaterThan(0);
+
     // Verify Hero fields are back with the original values
     await expect(headingField).toBeVisible({ timeout: 5000 });
     // Check heading field has the roundtrip value
@@ -1539,5 +1573,222 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     // Verify buttonText was preserved (it's not in any fieldMappings, so should persist)
     await expect(buttonTextField).toBeVisible({ timeout: 5000 });
     await expect(buttonTextInput).toHaveValue('Click Me', { timeout: 5000 });
+  });
+
+  test('hero to teaser and back preserves image rendering', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    await expect(heroBlock).toBeVisible({ timeout: 10000 });
+    await helper.clickBlockInIframe('block-4-hero');
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
+
+    // Convert Hero → Teaser
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    let menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    let dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    let convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    let submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Teaser').click();
+
+    // Verify converted to Teaser
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // Verify the teaser image renders (hero's image should map to preview_image)
+    const teaserImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(teaserImg).toBeVisible({ timeout: 5000 });
+    const teaserNaturalWidth = await teaserImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(teaserNaturalWidth, 'Teaser image should render (naturalWidth > 0)').toBeGreaterThan(0);
+
+    // Convert Teaser → Hero
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Hero').click();
+
+    // Verify converted back to Hero
+    await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
+
+    // Verify hero image renders after roundtrip
+    const heroImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(heroImg).toBeVisible({ timeout: 5000 });
+    const heroNaturalWidth = await heroImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(heroNaturalWidth, 'Hero image should render after roundtrip (naturalWidth > 0)').toBeGreaterThan(0);
+  });
+
+  test('image to teaser conversion does not show empty media picker when image exists', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on an image block (block-2-uuid has url and alt)
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // Convert Image → Teaser
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Teaser').click();
+
+    // Verify converted to Teaser
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // The empty-image-overlay should NOT appear — preview_image has a value from the conversion
+    await page.waitForTimeout(1000); // Allow UI to settle
+    const emptyImageOverlay = page.locator('.empty-image-overlay');
+    await expect(emptyImageOverlay).not.toBeVisible({ timeout: 3000 });
+  });
+
+  // NOTE: hero→summary roundtrip test removed — Summary is restricted at page level,
+  // so it doesn't appear in the Convert to menu. Would need a container that allows
+  // both hero and summary to test this. Slate↔text coercion is still exercised by
+  // hero→image→hero roundtrip test above.
+
+  test('convert-to only shows types from same fieldMappings family, not unrelated @default types', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a PAGE-LEVEL teaser block (not one inside a grid, which has its own allowedBlocks)
+    const teaserBlock = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
+    await expect(teaserBlock).toBeVisible({ timeout: 10000 });
+    await teaserBlock.click();
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+
+    // Hover over "Convert to" to open submenu
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await expect(convertToItem).toBeVisible({ timeout: 3000 });
+    await convertToItem.hover();
+
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+
+    // Get all items in the submenu
+    const submenuItems = submenu.locator('.volto-hydra-dropdown-item');
+    const count = await submenuItems.count();
+    const itemTexts: string[] = [];
+    for (let i = 0; i < count; i++) {
+      itemTexts.push((await submenuItems.nth(i).textContent() || '').trim());
+    }
+
+    // At page level, only non-restricted content-item types should appear
+    // (Default and Summary are restricted: true, so they can't be created or converted to at page level)
+    const expectedTypes = ['Image', 'Hero'];
+
+    // Types that should NOT appear:
+    // - Restricted content-item types (can't be created at page level)
+    // - Different fieldMapping families (facets, form fields)
+    const forbiddenTypes = [
+      // Restricted content-item types — same family but not allowed at page level
+      'Default', 'Summary',
+      // Facet family — share { title, field, hidden } @default
+      'Checkbox Facet', 'Select Facet', 'Date Range Facet', 'Toggle Facet',
+      // Form field family — share { label, description, required } @default
+      'Text', 'Textarea', 'Number', 'List', 'Single Choice', 'Multiple Choice',
+      'Checkbox', 'Date', 'E-mail', 'Static Text', 'Hidden', 'Attachment',
+    ];
+
+    // Verify expected types are present
+    for (const expected of expectedTypes) {
+      expect(itemTexts, `Expected "${expected}" in convert-to menu`).toContain(expected);
+    }
+
+    // Verify forbidden types are NOT present
+    for (const forbidden of forbiddenTypes) {
+      expect(itemTexts, `"${forbidden}" should NOT appear in teaser's convert-to menu`).not.toContain(forbidden);
+    }
+  });
+
+  test('convert-to menu respects container allowedBlocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a teaser inside the grid (grid allowedBlocks: ['teaser', 'image'])
+    const gridTeaser = iframe.locator('[data-block-uid="grid-cell-1"]');
+    await expect(gridTeaser).toBeVisible({ timeout: 10000 });
+    await gridTeaser.click();
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await expect(convertToItem).toBeVisible({ timeout: 3000 });
+    await convertToItem.hover();
+
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+
+    const submenuItems = submenu.locator('.volto-hydra-dropdown-item');
+    const count = await submenuItems.count();
+    const itemTexts: string[] = [];
+    for (let i = 0; i < count; i++) {
+      itemTexts.push((await submenuItems.nth(i).textContent() || '').trim());
+    }
+
+    // Grid allows only ['teaser', 'image'] — convert-to should only show Image
+    // (teaser is the current type so it's excluded)
+    expect(itemTexts).toContain('Image');
+
+    // Types reachable via fieldMappings but NOT in grid's allowedBlocks
+    expect(itemTexts, 'Hero not allowed by grid container').not.toContain('Hero');
+    expect(itemTexts, 'Summary not allowed by grid container').not.toContain('Summary');
+    expect(itemTexts, 'Default not allowed by grid container').not.toContain('Default');
   });
 });

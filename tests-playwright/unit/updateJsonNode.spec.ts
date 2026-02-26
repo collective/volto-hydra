@@ -409,16 +409,16 @@ test.describe('Bridge.updateJsonNode()', () => {
     expect(() => validateSlateStructure(result.value)).not.toThrow();
   });
 
-  test('handleTextChange detects childIndex in Nuxt-style DOM (P without data-editable-field)', async () => {
+  test('handleTextChange detects childIndex in Nuxt-style DOM (P without data-edit-text)', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');
 
-    // Simulate Nuxt structure: DIV[data-editable-field] > P[data-node-id] > [text, STRONG, text]
+    // Simulate Nuxt structure: DIV[data-edit-text] > P[data-node-id] > [text, STRONG, text]
     // When typing " normal" in the third text node, handleTextChange should detect childIndex=2
     const result = await body.evaluate(() => {
       // Create Nuxt-style DOM structure
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-nuxt-handletext" data-block-uid="test-block" data-editable-field="value">' +
+        '<div id="test-nuxt-handletext" data-block-uid="test-block" data-edit-text="value">' +
         '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> normal</p>' +
         '</div>'
       );
