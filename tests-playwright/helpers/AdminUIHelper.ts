@@ -4,6 +4,10 @@
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
 
+// Hardcoded test JWT — mock API only checks for "Bearer " prefix, never validates.
+// sub=admin, exp=4102444800 (2100-01-01). Shared with mock-api-server.js.
+export const TEST_AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6NDEwMjQ0NDgwMH0.fake-signature';
+
 export class AdminUIHelper {
   constructor(
     public readonly page: Page,
@@ -97,37 +101,18 @@ export class AdminUIHelper {
   /**
    * Log in to the Volto admin UI.
    */
-  async login(username: string = 'admin', password: string = 'admin'): Promise<void> {
-    // For testing, bypass the login form and set the auth cookie directly
-    // This avoids Redux/middleware complexity in the test environment
-
-    // Create a valid JWT format token (header.payload.signature)
-    // Header: {"alg":"HS256","typ":"JWT"}
-    // Payload: {"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400} (expires in 24 hours)
-    // Signature: fake but valid base64
-    const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
-    const payload = Buffer.from(JSON.stringify({"sub":"admin","exp":Math.floor(Date.now()/1000) + 86400})).toString('base64').replace(/=/g, '');
-    const signature = 'fake-signature';
-    const authToken = `${header}.${payload}.${signature}`;
-
-    // Set the auth_token cookie
+  async login(): Promise<void> {
+    // Set the auth_token cookie. Volto SSR reads this cookie and forwards it
+    // as Authorization: Bearer to the API, so page.goto() to any URL works.
     await this.page.context().addCookies([{
       name: 'auth_token',
-      value: authToken,
+      value: TEST_AUTH_TOKEN,
       domain: 'localhost',
       path: '/',
       httpOnly: false,
       secure: false,
       sameSite: 'Lax',
     }]);
-
-
-    // Navigate to homepage first (doesn't require SSR auth)
-    await this.page.goto(`${this.adminUrl}/`, {
-      timeout: 60000,
-      waitUntil: 'networkidle',
-    });
-
   }
 
   /**
@@ -140,8 +125,9 @@ export class AdminUIHelper {
 
   /**
    * Navigate to the edit page for a piece of content.
-   * If already on the page in view mode, clicks the Edit button.
-   * Otherwise uses client-side navigation to avoid SSR auth issues.
+   * Goes directly via page.goto() — Volto SSR reads the auth_token cookie
+   * and forwards it as Authorization: Bearer to the API.
+   * If already on a Volto page, uses client-side navigation (faster).
    */
   async navigateToEdit(contentPath: string): Promise<void> {
     // Ensure path starts with /
@@ -153,21 +139,18 @@ export class AdminUIHelper {
 
     const editPath = `${contentPath}/edit`;
     const currentUrl = this.page.url();
+    const isOnVoltoPage = currentUrl.startsWith(this.adminUrl);
 
-    // Check if we're already on this page (view mode)
-    const isOnViewPage = currentUrl.includes(contentPath) && !currentUrl.includes('/edit');
-
-    if (isOnViewPage) {
-      // Click the Edit button in the toolbar
-      const editButton = this.page.locator('#toolbar a.edit, #toolbar [aria-label="Edit"]');
-      await editButton.click({ timeout: 5000 });
-    } else {
-      // Client-side navigation via pushState + popstate.
+    if (isOnVoltoPage) {
+      // Already on a Volto page — use client-side navigation (no SSR round-trip).
       // connected-react-router's history library listens for popstate events.
       await this.page.evaluate((path) => {
         window.history.pushState({}, '', path);
         window.dispatchEvent(new PopStateEvent('popstate'));
       }, editPath);
+    } else {
+      // First navigation — go directly to the edit URL.
+      await this.page.goto(`${this.adminUrl}${editPath}`, { timeout: 60000 });
     }
 
     // Wait for the URL to change
@@ -187,7 +170,7 @@ export class AdminUIHelper {
 
   /**
    * Navigate to a content page in view mode (not editing).
-   * Uses client-side navigation to avoid SSR auth issues.
+   * Goes directly via page.goto() or client-side navigation if already on Volto.
    */
   async navigateToView(contentPath: string): Promise<void> {
     // Ensure path starts with /
@@ -197,11 +180,18 @@ export class AdminUIHelper {
     // Prepend content prefix (e.g., /_test_data) for test content paths
     contentPath = `${this.contentPrefix}${contentPath}`;
 
-    // Client-side navigation via pushState + popstate
-    await this.page.evaluate((path) => {
-      window.history.pushState({}, '', path);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }, contentPath);
+    const currentUrl = this.page.url();
+    const isOnVoltoPage = currentUrl.startsWith(this.adminUrl);
+
+    if (isOnVoltoPage) {
+      // Client-side navigation via pushState + popstate
+      await this.page.evaluate((path) => {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, contentPath);
+    } else {
+      await this.page.goto(`${this.adminUrl}${contentPath}`, { timeout: 60000 });
+    }
 
     // Wait for the URL to change
     await this.page.waitForURL(`${this.adminUrl}${contentPath}`, { timeout: 10000 });
