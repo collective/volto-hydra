@@ -61,6 +61,16 @@ const DropdownMenu = ({
     return () => document.removeEventListener('click', handleClickOutside);
   }, [onClose]);
 
+  // After rendering, check if dropdown overflows viewport and flip upward if needed
+  useEffect(() => {
+    if (!menuRef.current || !menuButtonRect) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight) {
+      // Flip: position above the trigger button instead of below
+      menuRef.current.style.top = `${menuButtonRect.top - rect.height - 4}px`;
+    }
+  }, [menuButtonRect]);
+
   if (!menuButtonRect) {
     return null;
   }
