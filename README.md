@@ -111,7 +111,7 @@ The page data structure becomes:
   },
   blocks_layout: { items: ['text-1'] },
   header_blocks: { items: ['header-1'] },
-  footer_blocks_layout: { items: ['footer-1'] }
+  footer_blocks: { items: ['footer-1'] }
 }
 ```
 

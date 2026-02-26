@@ -1178,7 +1178,10 @@ test.describe('Teaser starter UI and overwrite', () => {
     const titleElement = filledTeaser.locator('h3, h5');
     await expect(titleElement).toHaveText('Target Page');
 
-    // Initially overwrite is false - clicking on title should NOT make it editable
+    // Initially overwrite is false - block should be readonly
+    await expect(filledTeaser).toHaveAttribute('data-block-readonly', '', { timeout: 5000 });
+
+    // Clicking on title should NOT make it editable (block is readonly)
     await titleElement.click();
     await expect(titleElement).not.toHaveAttribute('contenteditable', 'true');
 
@@ -1187,9 +1190,12 @@ test.describe('Teaser starter UI and overwrite', () => {
     await expect(customizeCheckbox).toBeVisible({ timeout: 5000 });
     await customizeCheckbox.click();
 
-    // After enabling customize, clicking on title should make it editable
-    // Wait for the frontend to re-render with the overwrite change
-    await expect(titleElement).toHaveAttribute('data-edit-text', 'title', { timeout: 10000 });
+    // After enabling customize, block should no longer be readonly
+    await expect(filledTeaser).not.toHaveAttribute('data-block-readonly', { timeout: 10000 });
+
+    // Media overlay should be visible since there's no block-level preview_image
+    const mediaOverlay = page.locator('.empty-image-overlay');
+    await expect(mediaOverlay).toBeVisible({ timeout: 5000 });
 
     // Click on title to make it editable
     await titleElement.click();
@@ -1199,14 +1205,23 @@ test.describe('Teaser starter UI and overwrite', () => {
     await titleElement.fill('Custom Title');
     await expect(titleElement).toHaveText('Custom Title');
 
+    // Verify the sidebar title field syncs with the inline edit
+    const titleField = page.locator('#sidebar-properties .field-wrapper-title');
+    await expect(titleField).toBeVisible({ timeout: 5000 });
+    const titleInput = titleField.locator('input, textarea');
+    await expect(titleInput).toHaveValue('Custom Title', { timeout: 5000 });
+
     // Click the checkbox again to uncustomize
     await customizeCheckbox.click();
 
     // After disabling customize:
-    // 1. Title should revert to target's title
+    // 1. Block should be readonly again
+    await expect(filledTeaser).toHaveAttribute('data-block-readonly', '', { timeout: 5000 });
+
+    // 2. Title should revert to target's title
     await expect(titleElement).toHaveText('Target Page', { timeout: 5000 });
 
-    // 2. Click directly on the title - it should NOT become contenteditable
+    // 3. Click directly on the title - it should NOT become contenteditable
     await titleElement.click();
     await expect(titleElement).not.toHaveAttribute('contenteditable', 'true');
   });

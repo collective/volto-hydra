@@ -595,8 +595,8 @@ function renderTeaserBlock(block, blockUid) {
 
     // Show teaser content when href has value
     const imageHtml = imageSrc
-        ? `<img src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
-        : '';
+        ? `<img data-edit-media="preview_image" src="${imageSrc}" alt="" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px;" />`
+        : `<div data-edit-media="preview_image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 4px; cursor: pointer;">Click to add image</div>`;
 
     // When overwrite is false, add data-block-readonly to prevent editing
     // User must check "Customize teaser content" checkbox to enable editing

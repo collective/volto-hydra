@@ -26,6 +26,9 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
             url: null,
             class: bg_class
         }
+    } else if (typeof block === 'string') {
+        // Plain URL string (e.g., data URI, external URL)
+        image_url = block;
     } else if ('@id' in block && block?.image_scales) {
         // It's an image content object with scales
         image_url = block['@id'];
