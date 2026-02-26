@@ -621,7 +621,7 @@ function renderTeaserBlock(block, blockUid) {
  */
 function renderDefaultItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = hrefObj?.['@id'] || '';
+    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
@@ -644,7 +644,7 @@ function renderDefaultItemBlock(block, blockUid) {
  */
 function renderSummaryItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = hrefObj?.['@id'] || '';
+    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';

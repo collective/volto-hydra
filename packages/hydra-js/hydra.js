@@ -10296,76 +10296,61 @@ export async function expandListingBlocks(inputItems, options = {}) {
     log('expandListingBlocks: no bridgeInstance, skipping readonly registration for:', listingBlockIds);
   }
 
-  // Count non-listing blocks (they contribute 1 item each to the total)
-  const nonListingCount = blocksLayout.filter(
-    (blockId) => !listingBlockIds.includes(blockId)
-  ).length;
-
   // Account for items already counted by prior staticBlocks calls on the same paging object.
   // staticBlocks increments paging._seen for each static block it processes.
   const priorSeen = paging._seen || 0;
 
-  // Phase 1: Get totals from all listings in parallel
-  const listingTotals = {};
-  await Promise.all(
-    listingBlockIds.map(async (blockId) => {
-      try {
-        const result = await fetchItems(blocks[blockId], { start: 0, size: 0 });
-        listingTotals[blockId] = result.total || 0;
-      } catch (error) {
-        console.error(`[HYDRA] Failed to get total for listing ${blockId}:`, error);
-        listingTotals[blockId] = 0;
-      }
-    })
-  );
-
-  // Count items contributed by this call (non-listings + listing items_totals)
-  let batchTotal = nonListingCount;
-  for (const blockId of listingBlockIds) {
-    batchTotal += listingTotals[blockId];
-  }
-
-  // Phase 2: Compute which listings overlap the paging window, fetch only those slices
-  // Walk the blocks in layout order, tracking global position (starting after prior items)
+  // Single-pass: walk blocks in layout order, fetching each listing sequentially.
+  // Each fetch returns { items, total }, so we learn the total and get the items
+  // in one request. This avoids a separate "get totals" phase.
   let globalPos = priorSeen;
-  const fetchPlan = []; // { blockId, localStart, localSize }
+  let batchTotal = 0;
+  const listingTotals = {};
+  const listingResults = {};
+  const windowStart = paging.start;
+  const windowEnd = paging.start + paging.size;
 
   for (const blockId of blocksLayout) {
-    if (listingBlockIds.includes(blockId)) {
-      const total = listingTotals[blockId];
-      const blockStart = globalPos;
-      const blockEnd = globalPos + total;
+    if (!listingBlockIds.includes(blockId)) {
+      globalPos += 1; // Non-listing blocks contribute 1 item
+      batchTotal += 1;
+      continue;
+    }
 
-      // Does this listing overlap the page window [paging.start, paging.start + paging.size)?
-      const windowStart = paging.start;
-      const windowEnd = paging.start + paging.size;
+    const blockStart = globalPos;
 
-      if (blockEnd > windowStart && blockStart < windowEnd) {
-        // Compute local offset and size for this listing
-        const localStart = Math.max(0, windowStart - blockStart);
-        const localSize = Math.min(total - localStart, windowEnd - Math.max(blockStart, windowStart));
-        fetchPlan.push({ blockId, localStart, localSize });
+    // Optimistic check: if this listing starts past the page window end,
+    // we still need its total for paging UI, so fetch with size: 0.
+    // Otherwise, compute the slice we need and fetch items + total together.
+    let localStart = 0;
+    let localSize = 0;
+    if (blockStart < windowEnd) {
+      // This listing might overlap the window — compute the slice
+      localStart = Math.max(0, windowStart - blockStart);
+      // We don't know total yet, so request up to the remaining window size.
+      // The backend will clamp to actual available items.
+      localSize = windowEnd - Math.max(blockStart, windowStart);
+    }
+
+    try {
+      const result = await fetchItems(blocks[blockId], { start: localStart, size: localSize });
+      const total = result.total || 0;
+      listingTotals[blockId] = total;
+      batchTotal += total;
+
+      // Now that we know the actual total, check if this listing truly overlaps
+      const blockEnd = blockStart + total;
+      if (localSize > 0 && blockEnd > windowStart && blockStart < windowEnd) {
+        listingResults[blockId] = result.items || [];
       }
 
       globalPos += total;
-    } else {
-      globalPos += 1; // Non-listing blocks contribute 1 item
+    } catch (error) {
+      console.error(`[HYDRA] Failed to fetch listing ${blockId}:`, error);
+      listingTotals[blockId] = 0;
+      globalPos += 0;
     }
   }
-
-  // Fetch slices in parallel
-  const listingResults = {};
-  await Promise.all(
-    fetchPlan.map(async ({ blockId, localStart, localSize }) => {
-      try {
-        const result = await fetchItems(blocks[blockId], { start: localStart, size: localSize });
-        listingResults[blockId] = result.items || [];
-      } catch (error) {
-        console.error(`[HYDRA] Failed to fetch listing ${blockId}:`, error);
-        listingResults[blockId] = [];
-      }
-    })
-  );
 
   // Build items array — walk layout in order, emitting items that fall in the page window
   const items = [];

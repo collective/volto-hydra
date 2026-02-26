@@ -1238,12 +1238,9 @@ Both take an array of block IDs and return an array of block objects with `@uid`
 
 `expandListingBlocks` is backend-agnostic. You provide a `fetchItems` callback that fetches content items from your backend — Hydra handles shared paging across multiple listings and maps results to block objects via `fieldMapping`.
 
-**Fetching — two-phase server-side paging**
+**Fetching — sequential single-pass**
 
-When multiple listings share a single pager (e.g., in a grid), `expandListingBlocks` needs to know each listing's total before it can compute which slices to fetch. It does this in two parallel rounds:
-
-1. **Get totals**: calls `fetchItems(block, { start: 0, size: 0 })` for each listing in parallel — your backend returns `{ total }` with no items
-2. **Fetch slices**: computes which listings overlap the current page window, then calls `fetchItems(block, { start, size })` for just those listings with the exact offset and size needed
+`expandListingBlocks` walks listings in layout order, fetching each one sequentially. Each `fetchItems` call returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts — no separate "get totals" phase needed. This means one request per listing instead of two. Listings before or after the page window are fetched with `size: 0` (total only).
 
 For Plone backends, use the provided `ploneFetchItems` helper:
 
