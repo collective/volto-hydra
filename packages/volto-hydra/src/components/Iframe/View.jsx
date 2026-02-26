@@ -2161,8 +2161,25 @@ const Iframe = (props) => {
             // Also ensure blockSchema has fieldsets if properties exist (for new blocks only)
             Object.keys(blocksConfig).forEach((blockType) => {
               const blockConfig = blocksConfig[blockType];
-              if (blockConfig && !blockConfig.view) {
+              if (!blockConfig) return;
+              // Ensure id matches the key
+              if (!blockConfig.id) {
+                blockConfig.id = blockType;
+              }
+              // Default title from the key name (e.g. 'single_choice' -> 'Single Choice')
+              if (!blockConfig.title) {
+                blockConfig.title = blockType.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              }
+              if (!blockConfig.view) {
                 blockConfig.view = NoPreview;
+              }
+              // Default group to 'common' so blocks appear in the block chooser
+              if (!blockConfig.group) {
+                blockConfig.group = 'common';
+              }
+              // Show sidebar settings tab when block has a schema
+              if (blockConfig.blockSchema && blockConfig.sidebarTab === undefined) {
+                blockConfig.sidebarTab = 1;
               }
               // Auto-generate default fieldset if missing (only for new blocks, not overrides)
               // Also ensure required is an array (Volto expects this)

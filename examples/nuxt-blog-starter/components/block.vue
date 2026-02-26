@@ -548,6 +548,177 @@
     </div>
   </div>
 
+  <!-- Form block: renders subblocks as form fields, POSTs to /@submit-form -->
+  <div v-else-if="block['@type'] == 'form'" :data-block-uid="block_uid" class="my-6">
+    <h3 v-if="block.title" data-edit-text="title" class="text-xl font-semibold mb-4">{{ block.title }}</h3>
+    <div v-if="formState[block_uid]?.success" class="form-success p-4 bg-green-50 text-green-800 rounded-lg mb-4">
+      {{ block.send_message || 'Form submitted successfully.' }}
+    </div>
+    <form v-else @submit.prevent="handleFormSubmit($event, block)" novalidate class="space-y-4">
+      <template v-for="field in block.subblocks" :key="field.field_id">
+        <div :data-block-uid="field.field_id" :data-block-type="field.field_type" data-block-add="bottom"
+             class="form-field">
+          <!-- Text -->
+          <template v-if="field.field_type === 'text'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <input type="text" :name="field.field_id" :value="getFormValue(block_uid, field.field_id)"
+                   @input="setFormValue(block_uid, field.field_id, $event.target.value)"
+                   :class="['w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                            formFieldError(block_uid, field.field_id) ? 'border-red-500' : 'border-gray-300']" />
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Textarea -->
+          <template v-else-if="field.field_type === 'textarea'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <textarea :name="field.field_id" rows="4" :value="getFormValue(block_uid, field.field_id)"
+                      @input="setFormValue(block_uid, field.field_id, $event.target.value)"
+                      :class="['w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                               formFieldError(block_uid, field.field_id) ? 'border-red-500' : 'border-gray-300']"></textarea>
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Number -->
+          <template v-else-if="field.field_type === 'number'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <input type="number" :name="field.field_id" :value="getFormValue(block_uid, field.field_id)"
+                   @input="setFormValue(block_uid, field.field_id, $event.target.value)"
+                   :class="['w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                            formFieldError(block_uid, field.field_id) ? 'border-red-500' : 'border-gray-300']" />
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Select (List) -->
+          <template v-else-if="field.field_type === 'select'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <select :name="field.field_id" :value="getFormValue(block_uid, field.field_id)"
+                    @change="setFormValue(block_uid, field.field_id, $event.target.value)"
+                    :class="['w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                             formFieldError(block_uid, field.field_id) ? 'border-red-500' : 'border-gray-300']">
+              <option value="">Select...</option>
+              <option v-for="opt in field.input_values" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Single Choice (Radio) -->
+          <template v-else-if="field.field_type === 'single_choice'">
+            <fieldset>
+              <legend class="block text-sm font-medium text-gray-700 mb-1">
+                {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+              </legend>
+              <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+              <div class="space-y-1">
+                <label v-for="opt in field.input_values" :key="opt" class="flex items-center gap-2 text-sm">
+                  <input type="radio" :name="field.field_id" :value="opt"
+                         :checked="getFormValue(block_uid, field.field_id) === opt"
+                         @change="setFormValue(block_uid, field.field_id, opt)" class="border-gray-300" />
+                  {{ opt }}
+                </label>
+              </div>
+              <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+            </fieldset>
+          </template>
+          <!-- Multiple Choice (Checkboxes) -->
+          <template v-else-if="field.field_type === 'multiple_choice'">
+            <fieldset>
+              <legend class="block text-sm font-medium text-gray-700 mb-1">
+                {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+              </legend>
+              <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+              <div class="space-y-1">
+                <label v-for="opt in field.input_values" :key="opt" class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" :name="field.field_id" :value="opt"
+                         :checked="(getFormValue(block_uid, field.field_id) || []).includes(opt)"
+                         @change="toggleMultiChoice(block_uid, field.field_id, opt, $event.target.checked)"
+                         class="rounded border-gray-300" />
+                  {{ opt }}
+                </label>
+              </div>
+              <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+            </fieldset>
+          </template>
+          <!-- Checkbox -->
+          <template v-else-if="field.field_type === 'checkbox'">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" :name="field.field_id"
+                     :checked="!!getFormValue(block_uid, field.field_id)"
+                     @change="setFormValue(block_uid, field.field_id, $event.target.checked)"
+                     class="rounded border-gray-300" />
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mt-0.5">{{ field.description }}</p>
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Date -->
+          <template v-else-if="field.field_type === 'date'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <input type="date" :name="field.field_id" :value="getFormValue(block_uid, field.field_id)"
+                   @input="setFormValue(block_uid, field.field_id, $event.target.value)"
+                   :class="['w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                            formFieldError(block_uid, field.field_id) ? 'border-red-500' : 'border-gray-300']" />
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Email (from) -->
+          <template v-else-if="field.field_type === 'from'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <input type="email" :name="field.field_id" :value="getFormValue(block_uid, field.field_id)"
+                   @input="setFormValue(block_uid, field.field_id, $event.target.value)"
+                   :class="['w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                            formFieldError(block_uid, field.field_id) ? 'border-red-500' : 'border-gray-300']" />
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Attachment -->
+          <template v-else-if="field.field_type === 'attachment'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+            </label>
+            <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+            <input type="file" :name="field.field_id"
+                   @change="setFormValue(block_uid, field.field_id, $event.target.files?.[0]?.name || '')"
+                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
+          </template>
+          <!-- Static text -->
+          <template v-else-if="field.field_type === 'static_text'">
+            <div class="text-sm text-gray-600">
+              <strong v-if="field.label">{{ field.label }}</strong>
+              <p v-if="field.description">{{ field.description }}</p>
+            </div>
+          </template>
+          <!-- Hidden -->
+          <template v-else-if="field.field_type === 'hidden'">
+            <input type="hidden" :name="field.field_id" :value="field.value || ''" />
+          </template>
+        </div>
+      </template>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" data-edit-text="submit_label"
+                class="form-submit px-5 py-2.5 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:ring-blue-300">
+          {{ block.submit_label || 'Submit' }}
+        </button>
+        <button v-if="block.show_cancel" type="reset" data-edit-text="cancel_label"
+                class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+          {{ block.cancel_label || 'Cancel' }}
+        </button>
+      </div>
+    </form>
+  </div>
+
   <!-- Empty block - placeholder for deleted blocks in containers -->
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
   </div>
@@ -922,6 +1093,95 @@ const handleFacetSelectChange = (event) => {
   }
 
   window.location.href = url.toString();
+};
+
+// Form block: per-block state for errors, success, and user input values.
+// Values are tracked in reactive state because admin FORM_DATA updates can
+// re-render the iframe, which would lose DOM-only input values.
+const formState = ref({});
+const formValues = ref({});
+
+const formFieldError = (blockUid, fieldId) => {
+  return formState.value[blockUid]?.errors?.[fieldId] || '';
+};
+
+const getFormValue = (blockUid, fieldId) => {
+  return formValues.value[blockUid]?.[fieldId] ?? '';
+};
+
+const setFormValue = (blockUid, fieldId, value) => {
+  if (!formValues.value[blockUid]) {
+    formValues.value[blockUid] = {};
+  }
+  formValues.value[blockUid][fieldId] = value;
+};
+
+const toggleMultiChoice = (blockUid, fieldId, opt, checked) => {
+  const current = getFormValue(blockUid, fieldId) || [];
+  const arr = Array.isArray(current) ? [...current] : [];
+  if (checked) {
+    if (!arr.includes(opt)) arr.push(opt);
+  } else {
+    const idx = arr.indexOf(opt);
+    if (idx >= 0) arr.splice(idx, 1);
+  }
+  setFormValue(blockUid, fieldId, arr);
+};
+
+const validateFormValues = (blockUid, fields) => {
+  const errors = {};
+  const vals = formValues.value[blockUid] || {};
+  for (const field of fields) {
+    if (!field.required) continue;
+    if (field.field_type === 'static_text' || field.field_type === 'hidden') continue;
+    const value = vals[field.field_id];
+    const hasValue = Array.isArray(value) ? value.length > 0 : (value !== '' && value !== undefined && value !== false);
+    if (!hasValue) {
+      errors[field.field_id] = `${field.label} is required.`;
+    }
+  }
+  // Email format validation for 'from' fields
+  for (const field of fields) {
+    if (field.field_type !== 'from') continue;
+    const value = vals[field.field_id];
+    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      errors[field.field_id] = 'Please enter a valid email address.';
+    }
+  }
+  return errors;
+};
+
+const handleFormSubmit = async (event, formBlock) => {
+  const fields = formBlock.subblocks || [];
+  const uid = block_uid.value;
+
+  // Validate from reactive state
+  const errors = validateFormValues(uid, fields);
+  if (Object.keys(errors).length > 0) {
+    formState.value = { ...formState.value, [uid]: { errors } };
+    return;
+  }
+
+  // Collect submission data from reactive state
+  const vals = formValues.value[uid] || {};
+  const submitData = fields
+    .filter(f => f.field_type !== 'static_text')
+    .map(f => ({
+      field_id: f.field_id,
+      label: f.label,
+      value: vals[f.field_id] ?? '',
+    }));
+
+  const apiUrl = effectiveApiUrl.value;
+  const contextPath = effectiveContextPath.value;
+  const response = await fetch(`${apiUrl}${contextPath}/@submit-form`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ block_id: uid, data: submitData }),
+  });
+  if (response.ok || response.status === 204) {
+    formState.value = { ...formState.value, [uid]: { success: true } };
+  }
 };
 
 </script>

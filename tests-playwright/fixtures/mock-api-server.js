@@ -892,8 +892,8 @@ app.post('/@logout', (req, res) => {
  * Used by ImageWidget for file uploads
  */
 app.post('/*', (req, res, next) => {
-  // Skip special endpoints (already handled above)
-  if (req.path.startsWith('/@')) {
+  // Skip special endpoints (already handled above or below)
+  if (req.path.startsWith('/@') || req.path.includes('/@')) {
     return next();
   }
 
@@ -1768,6 +1768,18 @@ app.get('*/@contents', (req, res) => {
     'items': items,
     'items_total': items.length,
   });
+});
+
+/**
+ * POST /:path/@submit-form
+ * Form submission endpoint (collective.volto.formsupport)
+ * Accepts { block_id, data: [{ field_id, label, value }] }
+ */
+app.post('*/@submit-form', (req, res) => {
+  if (process.env.DEBUG) {
+    console.log(`POST @submit-form: path=${req.path}`);
+  }
+  res.status(204).end();
 });
 
 /**
