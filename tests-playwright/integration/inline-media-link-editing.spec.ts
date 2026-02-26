@@ -388,11 +388,10 @@ test.describe('Inline link editing', () => {
     await urlInput.click();
     await urlInput.fill('https://example.com/external-link');
 
-    // Press Enter to confirm — the widget may auto-accept the URL on fill
-    // (removing the input), so only press Enter if the input is still visible
-    if (await urlInput.isVisible()) {
-      await urlInput.press('Enter');
-    }
+    // Press Enter to confirm — use page.keyboard instead of urlInput.press
+    // because fill() triggers React re-renders that can detach the DOM element
+    // between locator resolution and keypress, causing infinite retry loops
+    await page.keyboard.press('Enter');
 
     // Verify the URL was saved - check the iframe's button href
     const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-link="buttonLink"]');
