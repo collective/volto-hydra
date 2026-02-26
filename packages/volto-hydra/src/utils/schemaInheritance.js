@@ -1445,7 +1445,7 @@ export function validateFieldMappings(blockType, blockConfig) {
  * @param {Object} blocksConfig - Block configuration registry
  * @returns {Array} - Array of { type, title } objects for convertible types
  */
-export function getConvertibleTypes(sourceType, blocksConfig) {
+export function getConvertibleTypes(sourceType, blocksConfig, allowedTypes = null) {
   if (!sourceType || !blocksConfig) return [];
 
   // Source block must have fieldMappings defined to be convertible
@@ -1483,11 +1483,16 @@ export function getConvertibleTypes(sourceType, blocksConfig) {
     }
   }
 
+  // Filter by container's allowedTypes if provided
+  const allowedSet = allowedTypes ? new Set(allowedTypes) : null;
+
   // Convert to array of { type, title }
-  return Array.from(reachable).map(blockType => ({
-    type: blockType,
-    title: blocksConfig[blockType]?.title || blockType,
-  }));
+  return Array.from(reachable)
+    .filter(blockType => !allowedSet || allowedSet.has(blockType))
+    .map(blockType => ({
+      type: blockType,
+      title: blocksConfig[blockType]?.title || blockType,
+    }));
 }
 
 /**
@@ -1566,9 +1571,17 @@ function getResolvedSchema(blocksConfig, blockType, intl) {
 /**
  * Map a schema widget to a convertFieldValue targetType.
  * Returns null if no coercion is needed (pass-through).
+ * @param {string} widget - The widget name from the schema field
+ * @param {Object} fieldDef - The full field definition (to check mode, etc.)
  */
-function widgetToTargetType(widget) {
-  if (widget === 'object_browser') return 'link';
+function widgetToTargetType(widget, fieldDef) {
+  if (widget === 'object_browser') {
+    // object_browser in image mode: array format [{ '@id': url, image_field?, image_scales? }]
+    if (fieldDef?.mode === 'image') return 'image_link';
+    return 'link';
+  }
+  // ImageWidget: string value + sibling image_field/image_scales fields on the block
+  if (widget === 'image') return 'image';
   if (widget === 'url') return 'string';
   if (widget === 'slate') return 'slate';
   if (widget === 'textarea') return 'textarea';
@@ -1602,8 +1615,26 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     return { [typeFieldName]: newType };
   }
 
-  // Apply mappings through each step in the path
+  // Pack image widget fields into canonical image format: [{ '@id': url, image_field?, image_scales? }]
+  // widget:'image' can store value as string (content path) or array [{ '@id': url }],
+  // with optional image_field/image_scales as separate block-level fields
   let currentData = { ...blockData };
+  const sourceSchema = getResolvedSchema(blocksConfig, sourceType, intl);
+  if (sourceSchema?.properties) {
+    for (const [fieldName, fieldDef] of Object.entries(sourceSchema.properties)) {
+      if (fieldDef.widget === 'image' && currentData[fieldName] !== undefined) {
+        const val = currentData[fieldName];
+        if (typeof val === 'string') {
+          const packed = { '@id': val };
+          if (currentData.image_field) packed.image_field = currentData.image_field;
+          if (currentData.image_scales) packed.image_scales = currentData.image_scales;
+          currentData[fieldName] = [packed];
+        }
+        break;
+      }
+    }
+  }
+
   for (let i = 1; i < path.length; i++) {
     const fromType = path[i - 1];
     const toType = path[i];
@@ -1631,7 +1662,17 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     const mappings = { ...targetMappings?.['@default'], ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
       if (canonicalData[sourceField] !== undefined) {
-        const targetType = widgetToTargetType(targetSchema?.properties?.[targetField]?.widget);
+        const targetFieldDef = targetSchema?.properties?.[targetField];
+        const targetType = widgetToTargetType(targetFieldDef?.widget, targetFieldDef);
+        // Unpack: when target is widget:'image' (string + siblings), hoist image_field/image_scales
+        // from the packed array before convertFieldValue extracts just the string
+        if (targetType === 'image') {
+          const srcVal = canonicalData[sourceField];
+          if (Array.isArray(srcVal) && srcVal.length > 0 && srcVal[0]?.['@id']) {
+            if (srcVal[0].image_field) newData.image_field = srcVal[0].image_field;
+            if (srcVal[0].image_scales) newData.image_scales = srcVal[0].image_scales;
+          }
+        }
         newData[targetField] = convertFieldValue(canonicalData[sourceField], targetType);
       }
     }
@@ -1650,7 +1691,8 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
   if (targetSchema?.properties) {
     for (const [field, value] of Object.entries(originalFields)) {
       if (convertedFields[field] !== undefined) continue; // Already mapped
-      const targetType = widgetToTargetType(targetSchema.properties[field]?.widget);
+      const fieldDef = targetSchema.properties[field];
+      const targetType = widgetToTargetType(fieldDef?.widget, fieldDef);
       if (targetType) {
         originalFields[field] = convertFieldValue(value, targetType);
       }

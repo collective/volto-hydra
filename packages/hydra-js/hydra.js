@@ -10290,17 +10290,55 @@ export function convertFieldValue(value, targetType) {
       return textToSlate(String(value ?? ''));
 
     case 'link':
-      // Wrap string URL as Volto link array: [{ '@id': url }]
+      // Volto link format: [{ '@id': url, title?: '...' }]
       if (typeof value === 'string') return [{ '@id': value }];
-      if (Array.isArray(value)) return value;  // Already array
+      if (Array.isArray(value)) {
+        // Strip image-specific metadata, keep only link fields
+        if (value.length > 0 && value[0]?.['@id']) {
+          return value.map(item => {
+            const { image_field, image_scales, ...linkFields } = item;
+            return linkFields;
+          });
+        }
+        return value;
+      }
+      if (value && typeof value === 'object' && value['@id']) return [{ '@id': value['@id'] }];
       return [{ '@id': String(value) }];
+
+    case 'image':
+      // ImageWidget format: plain string URL (siblings handled by pack/unpack in convertBlockType)
+      if (Array.isArray(value)) {
+        // Image link array: [{ '@id': url, ... }] → extract URL string
+        if (value.length > 0 && value[0]?.['@id']) return value[0]['@id'];
+        // Slate array → extract text as URL
+        if (value.length > 0 && value[0]?.type && value[0]?.children) return slateToText(value, ' ');
+        return value.join(', ');
+      }
+      if (typeof value === 'string') return value;
+      if (value && typeof value === 'object' && value['@id']) return value['@id'];
+      return value;
+
+    case 'image_link':
+      // object_browser image format: [{ '@id': url, image_field?: '...', image_scales?: {...} }]
+      if (Array.isArray(value)) {
+        // Already array format — pass through
+        if (value.length > 0 && value[0]?.['@id']) return value;
+        // Slate array → extract text as URL
+        if (value.length > 0 && value[0]?.type && value[0]?.children) {
+          return [{ '@id': slateToText(value, ' ') }];
+        }
+        return value;
+      }
+      if (typeof value === 'string') return [{ '@id': value }];
+      if (value && typeof value === 'object' && value['@id']) return [value];
+      return value;
 
     case 'array':
       if (Array.isArray(value)) return value;
       return [value];
 
     default:
-      return value;  // 'object', 'number', 'boolean', 'image', 'integer' — pass through
+      return value;  // 'object', 'number', 'boolean', 'integer' — pass through
   }
 }
 

@@ -3487,7 +3487,8 @@ const Iframe = (props) => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
               const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
               const blockType = blockData?.[typeFieldName];
-              return getConvertibleTypes(blockType, blocksConfig);
+              const allowedTypes = iframeSyncState.blockPathMap?.[selectedBlock]?.allowedSiblingTypes;
+              return getConvertibleTypes(blockType, blocksConfig, allowedTypes);
             })()}
             onConvertBlock={(newType) => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);

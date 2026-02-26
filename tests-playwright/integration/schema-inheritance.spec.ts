@@ -1575,34 +1575,24 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     await expect(buttonTextInput).toHaveValue('Click Me', { timeout: 5000 });
   });
 
-  test('hero to summary renders as summary in iframe and preserves fields on roundtrip', async ({ page }) => {
+  test('hero to teaser and back preserves image rendering', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
     const iframe = helper.getIframe();
-
-    // Verify hero block renders with h1 heading and button
-    const blockLocator = iframe.locator('[data-block-uid="block-4-hero"]');
-    await expect(blockLocator).toBeVisible({ timeout: 10000 });
-    await expect(blockLocator.locator('h1', { hasText: 'Welcome Hero' })).toBeVisible({ timeout: 3000 });
-    await expect(blockLocator.locator('a', { hasText: 'Click Me' })).toBeVisible({ timeout: 3000 });
-
+    const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    await expect(heroBlock).toBeVisible({ timeout: 10000 });
     await helper.clickBlockInIframe('block-4-hero');
+
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
 
     const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
     await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
 
-    // Record initial heading value
-    const headingField = page.locator('#sidebar-properties .field-wrapper-heading');
-    await expect(headingField).toBeVisible({ timeout: 5000 });
-    const headingInput = headingField.locator('input, textarea');
-    expect(await headingInput.inputValue()).toBe('Welcome Hero');
-
-    // Convert Hero → Summary
+    // Convert Hero → Teaser
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
     let menuButton = toolbar.locator('button:has-text("⋯")');
@@ -1614,22 +1604,18 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     await convertToItem.hover();
     let submenu = page.locator('.volto-hydra-submenu');
     await expect(submenu).toBeVisible({ timeout: 3000 });
-    await submenu.locator('.volto-hydra-dropdown-item', { hasText: 'Summary' }).click();
+    await submenu.locator('text=Teaser').click();
 
-    // Verify sidebar shows Summary (no UrlWidget crash)
-    await expect(breadcrumb).toContainText('Summary', { timeout: 5000 });
+    // Verify converted to Teaser
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
 
-    // Verify iframe renders as summary — title in h4 inside a link, no button
-    await expect(blockLocator.locator('h4', { hasText: 'Welcome Hero' })).toBeVisible({ timeout: 5000 });
-    await expect(blockLocator.locator('a', { hasText: 'Click Me' })).not.toBeVisible();
+    // Verify the teaser image renders (hero's image should map to preview_image)
+    const teaserImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(teaserImg).toBeVisible({ timeout: 5000 });
+    const teaserNaturalWidth = await teaserImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(teaserNaturalWidth, 'Teaser image should render (naturalWidth > 0)').toBeGreaterThan(0);
 
-    // Summary's title field should have the converted heading value
-    const titleField = page.locator('#sidebar-properties .field-wrapper-title');
-    await expect(titleField).toBeVisible({ timeout: 5000 });
-    const titleInput = titleField.locator('input, textarea');
-    await expect(titleInput).toHaveValue('Welcome Hero', { timeout: 5000 });
-
-    // Convert Summary → Hero
+    // Convert Teaser → Hero
     await expect(toolbar).toBeVisible({ timeout: 5000 });
     menuButton = toolbar.locator('button:has-text("⋯")');
     await menuButton.click();
@@ -1640,17 +1626,61 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     await convertToItem.hover();
     submenu = page.locator('.volto-hydra-submenu');
     await expect(submenu).toBeVisible({ timeout: 3000 });
-    await submenu.locator('.volto-hydra-dropdown-item', { hasText: 'Hero' }).click();
+    await submenu.locator('text=Hero').click();
 
-    // Verify converted back to Hero — renders with h1 heading and button again
+    // Verify converted back to Hero
     await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
-    await expect(blockLocator.locator('h1', { hasText: 'Welcome Hero' })).toBeVisible({ timeout: 5000 });
-    await expect(blockLocator.locator('a', { hasText: 'Click Me' })).toBeVisible({ timeout: 5000 });
 
-    // Heading should be preserved through roundtrip
-    await expect(headingField).toBeVisible({ timeout: 5000 });
-    await expect(headingInput).toHaveValue('Welcome Hero', { timeout: 5000 });
+    // Verify hero image renders after roundtrip
+    const heroImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(heroImg).toBeVisible({ timeout: 5000 });
+    const heroNaturalWidth = await heroImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(heroNaturalWidth, 'Hero image should render after roundtrip (naturalWidth > 0)').toBeGreaterThan(0);
   });
+
+  test('image to teaser conversion does not show empty media picker when image exists', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on an image block (block-2-uuid has url and alt)
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
+
+    // Convert Image → Teaser
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('text=Teaser').click();
+
+    // Verify converted to Teaser
+    await expect(breadcrumb).toContainText('Teaser', { timeout: 5000 });
+
+    // The empty-image-overlay should NOT appear — preview_image has a value from the conversion
+    await page.waitForTimeout(1000); // Allow UI to settle
+    const emptyImageOverlay = page.locator('.empty-image-overlay');
+    await expect(emptyImageOverlay).not.toBeVisible({ timeout: 3000 });
+  });
+
+  // NOTE: hero→summary roundtrip test removed — Summary is restricted at page level,
+  // so it doesn't appear in the Convert to menu. Would need a container that allows
+  // both hero and summary to test this. Slate↔text coercion is still exercised by
+  // hero→image→hero roundtrip test above.
 
   test('convert-to only shows types from same fieldMappings family, not unrelated @default types', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -1660,8 +1690,8 @@ test.describe('Block Type Conversion via fieldMappings', () => {
 
     const iframe = helper.getIframe();
 
-    // Click on a teaser block — teaser has fieldMappings with @default and explicit image mapping
-    const teaserBlock = iframe.locator('[data-block-uid="manual-teaser"]');
+    // Click on a PAGE-LEVEL teaser block (not one inside a grid, which has its own allowedBlocks)
+    const teaserBlock = iframe.locator('[data-block-uid="block-7-filled-teaser"]');
     await expect(teaserBlock).toBeVisible({ timeout: 10000 });
     await teaserBlock.click();
 
@@ -1689,11 +1719,16 @@ test.describe('Block Type Conversion via fieldMappings', () => {
       itemTexts.push((await submenuItems.nth(i).textContent() || '').trim());
     }
 
-    // Content-item types that SHOULD appear (same family as teaser — share content-item @default fields)
-    const expectedTypes = ['Image', 'Default', 'Summary', 'Hero'];
+    // At page level, only non-restricted content-item types should appear
+    // (Default and Summary are restricted: true, so they can't be created or converted to at page level)
+    const expectedTypes = ['Image', 'Hero'];
 
-    // Types with @default fieldMappings that should NOT appear — different families
+    // Types that should NOT appear:
+    // - Restricted content-item types (can't be created at page level)
+    // - Different fieldMapping families (facets, form fields)
     const forbiddenTypes = [
+      // Restricted content-item types — same family but not allowed at page level
+      'Default', 'Summary',
       // Facet family — share { title, field, hidden } @default
       'Checkbox Facet', 'Select Facet', 'Date Range Facet', 'Toggle Facet',
       // Form field family — share { label, description, required } @default
@@ -1710,5 +1745,50 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     for (const forbidden of forbiddenTypes) {
       expect(itemTexts, `"${forbidden}" should NOT appear in teaser's convert-to menu`).not.toContain(forbidden);
     }
+  });
+
+  test('convert-to menu respects container allowedBlocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a teaser inside the grid (grid allowedBlocks: ['teaser', 'image'])
+    const gridTeaser = iframe.locator('[data-block-uid="grid-cell-1"]');
+    await expect(gridTeaser).toBeVisible({ timeout: 10000 });
+    await gridTeaser.click();
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await expect(convertToItem).toBeVisible({ timeout: 3000 });
+    await convertToItem.hover();
+
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+
+    const submenuItems = submenu.locator('.volto-hydra-dropdown-item');
+    const count = await submenuItems.count();
+    const itemTexts: string[] = [];
+    for (let i = 0; i < count; i++) {
+      itemTexts.push((await submenuItems.nth(i).textContent() || '').trim());
+    }
+
+    // Grid allows only ['teaser', 'image'] — convert-to should only show Image
+    // (teaser is the current type so it's excluded)
+    expect(itemTexts).toContain('Image');
+
+    // Types reachable via fieldMappings but NOT in grid's allowedBlocks
+    expect(itemTexts, 'Hero not allowed by grid container').not.toContain('Hero');
+    expect(itemTexts, 'Summary not allowed by grid container').not.toContain('Summary');
+    expect(itemTexts, 'Default not allowed by grid container').not.toContain('Default');
   });
 });

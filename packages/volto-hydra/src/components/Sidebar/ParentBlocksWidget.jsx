@@ -347,7 +347,7 @@ const ParentBlockSection = ({
           {menuOpen && (() => {
             const pathInfo = blockPathMap?.[blockId];
             const blocksConfig = config.blocks?.blocksConfig;
-            const convertibleTypes = getConvertibleTypes(blockType, blocksConfig);
+            const convertibleTypes = getConvertibleTypes(blockType, blocksConfig, pathInfo?.allowedSiblingTypes);
             const handleConvertBlock = (newType) => {
               const newBlockData = convertBlockType(blockData, newType, blocksConfig, '@type', intl);
               // Preserve the block ID

@@ -572,7 +572,9 @@ function renderTeaserBlock(block, blockUid) {
     const description = useBlockData ? (block.description || '') : (hrefObj?.description || '');
 
     let imageSrc = '';
-    if (useBlockData && block.preview_image) {
+    if (block.preview_image) {
+        // Use block's own preview_image if available (covers both overwrite=true
+        // and conversion cases where block has image data but link target doesn't)
         imageSrc = getImageUrl(block.preview_image);
     } else if (!useBlockData && hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
         imageSrc = hrefObj['@id'] + '/@@images/preview_image';
