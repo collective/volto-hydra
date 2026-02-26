@@ -1361,9 +1361,17 @@ const Iframe = (props) => {
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
-        case 'ADD_BLOCK_AFTER':
-          insertAndSelectBlock(event.data.blockId, 'slate', 'after');
+        case 'ADD_BLOCK_AFTER': {
+          // Determine the default block type from the container's schema
+          const containerFieldConfig = getContainerFieldConfig(
+            event.data.blockId, iframeSyncState.blockPathMap, properties, config.blocks.blocksConfig, intl
+          );
+          const defaultType = containerFieldConfig?.defaultBlockType
+            || (containerFieldConfig?.allowedBlocks?.length === 1 ? containerFieldConfig.allowedBlocks[0] : null)
+            || 'slate';
+          insertAndSelectBlock(event.data.blockId, defaultType, 'after');
           break;
+        }
 
         case 'SLASH_MENU':
           if (event.data.action === 'filter') {
@@ -1550,7 +1558,7 @@ const Iframe = (props) => {
                     }));
                   });
                   onChangeFormData(mutatedFormData);
-                  insertAndSelectBlock(enterBlockId, 'slate', 'after', null, {
+                  insertAndSelectBlock(enterBlockId, currentBlock['@type'] || 'slate', 'after', null, {
                     formatRequestId: enterRequestId,
                     formData: mutatedFormData,
                     blockPathMap: syncedBpm,

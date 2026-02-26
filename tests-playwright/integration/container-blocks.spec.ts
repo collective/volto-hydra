@@ -343,6 +343,37 @@ test.describe('Adding Blocks to Containers', () => {
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
 
+  test('pressing Enter in container with single allowedBlock creates that type, not slate', async ({
+    page,
+  }) => {
+    // top_images field on the columns block allows only 'image' blocks.
+    // Pressing Enter on an image block there should create another image block,
+    // not a slate block (which is the hardcoded default in View.jsx).
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Count initial top_images blocks (should be 2: top-img-1, top-img-2)
+    const topImagesLocator = iframe.locator('.top-images-row > [data-block-uid]');
+    await expect(topImagesLocator).toHaveCount(2);
+
+    // Click on top-img-1 (an image block in the top_images container)
+    await helper.clickBlockInIframe('top-img-1');
+
+    // Press Enter to create a new block after top-img-1
+    await page.keyboard.press('Enter');
+
+    // Wait for a third block to appear in the top_images row
+    await expect(topImagesLocator).toHaveCount(3);
+
+    // The new block should be an image block, not slate.
+    // Verify via sidebar: the newly selected block should show "Image" as the current type.
+    await helper.waitForSidebarCurrentBlock('Image');
+  });
+
   test('sidebar add at page level adds block to page blocks', async ({
     page,
   }) => {

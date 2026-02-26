@@ -805,8 +805,9 @@ export class AdminUIHelper {
    */
   async waitForSidebarCurrentBlock(blockTypeTitle: string, timeout: number = 10000): Promise<void> {
     const sidebar = this.page.locator('.sidebar-container');
-    // The current block header has data-is-current="true" and contains the block type title
-    const currentBlockHeader = sidebar.locator('[data-is-current="true"]').filter({ hasText: blockTypeTitle });
+    // The current block header has data-is-current="true" with a nav button showing the type title
+    // Use the span inside parent-nav for exact text match to avoid substring matches (e.g., "Image" in "Top Images")
+    const currentBlockHeader = sidebar.locator('[data-is-current="true"] .parent-nav > span:not(.nav-prefix)').filter({ hasText: blockTypeTitle });
     await expect(currentBlockHeader).toBeVisible({ timeout });
   }
 

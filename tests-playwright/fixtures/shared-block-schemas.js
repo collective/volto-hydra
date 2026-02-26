@@ -91,7 +91,6 @@ export const sharedBlocksConfig = {
                     title: 'Top Images',
                     widget: 'blocks_layout',
                     allowedBlocks: ['image'],
-                    defaultBlockType: 'image',
                 },
                 columns: {
                     title: 'Columns',
