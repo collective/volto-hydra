@@ -359,9 +359,10 @@ test.describe('Inline link editing', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero block
+    // Click the hero block (scroll into view first - it may be below the fold)
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    await heroBlock.scrollIntoViewIfNeeded();
     await heroBlock.click();
     await helper.waitForSidebarOpen();
     await helper.waitForSidebarCurrentBlock('Hero');
@@ -387,8 +388,11 @@ test.describe('Inline link editing', () => {
     await urlInput.click();
     await urlInput.fill('https://example.com/external-link');
 
-    // Press Enter to confirm
-    await urlInput.press('Enter');
+    // Press Enter to confirm — the widget may auto-accept the URL on fill
+    // (removing the input), so only press Enter if the input is still visible
+    if (await urlInput.isVisible()) {
+      await urlInput.press('Enter');
+    }
 
     // Verify the URL was saved - check the iframe's button href
     const heroButton = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-link="buttonLink"]');
