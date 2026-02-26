@@ -96,6 +96,7 @@ import {
   syncChildBlockTypes,
   getConvertibleTypes,
   convertBlockType,
+  validateFieldMappings,
 } from '../../utils/schemaInheritance';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
@@ -2195,6 +2196,8 @@ const Iframe = (props) => {
               if (schema && !schema.required) {
                 schema.required = [];
               }
+              // Validate fieldMappings: warn about invalid @default keys
+              validateFieldMappings(blockType, blockConfig);
             });
             recurseUpdateVoltoConfig({ blocks: { blocksConfig } });
 
@@ -3490,7 +3493,7 @@ const Iframe = (props) => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
               if (!blockData) return;
               const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
-              const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName);
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
               const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, newBlockData);
               onChangeFormData(updatedProperties);
               // Rebuild blockPathMap and update state
@@ -3813,6 +3816,7 @@ const Iframe = (props) => {
             oldBlockData,
             newBlockData,
             config.blocks.blocksConfig,
+            intl,
           );
 
           // Validate data from sidebar before using it

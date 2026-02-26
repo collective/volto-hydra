@@ -698,9 +698,14 @@ const bridge = initBridge({
 - **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](#listings-and-dynamic-blocks))
 - **Synchronised container children** — a parent controls child type, all children convert together
 
-Each key in `fieldMappings` is either a target block type name or `@default`. The `@default` key maps from a generic schema (`@id`, `title`, `description`, `image`) that query results also use:
+Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.
+
+**`@default` is a virtual type** representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide (see `DEFAULT_FIELD_MAPPING` in `expandListingBlocks`). A block with `fieldMappings['@default']` is saying "I can be populated from standard content item fields." The keys in `@default` must only use these four canonical fields — using other fields (e.g., `label`, `field`, `required`) is invalid and will produce a console warning.
+
+**Explicit type-to-type mappings** (e.g., `fieldMappings: { image: {...} }`) define direct conversion between specific block types. Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
 ```js
+// Content item types: use @default (canonical fields) + explicit cross-mappings
 teaser: {
   fieldMappings: {
     '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
@@ -713,7 +718,17 @@ image: {
     teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
   },
 },
+
+// Non-content types: use explicit hub-type mappings (NOT @default)
+// All facet types map through checkboxFacet as hub
+selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
+checkboxFacet: { fieldMappings: { selectFacet: {...}, daterangeFacet: {...}, toggleFacet: {...} } },
 ```
+
+**Conversion graph rules:**
+- Explicit `fieldMappings[typeName]` always creates a conversion edge.
+- `@default` only creates edges between types that both have valid `@default` mappings (keys from `{ @id, title, description, image }`). Types with non-canonical `@default` keys are ignored.
+- Types without `fieldMappings` never appear in the "Convert to..." menu.
 
 Transitive conversions use paths through intermediate types (hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.
 

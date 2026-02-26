@@ -413,12 +413,15 @@ export const sharedBlocksConfig = {
     // - select/single_choice/multiple_choice add: input_values (SelectionSchemaExtender)
     // - from adds: use_as_reply_to, use_as_bcc (FromSchemaExtender)
     // - hidden adds: value (HiddenSchemaExtender)
-    // Shared fieldMappings enable "Convert to..." between field types
+    //
+    // fieldMappings use explicit type-to-type via `select` as hub (most fields).
+    // @default is NOT used because form field properties (label, description, required)
+    // are not canonical @default fields (@id, title, description, image).
     text: {
         id: 'text',
         title: 'Text',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Text Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
@@ -433,7 +436,7 @@ export const sharedBlocksConfig = {
         id: 'textarea',
         title: 'Textarea',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Textarea Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
@@ -448,7 +451,7 @@ export const sharedBlocksConfig = {
         id: 'number',
         title: 'Number',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Number Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
@@ -463,7 +466,19 @@ export const sharedBlocksConfig = {
         id: 'select',
         title: 'List',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
+        fieldMappings: {
+            text: { label: 'label', description: 'description', required: 'required' },
+            textarea: { label: 'label', description: 'description', required: 'required' },
+            number: { label: 'label', description: 'description', required: 'required' },
+            single_choice: { label: 'label', description: 'description', required: 'required', input_values: 'input_values' },
+            multiple_choice: { label: 'label', description: 'description', required: 'required', input_values: 'input_values' },
+            checkbox: { label: 'label', description: 'description', required: 'required' },
+            date: { label: 'label', description: 'description', required: 'required' },
+            from: { label: 'label', description: 'description', required: 'required' },
+            static_text: { label: 'label', description: 'description' },
+            hidden: { label: 'label' },
+            attachment: { label: 'label', description: 'description', required: 'required' },
+        },
         blockSchema: {
             title: 'Select Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }],
@@ -479,7 +494,7 @@ export const sharedBlocksConfig = {
         id: 'single_choice',
         title: 'Single Choice',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
         blockSchema: {
             title: 'Single Choice Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }],
@@ -495,7 +510,7 @@ export const sharedBlocksConfig = {
         id: 'multiple_choice',
         title: 'Multiple Choice',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
         blockSchema: {
             title: 'Multiple Choice Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }],
@@ -511,7 +526,7 @@ export const sharedBlocksConfig = {
         id: 'checkbox',
         title: 'Checkbox',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Checkbox Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
@@ -526,7 +541,7 @@ export const sharedBlocksConfig = {
         id: 'date',
         title: 'Date',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Date Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
@@ -541,7 +556,7 @@ export const sharedBlocksConfig = {
         id: 'from',
         title: 'E-mail',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Email Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'use_as_reply_to', 'use_as_bcc', 'required'] }],
@@ -558,7 +573,7 @@ export const sharedBlocksConfig = {
         id: 'static_text',
         title: 'Static Text',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description' } },
+        fieldMappings: { select: { label: 'label', description: 'description' } },
         blockSchema: {
             title: 'Static Text',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description'] }],
@@ -572,7 +587,7 @@ export const sharedBlocksConfig = {
         id: 'hidden',
         title: 'Hidden',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label' } },
+        fieldMappings: { select: { label: 'label' } },
         blockSchema: {
             title: 'Hidden Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'value'] }],
@@ -587,7 +602,7 @@ export const sharedBlocksConfig = {
         id: 'attachment',
         title: 'Attachment',
         restricted: true,
-        fieldMappings: { '@default': { label: 'label', description: 'description', required: 'required' } },
+        fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Attachment Field',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],

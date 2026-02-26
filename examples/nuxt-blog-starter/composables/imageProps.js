@@ -105,7 +105,7 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         // image block with image_field and url
         image_url = `${image_url}/@@images/${block?.image_field}`;
     }
-    else if (block['@type'] == "image" && !image_url.includes('@@images')) {
+    else if (block['@type'] == "image" && !image_url.includes('@@images') && !image_url.startsWith('data:')) {
         // image block without scale info - add default image scale
         image_url = `${image_url}/@@images/image`;
     }

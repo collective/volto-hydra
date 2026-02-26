@@ -1525,6 +1525,14 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     // Verify converted to Image
     await expect(breadcrumb).toContainText('Image', { timeout: 5000 });
 
+    // Verify iframe renders as image block with a working image
+    const imageBlockImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(imageBlockImg).toBeVisible({ timeout: 5000 });
+    const imageSrc = await imageBlockImg.getAttribute('src');
+    expect(imageSrc).toContain('Hero Image'); // The SVG data URL contains "Hero Image"
+    const imageNaturalWidth = await imageBlockImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(imageNaturalWidth).toBeGreaterThan(0);
+
     // Verify Image has alt field with the converted heading value
     const altField = page.locator('#sidebar-properties .field-wrapper-alt');
     await expect(altField).toBeVisible({ timeout: 5000 });
@@ -1548,6 +1556,14 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     // Verify converted back to Hero
     await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
 
+    // Verify hero image is preserved and renders through roundtrip
+    const heroImg = iframe.locator('[data-block-uid="block-4-hero"] img');
+    await expect(heroImg).toBeVisible({ timeout: 5000 });
+    const heroImgSrc = await heroImg.getAttribute('src');
+    expect(heroImgSrc).toContain('Hero Image');
+    const heroNaturalWidth = await heroImg.evaluate(el => (el as HTMLImageElement).naturalWidth);
+    expect(heroNaturalWidth).toBeGreaterThan(0);
+
     // Verify Hero fields are back with the original values
     await expect(headingField).toBeVisible({ timeout: 5000 });
     // Check heading field has the roundtrip value
@@ -1557,5 +1573,142 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     // Verify buttonText was preserved (it's not in any fieldMappings, so should persist)
     await expect(buttonTextField).toBeVisible({ timeout: 5000 });
     await expect(buttonTextInput).toHaveValue('Click Me', { timeout: 5000 });
+  });
+
+  test('hero to summary renders as summary in iframe and preserves fields on roundtrip', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify hero block renders with h1 heading and button
+    const blockLocator = iframe.locator('[data-block-uid="block-4-hero"]');
+    await expect(blockLocator).toBeVisible({ timeout: 10000 });
+    await expect(blockLocator.locator('h1', { hasText: 'Welcome Hero' })).toBeVisible({ timeout: 3000 });
+    await expect(blockLocator.locator('a', { hasText: 'Click Me' })).toBeVisible({ timeout: 3000 });
+
+    await helper.clickBlockInIframe('block-4-hero');
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    const breadcrumb = page.locator('.parent-block-section .parent-nav').last();
+    await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
+
+    // Record initial heading value
+    const headingField = page.locator('#sidebar-properties .field-wrapper-heading');
+    await expect(headingField).toBeVisible({ timeout: 5000 });
+    const headingInput = headingField.locator('input, textarea');
+    expect(await headingInput.inputValue()).toBe('Welcome Hero');
+
+    // Convert Hero → Summary
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    let menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    let dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    let convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    let submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('.volto-hydra-dropdown-item', { hasText: 'Summary' }).click();
+
+    // Verify sidebar shows Summary (no UrlWidget crash)
+    await expect(breadcrumb).toContainText('Summary', { timeout: 5000 });
+
+    // Verify iframe renders as summary — title in h4 inside a link, no button
+    await expect(blockLocator.locator('h4', { hasText: 'Welcome Hero' })).toBeVisible({ timeout: 5000 });
+    await expect(blockLocator.locator('a', { hasText: 'Click Me' })).not.toBeVisible();
+
+    // Summary's title field should have the converted heading value
+    const titleField = page.locator('#sidebar-properties .field-wrapper-title');
+    await expect(titleField).toBeVisible({ timeout: 5000 });
+    const titleInput = titleField.locator('input, textarea');
+    await expect(titleInput).toHaveValue('Welcome Hero', { timeout: 5000 });
+
+    // Convert Summary → Hero
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await convertToItem.hover();
+    submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+    await submenu.locator('.volto-hydra-dropdown-item', { hasText: 'Hero' }).click();
+
+    // Verify converted back to Hero — renders with h1 heading and button again
+    await expect(breadcrumb).toContainText('Hero', { timeout: 5000 });
+    await expect(blockLocator.locator('h1', { hasText: 'Welcome Hero' })).toBeVisible({ timeout: 5000 });
+    await expect(blockLocator.locator('a', { hasText: 'Click Me' })).toBeVisible({ timeout: 5000 });
+
+    // Heading should be preserved through roundtrip
+    await expect(headingField).toBeVisible({ timeout: 5000 });
+    await expect(headingInput).toHaveValue('Welcome Hero', { timeout: 5000 });
+  });
+
+  test('convert-to only shows types from same fieldMappings family, not unrelated @default types', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click on a teaser block — teaser has fieldMappings with @default and explicit image mapping
+    const teaserBlock = iframe.locator('[data-block-uid="manual-teaser"]');
+    await expect(teaserBlock).toBeVisible({ timeout: 10000 });
+    await teaserBlock.click();
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('button:has-text("⋯")');
+    await menuButton.click();
+
+    const dropdownMenu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+
+    // Hover over "Convert to" to open submenu
+    const convertToItem = dropdownMenu.locator('.convert-to-menu');
+    await expect(convertToItem).toBeVisible({ timeout: 3000 });
+    await convertToItem.hover();
+
+    const submenu = page.locator('.volto-hydra-submenu');
+    await expect(submenu).toBeVisible({ timeout: 3000 });
+
+    // Get all items in the submenu
+    const submenuItems = submenu.locator('.volto-hydra-dropdown-item');
+    const count = await submenuItems.count();
+    const itemTexts: string[] = [];
+    for (let i = 0; i < count; i++) {
+      itemTexts.push((await submenuItems.nth(i).textContent() || '').trim());
+    }
+
+    // Content-item types that SHOULD appear (same family as teaser — share content-item @default fields)
+    const expectedTypes = ['Image', 'Default', 'Summary', 'Hero'];
+
+    // Types with @default fieldMappings that should NOT appear — different families
+    const forbiddenTypes = [
+      // Facet family — share { title, field, hidden } @default
+      'Checkbox Facet', 'Select Facet', 'Date Range Facet', 'Toggle Facet',
+      // Form field family — share { label, description, required } @default
+      'Text', 'Textarea', 'Number', 'List', 'Single Choice', 'Multiple Choice',
+      'Checkbox', 'Date', 'E-mail', 'Static Text', 'Hidden', 'Attachment',
+    ];
+
+    // Verify expected types are present
+    for (const expected of expectedTypes) {
+      expect(itemTexts, `Expected "${expected}" in convert-to menu`).toContain(expected);
+    }
+
+    // Verify forbidden types are NOT present
+    for (const forbidden of forbiddenTypes) {
+      expect(itemTexts, `"${forbidden}" should NOT appear in teaser's convert-to menu`).not.toContain(forbidden);
+    }
   });
 });

@@ -10193,22 +10193,67 @@ function computePagingUI(paging) {
 }
 
 /**
+ * Extract plain text from a Slate JSON value (array of nodes).
+ * BR nodes within a paragraph become newlines when separator is '\n'.
+ */
+function slateToText(nodes, separator = '\n') {
+  if (!Array.isArray(nodes)) return String(nodes ?? '');
+  return nodes.map(node => {
+    if (node.text !== undefined) return node.text;
+    if (node.type === 'br') return separator;
+    if (node.children) return slateToText(node.children, separator);
+    return '';
+  }).join('');
+}
+
+/**
+ * Convert a plain text string to Slate JSON value.
+ * Always produces a single paragraph node (Slate fields have one block element).
+ * Newlines become BR inline nodes within the paragraph.
+ */
+function textToSlate(text) {
+  const str = String(text ?? '');
+  if (!str || !str.includes('\n')) {
+    return [{ type: 'p', children: [{ text: str }] }];
+  }
+  const lines = str.split('\n');
+  const children = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0) children.push({ type: 'br', children: [{ text: '' }] });
+    children.push({ text: lines[i] });
+  }
+  return [{ type: 'p', children }];
+}
+
+/**
  * Convert a field value to match a target JSON Schema type.
- * Used by expandListingBlocks when fieldMapping specifies a target type.
+ * Used by expandListingBlocks when fieldMapping specifies a target type,
+ * and by convertBlockType for coercing values between block schemas.
  *
  * Conversions:
- *   array → string:  join with ", "
+ *   array → string:  join with ", " (or extract @id from link arrays)
+ *   Slate array → string:  extract text (no line breaks)
  *   object (image) → string:  extract main image URL
  *   string → link:   wrap as [{ '@id': value }]
  *   string → array:  wrap as [value]
+ *   string → slate:  wrap as [{type:'p', children:[{text:value}]}]
+ *   Slate → textarea:  extract text with line breaks between paragraphs
+ *   string → textarea:  pass through
+ *   textarea → slate:  split on newlines into paragraph nodes
  *   * → string:      String(value)
  */
-function convertFieldValue(value, targetType) {
+export function convertFieldValue(value, targetType) {
   if (!targetType) return value;  // No type specified = pass through
 
   switch (targetType) {
     case 'string':
-      if (Array.isArray(value)) return value.join(', ');
+      if (Array.isArray(value)) {
+        // Object browser link array: [{@id: '/path', title: '...'}] → extract URL
+        if (value.length > 0 && value[0]?.['@id']) return value[0]['@id'];
+        // Slate array: extract text without line breaks
+        if (value.length > 0 && value[0]?.type && value[0]?.children) return slateToText(value, ' ');
+        return value.join(', ');
+      }
       if (value && typeof value === 'object') {
         // Image object: extract main URL from image_scales
         if (value.image_scales && value.image_field) {
@@ -10221,6 +10266,28 @@ function convertFieldValue(value, targetType) {
         return String(value);
       }
       return String(value);
+
+    case 'textarea':
+      // Like 'string' but preserves line breaks from Slate paragraphs
+      if (Array.isArray(value)) {
+        if (value.length > 0 && value[0]?.['@id']) return value[0]['@id'];
+        if (value.length > 0 && value[0]?.type && value[0]?.children) return slateToText(value, '\n');
+        return value.join(', ');
+      }
+      if (typeof value === 'string') return value;
+      return String(value ?? '');
+
+    case 'slate':
+      // Convert to Slate JSON array
+      if (Array.isArray(value)) {
+        // Already a Slate array — pass through
+        if (value.length > 0 && value[0]?.type && value[0]?.children) return value;
+        // Object browser link array → extract URL and wrap
+        if (value.length > 0 && value[0]?.['@id']) return textToSlate(value[0]['@id']);
+        return textToSlate(value.join(', '));
+      }
+      if (typeof value === 'string') return textToSlate(value);
+      return textToSlate(String(value ?? ''));
 
     case 'link':
       // Wrap string URL as Volto link array: [{ '@id': url }]

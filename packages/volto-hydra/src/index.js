@@ -347,11 +347,17 @@ const applyConfig = (config) => {
     widget: 'select_querystring_field',
     vocabulary: { '@id': 'plone.app.vocabularies.MetadataFields' },
   };
-  // Identity mapping — all facet types share the same core fields (title, field, hidden)
-  // Enables "Convert to..." menu in toolbar dropdown
-  const facetFieldMappings = {
-    '@default': { title: 'title', field: 'field', hidden: 'hidden' },
+  // Facet field mappings — explicit type-to-type using checkboxFacet as hub.
+  // All facet types share the same core fields (title, field, hidden).
+  // @default is NOT used here because these fields are facet-specific,
+  // not from the canonical @default type (@id, title, description, image).
+  const facetBaseFields = { title: 'title', field: 'field', hidden: 'hidden' };
+  const facetHubMappings = {
+    selectFacet: facetBaseFields,
+    daterangeFacet: facetBaseFields,
+    toggleFacet: facetBaseFields,
   };
+  const facetSpokeMappings = { checkboxFacet: facetBaseFields };
 
   config.blocks.blocksConfig.checkboxFacet = {
     ...config.blocks.blocksConfig.checkboxFacet,
@@ -360,7 +366,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
-    fieldMappings: facetFieldMappings,
+    fieldMappings: facetHubMappings,
     blockSchema: () => ({
       title: 'Checkbox Facet',
       fieldsets: [
@@ -391,7 +397,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
-    fieldMappings: facetFieldMappings,
+    fieldMappings: facetSpokeMappings,
     blockSchema: () => ({
       title: 'Select Facet',
       fieldsets: [
@@ -417,7 +423,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
-    fieldMappings: facetFieldMappings,
+    fieldMappings: facetSpokeMappings,
     blockSchema: () => ({
       title: 'Date Range Facet',
       fieldsets: [
@@ -443,7 +449,7 @@ const applyConfig = (config) => {
     icon: filterSVG,
     group: 'common',
     restricted: true,
-    fieldMappings: facetFieldMappings,
+    fieldMappings: facetSpokeMappings,
     blockSchema: () => ({
       title: 'Toggle Facet',
       fieldsets: [

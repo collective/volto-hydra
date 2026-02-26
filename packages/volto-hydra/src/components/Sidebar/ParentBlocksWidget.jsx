@@ -40,37 +40,14 @@ const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
   // (object_list items often don't have @type, so blockType may be undefined)
   const pathInfo = blockPathMap?.[blockId];
   if (pathInfo?.isObjectListItem) {
-    // Try to get title from blockType (parentType:fieldName format)
-    // For nested types like slateTable:rows:cells, parentType is slateTable:rows, fieldName is cells
+    // Look up title from blocksConfig — works for both typed items (e.g., 'text')
+    // and virtual types (e.g., 'slateTable:rows')
     if (pathInfo.blockType) {
-      const parts = pathInfo.blockType.split(':');
-      const fieldName = parts.pop(); // Last part is the field name
-      const parentType = parts.join(':'); // Everything else is parent type
-      const parentConfig = config.blocks?.blocksConfig?.[parentType];
-      if (parentConfig?.blockSchema) {
-        const parentSchema = typeof parentConfig.blockSchema === 'function'
-          ? parentConfig.blockSchema({ formData: {}, intl: { formatMessage: (m) => m.defaultMessage } })
-          : parentConfig.blockSchema;
-        const fieldDef = parentSchema?.properties?.[fieldName];
-        // Use itemSchema.title if available
-        if (fieldDef?.schema?.title) {
-          return fieldDef.schema.title;
-        }
-        // Fallback: use singular form of field title (e.g., "Slides" -> "Slide")
-        if (fieldDef?.title) {
-          const singular = fieldDef.title.replace(/s$/, '');
-          return singular;
-        }
-        // Fallback: derive from field name (e.g., "rows" -> "Row", "cells" -> "Cell")
-        if (fieldName) {
-          const singular = fieldName.replace(/s$/, '');
-          return singular.charAt(0).toUpperCase() + singular.slice(1);
-        }
-      }
+      const itemConfig = config.blocks?.blocksConfig?.[pathInfo.blockType];
+      if (itemConfig?.title) return itemConfig.title;
     }
 
-    // For nested object_list items without itemType, use containerField
-    // This handles deeply nested structures like slateTable (rows > cells)
+    // Fallback: derive from containerField (e.g., "subblocks" -> "Subblock")
     if (pathInfo.containerField) {
       const singular = pathInfo.containerField.replace(/s$/, '');
       return singular.charAt(0).toUpperCase() + singular.slice(1);
@@ -372,7 +349,7 @@ const ParentBlockSection = ({
             const blocksConfig = config.blocks?.blocksConfig;
             const convertibleTypes = getConvertibleTypes(blockType, blocksConfig);
             const handleConvertBlock = (newType) => {
-              const newBlockData = convertBlockType(blockData, newType, blocksConfig);
+              const newBlockData = convertBlockType(blockData, newType, blocksConfig, '@type', intl);
               // Preserve the block ID
               newBlockData['@uid'] = blockId;
               onChangeBlock(blockId, newBlockData);

@@ -31,10 +31,6 @@
       </a>
       <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
         :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
-      <figcaption v-if="block.title || block.description">
-        <strong v-if="block.title">{{ block.title }}</strong>
-        <p v-if="block?.description" data-edit-text="description">{{ block.description }}</p>
-      </figcaption>
     </figure>
   </div>
 
