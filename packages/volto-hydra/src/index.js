@@ -155,6 +155,8 @@ const applyConfig = (config) => {
     },
   };
 
+
+
   // Configure listing block to use variation as item type selector
   // The existing variation field is repurposed to select the block type for rendering items
   // expandListingBlocks reads from 'variation' field via itemTypeField option

@@ -2987,8 +2987,8 @@ test.describe('data-block-selector Navigation', () => {
     const initialCount = await slideItems.count();
     expect(initialCount).toBe(3);
 
-    // Add a new slide via the sidebar
-    await helper.addBlockViaSidebar('Slides');
+    // Add a new slide via the sidebar (typed object_list shows block chooser)
+    await helper.addBlockViaSidebar('Slides', 'Slide');
 
     // The new slide should be auto-selected after adding
     // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
@@ -3049,8 +3049,13 @@ test.describe('data-block-selector Navigation', () => {
     await helper.clickBlockInIframe('slide-1');
     await helper.waitForQuantaToolbar('slide-1');
 
-    // Click the add button in the iframe to add a new slide
+    // Click the add button in the iframe — typed object_list shows block chooser
     await helper.clickAddBlockButton();
+
+    // Select 'Slide' from the block chooser
+    const blockChooser = page.locator('.blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
+    await blockChooser.getByRole('button', { name: 'Slide' }).click();
 
     // The new slide should be auto-selected after adding
     // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
@@ -3278,7 +3283,7 @@ test.describe('slateTable Container', () => {
 
     // Count initial rows
     const initialRowCount = await iframe.locator('tr[data-block-uid]').count();
-    expect(initialRowCount).toBe(2);
+    expect(initialRowCount).toBe(3);
 
     // Click on cell-1-1 to select it (rows are fully covered by cells, so click cell first)
     await helper.clickBlockInIframe('cell-1-1');
@@ -3300,8 +3305,8 @@ test.describe('slateTable Container', () => {
     // Click the add button (should add row below since data-block-add="bottom")
     await page.locator('.volto-hydra-add-button').click();
 
-    // Verify a new row was added in the iframe
-    await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
+    // Verify a new row was added in the iframe (3 initial + 1 new = 4)
+    await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(4);
 
     // Verify the new row is selected (sidebar shows Row header for current block)
     const sidebarHeaders = page.locator('.sidebar-section-header[data-is-current="true"]');
@@ -3377,8 +3382,8 @@ test.describe('slateTable Container', () => {
     await expect(addButton).toHaveAttribute('title', 'Add row', { timeout: 5000 });
     await addButton.click();
 
-    // Wait for new row to appear (should have 3 rows total)
-    await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(3);
+    // Wait for new row to appear (3 initial + 1 new = 4 rows total)
+    await expect(iframe.locator('tr[data-block-uid]')).toHaveCount(4);
 
     // Verify new row has same cell count as existing rows (3 cells)
     const allRows = iframe.locator('tr[data-block-uid]');
@@ -3432,7 +3437,7 @@ test.describe('slateTable Container', () => {
     await expect(addButton.locator('svg')).toBeVisible();
   });
 
-  test('dropdown menu shows Remove Row for rows', async ({ page }) => {
+  test('dropdown menu shows plain Remove for rows (not Remove Row)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -3452,10 +3457,13 @@ test.describe('slateTable Container', () => {
     await expect(menuButton).toBeVisible();
     await menuButton.click();
 
-    // Should show "Remove Row" instead of just "Remove"
+    // At row level, should show plain "Remove" — the row IS the block being removed.
+    // "Remove Row" only appears at cell level (where you're removing the parent row).
     const dropdown = page.locator('.volto-hydra-dropdown-menu');
     await expect(dropdown).toBeVisible();
-    await expect(dropdown.getByText('Remove Row')).toBeVisible();
+    const removeItem = dropdown.locator('.volto-hydra-dropdown-item').last();
+    await expect(removeItem).toContainText('Remove');
+    await expect(removeItem).not.toContainText('Remove Row');
   });
 
   test('dropdown menu shows Remove Column for cells', async ({ page }) => {
@@ -3517,7 +3525,7 @@ test.describe('slateTable Container', () => {
     // Count initial rows
     const table = iframe.locator('[data-block-uid="table-1"] table');
     const initialRowCount = await table.locator('tr[data-block-uid]').count();
-    expect(initialRowCount).toBe(2);
+    expect(initialRowCount).toBe(3);
 
     // Select second cell in second row (cell-2-2)
     await helper.clickBlockInIframe('cell-2-2');
@@ -3625,7 +3633,7 @@ test.describe('slateTable Container', () => {
 
     const table = iframe.locator('[data-block-uid="table-1"] table');
     const initialRowCount = await table.locator('tr[data-block-uid]').count();
-    expect(initialRowCount).toBe(2);
+    expect(initialRowCount).toBe(3);
 
     // Select second row via Escape from its cell
     await helper.clickBlockInIframe('cell-2-1');
@@ -3684,7 +3692,7 @@ test.describe('slateTable Container', () => {
 
     const table = iframe.locator('[data-block-uid="table-1"] table');
     const initialRowCount = await table.locator('tr[data-block-uid]').count();
-    expect(initialRowCount).toBe(2);
+    expect(initialRowCount).toBe(3);
 
     // Select SECOND cell in second row (cell-2-2)
     await helper.clickBlockInIframe('cell-2-2');
@@ -3982,34 +3990,40 @@ test.describe('Multi-Container Field Operations', () => {
   });
 });
 
-test.describe('Single-Schema Object_List (slider)', () => {
+test.describe('Single-Schema Object_List (table rows)', () => {
   /**
    * Tests for single-schema object_list containers.
-   * The slider block uses widget: 'object_list' with a shared schema
-   * for all items (slides). All items get the same schema.
+   * The slateTable block uses widget: 'object_list' for rows, each row
+   * sharing the same schema. These tests verify add/delete/reorder of
+   * object_list items via the sidebar.
    */
 
-  test('no block chooser appears when adding a slide (single-schema auto-creates)', async ({
+  test('no block chooser appears when adding a row (single-schema auto-creates)', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
-    await helper.navigateToEdit('/carousel-test-page');
-    await helper.getStableBlockCount();
+    await helper.navigateToEdit('/table-test-page');
 
-    // Navigate to slider: click slide-1, then Escape to select slider-1
-    await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Click a cell, Escape to row level (table addMode needs a selected row to copy cell structure)
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForBlockSelected('row-1');
 
     const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    const table = iframe.locator('[data-block-uid="table-1"] table');
+    const initialRowCount = await table.locator('tr[data-block-uid]').count();
 
-    // Click the add button in the Slides section
-    // For single-schema object_list, no block chooser should appear — auto-creates
-    await helper.addBlockViaSidebar('Slides');
+    // Click the add button on the toolbar — for single-schema object_list,
+    // no block chooser should appear — auto-creates with matching cell count
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
 
     // The block chooser should NOT have appeared (no type selection needed)
     const blockChooser = page.locator('.blocks-chooser');
@@ -4018,34 +4032,38 @@ test.describe('Single-Schema Object_List (slider)', () => {
       .catch(() => false);
     expect(chooserVisible).toBe(false);
 
-    // A new slide should have been added and selected (sidebar shows slide fields)
-    const kickerInput = sidebar.getByLabel('Kicker');
-    await expect(kickerInput).toBeVisible({ timeout: 10000 });
+    // A new row should have been added — verify row count increased
+    await expect(table.locator('tr[data-block-uid]')).toHaveCount(initialRowCount + 1, { timeout: 10000 });
   });
 
-  test('deleting a slide selects previous sibling and removes it from array', async ({ page }) => {
+  test('deleting a row via sidebar selects previous sibling', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
-    await helper.navigateToEdit('/carousel-test-page');
-    await helper.getStableBlockCount();
+    await helper.navigateToEdit('/table-test-page');
 
-    // Navigate to slider: click slide-1, then Escape to slider-1
-    await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Click a cell, Escape twice to reach table level
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForBlockSelected('row-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('table-1');
 
     const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
-    const slideItems = sidebar.locator('.child-block-item');
-    await expect(slideItems).toHaveCount(3, { timeout: 5000 });
+    await expect(sidebar.locator('text=rows').first()).toBeVisible();
+    const rowItems = sidebar.locator('.child-block-item');
+    await expect(rowItems).toHaveCount(3, { timeout: 5000 });
 
-    // Delete slide-2 (middle item) — should select slide-1 (previous sibling)
-    // Slides order: slide-1, slide-2, slide-3
-    await slideItems.nth(1).click();
+    // Click row-2 (middle item) in sidebar — this drills into it
+    await rowItems.nth(1).click();
+
+    // Now at row level — sidebar shows "‹ Row" breadcrumb with menu trigger
     const currentBlockHeader = sidebar.locator('[data-is-current="true"]');
-    await expect(currentBlockHeader.filter({ hasText: 'Slide' })).toBeVisible({ timeout: 5000 });
+    await expect(currentBlockHeader.filter({ hasText: 'Row' })).toBeVisible({ timeout: 5000 });
 
     // Delete via the current block's sidebar dropdown
     const menuTrigger = currentBlockHeader.locator('.menu-trigger');
@@ -4054,44 +4072,50 @@ test.describe('Single-Schema Object_List (slider)', () => {
     await expect(removeOption).toBeVisible({ timeout: 3000 });
     await removeOption.click();
 
-    // After deleting slide-2, selection should move to previous sibling (slide-1)
-    await helper.waitForQuantaToolbar('slide-1');
+    // After deleting row-2, selection should move to previous sibling (row-1)
+    // Use waitForQuantaToolbar which verifies outline rect matches the block
+    await helper.waitForQuantaToolbar('row-1');
 
-    // Navigate to slider to verify child count
+    // Navigate back to table level to verify child count
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar('slider-1');
-    await expect(sidebar.locator('.child-block-item')).toHaveCount(2, { timeout: 5000 });
+    await helper.waitForQuantaToolbar('table-1');
+    const rowItemsAfter = sidebar.locator('.child-block-item');
+    await expect(rowItemsAfter).toHaveCount(2, { timeout: 5000 });
   });
 
-  test('reordering slides in sidebar updates the array order', async ({
+  test('reordering rows in sidebar updates the array order', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
-    await helper.navigateToEdit('/carousel-test-page');
-    await helper.getStableBlockCount();
+    await helper.navigateToEdit('/table-test-page');
 
-    // Navigate to slider: click slide-1, then Escape to select slider-1
-    await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-1"]').waitFor();
+
+    // Click a cell, Escape twice to reach table level
+    await helper.clickBlockInIframe('cell-1-1');
+    await helper.waitForSidebarOpen();
     await page.keyboard.press('Escape');
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForBlockSelected('row-1');
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('table-1');
 
     const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Slides').first()).toBeVisible();
+    await expect(sidebar.locator('text=rows').first()).toBeVisible();
 
     // Get initial order
-    const slideItems = sidebar.locator('.child-block-item');
-    await expect(slideItems).toHaveCount(3);
+    const rowItems = sidebar.locator('.child-block-item');
+    await expect(rowItems).toHaveCount(3);
 
-    // Get initial first item text
-    const firstItemText = await slideItems.first().textContent();
-    expect(firstItemText).toContain('Slide 1'); // slide-1 title
+    // Get initial first item text — sidebar shows "Item 1", "Item 2", etc.
+    const firstItemText = await rowItems.first().textContent();
+    expect(firstItemText).toContain('Item 1');
 
     // Drag first item below last to reorder (manual mouse moves for react-beautiful-dnd)
-    const firstDragHandle = slideItems.first().locator('.drag-handle');
-    const lastItem = slideItems.last();
+    const firstDragHandle = rowItems.first().locator('.drag-handle');
+    const lastItem = rowItems.last();
 
     await firstDragHandle.scrollIntoViewIfNeeded();
     await lastItem.scrollIntoViewIfNeeded();
@@ -4124,8 +4148,8 @@ test.describe('Single-Schema Object_List (slider)', () => {
 
     // Verify order changed - first item should now be different
     await expect(async () => {
-      const newFirstText = await slideItems.first().textContent();
-      expect(newFirstText).not.toContain('Slide 1');
+      const newFirstText = await rowItems.first().textContent();
+      expect(newFirstText).not.toContain('Item 1');
     }).toPass({ timeout: 5000 });
   });
 });

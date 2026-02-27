@@ -151,18 +151,9 @@ export const sharedBlocksConfig = {
                 slides: {
                     title: 'Slides',
                     widget: 'object_list',
-                    schema: {
-                        title: 'Slide',
-                        fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
-                        properties: {
-                            head_title: { title: 'Kicker', type: 'string' },
-                            title: { title: 'Title', type: 'string' },
-                            description: { title: 'Description', type: 'string', widget: 'textarea' },
-                            preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
-                            buttonText: { title: 'Button Text', type: 'string' },
-                            hideButton: { title: 'Hide Button', type: 'boolean' },
-                        },
-                    },
+                    allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
+                    typeField: '@type',
+                    defaultBlockType: 'slide',
                 },
                 autoplayEnabled: {
                     title: 'Autoplay Enabled',
@@ -183,30 +174,24 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    // Slide block: child of carousel
+    // Slide block: default child type for slider's typed object_list.
+    // Same schema as the slider's original inline item schema.
     slide: {
         id: 'slide',
         title: 'Slide',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
         group: 'common',
+        mostUsed: true,
         blockSchema: {
-            fieldsets: [
-                {
-                    id: 'default',
-                    title: 'Default',
-                    fields: ['title', 'content'],
-                },
-            ],
+            title: 'Slide',
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
             properties: {
-                title: {
-                    title: 'Title',
-                    type: 'string',
-                },
-                content: {
-                    title: 'Content',
-                    type: 'string',
-                    widget: 'textarea',
-                },
+                head_title: { title: 'Kicker', type: 'string' },
+                title: { title: 'Title', type: 'string' },
+                description: { title: 'Description', type: 'string', widget: 'textarea' },
+                preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                buttonText: { title: 'Button Text', type: 'string' },
+                hideButton: { title: 'Hide Button', type: 'boolean' },
             },
             required: [],
         },

@@ -993,8 +993,8 @@ const Iframe = (props) => {
       const typeFieldName = (action === 'inside' ? fieldDef?.typeField : blockPathMap[blockId]?.typeField) || '@type';
 
       let effectiveType;
-      if (typeFieldName !== '@type' && blockType) {
-        // Typed object_list: use the chosen block type (from BlockChooser)
+      if (blockType) {
+        // Block type explicitly chosen (from BlockChooser) — use it directly
         effectiveType = blockType;
       } else if (action === 'inside') {
         // Single-schema or no explicit type: virtual type from parent:field

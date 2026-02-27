@@ -535,8 +535,11 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
 
       // Determine block type:
       // - If typeField is set, read type from item[typeField] (typed object_list)
+      // - If typed mode and type missing, fall back to defaultBlockType (e.g., old data without @type)
       // - Otherwise, use virtual type like 'slateTable:rows' (single-schema object_list)
-      const itemBlockType = typeField ? (item[typeField] || virtualType) : virtualType;
+      const itemBlockType = typeField
+        ? (item[typeField] || (hasAllowedBlocks && fieldDef.defaultBlockType) || virtualType)
+        : virtualType;
 
       // Determine schema for this item:
       // - If allowedBlocks is set (typed mode), use blocksConfig schema (looked up via blockType)
@@ -665,9 +668,14 @@ export function getBlockById(formData, blockPathMap, blockId) {
     // Virtual blocks (like template instances) have blockData in pathMap instead of formData
     return pathInfo?.blockData;
   }
-  // Return the raw block data - no @type injection
-  // Callers should use blockPathMap[blockId].blockType for the block type
-  return getBlockByPath(formData, pathInfo.path);
+  const block = getBlockByPath(formData, pathInfo.path);
+  // For typed object_list items missing @type (e.g., old slider data without @type
+  // that resolves via defaultBlockType), inject the resolved blockType so that
+  // consumers like withBlockExtensions can find the correct block config.
+  if (block && !block['@type'] && pathInfo.isObjectListItem && pathInfo.typeField) {
+    return { ...block, '@type': pathInfo.blockType };
+  }
+  return block;
 }
 
 /**
