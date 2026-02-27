@@ -139,6 +139,14 @@ export const sharedBlocksConfig = {
         title: 'Slider',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
         group: 'common',
+        schemaEnhancer: {
+            inheritSchemaFrom: {
+                typeField: 'variation',
+                defaultsField: 'itemDefaults',
+                blocksField: 'slides',
+                title: 'Item Type',
+            },
+        },
         blockSchema: {
             fieldsets: [
                 {
@@ -182,6 +190,16 @@ export const sharedBlocksConfig = {
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
         group: 'common',
         mostUsed: true,
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
+        },
+        schemaEnhancer: {
+            childBlockConfig: {
+                defaultsField: 'itemDefaults',
+                editableFields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'],
+            },
+        },
         blockSchema: {
             title: 'Slide',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
@@ -222,6 +240,68 @@ export const sharedBlocksConfig = {
                     widget: 'blocks_layout',
                     allowedBlocks: ['slate', 'image'],
                     defaultBlockType: 'slate',
+                },
+            },
+            required: [],
+        },
+    },
+    // Code example block: tabbed code display with syntax highlighting
+    codeExample: {
+        id: 'codeExample',
+        title: 'Code Example',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [
+                {
+                    id: 'default',
+                    title: 'Default',
+                    fields: ['tabs'],
+                },
+            ],
+            properties: {
+                tabs: {
+                    title: 'Code Tabs',
+                    widget: 'object_list',
+                    schema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['label', 'language', 'code'],
+                            },
+                        ],
+                        properties: {
+                            label: {
+                                title: 'Tab Label',
+                                type: 'string',
+                            },
+                            language: {
+                                title: 'Language',
+                                widget: 'select',
+                                choices: [
+                                    ['javascript', 'JavaScript'],
+                                    ['jsx', 'JSX'],
+                                    ['typescript', 'TypeScript'],
+                                    ['python', 'Python'],
+                                    ['json', 'JSON'],
+                                    ['html', 'HTML'],
+                                    ['css', 'CSS'],
+                                    ['bash', 'Bash'],
+                                    ['xml', 'XML'],
+                                ],
+                            },
+                            code: {
+                                title: 'Code',
+                                type: 'string',
+                                widget: 'textarea',
+                            },
+                        },
+                        required: [],
+                    },
+                    default: [
+                        { '@id': 'tab-1', label: 'JavaScript', language: 'javascript', code: '' },
+                    ],
                 },
             },
             required: [],

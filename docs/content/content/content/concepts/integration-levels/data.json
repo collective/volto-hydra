@@ -41,9 +41,9 @@
         }
       ]
     },
-    "bridge-text": {
+    "bridge-text-t0": {
       "@type": "slate",
-      "plaintext": "Include hydra.js in your frontend and call initBridge() to create a two-way communication channel between Hydra and your frontend.",
+      "plaintext": "Include hydra.js in your frontend and call initBridge() to create a two-way communication channel between Hydra and your frontend. The bridge handles authentication, page navigation syncing, and block data transfer.",
       "value": [
         {
           "children": [
@@ -63,15 +63,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "bridge-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "import { initBridge } from './hydra.js';\n\nlet bridge;\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n        page: {\n            schema: {\n                properties: {\n                    blocks_layout: {\n                        title: 'Content',\n                        allowedBlocks: ['slate', 'image', 'video'],\n                    },\n                },\n            },\n        },\n    });\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "bridge-text-c1-javascript-930645",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "import { initBridge } from './hydra.js';\n\nlet bridge;\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n        page: {\n            schema: {\n                properties: {\n                    blocks_layout: {\n                        title: 'Content',\n                        allowedBlocks: ['slate', 'image', 'video'],\n                    },\n                },\n            },\n        },\n    });\n}"
+        }
+      ]
+    },
+    "bridge-text-t2": {
+      "@type": "slate",
+      "plaintext": "The page.schema.properties object configures which blocks fields your page has. The default field is blocks_layout. Each entry specifies a display title and which block types are allowed.",
+      "value": [
         {
           "children": [
             {
@@ -118,9 +127,9 @@
         }
       ]
     },
-    "multi-text": {
+    "multi-text-t0": {
       "@type": "slate",
-      "plaintext": "Pages can have multiple blocks fields for different areas like header, content and footer.",
+      "plaintext": "Pages can have multiple blocks fields for different areas (e.g., header, content, footer). Each shows as a separate section in the sidebar when no block is selected:",
       "value": [
         {
           "children": [
@@ -129,14 +138,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "multi-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'hero', 'columns'],\n                },\n                header_blocks: {\n                    title: 'Header',\n                    allowedBlocks: ['slate', 'image'],\n                    maxLength: 3,\n                },\n                footer_blocks: {\n                    title: 'Footer',\n                    allowedBlocks: ['slate', 'link'],\n                },\n            },\n        },\n    },\n});"
-            }
-          ],
-          "type": "p"
+          "@id": "multi-text-c1-javascript-9aa419",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'hero', 'columns'],\n                },\n                header_blocks: {\n                    title: 'Header',\n                    allowedBlocks: ['slate', 'image'],\n                    maxLength: 3,\n                },\n                footer_blocks: {\n                    title: 'Footer',\n                    allowedBlocks: ['slate', 'link'],\n                },\n            },\n        },\n    },\n});"
         }
       ]
     },
@@ -154,9 +166,9 @@
         }
       ]
     },
-    "pathtransform-text": {
+    "pathtransform-text-t0": {
       "@type": "slate",
-      "plaintext": "If your frontend embeds state in the URL path (like pagination), use pathToApiPath to transform frontend paths to API paths.",
+      "plaintext": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.",
       "value": [
         {
           "children": [
@@ -165,15 +177,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "pathtransform-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "pathtransform-text-c1-javascript-76182e",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
+        }
+      ]
+    },
+    "pathtransform-text-t2": {
+      "@type": "slate",
+      "plaintext": "The pathToApiPath function is called whenever hydra.js sends a PATH_CHANGE message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).",
+      "value": [
         {
           "children": [
             {
@@ -209,7 +230,7 @@
         }
       ]
     },
-    "callback-text": {
+    "callback-text-t0": {
       "@type": "slate",
       "plaintext": "Register onEditChange to receive live content updates as the user edits. Your frontend re-renders in realtime using the same data format as the Plone REST API.",
       "value": [
@@ -231,15 +252,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "callback-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "const bridge = initBridge({\n    ...,\n    onEditChange: (formData) => renderPage(formData),\n});\n\nif (!window.name.startsWith('hydra-edit')) {\n    // Normal page render from server\n    renderPage(await fetchContent(path));\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "callback-text-c1-javascript-145e55",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const bridge = initBridge({\n    ...,\n    onEditChange: (formData) => renderPage(formData),\n});\n\nif (!window.name.startsWith('hydra-edit')) {\n    // Normal page render from server\n    renderPage(await fetchContent(path));\n}"
+        }
+      ]
+    },
+    "callback-text-t2": {
+      "@type": "slate",
+      "plaintext": "Since the data structure is the same as returned by the Plone REST API, it's normally easy to re-render your page dynamically using the same code your frontend used to render the page initially. With onEditChange registered, editors get: Changes appear on the frontend as they type in the sidebarAdding and removing blocks shows immediately in the previewDrag and drop block reordering with live previewA '+' icon on the frontend to add blocks after the current block Note: For live updates you need a frontend deployed as SPA or hybrid rather than SSR or SSG. If your production deploy is SSG/SSR, deploy another edit-only preview frontend in SPA mode.",
+      "value": [
         {
           "children": [
             {
@@ -317,9 +347,9 @@
         }
       ]
     },
-    "custom-text": {
+    "custom-text-t0": {
       "@type": "slate",
-      "plaintext": "Define custom block types directly in your frontend configuration via the blocks option. No Volto plugin required.",
+      "plaintext": "Define custom block types directly in your frontend configuration via the blocks option in initBridge. No Volto plugin deployment required. Each block type needs an id, title, and a blockSchema with its field properties.",
       "value": [
         {
           "children": [
@@ -339,15 +369,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "custom-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "const bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'video', 'slider'],\n                },\n            },\n        },\n    },\n    blocks: {\n        slider: {\n            id: 'slider',\n            title: 'Slider',\n            icon: 'data:...',\n            group: 'common',\n            restricted: false,\n            mostUsed: true,\n            sidebarSchemaOnly: false,\n            blockSchema: {\n                properties: {\n                    slider_timing: {\n                        title: 'Delay',\n                        widget: 'float',\n                    },\n                    slides: {\n                        title: 'Slides',\n                        widget: 'blocks_layout',\n                        allowedBlocks: ['slide', 'image'],\n                        defaultBlockType: 'slide',\n                    }\n                },\n            }\n        },\n        slide: {\n            id: 'slide',\n            title: 'Slide',\n            blockSchema: {\n                properties: {\n                    url: { title: 'Link', widget: 'url' },\n                    title: { title: 'Title' },\n                    image: { title: 'Image', widget: 'image' },\n                    description: { title: 'Description',\n                                   widget: 'slate' },\n                },\n            },\n        },\n    },\n});"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "custom-text-c1-javascript-7d81d7",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'video', 'slider'],\n                },\n            },\n        },\n    },\n    blocks: {\n        slider: {\n            id: 'slider',\n            title: 'Slider',\n            icon: 'data:...',\n            group: 'common',\n            restricted: false,\n            mostUsed: true,\n            sidebarSchemaOnly: false,\n            blockSchema: {\n                properties: {\n                    slider_timing: {\n                        title: 'Delay',\n                        widget: 'float',\n                    },\n                    slides: {\n                        title: 'Slides',\n                        widget: 'blocks_layout',\n                        allowedBlocks: ['slide', 'image'],\n                        defaultBlockType: 'slide',\n                    }\n                },\n            }\n        },\n        slide: {\n            id: 'slide',\n            title: 'Slide',\n            blockSchema: {\n                properties: {\n                    url: { title: 'Link', widget: 'url' },\n                    title: { title: 'Title' },\n                    image: { title: 'Image', widget: 'image' },\n                    description: { title: 'Description',\n                                   widget: 'slate' },\n                },\n            },\n        },\n    },\n});"
+        }
+      ]
+    },
+    "custom-text-t2": {
+      "@type": "slate",
+      "plaintext": "Child block types (like 'slide' above) must be defined at the top level of blocks. You can also: Set restricted: true to hide a block from the block chooser (only usable as child blocks)Set mostUsed: true to pin a block to the top of the chooserSet sidebarSchemaOnly: true to use only the schema form in the sidebar (no custom edit component)Use fieldsets in the schema to organize fields into tabs",
+      "value": [
         {
           "children": [
             {
@@ -453,9 +492,9 @@
         }
       ]
     },
-    "enhancers-text": {
+    "enhancers-text-t0": {
       "@type": "slate",
-      "plaintext": "Schema enhancers modify block schemas dynamically. Use skiplogic for conditional field visibility.",
+      "plaintext": "Schema enhancers modify block schemas dynamically:",
       "value": [
         {
           "children": [
@@ -464,15 +503,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "enhancers-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                skiplogic: {\n                    advancedOptions: { field: 'mode', is: 'advanced' },\n                },\n            },\n        },\n    },\n});"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "enhancers-text-c1-javascript-92cb55",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                skiplogic: {\n                    advancedOptions: { field: 'mode', is: 'advanced' },\n                },\n            },\n        },\n    },\n});"
+        }
+      ]
+    },
+    "enhancers-text-t2": {
+      "@type": "slate",
+      "plaintext": "skiplogic: Conditionally show/hide fields based on other field values. field: Field to check (use ../field for parent/page fields)Operators: is, isNot, isSet, isNotSet, gt, gte, lt, lte",
+      "value": [
         {
           "children": [
             {
@@ -534,9 +582,9 @@
         }
       ]
     },
-    "conversion-text": {
+    "conversion-text-t0": {
       "@type": "slate",
-      "plaintext": "Define fieldMappings to enable a Convert to... UI action between block types.",
+      "plaintext": "If a block type has a fieldMappings defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (@id, title, preview-image, description):",
       "value": [
         {
           "children": [
@@ -556,15 +604,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "conversion-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "blocks: {\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n            teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n        },\n    },\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "conversion-text-c1-javascript-970ef0",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "blocks: {\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n            teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n        },\n    },\n}"
+        }
+      ]
+    },
+    "conversion-text-t2": {
+      "@type": "slate",
+      "plaintext": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., hero -> teaser -> image). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear.",
+      "value": [
         {
           "children": [
             {
@@ -589,9 +646,9 @@
         }
       ]
     },
-    "inherit-text": {
+    "inherit-text-t0": {
       "@type": "slate",
-      "plaintext": "Use inheritSchemaFrom and childBlockConfig to synchronise child block types in a container.",
+      "plaintext": "You might want one container type that holds different block types but constrains them to all be the same type with synchronised settings. A field on the parent lets the editor select the type and all blocks get converted using fieldMappings:",
       "value": [
         {
           "children": [
@@ -600,15 +657,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "inherit-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "blocks: {\n    gridBlock: {\n        allowedBlocks: ['teaser', 'image'],\n        schemaEnhancer: {\n            inheritSchemaFrom: {\n                typeField: 'variation',\n            },\n        },\n    },\n    teaser: {\n        schemaEnhancer: {\n            childBlockConfig: {\n                editableFields: ['href', 'title', 'description'],\n            },\n        },\n        fieldMappings: {\n            default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        },\n    },\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "inherit-text-c1-javascript-96ec67",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "blocks: {\n    gridBlock: {\n        allowedBlocks: ['teaser', 'image'],\n        schemaEnhancer: {\n            inheritSchemaFrom: {\n                typeField: 'variation',\n            },\n        },\n    },\n    teaser: {\n        schemaEnhancer: {\n            childBlockConfig: {\n                editableFields: ['href', 'title', 'description'],\n            },\n        },\n        fieldMappings: {\n            default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        },\n    },\n}"
+        }
+      ]
+    },
+    "inherit-text-t2": {
+      "@type": "slate",
+      "plaintext": "inheritSchemaFrom: Parent inherits schema from selected child type. When the type field changes, child blocks sync to new type.typeField: Field name for selecting child type (e.g., 'variation')defaultsField: Field name for storing inherited defaults (e.g., 'itemDefaults')blocksField: Which blocks field the sub-blocks are in. Set to \"..\" to use the parent's allowedBlocks.filterConvertibleFrom: Only allow selecting a block type which can convert from the specified type.childBlockConfig: Child hides fields except editableFields when inside a parent with inheritSchemaFrom.",
+      "value": [
         {
           "children": [
             {
@@ -726,9 +792,9 @@
         }
       ]
     },
-    "annotations-text": {
+    "annotations-text-t0": {
       "@type": "slate",
-      "plaintext": "Add data attributes to your rendered HTML to enable progressively richer visual editing.",
+      "plaintext": "Add data attributes to your rendered HTML to enable progressively richer visual editing: data-block-uid=\"blockId\" \u2014 Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks.data-edit-text=\"fieldName\" \u2014 Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar.data-edit-media=\"fieldName\" \u2014 Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element.data-edit-link=\"fieldName\" \u2014 Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link. Example of a fully annotated slide block:",
       "value": [
         {
           "children": [
@@ -751,7 +817,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
+                  "text": " \u2014 Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
                 }
               ],
               "type": "li"
@@ -767,7 +833,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
+                  "text": " \u2014 Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
                 }
               ],
               "type": "li"
@@ -783,7 +849,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
+                  "text": " \u2014 Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
                 }
               ],
               "type": "li"
@@ -799,7 +865,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
+                  "text": " \u2014 Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
                 }
               ],
               "type": "li"
@@ -814,14 +880,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "annotations-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<div class=\"slide\" data-block-uid=\"slide-1\">\n    <img data-edit-media=\"image\" src=\"/big_news.jpg\"/>\n    <h2 data-edit-text=\"title\">Big News</h2>\n    <div data-edit-text=\"description\">\n        Check out <b>hydra</b>, it will change everything\n    </div>\n    <a data-edit-link=\"url\"\n       data-edit-text=\"buttonText\"\n       href=\"/big_news\">Read more</a>\n</div>"
-            }
-          ],
-          "type": "p"
+          "@id": "annotations-text-c1-html-414f7f",
+          "label": "HTML",
+          "language": "html",
+          "code": "<div class=\"slide\" data-block-uid=\"slide-1\">\n    <img data-edit-media=\"image\" src=\"/big_news.jpg\"/>\n    <h2 data-edit-text=\"title\">Big News</h2>\n    <div data-edit-text=\"description\">\n        Check out <b>hydra</b>, it will change everything\n    </div>\n    <a data-edit-link=\"url\"\n       data-edit-text=\"buttonText\"\n       href=\"/big_news\">Read more</a>\n</div>"
         }
       ]
     },
@@ -839,9 +908,9 @@
         }
       ]
     },
-    "comment-text": {
+    "comment-text-t0": {
       "@type": "slate",
-      "plaintext": "If you can't modify the markup, use HTML comment syntax to specify block attributes.",
+      "plaintext": "If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:",
       "value": [
         {
           "children": [
@@ -850,15 +919,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "comment-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<!-- hydra block-uid=block-123\n     edit-text=title(.card-title)\n     edit-media=url(img)\n     edit-link=href(a.link) -->\n<div class=\"third-party-card\">\n  <h3 class=\"card-title\">Title</h3>\n  <img src=\"image.jpg\">\n  <a class=\"link\" href=\"...\">Read more</a>\n</div>\n<!-- /hydra -->"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "comment-text-c1-html-06720d",
+          "label": "HTML",
+          "language": "html",
+          "code": "<!-- hydra block-uid=block-123\n     edit-text=title(.card-title)\n     edit-media=url(img)\n     edit-link=href(a.link) -->\n<div class=\"third-party-card\">\n  <h3 class=\"card-title\">Title</h3>\n  <img src=\"image.jpg\">\n  <a class=\"link\" href=\"...\">Read more</a>\n</div>\n<!-- /hydra -->"
+        }
+      ]
+    },
+    "comment-text-t2": {
+      "@type": "slate",
+      "plaintext": "Attributes without selectors apply to the root element: block-uid=xxxAttributes with selectors target child elements: edit-text=title(.card-title)Closing <!-- /hydra --> marks end of scopeSelf-closing <!-- hydra block-uid=xxx /--> applies only to next sibling element Supported attributes: block-uid, block-readonly, edit-text, edit-link, edit-media, block-add",
+      "value": [
         {
           "children": [
             {
@@ -920,9 +998,9 @@
         }
       ]
     },
-    "linkable-text": {
+    "linkable-text-t0": {
       "@type": "slate",
-      "plaintext": "Add data-linkable-allow to elements that should navigate during edit mode.",
+      "plaintext": "Add data-linkable-allow to elements that should navigate during edit mode (paging links, facet controls, etc.):",
       "value": [
         {
           "children": [
@@ -942,14 +1020,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "linkable-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<a href=\"/page?pg=2\" data-linkable-allow>Next</a>\n<select data-linkable-allow @change=\"handleFilter\">...</select>"
-            }
-          ],
-          "type": "p"
+          "@id": "linkable-text-c1-html-1f7e2b",
+          "label": "HTML",
+          "language": "html",
+          "code": "<a href=\"/page?pg=2\" data-linkable-allow>Next</a>\n<select data-linkable-allow @change=\"handleFilter\">...</select>"
         }
       ]
     },
@@ -967,9 +1048,9 @@
         }
       ]
     },
-    "pathsyntax-text": {
+    "pathsyntax-text-t0": {
       "@type": "slate",
-      "plaintext": "Use Unix-style paths in data-edit-* attributes to edit fields outside the current block.",
+      "plaintext": "The data-edit-text|edit-media|edit-link attributes support Unix-style paths to edit fields outside the current block: fieldName \u2014 edit the block's own field (default)../fieldName \u2014 edit the parent block's field../../fieldName \u2014 edit the grandparent's field/fieldName \u2014 edit the page metadata field",
       "value": [
         {
           "children": [
@@ -992,7 +1073,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — edit the block's own field (default)"
+                  "text": " \u2014 edit the block's own field (default)"
                 }
               ],
               "type": "li"
@@ -1008,7 +1089,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — edit the parent block's field"
+                  "text": " \u2014 edit the parent block's field"
                 }
               ],
               "type": "li"
@@ -1024,7 +1105,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — edit the grandparent's field"
+                  "text": " \u2014 edit the grandparent's field"
                 }
               ],
               "type": "li"
@@ -1040,22 +1121,31 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — edit the page metadata field"
+                  "text": " \u2014 edit the page metadata field"
                 }
               ],
               "type": "li"
             }
           ],
           "type": "ul"
-        },
+        }
+      ]
+    },
+    "pathsyntax-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<!-- Edit the page title (not inside any block) -->\n<h1 data-edit-text=\"/title\">My Page Title</h1>\n\n<!-- Edit the page description -->\n<p data-edit-text=\"/description\">Page description here</p>\n\n<!-- Inside a nested block, edit the parent container's title -->\n<h3 data-edit-text=\"../title\">Column Title</h3>"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "pathsyntax-text-c1-html-c2fcbe",
+          "label": "HTML",
+          "language": "html",
+          "code": "<!-- Edit the page title (not inside any block) -->\n<h1 data-edit-text=\"/title\">My Page Title</h1>\n\n<!-- Edit the page description -->\n<p data-edit-text=\"/description\">Page description here</p>\n\n<!-- Inside a nested block, edit the parent container's title -->\n<h3 data-edit-text=\"../title\">Column Title</h3>"
+        }
+      ]
+    },
+    "pathsyntax-text-t2": {
+      "@type": "slate",
+      "plaintext": "This allows fixed parts of the page (like headers) to be editable without being inside a block.",
+      "value": [
         {
           "children": [
             {
@@ -1080,9 +1170,9 @@
         }
       ]
     },
-    "readonly-text": {
+    "readonly-text-t0": {
       "@type": "slate",
-      "plaintext": "Add data-block-readonly to disable inline editing for all fields inside an element.",
+      "plaintext": "Add data-block-readonly (or <!-- hydra block-readonly --> comment) to disable inline editing for all fields inside an element:",
       "value": [
         {
           "children": [
@@ -1102,15 +1192,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "readonly-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<div class=\"teaser\" data-block-uid=\"teaser-1\">\n  <div data-block-readonly>\n    <h2 data-edit-text=\"title\">Target Page Title</h2>\n  </div>\n  <a data-edit-link=\"href\" href=\"/target\">Read more</a>\n</div>"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "readonly-text-c1-html-122291",
+          "label": "HTML",
+          "language": "html",
+          "code": "<div class=\"teaser\" data-block-uid=\"teaser-1\">\n  <div data-block-readonly>\n    <h2 data-edit-text=\"title\">Target Page Title</h2>\n  </div>\n  <a data-edit-link=\"href\" href=\"/target\">Read more</a>\n</div>"
+        }
+      ]
+    },
+    "readonly-text-t1": {
+      "@type": "slate",
+      "plaintext": "Or using comment syntax:",
+      "value": [
         {
           "children": [
             {
@@ -1118,14 +1217,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "readonly-text-c2": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<!-- hydra block-readonly -->\n<div class=\"listing-item\" data-block-uid=\"item-1\">...</div>"
-            }
-          ],
-          "type": "p"
+          "@id": "readonly-text-c2-html-e50883",
+          "label": "HTML",
+          "language": "html",
+          "code": "<!-- hydra block-readonly -->\n<div class=\"listing-item\" data-block-uid=\"item-1\">...</div>"
         }
       ]
     },
@@ -1143,9 +1245,9 @@
         }
       ]
     },
-    "nodeid-text": {
+    "nodeid-text-t0": {
       "@type": "slate",
-      "plaintext": "When rendering Slate nodes to DOM, your renderer must follow specific rules for data-node-id attributes.",
+      "plaintext": "When rendering Slate nodes to DOM, your renderer must follow these rules for data-node-id: Element nodes (p, strong, em, etc.) must have data-node-id matching the Slate node's nodeIdWrapper elements \u2014 If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children.",
       "value": [
         {
           "children": [
@@ -1179,7 +1281,7 @@
             {
               "children": [
                 {
-                  "text": "Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element"
+                  "text": "Wrapper elements \u2014 If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element"
                 }
               ],
               "type": "li"
@@ -1194,14 +1296,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "nodeid-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "Valid wrapper pattern:\n<strong data-node-id=\"0.1\"><b data-node-id=\"0.1\">bold</b></strong>\nBoth elements have the same node-id, so they count as one Slate child.\n\nInvalid (missing node-id on wrapper):\n<span class=\"my-style\"><strong data-node-id=\"0.1\">bold</strong></span>\nThis breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure."
-            }
-          ],
-          "type": "p"
+          "@id": "nodeid-text-c1-html-5990e0",
+          "label": "HTML",
+          "language": "html",
+          "code": "Valid wrapper pattern:\n<strong data-node-id=\"0.1\"><b data-node-id=\"0.1\">bold</b></strong>\nBoth elements have the same node-id, so they count as one Slate child.\n\nInvalid (missing node-id on wrapper):\n<span class=\"my-style\"><strong data-node-id=\"0.1\">bold</strong></span>\nThis breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure."
         }
       ]
     },
@@ -1219,9 +1324,9 @@
         }
       ]
     },
-    "slateexample-text": {
+    "slateexample-text-t0": {
       "@type": "slate",
-      "plaintext": "Full example showing Slate data structure, renderer function, and usage.",
+      "plaintext": "Slate data structure (value is an array but always contains a single root node):",
       "value": [
         {
           "children": [
@@ -1230,15 +1335,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "slateexample-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "{\n  \"value\": [\n    {\n      \"type\": \"p\", \"nodeId\": \"0\",\n      \"children\": [\n        { \"text\": \"Hello \" },\n        { \"type\": \"strong\", \"nodeId\": \"0.1\",\n          \"children\": [{ \"text\": \"world\" }] },\n        { \"text\": \"! Visit \" },\n        { \"type\": \"link\", \"nodeId\": \"0.3\",\n          \"data\": { \"url\": \"/about\" },\n          \"children\": [{ \"text\": \"our page\" }] }\n      ]\n    }\n  ]\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "slateexample-text-c1-json-0d7d89",
+          "label": "JSON",
+          "language": "json",
+          "code": "{\n  \"value\": [\n    {\n      \"type\": \"p\", \"nodeId\": \"0\",\n      \"children\": [\n        { \"text\": \"Hello \" },\n        { \"type\": \"strong\", \"nodeId\": \"0.1\",\n          \"children\": [{ \"text\": \"world\" }] },\n        { \"text\": \"! Visit \" },\n        { \"type\": \"link\", \"nodeId\": \"0.3\",\n          \"data\": { \"url\": \"/about\" },\n          \"children\": [{ \"text\": \"our page\" }] }\n      ]\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "slateexample-text-t1": {
+      "@type": "slate",
+      "plaintext": "Renderer:",
+      "value": [
         {
           "children": [
             {
@@ -1246,15 +1360,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "slateexample-text-c2": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "function renderSlate(nodes) {\n  return (nodes || []).map(node => {\n    if (node.text !== undefined) return escapeHtml(node.text);\n    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong',\n                  em:'em', link:'a' }[node.type] || 'span';\n    const attrs = node.type === 'link'\n      ? ` href=\"${node.data?.url || '#'}\"`  : '';\n    return `<${tag} data-node-id=\"${node.nodeId}\"${attrs}>${renderSlate(node.children)}</${tag}>`;\n  }).join('');\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "slateexample-text-c2-javascript-44b686",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "function renderSlate(nodes) {\n  return (nodes || []).map(node => {\n    if (node.text !== undefined) return escapeHtml(node.text);\n    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong',\n                  em:'em', link:'a' }[node.type] || 'span';\n    const attrs = node.type === 'link'\n      ? ` href=\"${node.data?.url || '#'}\"`  : '';\n    return `<${tag} data-node-id=\"${node.nodeId}\"${attrs}>${renderSlate(node.children)}</${tag}>`;\n  }).join('');\n}"
+        }
+      ]
+    },
+    "slateexample-text-t2": {
+      "@type": "slate",
+      "plaintext": "Usage:",
+      "value": [
         {
           "children": [
             {
@@ -1262,14 +1385,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "slateexample-text-c3": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "<div data-block-uid=\"block-1\" data-edit-text=\"value\">\n  <!-- renderSlate(block.value) output goes here -->\n</div>"
-            }
-          ],
-          "type": "p"
+          "@id": "slateexample-text-c3-html-549235",
+          "label": "HTML",
+          "language": "html",
+          "code": "<div data-block-uid=\"block-1\" data-edit-text=\"value\">\n  <!-- renderSlate(block.value) output goes here -->\n</div>"
         }
       ]
     }
@@ -1280,35 +1406,65 @@
       "intro-1",
       "sep-1",
       "bridge-heading",
-      "bridge-text",
+      "bridge-text-t0",
+      "bridge-text-c1",
+      "bridge-text-t2",
       "multi-heading",
-      "multi-text",
+      "multi-text-t0",
+      "multi-text-c1",
       "pathtransform-heading",
-      "pathtransform-text",
+      "pathtransform-text-t0",
+      "pathtransform-text-c1",
+      "pathtransform-text-t2",
       "callback-heading",
-      "callback-text",
+      "callback-text-t0",
+      "callback-text-c1",
+      "callback-text-t2",
       "custom-heading",
-      "custom-text",
+      "custom-text-t0",
+      "custom-text-c1",
+      "custom-text-t2",
       "enhancers-heading",
-      "enhancers-text",
+      "enhancers-text-t0",
+      "enhancers-text-c1",
+      "enhancers-text-t2",
       "conversion-heading",
-      "conversion-text",
+      "conversion-text-t0",
+      "conversion-text-c1",
+      "conversion-text-t2",
       "inherit-heading",
-      "inherit-text",
+      "inherit-text-t0",
+      "inherit-text-c1",
+      "inherit-text-t2",
       "annotations-heading",
-      "annotations-text",
+      "annotations-text-t0",
+      "annotations-text-c1",
       "comment-heading",
-      "comment-text",
+      "comment-text-t0",
+      "comment-text-c1",
+      "comment-text-t2",
       "linkable-heading",
-      "linkable-text",
+      "linkable-text-t0",
+      "linkable-text-c1",
       "pathsyntax-heading",
-      "pathsyntax-text",
+      "pathsyntax-text-t0",
+      "pathsyntax-text-c1",
+      "pathsyntax-text-t2",
       "readonly-heading",
-      "readonly-text",
+      "readonly-text-t0",
+      "readonly-text-c1",
+      "readonly-text-t1",
+      "readonly-text-c2",
       "nodeid-heading",
-      "nodeid-text",
+      "nodeid-text-t0",
+      "nodeid-text-c1",
       "slateexample-heading",
-      "slateexample-text"
+      "slateexample-text-t0",
+      "slateexample-text-c1",
+      "slateexample-text-t1",
+      "slateexample-text-c2",
+      "slateexample-text-t2",
+      "slateexample-text-c3"
     ]
   },
   "contributors": [],

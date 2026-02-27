@@ -41,28 +41,6 @@
         }
       ]
     },
-    "diagram-text": {
-      "@type": "slate",
-      "plaintext": "Volto is split into Rendering and CMS UI/Admin UI, with the Rendering part replaceable with other implementations.",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations."
-            }
-          ],
-          "type": "p"
-        },
-        {
-          "children": [
-            {
-              "text": "                      Browser            RestAPI             Server\n\n                  ┌──────────────┐                       ┌─────────────┐\n Anon/Editing     │    Volto     │◄─────────────────────►│    Plone    │\n                  └──────────────┘                       └─────────────┘\n\n─────────────────────────────────────────────────────────────────────────\n\n              │   ┌──────────────┐                       ┌─────────────┐\n              │   │   Frontend   │◄──────────────────────┤    Plone    │\n              │   └──hydra.js────┘                       └─────────────┘\n              │          ▲                                  ▲\n Editing     UI          │ iFrame Bridge                    │\n              │          ▼                                  │\n              │   ┌──────────────┐                          │\n              │   │    Hydra     │◄─────────────────────────┘\n              │   └──────────────┘\n\n                  ┌──────────────┐                       ┌─────────────┐\n Anon             │   Frontend   │◄──────────────────────┤    Plone    │\n                  └──────────────┘                       └─────────────┘"
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
     "guide-heading": {
       "@type": "slate",
       "plaintext": "Building a Frontend for Headless Plone",
@@ -199,6 +177,31 @@
           "type": "p"
         }
       ]
+    },
+    "diagram-text": {
+      "@type": "slate",
+      "plaintext": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "diagram-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "diagram-text-c1-bash-1b6fcd",
+          "label": "Architecture",
+          "language": "bash",
+          "code": "                      Browser            RestAPI             Server\n\n                  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n Anon/Editing     \u2502    Volto     \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25ba\u2502    Plone    \u2502\n                  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n              \u2502   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n              \u2502   \u2502   Frontend   \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524    Plone    \u2502\n              \u2502   \u2514\u2500\u2500hydra.js\u2500\u2500\u2500\u2500\u2518                       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n              \u2502          \u25b2                                  \u25b2\n Editing     UI          \u2502 iFrame Bridge                    \u2502\n              \u2502          \u25bc                                  \u2502\n              \u2502   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                          \u2502\n              \u2502   \u2502    Hydra     \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n              \u2502   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n                  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n Anon             \u2502   Frontend   \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524    Plone    \u2502\n                  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -208,6 +211,7 @@
       "sep-1",
       "diagram-heading",
       "diagram-text",
+      "diagram-text-c1",
       "guide-heading",
       "guide-text"
     ]

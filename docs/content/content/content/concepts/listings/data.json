@@ -7,9 +7,9 @@
     "title-1": {
       "@type": "title"
     },
-    "intro-1": {
+    "intro-1-t0": {
       "@type": "slate",
-      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. expandListingBlocks walks a layout, fetches results for each listing-type block, and returns expanded block objects.",
+      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. expandListingBlocks(layout, options) walks a layout, fetches results for each listing-type block, and returns an array of block objects with @uid and @type. You tell it which block types need fetching via a fetchItems map \u2014 keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:",
       "value": [
         {
           "children": [
@@ -44,18 +44,21 @@
               "type": "strong"
             },
             {
-              "text": " map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
+              "text": " map \u2014 keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "intro-1-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "const items = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n  paging,\n});"
-            }
-          ],
-          "type": "p"
+          "@id": "intro-1-c1-javascript-cd69ac",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const items = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n  paging,\n});"
         }
       ]
     },
@@ -79,9 +82,9 @@
         }
       ]
     },
-    "example-text": {
+    "example-text-t0": {
       "@type": "slate",
-      "plaintext": "A grid with a mix of listing and other blocks with a single paging at the bottom.",
+      "plaintext": "A grid can have a mix of listing and static blocks sharing a single paging. The staticBlocks helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:",
       "value": [
         {
           "children": [
@@ -101,14 +104,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "example-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        fetchItems[blocks[id]['@type']] ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
-            }
-          ],
-          "type": "p"
+          "@id": "example-text-c1-jsx-dab0b1",
+          "label": "JSX",
+          "language": "jsx",
+          "code": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        fetchItems[blocks[id]['@type']] ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
         }
       ]
     },
@@ -128,7 +134,7 @@
     },
     "options-text": {
       "@type": "slate",
-      "plaintext": "Options for expandListingBlocks: blocks, fetchItems (type→fetcher map), paging, itemTypeField, defaultItemType.",
+      "plaintext": "Options for expandListingBlocks: blocks, fetchItems (type\u2192fetcher map), paging, itemTypeField, defaultItemType.",
       "value": [
         {
           "children": [
@@ -143,7 +149,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Map of blockId to block data"
+                  "text": " \u2014 Map of blockId to block data"
                 }
               ],
               "type": "li"
@@ -159,7 +165,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Required. Map of { blockType: async (block, { start, size }) => { items, total } }. Keys declare which block types to expand; values are fetcher functions. Use ploneFetchItems() for Plone backends."
+                  "text": " \u2014 Required. Map of { blockType: async (block, { start, size }) => { items, total } }. Keys declare which block types to expand; values are fetcher functions. Use ploneFetchItems() for Plone backends."
                 }
               ],
               "type": "li"
@@ -175,7 +181,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Shared paging object { start, size } (mutated in-place with computed values)"
+                  "text": " \u2014 Shared paging object { start, size } (mutated in-place with computed values)"
                 }
               ],
               "type": "li"
@@ -191,7 +197,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Field on the listing block that holds the item type (default: 'itemType')"
+                  "text": " \u2014 Field on the listing block that holds the item type (default: 'itemType')"
                 }
               ],
               "type": "li"
@@ -207,7 +213,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Fallback type when field is not set (default: 'summary')"
+                  "text": " \u2014 Fallback type when field is not set (default: 'summary')"
                 }
               ],
               "type": "li"
@@ -246,7 +252,7 @@
               "type": "strong"
             },
             {
-              "text": " — creates a fetcher function for Plone backends, suitable as a value in the fetchItems map. Normalizes results by packaging image_field + image_scales into a self-contained image object { @id, image_field, image_scales }."
+              "text": " \u2014 creates a fetcher function for Plone backends, suitable as a value in the fetchItems map. Normalizes results by packaging image_field + image_scales into a self-contained image object { @id, image_field, image_scales }."
             }
           ],
           "type": "p"
@@ -275,9 +281,9 @@
         }
       ]
     },
-    "fieldmapping-text": {
+    "fieldmapping-text-t0": {
       "@type": "slate",
-      "plaintext": "fieldMapping maps source fields to target block fields — only mapped fields appear on expanded items.",
+      "plaintext": "fieldMapping on a listing block controls which fields appear on expanded items \u2014 only mapped fields are included. Default: { @id \u2192 href, title \u2192 title, description \u2192 description, image \u2192 image }. Values can be a string (rename) or { field, type } for conversions:",
       "value": [
         {
           "children": [
@@ -290,18 +296,21 @@
               "type": "strong"
             },
             {
-              "text": " on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: { @id → href, title → title, description → description, image → image }. Values can be a string (rename) or { field, type } for conversions:"
+              "text": " on a listing block controls which fields appear on expanded items \u2014 only mapped fields are included. Default: { @id \u2192 href, title \u2192 title, description \u2192 description, image \u2192 image }. Values can be a string (rename) or { field, type } for conversions:"
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "fieldmapping-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"
-            }
-          ],
-          "type": "p"
+          "@id": "fieldmapping-text-c1-json-5a806b",
+          "label": "JSON",
+          "language": "json",
+          "code": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array\u2192join, image\u2192URL), link (\u2192[{@id}]), image (pass through)"
         }
       ]
     },
@@ -319,9 +328,9 @@
         }
       ]
     },
-    "itemtype-text": {
+    "itemtype-text-t0": {
       "@type": "slate",
-      "plaintext": "Use itemType on the listing block to control what @type expanded items get.",
+      "plaintext": "Use itemType (or variation) on the listing block to control what @type expanded items get. Combined with inheritSchemaFrom, the listing's sidebar shows fields from the selected item type:",
       "value": [
         {
           "children": [
@@ -352,14 +361,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "itemtype-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "listing: {\n    schemaEnhancer: ({ schema }) => {\n        schema.properties.itemType = {\n            title: 'Display as',\n            choices: [['teaser', 'Teaser'], ['card', 'Card']],\n        };\n        return schema;\n    },\n    inheritSchemaFrom: {\n        typeField: 'itemType',\n        blocksField: null,\n    },\n}"
-            }
-          ],
-          "type": "p"
+          "@id": "itemtype-text-c1-javascript-5113e6",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "listing: {\n    schemaEnhancer: ({ schema }) => {\n        schema.properties.itemType = {\n            title: 'Display as',\n            choices: [['teaser', 'Teaser'], ['card', 'Card']],\n        };\n        return schema;\n    },\n    inheritSchemaFrom: {\n        typeField: 'itemType',\n        blocksField: null,\n    },\n}"
         }
       ]
     },
@@ -395,7 +407,7 @@
               "type": "strong"
             },
             {
-              "text": " — expandListingBlocks mutates it with computed values:"
+              "text": " \u2014 expandListingBlocks mutates it with computed values:"
             }
           ],
           "type": "p"
@@ -413,7 +425,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (number) — Zero-based current page index"
+                  "text": " (number) \u2014 Zero-based current page index"
                 }
               ],
               "type": "li"
@@ -429,7 +441,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (number) — Total number of pages"
+                  "text": " (number) \u2014 Total number of pages"
                 }
               ],
               "type": "li"
@@ -445,7 +457,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (number) — Total item count across all blocks"
+                  "text": " (number) \u2014 Total item count across all blocks"
                 }
               ],
               "type": "li"
@@ -461,7 +473,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (number | null) — Previous page index, or null on first page"
+                  "text": " (number | null) \u2014 Previous page index, or null on first page"
                 }
               ],
               "type": "li"
@@ -477,7 +489,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (number | null) — Next page index, or null on last page"
+                  "text": " (number | null) \u2014 Next page index, or null on last page"
                 }
               ],
               "type": "li"
@@ -493,7 +505,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (array) — Window of ~5 page objects: { start, page } where page is 1-based"
+                  "text": " (array) \u2014 Window of ~5 page objects: { start, page } where page is 1-based"
                 }
               ],
               "type": "li"
@@ -509,7 +521,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " (Promise) — Resolves after all expandListingBlocks calls complete (for async paging UI)"
+                  "text": " (Promise) \u2014 Resolves after all expandListingBlocks calls complete (for async paging UI)"
                 }
               ],
               "type": "li"
@@ -551,18 +563,22 @@
   "blocks_layout": {
     "items": [
       "title-1",
-      "intro-1",
+      "intro-1-t0",
+      "intro-1-c1",
       "sep-1",
       "example-heading",
-      "example-text",
+      "example-text-t0",
+      "example-text-c1",
       "options-heading",
       "options-text",
       "plonefetch-heading",
       "plonefetch-text",
       "fieldmapping-heading",
-      "fieldmapping-text",
+      "fieldmapping-text-t0",
+      "fieldmapping-text-c1",
       "itemtype-heading",
-      "itemtype-text",
+      "itemtype-text-t0",
+      "itemtype-text-c1",
       "paging-heading",
       "paging-text",
       "notes-heading",

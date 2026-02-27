@@ -34,6 +34,9 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false, // "npm run generate -- --envName edit" == SPA
+      app: {
+        baseURL: process.env.NUXT_EDIT_BASE_URL || '/',
+      },
       nitro: {
         preset: 'static'
       },

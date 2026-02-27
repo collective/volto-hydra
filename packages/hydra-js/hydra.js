@@ -4069,6 +4069,44 @@ export class Bridge {
         field.setAttribute('contenteditable', 'true');
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
 
+        // For <pre> elements, handle Enter (newline) and Tab (indent) properly
+        const isPreElement = field.tagName === 'PRE' || !!field.closest('pre');
+        if (isPreElement && !field._preKeyHandler) {
+          field._preKeyHandler = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              // Insert a plain \n at cursor position instead of browser's <div>
+              const sel = window.getSelection();
+              if (!sel.rangeCount) return;
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              const textNode = document.createTextNode('\n');
+              range.insertNode(textNode);
+              // Move cursor after the newline
+              range.setStartAfter(textNode);
+              range.setEndAfter(textNode);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              field.dispatchEvent(new Event('input', { bubbles: true }));
+            } else if (e.key === 'Tab') {
+              e.preventDefault();
+              // Insert 2 spaces for indentation
+              const sel = window.getSelection();
+              if (!sel.rangeCount) return;
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              const spaces = document.createTextNode('  ');
+              range.insertNode(spaces);
+              range.setStartAfter(spaces);
+              range.setEndAfter(spaces);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              field.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          };
+          field.addEventListener('keydown', field._preKeyHandler);
+        }
+
         // For plain string fields (single-line), Enter navigates to next field or adds a block
         if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
           field._enterKeyHandler = (e) => {

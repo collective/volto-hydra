@@ -77,7 +77,15 @@
     "f51777793dab4a61982e35dfa71d0575/data.json",
     "e017bd4a0b3845aab26f6d855cc4ef14/data.json",
     "1efc7b73b28e4edeaf40040709299d69/data.json",
-    "7950cae06c994276930f6d13151308c5/data.json"
+    "7950cae06c994276930f6d13151308c5/data.json",
+    "concepts/data.json",
+    "concepts/architecture/data.json",
+    "concepts/integration-levels/data.json",
+    "concepts/container-blocks/data.json",
+    "concepts/listings/data.json",
+    "concepts/templates/data.json",
+    "concepts/deployment/data.json",
+    "concepts/advanced/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -453,6 +461,62 @@
       }
     },
     "plone_site_root": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-architecture-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-integration-levels-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-container-blocks-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-listings-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-templates-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-deployment-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-advanced-001": {
       "local_roles": {
         "admin": [
           "Owner"

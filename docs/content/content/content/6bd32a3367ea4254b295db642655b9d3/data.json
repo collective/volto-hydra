@@ -38,36 +38,42 @@
       "variation": "default"
     },
     "2a597dde-dd2b-4c66-816c-09e243a188f5": {
-      "@type": "listing",
-      "block": "24280e07-e962-4414-8ee5-cdaf58ca5f35",
-      "headline": "Listing: Grid",
+      "@type": "gridBlock",
+      "headline": "Listing: Grid (Teaser)",
       "headlineTag": "h2",
-      "query": [],
-      "querystring": {
-        "limit": "5",
-        "query": [
-          {
-            "i": "portal_type",
-            "o": "plone.app.querystring.operation.selection.any",
-            "v": [
-              "Document"
-            ]
+      "blocks": {
+        "grid-listing-1": {
+          "@type": "listing",
+          "querystring": {
+            "limit": "6",
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": [
+                  "Document"
+                ]
+              },
+              {
+                "i": "Subject",
+                "o": "plone.app.querystring.operation.selection.none",
+                "v": [
+                  "main folder"
+                ]
+              }
+            ],
+            "sort_on": "getId",
+            "sort_order": "ascending"
           },
-          {
-            "i": "Subject",
-            "o": "plone.app.querystring.operation.selection.none",
-            "v": [
-              "main folder"
-            ]
-          }
-        ],
-        "sort_on": "getId",
-        "sort_order": "ascending"
+          "variation": "teaser"
+        }
+      },
+      "blocks_layout": {
+        "items": ["grid-listing-1"]
       },
       "styles": {
         "backgroundColor": "transparent"
-      },
-      "variation": "grid"
+      }
     },
     "43068b6d-d8e9-4acc-912b-eabcdc650939": {
       "@type": "title"
@@ -105,25 +111,35 @@
       "variation": "summary"
     },
     "c2eaacd0-4e96-4344-a0ac-26ed644fc503": {
-      "@type": "listing",
-      "block": "c2eaacd0-4e96-4344-a0ac-26ed644fc503",
-      "headline": "Listing: Bilder-Slider",
+      "@type": "slider",
+      "headline": "Listing: Image Slider",
       "headlineTag": "h2",
-      "query": [],
-      "querystring": {
-        "query": [
-          {
-            "i": "portal_type",
-            "o": "plone.app.querystring.operation.selection.any",
-            "v": [
-              "Image"
-            ]
-          }
-        ],
-        "sort_order": "ascending"
+      "autoplayDelay": 4000,
+      "autoplayEnabled": false,
+      "autoplayJump": false,
+      "slides": [],
+      "blocks": {
+        "slider-listing-1": {
+          "@type": "listing",
+          "querystring": {
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": [
+                  "Image"
+                ]
+              }
+            ],
+            "sort_order": "ascending"
+          },
+          "variation": "image"
+        }
       },
-      "styles": {},
-      "variation": "imageGallery"
+      "blocks_layout": {
+        "items": ["slider-listing-1"]
+      },
+      "styles": {}
     }
   },
   "blocks_layout": {

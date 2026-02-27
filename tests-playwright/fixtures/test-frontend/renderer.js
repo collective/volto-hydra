@@ -229,6 +229,9 @@ async function renderBlock(blockId, block) {
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
+        case 'codeExample':
+            wrapper.innerHTML = renderCodeExampleBlock(block, blockId);
+            break;
         case 'title':
             // Title block is just rendered by page title, empty here
             wrapper.innerHTML = '';
@@ -1090,6 +1093,41 @@ function renderSliderBlock(block, blockId) {
         }
     });
     html += '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Render a codeExample block with tabs as child blocks.
+ * Each tab has its own data-block-uid and the code is shown in a <pre> element.
+ * @param {Object} block - Code example block data
+ * @param {string} blockId - Block ID
+ * @returns {string} HTML string
+ */
+function renderCodeExampleBlock(block, blockId) {
+    const tabs = block.tabs || [];
+    let html = '<div data-block-container="{add:\'horizontal\'}" style="background: #1a1a2e; border-radius: 8px; overflow: hidden; margin: 8px 0;">';
+
+    // Tab bar (only when 2+ tabs)
+    if (tabs.length > 1) {
+        html += '<div data-tab-bar style="display: flex; background: #16213e; border-bottom: 1px solid #334;">';
+        tabs.forEach((tab) => {
+            const tabId = tab['@id'];
+            html += `<button data-block-uid="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+        });
+        html += '</div>';
+    }
+
+    // Each tab is a child block - only first is visible
+    tabs.forEach((tab, index) => {
+        const tabId = tab['@id'];
+        const display = index === 0 ? 'block' : 'none';
+        const code = (tab.code || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += `<div data-block-uid="${tabId}" data-block-add="right" style="display: ${display};">`;
+        html += `<pre data-edit-text="code" style="padding: 16px; margin: 0; color: #e0e0e0; white-space: pre-wrap; font-size: 13px;"><code>${code}</code></pre>`;
+        html += '</div>';
+    });
 
     html += '</div>';
     return html;

@@ -891,7 +891,7 @@ app.post('/@logout', (req, res) => {
  * Create new content (e.g., Image upload)
  * Used by ImageWidget for file uploads
  */
-app.post('/*', (req, res, next) => {
+app.post('/{*path}', (req, res, next) => {
   // Skip special endpoints (already handled above or below)
   if (req.path.startsWith('/@') || req.path.includes('/@')) {
     return next();
@@ -1364,7 +1364,7 @@ app.get('/@types/:typeName', (req, res) => {
  * GET /:path/@types/:typeName
  * Get content type schema for a specific content path
  */
-app.get('*/@types/:typeName', (req, res) => {
+app.get('{*prefix}/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
   res.json(getTypeSchema(typeName));
 });
@@ -1373,7 +1373,7 @@ app.get('*/@types/:typeName', (req, res) => {
  * GET /:path/@breadcrumbs
  * Get breadcrumb trail
  */
-app.get('*/@breadcrumbs', (req, res) => {
+app.get('{*prefix}/@breadcrumbs', (req, res) => {
   const fullPath = req.path.replace('/@breadcrumbs', '');
   const parts = fullPath.split('/').filter((p) => p);
   const items = [{ '@id': 'http://localhost:8888/', title: 'Home' }];
@@ -1438,7 +1438,7 @@ app.get(/.*\/@actions$/, (req, res) => {
  *   metadata_fields: '_all'
  * }
  */
-app.post('*/@querystring-search', (req, res) => {
+app.post('{*prefix}/@querystring-search', (req, res) => {
   const contextPath = req.path.replace('/++api++/@querystring-search', '').replace('/@querystring-search', '');
   const baseUrl = `http://localhost:${PORT}`;
 
@@ -1581,7 +1581,7 @@ app.post('*/@querystring-search', (req, res) => {
  * Supports path.depth parameter to get children of a specific path
  * Supports path.query parameter to get a specific content item
  */
-app.get('*/@search', (req, res) => {
+app.get('{*prefix}/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
@@ -1707,7 +1707,7 @@ app.get('*/@search', (req, res) => {
  * Get folder contents for content browsing
  * Returns items at the parent folder level (siblings of current content)
  */
-app.get('*/@contents', (req, res) => {
+app.get('{*prefix}/@contents', (req, res) => {
   const contentPath = req.path.replace('/@contents', '') || '/';
 
   // Helper to format content item for response
@@ -1775,7 +1775,7 @@ app.get('*/@contents', (req, res) => {
  * Form submission endpoint (collective.volto.formsupport)
  * Accepts { block_id, data: [{ field_id, label, value }] }
  */
-app.post('*/@submit-form', (req, res) => {
+app.post('{*prefix}/@submit-form', (req, res) => {
   if (process.env.DEBUG) {
     console.log(`POST @submit-form: path=${req.path}`);
   }
@@ -1786,7 +1786,7 @@ app.post('*/@submit-form', (req, res) => {
  * POST /:path/@lock
  * Lock content for editing
  */
-app.post('*/@lock', (req, res) => {
+app.post('{*prefix}/@lock', (req, res) => {
   res.json({
     locked: true,
     stealable: true,
@@ -1800,7 +1800,7 @@ app.post('*/@lock', (req, res) => {
  * DELETE /:path/@lock
  * Unlock content after editing
  */
-app.delete('*/@lock', (req, res) => {
+app.delete('{*prefix}/@lock', (req, res) => {
   res.json({ locked: false });
 });
 
@@ -1809,7 +1809,7 @@ app.delete('*/@lock', (req, res) => {
  * Resolve a UID to content - used by distribution content that references
  * other content via resolveuid/UID links
  */
-app.get('*/resolveuid/:uid', (req, res) => {
+app.get('{*prefix}/resolveuid/:uid', (req, res) => {
   const uid = req.params.uid;
   const contentPath = uidToPathMap[uid];
   if (contentPath) {
@@ -1828,7 +1828,7 @@ app.get('*/resolveuid/:uid', (req, res) => {
  * Serves actual image files from content directories if they exist,
  * otherwise falls back to placeholder SVGs.
  */
-app.get('*/@@images/*', (req, res) => {
+app.get('{*prefix}/@@images/{*rest}', (req, res) => {
   // Extract content path, field name, and scale from URL
   // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, fieldName=image, scale=preview
   // e.g., /block/grid-block/@@images/preview_image/large -> fieldName=preview_image, scale=large
@@ -1893,7 +1893,7 @@ app.get('*/@@images/*', (req, res) => {
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
  */
-app.get('*', (req, res, next) => {
+app.get('{*path}', (req, res, next) => {
   // Only handle API requests (with ++api++ prefix)
   // Frontend requests should be handled by static file middleware
   if (!req.isApiRequest) {
@@ -1954,7 +1954,7 @@ app.get('*', (req, res, next) => {
  * Default session ('_default') does NOT persist to ensure test isolation for
  * unauthenticated requests.
  */
-app.patch('*', (req, res) => {
+app.patch('{*path}', (req, res) => {
   const urlPath = req.path;
   const cleanPath = urlPath.replace('/++api++', '');
   const sessionId = getSessionId(req);
@@ -2017,7 +2017,7 @@ app.get('/shared-block-schemas.js', (req, res) => {
 // Serve static files from content directories (for images, etc.)
 // This allows content like /pretagov/images/client-1.png to be served directly
 const STATIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.pdf'];
-app.get('*', (req, res, next) => {
+app.get('{*path}', (req, res, next) => {
   // Skip API requests and requests without file extensions
   if (req.isApiRequest) return next();
 
@@ -2060,7 +2060,7 @@ app.use(express.static(FRONTEND_DIR, {
 }));
 
 // Fallback to index.html for any non-API routes (SPA routing)
-app.get('*', (req, res) => {
+app.get('{*path}', (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 

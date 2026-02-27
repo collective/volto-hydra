@@ -715,6 +715,9 @@
     </form>
   </div>
 
+  <!-- Code example block: tabbed code with syntax highlighting -->
+  <CodeExample v-else-if="block['@type'] == 'codeExample'" :block_uid="block_uid" :block="block" />
+
   <!-- Empty block - placeholder for deleted blocks in containers -->
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
   </div>

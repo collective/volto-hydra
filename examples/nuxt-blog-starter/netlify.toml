@@ -1,6 +1,12 @@
 [build]
-  command = "npm run generate"
+  command = "bash scripts/netlify-build.sh"
   publish = ".output/public"
+
+# SPA fallback for edit mode (client-side routing)
+[[redirects]]
+  from = "/edit/*"
+  to = "/edit/index.html"
+  status = 200
 
 [images]
   remote_images = ["https://hydra-api.pretagov.com/.*"]
