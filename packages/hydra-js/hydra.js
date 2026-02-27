@@ -9806,6 +9806,96 @@ export class Bridge {
 // Use window.__hydraBridge to survive module hot-reloading in frameworks like Nuxt/Vite
 let bridgeInstance = (typeof window !== 'undefined' && window.__hydraBridge) || null;
 
+////////////////////////////////////////////////////////////////////////////////
+// Bridge Connection Diagnostic
+////////////////////////////////////////////////////////////////////////////////
+
+let _diagnosticShown = false;
+
+/**
+ * Show a diagnostic popup when the bridge can't connect.
+ * Automatically called when hydra.js detects it's in an iframe with edit signals
+ * but the bridge doesn't initialize within a timeout.
+ */
+function _showBridgeDiagnostic(info) {
+  if (_diagnosticShown) return;
+  if (typeof document === 'undefined') return;
+  _diagnosticShown = true;
+
+  const el = document.createElement('div');
+  el.id = 'hydra-bridge-diagnostic';
+  el.setAttribute('style', [
+    'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483647',
+    'max-width:440px', 'background:#fef2f2', 'border:2px solid #dc2626',
+    'border-radius:8px', 'padding:16px', 'box-shadow:0 4px 12px rgba(0,0,0,0.15)',
+    'font-family:monospace', 'font-size:13px', 'line-height:1.6', 'color:#7f1d1d',
+  ].join(';'));
+
+  const rows = [
+    `<strong>window.name:</strong> "${info.windowName || '(empty)'}"`,
+    `<strong>In iframe:</strong> ${info.inIframe}`,
+    `<strong>Admin origin:</strong> ${info.adminOrigin || '(none)'}`,
+    `<strong>initBridge called:</strong> ${info.bridgeCreated}`,
+    `<strong>INITIAL_DATA received:</strong> ${info.bridgeInitialized}`,
+  ];
+
+  let hint = '';
+  if (info.inIframe && !info.hasHydraName) {
+    hint = 'The admin should set the iframe name to "hydra-edit:&lt;origin&gt;". ' +
+      'Check that Volto sets window.name on the iframe element.';
+  } else if (info.bridgeCreated && !info.bridgeInitialized) {
+    hint = 'INIT was sent but admin did not respond with INITIAL_DATA. ' +
+      'Check that adminOrigin matches the parent window origin.';
+  } else if (!info.bridgeCreated) {
+    hint = 'hydra.js was imported but initBridge() was never called. ' +
+      'The frontend should call initBridge() in edit mode.';
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong style="color:#dc2626;font-size:14px">Hydra Bridge: Not Connected</strong>
+      <button id="hydra-diag-dismiss" style="background:none;border:none;cursor:pointer;font-size:18px;color:#666">&times;</button>
+    </div>
+    <div>${rows.join('<br>')}</div>
+    ${hint ? `<div style="margin-top:8px;padding:8px;background:#fee2e2;border-radius:4px;font-size:12px">${hint}</div>` : ''}
+  `;
+
+  document.body.appendChild(el);
+  document.getElementById('hydra-diag-dismiss').addEventListener('click', () => el.remove());
+}
+
+// Auto-detect bridge connection issues when hydra.js is loaded in an iframe
+// with edit signals (window.name or _edit param) but bridge doesn't connect.
+if (typeof window !== 'undefined' && window.self !== window.top) {
+  const _url = new URL(window.location.href);
+  const _editParam = _url.searchParams.get('_edit');
+  const _isEditMode = window.name.startsWith('hydra-edit:');
+  const _expectsHydra = _isEditMode || _editParam === 'true';
+
+  if (_expectsHydra) {
+    // Check after page load + 5 seconds — enough time for bridge to connect
+    const _checkConnection = () => {
+      setTimeout(() => {
+        if (!bridgeInstance || !bridgeInstance.initialized) {
+          _showBridgeDiagnostic({
+            windowName: window.name,
+            hasHydraName: _isEditMode,
+            inIframe: true,
+            adminOrigin: bridgeInstance?.adminOrigin || null,
+            bridgeCreated: !!bridgeInstance,
+            bridgeInitialized: bridgeInstance?.initialized || false,
+          });
+        }
+      }, 5000);
+    };
+    if (document.readyState === 'complete') {
+      _checkConnection();
+    } else {
+      window.addEventListener('load', _checkConnection);
+    }
+  }
+}
+
 /**
  * Initialize the bridge
  *
