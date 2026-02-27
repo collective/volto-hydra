@@ -1336,9 +1336,16 @@ const Iframe = (props) => {
             break;
           }
           // User clicked a nav link in iframe - they want to VIEW that page, not edit it
+          // Strip the iframe's base path prefix from the reported path
+          // e.g., iframe at /edit/about → content path /about
+          const iframeBasePath = u ? new URL(u).pathname.replace(/\/$/, '') : '';
+          let navPath = event.data.path;
+          if (iframeBasePath && navPath.startsWith(iframeBasePath)) {
+            navPath = navPath.slice(iframeBasePath.length) || '/';
+          }
           // Update module-level state BEFORE history.push so useEffect knows iframe already has this path
-          persistedIframe = { frontendUrl: u, path: event.data.path, isEdit: false };
-          history.push(event.data.path);
+          persistedIframe = { frontendUrl: u, path: navPath, isEdit: false };
+          history.push(navPath);
           break;
         }
 
@@ -2153,12 +2160,19 @@ const Iframe = (props) => {
           // Check if iframe navigated to a different page (e.g., user clicked nav link)
           // User confirmed beforeunload warning, so they're leaving edit mode
           if (event.data.currentPath) {
+            // Strip the iframe's base path prefix from the reported path
+            // e.g., iframe at /edit/about → content path /about
+            const iframeBasePath = u ? new URL(u).pathname.replace(/\/$/, '') : '';
+            let contentPath = event.data.currentPath;
+            if (iframeBasePath && contentPath.startsWith(iframeBasePath)) {
+              contentPath = contentPath.slice(iframeBasePath.length) || '/';
+            }
             const adminPath = history.location.pathname.replace(/\/edit$/, '') || '/';
-            if (event.data.currentPath !== adminPath) {
-              log('INIT: iframe navigated to different page, following to view mode:', event.data.currentPath);
+            if (contentPath !== adminPath) {
+              log('INIT: iframe navigated to different page, following to view mode:', contentPath, '(raw:', event.data.currentPath, ', base:', iframeBasePath, ')');
               // Update persistedIframe BEFORE history.push so useEffect won't reload iframe
-              persistedIframe = { frontendUrl: u, path: event.data.currentPath, isEdit: false };
-              history.push(event.data.currentPath);
+              persistedIframe = { frontendUrl: u, path: contentPath, isEdit: false };
+              history.push(contentPath);
               return; // Don't send INITIAL_DATA - admin will re-render with new page
             }
           }

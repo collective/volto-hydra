@@ -1716,7 +1716,7 @@ export class Bridge {
         } else {
           const initMessage = {
             type: 'INIT',
-            currentPath: currentPath,
+            currentPath: this.pathToApiPath(currentPath),
           };
           if (options?.page) {
             initMessage.page = options.page;
@@ -1860,7 +1860,7 @@ export class Bridge {
           }
         }
         window.parent.postMessage(
-          { type: 'INIT', currentPath: currentPath },
+          { type: 'INIT', currentPath: this.pathToApiPath(currentPath) },
           this.adminOrigin,
         );
       }
