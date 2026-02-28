@@ -189,3 +189,38 @@ defineProps({ block: Object });
 defineProps({ block: Object });
 </script>
 ```
+
+### Svelte
+
+```svelte
+<!-- ColumnsBlock.svelte -->
+<script>
+  import ColumnBlock from './ColumnBlock.svelte';
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']} class="columns-block">
+  <div style="display: flex; gap: 1rem">
+    {#each block.columns?.items || [] as id (id)}
+      <ColumnBlock block={{ ...block.columns.blocks[id], '@uid': id }} />
+    {/each}
+  </div>
+</div>
+```
+
+```svelte
+<!-- ColumnBlock.svelte -->
+<script>
+  import BlockRenderer from './BlockRenderer.svelte';
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']} style="flex: 1">
+  {#if block.title}
+    <h4 data-edit-text="title">{block.title}</h4>
+  {/if}
+  {#each block.blocks_layout?.items || [] as id (id)}
+    <BlockRenderer block={{ ...block.blocks_layout.blocks[id], '@uid': id }} />
+  {/each}
+</div>
+```
