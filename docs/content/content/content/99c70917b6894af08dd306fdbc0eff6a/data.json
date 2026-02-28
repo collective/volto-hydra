@@ -88,7 +88,7 @@
           "type": "p",
           "children": [
             {
-              "text": "columns: {\n  id: 'columns',\n  title: 'Columns',\n  icon: '<svg viewBox=\"0 0 24 24\"><rect x=\"2\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/></svg>',\n  group: 'common',\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['title', 'top_images', 'columns'] },\n    ],\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      top_images: {\n        title: 'Top Images',\n        widget: 'blocks_layout',\n        allowedBlocks: ['image'],\n      },\n      columns: {\n        title: 'Columns',\n        widget: 'blocks_layout',\n        allowedBlocks: ['column'],\n        maxLength: 4,\n      },\n    },\n  },\n}"
+              "text": "columns: {\n  id: 'columns',\n  title: 'Columns',\n  icon: '<svg viewBox=\"0 0 24 24\"><rect x=\"2\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/></svg>',\n  group: 'common',\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['title', 'top_images', 'columns'] },\n    ],\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      top_images: {\n        title: 'Top Images',\n        widget: 'blocks_layout',\n        allowedBlocks: ['image'],\n      },\n      columns: {\n        title: 'Columns',\n        widget: 'blocks_layout',\n        allowedBlocks: ['column'],\n        maxLength: 4,\n      },\n    },\n  },\n}\n\ncolumn: {\n  id: 'column',\n  title: 'Column',\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] },\n    ],\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      blocks_layout: {\n        title: 'Content',\n        widget: 'blocks_layout',\n        allowedBlocks: ['slate', 'image'],\n        defaultBlockType: 'slate',\n      },\n    },\n  },\n}"
             }
           ]
         }
@@ -196,7 +196,7 @@
           "type": "p",
           "children": [
             {
-              "text": "<!-- ColumnsBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"columns-block\">\n    <div style=\"display: flex; gap: 1rem\">\n      <ColumnBlock\n        v-for=\"id in block.columns?.items || []\"\n        :key=\"id\"\n        :block=\"{ ...block.columns.blocks[id], '@uid': id }\"\n      />\n    </div>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+              "text": "<!-- ColumnsBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"columns-block\">\n    <div style=\"display: flex; gap: 1rem\">\n      <ColumnBlock\n        v-for=\"id in block.columns?.items || []\"\n        :key=\"id\"\n        :block=\"{ ...block.columns.blocks[id], '@uid': id }\"\n      />\n    </div>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- ColumnBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" style=\"flex: 1\">\n    <h4 v-if=\"block.title\" data-edit-text=\"title\">{{ block.title }}</h4>\n    <BlockRenderer\n      v-for=\"id in block.blocks_layout?.items || []\"\n      :key=\"id\"\n      :block=\"{ ...block.blocks_layout.blocks[id], '@uid': id }\"\n    />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
             }
           ]
         }

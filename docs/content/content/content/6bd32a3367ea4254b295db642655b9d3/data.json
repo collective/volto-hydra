@@ -185,7 +185,7 @@
           "type": "p",
           "children": [
             {
-              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['querystring', 'variation'] }\n    ],\n    properties: {\n      querystring: {\n        title: 'Query',\n        widget: 'query',\n      },\n      variation: {\n        title: 'Item Type',\n        // Choices are computed from allowedBlocks that have fieldMappings['@default']\n        // Built-in options: 'default', 'summary', 'teaser', 'image'\n      },\n    },\n  },\n}"
+              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['querystring', 'variation'] }\n    ],\n    properties: {\n      querystring: {\n        title: 'Query',\n        widget: 'query',\n      },\n      variation: {\n        title: 'Item Type',\n        // Choices are computed from allowedBlocks that have fieldMappings['@default']\n        // Built-in options: 'default', 'summary', 'teaser', 'image'\n      },\n    },\n  },\n}\n\n{\n  properties: {\n    href:        { title: 'Link', widget: 'url' },\n    title:       { title: 'Title' },\n    description: { title: 'Description', widget: 'textarea' },\n  },\n}\n\n{\n  properties: {\n    href:        { title: 'Link', widget: 'url' },\n    title:       { title: 'Title' },\n    description: { title: 'Description', widget: 'textarea' },\n    image:       { title: 'Image', widget: 'url' },\n  },\n}"
             }
           ]
         }
@@ -221,7 +221,7 @@
           "type": "p",
           "children": [
             {
-              "text": "{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\"Document\"]\n      }\n    ],\n    \"sort_on\": \"effective\",\n    \"sort_order\": \"descending\"\n  }\n}"
+              "text": "{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\"Document\"]\n      }\n    ],\n    \"sort_on\": \"effective\",\n    \"sort_order\": \"descending\"\n  }\n}\n\n{\n  \"@uid\": \"item-1\",\n  \"@type\": \"summary\",\n  \"href\": \"/news/my-article\",\n  \"title\": \"My Article\",\n  \"description\": \"Article summary text\",\n  \"image\": \"/news/my-article/@@images/image-800x600.jpg\"\n}"
             }
           ]
         }

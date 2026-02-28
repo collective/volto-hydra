@@ -441,13 +441,13 @@
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
       "placeholder": "vue-code",
-      "plaintext": "<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProp",
+      "plaintext": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+              "text": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- SlateNode.vue -->\n<template>\n  <p v-if=\"node.type === 'p'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></p>\n  <h1 v-else-if=\"node.type === 'h1'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h1>\n  <h2 v-else-if=\"node.type === 'h2'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h2>\n  <h3 v-else-if=\"node.type === 'h3'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h3>\n  <blockquote v-else-if=\"node.type === 'blockquote'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></blockquote>\n  <ul v-else-if=\"node.type === 'ul'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></ul>\n  <ol v-else-if=\"node.type === 'ol'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></ol>\n  <li v-else-if=\"node.type === 'li'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></li>\n  <a v-else-if=\"node.type === 'link'\" :href=\"node.data?.url\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></a>\n  <strong v-else-if=\"node.type === 'strong'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></strong>\n  <em v-else-if=\"node.type === 'em'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></em>\n  <del v-else-if=\"node.type === 'del'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></del>\n  <u v-else-if=\"node.type === 'u'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></u>\n  <code v-else-if=\"node.type === 'code'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></code>\n  <template v-else>{{ node.text }}</template>\n</template>\n\n<script setup>\ndefineProps({ node: Object });\n</script>"
             }
           ]
         }
