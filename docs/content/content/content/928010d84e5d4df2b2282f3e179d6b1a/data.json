@@ -43,13 +43,197 @@
       "showSearchInput": true,
       "showSortOn": true,
       "showTotalResults": true
+    },
+    "ref-search-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "sep",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "ref-search-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "examples-heading",
+      "plaintext": "Developer Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Developer Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "schema-heading",
+      "plaintext": "Schema",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Schema"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-schema": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "schema",
+      "plaintext": "// Search block (built-in, enhanced by Hydra)\n{\n  schemaEnhancer: ({ schema }) => {\n    // Listing container — holds one listing block for results\n    schema.properties.listing = {\n      title: 'Resul",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "// Search block (built-in, enhanced by Hydra)\n{\n  schemaEnhancer: ({ schema }) => {\n    // Listing container — holds one listing block for results\n    schema.properties.listing = {\n      title: 'Results Listing',\n      widget: 'blocks_layout',\n      allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],\n      maxLength: 1,\n      defaultBlockType: 'listing',\n    };\n\n    // Facets — typed object_list, each facet has its own schema\n    schema.properties.facets = {\n      title: 'Facets',\n      widget: 'object_list',\n      typeField: 'type',\n      allowedBlocks: ['checkboxFacet', 'selectFacet', 'daterangeFacet', 'toggleFacet'],\n    };\n\n    return schema;\n  },\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "json-heading",
+      "plaintext": "JSON Block Data",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "JSON Block Data"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-json-data": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "json-data",
+      "plaintext": "{\n  \"@type\": \"search\",\n  \"facetsTitle\": \"Filter by\",\n  \"facets\": [\n    {\n      \"@id\": \"facet-1\",\n      \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\",\n      \"field\": \"portal_type\",\n      \"mult",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  \"@type\": \"search\",\n  \"facetsTitle\": \"Filter by\",\n  \"facets\": [\n    {\n      \"@id\": \"facet-1\",\n      \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\",\n      \"field\": \"portal_type\",\n      \"multiple\": true,\n      \"hidden\": false\n    },\n    {\n      \"@id\": \"facet-2\",\n      \"type\": \"daterangeFacet\",\n      \"title\": \"Date Range\",\n      \"field\": \"effective\",\n      \"hidden\": false\n    }\n  ],\n  \"listing\": {\n    \"items\": [\"listing-1\"],\n    \"blocks\": {\n      \"listing-1\": {\n        \"@type\": \"listing\",\n        \"variation\": \"summary\",\n        \"querystring\": {\n          \"query\": [\n            {\n              \"i\": \"portal_type\",\n              \"o\": \"plone.app.querystring.operation.selection.any\",\n              \"v\": [\"Document\", \"News Item\"]\n            }\n          ]\n        }\n      }\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-react-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "react-heading",
+      "plaintext": "React",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "React"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-react-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "react-code",
+      "plaintext": "function SearchBlock({ block, blockId }) {\n  const [query, setQuery] = useState('');\n\n  const facets = (block.facets || []).filter(f => !f.hidden);\n  const listing = block.listing || {};\n  const listi",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "function SearchBlock({ block, blockId }) {\n  const [query, setQuery] = useState('');\n\n  const facets = (block.facets || []).filter(f => !f.hidden);\n  const listing = block.listing || {};\n  const listingId = listing.items?.[0];\n  const listingBlock = listingId ? listing.blocks?.[listingId] : null;\n\n  return (\n    <div data-block-uid={blockId} className=\"search-block\">\n      <input\n        type=\"search\"\n        placeholder=\"Search...\"\n        value={query}\n        onChange={e => setQuery(e.target.value)}\n      />\n\n      {facets.length > 0 && (\n        <div className=\"facets\">\n          <h4>{block.facetsTitle || 'Filter'}</h4>\n          {facets.map(facet => (\n            <FacetRenderer key={facet['@id']} facet={facet} />\n          ))}\n        </div>\n      )}\n\n      {listingBlock && (\n        <ListingBlock block={listingBlock} blockId={listingId} />\n      )}\n    </div>\n  );\n}\n\nfunction FacetRenderer({ facet }) {\n  switch (facet.type) {\n    case 'checkboxFacet':\n      return <fieldset><legend>{facet.title}</legend>{/* checkbox options */}</fieldset>;\n    case 'selectFacet':\n      return <label>{facet.title}<select>{/* options */}</select></label>;\n    case 'daterangeFacet':\n      return <label>{facet.title}<input type=\"date\" /> – <input type=\"date\" /></label>;\n    case 'toggleFacet':\n      return <label><input type=\"checkbox\" /> {facet.title}</label>;\n    default:\n      return null;\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-vue-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "vue-heading",
+      "plaintext": "Vue",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Vue"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-search-vue-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "vue-code",
+      "plaintext": "<template>\n  <div :data-block-uid=\"blockId\" class=\"search-block\">\n    <input type=\"search\" placeholder=\"Search...\" v-model=\"query\" />\n\n    <div v-if=\"visibleFacets.length\" class=\"facets\">\n      <h4>{{",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "<template>\n  <div :data-block-uid=\"blockId\" class=\"search-block\">\n    <input type=\"search\" placeholder=\"Search...\" v-model=\"query\" />\n\n    <div v-if=\"visibleFacets.length\" class=\"facets\">\n      <h4>{{ block.facetsTitle || 'Filter' }}</h4>\n      <template v-for=\"facet in visibleFacets\" :key=\"facet['@id']\">\n        <fieldset v-if=\"facet.type === 'checkboxFacet'\">\n          <legend>{{ facet.title }}</legend>\n          <!-- checkbox options -->\n        </fieldset>\n        <label v-else-if=\"facet.type === 'selectFacet'\">\n          {{ facet.title }}<select><!-- options --></select>\n        </label>\n        <label v-else-if=\"facet.type === 'daterangeFacet'\">\n          {{ facet.title }}<input type=\"date\" /> – <input type=\"date\" />\n        </label>\n        <label v-else-if=\"facet.type === 'toggleFacet'\">\n          <input type=\"checkbox\" /> {{ facet.title }}\n        </label>\n      </template>\n    </div>\n\n    <ListingBlock\n      v-if=\"listingBlock\"\n      :block=\"listingBlock\"\n      :block-id=\"listingId\"\n    />\n  </div>\n</template>\n\n<script setup>\nimport { ref, computed } from 'vue';\nconst props = defineProps({ block: Object, blockId: String });\nconst query = ref('');\nconst visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));\nconst listingId = computed(() => props.block.listing?.items?.[0]);\nconst listingBlock = computed(() => listingId.value ? props.block.listing?.blocks?.[listingId.value] : null);\n</script>"
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "f6d35d7e-6422-4496-8a65-f7cfd42fb519",
       "518c46e7-9823-4e03-aa3a-d2a9ec1746dd",
-      "42b7d589-4d35-4b81-9fe9-ea17437beb81"
+      "42b7d589-4d35-4b81-9fe9-ea17437beb81",
+      "ref-search-sep",
+      "ref-search-heading",
+      "ref-search-schema-heading",
+      "ref-search-schema",
+      "ref-search-json-heading",
+      "ref-search-json-data",
+      "ref-search-react-heading",
+      "ref-search-react-code",
+      "ref-search-vue-heading",
+      "ref-search-vue-code"
     ]
   },
   "contributors": [],

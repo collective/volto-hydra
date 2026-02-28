@@ -68,13 +68,197 @@
           "type": "p"
         }
       ]
+    },
+    "ref-form-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "sep",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "ref-form-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "examples-heading",
+      "plaintext": "Developer Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Developer Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "schema-heading",
+      "plaintext": "Schema",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Schema"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-schema": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "schema",
+      "plaintext": "form: {\n  id: 'form',\n  title: 'Form',\n  icon: '<svg viewBox=\"0 0 24 24\"><path d=\"M4 4h16v2H4zm0 4h10v2H4zm0 4h16v2H4zm0 4h10v2H4z\"/></svg>',\n  group: 'common',\n  blockSchema: {\n    fieldsets: [\n     ",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "form: {\n  id: 'form',\n  title: 'Form',\n  icon: '<svg viewBox=\"0 0 24 24\"><path d=\"M4 4h16v2H4zm0 4h10v2H4zm0 4h16v2H4zm0 4h10v2H4z\"/></svg>',\n  group: 'common',\n  blockSchema: {\n    fieldsets: [\n      {\n        id: 'default',\n        title: 'Default',\n        fields: [\n          'title', 'description', 'subblocks',\n          'default_to', 'default_from', 'default_subject',\n          'submit_label',\n        ],\n      },\n    ],\n    properties: {\n      title:           { title: 'Title', type: 'string' },\n      description:     { title: 'Description', type: 'textarea' },\n      subblocks: {\n        title: 'Fields',\n        widget: 'object_list',\n        idField: 'field_id',\n        typeField: 'field_type',\n        allowedBlocks: [\n          'text', 'textarea', 'number', 'select',\n          'single_choice', 'multiple_choice', 'checkbox',\n          'date', 'from', 'static_text', 'hidden', 'attachment',\n        ],\n      },\n      default_to:      { title: 'Recipients', type: 'string' },\n      default_from:    { title: 'Default sender', type: 'string' },\n      default_subject: { title: 'Mail subject', type: 'string' },\n      submit_label:    { title: 'Submit button label', type: 'string' },\n    },\n    required: ['default_to', 'default_from', 'default_subject'],\n  },\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "json-heading",
+      "plaintext": "JSON Block Data",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "JSON Block Data"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-json-data": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "json-data",
+      "plaintext": "{\n  \"@type\": \"form\",\n  \"title\": \"Contact Us\",\n  \"description\": \"Fill out this form and we'll get back to you.\",\n  \"default_to\": \"admin@example.com\",\n  \"default_from\": \"noreply@example.com\",\n  \"default",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  \"@type\": \"form\",\n  \"title\": \"Contact Us\",\n  \"description\": \"Fill out this form and we'll get back to you.\",\n  \"default_to\": \"admin@example.com\",\n  \"default_from\": \"noreply@example.com\",\n  \"default_subject\": \"New contact form submission\",\n  \"submit_label\": \"Send Message\",\n  \"subblocks\": [\n    {\n      \"@id\": \"field-1\",\n      \"field_id\": \"name\",\n      \"field_type\": \"text\",\n      \"label\": \"Your Name\",\n      \"required\": true\n    },\n    {\n      \"@id\": \"field-2\",\n      \"field_id\": \"email\",\n      \"field_type\": \"from\",\n      \"label\": \"Email Address\",\n      \"use_as_reply_to\": true,\n      \"required\": true\n    },\n    {\n      \"@id\": \"field-3\",\n      \"field_id\": \"department\",\n      \"field_type\": \"select\",\n      \"label\": \"Department\",\n      \"input_values\": [\"Sales\", \"Support\", \"General\"],\n      \"required\": false\n    },\n    {\n      \"@id\": \"field-4\",\n      \"field_id\": \"message\",\n      \"field_type\": \"textarea\",\n      \"label\": \"Message\",\n      \"required\": true\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-react-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "react-heading",
+      "plaintext": "React",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "React"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-react-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "react-code",
+      "plaintext": "function FormBlock({ block }) {\n  const fields = block.subblocks || [];\n\n  return (\n    <form data-block-uid={block['@uid']} className=\"form-block\" onSubmit={e => e.preventDefault()}>\n      <h3>{block",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "function FormBlock({ block }) {\n  const fields = block.subblocks || [];\n\n  return (\n    <form data-block-uid={block['@uid']} className=\"form-block\" onSubmit={e => e.preventDefault()}>\n      <h3>{block.title}</h3>\n      {block.description && <p>{block.description}</p>}\n\n      {fields.map(field => (\n        <FormField key={field['@id']} field={field} />\n      ))}\n\n      <button type=\"submit\">{block.submit_label || 'Submit'}</button>\n    </form>\n  );\n}\n\nfunction FormField({ field }) {\n  const label = field.label || '';\n  const required = field.required || false;\n\n  switch (field.field_type) {\n    case 'text':\n      return <label>{label} <input type=\"text\" required={required} /></label>;\n    case 'textarea':\n      return <label>{label} <textarea required={required} /></label>;\n    case 'number':\n      return <label>{label} <input type=\"number\" required={required} /></label>;\n    case 'from':\n      return <label>{label} <input type=\"email\" required={required} /></label>;\n    case 'date':\n      return <label>{label} <input type=\"date\" required={required} /></label>;\n    case 'checkbox':\n      return <label><input type=\"checkbox\" required={required} /> {label}</label>;\n    case 'select':\n      return (\n        <label>{label}\n          <select required={required}>\n            <option value=\"\">Choose...</option>\n            {(field.input_values || []).map(v => <option key={v} value={v}>{v}</option>)}\n          </select>\n        </label>\n      );\n    case 'single_choice':\n      return (\n        <fieldset>\n          <legend>{label}</legend>\n          {(field.input_values || []).map(v => (\n            <label key={v}><input type=\"radio\" name={field.field_id} value={v} /> {v}</label>\n          ))}\n        </fieldset>\n      );\n    case 'multiple_choice':\n      return (\n        <fieldset>\n          <legend>{label}</legend>\n          {(field.input_values || []).map(v => (\n            <label key={v}><input type=\"checkbox\" value={v} /> {v}</label>\n          ))}\n        </fieldset>\n      );\n    case 'static_text':\n      return <p>{label}</p>;\n    case 'hidden':\n      return <input type=\"hidden\" name={field.field_id} value={field.value || ''} />;\n    case 'attachment':\n      return <label>{label} <input type=\"file\" required={required} /></label>;\n    default:\n      return <label>{label} <input type=\"text\" /></label>;\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-vue-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "vue-heading",
+      "plaintext": "Vue",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Vue"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-form-vue-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "vue-code",
+      "plaintext": "<template>\n  <form :data-block-uid=\"block['@uid']\" class=\"form-block\" @submit.prevent>\n    <h3>{{ block.title }}</h3>\n    <p v-if=\"block.description\">{{ block.description }}</p>\n\n    <div v-for=\"field",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "<template>\n  <form :data-block-uid=\"block['@uid']\" class=\"form-block\" @submit.prevent>\n    <h3>{{ block.title }}</h3>\n    <p v-if=\"block.description\">{{ block.description }}</p>\n\n    <div v-for=\"field in block.subblocks || []\" :key=\"field['@id']\" class=\"form-field\">\n      <template v-if=\"field.field_type === 'text'\">\n        <label>{{ field.label }} <input type=\"text\" :required=\"field.required\" /></label>\n      </template>\n      <template v-else-if=\"field.field_type === 'textarea'\">\n        <label>{{ field.label }} <textarea :required=\"field.required\" /></label>\n      </template>\n      <template v-else-if=\"field.field_type === 'from'\">\n        <label>{{ field.label }} <input type=\"email\" :required=\"field.required\" /></label>\n      </template>\n      <template v-else-if=\"field.field_type === 'select'\">\n        <label>{{ field.label }}\n          <select :required=\"field.required\">\n            <option value=\"\">Choose...</option>\n            <option v-for=\"v in field.input_values || []\" :key=\"v\" :value=\"v\">{{ v }}</option>\n          </select>\n        </label>\n      </template>\n      <template v-else-if=\"field.field_type === 'single_choice'\">\n        <fieldset>\n          <legend>{{ field.label }}</legend>\n          <label v-for=\"v in field.input_values || []\" :key=\"v\">\n            <input type=\"radio\" :name=\"field.field_id\" :value=\"v\" /> {{ v }}\n          </label>\n        </fieldset>\n      </template>\n      <template v-else-if=\"field.field_type === 'checkbox'\">\n        <label><input type=\"checkbox\" :required=\"field.required\" /> {{ field.label }}</label>\n      </template>\n      <template v-else-if=\"field.field_type === 'static_text'\">\n        <p>{{ field.label }}</p>\n      </template>\n      <template v-else-if=\"field.field_type === 'hidden'\">\n        <input type=\"hidden\" :name=\"field.field_id\" :value=\"field.value\" />\n      </template>\n      <template v-else>\n        <label>{{ field.label }} <input type=\"text\" :required=\"field.required\" /></label>\n      </template>\n    </div>\n\n    <button type=\"submit\">{{ block.submit_label || 'Submit' }}</button>\n  </form>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "00e8d49b-5b99-4d2f-83b3-7d69bc80b893",
       "3687103d-0766-4d5e-8aae-fc7e65c457a6",
-      "eb25b89c-d64a-4566-8e6e-71fd0f371964"
+      "eb25b89c-d64a-4566-8e6e-71fd0f371964",
+      "ref-form-sep",
+      "ref-form-heading",
+      "ref-form-schema-heading",
+      "ref-form-schema",
+      "ref-form-json-heading",
+      "ref-form-json-data",
+      "ref-form-react-heading",
+      "ref-form-react-code",
+      "ref-form-vue-heading",
+      "ref-form-vue-code"
     ]
   },
   "contributors": [],

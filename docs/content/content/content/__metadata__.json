@@ -77,7 +77,8 @@
     "f51777793dab4a61982e35dfa71d0575/data.json",
     "e017bd4a0b3845aab26f6d855cc4ef14/data.json",
     "1efc7b73b28e4edeaf40040709299d69/data.json",
-    "7950cae06c994276930f6d13151308c5/data.json"
+    "7950cae06c994276930f6d13151308c5/data.json",
+    "templates/block-reference-layout/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -458,6 +459,13 @@
           "Owner"
         ]
       }
+    },
+    "tpl-block-reference-layout": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
     }
   },
   "ordering": {
@@ -514,7 +522,8 @@
     "f0018ecb26ac442aa1f03482a09c8b81": 0,
     "f51777793dab4a61982e35dfa71d0575": 6,
     "f8cd4a2d8d7c4703b4e41d2093b21aed": 0,
-    "fb086a3d1d3d4a9ebf9bc864d2172e79": 3
+    "fb086a3d1d3d4a9ebf9bc864d2172e79": 3,
+    "tpl-block-reference-layout": 0
   },
   "relations": []
 }

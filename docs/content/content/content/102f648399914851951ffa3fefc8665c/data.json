@@ -5162,6 +5162,180 @@
       "heading": "Basic Table",
       "styles": {},
       "tag": "h2"
+    },
+    "ref-table-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "sep",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "ref-table-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "examples-heading",
+      "plaintext": "Developer Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Developer Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "schema-heading",
+      "plaintext": "Schema",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Schema"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-schema": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "schema",
+      "plaintext": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['rows'] }\n    ],\n    properties: {\n      rows: {\n        widget: 'object_list',\n        idField: 'key',\n        da",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['rows'] }\n    ],\n    properties: {\n      rows: {\n        widget: 'object_list',\n        idField: 'key',\n        dataPath: ['table', 'rows'],  // data lives at block.table.rows\n        schema: {\n          fieldsets: [{ id: 'default', title: 'Default', fields: [] }],\n          properties: {\n            cells: {\n              widget: 'object_list',\n              idField: 'key',\n              schema: {\n                fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],\n                properties: {\n                  value: {\n                    title: 'Content',\n                    widget: 'slate',\n                    default: [{ type: 'p', children: [{ text: '' }] }],\n                  },\n                },\n              },\n            },\n          },\n        },\n      },\n    },\n  },\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "json-heading",
+      "plaintext": "JSON Block Data",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "JSON Block Data"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-json-data": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "json-data",
+      "plaintext": "{\n  \"@type\": \"slateTable\",\n  \"table\": {\n    \"rows\": [\n      {\n        \"key\": \"row-1\",\n        \"cells\": [\n          {\n            \"key\": \"cell-1\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"t",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  \"@type\": \"slateTable\",\n  \"table\": {\n    \"rows\": [\n      {\n        \"key\": \"row-1\",\n        \"cells\": [\n          {\n            \"key\": \"cell-1\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Name\" }] }]\n          },\n          {\n            \"key\": \"cell-2\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Role\" }] }]\n          }\n        ]\n      },\n      {\n        \"key\": \"row-2\",\n        \"cells\": [\n          {\n            \"key\": \"cell-3\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Alice\" }] }]\n          },\n          {\n            \"key\": \"cell-4\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Engineer\" }] }]\n          }\n        ]\n      }\n    ]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-react-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "react-heading",
+      "plaintext": "React",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "React"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-react-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "react-code",
+      "plaintext": "function TableBlock({ block }) {\n  const rows = block.table?.rows || [];\n  return (\n    <div data-block-uid={block['@uid']}>\n      <table>\n        <tbody>\n          {rows.map(row => (\n            <tr ",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "function TableBlock({ block }) {\n  const rows = block.table?.rows || [];\n  return (\n    <div data-block-uid={block['@uid']}>\n      <table>\n        <tbody>\n          {rows.map(row => (\n            <tr key={row.key} data-block-uid={row.key}>\n              {row.cells.map(cell => (\n                <td key={cell.key} data-block-uid={cell.key} data-edit-text=\"value\">\n                  {(cell.value || []).map((node, i) => (\n                    <SlateNode key={i} node={node} />\n                  ))}\n                </td>\n              ))}\n            </tr>\n          ))}\n        </tbody>\n      </table>\n    </div>\n  );\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-vue-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "vue-heading",
+      "plaintext": "Vue",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Vue"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-table-vue-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "vue-code",
+      "plaintext": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <table>\n      <tbody>\n        <tr v-for=\"row in block.table?.rows || []\" :key=\"row.key\" :data-block-uid=\"row.key\">\n          <td v-for=\"cell in r",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <table>\n      <tbody>\n        <tr v-for=\"row in block.table?.rows || []\" :key=\"row.key\" :data-block-uid=\"row.key\">\n          <td v-for=\"cell in row.cells\" :key=\"cell.key\" :data-block-uid=\"cell.key\" data-edit-text=\"value\">\n            <SlateNode v-for=\"(node, i) in cell.value || []\" :key=\"i\" :node=\"node\" />\n          </td>\n        </tr>\n      </tbody>\n    </table>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -5174,7 +5348,17 @@
       "10566683-a8b2-4b47-b64b-b01ddf43c307",
       "0b0891c8-812e-41ca-b572-b7851361025f",
       "aa800193-7bf4-4f54-9bb6-a6c5b4e02b81",
-      "4266731a-e721-4f2f-95de-c7c3e885677b"
+      "4266731a-e721-4f2f-95de-c7c3e885677b",
+      "ref-table-sep",
+      "ref-table-heading",
+      "ref-table-schema-heading",
+      "ref-table-schema",
+      "ref-table-json-heading",
+      "ref-table-json-data",
+      "ref-table-react-heading",
+      "ref-table-react-code",
+      "ref-table-vue-heading",
+      "ref-table-vue-code"
     ]
   },
   "contributors": [],

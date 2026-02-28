@@ -170,12 +170,12 @@
     },
     "910a3f25-0318-41b3-a1a6-6e35cdf83451": {
       "@type": "slate",
-      "plaintext": "\u00dcberschrift zweiter Ordnung (Headline H2)",
+      "plaintext": "Überschrift zweiter Ordnung (Headline H2)",
       "value": [
         {
           "children": [
             {
-              "text": "\u00dcberschrift zweiter Ordnung (Headline H2)"
+              "text": "Überschrift zweiter Ordnung (Headline H2)"
             }
           ],
           "type": "h2"
@@ -267,15 +267,189 @@
     },
     "f0a56edf-a963-4177-877c-76d9a4d6c20b": {
       "@type": "slate",
-      "plaintext": "\u00dcberschrift dritter Ordnung (Headline H3)",
+      "plaintext": "Überschrift dritter Ordnung (Headline H3)",
       "value": [
         {
           "children": [
             {
-              "text": "\u00dcberschrift dritter Ordnung (Headline H3)"
+              "text": "Überschrift dritter Ordnung (Headline H3)"
             }
           ],
           "type": "h3"
+        }
+      ]
+    },
+    "ref-text-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "sep",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "ref-text-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "examples-heading",
+      "plaintext": "Developer Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Developer Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "schema-heading",
+      "plaintext": "Schema",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Schema"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-schema": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "schema",
+      "plaintext": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['value'] }\n    ],\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['value'] }\n    ],\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },\n  },\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "json-heading",
+      "plaintext": "JSON Block Data",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "JSON Block Data"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-json-data": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "json-data",
+      "plaintext": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [{ \"text\": \"Welcome\" }]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"This is \" },\n        { \"ty",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [{ \"text\": \"Welcome\" }]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"This is \" },\n        { \"type\": \"strong\", \"children\": [{ \"text\": \"bold\" }] },\n        { \"text\": \" and \" },\n        { \"type\": \"em\", \"children\": [{ \"text\": \"italic\" }] },\n        { \"text\": \" text.\" }\n      ]\n    },\n    {\n      \"type\": \"ul\",\n      \"children\": [\n        { \"type\": \"li\", \"children\": [{ \"text\": \"First item\" }] },\n        { \"type\": \"li\", \"children\": [{ \"text\": \"Second item\" }] }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"Visit \" },\n        {\n          \"type\": \"link\",\n          \"data\": { \"url\": \"https://example.com\" },\n          \"children\": [{ \"text\": \"our site\" }]\n        },\n        { \"text\": \" for more.\" }\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-react-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "react-heading",
+      "plaintext": "React",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "React"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-react-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "react-code",
+      "plaintext": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n    ",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}\n\nfunction SlateNode({ node }) {\n  const children = (node.children || []).map((child, i) => (\n    <SlateNode key={i} node={child} />\n  ));\n\n  switch (node.type) {\n    case 'p':         return <p>{children}</p>;\n    case 'h1':        return <h1>{children}</h1>;\n    case 'h2':        return <h2>{children}</h2>;\n    case 'h3':        return <h3>{children}</h3>;\n    case 'blockquote': return <blockquote>{children}</blockquote>;\n    case 'ul':        return <ul>{children}</ul>;\n    case 'ol':        return <ol>{children}</ol>;\n    case 'li':        return <li>{children}</li>;\n    case 'link':      return <a href={node.data?.url}>{children}</a>;\n    case 'strong':    return <strong>{children}</strong>;\n    case 'em':        return <em>{children}</em>;\n    case 'del':       return <del>{children}</del>;\n    case 'u':         return <u>{children}</u>;\n    case 'code':      return <code>{children}</code>;\n    default:\n      // Leaf text node\n      if (node.text !== undefined) return <>{node.text}</>;\n      return <span>{children}</span>;\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-vue-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "vue-heading",
+      "plaintext": "Vue",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Vue"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-vue-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "vue-code",
+      "plaintext": "<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProp",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+            }
+          ]
         }
       ]
     }
@@ -298,7 +472,17 @@
       "910a3f25-0318-41b3-a1a6-6e35cdf83451",
       "486c4646-de10-40a9-9470-58b7b1449240",
       "f0a56edf-a963-4177-877c-76d9a4d6c20b",
-      "00146980-5c86-4ecd-a84e-d373183231ad"
+      "00146980-5c86-4ecd-a84e-d373183231ad",
+      "ref-text-sep",
+      "ref-text-heading",
+      "ref-text-schema-heading",
+      "ref-text-schema",
+      "ref-text-json-heading",
+      "ref-text-json-data",
+      "ref-text-react-heading",
+      "ref-text-react-code",
+      "ref-text-vue-heading",
+      "ref-text-vue-code"
     ]
   },
   "contributors": [],
