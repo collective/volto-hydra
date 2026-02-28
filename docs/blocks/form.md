@@ -146,6 +146,7 @@ All field types: `text`, `textarea`, `number`, `select`, `single_choice`, `multi
 
 ### React
 
+<!-- file: examples/react/FormBlock.jsx -->
 ```jsx
 function FormBlock({ block }) {
   const fields = block.subblocks || [];
@@ -222,6 +223,7 @@ function FormField({ field }) {
 
 ### Vue
 
+<!-- file: examples/vue/FormBlock.vue -->
 ```vue
 <template>
   <form :data-block-uid="block['@uid']" class="form-block" @submit.prevent>
@@ -279,6 +281,7 @@ defineProps({ block: Object });
 
 ### Svelte
 
+<!-- file: examples/svelte/FormBlock.svelte -->
 ```svelte
 <script>
   export let block;

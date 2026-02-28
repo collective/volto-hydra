@@ -118,6 +118,7 @@ Container blocks render their children by iterating the `items` array and lookin
 
 ### React
 
+<!-- file: examples/react/ColumnsBlock.jsx -->
 ```jsx
 function ColumnsBlock({ block }) {
   const columns = block.columns || {};
@@ -153,8 +154,8 @@ function ColumnBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/ColumnsBlock.vue -->
 ```vue
-<!-- ColumnsBlock.vue -->
 <template>
   <div :data-block-uid="block['@uid']" class="columns-block">
     <div style="display: flex; gap: 1rem">
@@ -172,8 +173,8 @@ defineProps({ block: Object });
 </script>
 ```
 
+<!-- file: examples/vue/ColumnBlock.vue -->
 ```vue
-<!-- ColumnBlock.vue -->
 <template>
   <div :data-block-uid="block['@uid']" style="flex: 1">
     <h4 v-if="block.title" data-edit-text="title">{{ block.title }}</h4>
@@ -192,8 +193,8 @@ defineProps({ block: Object });
 
 ### Svelte
 
+<!-- file: examples/svelte/ColumnsBlock.svelte -->
 ```svelte
-<!-- ColumnsBlock.svelte -->
 <script>
   import ColumnBlock from './ColumnBlock.svelte';
   export let block;
@@ -208,8 +209,8 @@ defineProps({ block: Object });
 </div>
 ```
 
+<!-- file: examples/svelte/ColumnBlock.svelte -->
 ```svelte
-<!-- ColumnBlock.svelte -->
 <script>
   import BlockRenderer from './BlockRenderer.svelte';
   export let block;

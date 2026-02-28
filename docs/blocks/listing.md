@@ -106,6 +106,7 @@ The listing block fetches items and renders each one based on the `variation`. H
 
 ### React
 
+<!-- file: examples/react/ListingBlock.jsx -->
 ```jsx
 function ListingBlock({ block, blockId }) {
   const [items, setItems] = useState([]);
@@ -147,6 +148,7 @@ function ListingItem({ item, variation }) {
 
 ### Vue
 
+<!-- file: examples/vue/ListingBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="blockId" class="listing-block">
@@ -177,6 +179,7 @@ watch(() => props.block.querystring, async () => {
 
 ### Svelte
 
+<!-- file: examples/svelte/ListingBlock.svelte -->
 ```svelte
 <script>
   export let block;

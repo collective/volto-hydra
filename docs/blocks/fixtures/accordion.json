@@ -1,0 +1,21 @@
+{
+  "@type": "accordion",
+  "header": {
+    "items": ["header-text-1"],
+    "blocks": {
+      "header-text-1": {
+        "@type": "slate",
+        "value": [{ "type": "p", "children": [{ "text": "Frequently Asked Questions" }] }]
+      }
+    }
+  },
+  "content": {
+    "items": ["content-text-1"],
+    "blocks": {
+      "content-text-1": {
+        "@type": "slate",
+        "value": [{ "type": "p", "children": [{ "text": "Here are the answers to common questions." }] }]
+      }
+    }
+  }
+}

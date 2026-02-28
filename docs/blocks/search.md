@@ -137,6 +137,7 @@ The search block combines a listing container with typed facets:
 
 ### React
 
+<!-- file: examples/react/SearchBlock.jsx -->
 ```jsx
 function SearchBlock({ block, blockId }) {
   const [query, setQuery] = useState('');
@@ -189,6 +190,7 @@ function FacetRenderer({ facet }) {
 
 ### Vue
 
+<!-- file: examples/vue/SearchBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="blockId" class="search-block">
@@ -233,6 +235,7 @@ const listingBlock = computed(() => listingId.value ? props.block.listing?.block
 
 ### Svelte
 
+<!-- file: examples/svelte/SearchBlock.svelte -->
 ```svelte
 <script>
   import ListingBlock from './ListingBlock.svelte';

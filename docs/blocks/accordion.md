@@ -66,6 +66,7 @@ Both `header` and `content` are `blocks_layout` container fields. The header is 
 
 ### React
 
+<!-- file: examples/react/AccordionBlock.jsx -->
 ```jsx
 function AccordionBlock({ block }) {
   const [open, setOpen] = useState(false);
@@ -95,6 +96,7 @@ function AccordionBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/AccordionBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" class="accordion-block">
@@ -125,6 +127,7 @@ const open = ref(false);
 
 ### Svelte
 
+<!-- file: examples/svelte/AccordionBlock.svelte -->
 ```svelte
 <script>
   import BlockRenderer from './BlockRenderer.svelte';

@@ -93,6 +93,7 @@ The `object_list` widget stores items as an array of objects (each with an `@id`
 
 ### React
 
+<!-- file: examples/react/SliderBlock.jsx -->
 ```jsx
 function SliderBlock({ block }) {
   const [current, setCurrent] = useState(0);
@@ -132,6 +133,7 @@ function SliderBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/SliderBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" class="slider-block">
@@ -173,6 +175,7 @@ const current = ref(0);
 
 ### Svelte
 
+<!-- file: examples/svelte/SliderBlock.svelte -->
 ```svelte
 <script>
   export let block;

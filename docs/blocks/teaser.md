@@ -68,6 +68,7 @@ When `overwrite` is `false` (default), the renderer should use `href[0].title` a
 
 ### React
 
+<!-- file: examples/react/TeaserBlock.jsx -->
 ```jsx
 function TeaserBlock({ block }) {
   const hrefObj = block.href?.[0] || null;
@@ -101,6 +102,7 @@ function TeaserBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/TeaserBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" class="teaser-block">
@@ -138,6 +140,7 @@ const imageSrc = computed(() => {
 
 ### Svelte
 
+<!-- file: examples/svelte/TeaserBlock.svelte -->
 ```svelte
 <script>
   export let block;

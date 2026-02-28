@@ -90,6 +90,7 @@ hero: {
 
 ### React
 
+<!-- file: examples/react/HeroBlock.jsx -->
 ```jsx
 function HeroBlock({ block }) {
   const heading = block.heading || '';
@@ -120,6 +121,7 @@ function HeroBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/HeroBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" class="hero-block">
@@ -145,6 +147,7 @@ const buttonLink = computed(() => props.block.buttonLink?.[0]?.['@id'] || '');
 
 ### Svelte
 
+<!-- file: examples/svelte/HeroBlock.svelte -->
 ```svelte
 <script>
   import SlateNode from './SlateNode.svelte';

@@ -88,6 +88,7 @@ The `widget: 'slate'` field stores content as a Slate JSON tree (not HTML).
 
 ### React
 
+<!-- file: examples/react/SlateBlock.jsx -->
 ```jsx
 function SlateBlock({ block }) {
   return (
@@ -98,7 +99,10 @@ function SlateBlock({ block }) {
     </div>
   );
 }
+```
 
+<!-- file: examples/react/SlateNode.jsx -->
+```jsx
 function SlateNode({ node }) {
   const children = (node.children || []).map((child, i) => (
     <SlateNode key={i} node={child} />
@@ -129,6 +133,7 @@ function SlateNode({ node }) {
 
 ### Vue
 
+<!-- file: examples/vue/SlateBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" data-edit-text="value">
@@ -141,8 +146,8 @@ defineProps({ block: Object });
 </script>
 ```
 
+<!-- file: examples/vue/SlateNode.vue -->
 ```vue
-<!-- SlateNode.vue -->
 <template>
   <p v-if="node.type === 'p'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></p>
   <h1 v-else-if="node.type === 'h1'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></h1>
@@ -168,6 +173,7 @@ defineProps({ node: Object });
 
 ### Svelte
 
+<!-- file: examples/svelte/SlateBlock.svelte -->
 ```svelte
 <script>
   export let block;
@@ -180,8 +186,8 @@ defineProps({ node: Object });
 </div>
 ```
 
+<!-- file: examples/svelte/SlateNode.svelte -->
 ```svelte
-<!-- SlateNode.svelte -->
 <script>
   export let node;
 </script>

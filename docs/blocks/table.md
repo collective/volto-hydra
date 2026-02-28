@@ -91,6 +91,7 @@ Each cell's `value` is a Slate JSON tree — reuse your Slate renderer (see [Sla
 
 ### React
 
+<!-- file: examples/react/TableBlock.jsx -->
 ```jsx
 function TableBlock({ block }) {
   const rows = block.table?.rows || [];
@@ -118,6 +119,7 @@ function TableBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/TableBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']">
@@ -140,6 +142,7 @@ defineProps({ block: Object });
 
 ### Svelte
 
+<!-- file: examples/svelte/TableBlock.svelte -->
 ```svelte
 <script>
   import SlateNode from './SlateNode.svelte';

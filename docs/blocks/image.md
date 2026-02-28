@@ -58,6 +58,7 @@ The `href` field (optional) wraps the image in a link. Format is an array with o
 
 ### React
 
+<!-- file: examples/react/ImageBlock.jsx -->
 ```jsx
 function ImageBlock({ block }) {
   const src = block.url || '';
@@ -82,6 +83,7 @@ function ImageBlock({ block }) {
 
 ### Vue
 
+<!-- file: examples/vue/ImageBlock.vue -->
 ```vue
 <template>
   <div :data-block-uid="block['@uid']">
@@ -101,6 +103,7 @@ const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);
 
 ### Svelte
 
+<!-- file: examples/svelte/ImageBlock.svelte -->
 ```svelte
 <script>
   export let block;
