@@ -2430,6 +2430,25 @@
           ]
         }
       ]
+    },
+    "ref-accordion-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-accordion",
+      "placeholder": "examples-desc",
+      "plaintext": "The following examples show how to render an Accordion block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The following examples show how to render an Accordion block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -2439,6 +2458,7 @@
       "8f68209e-220e-4230-9d42-8b0602573bd9",
       "ref-accordion-sep",
       "ref-accordion-heading",
+      "ref-accordion-desc",
       "ref-accordion-schema-heading",
       "ref-accordion-schema",
       "ref-accordion-json-heading",

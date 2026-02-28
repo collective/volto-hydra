@@ -379,6 +379,25 @@
           ]
         }
       ]
+    },
+    "ref-image-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "examples-desc",
+      "plaintext": "The following examples show how to render an Image block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The following examples show how to render an Image block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -402,6 +421,7 @@
       "b6bf35d7-7536-4a32-9821-4ae209de88fe",
       "ref-image-sep",
       "ref-image-heading",
+      "ref-image-desc",
       "ref-image-schema-heading",
       "ref-image-schema",
       "ref-image-json-heading",

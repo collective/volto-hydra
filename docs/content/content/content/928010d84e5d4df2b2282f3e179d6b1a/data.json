@@ -217,6 +217,25 @@
           ]
         }
       ]
+    },
+    "ref-search-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "examples-desc",
+      "plaintext": "The following examples show how to render a Search block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The following examples show how to render a Search block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -226,6 +245,7 @@
       "42b7d589-4d35-4b81-9fe9-ea17437beb81",
       "ref-search-sep",
       "ref-search-heading",
+      "ref-search-desc",
       "ref-search-schema-heading",
       "ref-search-schema",
       "ref-search-json-heading",

@@ -242,6 +242,25 @@
           ]
         }
       ]
+    },
+    "ref-form-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-form",
+      "placeholder": "examples-desc",
+      "plaintext": "The following examples show how to render a Form block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The following examples show how to render a Form block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -251,6 +270,7 @@
       "eb25b89c-d64a-4566-8e6e-71fd0f371964",
       "ref-form-sep",
       "ref-form-heading",
+      "ref-form-desc",
       "ref-form-schema-heading",
       "ref-form-schema",
       "ref-form-json-heading",

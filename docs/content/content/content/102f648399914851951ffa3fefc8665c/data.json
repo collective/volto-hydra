@@ -5336,6 +5336,25 @@
           ]
         }
       ]
+    },
+    "ref-table-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-table",
+      "placeholder": "examples-desc",
+      "plaintext": "The following examples show how to render a Table block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The following examples show how to render a Table block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -5351,6 +5370,7 @@
       "4266731a-e721-4f2f-95de-c7c3e885677b",
       "ref-table-sep",
       "ref-table-heading",
+      "ref-table-desc",
       "ref-table-schema-heading",
       "ref-table-schema",
       "ref-table-json-heading",
