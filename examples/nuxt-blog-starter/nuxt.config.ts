@@ -8,7 +8,10 @@ const fixturesPath = resolve(__dirname, '../../tests-playwright/fixtures')
 
 export default defineNuxtConfig({
   nitro: {
-    preset: 'static'
+    preset: 'static',
+    prerender: {
+      failOnError: false, // IPX image routes may 500 during local build
+    },
   },
   app: {
     head: {
@@ -62,7 +65,7 @@ export default defineNuxtConfig({
         }
       },
       image: {
-        provider: 'netlify',
+        provider: 'none',
       }
     },
     test: {
