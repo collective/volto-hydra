@@ -138,6 +138,199 @@
     },
     "b986b92c-e180-42d3-b755-4728854e5a50": {
       "@type": "title"
+    },
+    "ref-teaser-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "sep",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "ref-teaser-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "examples-heading",
+      "plaintext": "Developer Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Developer Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "schema-heading",
+      "plaintext": "Schema",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Schema"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-schema": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "schema",
+      "plaintext": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['href', 'title', 'description', 'preview_image', 'overwrite'] }\n    ],\n    properties: {\n      href: {\n        tit",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['href', 'title', 'description', 'preview_image', 'overwrite'] }\n    ],\n    properties: {\n      href: {\n        title: 'Target',\n        widget: 'object_browser',\n        mode: 'link',\n      },\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      description: {\n        title: 'Description',\n        type: 'string',\n      },\n      preview_image: {\n        title: 'Image',\n        widget: 'image',\n      },\n      overwrite: {\n        title: 'Overwrite',\n        type: 'boolean',\n        description: 'Override target content values with custom ones',\n      },\n    },\n  },\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "json-heading",
+      "plaintext": "JSON Block Data",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "JSON Block Data"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-json-data": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "json-data",
+      "plaintext": "{\n  \"@type\": \"teaser\",\n  \"href\": [\n    {\n      \"@id\": \"/news/my-article\",\n      \"title\": \"My Article\",\n      \"description\": \"A short summary of the article\",\n      \"hasPreviewImage\": true\n    }\n  ],\n ",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "{\n  \"@type\": \"teaser\",\n  \"href\": [\n    {\n      \"@id\": \"/news/my-article\",\n      \"title\": \"My Article\",\n      \"description\": \"A short summary of the article\",\n      \"hasPreviewImage\": true\n    }\n  ],\n  \"title\": \"Custom Title\",\n  \"description\": \"Custom description overriding the target\",\n  \"preview_image\": \"/news/my-article/@@images/preview_image\",\n  \"overwrite\": true\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-react-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "react-heading",
+      "plaintext": "React",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "React"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-react-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "react-code",
+      "plaintext": "function TeaserBlock({ block }) {\n  const hrefObj = block.href?.[0] || null;\n  const useBlockData = block.overwrite || !hrefObj?.title;\n\n  const title = useBlockData ? block.title : hrefObj?.title || ",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "function TeaserBlock({ block }) {\n  const hrefObj = block.href?.[0] || null;\n  const useBlockData = block.overwrite || !hrefObj?.title;\n\n  const title = useBlockData ? block.title : hrefObj?.title || '';\n  const description = useBlockData ? block.description : hrefObj?.description || '';\n  const href = hrefObj?.['@id'] || '';\n  const imageSrc = block.preview_image\n    ? (typeof block.preview_image === 'string' ? block.preview_image : block.preview_image['@id'])\n    : (hrefObj?.hasPreviewImage ? `${href}/@@images/preview_image` : '');\n\n  if (!href) {\n    return (\n      <div data-block-uid={block['@uid']} className=\"teaser-placeholder\">\n        <p>Select a target page for this teaser</p>\n      </div>\n    );\n  }\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"teaser-block\">\n      {imageSrc && <img data-edit-media=\"preview_image\" src={imageSrc} alt=\"\" />}\n      <h3 data-edit-text=\"title\">{title}</h3>\n      <p data-edit-text=\"description\">{description}</p>\n      <a href={href} data-edit-link=\"href\">Read more</a>\n    </div>\n  );\n}"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-vue-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "vue-heading",
+      "plaintext": "Vue",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Vue"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-vue-code": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "vue-code",
+      "plaintext": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"teaser-block\">\n    <div v-if=\"!href\" class=\"teaser-placeholder\">\n      <p>Select a target page for this teaser</p>\n    </div>\n    <template v-e",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"teaser-block\">\n    <div v-if=\"!href\" class=\"teaser-placeholder\">\n      <p>Select a target page for this teaser</p>\n    </div>\n    <template v-else>\n      <img v-if=\"imageSrc\" data-edit-media=\"preview_image\" :src=\"imageSrc\" alt=\"\" />\n      <h3 data-edit-text=\"title\">{{ title }}</h3>\n      <p data-edit-text=\"description\">{{ description }}</p>\n      <a :href=\"href\" data-edit-link=\"href\">Read more</a>\n    </template>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\n\nconst hrefObj = computed(() => props.block.href?.[0] || null);\nconst useBlockData = computed(() => props.block.overwrite || !hrefObj.value?.title);\nconst title = computed(() => useBlockData.value ? props.block.title : hrefObj.value?.title || '');\nconst description = computed(() => useBlockData.value ? props.block.description : hrefObj.value?.description || '');\nconst href = computed(() => hrefObj.value?.['@id'] || '');\nconst imageSrc = computed(() => {\n  if (props.block.preview_image) {\n    return typeof props.block.preview_image === 'string'\n      ? props.block.preview_image\n      : props.block.preview_image['@id'];\n  }\n  return hrefObj.value?.hasPreviewImage ? `${href.value}/@@images/preview_image` : '';\n});\n</script>"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-teaser-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-teaser",
+      "placeholder": "examples-desc",
+      "plaintext": "The following examples show how to render a Teaser block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The following examples show how to render a Teaser block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -148,7 +341,18 @@
       "530939e1-8579-4d37-a111-716475c00cac",
       "95648579-7116-401f-a448-e48938c88246",
       "b798dde4-6a5d-4cef-9e25-fd532e1ea9a7",
-      "620f0540-8c3d-422d-a1c6-47037b5dbfbc"
+      "620f0540-8c3d-422d-a1c6-47037b5dbfbc",
+      "ref-teaser-sep",
+      "ref-teaser-heading",
+      "ref-teaser-desc",
+      "ref-teaser-schema-heading",
+      "ref-teaser-schema",
+      "ref-teaser-json-heading",
+      "ref-teaser-json-data",
+      "ref-teaser-react-heading",
+      "ref-teaser-react-code",
+      "ref-teaser-vue-heading",
+      "ref-teaser-vue-code"
     ]
   },
   "contributors": [],

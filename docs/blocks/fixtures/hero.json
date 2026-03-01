@@ -1,0 +1,14 @@
+{
+  "@type": "hero",
+  "heading": "Welcome to Our Site",
+  "subheading": "Discover amazing content\nacross multiple lines",
+  "buttonText": "Get Started",
+  "buttonLink": [{ "@id": "/getting-started" }],
+  "image": "/hero-banner/@@images/image",
+  "description": [
+    {
+      "type": "p",
+      "children": [{ "text": "We build tools that make content editing delightful." }]
+    }
+  ]
+}
